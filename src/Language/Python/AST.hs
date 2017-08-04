@@ -1,6 +1,8 @@
 {-# language DeriveFoldable #-}
 {-# language DeriveFunctor #-}
 {-# language DeriveTraversable #-}
+{-# language FlexibleContexts #-}
+{-# language KindSignatures #-}
 {-# language TemplateHaskell #-}
 {-# language RecordWildCards #-}
 module Language.Python.AST where
@@ -18,7 +20,6 @@ import Data.Text (Text)
 import Text.Show.Deriving
 
 import Language.Python.AST.BytesEscapeSeq
-import Language.Python.AST.Keywords
 import Language.Python.AST.LongBytesChar
 import Language.Python.AST.ShortBytesChar
 import Language.Python.AST.LongStringChar
@@ -32,7 +33,7 @@ data Identifier a
   = Identifier
   { _identifier_value :: Text
   , _identifier_ann :: a
-  } deriving (Eq, Foldable, Functor, Traversable, Show)
+  } deriving (Functor, Foldable, Traversable)
 
 data StringPrefix
   = StringPrefix_r
@@ -60,10 +61,8 @@ data ShortString a
          DoubleQuote
          [Either (ShortStringChar DoubleQuote) StringEscapeSeq]
   , _shortString_ann :: a
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
+  } deriving (Functor, Foldable, Traversable)
 
-deriveEq1 ''ShortString
-deriveShow1 ''ShortString
 
 data LongString a
   = LongStringSingle
@@ -80,10 +79,7 @@ data LongString a
          [Either LongStringChar StringEscapeSeq]
   , _longStringDouble_ann :: a
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-
-deriveEq1 ''LongString
-deriveShow1 ''LongString
+  deriving (Functor, Foldable, Traversable)
 
 data BytesPrefix
   = BytesPrefix_b
@@ -113,10 +109,7 @@ data ShortBytes a
          [Either (ShortBytesChar DoubleQuote) BytesEscapeSeq]
   , _shortBytes_ann :: a
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-
-deriveEq1 ''ShortBytes
-deriveShow1 ''ShortBytes
+  deriving (Functor, Foldable, Traversable)
 
 data LongBytes a
   = LongBytesSingle
@@ -133,10 +126,7 @@ data LongBytes a
          [Either LongBytesChar BytesEscapeSeq]
   , _longBytes_ann :: a
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-
-deriveEq1 ''LongBytes
-deriveShow1 ''LongBytes
+  deriving (Functor, Foldable, Traversable)
 
 data Digit
   = Digit_0
@@ -228,7 +218,7 @@ data Integer' a
          (NonEmpty BinDigit)
   , _integer_ann :: a
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Functor, Foldable, Traversable)
 
 data PointFloat
   = WithDecimalPlaces (Maybe (NonEmpty Digit)) (NonEmpty Digit)
@@ -248,10 +238,7 @@ data Float' a
     :: Before (Either Char_e Char_E) (Before (Either Plus Minus) (NonEmpty Digit))
   , _float_ann :: a
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-
-deriveEq1 ''Float'
-deriveShow1 ''Float'
+  deriving (Functor, Foldable, Traversable)
 
 data Imag a
   = Imag
@@ -262,7 +249,7 @@ data Imag a
          a
   , _imag_ann :: a
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Functor, Foldable, Traversable)
 
 data StringLiteral a
   = StringLiteral
@@ -272,10 +259,7 @@ data StringLiteral a
          (Sum ShortString LongString)
          a
   , _stringLiteral_ann :: a
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
-
-deriveEq1 ''StringLiteral
-deriveShow1 ''StringLiteral
+  } deriving (Functor, Foldable, Traversable)
 
 data BytesLiteral a
   = BytesLiteral
@@ -285,10 +269,7 @@ data BytesLiteral a
          (Sum ShortBytes LongBytes)
          a
   , _bytesLiteral_ann :: a
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
-
-deriveEq1 ''BytesLiteral
-deriveShow1 ''BytesLiteral
+  } deriving (Functor, Foldable, Traversable)
 
 data Literal a
   = LiteralString
@@ -312,13 +293,14 @@ data Literal a
   { _literalImag_value :: Imag a
   , _literal_ann :: a
   }
-  deriving (Eq, Show, Functor)
+  deriving (Functor, Foldable, Traversable)
 
 data IfThenElse a
   = IfThenElse
   { _ifThenElse_if :: Compose (Between' [WhitespaceChar]) OrTest a
   , _ifThenElse_else :: Compose (Before [WhitespaceChar]) Expression a
   }
+  deriving (Functor, Foldable, Traversable)
 
 data CompOperator
   = CompLT
@@ -331,6 +313,7 @@ data CompOperator
   | CompIsNot (NonEmpty WhitespaceChar)
   | CompIn
   | CompNotIn (NonEmpty WhitespaceChar)
+  deriving (Eq, Show)
 
 data ExpressionList a
   = ExpressionList
@@ -338,11 +321,13 @@ data ExpressionList a
   , _expressionList_tail
     :: Compose
          []
-         (Product (Between' [WhitespaceChar] Comma) Expression)
+         (Compose
+           ((,) (Between' [WhitespaceChar] Comma))
+           Expression)
          a
   , _expressionList_trailingComma :: Maybe (Before [WhitespaceChar] Comma)
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data Subscription a
   = Subscription
@@ -350,7 +335,7 @@ data Subscription a
   , _subscription_inner :: Compose (Between' [WhitespaceChar]) ExpressionList a
   , _subscription_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data AttRef a
   = AttRef
@@ -358,7 +343,7 @@ data AttRef a
   , _attrRef_right :: Compose (Before [WhitespaceChar]) Identifier a
   , _attrRef_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data ProperSlice a
   = ProperSlice
@@ -377,11 +362,15 @@ data ProperSlice a
          Maybe
          (Compose
            ((,) (Before [WhitespaceChar] Colon))
-           (Compose Maybe (Before [WhitespaceChar] Expression)))
+           (Compose
+             Maybe
+             (Compose
+               (Before [WhitespaceChar])
+               Expression)))
          a
   , _properSlice_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data SliceItem a
   = SliceItemExpr
@@ -392,7 +381,7 @@ data SliceItem a
   { _sliceItemProper_value :: ProperSlice a
   , _sliceItem_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data SliceList a
   = SliceList
@@ -400,11 +389,13 @@ data SliceList a
   , _sliceList_tail
     :: Compose
          []
-         (Product (Between' [WhitespaceChar] Comma) SliceItem)
+         (Compose
+           ((,) (Between' [WhitespaceChar] Comma))
+           SliceItem)
          a
   , _sliceList_trailingComma :: Maybe (Before [WhitespaceChar] Comma)
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data Slicing a
   = Slicing
@@ -412,7 +403,7 @@ data Slicing a
   , _slicing_innter :: Compose (Between' [WhitespaceChar]) SliceList a
   , _slicing_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data PositionalArgs a
   = PositionalArgs
@@ -432,15 +423,15 @@ data PositionalArgs a
          a
   , _positionalArgs_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data KeywordItem a
   = KeywordItem
-  { _keywordItem_left :: After [WhitespaceChar] Identifier
-  , _keywordItem_right :: Before [WhitespaceChar] Expression
+  { _keywordItem_left :: Compose (After [WhitespaceChar]) Identifier a
+  , _keywordItem_right :: Compose (Before [WhitespaceChar]) Expression a
   , _keywordItem_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data StarredAndKeywords a
   = StarredAndKeywords
@@ -456,13 +447,13 @@ data StarredAndKeywords a
          ((,) (After [WhitespaceChar] Comma))
          (Sum
            (Compose
-             ((,) (After [WhitespaceChar]) Asterisk)
+             ((,) (After [WhitespaceChar] Asterisk))
              Expression)
            KeywordItem)
          a
   , _starredAndKeywords_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data KeywordsArgs a
   = KeywordsArgs
@@ -484,19 +475,19 @@ data KeywordsArgs a
        a
   , _keywordsArgs_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data ArgList a
   = ArgListAll
-  { _argList_positional :: PositionalArgs a
-  , _argList_starred
+  { _argListAll_positional :: PositionalArgs a
+  , _argListAll_starred
     :: Compose
          Maybe
          (Compose
            ((,) (Between' [WhitespaceChar] Comma))
            StarredAndKeywords)
          a
-  , _argList_keyword
+  , _argListAll_keyword
     :: Compose
          Maybe
          (Compose
@@ -506,8 +497,8 @@ data ArgList a
   , _argList_ann :: a
   }
   | ArgListStarred
-  { _argList_starred :: StarredAndKeywords a
-  , _argList_keyword
+  { _argListStarred_starred :: StarredAndKeywords a
+  , _argListStarred_keyword
     :: Compose
          Maybe
          (Compose
@@ -517,10 +508,10 @@ data ArgList a
   , _argList_ann :: a
   }
   | ArgListKeywords
-  { _argList_keyword :: KeywordsArgs a
+  { _argListKeywords_keyword :: KeywordsArgs a
   , _argList_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data Target a
   = TargetIdentifier
@@ -528,13 +519,13 @@ data Target a
   , _target_ann :: a
   }
   | TargetTuple
-  { _targetTuple_value :: Compose ((,) (Between' [WhitespaceChar])) TargetList a
+  { _targetTuple_value :: Compose (Between' [WhitespaceChar]) TargetList a
   , _target_ann :: a
   }
   | TargetList'
-  { _targetTuple_value
+  { _targetList_value
     :: Compose
-         ((,) (Between' [WhitespaceChar]))
+         (Between' [WhitespaceChar])
          (Compose Maybe TargetList)
          a
   , _target_ann :: a
@@ -555,6 +546,7 @@ data Target a
   { _targetUnpacked_value :: Compose (Before [WhitespaceChar]) Target a
   , _target_ann :: a
   }
+  deriving (Functor, Foldable, Traversable)
 
 data TargetList a
   = TargetList
@@ -568,15 +560,16 @@ data TargetList a
          a
   , _targetList_trailingComma :: Maybe (Before [WhitespaceChar] Comma)
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data ParameterList a = ParameterList
+  deriving (Functor, Foldable, Traversable)
 
 data LambdaExpressionNocond a
   = LambdaExprNocond
   { _lambdaExprNocond_params
     :: Compose
-         ((,) (Between' [WhitespaceChar]))
+         (Between' [WhitespaceChar])
          (Compose
            Maybe
            (Compose
@@ -586,21 +579,21 @@ data LambdaExpressionNocond a
   , _lambdaExprNocond_expr :: Compose (Before [WhitespaceChar]) ExpressionNocond a
   , _lambdaExprNocond_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data ExpressionNocond a
   = ExpressionNocond
-  { _expressionNocond_value :: Sum OrTest LambdaExprNocond a
+  { _expressionNocond_value :: Sum OrTest LambdaExpressionNocond a
   , _expressionNocond_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data CompIter a
   = CompIter
   { _compIter_value :: Sum CompFor CompIf a
   , _compIter_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data CompIf a
   = CompIf
@@ -612,7 +605,7 @@ data CompIf a
          a
   , _compIf_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data CompFor a
   = CompFor
@@ -625,7 +618,7 @@ data CompFor a
          a
   , _compFor_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data Comprehension a
   = Comprehension
@@ -633,7 +626,7 @@ data Comprehension a
   , _comprehension_for :: CompFor a
   , _comprehension_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data Call a
   = Call
@@ -651,6 +644,7 @@ data Call a
         a
   , _call_ann :: a
   }
+  deriving (Functor, Foldable, Traversable)
 
 data Primary a
   = PrimaryAtom
@@ -673,14 +667,14 @@ data Primary a
   { _primaryCall_value :: Call a
   , _primary_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data AwaitExpr a
   = Await
   { _await_value :: Compose (Before [WhitespaceChar]) Primary a
   , _await_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data Power a
   = Power
@@ -692,7 +686,7 @@ data Power a
          a
   , _power_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data UExpr a
   = UExprNone
@@ -711,7 +705,7 @@ data UExpr a
   { _uExprInv_value :: Compose (Before [WhitespaceChar]) UExpr a
   , _uExpr_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data MExpr a
   = MExprNone
@@ -743,7 +737,7 @@ data MExpr a
   , _mExprMod_right :: Compose (Before [WhitespaceChar]) UExpr a
   , _mExpr_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data AExpr a
   = AExprNone
@@ -760,7 +754,7 @@ data AExpr a
   , _aExprSubtract_right :: Compose (Before [WhitespaceChar]) MExpr a
   , _aExpr_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data ShiftExpr a
   = ShiftExprNone
@@ -777,7 +771,7 @@ data ShiftExpr a
   , _shiftExprRight_right :: Compose (Before [WhitespaceChar]) AExpr a
   , _shiftExpr_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data AndExpr a
   = AndExprNone
@@ -789,7 +783,7 @@ data AndExpr a
   , _andExprSome_right :: Compose (Before [WhitespaceChar]) ShiftExpr a
   , _andExpr_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data XorExpr a
   = XorExprNone
@@ -801,8 +795,8 @@ data XorExpr a
   , _xorExprSome_right :: Compose (Before [WhitespaceChar]) AndExpr a
   , _xorExpr_ann :: a
   }
-  deriving (Eq, Show)
-  
+  deriving (Functor, Foldable, Traversable)
+
 data OrExpr a
   = OrExprNone
   { _orExprNone_value :: XorExpr a
@@ -813,7 +807,7 @@ data OrExpr a
   , _orExprSome_Right :: Compose (Before [WhitespaceChar]) XorExpr a
   , _orExpr_ann :: a
   }
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data Comparison a
   = Comparison
@@ -821,12 +815,13 @@ data Comparison a
   , _comparison_right
     :: Compose
          []
-         (Product
-           (Compose (Between' [WhitespaceChar]) CompOperator)
+         (Compose
+           ((,) (Between' [WhitespaceChar] CompOperator))
            OrExpr)
          a
   , _comparison_ann :: a
   }
+  deriving (Functor, Foldable, Traversable)
 
 data NotTest a
   = NotTestNone
@@ -837,6 +832,7 @@ data NotTest a
   { _notTestSome_value :: Compose (Before [WhitespaceChar]) NotTest a
   , _notTest_ann :: a
   }
+  deriving (Functor, Foldable, Traversable)
 
 data AndTest a
   = AndTestNone
@@ -848,6 +844,7 @@ data AndTest a
   , _andTestSome_right :: Compose (Before [WhitespaceChar]) NotTest a
   , _andTest_ann :: a
   }
+  deriving (Functor, Foldable, Traversable)
 
 data OrTest a
   = OrTestNone
@@ -859,6 +856,7 @@ data OrTest a
   , _orTestSome_Right :: Compose (Before [WhitespaceChar]) AndTest a
   , _orTest_ann :: a
   }
+  deriving (Functor, Foldable, Traversable)
 
 data Expression a
   = ExpressionConditional
@@ -866,6 +864,7 @@ data Expression a
   , _expressionConditional_tail :: Compose Maybe (TokenF IfThenElse) a
   }
   | ExpressionLambda
+  deriving (Functor, Foldable, Traversable)
 
 data StarredItem a
   = StarredItemExpr
@@ -875,7 +874,7 @@ data StarredItem a
   | StarredItemUnpack
   { _starredItemUnpack_value :: OrExpr a
   , _starredItem_ann :: a
-  } deriving (Eq, Show)
+  } deriving (Functor, Foldable, Traversable)
 
 data StarredExpression a
   = StarredExpressionExpr
@@ -889,7 +888,7 @@ data StarredExpression a
          a
   , _starredExpressionUnpack_last :: Compose Maybe (TokenF StarredItem) a
   , _starredExpression_ann :: a
-  } deriving (Eq, Show)
+  } deriving (Functor, Foldable, Traversable)
 
 data Enclosure a
   = EnclosureParen
@@ -907,7 +906,7 @@ data Enclosure a
   | EnclosureSet
   | EnclosureGenerator
   | EnclosureYield
-  deriving (Eq, Show)
+  deriving (Functor, Foldable, Traversable)
 
 data Atom a
   = AtomIdentifier
@@ -921,20 +920,346 @@ data Atom a
   | AtomEnclosure
   { _atom_enclosure_value :: Enclosure a
   , _atom_ann :: a
-  } deriving (Eq, Show)
+  } deriving (Functor, Foldable, Traversable)
 
 data Comment a
   = Comment
   { _comment_text :: Before Hash Text
   , _comment_ann :: a
-  } deriving (Eq, Foldable, Functor, Traversable, Show)
+  } deriving (Functor, Foldable, Traversable)
 
 data Module a
   = Module
   { _module_content :: a
   , _module_ann :: a
-  } deriving (Eq, Foldable, Functor, Traversable, Show)
+  } deriving (Functor, Foldable, Traversable)
+
+deriveEq ''ShortString
+deriveShow ''ShortString
+deriveEq1 ''ShortString
+deriveShow1 ''ShortString
+makeLenses ''ShortString
+
+deriveEq ''LongString
+deriveShow ''LongString
+deriveEq1 ''LongString
+deriveShow1 ''LongString
+makeLenses ''LongString
+
+deriveEq ''ShortBytes
+deriveShow ''ShortBytes
+deriveEq1 ''ShortBytes
+deriveShow1 ''ShortBytes
+makeLenses ''ShortBytes
+
+deriveEq ''LongBytes
+deriveShow ''LongBytes
+deriveEq1 ''LongBytes
+deriveShow1 ''LongBytes
+makeLenses ''LongBytes
+
+deriveEq ''Float'
+deriveShow ''Float'
+deriveEq1 ''Float'
+deriveShow1 ''Float'
+makeLenses ''Float'
+
+deriveEq ''StringLiteral
+deriveShow ''StringLiteral
+deriveEq1 ''StringLiteral
+deriveShow1 ''StringLiteral
+makeLenses ''StringLiteral
+
+deriveEq ''BytesLiteral
+deriveShow ''BytesLiteral
+deriveEq1 ''BytesLiteral
+deriveShow1 ''BytesLiteral
+makeLenses ''BytesLiteral
+
+deriveEq ''Comparison
+deriveShow ''Comparison
+deriveEq1 ''Comparison
+deriveShow1 ''Comparison
+makeLenses ''Comparison
+
+deriveEq ''NotTest
+deriveShow ''NotTest
+deriveEq1 ''NotTest
+deriveShow1 ''NotTest
+makeLenses ''NotTest
+
+deriveEq ''AndTest
+deriveShow ''AndTest
+deriveEq1 ''AndTest
+deriveShow1 ''AndTest
+makeLenses ''AndTest
+
+deriveEq ''OrTest
+deriveShow ''OrTest
+deriveEq1 ''OrTest
+deriveShow1 ''OrTest
+makeLenses ''OrTest
+
+deriveEq ''IfThenElse
+deriveShow ''IfThenElse
+deriveEq1 ''IfThenElse
+deriveShow1 ''IfThenElse
+makeLenses ''IfThenElse
+
+deriveEq ''Expression
+deriveShow ''Expression
+deriveEq1 ''Expression
+deriveShow1 ''Expression
+makeLenses ''Expression
+
+deriveEq ''ExpressionList
+deriveShow ''ExpressionList
+deriveEq1 ''ExpressionList
+deriveShow1 ''ExpressionList
+makeLenses ''ExpressionList
+
+deriveEq ''Subscription
+deriveShow ''Subscription
+deriveEq1 ''Subscription
+deriveShow1 ''Subscription
+makeLenses ''Subscription
+
+deriveEq ''Identifier
+deriveShow ''Identifier
+deriveEq1 ''Identifier
+deriveShow1 ''Identifier
+makeLenses ''Identifier
+
+deriveEq ''AttRef
+deriveShow ''AttRef
+deriveEq1 ''AttRef
+deriveShow1 ''AttRef
+makeLenses ''AttRef
+
+deriveEq ''ProperSlice
+deriveShow ''ProperSlice
+deriveEq1 ''ProperSlice
+deriveShow1 ''ProperSlice
+makeLenses ''ProperSlice
+
+deriveEq ''SliceItem
+deriveShow ''SliceItem
+deriveEq1 ''SliceItem
+deriveShow1 ''SliceItem
+makeLenses ''SliceItem
+
+deriveEq ''SliceList
+deriveShow ''SliceList
+deriveEq1 ''SliceList
+deriveShow1 ''SliceList
+makeLenses ''SliceList
+
+deriveEq ''Slicing
+deriveShow ''Slicing
+deriveEq1 ''Slicing
+deriveShow1 ''Slicing
+makeLenses ''Slicing
+
+deriveEq ''PositionalArgs
+deriveShow ''PositionalArgs
+deriveEq1 ''PositionalArgs
+deriveShow1 ''PositionalArgs
+makeLenses ''PositionalArgs
+
+deriveEq ''KeywordItem
+deriveShow ''KeywordItem
+deriveEq1 ''KeywordItem
+deriveShow1 ''KeywordItem
+makeLenses ''KeywordItem
+
+deriveEq ''StarredAndKeywords
+deriveShow ''StarredAndKeywords
+deriveEq1 ''StarredAndKeywords
+deriveShow1 ''StarredAndKeywords
+makeLenses ''StarredAndKeywords
+
+deriveEq ''KeywordsArgs
+deriveShow ''KeywordsArgs
+deriveEq1 ''KeywordsArgs
+deriveShow1 ''KeywordsArgs
+makeLenses ''KeywordsArgs
+
+deriveEq ''ArgList
+deriveShow ''ArgList
+deriveEq1 ''ArgList
+deriveShow1 ''ArgList
+makeLenses ''ArgList
+
+deriveEq ''Target
+deriveShow ''Target
+deriveEq1 ''Target
+deriveShow1 ''Target
+makeLenses ''Target
+
+deriveEq ''TargetList
+deriveShow ''TargetList
+deriveEq1 ''TargetList
+deriveShow1 ''TargetList
+makeLenses ''TargetList
+
+deriveEq ''ParameterList
+deriveShow ''ParameterList
+deriveEq1 ''ParameterList
+deriveShow1 ''ParameterList
+makeLenses ''ParameterList
+
+deriveEq ''LambdaExpressionNocond
+deriveShow ''LambdaExpressionNocond
+deriveEq1 ''LambdaExpressionNocond
+deriveShow1 ''LambdaExpressionNocond
+makeLenses ''LambdaExpressionNocond
+
+deriveEq ''ExpressionNocond
+deriveShow ''ExpressionNocond
+deriveEq1 ''ExpressionNocond
+deriveShow1 ''ExpressionNocond
+makeLenses ''ExpressionNocond
+
+makeLenses ''CompIter
+deriveEq ''CompIter
+deriveShow ''CompIter
+deriveEq1 ''CompIter
+deriveShow1 ''CompIter
+
+makeLenses ''CompIf
+deriveEq ''CompIf
+deriveShow ''CompIf
+deriveEq1 ''CompIf
+deriveShow1 ''CompIf
+
+makeLenses ''CompFor
+deriveEq ''CompFor
+deriveShow ''CompFor
+deriveEq1 ''CompFor
+deriveShow1 ''CompFor
+
+makeLenses ''Comprehension
+deriveEq ''Comprehension
+deriveShow ''Comprehension
+deriveEq1 ''Comprehension
+deriveShow1 ''Comprehension
+
+makeLenses ''Call
+deriveEq ''Call
+deriveShow ''Call
+deriveEq1 ''Call
+deriveShow1 ''Call
+
+makeLenses ''Primary
+deriveEq ''Primary
+deriveShow ''Primary
+deriveEq1 ''Primary
+deriveShow1 ''Primary
+
+makeLenses ''AwaitExpr
+deriveEq ''AwaitExpr
+deriveShow ''AwaitExpr
+deriveEq1 ''AwaitExpr
+deriveShow1 ''AwaitExpr
+
+makeLenses ''Power
+deriveEq ''Power
+deriveShow ''Power
+deriveEq1 ''Power
+deriveShow1 ''Power
+
+makeLenses ''UExpr
+deriveEq ''UExpr
+deriveShow ''UExpr
+deriveEq1 ''UExpr
+deriveShow1 ''UExpr
+
+makeLenses ''MExpr
+deriveEq ''MExpr
+deriveShow ''MExpr
+deriveEq1 ''MExpr
+deriveShow1 ''MExpr
+
+makeLenses ''AExpr
+deriveEq ''AExpr
+deriveShow ''AExpr
+deriveEq1 ''AExpr
+deriveShow1 ''AExpr
+
+makeLenses ''ShiftExpr
+deriveEq ''ShiftExpr
+deriveShow ''ShiftExpr
+deriveEq1 ''ShiftExpr
+deriveShow1 ''ShiftExpr
+
+makeLenses ''AndExpr
+deriveEq ''AndExpr
+deriveShow ''AndExpr
+deriveEq1 ''AndExpr
+deriveShow1 ''AndExpr
+
+makeLenses ''XorExpr
+deriveEq ''XorExpr
+deriveShow ''XorExpr
+deriveEq1 ''XorExpr
+deriveShow1 ''XorExpr
+  
+makeLenses ''OrExpr
+deriveEq ''OrExpr
+deriveShow ''OrExpr
+deriveEq1 ''OrExpr
+deriveShow1 ''OrExpr
+
+makeLenses ''StarredItem
+deriveEq ''StarredItem
+deriveShow ''StarredItem
+deriveEq1 ''StarredItem
+deriveShow1 ''StarredItem
+
+makeLenses ''StarredExpression
+deriveEq ''StarredExpression
+deriveShow ''StarredExpression
+deriveEq1 ''StarredExpression
+deriveShow1 ''StarredExpression
+
+makeLenses ''Enclosure
+deriveEq ''Enclosure
+deriveShow ''Enclosure
+deriveEq1 ''Enclosure
+deriveShow1 ''Enclosure
+
+makeLenses ''Integer'
+deriveEq ''Integer'
+deriveShow ''Integer'
+deriveEq1 ''Integer'
+deriveShow1 ''Integer'
+
+makeLenses ''Imag
+deriveEq ''Imag
+deriveShow ''Imag
+deriveEq1 ''Imag
+deriveShow1 ''Imag
+
+makeLenses ''Literal
+deriveEq ''Literal
+deriveShow ''Literal
+deriveEq1 ''Literal
+deriveShow1 ''Literal
+
+makeLenses ''Atom
+deriveEq ''Atom
+deriveShow ''Atom
+deriveEq1 ''Atom
+deriveShow1 ''Atom
 
 makeLenses ''Comment
-makeLenses ''Identifier
+deriveEq ''Comment
+deriveShow ''Comment
+deriveEq1 ''Comment
+deriveShow1 ''Comment
+
 makeLenses ''Module
+deriveEq ''Module
+deriveShow ''Module
+deriveEq1 ''Module
+deriveShow1 ''Module

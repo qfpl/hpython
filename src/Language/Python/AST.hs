@@ -47,36 +47,29 @@ newtype StringEscapeSeq
   { _stringEscapeSeq_value :: Char
   } deriving (Eq, Show)
 
+-- | Between one quote
 data ShortString a
   = ShortStringSingle
   { _shortStringSingle_value
-    :: Between'
-         SingleQuote
-         [Either (ShortStringChar SingleQuote) StringEscapeSeq]
+    :: [Either (ShortStringChar SingleQuote) StringEscapeSeq]
   , _shortString_ann :: a
   }
   | ShortStringDouble
   { _shortStringDouble_value
-    :: Between'
-         DoubleQuote
-         [Either (ShortStringChar DoubleQuote) StringEscapeSeq]
+    :: [Either (ShortStringChar DoubleQuote) StringEscapeSeq]
   , _shortString_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
-
+-- | Between three quotes
 data LongString a
   = LongStringSingle
   { _longStringSingle_value
-    :: Between'
-         TripleSingleQuote
-         [Either LongStringChar StringEscapeSeq]
+    :: [Either LongStringChar StringEscapeSeq]
   , _longStringSingle_ann :: a
   }
   | LongStringDouble
   { _longStringDouble_value
-    :: Between'
-         TripleDoubleQuote
-         [Either LongStringChar StringEscapeSeq]
+    :: [Either LongStringChar StringEscapeSeq]
   , _longStringDouble_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -97,33 +90,26 @@ data BytesPrefix
 data ShortBytes a
   = ShortBytesSingle
   { _shortBytesSingle_value
-    :: Between'
-         SingleQuote
-         [Either (ShortBytesChar SingleQuote) BytesEscapeSeq]
+    :: [Either (ShortBytesChar SingleQuote) BytesEscapeSeq]
   , _shortBytes_ann :: a
   }
   | ShortBytesDouble
   { _shortBytesDouble_value
-    :: Between'
-         DoubleQuote
-         [Either (ShortBytesChar DoubleQuote) BytesEscapeSeq]
+    :: [Either (ShortBytesChar DoubleQuote) BytesEscapeSeq]
   , _shortBytes_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
+-- | Between triple quotes
 data LongBytes a
   = LongBytesSingle
   { _longBytesSingle_value
-    :: Between'
-         TripleSingleQuote
-         [Either LongBytesChar BytesEscapeSeq]
+    :: [Either LongBytesChar BytesEscapeSeq]
   , _longBytes_ann :: a
   }
   | LongBytesDouble
   { _longBytesDouble_value
-    :: Between'
-         TripleDoubleQuote
-         [Either LongBytesChar BytesEscapeSeq]
+    :: [Either LongBytesChar BytesEscapeSeq]
   , _longBytes_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -235,7 +221,9 @@ data Float' a
   { _floatExponent_base
     :: Either (NonEmpty Digit) PointFloat
   , _floatExponent_exponent
-    :: Before (Either Char_e Char_E) (Before (Either Plus Minus) (NonEmpty Digit))
+    :: Before
+         (Either Char_e Char_E)
+           (Before (Either Plus Minus) (NonEmpty Digit))
   , _float_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -263,11 +251,8 @@ data StringLiteral a
 
 data BytesLiteral a
   = BytesLiteral
-  { _bytesLiteral_value
-    :: Compose
-         (Before (Maybe BytesPrefix))
-         (Sum ShortBytes LongBytes)
-         a
+  { _bytesLiteral_prefix :: BytesPrefix
+  , _bytesLiteral_value :: Sum ShortBytes LongBytes a
   , _bytesLiteral_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
@@ -297,8 +282,8 @@ data Literal a
 
 data IfThenElse a
   = IfThenElse
-  { _ifThenElse_if :: Compose (Between' [WhitespaceChar]) OrTest a
-  , _ifThenElse_else :: Compose (Before [WhitespaceChar]) Expression a
+  { _ifThenElse_if :: Compose (Between' (NonEmpty WhitespaceChar)) OrTest a
+  , _ifThenElse_else :: Compose (Before (NonEmpty WhitespaceChar)) Expression a
   }
   deriving (Functor, Foldable, Traversable)
 
@@ -326,6 +311,7 @@ data ExpressionList a
            Expression)
          a
   , _expressionList_trailingComma :: Maybe (Before [WhitespaceChar] Comma)
+  , _expressionList_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
@@ -394,13 +380,14 @@ data SliceList a
            SliceItem)
          a
   , _sliceList_trailingComma :: Maybe (Before [WhitespaceChar] Comma)
+  , _sliceList_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
 data Slicing a
   = Slicing
   { _slicing_outer :: Compose (After [WhitespaceChar]) Primary a
-  , _slicing_innter :: Compose (Between' [WhitespaceChar]) SliceList a
+  , _slicing_inner :: Compose (Between' [WhitespaceChar]) SliceList a
   , _slicing_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -409,7 +396,7 @@ data PositionalArgs a
   = PositionalArgs
   { _positionalArgs_head
     :: Compose
-         ((,) (After [WhitespaceChar] Asterisk))
+         ((,) (Maybe (After [WhitespaceChar] Asterisk)))
          Expression
          a
   , _positionalArgs_tail
@@ -418,7 +405,7 @@ data PositionalArgs a
          (Compose
            ((,) (After [WhitespaceChar] Comma))
            (Compose
-             ((,) (After [WhitespaceChar] Asterisk))
+             ((,) (Maybe (After [WhitespaceChar] Asterisk)))
              Expression))
          a
   , _positionalArgs_ann :: a
@@ -559,6 +546,7 @@ data TargetList a
            Target)
          a
   , _targetList_trailingComma :: Maybe (Before [WhitespaceChar] Comma)
+  , _targetList_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
@@ -569,11 +557,11 @@ data LambdaExpressionNocond a
   = LambdaExprNocond
   { _lambdaExprNocond_params
     :: Compose
-         (Between' [WhitespaceChar])
+         (Before WhitespaceChar)
          (Compose
            Maybe
            (Compose
-             (Before WhitespaceChar)
+             (Between' [WhitespaceChar])
              ParameterList))
          a
   , _lambdaExprNocond_expr :: Compose (Before [WhitespaceChar]) ExpressionNocond a
@@ -600,8 +588,8 @@ data CompIf a
   { _compIf_expr :: Compose (Before [WhitespaceChar]) ExpressionNocond a
   , _compIf_iter
     :: Compose
-         (Before [WhitespaceChar])
-         CompIter
+         Maybe
+         (Compose (Before [WhitespaceChar]) CompIter)
          a
   , _compIf_ann :: a
   }
@@ -613,8 +601,8 @@ data CompFor a
   , _compFor_expr :: Compose (Before [WhitespaceChar]) OrTest a
   , _compFor_iter
     :: Compose
-         (Before [WhitespaceChar])
-         CompIter
+         Maybe
+         (Compose (Before [WhitespaceChar]) CompIter)
          a
   , _compFor_ann :: a
   }
@@ -682,7 +670,9 @@ data Power a
   , _power_right
     :: Compose
          Maybe
-         (Compose (Before [WhitespaceChar]) UExpr)
+         (Compose
+           ((,) [WhitespaceChar])
+           (Compose (Before [WhitespaceChar]) UExpr))
          a
   , _power_ann :: a
   }
@@ -829,7 +819,7 @@ data NotTest a
   , _notTest_ann :: a
   }
   | NotTestSome
-  { _notTestSome_value :: Compose (Before [WhitespaceChar]) NotTest a
+  { _notTestSome_value :: Compose (Before (NonEmpty WhitespaceChar)) NotTest a
   , _notTest_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -840,8 +830,8 @@ data AndTest a
   , _andTest_ann :: a
   }
   | AndTestSome
-  { _andTestSome_left :: Compose (After [WhitespaceChar]) AndTest a
-  , _andTestSome_right :: Compose (Before [WhitespaceChar]) NotTest a
+  { _andTestSome_left :: Compose (After (NonEmpty WhitespaceChar)) AndTest a
+  , _andTestSome_right :: Compose (Before (NonEmpty WhitespaceChar)) NotTest a
   , _andTest_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -852,8 +842,8 @@ data OrTest a
   , _orTest_ann :: a
   }
   | OrTestSome
-  { _orTestSome_left :: Compose (After [WhitespaceChar]) OrTest a
-  , _orTestSome_Right :: Compose (Before [WhitespaceChar]) AndTest a
+  { _orTestSome_left :: Compose (After (NonEmpty WhitespaceChar)) OrTest a
+  , _orTestSome_Right :: Compose (Before (NonEmpty WhitespaceChar)) AndTest a
   , _orTest_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -861,7 +851,14 @@ data OrTest a
 data Expression a
   = ExpressionConditional
   { _expressionConditional_head :: OrTest a
-  , _expressionConditional_tail :: Compose Maybe (TokenF IfThenElse) a
+  , _expressionConditional_tail
+    :: Compose
+         Maybe
+         (Compose
+           (Before [WhitespaceChar])
+           IfThenElse)
+         a
+  , _expression_ann :: a
   }
   | ExpressionLambda
   deriving (Functor, Foldable, Traversable)
@@ -872,7 +869,7 @@ data StarredItem a
   , _starredItem_ann :: a
   }
   | StarredItemUnpack
-  { _starredItemUnpack_value :: OrExpr a
+  { _starredItemUnpack_value :: Compose (Before [WhitespaceChar]) OrExpr a
   , _starredItem_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
@@ -881,12 +878,16 @@ data StarredExpression a
   { _starredExpressionExpr_value :: Expression a
   , _starredExpression_ann :: a
   }
-  | StarredExpressionUnpack
-  { _starredExpressionUnpack_init
+  | StarredExpressionTuple
+  { _starredExpressionTuple_init
     :: Compose []
-         (Compose (After (Token Comma)) (TokenF StarredItem))
+         (Compose (After Comma) (TokenF StarredItem))
          a
-  , _starredExpressionUnpack_last :: Compose Maybe (TokenF StarredItem) a
+  , _starredExpressionTuple_last
+    :: Compose
+         Maybe
+         (Compose (Before [WhitespaceChar]) StarredItem)
+         a
   , _starredExpression_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
@@ -928,10 +929,10 @@ data Comment a
   , _comment_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
-data Module a
-  = Module
-  { _module_content :: a
-  , _module_ann :: a
+data PythonModule a
+  = PythonModule
+  { _pythonModule_content :: a
+  , _pythonModule_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 deriveEq ''ShortString
@@ -1258,8 +1259,8 @@ deriveShow ''Comment
 deriveEq1 ''Comment
 deriveShow1 ''Comment
 
-makeLenses ''Module
-deriveEq ''Module
-deriveShow ''Module
-deriveEq1 ''Module
-deriveShow1 ''Module
+makeLenses ''PythonModule
+deriveEq ''PythonModule
+deriveShow ''PythonModule
+deriveEq1 ''PythonModule
+deriveShow1 ''PythonModule

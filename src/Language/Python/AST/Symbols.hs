@@ -1,4 +1,7 @@
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor #-}
+{-# language DeriveFoldable #-}
+{-# language DeriveTraversable #-}
+{-# language TemplateHaskell #-}
 module Language.Python.AST.Symbols where
 
 import Papa

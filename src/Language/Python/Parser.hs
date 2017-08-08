@@ -603,7 +603,7 @@ literal =
       annotated $
       LiteralString <$>
       stringOrBytes <*>
-      whitespaceBeforeF (Compose <$> many stringOrBytes)
+      (Compose <$> many (whitespaceBeforeF stringOrBytes))
     literalInteger = annotated $ LiteralInteger <$> integer
     literalFloat = annotated $ LiteralFloat <$> float
     literalImag = annotated $ LiteralImag <$> imag
@@ -724,12 +724,12 @@ uExpr =
   
 mExpr :: DeltaParsing m => m (MExpr SrcInfo)
 mExpr =
+  try mExprNone <|>
   try mExprMult <|>
   try mExprAt <|>
   try mExprFloorDiv <|>
   try mExprDiv <|>
-  try mExprMod <|>
-  mExprNone
+  mExprMod
   where
     mExprMult =
       annotated $
@@ -759,7 +759,7 @@ mExpr =
     mExprNone = annotated $ MExprNone <$> uExpr
   
 aExpr :: DeltaParsing m => m (AExpr SrcInfo)
-aExpr = try aExprSubtract <|> try aExprAdd <|> aExprNone
+aExpr = try aExprNone <|> try aExprAdd <|> aExprSubtract
   where
     aExprSubtract =
       annotated $
@@ -774,7 +774,7 @@ aExpr = try aExprSubtract <|> try aExprAdd <|> aExprNone
     aExprNone = annotated $ AExprNone <$> mExpr
   
 shiftExpr :: DeltaParsing m => m (ShiftExpr SrcInfo)
-shiftExpr = try shiftExprLeft <|> try shiftExprRight <|> shiftExprNone
+shiftExpr = try shiftExprNone <|> try shiftExprLeft <|> shiftExprRight
   where
     shiftExprLeft =
       annotated $
@@ -789,7 +789,7 @@ shiftExpr = try shiftExprLeft <|> try shiftExprRight <|> shiftExprNone
     shiftExprNone = annotated $ ShiftExprNone <$> aExpr
   
 andExpr :: DeltaParsing m => m (AndExpr SrcInfo)
-andExpr = try andExprSome <|> andExprNone
+andExpr = try andExprNone <|> andExprSome
   where
     andExprNone = annotated $ AndExprNone <$> shiftExpr
     andExprSome =
@@ -799,7 +799,7 @@ andExpr = try andExprSome <|> andExprNone
       whitespaceBeforeF shiftExpr
 
 xorExpr :: DeltaParsing m => m (XorExpr SrcInfo)
-xorExpr = try xorExprSome <|> xorExprNone
+xorExpr = try xorExprNone <|> xorExprSome
   where
     xorExprNone = annotated $ XorExprNone <$> andExpr
     xorExprSome =
@@ -809,7 +809,7 @@ xorExpr = try xorExprSome <|> xorExprNone
       whitespaceBeforeF andExpr
   
 orExpr :: DeltaParsing m => m (OrExpr SrcInfo)
-orExpr = try orExprSome <|> orExprNone
+orExpr = try orExprNone <|> orExprSome
   where
     orExprNone = annotated $ OrExprNone <$> xorExpr
     orExprSome =
@@ -824,6 +824,7 @@ compOperator =
   try (char '>' $> CompGT) <|>
   try (string "==" $> CompEq) <|>
   try (string ">=" $> CompGEq) <|>
+  try (string "!=" $> CompNEq) <|>
   try (string "<=" $> CompLEq) <|>
   try (string "is" $> CompIs) <|>
   try (string "is" *> (CompIsNot <$> some1 whitespaceChar) <* string "not") <|>
@@ -858,7 +859,7 @@ comparison =
       orExpr
 
 notTest :: DeltaParsing m => m (NotTest SrcInfo)
-notTest = try notTestSome <|> notTestNone
+notTest = try notTestNone <|> notTestSome
   where
     notTestSome =
       annotated $
@@ -867,7 +868,7 @@ notTest = try notTestSome <|> notTestNone
     notTestNone = annotated $ NotTestNone <$> comparison
 
 andTest :: DeltaParsing m => m (AndTest SrcInfo)
-andTest = try andTestSome <|> andTestNone
+andTest = try andTestNone <|> andTestSome
   where
     andTestSome =
       annotated $
@@ -878,7 +879,7 @@ andTest = try andTestSome <|> andTestNone
     andTestNone = annotated $ AndTestNone <$> notTest
 
 orTest :: DeltaParsing m => m (OrTest SrcInfo)
-orTest = try orTestSome <|> orTestNone
+orTest = try orTestNone <|> orTestSome
   where
     orTestSome =
       annotated $
@@ -982,15 +983,15 @@ ifThenElse =
   (string "if" *> betweenWhitespace1F orTest) <*>
   (string "else" *> whitespaceBeforeF1 expression)
 
-expressionConditional :: DeltaParsing m => m (Expression SrcInfo)
-expressionConditional =
-  annotated $
-  ExpressionConditional <$>
-  orTest <*>
-  (Compose <$> optional (whitespaceBeforeF ifThenElse))
-
-expressionLambda :: DeltaParsing m => m (Expression SrcInfo)
-expressionLambda = pure ExpressionLambda
-
 expression :: DeltaParsing m => m (Expression SrcInfo)
-expression = expressionConditional <|> expressionLambda
+expression = try expressionConditional <|> expressionLambda
+  where
+    expressionConditional :: DeltaParsing m => m (Expression SrcInfo)
+    expressionConditional =
+      annotated $
+      ExpressionConditional <$>
+      orTest <*>
+      (Compose <$> optional (whitespaceBeforeF ifThenElse))
+
+    expressionLambda :: DeltaParsing m => m (Expression SrcInfo)
+    expressionLambda = pure ExpressionLambda

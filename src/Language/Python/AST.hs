@@ -42,12 +42,10 @@ data StringPrefix
   | StringPrefix_U
   deriving (Eq, Show)
 
-newtype StringEscapeSeq
-  = StringEscapeSeq
-  { _stringEscapeSeq_value :: Char
-  } deriving (Eq, Show)
+newtype StringEscapeSeq = StringEscapeSeq Char
+  deriving (Eq, Show)
 
--- | Between one quote
+-- | Strings between one single or double quote
 data ShortString a
   = ShortStringSingle
   { _shortStringSingle_value
@@ -261,8 +259,8 @@ data Literal a
   { _literalString_head :: Sum StringLiteral BytesLiteral a
   , _literalString_tail
     :: Compose
-         (Before [WhitespaceChar])
-         (Compose [] (Sum StringLiteral BytesLiteral))
+         []
+         (Compose (Before [WhitespaceChar]) (Sum StringLiteral BytesLiteral))
          a
   , _literal_ann :: a
   }
@@ -843,7 +841,7 @@ data OrTest a
   }
   | OrTestSome
   { _orTestSome_left :: Compose (After (NonEmpty WhitespaceChar)) OrTest a
-  , _orTestSome_Right :: Compose (Before (NonEmpty WhitespaceChar)) AndTest a
+  , _orTestSome_right :: Compose (Before (NonEmpty WhitespaceChar)) AndTest a
   , _orTest_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -895,9 +893,7 @@ data Enclosure a
   = EnclosureParen
   { _enclosureParen_value
     :: Compose
-         (Between
-           (After [WhitespaceChar] LeftParen)
-           (Before [WhitespaceChar] RightParen))
+         (Between' [WhitespaceChar])
          (Compose Maybe StarredExpression)
          a
   , _enclosure_ann :: a
@@ -925,7 +921,7 @@ data Atom a
 
 data Comment a
   = Comment
-  { _comment_text :: Before Hash Text
+  { _comment_text :: Text
   , _comment_ann :: a
   } deriving (Functor, Foldable, Traversable)
 

@@ -26,6 +26,7 @@ library
                        Language.Python.AST.ShortStringChar
                        Language.Python.AST.Symbols
                        Language.Python.Parser
+                       Language.Python.Printer
                        Data.Separated.After
                        Data.Separated.Before
                        Data.Separated.Between
@@ -37,6 +38,7 @@ library
                      , deriving-compat
                      , papa
                      , parsers
+                     , pretty
                      , transformers
                      , trifecta
   hs-source-dirs:      src

@@ -11,7 +11,6 @@ import Papa hiding (Plus, Sum, Product)
 
 import Data.Eq.Deriving
 import Data.Functor.Compose
-import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Separated.After
 import Data.Separated.Before
@@ -24,6 +23,7 @@ import Language.Python.AST.LongBytesChar
 import Language.Python.AST.ShortBytesChar
 import Language.Python.AST.LongStringChar
 import Language.Python.AST.ShortStringChar
+import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 
 type Token = After [WhitespaceChar]
@@ -278,13 +278,6 @@ data Literal a
   }
   deriving (Functor, Foldable, Traversable)
 
-data IfThenElse a
-  = IfThenElse
-  { _ifThenElse_if :: Compose (Between' (NonEmpty WhitespaceChar)) OrTest a
-  , _ifThenElse_else :: Compose (Before (NonEmpty WhitespaceChar)) Expression a
-  }
-  deriving (Functor, Foldable, Traversable)
-
 data CompOperator
   = CompLT
   | CompGT
@@ -298,278 +291,69 @@ data CompOperator
   | CompNotIn (NonEmpty WhitespaceChar)
   deriving (Eq, Show)
 
-data ExpressionList a
-  = ExpressionList
-  { _expressionList_head :: Expression a
-  , _expressionList_tail
-    :: Compose
-         []
-         (Compose
-           ((,) (Between' [WhitespaceChar] Comma))
-           Expression)
-         a
-  , _expressionList_trailingComma :: Maybe (Before [WhitespaceChar] Comma)
-  , _expressionList_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data Subscription a
-  = Subscription
-  { _subscription_outer :: Compose (After [WhitespaceChar]) Primary a
-  , _subscription_inner :: Compose (Between' [WhitespaceChar]) ExpressionList a
-  , _subscription_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data AttRef a
-  = AttRef
-  { _attrRef_left :: Compose (After [WhitespaceChar]) Primary a
-  , _attrRef_right :: Compose (Before [WhitespaceChar]) Identifier a
-  , _attrRef_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data ProperSlice a
-  = ProperSlice
-  { _properSlice_lower
-    :: Compose
-         Maybe
-         (Compose (After [WhitespaceChar]) Expression)
-         a
-  , _properSlice_upper
-    :: Compose
-         Maybe
-         (Compose (Between' [WhitespaceChar]) Expression)
-         a
-  , _properSlice_stride
+data Argument a
+  = ArgumentFor
+  { _argumentFor_expr :: Test a
+  , _argumentFor_for
     :: Compose
          Maybe
          (Compose
-           ((,) (Before [WhitespaceChar] Colon))
-           (Compose
-             Maybe
-             (Compose
-               (Before [WhitespaceChar])
-               Expression)))
+           (Before [WhitespaceChar])
+           CompFor)
          a
-  , _properSlice_ann :: a
+  , _argument_ann :: a    
   }
-  deriving (Functor, Foldable, Traversable)
-
-data SliceItem a
-  = SliceItemExpr
-  { _sliceItemExpr_value :: Expression a
-  , _sliceItem_ann :: a
+  | ArgumentDefault
+  { _argumentDefault_left :: Test a
+  , _argumentDefault_right :: Test a
+  , _argument_ann :: a    
   }
-  | SliceItemProper
-  { _sliceItemProper_value :: ProperSlice a
-  , _sliceItem_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data SliceList a
-  = SliceList
-  { _sliceList_head :: SliceItem a
-  , _sliceList_tail
-    :: Compose
-         []
-         (Compose
-           ((,) (Between' [WhitespaceChar] Comma))
-           SliceItem)
-         a
-  , _sliceList_trailingComma :: Maybe (Before [WhitespaceChar] Comma)
-  , _sliceList_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data Slicing a
-  = Slicing
-  { _slicing_outer :: Compose (After [WhitespaceChar]) Primary a
-  , _slicing_inner :: Compose (Between' [WhitespaceChar]) SliceList a
-  , _slicing_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data PositionalArgs a
-  = PositionalArgs
-  { _positionalArgs_head
-    :: Compose
-         ((,) (Maybe (After [WhitespaceChar] Asterisk)))
-         Expression
-         a
-  , _positionalArgs_tail
-    :: Compose
-         [] 
-         (Compose
-           ((,) (After [WhitespaceChar] Comma))
-           (Compose
-             ((,) (Maybe (After [WhitespaceChar] Asterisk)))
-             Expression))
-         a
-  , _positionalArgs_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data KeywordItem a
-  = KeywordItem
-  { _keywordItem_left :: Compose (After [WhitespaceChar]) Identifier a
-  , _keywordItem_right :: Compose (Before [WhitespaceChar]) Expression a
-  , _keywordItem_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data StarredAndKeywords a
-  = StarredAndKeywords
-  { _starredAndKeywords_head
-    :: Sum
-         (Compose
-           ((,) (After [WhitespaceChar] Asterisk))
-           Expression)
-         KeywordItem
-         a
-  , _starredAndKeywords_tail
-    :: Compose
-         ((,) (After [WhitespaceChar] Comma))
-         (Sum
-           (Compose
-             ((,) (After [WhitespaceChar] Asterisk))
-             Expression)
-           KeywordItem)
-         a
-  , _starredAndKeywords_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data KeywordsArgs a
-  = KeywordsArgs
-  { _keywordsArgs_head
-    :: Sum
-         KeywordItem
-         (Compose
-           ((,) (After [WhitespaceChar] DoubleAsterisk))
-           Expression)
-         a
-  , _keywordsArgs_tail
-    :: Compose
-       ((,) (After [WhitespaceChar] Comma))
-       (Sum
-         KeywordItem
-         (Compose
-           ((,) (After [WhitespaceChar] DoubleAsterisk))
-           Expression))
-       a
-  , _keywordsArgs_ann :: a
+  | ArgumentUnpack
+  { _argumentUnpack_symbol :: Either Asterisk DoubleAsterisk
+  , _argumentUnpack_val :: Test a
+  , _argument_ann :: a    
   }
   deriving (Functor, Foldable, Traversable)
 
 data ArgList a
-  = ArgListAll
-  { _argListAll_positional :: PositionalArgs a
-  , _argListAll_starred
-    :: Compose
-         Maybe
-         (Compose
-           ((,) (Between' [WhitespaceChar] Comma))
-           StarredAndKeywords)
-         a
-  , _argListAll_keyword
-    :: Compose
-         Maybe
-         (Compose
-           ((,) (Between' [WhitespaceChar] Comma))
-           KeywordsArgs)
-         a
-  , _argList_ann :: a
-  }
-  | ArgListStarred
-  { _argListStarred_starred :: StarredAndKeywords a
-  , _argListStarred_keyword
-    :: Compose
-         Maybe
-         (Compose
-           ((,) (Between' [WhitespaceChar] Comma))
-           KeywordsArgs)
-         a
-  , _argList_ann :: a
-  }
-  | ArgListKeywords
-  { _argListKeywords_keyword :: KeywordsArgs a
-  , _argList_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data Target a
-  = TargetIdentifier
-  { _targetIdentifier_value :: Identifier a
-  , _target_ann :: a
-  }
-  | TargetTuple
-  { _targetTuple_value :: Compose (Between' [WhitespaceChar]) TargetList a
-  , _target_ann :: a
-  }
-  | TargetList'
-  { _targetList_value
-    :: Compose
-         (Between' [WhitespaceChar])
-         (Compose Maybe TargetList)
-         a
-  , _target_ann :: a
-  }
-  | TargetAttRef
-  { _targetAttRef_value :: AttRef a
-  , _target_ann :: a
-  }
-  | TargetSubscription
-  { _targetSubscription_value :: Subscription a
-  , _target_ann :: a
-  }
-  | TargetSlicing
-  { _targetSlicing_value :: Slicing a
-  , _target_ann :: a
-  }
-  | TargetUnpacked
-  { _targetUnpacked_value :: Compose (Before [WhitespaceChar]) Target a
-  , _target_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data TargetList a
-  = TargetList
-  { _targetList_head :: Target a
-  , _targetList_tail
+  = ArgList
+  { _argList_head :: Argument a
+  , _argList_tail
     :: Compose
          []
          (Compose
-           ((,) (Between' [WhitespaceChar] Comma))
-           Target)
+           (Before (Between' [WhitespaceChar] Comma))
+           Argument)
          a
-  , _targetList_trailingComma :: Maybe (Before [WhitespaceChar] Comma)
-  , _targetList_ann :: a
+  , _argList_comma :: Maybe (Before [WhitespaceChar] Comma)
   }
   deriving (Functor, Foldable, Traversable)
 
-data ParameterList a = ParameterList
+data VarargsList a
+  = VarargsList
   deriving (Functor, Foldable, Traversable)
 
-data LambdaExpressionNocond a
-  = LambdaExprNocond
-  { _lambdaExprNocond_params
+data LambdefNocond a
+  = LambdefNocond
+  { _lambdefNocond_args
     :: Compose
-         (Before WhitespaceChar)
+         Maybe
          (Compose
-           Maybe
-           (Compose
-             (Between' [WhitespaceChar])
-             ParameterList))
+           (Between (NonEmpty WhitespaceChar) [WhitespaceChar])
+           VarargsList)
          a
-  , _lambdaExprNocond_expr :: Compose (Before [WhitespaceChar]) ExpressionNocond a
-  , _lambdaExprNocond_ann :: a
+  , _lambdefNocond_expr
+    :: Compose
+         (Before [WhitespaceChar])
+         TestNocond
+         a
+  , _lambdefNocond_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
-data ExpressionNocond a
-  = ExpressionNocond
-  { _expressionNocond_value :: Sum OrTest LambdaExpressionNocond a
+data TestNocond a
+  = TestNocond
+  { _expressionNocond_value :: Sum OrTest LambdefNocond a
   , _expressionNocond_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -583,7 +367,7 @@ data CompIter a
 
 data CompIf a
   = CompIf
-  { _compIf_expr :: Compose (Before [WhitespaceChar]) ExpressionNocond a
+  { _compIf_expr :: Compose (Before [WhitespaceChar]) TestNocond a
   , _compIf_iter
     :: Compose
          Maybe
@@ -593,9 +377,30 @@ data CompIf a
   }
   deriving (Functor, Foldable, Traversable)
 
+data StarExpr a
+  = StarExpr
+  { _starExpr_value :: Expr a
+  , _starExpr_ann :: a
+  }
+  deriving (Functor, Foldable, Traversable)
+
+data ExprList a
+  = ExprList
+  { _exprList_head :: Sum Expr StarExpr a
+  , _exprList_tail
+    :: Compose
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] Comma))
+           (Sum Expr StarExpr))
+         a
+  , _exprList_ann :: a
+  }
+  deriving (Functor, Foldable, Traversable)
+
 data CompFor a
   = CompFor
-  { _compFor_targets :: Compose (Between' [WhitespaceChar]) TargetList a
+  { _compFor_targets :: Compose (Between' [WhitespaceChar]) ExprList a
   , _compFor_expr :: Compose (Before [WhitespaceChar]) OrTest a
   , _compFor_iter
     :: Compose
@@ -606,318 +411,397 @@ data CompFor a
   }
   deriving (Functor, Foldable, Traversable)
 
-data Comprehension a
-  = Comprehension
-  { _comprehension_expr :: Compose (After [WhitespaceChar]) Expression a
-  , _comprehension_for :: CompFor a
-  , _comprehension_ann :: a
+data SliceOp a
+  = SliceOp
+  { _sliceOp_val
+    :: Compose
+         Maybe
+         (Compose (Before [WhitespaceChar]) Test)
+         a
+  , _sliceOp_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
-data Call a
-  = Call
-  { _call_name :: Compose (After [WhitespaceChar]) Primary a
-  , _call_args ::
-      Compose
-        Maybe
-        (Compose
-          (Between' [WhitespaceChar])
-          (Sum
-            (Product
-              (Compose (After [WhitespaceChar]) ArgList)
-              (Const (Maybe Comma)))
-            Comprehension))
-        a
-  , _call_ann :: a
+data Subscript a
+  = SubscriptTest
+  { _subscriptTest_val :: Test a
+  , _subscript_ann :: a
+  }
+  | SubscriptSlice
+  { _subscriptSlice_left
+    :: Compose
+         Maybe
+         (Compose (After [WhitespaceChar]) Test)
+         a
+  , _subscriptSlice_right
+    :: Compose
+         Maybe
+         (Compose (Before [WhitespaceChar]) Test)
+         a
+  , _subscriptSlice_sliceOp
+    :: Compose
+         Maybe
+         (Compose (Before [WhitespaceChar]) SliceOp)
+         a 
+  , _subscript_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
-data Primary a
-  = PrimaryAtom
-  { _primaryAtom_value :: Atom a
-  , _primary_ann :: a
-  }
-  | PrimaryAttRef
-  { _primaryAttRef_value :: AttRef a
-  , _primary_ann :: a
-  }
-  | PrimarySubscription
-  { _primarySubscription_value :: Subscription a
-  , _primary_ann :: a
-  }
-  | PrimarySlicing
-  { _primarySlicing_value :: Slicing a
-  , _primary_ann :: a
-  }
-  | PrimaryCall
-  { _primaryCall_value :: Call a
-  , _primary_ann :: a
+data SubscriptList a
+  = SubscriptList
+  { _subscriptList_head :: Subscript a
+  , _subscriptList_tail :: Subscript a
+  , _subscriptList_comma :: Maybe (Before [WhitespaceChar] Comma)
   }
   deriving (Functor, Foldable, Traversable)
 
-data AwaitExpr a
-  = Await
-  { _await_value :: Compose (Before [WhitespaceChar]) Primary a
-  , _await_ann :: a
+data Trailer a
+  = TrailerCall
+  { _trailerCall_value
+    :: Compose
+         Maybe
+         (Compose (Between' [WhitespaceChar]) ArgList)
+         a
+  , _trailer_ann :: a
+  }
+  | TrailerSubscript
+  { _trailerSubscript_value
+    :: Compose
+         Maybe
+         (Compose (Between' [WhitespaceChar]) SubscriptList)
+         a
+  , _trailer_ann :: a
+  }
+  | TrailerAccess
+  { _trailerAccess_value :: Compose (Before [WhitespaceChar]) Identifier a
+  , _trailer_ann :: a
+  }
+  deriving (Functor, Foldable, Traversable)
+
+data AtomExpr a
+  = AtomExpr
+  { _atomExpr_await :: Maybe KAwait
+  , _atomExpr_atom :: Atom a
+  , _atomExpr_trailers :: Compose [] Trailer a
   }
   deriving (Functor, Foldable, Traversable)
 
 data Power a
   = Power
-  { _power_left :: Sum AwaitExpr Primary a
+  { _power_left :: AtomExpr a
   , _power_right
     :: Compose
          Maybe
          (Compose
-           ((,) [WhitespaceChar])
-           (Compose (Before [WhitespaceChar]) UExpr))
+           (Before (After [WhitespaceChar] DoubleAsterisk))
+           Factor)
          a
   , _power_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
-data UExpr a
-  = UExprNone
-  { _uExprNone_value :: Power a
-  , _uExpr_ann :: a
+data FactorOp
+  = FactorNeg
+  | FactorPos
+  | FactorInv
+  deriving (Eq, Show)
+
+data Factor a
+  = FactorNone
+  { _factorNone_value :: Power a
+  , _factor_ann :: a
   }
-  | UExprNeg
-  { _uExprNeg_value :: Compose (Before [WhitespaceChar]) UExpr a
-  , _uExpr_ann :: a
-  }
-  | UExprPos
-  { _uExprPos_value :: Compose (Before [WhitespaceChar]) UExpr a
-  , _uExpr_ann :: a
-  }
-  | UExprInv
-  { _uExprInv_value :: Compose (Before [WhitespaceChar]) UExpr a
-  , _uExpr_ann :: a
+  | FactorSome
+  { _factorSome_value
+    :: Compose
+         (Before (After [WhitespaceChar] FactorOp))
+         Factor
+         a
+  , _factor_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
-data MExpr a
-  = MExprNone
-  { _mExprNone_value :: UExpr a
-  , _mExpr_ann :: a
-  }
-  | MExprMult
-  { _mExprMult_left :: Compose (After [WhitespaceChar]) MExpr a
-  , _mExprMult_right :: Compose (Before [WhitespaceChar]) UExpr a
-  , _mExpr_ann :: a
-  }
-  | MExprAt
-  { _mExprAt_left :: Compose (After [WhitespaceChar]) MExpr a
-  , _mExprAt_right :: Compose (Before [WhitespaceChar]) MExpr a
-  , _mExpr_ann :: a
-  }
-  | MExprFloorDiv
-  { _mExprFloorDiv_left :: Compose (After [WhitespaceChar]) MExpr a
-  , _mExprFloorDiv_right :: Compose (Before [WhitespaceChar]) UExpr a
-  , _mExpr_ann :: a
-  }
-  | MExprDiv
-  { _mExprDiv_left :: Compose (After [WhitespaceChar]) MExpr a
-  , _mExprDiv_right :: Compose (Before [WhitespaceChar]) UExpr a
-  , _mExpr_ann :: a
-  }
-  | MExprMod
-  { _mExprMod_left :: Compose (After [WhitespaceChar]) MExpr a
-  , _mExprMod_right :: Compose (Before [WhitespaceChar]) UExpr a
-  , _mExpr_ann :: a
+data TermOp
+  = TermMult
+  | TermAt
+  | TermFloorDiv
+  | TermDiv
+  | TermMod
+  deriving (Eq, Show)
+
+data Term a
+  = Term
+  { _term_left :: Factor a
+  , _term_right
+    :: Compose
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] TermOp))
+           Factor)
+         a
+  , _term_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
-data AExpr a
-  = AExprNone
-  { _aExprNone_value :: MExpr a
-  , _aExpr_ann :: a
-  }
-  | AExprAdd
-  { _aExprAdd_left :: Compose (After [WhitespaceChar]) AExpr a
-  , _aExprAdd_right :: Compose (Before [WhitespaceChar]) MExpr a
-  , _aExpr_ann :: a
-  }
-  | AExprSubtract
-  { _aExprSubtract_left :: Compose (After [WhitespaceChar]) AExpr a
-  , _aExprSubtract_right :: Compose (Before [WhitespaceChar]) MExpr a
-  , _aExpr_ann :: a
+data ArithExpr a
+  = ArithExpr
+  { _arithExpr_left :: Term a
+  , _arithExpr_right
+    :: Compose
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] (Either Plus Minus)))
+           Term)
+         a
+  , _arithExpr_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
 data ShiftExpr a
-  = ShiftExprNone
-  { _shiftExprNone_value :: AExpr a
-  , _shiftExpr_ann :: a
-  }
-  | ShiftExprLeft
-  { _shiftExprLeft_left :: Compose (After [WhitespaceChar]) ShiftExpr a
-  , _shiftExprLeft_right :: Compose (Before [WhitespaceChar]) AExpr a
-  , _shiftExpr_ann :: a
-  }
-  | ShiftExprRight
-  { _shiftExprRight_left :: Compose (After [WhitespaceChar]) ShiftExpr a
-  , _shiftExprRight_right :: Compose (Before [WhitespaceChar]) AExpr a
+  = ShiftExpr
+  { _shiftExpr_left :: ArithExpr a
+  , _shiftExpr_right
+    :: Compose
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] (Either DoubleLT DoubleGT)))
+           ArithExpr)
+         a
   , _shiftExpr_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
 data AndExpr a
-  = AndExprNone
-  { _andExprNone_value :: ShiftExpr a
-  , _andExpr_ann :: a
-  }
-  | AndExprSome
-  { _andExprSome_left :: Compose (After [WhitespaceChar]) AndExpr a
-  , _andExprSome_right :: Compose (Before [WhitespaceChar]) ShiftExpr a
+  = AndExpr
+  { _andExpr_left :: ShiftExpr a
+  , _andExprSome_right
+    :: Compose
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] Ampersand))
+           ShiftExpr)
+         a
   , _andExpr_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
 data XorExpr a
-  = XorExprNone
-  { _xorExprNone_value :: AndExpr a
-  , _xorExpr_ann :: a
-  }
-  | XorExprSome
-  { _xorExprSome_left :: Compose (After [WhitespaceChar]) XorExpr a
-  , _xorExprSome_right :: Compose (Before [WhitespaceChar]) AndExpr a
+  = XorExpr
+  { _xorExpr_left :: AndExpr a
+  , _xorExprSome_right
+    :: Compose
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] Caret))
+           AndExpr)
+         a
   , _xorExpr_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
-data OrExpr a
-  = OrExprNone
-  { _orExprNone_value :: XorExpr a
-  , _orExpr_ann :: a
-  }
-  | OrExprSome
-  { _orExprSome_left :: Compose (After [WhitespaceChar]) OrExpr a
-  , _orExprSome_Right :: Compose (Before [WhitespaceChar]) XorExpr a
-  , _orExpr_ann :: a
+data Expr a
+  = Expr
+  { _expr_left :: XorExpr a
+  , _expr_right
+    :: Compose
+        []
+        (Compose
+          (Before (Between' [WhitespaceChar] Pipe))
+          XorExpr)
+        a
+  , _expr_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
 data Comparison a
   = Comparison
-  { _comparison_left :: OrExpr a
+  { _comparison_left :: Expr a
   , _comparison_right
     :: Compose
          []
          (Compose
-           ((,) (Between' [WhitespaceChar] CompOperator))
-           OrExpr)
+           (Before (Between' [WhitespaceChar] CompOperator))
+           Expr)
          a
   , _comparison_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
 data NotTest a
-  = NotTestNone
-  { _notTestNone_value :: Comparison a
+  = NotTestSome
+  { _notTestSome_value
+    :: Compose
+         (Before (After (NonEmpty WhitespaceChar) KNot))
+         NotTest
+         a
   , _notTest_ann :: a
   }
-  | NotTestSome
-  { _notTestSome_value :: Compose (Before (NonEmpty WhitespaceChar)) NotTest a
+  | NotTestNone
+  { _notTestNone_value :: Comparison a
   , _notTest_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
 data AndTest a
-  = AndTestNone
-  { _andTestNone_value :: NotTest a
-  , _andTest_ann :: a
-  }
-  | AndTestSome
-  { _andTestSome_left :: Compose (After (NonEmpty WhitespaceChar)) AndTest a
-  , _andTestSome_right :: Compose (Before (NonEmpty WhitespaceChar)) NotTest a
+  = AndTest
+  { _andTest_left :: NotTest a
+  , _andTest_right
+    :: Compose
+         []
+         (Compose
+           (Before (Between' (NonEmpty WhitespaceChar) KAnd))
+           AndTest)
+         a
   , _andTest_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
 data OrTest a
-  = OrTestNone
-  { _orTestNone_value :: AndTest a
-  , _orTest_ann :: a
-  }
-  | OrTestSome
-  { _orTestSome_left :: Compose (After (NonEmpty WhitespaceChar)) OrTest a
-  , _orTestSome_right :: Compose (Before (NonEmpty WhitespaceChar)) AndTest a
+  = OrTest
+  { _orTest_left :: AndTest a
+  , _orTest_right
+    :: Compose
+         []
+         (Compose
+           (Before (Between' (NonEmpty WhitespaceChar) KOr))
+           AndTest)
+         a
   , _orTest_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
-data Expression a
-  = ExpressionConditional
-  { _expressionConditional_head :: OrTest a
-  , _expressionConditional_tail
+data IfThenElse a
+  = IfThenElse
+  { _ifThenElse_if :: Compose (Between' (NonEmpty WhitespaceChar)) OrTest a
+  , _ifThenElse_else :: Compose (Before (NonEmpty WhitespaceChar)) Test a
+  }
+  deriving (Functor, Foldable, Traversable)
+
+data Test a
+  = TestCond
+  { _testCond_head :: OrTest a
+  , _testCond_tail
     :: Compose
          Maybe
          (Compose
-           (Before [WhitespaceChar])
+           (Before (NonEmpty WhitespaceChar))
            IfThenElse)
          a
-  , _expression_ann :: a
+  , _test_ann :: a
   }
-  | ExpressionLambda
+  | TestLambdef
   deriving (Functor, Foldable, Traversable)
 
-data StarredItem a
-  = StarredItemExpr
-  { _starredItemExpr_value :: Expression a
-  , _starredItem_ann :: a
+data TestList a
+  = TestList
+  { _testList_head :: Test a
+  , _testList_tail :: Compose (Before (Between' [WhitespaceChar] Comma)) Test a
+  , _testList_comma :: Maybe (Before [WhitespaceChar] Comma)
   }
-  | StarredItemUnpack
-  { _starredItemUnpack_value :: Compose (Before [WhitespaceChar]) OrExpr a
-  , _starredItem_ann :: a
-  } deriving (Functor, Foldable, Traversable)
+  deriving (Functor, Foldable, Traversable)
 
-data StarredExpression a
-  = StarredExpressionExpr
-  { _starredExpressionExpr_value :: Expression a
-  , _starredExpression_ann :: a
+data YieldArg a
+  = YieldArgFrom
+  { _yieldArgFrom_value :: Compose (Before (NonEmpty WhitespaceChar)) Test a
+  , _yieldArg_ann :: a
   }
-  | StarredExpressionTuple
-  { _starredExpressionTuple_init
-    :: Compose []
-         (Compose (After Comma) (TokenF StarredItem))
-         a
-  , _starredExpressionTuple_last
+  | YieldArgList
+  { _yieldArgList_value :: TestList a
+  , _yieldArg_ann :: a
+  }
+  deriving (Functor, Foldable, Traversable)
+
+data YieldExpr a
+  = YieldExpr
+  { _yieldExpr_value
     :: Compose
          Maybe
-         (Compose (Before [WhitespaceChar]) StarredItem)
+         (Compose
+           (Before (NonEmpty WhitespaceChar))
+           YieldArg)
          a
-  , _starredExpression_ann :: a
-  } deriving (Functor, Foldable, Traversable)
-
-data Enclosure a
-  = EnclosureParen
-  { _enclosureParen_value
-    :: Compose
-         (Between' [WhitespaceChar])
-         (Compose Maybe StarredExpression)
-         a
-  , _enclosure_ann :: a
+  , _yieldExpr_ann :: a
   }
-  | EnclosureList
-  | EnclosureDict
-  | EnclosureSet
-  | EnclosureGenerator
-  | EnclosureYield
+  deriving (Functor, Foldable, Traversable)
+
+data TestlistComp a
+  = TestlistCompFor
+  { _testlistComp_head :: Sum Test StarExpr a
+  , _testlistCompFor_tail :: CompFor a
+  , _testlistComp_ann :: a
+  }
+  | TestlistCompList
+  { _testlistComp_head :: Sum Test StarExpr a
+  , _testlistCompList_tail
+    :: Compose
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] Comma))
+           (Sum Test StarExpr))
+         a
+  , _testlistCompList_comma :: Maybe (Before [WhitespaceChar] Comma)
+  , _testlistComp_ann :: a
+  }
+  deriving (Functor, Foldable, Traversable)
+
+data DictOrSetMaker a
+  = DictOrSetMaker
   deriving (Functor, Foldable, Traversable)
 
 data Atom a
-  = AtomIdentifier
-  { _atom_identifier_value :: Identifier a
+  = AtomParen
+  { _atomParen_val
+    :: Compose
+         (Between' [WhitespaceChar])
+         (Sum YieldExpr TestlistComp)
+         a
   , _atom_ann :: a
   }
-  | AtomLiteral
-  { _atom_literal_value :: Literal a
+  | AtomBracket
+  { _atomBracket_val
+    :: Compose
+         (Between' [WhitespaceChar])
+         TestlistComp
+         a
   , _atom_ann :: a
   }
-  | AtomEnclosure
-  { _atom_enclosure_value :: Enclosure a
+  | AtomCurly
+  { _atomCurly_val
+    :: Compose
+         (Between' [WhitespaceChar])
+         DictOrSetMaker
+         a
   , _atom_ann :: a
-  } deriving (Functor, Foldable, Traversable)
+  }
+  | AtomIdentifier
+  { _atomIdentifier_value :: Identifier a
+  , _atom_ann :: a
+  }
+  | AtomInteger
+  { _atomInteger :: Integer' a
+  , _atom_ann :: a
+  }
+  | AtomFloat
+  { _atomFloat :: Float' a
+  , _atom_ann :: a
+  }
+  | AtomString
+  { _atomString_value :: Compose NonEmpty (Sum StringLiteral BytesLiteral) a
+  , _atom_ann :: a
+  }
+  | AtomEllipsis
+  { _atom_ann :: a
+  }
+  | AtomNone
+  { _atom_ann :: a
+  }
+  | AtomTrue
+  { _atom_ann :: a
+  }
+  | AtomFalse
+  { _atom_ann :: a
+  }
+  deriving (Functor, Foldable, Traversable)
 
 data Comment a
   = Comment
@@ -1003,23 +887,17 @@ deriveEq1 ''IfThenElse
 deriveShow1 ''IfThenElse
 makeLenses ''IfThenElse
 
-deriveEq ''Expression
-deriveShow ''Expression
-deriveEq1 ''Expression
-deriveShow1 ''Expression
-makeLenses ''Expression
+deriveEq ''Test
+deriveShow ''Test
+deriveEq1 ''Test
+deriveShow1 ''Test
+makeLenses ''Test
 
-deriveEq ''ExpressionList
-deriveShow ''ExpressionList
-deriveEq1 ''ExpressionList
-deriveShow1 ''ExpressionList
-makeLenses ''ExpressionList
-
-deriveEq ''Subscription
-deriveShow ''Subscription
-deriveEq1 ''Subscription
-deriveShow1 ''Subscription
-makeLenses ''Subscription
+deriveEq ''TestList
+deriveShow ''TestList
+deriveEq1 ''TestList
+deriveShow1 ''TestList
+makeLenses ''TestList
 
 deriveEq ''Identifier
 deriveShow ''Identifier
@@ -1027,59 +905,11 @@ deriveEq1 ''Identifier
 deriveShow1 ''Identifier
 makeLenses ''Identifier
 
-deriveEq ''AttRef
-deriveShow ''AttRef
-deriveEq1 ''AttRef
-deriveShow1 ''AttRef
-makeLenses ''AttRef
-
-deriveEq ''ProperSlice
-deriveShow ''ProperSlice
-deriveEq1 ''ProperSlice
-deriveShow1 ''ProperSlice
-makeLenses ''ProperSlice
-
-deriveEq ''SliceItem
-deriveShow ''SliceItem
-deriveEq1 ''SliceItem
-deriveShow1 ''SliceItem
-makeLenses ''SliceItem
-
-deriveEq ''SliceList
-deriveShow ''SliceList
-deriveEq1 ''SliceList
-deriveShow1 ''SliceList
-makeLenses ''SliceList
-
-deriveEq ''Slicing
-deriveShow ''Slicing
-deriveEq1 ''Slicing
-deriveShow1 ''Slicing
-makeLenses ''Slicing
-
-deriveEq ''PositionalArgs
-deriveShow ''PositionalArgs
-deriveEq1 ''PositionalArgs
-deriveShow1 ''PositionalArgs
-makeLenses ''PositionalArgs
-
-deriveEq ''KeywordItem
-deriveShow ''KeywordItem
-deriveEq1 ''KeywordItem
-deriveShow1 ''KeywordItem
-makeLenses ''KeywordItem
-
-deriveEq ''StarredAndKeywords
-deriveShow ''StarredAndKeywords
-deriveEq1 ''StarredAndKeywords
-deriveShow1 ''StarredAndKeywords
-makeLenses ''StarredAndKeywords
-
-deriveEq ''KeywordsArgs
-deriveShow ''KeywordsArgs
-deriveEq1 ''KeywordsArgs
-deriveShow1 ''KeywordsArgs
-makeLenses ''KeywordsArgs
+deriveEq ''Argument
+deriveShow ''Argument
+deriveEq1 ''Argument
+deriveShow1 ''Argument
+makeLenses ''Argument
 
 deriveEq ''ArgList
 deriveShow ''ArgList
@@ -1087,35 +917,23 @@ deriveEq1 ''ArgList
 deriveShow1 ''ArgList
 makeLenses ''ArgList
 
-deriveEq ''Target
-deriveShow ''Target
-deriveEq1 ''Target
-deriveShow1 ''Target
-makeLenses ''Target
+deriveEq ''VarargsList
+deriveShow ''VarargsList
+deriveEq1 ''VarargsList
+deriveShow1 ''VarargsList
+makeLenses ''VarargsList
 
-deriveEq ''TargetList
-deriveShow ''TargetList
-deriveEq1 ''TargetList
-deriveShow1 ''TargetList
-makeLenses ''TargetList
+deriveEq ''LambdefNocond
+deriveShow ''LambdefNocond
+deriveEq1 ''LambdefNocond
+deriveShow1 ''LambdefNocond
+makeLenses ''LambdefNocond
 
-deriveEq ''ParameterList
-deriveShow ''ParameterList
-deriveEq1 ''ParameterList
-deriveShow1 ''ParameterList
-makeLenses ''ParameterList
-
-deriveEq ''LambdaExpressionNocond
-deriveShow ''LambdaExpressionNocond
-deriveEq1 ''LambdaExpressionNocond
-deriveShow1 ''LambdaExpressionNocond
-makeLenses ''LambdaExpressionNocond
-
-deriveEq ''ExpressionNocond
-deriveShow ''ExpressionNocond
-deriveEq1 ''ExpressionNocond
-deriveShow1 ''ExpressionNocond
-makeLenses ''ExpressionNocond
+deriveEq ''TestNocond
+deriveShow ''TestNocond
+deriveEq1 ''TestNocond
+deriveShow1 ''TestNocond
+makeLenses ''TestNocond
 
 makeLenses ''CompIter
 deriveEq ''CompIter
@@ -1129,35 +947,53 @@ deriveShow ''CompIf
 deriveEq1 ''CompIf
 deriveShow1 ''CompIf
 
+makeLenses ''StarExpr
+deriveEq ''StarExpr
+deriveShow ''StarExpr
+deriveEq1 ''StarExpr
+deriveShow1 ''StarExpr
+
+makeLenses ''ExprList
+deriveEq ''ExprList
+deriveShow ''ExprList
+deriveEq1 ''ExprList
+deriveShow1 ''ExprList
+
+makeLenses ''SliceOp
+deriveEq ''SliceOp
+deriveShow ''SliceOp
+deriveEq1 ''SliceOp
+deriveShow1 ''SliceOp
+
+makeLenses ''Subscript
+deriveEq ''Subscript
+deriveShow ''Subscript
+deriveEq1 ''Subscript
+deriveShow1 ''Subscript
+
+makeLenses ''SubscriptList
+deriveEq ''SubscriptList
+deriveShow ''SubscriptList
+deriveEq1 ''SubscriptList
+deriveShow1 ''SubscriptList
+
 makeLenses ''CompFor
 deriveEq ''CompFor
 deriveShow ''CompFor
 deriveEq1 ''CompFor
 deriveShow1 ''CompFor
 
-makeLenses ''Comprehension
-deriveEq ''Comprehension
-deriveShow ''Comprehension
-deriveEq1 ''Comprehension
-deriveShow1 ''Comprehension
+makeLenses ''Trailer
+deriveEq ''Trailer
+deriveShow ''Trailer
+deriveEq1 ''Trailer
+deriveShow1 ''Trailer
 
-makeLenses ''Call
-deriveEq ''Call
-deriveShow ''Call
-deriveEq1 ''Call
-deriveShow1 ''Call
-
-makeLenses ''Primary
-deriveEq ''Primary
-deriveShow ''Primary
-deriveEq1 ''Primary
-deriveShow1 ''Primary
-
-makeLenses ''AwaitExpr
-deriveEq ''AwaitExpr
-deriveShow ''AwaitExpr
-deriveEq1 ''AwaitExpr
-deriveShow1 ''AwaitExpr
+makeLenses ''AtomExpr
+deriveEq ''AtomExpr
+deriveShow ''AtomExpr
+deriveEq1 ''AtomExpr
+deriveShow1 ''AtomExpr
 
 makeLenses ''Power
 deriveEq ''Power
@@ -1165,23 +1001,23 @@ deriveShow ''Power
 deriveEq1 ''Power
 deriveShow1 ''Power
 
-makeLenses ''UExpr
-deriveEq ''UExpr
-deriveShow ''UExpr
-deriveEq1 ''UExpr
-deriveShow1 ''UExpr
+makeLenses ''Factor
+deriveEq ''Factor
+deriveShow ''Factor
+deriveEq1 ''Factor
+deriveShow1 ''Factor
 
-makeLenses ''MExpr
-deriveEq ''MExpr
-deriveShow ''MExpr
-deriveEq1 ''MExpr
-deriveShow1 ''MExpr
+makeLenses ''Term
+deriveEq ''Term
+deriveShow ''Term
+deriveEq1 ''Term
+deriveShow1 ''Term
 
-makeLenses ''AExpr
-deriveEq ''AExpr
-deriveShow ''AExpr
-deriveEq1 ''AExpr
-deriveShow1 ''AExpr
+makeLenses ''ArithExpr
+deriveEq ''ArithExpr
+deriveShow ''ArithExpr
+deriveEq1 ''ArithExpr
+deriveShow1 ''ArithExpr
 
 makeLenses ''ShiftExpr
 deriveEq ''ShiftExpr
@@ -1201,29 +1037,11 @@ deriveShow ''XorExpr
 deriveEq1 ''XorExpr
 deriveShow1 ''XorExpr
   
-makeLenses ''OrExpr
-deriveEq ''OrExpr
-deriveShow ''OrExpr
-deriveEq1 ''OrExpr
-deriveShow1 ''OrExpr
-
-makeLenses ''StarredItem
-deriveEq ''StarredItem
-deriveShow ''StarredItem
-deriveEq1 ''StarredItem
-deriveShow1 ''StarredItem
-
-makeLenses ''StarredExpression
-deriveEq ''StarredExpression
-deriveShow ''StarredExpression
-deriveEq1 ''StarredExpression
-deriveShow1 ''StarredExpression
-
-makeLenses ''Enclosure
-deriveEq ''Enclosure
-deriveShow ''Enclosure
-deriveEq1 ''Enclosure
-deriveShow1 ''Enclosure
+makeLenses ''Expr
+deriveEq ''Expr
+deriveShow ''Expr
+deriveEq1 ''Expr
+deriveShow1 ''Expr
 
 makeLenses ''Integer'
 deriveEq ''Integer'
@@ -1243,6 +1061,30 @@ deriveShow ''Literal
 deriveEq1 ''Literal
 deriveShow1 ''Literal
 
+makeLenses ''YieldArg
+deriveEq ''YieldArg
+deriveShow ''YieldArg
+deriveEq1 ''YieldArg
+deriveShow1 ''YieldArg
+
+makeLenses ''YieldExpr
+deriveEq ''YieldExpr
+deriveShow ''YieldExpr
+deriveEq1 ''YieldExpr
+deriveShow1 ''YieldExpr
+
+makeLenses ''TestlistComp
+deriveEq ''TestlistComp
+deriveShow ''TestlistComp
+deriveEq1 ''TestlistComp
+deriveShow1 ''TestlistComp
+
+makeLenses ''DictOrSetMaker
+deriveEq ''DictOrSetMaker
+deriveShow ''DictOrSetMaker
+deriveEq1 ''DictOrSetMaker
+deriveShow1 ''DictOrSetMaker
+
 makeLenses ''Atom
 deriveEq ''Atom
 deriveShow ''Atom
@@ -1260,3 +1102,6 @@ deriveEq ''PythonModule
 deriveShow ''PythonModule
 deriveEq1 ''PythonModule
 deriveShow1 ''PythonModule
+
+deriveEq1 ''NonEmpty
+deriveShow1 ''NonEmpty

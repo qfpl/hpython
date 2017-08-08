@@ -1,4 +1,8 @@
+-- from https://docs.python.org/3.5/reference/grammar.html
+
 module Language.Python.Parser where
+
+import Prelude (error)
 
 import Papa hiding (Space, zero, o, Plus, (\\), Product)
 import Data.Functor.Compose
@@ -38,8 +42,9 @@ annotated
   => m (SrcInfo -> f SrcInfo)
   -> m (f SrcInfo)
 annotated m = do
-  srcPos <- SrcInfo <$> careting <*> spanning m
-  m <*> pure srcPos
+  c <- careting
+  f :~ s <- spanned m
+  pure . f $ SrcInfo c s
   
 target :: DeltaParsing m => m (Target SrcInfo)
 target =
@@ -80,7 +85,7 @@ targetList =
   optional (whitespaceBefore comma)
 
 parameterList :: DeltaParsing m => m (ParameterList SrcInfo)
-parameterList = pure ParameterList
+parameterList = error "parameterList not implemented" -- ParameterList
 
 lambdaExpressionNocond :: DeltaParsing m => m (LambdaExpressionNocond SrcInfo)
 lambdaExpressionNocond =
@@ -660,16 +665,21 @@ enclosure =
   where
     enclosureParen =
       annotated .
-      fmap (EnclosureParen . Compose) $
-      Between <$>
-      whitespaceAfter leftParen <*>
-      (Compose <$> optional starredExpression) <*>
-      whitespaceBefore rightParen
-    enclosureList = pure EnclosureList
-    enclosureDict = pure EnclosureDict
-    enclosureSet = pure EnclosureSet
-    enclosureGenerator = pure EnclosureGenerator
-    enclosureYield = pure EnclosureYield
+      fmap EnclosureParen $
+      between
+        (char '(')
+        (char ')')
+        (betweenWhitespaceF $ Compose <$> optional starredExpression)
+    enclosureList =
+      error "enclosureList not implemented" -- EnclosureList
+    enclosureDict =
+      error "enclosureDict not implemented" -- EnclosureDict
+    enclosureSet =
+      error "enclosureSet not implemented" -- EnclosureSet
+    enclosureGenerator =
+      error "enclosureGenerator not implemented" -- EnclosureGenerator
+    enclosureYield =
+      error "enclosureYield not implemented" -- EnclosureYield
 
 atom :: DeltaParsing m => m (Atom SrcInfo)
 atom =
@@ -759,7 +769,10 @@ mExpr =
     mExprNone = annotated $ MExprNone <$> uExpr
   
 aExpr :: DeltaParsing m => m (AExpr SrcInfo)
-aExpr = try aExprNone <|> try aExprAdd <|> aExprSubtract
+aExpr =
+  try aExprNone <|>
+  try aExprAdd <|>
+  aExprSubtract
   where
     aExprSubtract =
       annotated $
@@ -994,4 +1007,5 @@ expression = try expressionConditional <|> expressionLambda
       (Compose <$> optional (whitespaceBeforeF ifThenElse))
 
     expressionLambda :: DeltaParsing m => m (Expression SrcInfo)
-    expressionLambda = pure ExpressionLambda
+    expressionLambda =
+      error "expressionLambda not implemented" -- ExpressionLambda

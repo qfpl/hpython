@@ -1,6 +1,8 @@
 {-# language RankNTypes #-}
 module Language.Python.Printer where
 
+import Prelude (error)
+
 import Papa hiding (Product, Sum, Space, zero, o)
 
 import Data.Functor.Compose
@@ -527,7 +529,7 @@ targetList (TargetList h t c _) =
   foldMap (whitespaceBefore comma) c
 
 parameterList :: ParameterList a -> Doc
-parameterList _ = mempty
+parameterList _ = error "parameterList not implemented"
 
 lambdaExpressionNocond :: LambdaExpressionNocond a -> Doc
 lambdaExpressionNocond (LambdaExprNocond p e _) =
@@ -732,7 +734,7 @@ expression e =
     ExpressionConditional h t _ ->
       orTest h <>
       foldMap (whitespaceBeforeF ifThenElse) (getCompose t)
-    ExpressionLambda -> mempty 
+    ExpressionLambda -> error "expressionLambda not implemented" 
 
 starredItem :: StarredItem a -> Doc
 starredItem s =
@@ -756,11 +758,11 @@ enclosure e =
     EnclosureParen val _ ->
       parens $
       betweenWhitespace'F (foldMap starredExpression . getCompose) val
-    EnclosureList -> mempty
-    EnclosureDict -> mempty
-    EnclosureSet -> mempty
-    EnclosureGenerator -> mempty
-    EnclosureYield -> mempty
+    EnclosureList -> error "enclosureList not implemented"
+    EnclosureDict -> error "enclosureDict not implemented"
+    EnclosureSet -> error "enclosureSet not implemented"
+    EnclosureGenerator -> error "enclosureGenerator not implemented"
+    EnclosureYield -> error "enclosureYield not implemented"
 
 atom :: Atom a -> Doc
 atom a =

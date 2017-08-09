@@ -503,10 +503,10 @@ binDigit = try (char '0' $> BinDigit_0) <|> (char '1' $> BinDigit_1)
 
 integer :: DeltaParsing m => m (Integer' SrcInfo)
 integer =
-  try integerDecimal <|>
+  try integerBin <|>
   try integerOct <|>
   try integerHex <|>
-  integerBin
+  integerDecimal
   where
     integerDecimal =
       annotated $

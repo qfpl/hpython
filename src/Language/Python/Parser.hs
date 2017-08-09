@@ -1,14 +1,14 @@
 -- from https://docs.python.org/3.5/reference/grammar.html
+-- `test` is the production for an expression
 
 module Language.Python.Parser where
 
 import Prelude (error)
 
-import Papa hiding (Space, zero, o, Plus, (\\), Product)
+import Papa hiding (Space, zero, o, Plus, (\\), Product, argument)
 import Data.Functor.Compose
-import Data.Functor.Product
 import Data.Functor.Sum
-import Text.Trifecta hiding
+import Text.Trifecta as P hiding
   (stringLiteral, integer, octDigit, hexDigit, comma, colon)
 
 import Data.CharSet ((\\))
@@ -21,15 +21,16 @@ import Data.Separated.Before (Before(..))
 import Data.Separated.Between (Between(..), Between'(..))
 import Language.Python.AST
 import Language.Python.AST.BytesEscapeSeq
+import Language.Python.AST.Keywords
 import Language.Python.AST.LongBytesChar
-import Language.Python.AST.ShortBytesChar
 import Language.Python.AST.LongStringChar
+import Language.Python.AST.ShortBytesChar
 import Language.Python.AST.ShortStringChar
-import Language.Python.AST.Symbols
+import Language.Python.AST.Symbols as S
 
 data SrcInfo
   = SrcInfo
-  { _srcCaret :: Caret
+  { _srcCaret :: P.Caret
   , _srcSpan :: Span
   }
   deriving (Eq, Show)
@@ -46,242 +47,208 @@ annotated m = do
   f :~ s <- spanned m
   pure . f $ SrcInfo c s
   
-target :: DeltaParsing m => m (Target SrcInfo)
-target =
-  try targetIdentifier <|>
-  try targetTuple <|>
-  try targetList' <|>
-  try targetAttRef <|>
-  try targetSubscription <|>
-  try targetSlicing <|>
-  targetUnpacked
+whitespaceChar :: CharParsing m => m WhitespaceChar
+whitespaceChar =
+  (char ' ' $> Space) <|>
+  (char '\t' $> Tab) <|>
+  (Continued <$> newlineChar)
+
+whitespaceBefore :: CharParsing m => m a -> m (Before [WhitespaceChar] a)
+whitespaceBefore m = Before <$> many whitespaceChar <*> m
+
+whitespaceBeforeF
+  :: CharParsing m
+  => m (f a)
+  -> m (Compose (Before [WhitespaceChar]) f a)
+whitespaceBeforeF = fmap Compose . whitespaceBefore
+
+whitespaceBefore1
+  :: CharParsing m
+  => m a
+  -> m (Before (NonEmpty WhitespaceChar) a)
+whitespaceBefore1 m = Before <$> some1 whitespaceChar <*> m
+
+whitespaceBefore1F
+  :: CharParsing m
+  => m (f a)
+  -> m (Compose (Before (NonEmpty WhitespaceChar)) f a)
+whitespaceBefore1F = fmap Compose . whitespaceBefore1
+
+whitespaceAfter :: CharParsing m => m a -> m (After [WhitespaceChar] a)
+whitespaceAfter m = After <$> many whitespaceChar <*> m
+
+whitespaceAfterF
+  :: CharParsing m
+  => m (f a)
+  -> m (Compose (After [WhitespaceChar]) f a)
+whitespaceAfterF = fmap Compose . whitespaceAfter
+
+whitespaceAfter1
+  :: CharParsing m
+  => m a
+  -> m (After (NonEmpty WhitespaceChar) a)
+whitespaceAfter1 m = After <$> some1 whitespaceChar <*> m
+
+whitespaceAfter1F
+  :: CharParsing m
+  => m (f a)
+  -> m (Compose (After (NonEmpty WhitespaceChar)) f a)
+whitespaceAfter1F = fmap Compose . whitespaceAfter1
+
+betweenWhitespace
+  :: CharParsing m
+  => m a
+  -> m (Between' [WhitespaceChar] a)
+betweenWhitespace m =
+  fmap Between' $
+  Between <$>
+  many whitespaceChar <*>
+  m <*>
+  many whitespaceChar
+
+                    
+betweenWhitespaceF
+  :: CharParsing m
+  => m (f a)
+  -> m (Compose (Between' [WhitespaceChar]) f a)
+betweenWhitespaceF = fmap Compose . betweenWhitespace
+
+betweenWhitespace1
+  :: CharParsing m
+  => m a
+  -> m (Between' (NonEmpty WhitespaceChar) a)
+betweenWhitespace1 m =
+  fmap Between' $
+  Between <$>
+  some1 whitespaceChar <*>
+  m <*>
+  some1 whitespaceChar
+
+betweenWhitespace1F
+  :: CharParsing m
+  => m (f a)
+  -> m (Compose (Between' (NonEmpty WhitespaceChar)) f a)
+betweenWhitespace1F = fmap Compose . betweenWhitespace1
+  
+ifThenElse :: DeltaParsing m => m (IfThenElse SrcInfo)
+ifThenElse =
+  IfThenElse <$>
+  (string "if" *> betweenWhitespace1F orTest) <*>
+  (string "else" *> whitespaceBefore1F test)
+
+test :: DeltaParsing m => m (Test SrcInfo)
+test = try testConditional <|> testLambdef
   where
-    targetIdentifier = annotated $ TargetIdentifier <$> identifier
-    targetTuple =
+    testConditional :: DeltaParsing m => m (Test SrcInfo)
+    testConditional =
       annotated $
-      TargetTuple <$>
-      between (char '(') (char ')') (betweenWhitespaceF targetList)
-    targetList' = 
-      annotated $
-      TargetList' <$>
-      between
-        (char '[')
-        (char ']')
-        (betweenWhitespaceF (Compose <$> optional targetList))
-    targetAttRef = annotated $ TargetAttRef <$> attRef
-    targetSubscription = annotated $ TargetSubscription <$> subscription
-    targetSlicing = annotated $ TargetSlicing <$> slicing
-    targetUnpacked =
-      annotated $
-      TargetUnpacked <$> (char '*' *> whitespaceBeforeF target)
+      TestCond <$>
+      orTest <*>
+      optionalF (whitespaceBefore1F ifThenElse)
 
-targetList :: DeltaParsing m => m (TargetList SrcInfo)
-targetList =
+    testLambdef :: DeltaParsing m => m (Test SrcInfo)
+    testLambdef =
+      error "testLambda not implemented" -- TestLambef
+
+kOr :: DeltaParsing m => m KOr
+kOr = string "or" $> KOr
+      
+orTest :: DeltaParsing m => m (OrTest SrcInfo)
+orTest =
   annotated $
-  TargetList <$>
-  target <*>
-  (Compose <$>
-    many (Compose <$> liftA2 (,) (betweenWhitespace comma) target)) <*>
-  optional (whitespaceBefore comma)
+  OrTest <$>
+  andTest <*>
+  manyF (beforeF (betweenWhitespace1 kOr) andTest)
 
-parameterList :: DeltaParsing m => m (ParameterList SrcInfo)
-parameterList = error "parameterList not implemented" -- ParameterList
-
-lambdaExpressionNocond :: DeltaParsing m => m (LambdaExpressionNocond SrcInfo)
-lambdaExpressionNocond =
+varargsList :: DeltaParsing m => m (VarargsList SrcInfo)
+varargsList = error "varargsList not implemented"
+  
+lambdefNocond :: DeltaParsing m => m (LambdefNocond SrcInfo)
+lambdefNocond =
   annotated $
-  LambdaExprNocond <$>
-  (string "lambda" *>
-    beforeF
-    whitespaceChar
-    (Compose <$> optional (betweenWhitespaceF parameterList))) <*>
-  (colon *> whitespaceBeforeF expressionNocond)
+  LambdefNocond <$>
+  optionalF
+    (betweenF
+      (some1 whitespaceChar)
+      (many whitespaceChar)
+      varargsList) <*>
+  whitespaceBeforeF testNocond
 
-expressionNocond :: DeltaParsing m => m (ExpressionNocond SrcInfo)
-expressionNocond =
+testNocond :: DeltaParsing m => m (TestNocond SrcInfo)
+testNocond =
   annotated $
-  ExpressionNocond <$>
-  (try (InL <$> orTest) <|> (InR <$> lambdaExpressionNocond))
+  TestNocond <$>
+  (try (InL <$> orTest) <|> (InR <$> lambdefNocond))
   
 compIf :: DeltaParsing m => m (CompIf SrcInfo)
 compIf =
   annotated $
   CompIf <$>
-  (string "if" *> whitespaceBeforeF expressionNocond) <*>
-  (Compose <$> optional (whitespaceBeforeF compIter))
+  (string "if" *> whitespaceBeforeF testNocond) <*>
+  optionalF (whitespaceBeforeF compIter)
   
 compIter :: DeltaParsing m => m (CompIter SrcInfo)
 compIter =
   annotated $
   CompIter <$> (try (InL <$> compFor) <|> (InR <$> compIf))
-  
+
+starExpr :: DeltaParsing m => m (StarExpr SrcInfo)
+starExpr =
+  annotated $
+  StarExpr <$>
+  (char '*' *> whitespaceBeforeF expr)
+
+exprList :: DeltaParsing m => m (ExprList SrcInfo)
+exprList =
+  annotated $
+  ExprList <$>
+  exprOrStar <*>
+  manyF (beforeF (betweenWhitespace comma) exprOrStar)
+  where
+    exprOrStar = try (InL <$> expr) <|> (InR <$> starExpr)
+    
 compFor :: DeltaParsing m => m (CompFor SrcInfo)
 compFor =
   annotated $
   CompFor <$>
-  (string "for" *> betweenWhitespaceF targetList) <*>
+  (string "for" *> betweenWhitespaceF exprList) <*>
   (string "in" *> whitespaceBeforeF orTest) <*>
-  (Compose <$> optional (whitespaceBeforeF compIter))
-  
-comprehension :: DeltaParsing m => m (Comprehension SrcInfo)
-comprehension =
-  annotated $
-  Comprehension <$>
-  whitespaceAfterF expression <*>
-  compFor
-
-starredAndKeywords :: DeltaParsing m => m (StarredAndKeywords SrcInfo)
-starredAndKeywords =
-  annotated $
-  StarredAndKeywords <$>
-  unpackedOrKeyword <*>
-  (Compose <$> liftA2 (,) (whitespaceAfter comma) unpackedOrKeyword)
-  where
-    unpackedOrKeyword = try (InL <$> unpackedExpr) <|> (InR <$> keywordItem)
-    unpackedExpr =
-      Compose <$> liftA2 (,) (whitespaceAfter asterisk) expression
-
-keywordItem :: DeltaParsing m => m (KeywordItem SrcInfo)
-keywordItem =
-  annotated $
-  KeywordItem <$>
-  (whitespaceAfterF identifier <* char '=') <*>
-  whitespaceBeforeF expression
-
+  optionalF (whitespaceBeforeF compIter)
 doubleAsterisk :: DeltaParsing m => m DoubleAsterisk
 doubleAsterisk = string "**" $> DoubleAsterisk
-
-keywordsArgs :: DeltaParsing m => m (KeywordsArgs SrcInfo)
-keywordsArgs =
-  annotated $
-  KeywordsArgs <$>
-  keywordOrUnpacked <*>
-  (Compose <$> liftA2 (,) (whitespaceAfter comma) keywordOrUnpacked)
-  where
-    keywordOrUnpacked = try (InL <$> keywordItem) <|> (InR <$> unpackedExpr)
-    unpackedExpr =
-      Compose <$> liftA2 (,) (whitespaceAfter doubleAsterisk) expression
 
 asterisk :: DeltaParsing m => m Asterisk
 asterisk = char '*' $> Asterisk
 
-positionalArgs :: DeltaParsing m => m (PositionalArgs SrcInfo)
-positionalArgs =
-  annotated $
-  PositionalArgs <$>
-  (Compose <$>
-    liftA2 (,) (optional $ whitespaceAfter asterisk) expression) <*>
-  (Compose <$>
-    many
-      (Compose <$>
-        liftA2
-          (,)
-          (whitespaceAfter comma)
-          (Compose <$>
-            liftA2 (,) (optional $ whitespaceAfter asterisk) expression)))
+argument :: DeltaParsing m => m (Argument SrcInfo)
+argument = try argumentFor <|> try argumentDefault <|> argumentUnpack
+  where
+    argumentFor =
+      annotated $
+      ArgumentFor <$>
+      test <*>
+      optionalF (whitespaceBeforeF compFor)
+    argumentDefault =
+      annotated $
+      ArgumentDefault <$>
+      (whitespaceAfterF test <* char '=') <*>
+      whitespaceBeforeF test
+    argumentUnpack =
+      annotated $
+      ArgumentUnpack <$>
+      (try (Left <$> asterisk) <|> (Right <$> doubleAsterisk)) <*>
+      whitespaceBeforeF test
 
 argList :: DeltaParsing m => m (ArgList SrcInfo)
-argList = try argListAll <|> try argListStarred <|> try argListKeywords
-  where
-    argListAll =
-      annotated $
-      ArgListAll <$>
-      positionalArgs <*>
-      (Compose <$>
-        optional
-          (Compose <$>
-            liftA2 (,) (betweenWhitespace comma) starredAndKeywords)) <*>
-      (Compose <$>
-        optional
-          (Compose <$>
-            liftA2 (,) (betweenWhitespace comma) keywordsArgs))
-    argListStarred =
-      annotated $
-      ArgListStarred <$>
-      starredAndKeywords <*>
-      (Compose <$>
-        optional
-          (Compose <$>
-            liftA2 (,) (betweenWhitespace comma) keywordsArgs))
-    argListKeywords = annotated $ ArgListKeywords <$> keywordsArgs
-
-call :: DeltaParsing m => m (Call SrcInfo)
-call =
+argList =
   annotated $
-  Call <$>
-  whitespaceAfterF primary <*>
-  between (char '(') (char ')')
-    (Compose <$> optional
-      (betweenWhitespaceF
-        (try (InL <$> args) <|> (InR <$> comprehension))))
-  where
-    args = Pair <$> whitespaceAfterF argList <*> (Const <$> optional comma)
+  ArgList <$>
+  argument <*>
+  manyF (beforeF (betweenWhitespace comma) argument) <*>
+  optional (whitespaceBefore comma)
 
 colon :: DeltaParsing m => m Colon
 colon = char ':' $> Colon
-
-properSlice :: DeltaParsing m => m (ProperSlice SrcInfo)
-properSlice =
-  annotated $
-  ProperSlice <$>
-  (Compose <$> optional (whitespaceAfterF expression)) <*>
-  fmap Compose (colon *> optional (betweenWhitespaceF expression)) <*>
-  (Compose <$> optional
-    (Compose <$>
-      liftA2
-        (,)
-        (whitespaceBefore colon)
-        (Compose <$> optional (whitespaceBeforeF expression))))
-
-sliceItem :: DeltaParsing m => m (SliceItem SrcInfo)
-sliceItem = try sliceItemExpr <|> sliceItemProper
-  where
-    sliceItemExpr = annotated $ SliceItemExpr <$> expression
-    sliceItemProper = annotated $ SliceItemProper <$> properSlice
-
-sliceList :: DeltaParsing m => m (SliceList SrcInfo)
-sliceList =
-  annotated $
-  SliceList <$>
-  sliceItem <*>
-  (Compose <$>
-    many (Compose <$> liftA2 (,) (betweenWhitespace comma) sliceItem)) <*>
-  optional (whitespaceBefore comma)
-  
-slicing :: DeltaParsing m => m (Slicing SrcInfo)
-slicing =
-  annotated $
-  Slicing <$>
-  whitespaceAfterF primary <*>
-  between (char '[') (char ']') (betweenWhitespaceF sliceList)
-
-expressionList :: DeltaParsing m => m (ExpressionList SrcInfo)
-expressionList =
-  annotated $
-  ExpressionList <$>
-  expression <*>
-  (Compose <$>
-    many
-      (Compose <$>
-        liftA2
-          (,)
-          (betweenWhitespace comma)
-          expression)) <*>
-  optional (whitespaceBefore comma)
-
-subscription :: DeltaParsing m => m (Subscription SrcInfo)
-subscription =
-  annotated $
-  Subscription <$>
-  afterF (many whitespaceChar) primary <*>
-  between'F (many whitespaceChar) expressionList
-
-attRef :: DeltaParsing m => m (AttRef SrcInfo)
-attRef =
-  annotated $
-  AttRef <$>
-  afterF (many whitespaceChar) primary <*>
-  beforeF (many whitespaceChar) identifier
 
 identifier :: DeltaParsing m => m (Identifier SrcInfo)
 identifier =
@@ -608,7 +575,7 @@ literal =
       annotated $
       LiteralString <$>
       stringOrBytes <*>
-      (Compose <$> many (whitespaceBeforeF stringOrBytes))
+      manyF (whitespaceBeforeF stringOrBytes)
     literalInteger = annotated $ LiteralInteger <$> integer
     literalFloat = annotated $ LiteralFloat <$> float
     literalImag = annotated $ LiteralImag <$> imag
@@ -619,217 +586,258 @@ leftParen = char '(' $> LeftParen
 rightParen :: DeltaParsing m => m RightParen
 rightParen = char ')' $> RightParen
 
+optionalF :: DeltaParsing m => m (f a) -> m (Compose Maybe f a)
+optionalF m = Compose <$> optional m
+
+some1F :: DeltaParsing m => m (f a) -> m (Compose NonEmpty f a)
+some1F m = Compose <$> some1 m
+
+manyF :: DeltaParsing m => m (f a) -> m (Compose [] f a)
+manyF m = Compose <$> many m
+
 afterF :: DeltaParsing m => m s -> m (f a) -> m (Compose (After s) f a)
 afterF ms ma = fmap Compose $ flip After <$> ma <*> ms
 
 beforeF :: DeltaParsing m => m s -> m (f a) -> m (Compose (Before s) f a)
 beforeF ms ma = fmap Compose $ Before <$> ms <*> ma
 
+betweenF
+  :: DeltaParsing m
+  => m s
+  -> m t
+  -> m (f a)
+  -> m (Compose (Between s t) f a)
+betweenF ms mt ma = fmap Compose $ Between <$> ms <*> ma <*> mt
+
 between'F :: DeltaParsing m => m s -> m (f a) -> m (Compose (Between' s) f a)
 between'F ms ma = fmap (Compose . Between') $ Between <$> ms <*> ma <*> ms
 
-starredItem :: DeltaParsing m => m (StarredItem SrcInfo)
-starredItem =
-  try starredItemExpr <|>
-  starredItemUnpack
-  where
-    starredItemExpr = annotated $ StarredItemExpr <$> expression
-    starredItemUnpack =
-      annotated $
-      StarredItemUnpack <$> (char '*' *> whitespaceBeforeF orExpr)
+between' :: DeltaParsing m => m s -> m a -> m (Between' s a)
+between' ms ma = fmap Between' $ Between <$> ms <*> ma <*> ms
 
 comma :: DeltaParsing m => m Comma
 comma = char ',' $> Comma
 
-starredExpression :: DeltaParsing m => m (StarredExpression SrcInfo)
-starredExpression =
-  try starredExpressionExpr <|>
-  starredExpressionTuple
+dictOrSetMaker :: DeltaParsing m => m (DictOrSetMaker SrcInfo)
+dictOrSetMaker = error "dictOrSetMaker not implemented"
+
+testlistComp :: DeltaParsing m => m (TestlistComp SrcInfo)
+testlistComp = error "testlistComp not implemented"
+
+testList :: DeltaParsing m => m (TestList SrcInfo)
+testList =
+  annotated $
+  TestList <$>
+  test <*>
+  beforeF (betweenWhitespace comma) test <*>
+  optional (whitespaceBefore comma)
+
+yieldArg :: DeltaParsing m => m (YieldArg SrcInfo)
+yieldArg = try yieldArgFrom <|> yieldArgList
   where
-    starredExpressionExpr =
-      annotated $ StarredExpressionExpr <$> expression
-    starredExpressionTuple =
+    yieldArgFrom =
       annotated $
-      StarredExpressionTuple <$>
-      (Compose <$> many (afterF comma (whitespaceAfterF starredItem))) <*>
-      (Compose <$> optional (whitespaceBeforeF starredItem))
-    
-enclosure :: DeltaParsing m => m (Enclosure SrcInfo)
-enclosure =
-  try enclosureParen <|>
-  try enclosureList <|>
-  try enclosureDict <|>
-  try enclosureSet <|>
-  try enclosureGenerator <|>
-  enclosureYield
-  where
-    enclosureParen =
-      annotated .
-      fmap EnclosureParen $
-      between
-        (char '(')
-        (char ')')
-        (betweenWhitespaceF $ Compose <$> optional starredExpression)
-    enclosureList =
-      error "enclosureList not implemented" -- EnclosureList
-    enclosureDict =
-      error "enclosureDict not implemented" -- EnclosureDict
-    enclosureSet =
-      error "enclosureSet not implemented" -- EnclosureSet
-    enclosureGenerator =
-      error "enclosureGenerator not implemented" -- EnclosureGenerator
-    enclosureYield =
-      error "enclosureYield not implemented" -- EnclosureYield
+      YieldArgFrom <$>
+      (string "from" *> whitespaceBefore1F test)
+    yieldArgList =
+      annotated $
+      YieldArgList <$> testList
+
+yieldExpr :: DeltaParsing m => m (YieldExpr SrcInfo)
+yieldExpr =
+  annotated $
+  YieldExpr <$>
+  (string "yield" *> optionalF (whitespaceBefore1F yieldArg))
 
 atom :: DeltaParsing m => m (Atom SrcInfo)
 atom =
-  try (annotated $ AtomIdentifier <$> identifier) <|>
-  try (annotated $ AtomLiteral <$> literal) <|>
-  annotated (AtomEnclosure <$> enclosure)
-  
-primary :: DeltaParsing m => m (Primary SrcInfo)
-primary =
-  try primaryAtom <|>
-  try primaryAttRef <|>
-  try primarySubscription <|>
-  try primarySlicing <|>
-  primaryCall
+  try atomParen <|>
+  try atomBracket <|>
+  try atomCurly <|>
+  try atomIdentifier <|>
+  try atomInteger <|>
+  try atomFloat <|>
+  try atomString <|>
+  try atomEllipsis <|>
+  try atomNone <|>
+  try atomTrue <|>
+  atomFalse
   where
-    primaryAtom = annotated $ PrimaryAtom <$> atom
-    primaryAttRef = annotated $ PrimaryAttRef <$> attRef
-    primarySubscription = annotated $ PrimarySubscription <$> subscription
-    primarySlicing = annotated $ PrimarySlicing <$> slicing
-    primaryCall = annotated $ PrimaryCall <$> call
+    atomParen =
+      annotated $
+      AtomParen <$>
+      between
+        (char '(')
+        (char ')')
+        (betweenWhitespaceF
+           ((InL <$> try yieldExpr) <|> (InR <$> testlistComp)))
+    atomBracket =
+      annotated $
+      AtomBracket <$>
+      between (char '[') (char ']') (betweenWhitespaceF testlistComp)
+    atomCurly =
+      annotated $
+      AtomCurly <$>
+      between (char '{') (char '}') (betweenWhitespaceF dictOrSetMaker)
+    atomIdentifier =
+      annotated $
+      AtomIdentifier <$> identifier
+    atomInteger =
+      annotated $
+      AtomInteger <$> integer
+    atomFloat =
+      annotated $
+      AtomFloat <$> float
+    atomString =
+      annotated $
+      AtomString <$>
+      some1F ((InL <$> try stringLiteral) <|> (InR <$> bytesLiteral))
+    atomEllipsis =
+      annotated $
+      string "..." $> AtomEllipsis
+    atomNone =
+      annotated $
+      string "None" $> AtomNone
+    atomTrue =
+      annotated $
+      string "True" $> AtomTrue
+    atomFalse =
+      annotated $
+      string "False" $> AtomFalse
+      
+sliceOp :: DeltaParsing m => m (SliceOp SrcInfo)
+sliceOp =
+  annotated $
+  SliceOp <$>
+  (char ':' *> optionalF (whitespaceBeforeF test))
+      
+subscript :: DeltaParsing m => m (Subscript SrcInfo)
+subscript = try subscriptTest <|> subscriptSlice
+  where
+    subscriptTest = annotated $ SubscriptTest <$> test
+    subscriptSlice =
+      annotated $
+      SubscriptSlice <$>
+      optionalF (whitespaceAfterF test) <*>
+      (char ':' *> optionalF (whitespaceBeforeF test)) <*>
+      optionalF (whitespaceBeforeF sliceOp)
 
-awaitExpr :: DeltaParsing m => m (AwaitExpr SrcInfo)
-awaitExpr = annotated $ Await <$> (string "await" *> whitespaceBeforeF primary)
+subscriptList :: DeltaParsing m => m (SubscriptList SrcInfo)
+subscriptList =
+  annotated $
+  SubscriptList <$>
+  subscript <*>
+  optionalF (beforeF (betweenWhitespace comma) subscript) <*>
+  optional (whitespaceBefore comma)
+      
+trailer :: DeltaParsing m => m (Trailer SrcInfo)
+trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
+  where
+    trailerCall =
+      annotated $
+      TrailerCall <$>
+      between (char '(') (char ')') (optionalF (betweenWhitespaceF argList))
+      
+    trailerSubscript =
+      annotated $
+      TrailerSubscript <$>
+      between
+        (char '[')
+        (char ']')
+        (optionalF (betweenWhitespaceF subscriptList))
+
+    trailerAccess =
+      annotated $
+      TrailerAccess <$>
+      (char '.' *> whitespaceBeforeF identifier)
+      
+atomExpr :: DeltaParsing m => m (AtomExpr SrcInfo)
+atomExpr =
+  annotated $
+  AtomExpr <$>
+  optionalF (string "await" *> whitespaceAfter1 (pure KAwait)) <*>
+  atom <*>
+  manyF (whitespaceBeforeF trailer)
   
 power :: DeltaParsing m => m (Power SrcInfo)
-power = annotated $ Power <$> powerLeft <*> powerRight
-  where
-    powerLeft = try (InL <$> awaitExpr) <|> (InR <$> primary)
-    powerRight =
-      Compose <$>
-      optional
-        (Compose <$>
-          liftA2
-            (,)
-            (many whitespaceChar <* string "**")
-            (whitespaceBeforeF uExpr))
+power =
+  annotated $
+  Power <$>
+  atomExpr <*>
+  optionalF (beforeF (whitespaceAfter doubleAsterisk) factor)
+
+factorOp :: DeltaParsing m => m FactorOp
+factorOp =
+  try (char '-' $> FactorNeg) <|>
+  try (char '+' $> FactorPos) <|>
+  (char '~' $> FactorInv)
   
-uExpr :: DeltaParsing m => m (UExpr SrcInfo)
-uExpr =
-  try uExprNeg <|>
-  try uExprPos <|>
-  try uExprInv <|>
-  uExprNone
+factor :: DeltaParsing m => m (Factor SrcInfo)
+factor = try factorSome <|> factorNone
   where
-    uExprNeg =
-      annotated $ UExprNeg <$> (char '-' *> whitespaceBeforeF uExpr)
-    uExprPos =
-      annotated $ UExprNeg <$> (char '+' *> whitespaceBeforeF uExpr)
-    uExprInv =
-      annotated $ UExprNeg <$> (char '~' *> whitespaceBeforeF uExpr)
-    uExprNone = annotated $ UExprNone <$> power
+    factorSome =
+      annotated $
+      FactorSome <$>
+      beforeF (whitespaceAfter factorOp) factor
+
+    factorNone = annotated $ FactorNone <$> power
+
+termOp :: DeltaParsing m => m TermOp
+termOp =
+  try (char '*' $> TermMult) <|>
+  try (char '@' $> TermAt) <|>
+  try (string "//" $> TermFloorDiv) <|>
+  try (char '/' $> TermDiv) <|>
+  (char '%' $> TermMod)
   
-mExpr :: DeltaParsing m => m (MExpr SrcInfo)
-mExpr =
-  try mExprNone <|>
-  try mExprMult <|>
-  try mExprAt <|>
-  try mExprFloorDiv <|>
-  try mExprDiv <|>
-  mExprMod
-  where
-    mExprMult =
-      annotated $
-      MExprMult <$>
-      (whitespaceAfterF mExpr <* char '*') <*>
-      whitespaceBeforeF uExpr
-    mExprAt =
-      annotated $
-      MExprAt <$>
-      (whitespaceAfterF mExpr <* char '@') <*>
-      whitespaceBeforeF mExpr
-    mExprFloorDiv =
-      annotated $
-      MExprFloorDiv <$>
-      (whitespaceAfterF mExpr <* string "//") <*>
-      whitespaceBeforeF uExpr
-    mExprDiv =
-      annotated $
-      MExprDiv <$>
-      (whitespaceAfterF mExpr <* char '/') <*>
-      whitespaceBeforeF uExpr
-    mExprMod =
-      annotated $
-      MExprMod <$>
-      (whitespaceAfterF mExpr <* char '%') <*>
-      whitespaceBeforeF uExpr
-    mExprNone = annotated $ MExprNone <$> uExpr
+term :: DeltaParsing m => m (Term SrcInfo)
+term =
+  annotated $
+  Term <$>
+  factor <*>
+  manyF (beforeF (betweenWhitespace termOp) factor)
   
-aExpr :: DeltaParsing m => m (AExpr SrcInfo)
-aExpr =
-  try aExprNone <|>
-  try aExprAdd <|>
-  aExprSubtract
+arithExpr :: DeltaParsing m => m (ArithExpr SrcInfo)
+arithExpr =
+  annotated $
+  ArithExpr <$>
+  term <*>
+  manyF (beforeF (betweenWhitespace plusOrMinus) term)
   where
-    aExprSubtract =
-      annotated $
-      AExprSubtract <$>
-      (whitespaceAfterF aExpr <* char '-') <*>
-      whitespaceBeforeF mExpr
-    aExprAdd =
-      annotated $
-      AExprAdd <$>
-      (whitespaceAfterF aExpr <* char '+') <*>
-      whitespaceBeforeF mExpr
-    aExprNone = annotated $ AExprNone <$> mExpr
+    plusOrMinus =
+      (Left <$> try (char '+' $> Plus)) <|> (Right <$> (char '-' $> Minus))
   
 shiftExpr :: DeltaParsing m => m (ShiftExpr SrcInfo)
-shiftExpr = try shiftExprNone <|> try shiftExprLeft <|> shiftExprRight
+shiftExpr = 
+  annotated $
+  ShiftExpr <$>
+  arithExpr <*>
+  manyF (beforeF (betweenWhitespace shiftLeftOrRight) arithExpr)
   where
-    shiftExprLeft =
-      annotated $
-      ShiftExprLeft <$>
-      whitespaceAfterF shiftExpr <*>
-      whitespaceBeforeF aExpr
-    shiftExprRight =
-      annotated $
-      ShiftExprRight <$>
-      whitespaceAfterF shiftExpr <*>
-      whitespaceBeforeF aExpr
-    shiftExprNone = annotated $ ShiftExprNone <$> aExpr
+    shiftLeftOrRight =
+      (Left <$> try (string "<<" $> DoubleLT)) <|>
+      (Right <$> (string ">>" $> DoubleGT))
   
 andExpr :: DeltaParsing m => m (AndExpr SrcInfo)
-andExpr = try andExprNone <|> andExprSome
-  where
-    andExprNone = annotated $ AndExprNone <$> shiftExpr
-    andExprSome =
-      annotated $
-      AndExprSome <$>
-      (whitespaceAfterF andExpr <* char '&') <*>
-      whitespaceBeforeF shiftExpr
+andExpr = 
+  annotated $
+  AndExpr <$>
+  shiftExpr <*>
+  manyF (beforeF (betweenWhitespace $ char '&' $> Ampersand) shiftExpr)
 
 xorExpr :: DeltaParsing m => m (XorExpr SrcInfo)
-xorExpr = try xorExprNone <|> xorExprSome
-  where
-    xorExprNone = annotated $ XorExprNone <$> andExpr
-    xorExprSome =
-      annotated $
-      XorExprSome <$>
-      (whitespaceAfterF xorExpr <* char '^') <*>
-      whitespaceBeforeF andExpr
+xorExpr =
+  annotated $
+  XorExpr <$>
+  andExpr <*>
+  manyF (beforeF (betweenWhitespace $ char '^' $> S.Caret) andExpr)
   
-orExpr :: DeltaParsing m => m (OrExpr SrcInfo)
-orExpr = try orExprNone <|> orExprSome
-  where
-    orExprNone = annotated $ OrExprNone <$> xorExpr
-    orExprSome =
-      annotated $
-      OrExprSome <$>
-      (whitespaceAfterF orExpr <* char '|') <*>
-      whitespaceBeforeF xorExpr
+expr :: DeltaParsing m => m (Expr SrcInfo)
+expr =
+  annotated $
+  Expr <$>
+  xorExpr <*>
+  manyF (beforeF (betweenWhitespace $ char '|' $> Pipe) xorExpr)
 
 compOperator :: DeltaParsing m => m CompOperator
 compOperator =
@@ -844,168 +852,31 @@ compOperator =
   try (string "in" $> CompIn) <|>
   (string "not" *> (CompNotIn <$> some1 whitespaceChar) <* string "in")
 
-betweenWhitespace
-  :: CharParsing m
-  => m a
-  -> m (Between' [WhitespaceChar] a)
-betweenWhitespace m =
-  fmap getConst . getCompose <$> betweenWhitespaceF (Const <$> m)
-  
-betweenWhitespace1
-  :: CharParsing m
-  => m a
-  -> m (Between' (NonEmpty WhitespaceChar) a)
-betweenWhitespace1 m =
-  fmap getConst . getCompose <$> betweenWhitespace1F (Const <$> m)
-  
 comparison :: DeltaParsing m => m (Comparison SrcInfo)
 comparison =
   annotated $
   Comparison <$>
-  orExpr <*>
-  (Compose <$> many opSection)
-  where
-    opSection =
-      fmap Compose $
-      (,) <$>
-      betweenWhitespace compOperator <*>
-      orExpr
+  expr <*>
+  manyF (beforeF (betweenWhitespace compOperator) expr)
 
 notTest :: DeltaParsing m => m (NotTest SrcInfo)
-notTest = try notTestNone <|> notTestSome
+notTest = try notTestSome <|> notTestNone
   where
     notTestSome =
       annotated $
       NotTestSome <$>
-      (string "not" *> whitespaceBeforeF1 notTest)
+      beforeF (whitespaceAfter1 $ string "not" $> KNot) notTest
     notTestNone = annotated $ NotTestNone <$> comparison
 
 andTest :: DeltaParsing m => m (AndTest SrcInfo)
-andTest = try andTestNone <|> andTestSome
-  where
-    andTestSome =
-      annotated $
-        AndTestSome <$>
-        whitespaceAfterF1 andTest <*>
-        whitespaceBeforeF1 notTest
-        
-    andTestNone = annotated $ AndTestNone <$> notTest
-
-orTest :: DeltaParsing m => m (OrTest SrcInfo)
-orTest = try orTestNone <|> orTestSome
-  where
-    orTestSome =
-      annotated $
-        OrTestSome <$>
-        whitespaceAfterF1 orTest <*>
-        (string "or" *> whitespaceBeforeF1 andTest)
-      
-    orTestNone = annotated (OrTestNone <$> andTest)
+andTest =
+  annotated $
+  AndTest <$>
+  notTest <*>
+  manyF (beforeF (betweenWhitespace1 $ string "and" $> KAnd) andTest)
 
 newlineChar :: CharParsing m => m NewlineChar
 newlineChar =
   (char '\r' $> CR) <|>
   (char '\n' $> LF) <|>
   (string "\r\n" $> CRLF)
-
-whitespaceChar :: CharParsing m => m WhitespaceChar
-whitespaceChar =
-  (char ' ' $> Space) <|>
-  (char '\t' $> Tab) <|>
-  (Continued <$> newlineChar)
-
-whitespaceBeforeF
-  :: CharParsing m
-  => m (f a)
-  -> m (Compose (Before [WhitespaceChar]) f a)
-whitespaceBeforeF m =
-  fmap Compose $
-    Before <$>
-    many whitespaceChar <*>
-    m
-    
-whitespaceAfterF
-  :: CharParsing m
-  => m (f a)
-  -> m (Compose (After [WhitespaceChar]) f a)
-whitespaceAfterF m =
-  fmap Compose $
-    flip After <$>
-    m <*>
-    many whitespaceChar
-    
-whitespaceBefore
-  :: CharParsing m
-  => m a
-  -> m (Before [WhitespaceChar] a)
-whitespaceBefore m =
-  fmap getConst . getCompose <$> whitespaceBeforeF (fmap Const m)
-    
-whitespaceAfter
-  :: CharParsing m
-  => m a
-  -> m (After [WhitespaceChar] a)
-whitespaceAfter m =
-  fmap getConst . getCompose <$> whitespaceAfterF (fmap Const m)
-    
-whitespaceAfterF1
-  :: CharParsing m
-  => m (f a)
-  -> m (Compose (After (NonEmpty WhitespaceChar)) f a)
-whitespaceAfterF1 m =
-  fmap Compose $
-    flip After <$>
-    m <*>
-    some1 whitespaceChar
-    
-whitespaceBeforeF1
-  :: CharParsing m
-  => m (f a)
-  -> m (Compose (Before (NonEmpty WhitespaceChar)) f a)
-whitespaceBeforeF1 m =
-  fmap Compose $
-    Before <$>
-    some1 whitespaceChar <*>
-    m
-    
-betweenWhitespaceF
-  :: CharParsing m
-  => m (f a)
-  -> m (Compose (Between' [WhitespaceChar]) f a)
-betweenWhitespaceF m =
-  fmap (Compose . Between') $
-  Between <$>
-  many whitespaceChar <*>
-  m <*>
-  many whitespaceChar
-
-betweenWhitespace1F
-  :: CharParsing m
-  => m (f a)
-  -> m (Compose (Between' (NonEmpty WhitespaceChar)) f a)
-betweenWhitespace1F m =
-  fmap (Compose . Between') $
-  Between <$>
-  some1 whitespaceChar <*>
-  m <*>
-  some1 whitespaceChar
-
-ifThenElse :: DeltaParsing m => m (IfThenElse SrcInfo)
-ifThenElse =
-  IfThenElse <$>
-  (string "if" *> betweenWhitespace1F orTest) <*>
-  (string "else" *> whitespaceBeforeF1 expression)
-
-expression :: DeltaParsing m => m (Expression SrcInfo)
-expression = try expressionConditional <|> expressionLambda
-  where
-    expressionConditional :: DeltaParsing m => m (Expression SrcInfo)
-    expressionConditional =
-      annotated $
-      ExpressionConditional <$>
-      orTest <*>
-      (Compose <$> optional (whitespaceBeforeF ifThenElse))
-
-    expressionLambda :: DeltaParsing m => m (Expression SrcInfo)
-    expressionLambda =
-      error "expressionLambda not implemented" -- ExpressionLambda

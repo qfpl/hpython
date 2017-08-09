@@ -304,13 +304,13 @@ data Argument a
   , _argument_ann :: a    
   }
   | ArgumentDefault
-  { _argumentDefault_left :: Test a
-  , _argumentDefault_right :: Test a
+  { _argumentDefault_left :: Compose (After [WhitespaceChar]) Test a
+  , _argumentDefault_right :: Compose (Before [WhitespaceChar]) Test a
   , _argument_ann :: a    
   }
   | ArgumentUnpack
   { _argumentUnpack_symbol :: Either Asterisk DoubleAsterisk
-  , _argumentUnpack_val :: Test a
+  , _argumentUnpack_val :: Compose (Before [WhitespaceChar]) Test a
   , _argument_ann :: a    
   }
   deriving (Functor, Foldable, Traversable)
@@ -326,6 +326,7 @@ data ArgList a
            Argument)
          a
   , _argList_comma :: Maybe (Before [WhitespaceChar] Comma)
+  , _argList_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
@@ -379,7 +380,7 @@ data CompIf a
 
 data StarExpr a
   = StarExpr
-  { _starExpr_value :: Expr a
+  { _starExpr_value :: Compose (Before [WhitespaceChar]) Expr a
   , _starExpr_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -450,8 +451,15 @@ data Subscript a
 data SubscriptList a
   = SubscriptList
   { _subscriptList_head :: Subscript a
-  , _subscriptList_tail :: Subscript a
+  , _subscriptList_tail
+    :: Compose
+         Maybe
+         (Compose
+           (Before (Between' [WhitespaceChar] Comma))
+           Subscript)
+         a
   , _subscriptList_comma :: Maybe (Before [WhitespaceChar] Comma)
+  , _subscriptList_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
@@ -480,9 +488,11 @@ data Trailer a
 
 data AtomExpr a
   = AtomExpr
-  { _atomExpr_await :: Maybe KAwait
+  { _atomExpr_await :: Compose Maybe (After (NonEmpty WhitespaceChar)) KAwait
   , _atomExpr_atom :: Atom a
-  , _atomExpr_trailers :: Compose [] Trailer a
+  , _atomExpr_trailers
+    :: Compose [] (Compose (Before [WhitespaceChar]) Trailer) a
+  , _atomExpr_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
@@ -697,6 +707,7 @@ data TestList a
   { _testList_head :: Test a
   , _testList_tail :: Compose (Before (Between' [WhitespaceChar] Comma)) Test a
   , _testList_comma :: Maybe (Before [WhitespaceChar] Comma)
+  , _testList_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 

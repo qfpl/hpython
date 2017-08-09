@@ -3,7 +3,7 @@ module Language.Python.Printer where
 
 import Prelude (error)
 
-import Papa hiding (Product, Sum, Space, zero, o)
+import Papa hiding (Plus, Product, Sum, Space, zero, o, argument)
 
 import Data.Functor.Compose
 import Data.Functor.Product
@@ -17,20 +17,106 @@ import Data.Separated.Before (Before(..))
 import Data.Separated.Between (Between(..), Between'(..))
 import Language.Python.AST
 import Language.Python.AST.BytesEscapeSeq
-import Language.Python.AST.LongBytesChar
+import Language.Python.AST.Keywords
 import Language.Python.AST.ShortBytesChar
-import Language.Python.AST.LongStringChar
 import Language.Python.AST.ShortStringChar
+import Language.Python.AST.LongBytesChar
+import Language.Python.AST.LongStringChar
 import Language.Python.AST.Symbols
 
 identifier :: Identifier a -> Doc
 identifier i = i ^. identifier_value . to T.unpack . to text
 
+plus :: Plus -> Doc
+plus _ = char '+'
+
+minus :: Minus -> Doc
+minus _ = char '-'
+
+ampersand :: Ampersand -> Doc
+ampersand _ = char '&'
+
+doubleLT :: DoubleLT -> Doc
+doubleLT _ = text "<<"
+
+doubleGT :: DoubleGT -> Doc
+doubleGT _ = text ">>"
+
 comma :: Comma -> Doc
 comma _ = char ','
 
+caret :: Caret -> Doc
+caret _ = char '^'
+
+pipe :: Pipe -> Doc
+pipe _ = char '|'
+
 colon :: Colon -> Doc
 colon _ = char ':'
+
+kAwait :: KAwait -> Doc
+kAwait _ = text "await"
+
+kOr :: KOr -> Doc
+kOr _ = text "or"
+
+kAnd :: KAnd -> Doc
+kAnd _ = text "and"
+
+kNot :: KNot -> Doc
+kNot _ = text "not"
+
+foldMapF :: (Foldable f, Monoid r) => (g a -> r) -> Compose f g a -> r
+foldMapF f = foldMap f . getCompose
+
+before :: Semigroup r => (s -> r) -> (a -> r) -> Before s a -> r
+before f g (Before s a) = f s <> g a
+
+beforeF
+  :: Semigroup r
+  => (s -> r)
+  -> (forall x. f x -> r)
+  -> Compose (Before s) f a
+  -> r
+beforeF f g = before f g . getCompose
+
+after :: Semigroup r => (s -> r) -> (a -> r) -> After s a -> r
+after f g (After s a) = g a <> f s
+
+afterF
+  :: Semigroup r
+  => (s -> r)
+  -> (forall x. f x -> r)
+  -> Compose (After s) f a
+  -> r
+afterF f g = after f g . getCompose
+
+between
+  :: Semigroup r
+  => (s -> r)
+  -> (t -> r)
+  -> (a -> r)
+  -> Between s t a
+  -> r
+between f g h (Between s a t) = f s <> h a <> g t
+
+betweenF
+  :: Semigroup r
+  => (s -> r)
+  -> (t -> r)
+  -> (forall x. f x -> r)
+  -> Compose (Between s t) f a
+  -> r
+betweenF f g h = between f g h . getCompose
+
+between'
+  :: Semigroup r
+  => (s -> r)
+  -> (a -> r)
+  -> Between' s a
+  -> r
+between' f g (Between' (Between s a t)) = f s <> g a <> f t
+
 
 whitespaceAfterF
   :: Foldable g
@@ -40,11 +126,14 @@ whitespaceAfterF
 whitespaceAfterF f = after (foldMap whitespaceChar) f . getCompose
 
 whitespaceAfter
-  :: (a -> Doc) -> After [WhitespaceChar] a -> Doc
+  :: Foldable g
+  => (a -> Doc) -> After (g WhitespaceChar) a -> Doc
 whitespaceAfter = after (foldMap whitespaceChar)
 
 whitespaceBefore
-  :: (a -> Doc) -> Before [WhitespaceChar] a -> Doc
+  :: Foldable g
+  => (a -> Doc)
+  -> Before (g WhitespaceChar) a -> Doc
 whitespaceBefore = before (foldMap whitespaceChar)
 
 whitespaceBeforeF
@@ -62,7 +151,8 @@ betweenWhitespace'F
 betweenWhitespace'F f = between' (foldMap whitespaceChar) f . getCompose
 
 betweenWhitespace'
-  :: (a -> Doc) -> Between' [WhitespaceChar] a -> Doc
+  :: Foldable f
+  => (a -> Doc) -> Between' (f WhitespaceChar) a -> Doc
 betweenWhitespace' = between' (foldMap whitespaceChar)
 
 stringPrefix :: StringPrefix -> Doc
@@ -222,29 +312,6 @@ binDigit d =
 zero :: Zero -> Doc
 zero _ = char '0'
 
-before :: Semigroup r => (s -> r) -> (a -> r) -> Before s a -> r
-before f g (Before s a) = f s <> g a
-
-after :: Semigroup r => (s -> r) -> (a -> r) -> After s a -> r
-after f g (After s a) = g a <> f s
-
-between
-  :: Semigroup r
-  => (s -> r)
-  -> (t -> r)
-  -> (a -> r)
-  -> Between s t a
-  -> r
-between f g h (Between s a t) = f s <> h a <> g t
-
-between'
-  :: Semigroup r
-  => (s -> r)
-  -> (a -> r)
-  -> Between' s a
-  -> r
-between' f g (Between' (Between s a t)) = f s <> g a <> f t
-
 integer' :: Integer' a -> Doc
 integer' i =
   case i of
@@ -300,17 +367,17 @@ sumElim _ g (InR a) = g a
 
 imag :: Imag a -> Doc
 imag (Imag val _) =
-  after
+  afterF
     (either (const $ char 'j') (const $ char 'J'))
-    (sumElim float' (foldMap digit . getConst)) $
-    getCompose val
+    (sumElim float' (foldMap digit . getConst))
+    val
 
 stringLiteral :: StringLiteral a -> Doc
 stringLiteral (StringLiteral val _) =
-  before
+  beforeF
     (foldMap stringPrefix)
-    (sumElim shortString longString) $
-  getCompose val
+    (sumElim shortString longString)
+  val
   
 bytesLiteral :: BytesLiteral a -> Doc
 bytesLiteral (BytesLiteral prefix val _) =
@@ -336,9 +403,9 @@ literal l =
   case l of
     LiteralString h t _ ->
       sumElim stringLiteral bytesLiteral h <>
-      foldMap
+      foldMapF
         (whitespaceBeforeF (sumElim stringLiteral bytesLiteral))
-        (getCompose t)
+        t
     LiteralInteger val _ -> integer' val
     LiteralFloat val _ -> float' val
     LiteralImag val _ -> imag val
@@ -348,7 +415,7 @@ ifThenElse (IfThenElse i e) =
   text "if" <>
   betweenWhitespace'F orTest i <>
   text "else" <>
-  whitespaceBeforeF expression e
+  whitespaceBeforeF test e
 
 compOperator :: CompOperator -> Doc
 compOperator o =
@@ -367,202 +434,54 @@ compOperator o =
 tupleElim :: Semigroup r => (a -> r) -> (b -> r) -> (a, b) -> r
 tupleElim f g (a, b) = f a <> g b
 
-expressionList :: ExpressionList a -> Doc
-expressionList (ExpressionList h t c _) =
-  expression h <>
-  foldMap
-    (tupleElim
-      (betweenWhitespace' comma)
-      expression .
-      getCompose)
-    (getCompose t) <>
-  foldMap (whitespaceBefore comma) c
-
-subscription :: Subscription a -> Doc
-subscription (Subscription o i _) =
-  whitespaceAfterF primary o <>
-  brackets
-    (betweenWhitespace'F expressionList i)
-
-attRef :: AttRef a -> Doc
-attRef (AttRef l r _) =
-  whitespaceAfterF primary l <>
-  char '.' <>
-  whitespaceBeforeF identifier r
-
-properSlice :: ProperSlice a -> Doc
-properSlice (ProperSlice l u s _) =
-  foldMap
-    (whitespaceAfterF expression)
-    (getCompose l) <>
-  char ':' <>
-  foldMap
-    (betweenWhitespace'F expression)
-    (getCompose u) <>
-  foldMap
-    (tupleElim
-      (whitespaceBefore colon)
-      (foldMap
-        (whitespaceBeforeF expression) .
-        getCompose) .
-      getCompose)
-    (getCompose s)
-
-sliceItem :: SliceItem a -> Doc
-sliceItem s =
-  case s of
-    SliceItemExpr val _ -> expression val
-    SliceItemProper val _ -> properSlice val
-
-sliceList :: SliceList a -> Doc
-sliceList (SliceList h t c _) =
-  sliceItem h <>
-  foldMap
-    (tupleElim
-      (betweenWhitespace' comma)
-      sliceItem .
-      getCompose)
-    (getCompose t) <>
-  foldMap (whitespaceBefore comma) c
-
-slicing :: Slicing a -> Doc
-slicing (Slicing o i _) =
-  whitespaceAfterF primary o <>
-  brackets (betweenWhitespace'F sliceList i)
-
 asterisk :: Asterisk -> Doc
 asterisk _ = char '*'
 
 doubleAsterisk :: DoubleAsterisk -> Doc
 doubleAsterisk _ = text "**"
 
-positionalArgs :: PositionalArgs a -> Doc
-positionalArgs (PositionalArgs h t _) =
-  tupleElim
-    (foldMap $ whitespaceAfter asterisk)
-    expression
-  (getCompose h) <>
-  foldMap
-    (tupleElim
-      (whitespaceAfter comma)
-      (tupleElim
-        (foldMap (whitespaceAfter asterisk))
-        expression .
-        getCompose) .
-      getCompose)
-    (getCompose t)
-
-keywordItem :: KeywordItem a -> Doc
-keywordItem (KeywordItem l r _) =
-  whitespaceAfterF identifier l <>
-  char '=' <>
-  whitespaceBeforeF expression r
-
-starredAndKeywords :: StarredAndKeywords a -> Doc
-starredAndKeywords (StarredAndKeywords h t _) =
-  sumElim
-    (tupleElim (whitespaceAfter asterisk) expression . getCompose)
-    keywordItem
-    h <>
-  tupleElim
-    (whitespaceAfter comma)
-    (sumElim
-      (tupleElim (whitespaceAfter asterisk) expression . getCompose)
-      keywordItem)
-  (getCompose t)
-
-keywordsArgs :: KeywordsArgs a -> Doc
-keywordsArgs (KeywordsArgs h t _) =
-  sumElim
-    keywordItem
-    (tupleElim (whitespaceAfter doubleAsterisk) expression . getCompose)
-    h <>
-  tupleElim
-    (whitespaceAfter comma)
-    (sumElim
-      keywordItem
-      (tupleElim (whitespaceAfter doubleAsterisk) expression . getCompose))
-  (getCompose t)
-
-argList :: ArgList a -> Doc
-argList a =
-  case a of
-    ArgListAll p s k _ ->
-      positionalArgs p <>
-      foldMap
-        (tupleElim
-          (betweenWhitespace' comma)
-          starredAndKeywords .
-          getCompose)
-        (getCompose s) <>
-      foldMap
-        (tupleElim (betweenWhitespace' comma) keywordsArgs . getCompose)
-        (getCompose k)
-    ArgListStarred s k _ ->
-      starredAndKeywords s <>
-      foldMap
-        (tupleElim (betweenWhitespace' comma) keywordsArgs . getCompose)
-        (getCompose k)
-    ArgListKeywords k _ -> keywordsArgs k
-
-target :: Target a -> Doc
-target t =
-  case t of
-    TargetIdentifier val _ -> identifier val
-    TargetTuple val _ -> parens $ betweenWhitespace'F targetList val
-    TargetList' val _ ->
-      brackets $ betweenWhitespace'F (foldMap targetList . getCompose) val
-    TargetAttRef val _ -> attRef val
-    TargetSubscription val _ -> subscription val
-    TargetSlicing val _ -> slicing val
-    TargetUnpacked val _ -> char '*' <> whitespaceBeforeF target val
-
-targetList :: TargetList a -> Doc
-targetList (TargetList h t c _) =
-  target h <>
-  foldMap
-    (tupleElim
-      (betweenWhitespace' comma)
-      target .
-      getCompose)
-    (getCompose t) <>
-  foldMap (whitespaceBefore comma) c
-
-parameterList :: ParameterList a -> Doc
-parameterList _ = error "parameterList not implemented"
-
-lambdaExpressionNocond :: LambdaExpressionNocond a -> Doc
-lambdaExpressionNocond (LambdaExprNocond p e _) =
-  text "lambda" <>
-  (before whitespaceChar $ foldMap (betweenWhitespace'F parameterList) . getCompose) (getCompose p) <>
-  char ':' <>
-  whitespaceBeforeF expressionNocond e
-
-expressionNocond :: ExpressionNocond a -> Doc
-expressionNocond (ExpressionNocond v _) =
-  sumElim orTest lambdaExpressionNocond v
 
 compIter :: CompIter a -> Doc
 compIter (CompIter val _) = sumElim compFor compIf val
 
+varargsList :: VarargsList a -> Doc
+varargsList = error "varargsList not implemented" 
+
+lambdefNocond :: LambdefNocond a -> Doc
+lambdefNocond  (LambdefNocond a e _) =
+  text "lambda" <>
+  foldMapF
+    (betweenF
+      (foldMap whitespaceChar)
+      (foldMap whitespaceChar)
+      varargsList)
+    a <>
+  char ':' <>
+  whitespaceBeforeF testNocond e
+
+testNocond :: TestNocond a -> Doc
+testNocond (TestNocond val _) = sumElim orTest lambdefNocond val
+
 compIf :: CompIf a -> Doc
 compIf (CompIf e i _) =
   text "if" <>
-  whitespaceBeforeF expressionNocond e <>
-  foldMap (whitespaceBeforeF compIter) (getCompose i)
+  whitespaceBeforeF testNocond e <>
+  foldMapF (whitespaceBeforeF compIter) i
+
+exprList :: ExprList a -> Doc
+exprList (ExprList h t _) =
+  exprOrStar h <>
+  foldMapF (beforeF (betweenWhitespace' comma) exprOrStar) t
+  where
+    exprOrStar = sumElim expr starExpr
 
 compFor :: CompFor a -> Doc
 compFor (CompFor t e i _) =
   text "for" <>
-  betweenWhitespace'F targetList t <>
+  betweenWhitespace'F exprList t <>
   text "in" <>
   whitespaceBeforeF orTest e <>
-  foldMap (whitespaceBeforeF compIter) (getCompose i)
-
-comprehension :: Comprehension a -> Doc
-comprehension (Comprehension e f _) =
-  whitespaceAfterF expression e <>
-  compFor f
+  foldMapF (whitespaceBeforeF compIter) i
 
 prodElim
   :: Semigroup r
@@ -571,205 +490,202 @@ prodElim
   -> Product f g a -> r
 prodElim f g (Pair a b) = f a <> g b
 
-call :: Call a -> Doc
-call (Call n a _) =
-  whitespaceAfterF primary n <>
-  parens
-    (foldMap
-      (betweenWhitespace'F $
-        sumElim
-          (prodElim (whitespaceAfterF argList) (foldMap comma . getConst))
-          comprehension)
-      (getCompose a))
-
-primary :: Primary a -> Doc
-primary p =
-  case p of
-    PrimaryAtom val _ -> atom val
-    PrimaryAttRef val _ -> attRef val
-    PrimarySubscription val _ -> subscription val
-    PrimarySlicing val _ -> slicing val
-    PrimaryCall val _ -> call val
-
-awaitExpr :: AwaitExpr a -> Doc
-awaitExpr (Await val _) =
-  text "await" <>
-  whitespaceBeforeF primary val
-
-power :: Power a -> Doc
-power (Power l r _) =
-  sumElim awaitExpr primary l <>
-  foldMap
-    (tupleElim
-      ((<> text "**") . foldMap whitespaceChar)
-      (whitespaceBeforeF uExpr) .
-      getCompose)
-    (getCompose r)
-
-uExpr :: UExpr a -> Doc
-uExpr u =
-  case u of
-    UExprNone val _ -> power val
-    UExprNeg val _ -> char '-' <> whitespaceBeforeF uExpr val
-    UExprPos val _ -> char '+' <> whitespaceBeforeF uExpr val
-    UExprInv val _ -> char '~' <> whitespaceBeforeF uExpr val
-
-mExpr :: MExpr a -> Doc
-mExpr m =
-  case m of
-    MExprNone val _ -> uExpr val
-    MExprMult l r _ ->
-      whitespaceAfterF mExpr l <>
-      char '*' <>
-      whitespaceBeforeF uExpr r
-    MExprAt l r _ ->
-      whitespaceAfterF mExpr l <>
-      char '@' <>
-      whitespaceBeforeF mExpr r
-    MExprFloorDiv l r _ ->
-      whitespaceAfterF mExpr l <>
-      text "//" <>
-      whitespaceBeforeF uExpr r
-    MExprDiv l r _ ->
-      whitespaceAfterF mExpr l <>
-      char '/' <>
-      whitespaceBeforeF uExpr r
-    MExprMod l r _ ->
-      whitespaceAfterF mExpr l <>
-      char '%' <>
-      whitespaceBeforeF uExpr r
-
-aExpr :: AExpr a -> Doc
-aExpr a =
-  case a of
-    AExprNone val _ -> mExpr val
-    AExprAdd l r _ ->
-      whitespaceAfterF aExpr l <>
-      char '+' <>
-      whitespaceBeforeF mExpr r
-    AExprSubtract l r _ ->
-      whitespaceAfterF aExpr l <>
-      char '-' <>
-      whitespaceBeforeF mExpr r
-
-shiftExpr :: ShiftExpr a -> Doc
-shiftExpr a =
-  case a of
-    ShiftExprNone val _ -> aExpr val
-    ShiftExprLeft l r _ ->
-      whitespaceAfterF shiftExpr l <>
-      text "<<" <>
-      whitespaceBeforeF aExpr r
-    ShiftExprRight l r _ ->
-      whitespaceAfterF shiftExpr l <>
-      text ">>" <>
-      whitespaceBeforeF aExpr r
-
-andExpr :: AndExpr a -> Doc
-andExpr a =
-  case a of
-    AndExprNone val _ -> shiftExpr val
-    AndExprSome l r _ ->
-      whitespaceAfterF andExpr l <>
-      char '&' <>
-      whitespaceBeforeF shiftExpr r
-
-xorExpr :: XorExpr a -> Doc
-xorExpr a =
-  case a of
-    XorExprNone val _ -> andExpr val
-    XorExprSome l r _ ->
-      whitespaceAfterF xorExpr l <>
-      char '^' <>
-      whitespaceBeforeF andExpr r
-      
-orExpr :: OrExpr a -> Doc
-orExpr a =
-  case a of
-    OrExprNone val _ -> xorExpr val
-    OrExprSome l r _ ->
-      whitespaceAfterF orExpr l <>
-      char '|' <>
-      whitespaceBeforeF xorExpr r
+expr :: Expr a -> Doc
+expr (Expr l r _) =
+  xorExpr l <>
+  foldMapF (beforeF (betweenWhitespace' pipe) xorExpr) r
 
 comparison :: Comparison a -> Doc
 comparison (Comparison l r _) =
-  orExpr l <>
-  foldMap
-    (tupleElim
-      (betweenWhitespace' compOperator)
-      orExpr .
-      getCompose)
-    (getCompose r)
+  expr l <>
+  foldMapF (beforeF (betweenWhitespace' compOperator) expr) r
 
-notTest :: NotTest a -> Doc
-notTest n =
-  case n of
-    NotTestNone val _ -> comparison val
-    NotTestSome val _ ->
-      text "not" <>
-      whitespaceBeforeF notTest val
+dictOrSetMaker :: DictOrSetMaker a -> Doc
+dictOrSetMaker _ = error "dictOrSetMaker not implemented"
 
-andTest :: AndTest a -> Doc
-andTest a =
-  case a of
-    AndTestNone val _ -> notTest val
-    AndTestSome l r _ ->
-      whitespaceAfterF andTest l <>
-      text "and" <>
-      whitespaceBeforeF notTest r
+starExpr :: StarExpr a -> Doc
+starExpr (StarExpr val _) =
+  char '*' <>
+  whitespaceBeforeF expr val
 
-orTest :: OrTest a -> Doc
-orTest o =
-  case o of
-    OrTestNone val _ -> andTest val
-    OrTestSome l r _ ->
-      whitespaceAfterF orTest l <>
-      text "or" <>
-      whitespaceBeforeF andTest r
+testlistComp :: TestlistComp a -> Doc
+testlistComp t =
+  case t of
+    TestlistCompFor h t _ ->
+      testOrStar h <>
+      whitespaceBeforeF compFor t
+    TestlistCompList h t c _ ->
+      testOrStar h <>
+      foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t <>
+      foldMap (whitespaceBefore comma) c
+  where
+    testOrStar = sumElim test starExpr
 
-expression :: Expression a -> Doc
-expression e =
-  case e of
-    ExpressionConditional h t _ ->
-      orTest h <>
-      foldMap (whitespaceBeforeF ifThenElse) (getCompose t)
-    ExpressionLambda -> error "expressionLambda not implemented" 
+testList :: TestList a -> Doc
+testList (TestList h t c _) =
+  test h <>
+  beforeF (betweenWhitespace' comma) test t <>
+  foldMap (whitespaceBefore comma) c
 
-starredItem :: StarredItem a -> Doc
-starredItem s =
-  case s of
-    StarredItemExpr val _ -> expression val
-    StarredItemUnpack val _ -> char '*' <> whitespaceBeforeF orExpr val
+yieldArg :: YieldArg a -> Doc
+yieldArg y =
+  case y of
+    YieldArgFrom val _ -> text "from" <> whitespaceBeforeF test val
+    YieldArgList val _ -> testList val
 
-starredExpression :: StarredExpression a -> Doc
-starredExpression s =
-  case s of
-    StarredExpressionExpr val _ -> expression val
-    StarredExpressionTuple i l _ ->
-      foldMap
-        (after comma (whitespaceAfterF starredItem) . getCompose)
-        (getCompose i) <>
-      foldMap (whitespaceBeforeF starredItem) (getCompose l)
-
-enclosure :: Enclosure a -> Doc
-enclosure e =
-  case e of
-    EnclosureParen val _ ->
-      parens $
-      betweenWhitespace'F (foldMap starredExpression . getCompose) val
-    EnclosureList -> error "enclosureList not implemented"
-    EnclosureDict -> error "enclosureDict not implemented"
-    EnclosureSet -> error "enclosureSet not implemented"
-    EnclosureGenerator -> error "enclosureGenerator not implemented"
-    EnclosureYield -> error "enclosureYield not implemented"
+yieldExpr :: YieldExpr a -> Doc
+yieldExpr (YieldExpr val _) =
+  text "yield" <>
+  foldMapF (whitespaceBeforeF yieldArg) val
 
 atom :: Atom a -> Doc
 atom a =
   case a of
+    AtomParen val _ ->
+      parens $ betweenWhitespace'F (sumElim yieldExpr testlistComp) val
+    AtomBracket val _ -> brackets $ betweenWhitespace'F testlistComp val
+    AtomCurly val _ -> braces $ betweenWhitespace'F dictOrSetMaker val
     AtomIdentifier val _ -> identifier val
-    AtomLiteral val _ -> literal val
-    AtomEnclosure val _ -> enclosure val
+    AtomInteger val _ -> integer' val
+    AtomFloat val _ -> float' val
+    AtomString val _ -> foldMapF (sumElim stringLiteral bytesLiteral) val
+    AtomEllipsis _ -> text "..."
+    AtomNone _ -> text "None"
+    AtomTrue _ -> text "True"
+    AtomFalse _ -> text "False"
+
+argument :: Argument a -> Doc
+argument a =
+  case a of
+    ArgumentFor e f _ ->
+      test e <>
+      foldMapF (whitespaceBeforeF compFor) f
+    ArgumentDefault l r _ ->
+      whitespaceAfterF test l <>
+      char '=' <>
+      whitespaceBeforeF test r
+    ArgumentUnpack s val _ ->
+      either asterisk doubleAsterisk s <>
+      whitespaceBeforeF test val
+
+argList :: ArgList a -> Doc
+argList (ArgList h t c _) =
+  argument h <>
+  foldMapF (beforeF (betweenWhitespace' comma) argument) t <>
+  foldMap (whitespaceBefore comma) c
+
+sliceOp :: SliceOp a -> Doc
+sliceOp (SliceOp val _) = char ':' <> foldMapF (whitespaceBeforeF test) val
+
+subscript :: Subscript a -> Doc
+subscript s =
+  case s of
+    SubscriptTest val _ -> test val
+    SubscriptSlice l r o _ ->
+      foldMapF (whitespaceAfterF test) l <>
+      char ':' <>
+      foldMapF (whitespaceBeforeF test) r <>
+      foldMapF (whitespaceBeforeF sliceOp) o
+
+subscriptList :: SubscriptList a -> Doc
+subscriptList (SubscriptList h t c _) =
+  subscript h <>
+  foldMapF (beforeF (betweenWhitespace' comma) subscript) t <>
+  foldMap (whitespaceBefore comma) c
+
+trailer :: Trailer a -> Doc
+trailer t =
+  case t of
+    TrailerCall val _ -> parens $ foldMapF (betweenWhitespace'F argList) val
+    TrailerSubscript val _ ->
+      brackets $ foldMapF (betweenWhitespace'F subscriptList) val
+    TrailerAccess val _ -> char '.' <> whitespaceBeforeF identifier val
+
+atomExpr :: AtomExpr a -> Doc
+atomExpr (AtomExpr await a trailers _) =
+  foldMapF (whitespaceAfter kAwait) await <>
+  atom a <>
+  foldMapF (whitespaceBeforeF trailer) trailers
+
+power :: Power a -> Doc
+power (Power l r _) =
+  atomExpr l <>
+  foldMapF (beforeF (whitespaceAfter doubleAsterisk) factor) r
+
+factorOp :: FactorOp -> Doc
+factorOp f =
+  case f of
+    FactorNeg -> char '-'
+    FactorPos -> char '+'
+    FactorInv -> char '~'
+
+factor :: Factor a -> Doc
+factor f =
+  case f of
+    FactorNone val _ -> power val
+    FactorSome val _ -> beforeF (whitespaceAfter factorOp) factor val
+
+termOp :: TermOp -> Doc
+termOp t =
+  case t of
+    TermMult -> char '*'
+    TermAt -> char '@'
+    TermFloorDiv -> text "//"
+    TermDiv -> char '/'
+    TermMod -> char '%'
+
+term :: Term a -> Doc
+term (Term l r _) =
+  factor l <>
+  foldMapF (beforeF (betweenWhitespace' termOp) factor) r
+
+arithExpr :: ArithExpr a -> Doc
+arithExpr (ArithExpr l r _) =
+  term l <>
+  foldMapF (beforeF (betweenWhitespace' (either plus minus)) term) r
+  
+shiftExpr :: ShiftExpr a -> Doc
+shiftExpr (ShiftExpr l r _) =
+  arithExpr l <>
+  foldMapF
+    (beforeF
+      (betweenWhitespace' (either doubleLT doubleGT))
+      arithExpr)
+    r
+  
+andExpr :: AndExpr a -> Doc
+andExpr (AndExpr l r _) =
+  shiftExpr l <>
+  foldMapF (beforeF (betweenWhitespace' ampersand) shiftExpr) r
+
+xorExpr :: XorExpr a -> Doc
+xorExpr (XorExpr l r _) =
+  andExpr l <>
+  foldMapF (beforeF (betweenWhitespace' caret) andExpr) r
+
+notTest :: NotTest a -> Doc
+notTest n =
+  case n of
+    NotTestSome val _ -> beforeF (whitespaceAfter kNot) notTest val
+    NotTestNone val _ -> comparison val
+      
+andTest :: AndTest a -> Doc
+andTest (AndTest l r _) =
+  notTest l <>
+  foldMapF (beforeF (betweenWhitespace' kAnd) andTest) r
+
+orTest :: OrTest a -> Doc
+orTest (OrTest l r _) =
+  andTest l <>
+  foldMapF (beforeF (betweenWhitespace' kOr) andTest) r
+
+test :: Test a -> Doc
+test t =
+  case t of
+    TestCond h t _ ->
+      orTest h <>
+      foldMapF (whitespaceBeforeF ifThenElse) t
+    TestLambdef -> error "testLambdef not implemented"
 
 comment :: Comment a -> Doc
 comment (Comment val _) = char '#' <> text (T.unpack val)

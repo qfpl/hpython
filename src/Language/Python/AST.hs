@@ -738,7 +738,7 @@ data YieldExpr a
 data TestlistComp a
   = TestlistCompFor
   { _testlistComp_head :: Sum Test StarExpr a
-  , _testlistCompFor_tail :: CompFor a
+  , _testlistCompFor_tail :: Compose (Before [WhitespaceChar]) CompFor a
   , _testlistComp_ann :: a
   }
   | TestlistCompList

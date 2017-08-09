@@ -489,7 +489,7 @@ data Trailer a
 data AtomExpr a
   = AtomExpr
   { _atomExpr_await :: Compose Maybe (After (NonEmpty WhitespaceChar)) KAwait
-  , _atomExpr_atom :: Atom a
+  , _atomExpr_atom :: Compose (After [WhitespaceChar]) Atom a
   , _atomExpr_trailers
     :: Compose [] (Compose (Before [WhitespaceChar]) Trailer) a
   , _atomExpr_ann :: a

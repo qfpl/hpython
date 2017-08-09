@@ -396,7 +396,7 @@ whitespaceChar w =
   case w of
     Space -> char ' '
     Tab -> char '\t'
-    Continued nl -> newlineChar nl
+    Continued nl -> char '\\' <> newlineChar nl
 
 literal :: Literal a -> Doc
 literal l =
@@ -604,7 +604,7 @@ trailer t =
 atomExpr :: AtomExpr a -> Doc
 atomExpr (AtomExpr await a trailers _) =
   foldMapF (whitespaceAfter kAwait) await <>
-  atom a <>
+  whitespaceAfterF atom a <>
   foldMapF (whitespaceBeforeF trailer) trailers
 
 power :: Power a -> Doc

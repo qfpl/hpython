@@ -51,7 +51,7 @@ whitespaceChar :: CharParsing m => m WhitespaceChar
 whitespaceChar =
   (char ' ' $> Space) <|>
   (char '\t' $> Tab) <|>
-  (Continued <$> newlineChar)
+  (fmap Continued $ char '\\' *> newlineChar)
 
 whitespaceBefore :: CharParsing m => m a -> m (Before [WhitespaceChar] a)
 whitespaceBefore m = Before <$> many whitespaceChar <*> m
@@ -75,7 +75,7 @@ whitespaceBefore1F
 whitespaceBefore1F = fmap Compose . whitespaceBefore1
 
 whitespaceAfter :: CharParsing m => m a -> m (After [WhitespaceChar] a)
-whitespaceAfter m = After <$> many whitespaceChar <*> m
+whitespaceAfter m = flip After <$> m <*> many whitespaceChar
 
 whitespaceAfterF
   :: CharParsing m
@@ -106,7 +106,6 @@ betweenWhitespace m =
   m <*>
   many whitespaceChar
 
-                    
 betweenWhitespaceF
   :: CharParsing m
   => m (f a)
@@ -622,7 +621,20 @@ dictOrSetMaker :: DeltaParsing m => m (DictOrSetMaker SrcInfo)
 dictOrSetMaker = error "dictOrSetMaker not implemented"
 
 testlistComp :: DeltaParsing m => m (TestlistComp SrcInfo)
-testlistComp = error "testlistComp not implemented"
+testlistComp = try testlistCompFor <|> testlistCompList
+  where
+    testOrStar = try (InL <$> test) <|> (InR <$> starExpr)
+    testlistCompFor =
+      annotated $
+      TestlistCompFor <$>
+      testOrStar <*>
+      whitespaceBeforeF compFor
+    testlistCompList =
+      annotated $
+      TestlistCompList <$>
+      testOrStar <*>
+      manyF (beforeF (betweenWhitespace comma) testOrStar) <*>
+      optional (whitespaceBefore comma)
 
 testList :: DeltaParsing m => m (TestList SrcInfo)
 testList =
@@ -756,7 +768,7 @@ atomExpr =
   annotated $
   AtomExpr <$>
   optionalF (string "await" *> whitespaceAfter1 (pure KAwait)) <*>
-  atom <*>
+  whitespaceAfterF atom <*>
   manyF (whitespaceBeforeF trailer)
   
 power :: DeltaParsing m => m (Power SrcInfo)

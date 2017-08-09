@@ -535,21 +535,26 @@ plusOrMinus =
   fmap Right (char '+' $> Minus)
   
 float :: DeltaParsing m => m (Float' SrcInfo)
-float = try floatPoint <|> floatExponent
+float = try floatDecimalBase <|> try floatDecimalNoBase <|> floatNoDecimal
   where
-    fraction = char '.' *> some1 digit'
-    withDecimals = WithDecimalPlaces <$> optional (some1 digit') <*> fraction
-    noDecimals = NoDecimalPlaces <$> (some1 digit' <* char '.')
-    pointFloat = try withDecimals <|> noDecimals
-    floatPoint =
+    floatDecimalBase =
       annotated $
-      FloatPoint <$> pointFloat
+      FloatDecimalBase <$>
+      integer <*>
+      (char '.' *> optionalF integer) <*>
+      optionalF (beforeF e integer)
       
-    floatExponent =
+    floatDecimalNoBase =
       annotated $
-      FloatExponent <$>
-      (try (Left <$> some1 digit') <|> (Right <$> pointFloat)) <*>
-      (Before <$> e <*> (Before <$> plusOrMinus <*> some1 digit'))
+      FloatDecimalNoBase <$>
+      (char '.' *> integer) <*>
+      optionalF (beforeF e integer)
+      
+    floatNoDecimal =
+      annotated $
+      FloatNoDecimal <$>
+      integer <*>
+      optionalF (beforeF e integer)
 
 j :: DeltaParsing m => m (Either Char_j Char_J)
 j = try (fmap Left $ char 'j' $> Char_j) <|> fmap Right (char 'J' $> Char_J)
@@ -667,8 +672,8 @@ atom =
   try atomBracket <|>
   try atomCurly <|>
   try atomIdentifier <|>
-  try atomInteger <|>
   try atomFloat <|>
+  try atomInteger <|>
   try atomString <|>
   try atomEllipsis <|>
   try atomNone <|>

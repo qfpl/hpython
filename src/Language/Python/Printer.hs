@@ -339,27 +339,22 @@ integer' i =
         (foldMap binDigit)
         val
 
-pointFloat :: PointFloat -> Doc
-pointFloat p =
-  case p of
-    WithDecimalPlaces a b ->
-      foldMap (foldMap digit) a <>
-      char '.' <>
-      foldMap digit b
-    NoDecimalPlaces a -> foldMap digit a <> char '.'
-
 float' :: Float' a -> Doc
 float' f =
   case f of
-    FloatPoint val _ -> pointFloat val
-    FloatExponent base ex _ ->
-      either (foldMap digit) pointFloat base <>
-      before
-        (either (const $ char 'e') (const $ char 'E'))
-        (before
-          (either (const $ char '+') (const $ char '-'))
-          (foldMap digit))
-        ex
+    FloatNoDecimal b e _ ->
+      integer' b <>
+      ex e
+    FloatDecimalNoBase f e _ ->
+      char '.' <> integer' f <> ex e 
+    FloatDecimalBase b f e _ ->
+      integer' b <> char '.' <> foldMapF integer' f <> ex e
+  where
+    ex =
+      foldMapF
+        (beforeF
+          (either (const $ char 'e') (const $ char 'E'))
+          integer')
 
 sumElim :: (forall x. f x -> r) -> (forall x. g x -> r) -> Sum f g a -> r
 sumElim f _ (InL a) = f a

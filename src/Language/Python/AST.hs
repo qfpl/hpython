@@ -210,18 +210,38 @@ data PointFloat
   deriving (Eq, Show)
 
 data Float' a
-  = FloatPoint
-  { _floatPoint_value
-    :: PointFloat
+  = FloatNoDecimal
+  { _floatNoDecimal_base :: Integer' a
+  , _float_exponent
+    :: Compose
+         Maybe
+         (Compose
+           (Before (Either Char_e Char_E))
+           Integer')
+         a
   , _float_ann :: a
   }
-  | FloatExponent
-  { _floatExponent_base
-    :: Either (NonEmpty Digit) PointFloat
-  , _floatExponent_exponent
-    :: Before
-         (Either Char_e Char_E)
-           (Before (Either Plus Minus) (NonEmpty Digit))
+  | FloatDecimalNoBase
+  { _floatDecimalNoBase_fraction :: Integer' a
+  , _float_exponent
+    :: Compose
+         Maybe
+         (Compose
+           (Before (Either Char_e Char_E))
+           Integer')
+         a
+  , _float_ann :: a
+  }
+  | FloatDecimalBase
+  { _floatDecimalBase_base :: Integer' a
+  , _floatDecimalBase_fraction :: Compose Maybe Integer' a
+  , _float_exponent
+    :: Compose
+         Maybe
+         (Compose
+           (Before (Either Char_e Char_E))
+           Integer')
+         a
   , _float_ann :: a
   }
   deriving (Functor, Foldable, Traversable)

@@ -27,6 +27,12 @@ import Language.Python.AST.Symbols
 identifier :: Identifier a -> Doc
 identifier i = i ^. identifier_value . to T.unpack . to text
 
+leftParen :: LeftParen -> Doc
+leftParen _ = char '('
+
+rightParen :: RightParen -> Doc
+rightParen _ = char ')'
+
 plus :: Plus -> Doc
 plus _ = char '+'
 
@@ -421,10 +427,18 @@ compOperator o =
     CompNEq -> text "!="
     CompLEq -> text "<="
     CompGEq -> text ">="
-    CompIs -> text "is"
-    CompIsNot s -> text "is" <> foldMap whitespaceChar s <> text "not"
-    CompIn -> text "in"
-    CompNotIn s -> text "not" <> foldMap whitespaceChar s <> text "in"
+    CompIs s -> text "is" <> whitespaceChar s
+    CompIsNot s s' ->
+      text "is" <>
+      foldMap whitespaceChar s <>
+      text "not" <>
+      whitespaceChar s'
+    CompIn s -> text "in" <> whitespaceChar s
+    CompNotIn s s' ->
+      text "not" <>
+      foldMap whitespaceChar s <>
+      text "in" <>
+      whitespaceChar s'
 
 tupleElim :: Semigroup r => (a -> r) -> (b -> r) -> (a, b) -> r
 tupleElim f g (a, b) = f a <> g b
@@ -493,7 +507,11 @@ expr (Expr l r _) =
 comparison :: Comparison a -> Doc
 comparison (Comparison l r _) =
   expr l <>
-  foldMapF (beforeF (betweenWhitespace' compOperator) expr) r
+  foldMapF
+    (beforeF
+      (betweenWhitespace' compOperator)
+      expr)
+    r
 
 dictOrSetMaker :: DictOrSetMaker a -> Doc
 dictOrSetMaker _ = error "dictOrSetMaker not implemented"
@@ -537,13 +555,21 @@ atom :: Atom a -> Doc
 atom a =
   case a of
     AtomParen val _ ->
-      parens $ betweenWhitespace'F (sumElim yieldExpr testlistComp) val
-    AtomBracket val _ -> brackets $ betweenWhitespace'F testlistComp val
-    AtomCurly val _ -> braces $ betweenWhitespace'F dictOrSetMaker val
+      parens $
+      betweenWhitespace'F
+        (foldMapF $ sumElim yieldExpr testlistComp) val
+    AtomBracket val _ ->
+      brackets $
+      betweenWhitespace'F (foldMapF testlistComp) val
+    AtomCurly val _ ->
+      braces $
+      betweenWhitespace'F (foldMapF dictOrSetMaker) val
     AtomIdentifier val _ -> identifier val
     AtomInteger val _ -> integer' val
     AtomFloat val _ -> float' val
-    AtomString val _ -> foldMapF (sumElim stringLiteral bytesLiteral) val
+    AtomString h t _ ->
+      sumElim stringLiteral bytesLiteral h <>
+      foldMapF (whitespaceBeforeF $ sumElim stringLiteral bytesLiteral) t
     AtomEllipsis _ -> text "..."
     AtomNone _ -> text "None"
     AtomTrue _ -> text "True"
@@ -599,7 +625,7 @@ trailer t =
 atomExpr :: AtomExpr a -> Doc
 atomExpr (AtomExpr await a trailers _) =
   foldMapF (whitespaceAfter kAwait) await <>
-  whitespaceAfterF atom a <>
+  atom a <>
   foldMapF (whitespaceBeforeF trailer) trailers
 
 power :: Power a -> Doc
@@ -667,7 +693,11 @@ notTest n =
 andTest :: AndTest a -> Doc
 andTest (AndTest l r _) =
   notTest l <>
-  foldMapF (beforeF (betweenWhitespace' kAnd) andTest) r
+  foldMapF
+    (beforeF
+      (betweenWhitespace' kAnd)
+      andTest)
+    r
 
 orTest :: OrTest a -> Doc
 orTest (OrTest l r _) =

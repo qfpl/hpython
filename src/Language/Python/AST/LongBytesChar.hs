@@ -17,7 +17,6 @@ _LongBytesChar =
   prism'
   _longStringChar_value
   (\case
-      '\n' -> Nothing
       '\\' -> Nothing
       c
         | isAscii c -> Just $ LongBytesChar c

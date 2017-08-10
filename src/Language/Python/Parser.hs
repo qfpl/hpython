@@ -3,6 +3,7 @@
 
 module Language.Python.Parser where
 
+import GHC.Stack
 import Prelude (error)
 
 import Papa hiding (Space, zero, o, Plus, (\\), Product, argument)
@@ -46,12 +47,18 @@ annotated m = do
   c <- careting
   f :~ s <- spanned m
   pure . f $ SrcInfo c s
+
+leftParen :: DeltaParsing m => m LeftParen
+leftParen = char '(' $> LeftParen
+
+rightParen :: DeltaParsing m => m RightParen
+rightParen = char ')' $> RightParen
   
 whitespaceChar :: CharParsing m => m WhitespaceChar
 whitespaceChar =
   (char ' ' $> Space) <|>
   (char '\t' $> Tab) <|>
-  (fmap Continued $ char '\\' *> newlineChar)
+  fmap Continued (char '\\' *> newlineChar)
 
 whitespaceBefore :: CharParsing m => m a -> m (Before [WhitespaceChar] a)
 whitespaceBefore m = Before <$> many whitespaceChar <*> m
@@ -143,21 +150,23 @@ test = try testConditional <|> testLambdef
       annotated $
       TestCond <$>
       orTest <*>
-      optionalF (whitespaceBefore1F ifThenElse)
+      optionalF (try $ whitespaceBefore1F ifThenElse)
 
     testLambdef :: DeltaParsing m => m (Test SrcInfo)
-    testLambdef =
-      error "testLambda not implemented" -- TestLambef
+    testLambdef = unexpected $ error "testLamdef not implemented"
 
 kOr :: DeltaParsing m => m KOr
 kOr = string "or" $> KOr
+
+kAnd :: DeltaParsing m => m KAnd
+kAnd = string "and" $> KAnd
       
 orTest :: DeltaParsing m => m (OrTest SrcInfo)
 orTest =
   annotated $
   OrTest <$>
   andTest <*>
-  manyF (beforeF (betweenWhitespace1 kOr) andTest)
+  manyF (try $ beforeF (betweenWhitespace1 kOr) andTest)
 
 varargsList :: DeltaParsing m => m (VarargsList SrcInfo)
 varargsList = error "varargsList not implemented"
@@ -167,7 +176,7 @@ lambdefNocond =
   annotated $
   LambdefNocond <$>
   optionalF
-    (betweenF
+    (try $ betweenF
       (some1 whitespaceChar)
       (many whitespaceChar)
       varargsList) <*>
@@ -184,7 +193,7 @@ compIf =
   annotated $
   CompIf <$>
   (string "if" *> whitespaceBeforeF testNocond) <*>
-  optionalF (whitespaceBeforeF compIter)
+  optionalF (try $ whitespaceBeforeF compIter)
   
 compIter :: DeltaParsing m => m (CompIter SrcInfo)
 compIter =
@@ -202,7 +211,7 @@ exprList =
   annotated $
   ExprList <$>
   exprOrStar <*>
-  manyF (beforeF (betweenWhitespace comma) exprOrStar)
+  manyF (try $ beforeF (betweenWhitespace comma) exprOrStar)
   where
     exprOrStar = try (InL <$> expr) <|> (InR <$> starExpr)
     
@@ -212,7 +221,7 @@ compFor =
   CompFor <$>
   (string "for" *> betweenWhitespaceF exprList) <*>
   (string "in" *> whitespaceBeforeF orTest) <*>
-  optionalF (whitespaceBeforeF compIter)
+  optionalF (try $ whitespaceBeforeF compIter)
 doubleAsterisk :: DeltaParsing m => m DoubleAsterisk
 doubleAsterisk = string "**" $> DoubleAsterisk
 
@@ -226,7 +235,7 @@ argument = try argumentFor <|> try argumentDefault <|> argumentUnpack
       annotated $
       ArgumentFor <$>
       test <*>
-      optionalF (whitespaceBeforeF compFor)
+      optionalF (try $ whitespaceBeforeF compFor)
     argumentDefault =
       annotated $
       ArgumentDefault <$>
@@ -243,8 +252,8 @@ argList =
   annotated $
   ArgList <$>
   argument <*>
-  manyF (beforeF (betweenWhitespace comma) argument) <*>
-  optional (whitespaceBefore comma)
+  manyF (try $ beforeF (betweenWhitespace comma) argument) <*>
+  optional (try $ whitespaceBefore comma)
 
 colon :: DeltaParsing m => m Colon
 colon = char ':' $> Colon
@@ -263,23 +272,23 @@ stringPrefix =
   try (char 'R' $> StringPrefix_R) <|>
   (char 'u' $> StringPrefix_U)
   
-shortString :: DeltaParsing m => m (ShortString SrcInfo)
+shortString :: (HasCallStack, DeltaParsing m) => m (ShortString SrcInfo)
 shortString = try shortStringSingle <|> shortStringDouble
   where
     shortStringSingle =
       annotated $
       ShortStringSingle <$>
       between
-        tripleSinglequote
-        tripleSinglequote
+        singleQuote
+        singleQuote
         (many charOrEscapeSingle)
       
     shortStringDouble =
       annotated $
       ShortStringDouble <$>
       between
-        tripleDoublequote
-        tripleDoublequote
+        doubleQuote
+        doubleQuote
         (many charOrEscapeDouble)
 
     charOrEscapeSingle =
@@ -292,17 +301,21 @@ shortString = try shortStringSingle <|> shortStringDouble
 
     stringEscape = StringEscapeSeq <$> (char '\\' *> anyChar)
 
+    shortStringCharSingle
+      :: (HasCallStack, DeltaParsing m) => m (ShortStringChar SingleQuote)
     shortStringCharSingle =
       (^?! _ShortStringCharSingle) <$>
       oneOfSet
         (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '\'')
 
+    shortStringCharDouble
+      :: (HasCallStack, DeltaParsing m) => m (ShortStringChar DoubleQuote)
     shortStringCharDouble =
       (^?! _ShortStringCharDouble) <$>
       oneOfSet
         (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '"')
 
-longString :: DeltaParsing m => m (LongString SrcInfo)
+longString :: (HasCallStack, DeltaParsing m) => m (LongString SrcInfo)
 longString = try longStringSingle <|> longStringDouble
   where
     longStringSingle =
@@ -319,15 +332,19 @@ longString = try longStringSingle <|> longStringDouble
       try (Left <$> longStringChar) <|> (Right <$> stringEscape)
       
     stringEscape = StringEscapeSeq <$> (char '\\' *> anyChar)
+
+    longStringChar
+      :: (HasCallStack, DeltaParsing m) => m LongStringChar
     longStringChar =
-      (^?! _LongStringChar) <$> oneOfSet (CharSet.ascii CharSet.\\ CharSet.singleton '\\')
+      (^?! _LongStringChar) <$> satisfy (/= '\\')
+      
     
 stringLiteral :: DeltaParsing m => m (StringLiteral SrcInfo)
 stringLiteral =
   annotated $
   StringLiteral <$>
   beforeF
-    (optional stringPrefix)
+    (optional $ try stringPrefix)
     (try (InL <$> shortString) <|> (InR <$> longString))
 
 bytesPrefix :: DeltaParsing m => m BytesPrefix
@@ -350,16 +367,16 @@ shortBytes = try shortBytesSingle <|> shortBytesDouble
       annotated $
       ShortBytesSingle <$>
       between
-        tripleSinglequote
-        tripleSinglequote
+        singleQuote
+        singleQuote
         (many charOrEscapeSingle)
       
     shortBytesDouble =
       annotated $
       ShortBytesDouble <$>
       between
-        tripleDoublequote
-        tripleDoublequote
+        doubleQuote
+        doubleQuote
         (many charOrEscapeDouble)
 
     charOrEscapeSingle =
@@ -370,15 +387,21 @@ shortBytes = try shortBytesSingle <|> shortBytesDouble
       try (Left <$> shortBytesCharDouble) <|>
       (Right <$> bytesEscape)
 
+    bytesEscape
+      :: (HasCallStack, DeltaParsing m) => m BytesEscapeSeq
     bytesEscape =
       char '\\' *>
       ((^?! _BytesEscapeSeq) <$> oneOfSet CharSet.ascii)
 
+    shortBytesCharSingle
+      :: (HasCallStack, DeltaParsing m) => m (ShortBytesChar SingleQuote)
     shortBytesCharSingle =
       (^?! _ShortBytesCharSingle) <$>
       oneOfSet
         (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '\'')
 
+    shortBytesCharDouble
+      :: (HasCallStack, DeltaParsing m) => m (ShortBytesChar DoubleQuote)
     shortBytesCharDouble =
       (^?! _ShortBytesCharDouble) <$>
       oneOfSet
@@ -389,6 +412,12 @@ tripleDoublequote = string "\"\"\"" $> ()
 
 tripleSinglequote :: DeltaParsing m => m ()
 tripleSinglequote = string "'''" $> ()
+
+doubleQuote :: DeltaParsing m => m ()
+doubleQuote = char '"' $> ()
+
+singleQuote :: DeltaParsing m => m ()
+singleQuote = char '\'' $> ()
 
 longBytes :: DeltaParsing m => m (LongBytes SrcInfo)
 longBytes = try longBytesSingle <|> longBytesDouble
@@ -406,9 +435,14 @@ longBytes = try longBytesSingle <|> longBytesDouble
     charOrEscape =
       try (Left <$> longBytesChar) <|> (Right <$> bytesEscape)
       
+    bytesEscape
+      :: (HasCallStack, DeltaParsing m) => m BytesEscapeSeq
     bytesEscape =
       char '\\' *>
       ((^?! _BytesEscapeSeq) <$> oneOfSet CharSet.ascii)
+      
+    longBytesChar
+      :: (HasCallStack, DeltaParsing m) => m LongBytesChar
     longBytesChar =
       (^?! _LongBytesChar) <$> oneOfSet (CharSet.ascii CharSet.\\ CharSet.singleton '\\')
 
@@ -533,7 +567,7 @@ plusOrMinus :: DeltaParsing m => m (Either Plus Minus)
 plusOrMinus =
   try (fmap Left $ char '+' $> Plus) <|>
   fmap Right (char '+' $> Minus)
-  
+
 float :: DeltaParsing m => m (Float' SrcInfo)
 float = try floatDecimalBase <|> try floatDecimalNoBase <|> floatNoDecimal
   where
@@ -541,20 +575,20 @@ float = try floatDecimalBase <|> try floatDecimalNoBase <|> floatNoDecimal
       annotated $
       FloatDecimalBase <$>
       integer <*>
-      (char '.' *> optionalF integer) <*>
-      optionalF (beforeF e integer)
-      
+      (char '.' *> optionalF (try integer)) <*>
+      optionalF (try $ beforeF e integer)
+
     floatDecimalNoBase =
       annotated $
       FloatDecimalNoBase <$>
       (char '.' *> integer) <*>
-      optionalF (beforeF e integer)
-      
+      optionalF (try $ beforeF e integer)
+
     floatNoDecimal =
       annotated $
       FloatNoDecimal <$>
       integer <*>
-      optionalF (beforeF e integer)
+      optionalF (try $ beforeF e integer)
 
 j :: DeltaParsing m => m (Either Char_j Char_J)
 j = try (fmap Left $ char 'j' $> Char_j) <|> fmap Right (char 'J' $> Char_J)
@@ -579,17 +613,11 @@ literal =
       annotated $
       LiteralString <$>
       stringOrBytes <*>
-      manyF (whitespaceBeforeF stringOrBytes)
+      manyF (try $ whitespaceBeforeF stringOrBytes)
     literalInteger = annotated $ LiteralInteger <$> integer
     literalFloat = annotated $ LiteralFloat <$> float
     literalImag = annotated $ LiteralImag <$> imag
     
-leftParen :: DeltaParsing m => m LeftParen
-leftParen = char '(' $> LeftParen
-
-rightParen :: DeltaParsing m => m RightParen
-rightParen = char ')' $> RightParen
-
 optionalF :: DeltaParsing m => m (f a) -> m (Compose Maybe f a)
 optionalF m = Compose <$> optional m
 
@@ -638,8 +666,8 @@ testlistComp = try testlistCompFor <|> testlistCompList
       annotated $
       TestlistCompList <$>
       testOrStar <*>
-      manyF (beforeF (betweenWhitespace comma) testOrStar) <*>
-      optional (whitespaceBefore comma)
+      manyF (try $ beforeF (betweenWhitespace comma) testOrStar) <*>
+      optional (try $ whitespaceBefore comma)
 
 testList :: DeltaParsing m => m (TestList SrcInfo)
 testList =
@@ -647,7 +675,7 @@ testList =
   TestList <$>
   test <*>
   beforeF (betweenWhitespace comma) test <*>
-  optional (whitespaceBefore comma)
+  optional (try $ whitespaceBefore comma)
 
 yieldArg :: DeltaParsing m => m (YieldArg SrcInfo)
 yieldArg = try yieldArgFrom <|> yieldArgList
@@ -664,7 +692,7 @@ yieldExpr :: DeltaParsing m => m (YieldExpr SrcInfo)
 yieldExpr =
   annotated $
   YieldExpr <$>
-  (string "yield" *> optionalF (whitespaceBefore1F yieldArg))
+  (string "yield" *> optionalF (try $ whitespaceBefore1F yieldArg))
 
 atom :: DeltaParsing m => m (Atom SrcInfo)
 atom =
@@ -683,19 +711,26 @@ atom =
     atomParen =
       annotated $
       AtomParen <$>
-      between
-        (char '(')
-        (char ')')
-        (betweenWhitespaceF
-           ((InL <$> try yieldExpr) <|> (InR <$> testlistComp)))
+      between (char '(') (char ')')
+      (betweenWhitespaceF
+        (optionalF
+          (try $ (InL <$> try yieldExpr) <|> (InR <$> testlistComp))))
     atomBracket =
       annotated $
       AtomBracket <$>
-      between (char '[') (char ']') (betweenWhitespaceF testlistComp)
+      between
+        (char '[')
+        (char ']')
+        (betweenWhitespaceF $
+          optionalF $ try testlistComp)
     atomCurly =
       annotated $
       AtomCurly <$>
-      between (char '{') (char '}') (betweenWhitespaceF dictOrSetMaker)
+      between
+        (char '{')
+        (char '}')
+        (betweenWhitespaceF $
+          optionalF $ try dictOrSetMaker)
     atomIdentifier =
       annotated $
       AtomIdentifier <$> identifier
@@ -705,10 +740,12 @@ atom =
     atomFloat =
       annotated $
       AtomFloat <$> float
+    stringOrBytes = (InL <$> try stringLiteral) <|> (InR <$> bytesLiteral)
     atomString =
       annotated $
       AtomString <$>
-      some1F ((InL <$> try stringLiteral) <|> (InR <$> bytesLiteral))
+      stringOrBytes <*>
+      manyF (try $ whitespaceBeforeF stringOrBytes)
     atomEllipsis =
       annotated $
       string "..." $> AtomEllipsis
@@ -726,7 +763,7 @@ sliceOp :: DeltaParsing m => m (SliceOp SrcInfo)
 sliceOp =
   annotated $
   SliceOp <$>
-  (char ':' *> optionalF (whitespaceBeforeF test))
+  (char ':' *> optionalF (try $ whitespaceBeforeF test))
       
 subscript :: DeltaParsing m => m (Subscript SrcInfo)
 subscript = try subscriptTest <|> subscriptSlice
@@ -735,17 +772,17 @@ subscript = try subscriptTest <|> subscriptSlice
     subscriptSlice =
       annotated $
       SubscriptSlice <$>
-      optionalF (whitespaceAfterF test) <*>
-      (char ':' *> optionalF (whitespaceBeforeF test)) <*>
-      optionalF (whitespaceBeforeF sliceOp)
+      optionalF (try $ whitespaceAfterF test) <*>
+      (char ':' *> optionalF (try $ whitespaceBeforeF test)) <*>
+      optionalF (try $ whitespaceBeforeF sliceOp)
 
 subscriptList :: DeltaParsing m => m (SubscriptList SrcInfo)
 subscriptList =
   annotated $
   SubscriptList <$>
   subscript <*>
-  optionalF (beforeF (betweenWhitespace comma) subscript) <*>
-  optional (whitespaceBefore comma)
+  optionalF (try $ beforeF (betweenWhitespace comma) subscript) <*>
+  optional (try $ whitespaceBefore comma)
       
 trailer :: DeltaParsing m => m (Trailer SrcInfo)
 trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
@@ -753,7 +790,7 @@ trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
     trailerCall =
       annotated $
       TrailerCall <$>
-      between (char '(') (char ')') (optionalF (betweenWhitespaceF argList))
+      between (char '(') (char ')') (optionalF (try $ betweenWhitespaceF argList))
       
     trailerSubscript =
       annotated $
@@ -761,7 +798,7 @@ trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
       between
         (char '[')
         (char ']')
-        (optionalF (betweenWhitespaceF subscriptList))
+        (optionalF (try $ betweenWhitespaceF subscriptList))
 
     trailerAccess =
       annotated $
@@ -772,16 +809,16 @@ atomExpr :: DeltaParsing m => m (AtomExpr SrcInfo)
 atomExpr =
   annotated $
   AtomExpr <$>
-  optionalF (string "await" *> whitespaceAfter1 (pure KAwait)) <*>
-  whitespaceAfterF atom <*>
-  manyF (whitespaceBeforeF trailer)
+  optionalF (try $ string "await" *> whitespaceAfter1 (pure KAwait)) <*>
+  atom <*>
+  manyF (try $ whitespaceBeforeF trailer)
   
 power :: DeltaParsing m => m (Power SrcInfo)
 power =
   annotated $
   Power <$>
   atomExpr <*>
-  optionalF (beforeF (whitespaceAfter doubleAsterisk) factor)
+  optionalF (try $ beforeF (whitespaceAfter doubleAsterisk) factor)
 
 factorOp :: DeltaParsing m => m FactorOp
 factorOp =
@@ -812,14 +849,14 @@ term =
   annotated $
   Term <$>
   factor <*>
-  manyF (beforeF (betweenWhitespace termOp) factor)
+  manyF (try $ beforeF (betweenWhitespace termOp) factor)
   
 arithExpr :: DeltaParsing m => m (ArithExpr SrcInfo)
 arithExpr =
   annotated $
   ArithExpr <$>
   term <*>
-  manyF (beforeF (betweenWhitespace plusOrMinus) term)
+  manyF (try $ beforeF (betweenWhitespace plusOrMinus) term)
   where
     plusOrMinus =
       (Left <$> try (char '+' $> Plus)) <|> (Right <$> (char '-' $> Minus))
@@ -829,7 +866,7 @@ shiftExpr =
   annotated $
   ShiftExpr <$>
   arithExpr <*>
-  manyF (beforeF (betweenWhitespace shiftLeftOrRight) arithExpr)
+  manyF (try $ beforeF (betweenWhitespace shiftLeftOrRight) arithExpr)
   where
     shiftLeftOrRight =
       (Left <$> try (string "<<" $> DoubleLT)) <|>
@@ -840,42 +877,51 @@ andExpr =
   annotated $
   AndExpr <$>
   shiftExpr <*>
-  manyF (beforeF (betweenWhitespace $ char '&' $> Ampersand) shiftExpr)
+  manyF (try $ beforeF (betweenWhitespace $ char '&' $> Ampersand) shiftExpr)
 
 xorExpr :: DeltaParsing m => m (XorExpr SrcInfo)
 xorExpr =
   annotated $
   XorExpr <$>
   andExpr <*>
-  manyF (beforeF (betweenWhitespace $ char '^' $> S.Caret) andExpr)
+  manyF (try $ beforeF (betweenWhitespace $ char '^' $> S.Caret) andExpr)
   
 expr :: DeltaParsing m => m (Expr SrcInfo)
 expr =
   annotated $
   Expr <$>
   xorExpr <*>
-  manyF (beforeF (betweenWhitespace $ char '|' $> Pipe) xorExpr)
+  manyF (try $ beforeF (betweenWhitespace $ char '|' $> Pipe) xorExpr)
 
 compOperator :: DeltaParsing m => m CompOperator
 compOperator =
-  try (char '<' $> CompLT) <|>
-  try (char '>' $> CompGT) <|>
   try (string "==" $> CompEq) <|>
   try (string ">=" $> CompGEq) <|>
   try (string "!=" $> CompNEq) <|>
   try (string "<=" $> CompLEq) <|>
-  try (string "is" $> CompIs) <|>
-  try (string "is" *> (CompIsNot <$> some1 whitespaceChar) <* string "not") <|>
-  try (string "in" $> CompIn) <|>
-  (string "not" *> (CompNotIn <$> some1 whitespaceChar) <* string "in")
+  try (char '<' $> CompLT) <|>
+  try (char '>' $> CompGT) <|>
+  try (string "is" *>
+    (CompIsNot <$> some1 whitespaceChar) <*
+    string "not" <*>
+    whitespaceChar) <|>
+  try (string "is" *> (CompIs <$> whitespaceChar)) <|>
+  try (string "in" *> (CompIn <$> whitespaceChar)) <|>
+  (string "not" *>
+    (CompNotIn <$> some1 whitespaceChar) <*
+    string "in" <*>
+    whitespaceChar)
 
 comparison :: DeltaParsing m => m (Comparison SrcInfo)
 comparison =
   annotated $
   Comparison <$>
   expr <*>
-  manyF (beforeF (betweenWhitespace compOperator) expr)
-
+  manyF
+    (try $ beforeF
+      (betweenWhitespace compOperator)
+      expr)
+    
 notTest :: DeltaParsing m => m (NotTest SrcInfo)
 notTest = try notTestSome <|> notTestNone
   where
@@ -890,7 +936,11 @@ andTest =
   annotated $
   AndTest <$>
   notTest <*>
-  manyF (beforeF (betweenWhitespace1 $ string "and" $> KAnd) andTest)
+  manyF
+    (try $
+      beforeF
+        (betweenWhitespace1 kAnd)
+        andTest)
 
 newlineChar :: CharParsing m => m NewlineChar
 newlineChar =

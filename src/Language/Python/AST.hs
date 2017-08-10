@@ -306,9 +306,19 @@ data CompOperator
   | CompLEq
   | CompNEq
   | CompIs
-  | CompIsNot (NonEmpty WhitespaceChar)
+  { _compIs_spaceAfter :: WhitespaceChar
+  }
+  | CompIsNot
+  { _compIsNot_spaceBetween :: NonEmpty WhitespaceChar
+  , _compIsNot_spaceAfter :: WhitespaceChar
+  }
   | CompIn
-  | CompNotIn (NonEmpty WhitespaceChar)
+  { _compIn_spaceAfter :: WhitespaceChar
+  }
+  | CompNotIn
+  { _compNotIn_spaceBetween :: NonEmpty WhitespaceChar
+  , _compNotIn_spaceAfter :: WhitespaceChar
+  }
   deriving (Eq, Show)
 
 data Argument a
@@ -509,7 +519,7 @@ data Trailer a
 data AtomExpr a
   = AtomExpr
   { _atomExpr_await :: Compose Maybe (After (NonEmpty WhitespaceChar)) KAwait
-  , _atomExpr_atom :: Compose (After [WhitespaceChar]) Atom a
+  , _atomExpr_atom :: Atom a
   , _atomExpr_trailers
     :: Compose [] (Compose (Before [WhitespaceChar]) Trailer) a
   , _atomExpr_ann :: a
@@ -650,7 +660,8 @@ data Comparison a
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] CompOperator))
+           (Before
+             (Between' [WhitespaceChar] CompOperator))
            Expr)
          a
   , _comparison_ann :: a
@@ -784,7 +795,9 @@ data Atom a
   { _atomParen_val
     :: Compose
          (Between' [WhitespaceChar])
-         (Sum YieldExpr TestlistComp)
+         (Compose
+           Maybe
+           (Sum YieldExpr TestlistComp))
          a
   , _atom_ann :: a
   }
@@ -792,7 +805,9 @@ data Atom a
   { _atomBracket_val
     :: Compose
          (Between' [WhitespaceChar])
-         TestlistComp
+         (Compose
+           Maybe
+           TestlistComp)
          a
   , _atom_ann :: a
   }
@@ -800,7 +815,9 @@ data Atom a
   { _atomCurly_val
     :: Compose
          (Between' [WhitespaceChar])
-         DictOrSetMaker
+         (Compose
+           Maybe
+           DictOrSetMaker)
          a
   , _atom_ann :: a
   }
@@ -817,7 +834,14 @@ data Atom a
   , _atom_ann :: a
   }
   | AtomString
-  { _atomString_value :: Compose NonEmpty (Sum StringLiteral BytesLiteral) a
+  { _atomString_head :: Sum StringLiteral BytesLiteral a
+  , _atomString_tail
+    :: Compose
+         []
+         (Compose
+           (Before [WhitespaceChar])
+           (Sum StringLiteral BytesLiteral))
+         a
   , _atom_ann :: a
   }
   | AtomEllipsis

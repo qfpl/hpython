@@ -17,6 +17,5 @@ _LongStringChar =
   prism'
   _longStringChar_value
   (\case
-      '\n' -> Nothing
       '\\' -> Nothing
       c -> Just $ LongStringChar c)

@@ -1,5 +1,6 @@
-{ mkDerivation, base, charset, deriving-compat, papa, parsers
-, pretty, stdenv, text, transformers, trifecta
+{ mkDerivation, ansi-wl-pprint, base, charset, deriving-compat
+, hedgehog, hspec, papa, parsers, pretty, stdenv, tasty
+, tasty-hspec, text, transformers, trifecta
 }:
 mkDerivation {
   pname = "hpython";
@@ -7,6 +8,10 @@ mkDerivation {
   src = ./.;
   libraryHaskellDepends = [
     base charset deriving-compat papa parsers pretty text transformers
+    trifecta
+  ];
+  testHaskellDepends = [
+    ansi-wl-pprint base hedgehog hspec papa pretty tasty tasty-hspec
     trifecta
   ];
   homepage = "https://github.com/qfpl/hpython";

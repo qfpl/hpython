@@ -278,18 +278,12 @@ shortString = try shortStringSingle <|> shortStringDouble
     shortStringSingle =
       annotated $
       ShortStringSingle <$>
-      between
-        singleQuote
-        singleQuote
-        (many charOrEscapeSingle)
+      (singleQuote *> manyTill charOrEscapeSingle (try singleQuote))
       
     shortStringDouble =
       annotated $
       ShortStringDouble <$>
-      between
-        doubleQuote
-        doubleQuote
-        (many charOrEscapeDouble)
+      (doubleQuote *> manyTill charOrEscapeDouble (try doubleQuote))
 
     charOrEscapeSingle =
       try (Left <$> shortStringCharSingle) <|>
@@ -304,14 +298,20 @@ shortString = try shortStringSingle <|> shortStringDouble
     shortStringCharSingle
       :: (HasCallStack, DeltaParsing m) => m (ShortStringChar SingleQuote)
     shortStringCharSingle =
-      (^?! _ShortStringCharSingle) <$>
+      -- (^?! _ShortStringCharSingle) <$>
+      -- oneOfSet
+        -- (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '\'')
+      (\c -> fromMaybe (error $ show c) $ c ^? _ShortStringCharSingle) <$>
       oneOfSet
         (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '\'')
 
     shortStringCharDouble
       :: (HasCallStack, DeltaParsing m) => m (ShortStringChar DoubleQuote)
     shortStringCharDouble =
-      (^?! _ShortStringCharDouble) <$>
+      -- (^?! _ShortStringCharDouble) <$>
+      -- oneOfSet
+        -- (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '"')
+      (\c -> fromMaybe (error $ show c) $ c ^? _ShortStringCharDouble) <$>
       oneOfSet
         (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '"')
 
@@ -321,12 +321,12 @@ longString = try longStringSingle <|> longStringDouble
     longStringSingle =
       annotated $
       LongStringSingle <$>
-      between tripleSinglequote tripleSinglequote (many charOrEscape)
+      (tripleSinglequote *> manyTill charOrEscape (try tripleSinglequote))
       
     longStringDouble =
       annotated $
       LongStringDouble <$>
-      between tripleDoublequote tripleDoublequote (many charOrEscape)
+      (tripleDoublequote *> manyTill charOrEscape (try tripleDoublequote))
 
     charOrEscape =
       try (Left <$> longStringChar) <|> (Right <$> stringEscape)
@@ -336,16 +336,17 @@ longString = try longStringSingle <|> longStringDouble
     longStringChar
       :: (HasCallStack, DeltaParsing m) => m LongStringChar
     longStringChar =
-      (^?! _LongStringChar) <$> satisfy (/= '\\')
+      -- (^?! _LongStringChar) <$> satisfy (/= '\\')
+      (\c -> fromMaybe (error $ show c) $ c ^? _LongStringChar) <$>
+      satisfy (/= '\\')
       
-    
 stringLiteral :: DeltaParsing m => m (StringLiteral SrcInfo)
 stringLiteral =
   annotated $
   StringLiteral <$>
   beforeF
     (optional $ try stringPrefix)
-    (try (InL <$> shortString) <|> (InR <$> longString))
+    (try (InR <$> longString) <|> (InL <$> shortString))
 
 bytesPrefix :: DeltaParsing m => m BytesPrefix
 bytesPrefix =
@@ -366,18 +367,12 @@ shortBytes = try shortBytesSingle <|> shortBytesDouble
     shortBytesSingle =
       annotated $
       ShortBytesSingle <$>
-      between
-        singleQuote
-        singleQuote
-        (many charOrEscapeSingle)
+      (singleQuote *> manyTill charOrEscapeSingle (try singleQuote))
       
     shortBytesDouble =
       annotated $
       ShortBytesDouble <$>
-      between
-        doubleQuote
-        doubleQuote
-        (many charOrEscapeDouble)
+      (doubleQuote *> manyTill charOrEscapeDouble (try doubleQuote))
 
     charOrEscapeSingle =
       try (Left <$> shortBytesCharSingle) <|>
@@ -391,19 +386,27 @@ shortBytes = try shortBytesSingle <|> shortBytesDouble
       :: (HasCallStack, DeltaParsing m) => m BytesEscapeSeq
     bytesEscape =
       char '\\' *>
-      ((^?! _BytesEscapeSeq) <$> oneOfSet CharSet.ascii)
+      -- ((^?! _BytesEscapeSeq) <$> oneOfSet CharSet.ascii)
+      ((\c -> fromMaybe (error (show c)) $ c ^? _BytesEscapeSeq) <$>
+       oneOfSet CharSet.ascii)
 
     shortBytesCharSingle
       :: (HasCallStack, DeltaParsing m) => m (ShortBytesChar SingleQuote)
     shortBytesCharSingle =
-      (^?! _ShortBytesCharSingle) <$>
+      -- (^?! _ShortBytesCharSingle) <$>
+      -- oneOfSet
+        -- (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '\'')
+      (\c -> fromMaybe (error $ show c) $ c ^? _ShortBytesCharSingle) <$>
       oneOfSet
         (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '\'')
 
     shortBytesCharDouble
       :: (HasCallStack, DeltaParsing m) => m (ShortBytesChar DoubleQuote)
     shortBytesCharDouble =
-      (^?! _ShortBytesCharDouble) <$>
+      -- (^?! _ShortBytesCharDouble) <$>
+      -- oneOfSet
+        -- (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '"')
+      (\c -> fromMaybe (error $ show c) $ c ^? _ShortBytesCharDouble) <$>
       oneOfSet
         (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '"')
 
@@ -425,12 +428,12 @@ longBytes = try longBytesSingle <|> longBytesDouble
     longBytesSingle =
       annotated $
       LongBytesSingle <$>
-      between tripleSinglequote tripleSinglequote (many charOrEscape)
+      (tripleSinglequote *> manyTill charOrEscape (try tripleSinglequote))
       
     longBytesDouble =
       annotated $
       LongBytesDouble <$>
-      between tripleDoublequote tripleDoublequote (many charOrEscape)
+      (tripleDoublequote *> manyTill charOrEscape (try tripleDoublequote))
 
     charOrEscape =
       try (Left <$> longBytesChar) <|> (Right <$> bytesEscape)
@@ -438,20 +441,25 @@ longBytes = try longBytesSingle <|> longBytesDouble
     bytesEscape
       :: (HasCallStack, DeltaParsing m) => m BytesEscapeSeq
     bytesEscape =
+      -- char '\\' *>
+      -- ((^?! _BytesEscapeSeq) <$> oneOfSet CharSet.ascii)
       char '\\' *>
-      ((^?! _BytesEscapeSeq) <$> oneOfSet CharSet.ascii)
+      ((\c -> fromMaybe (error $ show c) $ c ^? _BytesEscapeSeq) <$>
+       oneOfSet CharSet.ascii)
       
     longBytesChar
       :: (HasCallStack, DeltaParsing m) => m LongBytesChar
     longBytesChar =
-      (^?! _LongBytesChar) <$> oneOfSet (CharSet.ascii CharSet.\\ CharSet.singleton '\\')
+      -- (^?! _LongBytesChar) <$> oneOfSet (CharSet.ascii CharSet.\\ CharSet.singleton '\\')
+      (\c -> fromMaybe (error $ show c) $ c ^? _LongBytesChar) <$>
+      oneOfSet (CharSet.ascii CharSet.\\ CharSet.singleton '\\')
 
 bytesLiteral :: DeltaParsing m => m (BytesLiteral SrcInfo)
 bytesLiteral =
   annotated $
   BytesLiteral <$>
   bytesPrefix <*>
-  (try (fmap InL shortBytes) <|> fmap InR longBytes)
+  (try (InR <$> longBytes) <|> (InL <$> shortBytes))
 
 nonZeroDigit :: DeltaParsing m => m NonZeroDigit
 nonZeroDigit =

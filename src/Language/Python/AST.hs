@@ -497,16 +497,20 @@ data Trailer a
   = TrailerCall
   { _trailerCall_value
     :: Compose
-         Maybe
-         (Compose (Between' [WhitespaceChar]) ArgList)
+         (Between' [WhitespaceChar])
+         (Compose
+           Maybe
+           ArgList)
          a
   , _trailer_ann :: a
   }
   | TrailerSubscript
   { _trailerSubscript_value
     :: Compose
-         Maybe
-         (Compose (Between' [WhitespaceChar]) SubscriptList)
+         (Between' [WhitespaceChar])
+         (Compose
+           Maybe
+           SubscriptList)
          a
   , _trailer_ann :: a
   }

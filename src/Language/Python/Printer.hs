@@ -617,9 +617,9 @@ subscriptList (SubscriptList h t c _) =
 trailer :: Trailer a -> Doc
 trailer t =
   case t of
-    TrailerCall val _ -> parens $ foldMapF (betweenWhitespace'F argList) val
+    TrailerCall val _ -> parens $ betweenWhitespace'F (foldMapF argList) val
     TrailerSubscript val _ ->
-      brackets $ foldMapF (betweenWhitespace'F subscriptList) val
+      brackets $ betweenWhitespace'F (foldMapF subscriptList) val
     TrailerAccess val _ -> char '.' <> whitespaceBeforeF identifier val
 
 atomExpr :: AtomExpr a -> Doc

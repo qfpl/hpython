@@ -228,33 +228,6 @@ doubleAsterisk = string "**" $> DoubleAsterisk
 asterisk :: DeltaParsing m => m Asterisk
 asterisk = char '*' $> Asterisk
 
-argument :: DeltaParsing m => m (Argument SrcInfo)
-argument = try argumentFor <|> try argumentDefault <|> argumentUnpack
-  where
-    argumentFor =
-      annotated $
-      ArgumentFor <$>
-      test <*>
-      optionalF (try $ whitespaceBeforeF compFor)
-    argumentDefault =
-      annotated $
-      ArgumentDefault <$>
-      (whitespaceAfterF test <* char '=') <*>
-      whitespaceBeforeF test
-    argumentUnpack =
-      annotated $
-      ArgumentUnpack <$>
-      (try (Left <$> asterisk) <|> (Right <$> doubleAsterisk)) <*>
-      whitespaceBeforeF test
-
-argList :: DeltaParsing m => m (ArgList SrcInfo)
-argList =
-  annotated $
-  ArgList <$>
-  argument <*>
-  manyF (try $ beforeF (betweenWhitespace comma) argument) <*>
-  optional (try $ whitespaceBefore comma)
-
 colon :: DeltaParsing m => m Colon
 colon = char ':' $> Colon
 
@@ -772,6 +745,26 @@ sliceOp =
   annotated $
   SliceOp <$>
   (char ':' *> optionalF (try $ whitespaceBeforeF test))
+  
+argument :: DeltaParsing m => m (Argument SrcInfo)
+argument = try argumentUnpack <|> try argumentDefault <|> argumentFor
+  where
+    argumentFor =
+      annotated $
+      ArgumentFor <$>
+      test <*>
+      optionalF (try $ whitespaceBeforeF compFor)
+    argumentDefault =
+      annotated $
+      ArgumentDefault <$>
+      (whitespaceAfterF test <* char '=') <*>
+      whitespaceBeforeF test
+    argumentUnpack =
+      annotated $
+      ArgumentUnpack <$>
+      (try (Right <$> doubleAsterisk) <|> (Left <$> asterisk)) <*>
+      whitespaceBeforeF test
+
       
 subscript :: DeltaParsing m => m (Subscript SrcInfo)
 subscript = try subscriptSlice <|> subscriptTest
@@ -783,6 +776,14 @@ subscript = try subscriptSlice <|> subscriptTest
       optionalF (try $ whitespaceAfterF test) <*>
       (char ':' *> optionalF (try $ whitespaceBeforeF test)) <*>
       optionalF (try $ whitespaceBeforeF sliceOp)
+      
+argList :: DeltaParsing m => m (ArgList SrcInfo)
+argList =
+  annotated $
+  ArgList <$>
+  argument <*>
+  manyF (try $ beforeF (betweenWhitespace comma) argument) <*>
+  optional (try $ whitespaceBefore comma)
 
 subscriptList :: DeltaParsing m => m (SubscriptList SrcInfo)
 subscriptList =
@@ -798,7 +799,10 @@ trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
     trailerCall =
       annotated $
       TrailerCall <$>
-      between (char '(') (char ')') (optionalF (try $ betweenWhitespaceF argList))
+      between
+        (char '(')
+        (char ')')
+        (betweenWhitespaceF . optionalF $ try argList)
       
     trailerSubscript =
       annotated $
@@ -806,7 +810,7 @@ trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
       between
         (char '[')
         (char ']')
-        (optionalF (try $ betweenWhitespaceF subscriptList))
+        (betweenWhitespaceF . optionalF $ try subscriptList)
 
     trailerAccess =
       annotated $

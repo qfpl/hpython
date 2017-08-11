@@ -774,7 +774,7 @@ sliceOp =
   (char ':' *> optionalF (try $ whitespaceBeforeF test))
       
 subscript :: DeltaParsing m => m (Subscript SrcInfo)
-subscript = try subscriptTest <|> subscriptSlice
+subscript = try subscriptSlice <|> subscriptTest
   where
     subscriptTest = annotated $ SubscriptTest <$> test
     subscriptSlice =

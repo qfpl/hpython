@@ -1,6 +1,6 @@
 { mkDerivation, ansi-wl-pprint, base, charset, deriving-compat
-, directory, filepath, hedgehog, papa, parsers, pretty, stdenv
-, tasty, tasty-hspec, text, transformers, trifecta
+, directory, filepath, hedgehog, papa, parsers, pretty, process
+, stdenv, tasty, tasty-hspec, text, transformers, trifecta
 }:
 mkDerivation {
   pname = "hpython";
@@ -11,8 +11,8 @@ mkDerivation {
     trifecta
   ];
   testHaskellDepends = [
-    ansi-wl-pprint base directory filepath hedgehog papa pretty tasty
-    tasty-hspec trifecta
+    ansi-wl-pprint base directory filepath hedgehog papa pretty process
+    tasty tasty-hspec transformers trifecta
   ];
   homepage = "https://github.com/qfpl/hpython";
   description = "Write Python using Haskell";

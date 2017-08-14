@@ -56,7 +56,7 @@ checkSyntax input = do
       , "-m py_compile" 
       ]
       ""
-  case parseString parseErr mempty input of
+  case parseString parseErr mempty err of
     Success s -> pure s
     Failure (ErrInfo msg _) ->
       error $
@@ -68,8 +68,8 @@ checkSyntax input = do
     parseErr :: (Monad m, DeltaParsing m) => m SyntaxCheckResult
     parseErr = do
       msg <- manyTill anyChar (try $ string "SyntaxError")
-      error <- optional (string "SyntaxError:" *> manyTill anyChar eof)
-      pure $ case error of
+      err <- optional (string "SyntaxError:" *> manyTill anyChar eof)
+      pure $ case err of
         Nothing -> SyntaxCorrect
         Just _ -> SyntaxError msg
 

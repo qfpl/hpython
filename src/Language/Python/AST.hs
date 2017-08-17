@@ -1161,6 +1161,3 @@ deriveEq ''PythonModule
 deriveShow ''PythonModule
 deriveEq1 ''PythonModule
 deriveShow1 ''PythonModule
-
-deriveEq1 ''NonEmpty
-deriveShow1 ''NonEmpty

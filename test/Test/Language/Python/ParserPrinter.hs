@@ -2,7 +2,7 @@
 
 module Test.Language.Python.ParserPrinter (makeParserPrinterTests) where
 
-import Papa
+import Papa as Papa
 import Prelude (error)
 import Control.Monad.IO.Class
 import Hedgehog
@@ -11,6 +11,7 @@ import System.FilePath
 import System.Process
 import Test.Tasty
 import Test.Tasty.Hspec
+import Test.Tasty.Hedgehog
 import Text.Trifecta hiding (render)
 
 import qualified Hedgehog.Gen as Gen
@@ -52,26 +53,33 @@ checkSyntax input = do
   (_, _, err) <-
     readProcessWithExitCode
       "python3"
-      [ "-c " ++ input
-      , "-m py_compile" 
+      [ "-c"
+      , input
+      , "-m"
+      , "py_compile" 
       ]
       ""
-  case parseString parseErr mempty err of
-    Success s -> pure s
-    Failure (ErrInfo msg _) ->
-      error $
-        WL.displayS (WL.renderPretty 1.0 80 $
-          WL.text "Parsing of Python stderr failed: " WL.<$>
-          WL.line <>
-          msg) ""
+  case last (lines err) of
+    Nothing -> pure SyntaxCorrect
+    Just l -> 
+      case parseString (parseErr err) mempty l of
+        Success s -> pure s
+        Failure (ErrInfo msg _) ->
+          error $
+            WL.displayS (WL.renderPretty 1.0 80 $
+              WL.text "Parsing of Python stderr failed." WL.<$>
+              WL.line <>
+              WL.text "Parser error: " WL.<$> WL.line <> msg WL.<$> WL.line <>
+              WL.text "Input string: " WL.<$> WL.line <> WL.text err) ""
   where
-    parseErr :: (Monad m, DeltaParsing m) => m SyntaxCheckResult
-    parseErr = do
-      msg <- manyTill anyChar (try $ string "SyntaxError")
-      err <- optional (string "SyntaxError:" *> manyTill anyChar eof)
+    parseErr :: (Monad m, DeltaParsing m) => String -> m SyntaxCheckResult
+    parseErr errorMsg = do
+      err <- optional (manyTill anyChar (try $ string "Error: "))
+      msg <- manyTill anyChar eof
       pure $ case err of
-        Nothing -> SyntaxCorrect
-        Just _ -> SyntaxError msg
+        Just "Syntax" -> SyntaxError errorMsg
+        Just "Indentation" -> SyntaxError errorMsg
+        _ -> SyntaxCorrect
 
 prop_ast_is_valid_python :: Property
 prop_ast_is_valid_python =
@@ -79,7 +87,21 @@ prop_ast_is_valid_python =
     expr <- forAll GenAST.genTest
     let program = HPJ.render $ Print.test expr
     res <- liftIO $ checkSyntax program
-    res === SyntaxCorrect 
+    case res of
+      SyntaxError pythonError -> do
+        footnote $
+          unlines
+          [ "Input string caused a syntax error."
+          , ""
+          , "Input string:"
+          , show program
+          , ""
+          , "Error message:"
+          , ""
+          , pythonError
+          ]
+        failure
+      SyntaxCorrect -> success
 
 makeParserPrinterTests :: IO [TestTree]
 makeParserPrinterTests = do
@@ -88,4 +110,4 @@ makeParserPrinterTests = do
   let filesExpectations =
         zip files (parse_print_expr_id <$> contents)
   let spec = traverse_ (uncurry it) filesExpectations
-  testSpecs spec
+  (testProperty "AST is valid python" prop_ast_is_valid_python :) <$> testSpecs spec

@@ -349,18 +349,18 @@ float' :: Float' a -> Doc
 float' f =
   case f of
     FloatNoDecimal b e _ ->
-      integer' b <>
+      foldMap digit b <>
       ex e
     FloatDecimalNoBase f e _ ->
-      char '.' <> integer' f <> ex e 
+      char '.' <> foldMap digit f <> ex e 
     FloatDecimalBase b f e _ ->
-      integer' b <> char '.' <> foldMapF integer' f <> ex e
+      foldMap digit b <> char '.' <> foldMap digit f <> ex e
   where
     ex =
-      foldMapF
-        (beforeF
-          (either (const $ char 'e') (const $ char 'E'))
-          integer')
+      foldMap
+        (before
+          (either (const $ char 'e') (const $ char 'E')) $
+          foldMap digit)
 
 sumElim :: (forall x. f x -> r) -> (forall x. g x -> r) -> Sum f g a -> r
 sumElim f _ (InL a) = f a

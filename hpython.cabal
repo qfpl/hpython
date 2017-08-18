@@ -21,8 +21,8 @@ library
                        Language.Python.AST.BytesEscapeSeq
                        Language.Python.AST.Keywords
                        Language.Python.AST.LongBytesChar
-                       Language.Python.AST.ShortBytesChar
                        Language.Python.AST.LongStringChar
+                       Language.Python.AST.ShortBytesChar
                        Language.Python.AST.ShortStringChar
                        Language.Python.AST.Symbols
                        Language.Python.Parser

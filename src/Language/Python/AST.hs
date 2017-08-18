@@ -211,37 +211,22 @@ data PointFloat
 
 data Float' a
   = FloatNoDecimal
-  { _floatNoDecimal_base :: Integer' a
+  { _floatNoDecimal_base :: NonEmpty Digit
   , _float_exponent
-    :: Compose
-         Maybe
-         (Compose
-           (Before (Either Char_e Char_E))
-           Integer')
-         a
+    :: Maybe (Before (Either Char_e Char_E) (NonEmpty Digit))
   , _float_ann :: a
   }
   | FloatDecimalNoBase
-  { _floatDecimalNoBase_fraction :: Integer' a
+  { _floatDecimalNoBase_fraction :: NonEmpty Digit
   , _float_exponent
-    :: Compose
-         Maybe
-         (Compose
-           (Before (Either Char_e Char_E))
-           Integer')
-         a
+    :: Maybe (Before (Either Char_e Char_E) (NonEmpty Digit))
   , _float_ann :: a
   }
   | FloatDecimalBase
-  { _floatDecimalBase_base :: Integer' a
-  , _floatDecimalBase_fraction :: Compose Maybe Integer' a
+  { _floatDecimalBase_base :: NonEmpty Digit
+  , _floatDecimalBase_fraction :: Compose Maybe NonEmpty Digit
   , _float_exponent
-    :: Compose
-         Maybe
-         (Compose
-           (Before (Either Char_e Char_E))
-           Integer')
-         a
+    :: Maybe (Before (Either Char_e Char_E) (NonEmpty Digit))
   , _float_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -1161,3 +1146,6 @@ deriveEq ''PythonModule
 deriveShow ''PythonModule
 deriveEq1 ''PythonModule
 deriveShow1 ''PythonModule
+
+deriveEq1 ''NonEmpty
+deriveShow1 ''NonEmpty

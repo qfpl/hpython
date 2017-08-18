@@ -555,21 +555,23 @@ float = try floatDecimalBase <|> try floatDecimalNoBase <|> floatNoDecimal
     floatDecimalBase =
       annotated $
       FloatDecimalBase <$>
-      integer <*>
-      (char '.' *> optionalF (try integer)) <*>
-      optionalF (try $ beforeF e integer)
+      try (some1 digit') <*>
+      (char '.' *> optionalF (some1 digit')) <*>
+      ex
 
     floatDecimalNoBase =
       annotated $
       FloatDecimalNoBase <$>
-      (char '.' *> integer) <*>
-      optionalF (try $ beforeF e integer)
+      (char '.' *> some1 digit') <*>
+      ex
 
     floatNoDecimal =
       annotated $
       FloatNoDecimal <$>
-      integer <*>
-      optionalF (try $ beforeF e integer)
+      try (some1 digit') <*>
+      ex
+
+    ex = optional (try $ Before <$> e <*> some1 digit')
 
 j :: DeltaParsing m => m (Either Char_j Char_J)
 j = try (fmap Left $ char 'j' $> Char_j) <|> fmap Right (char 'J' $> Char_J)
@@ -681,8 +683,8 @@ atom =
   try atomBracket <|>
   try atomCurly <|>
   try atomIdentifier <|>
-  try atomFloat <|>
   try atomInteger <|>
+  try atomFloat <|>
   try atomString <|>
   try atomEllipsis <|>
   try atomNone <|>

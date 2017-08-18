@@ -144,7 +144,7 @@ genBetweenWhitespace1F
   => m (f a)
   -> m (Compose (Between' (NonEmpty AST.WhitespaceChar)) f a)
 genBetweenWhitespace1F = fmap Compose . genBetweenWhitespace1
-    
+
 genIfThenElse :: MonadGen m => m (AST.IfThenElse ())
 genIfThenElse =
   AST.IfThenElse <$>
@@ -160,13 +160,13 @@ genTermOp =
     , AST.TermDiv
     , AST.TermMod
     ]
-    
+
 genStarExpr :: MonadGen m => m (AST.StarExpr ())
 genStarExpr =
   AST.StarExpr <$>
   genWhitespaceBeforeF genExpr <*>
   pure ()
-    
+
 genTestlistComp :: MonadGen m => m (AST.TestlistComp ())
 genTestlistComp =
   Gen.choice
@@ -311,21 +311,22 @@ genFloat :: MonadGen m => m (AST.Float' ())
 genFloat =
   Gen.choice
     [ AST.FloatNoDecimal <$>
-      genInteger <*>
-      genMaybeF
-        (genBeforeF genE genInteger) <*>
+      someDigits <*>
+      Gen.maybe
+        (genBefore genE someDigits) <*>
       pure ()
     , AST.FloatDecimalNoBase <$>
-      genInteger <*>
-      genMaybeF (genBeforeF genE genInteger) <*>
+      someDigits <*>
+      Gen.maybe (genBefore genE someDigits) <*>
       pure ()
     , AST.FloatDecimalBase <$>
-      genInteger <*>
-      genMaybeF genInteger <*>
-      genMaybeF (genBeforeF genE genInteger) <*>
+      someDigits <*>
+      genMaybeF someDigits <*>
+      Gen.maybe (genBefore genE someDigits) <*>
       pure ()
     ]
   where
+    someDigits = Gen.nonEmpty (Range.linear 0 10) genDigit
     genE = Gen.element [Left AST.Char_e, Right AST.Char_E]
 
 genStringPrefix :: MonadGen m => m AST.StringPrefix
@@ -539,7 +540,7 @@ genTestNocond :: MonadGen m => m (AST.TestNocond ())
 genTestNocond =
   AST.TestNocond <$>
   Gen.choice [ InL <$> genOrTest, InR <$> genLambdefNocond ] <*>
-  pure () 
+  pure ()
 
 genCompIf :: MonadGen m => m (AST.CompIf ())
 genCompIf =
@@ -757,8 +758,8 @@ genCompOperator =
     , pure AST.CompLEq
     , pure AST.CompNEq
     , AST.CompIs <$> genWhitespaceChar
-    , AST.CompIsNot <$> genWhitespace1 <*> genWhitespaceChar
     , AST.CompIn <$> genWhitespaceChar
+    , AST.CompIsNot <$> genWhitespace1 <*> genWhitespaceChar
     , AST.CompNotIn <$> genWhitespace1 <*> genWhitespaceChar
     ]
 
@@ -775,12 +776,12 @@ genComparison =
 genNotTest :: MonadGen m => m (AST.NotTest ())
 genNotTest =
   Gen.choice
-    [ AST.NotTestSome <$>
+    [ AST.NotTestNone <$> genComparison <*> pure ()
+    , AST.NotTestSome <$>
       genBeforeF
         (genWhitespaceAfter1 $ pure AST.KNot)
         genNotTest <*>
       pure ()
-    , AST.NotTestNone <$> genComparison <*> pure ()
     ]
     
 genAndTest :: MonadGen m => m (AST.AndTest ())
@@ -808,12 +809,10 @@ genTest =
   Gen.choice
     [ AST.TestCond <$>
       genOrTest <*>
-      (Compose <$>
-         Gen.maybe
-           (Compose <$>
-              genBefore
-                genWhitespace1 
-                genIfThenElse)) <*>
+      (genMaybeF
+        (genBeforeF
+          genWhitespace1 
+          genIfThenElse)) <*>
       pure ()
     -- , pure AST.TestLambdef
     ]

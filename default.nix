@@ -1,4 +1,14 @@
-{ pkgs ? import <nixpkgs> { }, compiler ? "ghc802" }:
-pkgs.haskell.packages.${compiler}.callPackage
-  ./hpython.nix
-  { inherit (import ./papa.nix haskellPackages); }
+{ nixpkgs ? import <nixpkgs> { }, compiler ? "default" }:
+let
+  inherit (nixpkgs) pkgs;
+  haskellPackages = if compiler == "default"
+                       then pkgs.haskellPackages
+                       else pkgs.haskell.packages.${compiler};
+
+  drv = haskellPackages.callPackage ./hpython.nix { };
+
+in
+
+  drv.overrideAttrs (oldAttrs: oldAttrs // {
+    buildInputs = oldAttrs.buildInputs ++ [ pkgs.python3 ];
+  })

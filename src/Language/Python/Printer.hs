@@ -1,3 +1,4 @@
+{-# language GADTs #-}
 {-# language RankNTypes #-}
 module Language.Python.Printer where
 
@@ -411,7 +412,7 @@ literal l =
     LiteralFloat val _ -> float' val
     LiteralImag val _ -> imag val
 
-ifThenElse :: IfThenElse a -> Doc
+ifThenElse :: IfThenElse ctxt a -> Doc
 ifThenElse (IfThenElse i e) =
   text "if" <>
   betweenWhitespace'F orTest i <>
@@ -450,13 +451,13 @@ doubleAsterisk :: DoubleAsterisk -> Doc
 doubleAsterisk _ = text "**"
 
 
-compIter :: CompIter a -> Doc
+compIter :: CompIter ctxt a -> Doc
 compIter (CompIter val _) = sumElim compFor compIf val
 
-varargsList :: VarargsList a -> Doc
+varargsList :: VarargsList ctxt a -> Doc
 varargsList = error "varargsList not implemented" 
 
-lambdefNocond :: LambdefNocond a -> Doc
+lambdefNocond :: LambdefNocond ctxt a -> Doc
 lambdefNocond  (LambdefNocond a e _) =
   text "lambda" <>
   foldMapF
@@ -468,23 +469,23 @@ lambdefNocond  (LambdefNocond a e _) =
   char ':' <>
   whitespaceBeforeF testNocond e
 
-testNocond :: TestNocond a -> Doc
+testNocond :: TestNocond ctxt a -> Doc
 testNocond (TestNocond val _) = sumElim orTest lambdefNocond val
 
-compIf :: CompIf a -> Doc
+compIf :: CompIf ctxt a -> Doc
 compIf (CompIf e i _) =
   text "if" <>
   whitespaceBeforeF testNocond e <>
   foldMapF (whitespaceBeforeF compIter) i
 
-exprList :: ExprList a -> Doc
+exprList :: ExprList ctxt a -> Doc
 exprList (ExprList h t _) =
   exprOrStar h <>
   foldMapF (beforeF (betweenWhitespace' comma) exprOrStar) t
   where
     exprOrStar = sumElim expr starExpr
 
-compFor :: CompFor a -> Doc
+compFor :: CompFor ctxt a -> Doc
 compFor (CompFor t e i _) =
   text "for" <>
   betweenWhitespace'F exprList t <>
@@ -499,12 +500,12 @@ prodElim
   -> Product f g a -> r
 prodElim f g (Pair a b) = f a <> g b
 
-expr :: Expr a -> Doc
+expr :: Expr ctxt a -> Doc
 expr (Expr l r _) =
   xorExpr l <>
   foldMapF (beforeF (betweenWhitespace' pipe) xorExpr) r
 
-comparison :: Comparison a -> Doc
+comparison :: Comparison ctxt a -> Doc
 comparison (Comparison l r _) =
   expr l <>
   foldMapF
@@ -513,15 +514,15 @@ comparison (Comparison l r _) =
       expr)
     r
 
-dictOrSetMaker :: DictOrSetMaker a -> Doc
+dictOrSetMaker :: DictOrSetMaker ctxt a -> Doc
 dictOrSetMaker _ = error "dictOrSetMaker not implemented"
 
-starExpr :: StarExpr a -> Doc
+starExpr :: StarExpr ctxt a -> Doc
 starExpr (StarExpr val _) =
   char '*' <>
   whitespaceBeforeF expr val
 
-testlistComp :: TestlistComp a -> Doc
+testlistComp :: TestlistComp ctxt a -> Doc
 testlistComp t =
   case t of
     TestlistCompFor h t _ ->
@@ -534,13 +535,13 @@ testlistComp t =
   where
     testOrStar = sumElim test starExpr
 
-testList :: TestList a -> Doc
+testList :: TestList ctxt a -> Doc
 testList (TestList h t c _) =
   test h <>
   beforeF (betweenWhitespace' comma) test t <>
   foldMap (whitespaceBefore comma) c
 
-yieldArg :: YieldArg a -> Doc
+yieldArg :: YieldArg ctxt a -> Doc
 yieldArg y =
   case y of
     YieldArgFrom val _ -> text "from" <> whitespaceBeforeF test val
@@ -551,13 +552,15 @@ yieldExpr (YieldExpr val _) =
   text "yield" <>
   foldMapF (whitespaceBeforeF yieldArg) val
 
-atom :: Atom a -> Doc
+atom :: Atom ctxt a -> Doc
 atom a =
   case a of
-    AtomParen val _ ->
+    AtomParenYield val _ ->
       parens $
       betweenWhitespace'F
         (foldMapF $ sumElim yieldExpr testlistComp) val
+    AtomParenNoYield val _ ->
+      parens $ betweenWhitespace'F (foldMapF testlistComp) val
     AtomBracket val _ ->
       brackets $
       betweenWhitespace'F (foldMapF testlistComp) val
@@ -575,7 +578,7 @@ atom a =
     AtomTrue _ -> text "True"
     AtomFalse _ -> text "False"
 
-argument :: Argument a -> Doc
+argument :: Argument ctxt a -> Doc
 argument a =
   case a of
     ArgumentFor e f _ ->
@@ -589,16 +592,16 @@ argument a =
       either asterisk doubleAsterisk s <>
       whitespaceBeforeF test val
 
-argList :: ArgList a -> Doc
+argList :: ArgList ctxt a -> Doc
 argList (ArgList h t c _) =
   argument h <>
   foldMapF (beforeF (betweenWhitespace' comma) argument) t <>
   foldMap (whitespaceBefore comma) c
 
-sliceOp :: SliceOp a -> Doc
+sliceOp :: SliceOp ctxt a -> Doc
 sliceOp (SliceOp val _) = char ':' <> foldMapF (whitespaceBeforeF test) val
 
-subscript :: Subscript a -> Doc
+subscript :: Subscript ctxt a -> Doc
 subscript s =
   case s of
     SubscriptTest val _ -> test val
@@ -608,13 +611,13 @@ subscript s =
       foldMapF (whitespaceBeforeF test) r <>
       foldMapF (whitespaceBeforeF sliceOp) o
 
-subscriptList :: SubscriptList a -> Doc
+subscriptList :: SubscriptList ctxt a -> Doc
 subscriptList (SubscriptList h t c _) =
   subscript h <>
   foldMapF (beforeF (betweenWhitespace' comma) subscript) t <>
   foldMap (whitespaceBefore comma) c
 
-trailer :: Trailer a -> Doc
+trailer :: Trailer ctxt a -> Doc
 trailer t =
   case t of
     TrailerCall val _ -> parens $ betweenWhitespace'F (foldMapF argList) val
@@ -622,13 +625,16 @@ trailer t =
       brackets $ betweenWhitespace'F (foldMapF subscriptList) val
     TrailerAccess val _ -> char '.' <> whitespaceBeforeF identifier val
 
-atomExpr :: AtomExpr a -> Doc
-atomExpr (AtomExpr await a trailers _) =
+atomExpr :: AtomExpr ctxt a -> Doc
+atomExpr (AtomExprAwait await a trailers _) =
   foldMapF (whitespaceAfter kAwait) await <>
   atom a <>
   foldMapF (whitespaceBeforeF trailer) trailers
+atomExpr (AtomExprNoAwait a trailers _) =
+  atom a <>
+  foldMapF (whitespaceBeforeF trailer) trailers
 
-power :: Power a -> Doc
+power :: Power ctxt a -> Doc
 power (Power l r _) =
   atomExpr l <>
   foldMapF (beforeF (whitespaceAfter doubleAsterisk) factor) r
@@ -640,7 +646,7 @@ factorOp f =
     FactorPos -> char '+'
     FactorInv -> char '~'
 
-factor :: Factor a -> Doc
+factor :: Factor ctxt a -> Doc
 factor f =
   case f of
     FactorNone val _ -> power val
@@ -655,17 +661,17 @@ termOp t =
     TermDiv -> char '/'
     TermMod -> char '%'
 
-term :: Term a -> Doc
+term :: Term ctxt a -> Doc
 term (Term l r _) =
   factor l <>
   foldMapF (beforeF (betweenWhitespace' termOp) factor) r
 
-arithExpr :: ArithExpr a -> Doc
+arithExpr :: ArithExpr ctxt a -> Doc
 arithExpr (ArithExpr l r _) =
   term l <>
   foldMapF (beforeF (betweenWhitespace' (either plus minus)) term) r
   
-shiftExpr :: ShiftExpr a -> Doc
+shiftExpr :: ShiftExpr ctxt a -> Doc
 shiftExpr (ShiftExpr l r _) =
   arithExpr l <>
   foldMapF
@@ -674,23 +680,23 @@ shiftExpr (ShiftExpr l r _) =
       arithExpr)
     r
   
-andExpr :: AndExpr a -> Doc
+andExpr :: AndExpr ctxt a -> Doc
 andExpr (AndExpr l r _) =
   shiftExpr l <>
   foldMapF (beforeF (betweenWhitespace' ampersand) shiftExpr) r
 
-xorExpr :: XorExpr a -> Doc
+xorExpr :: XorExpr ctxt a -> Doc
 xorExpr (XorExpr l r _) =
   andExpr l <>
   foldMapF (beforeF (betweenWhitespace' caret) andExpr) r
 
-notTest :: NotTest a -> Doc
+notTest :: NotTest ctxt a -> Doc
 notTest n =
   case n of
     NotTestSome val _ -> beforeF (whitespaceAfter kNot) notTest val
     NotTestNone val _ -> comparison val
       
-andTest :: AndTest a -> Doc
+andTest :: AndTest ctxt a -> Doc
 andTest (AndTest l r _) =
   notTest l <>
   foldMapF
@@ -699,12 +705,12 @@ andTest (AndTest l r _) =
       andTest)
     r
 
-orTest :: OrTest a -> Doc
+orTest :: OrTest ctxt a -> Doc
 orTest (OrTest l r _) =
   andTest l <>
   foldMapF (beforeF (betweenWhitespace' kOr) andTest) r
 
-test :: Test a -> Doc
+test :: Test ctxt a -> Doc
 test t =
   case t of
     TestCond h t _ ->

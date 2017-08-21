@@ -1,3 +1,6 @@
+{-# language DataKinds #-}
+{-# language FlexibleInstances #-}
+{-# language KindSignatures #-}
 module Test.Language.Python.AST.Gen where
 
 import Papa
@@ -31,10 +34,14 @@ genBeforeF
   -> m (Compose (Before s) f a)
 genBeforeF ms = fmap Compose . genBefore ms
 
-genAfter :: MonadGen m => m s -> m a -> m (After s a)
+genAfter
+  :: MonadGen m
+  => m s -> m a -> m (After s a)
 genAfter = liftA2 After
 
-genBetween :: MonadGen m => m s -> m t -> m a -> m (Between s t a)
+genBetween
+  :: MonadGen m
+  => m s -> m t -> m a -> m (Between s t a)
 genBetween ms mt ma = Between <$> ms <*> ma <*> mt
 
 genBetweenF
@@ -45,13 +52,19 @@ genBetweenF
   -> m (Compose (Between s t) f a)
 genBetweenF ms mt = fmap Compose . genBetween ms mt
 
-genBetween' :: MonadGen m => m s -> m a -> m (Between' s a)
+genBetween'
+  :: MonadGen m
+  => m s -> m a -> m (Between' s a)
 genBetween' ms ma = Between' <$> genBetween ms ms ma
 
-genNewlineChar :: MonadGen m => m AST.NewlineChar
+genNewlineChar
+  :: MonadGen m
+  => m AST.NewlineChar
 genNewlineChar = Gen.element [AST.CR, AST.LF, AST.CRLF]
 
-genWhitespaceChar :: MonadGen m => m AST.WhitespaceChar
+genWhitespaceChar
+  :: MonadGen m
+  => m AST.WhitespaceChar
 genWhitespaceChar =
   Gen.choice
     [ pure AST.Space
@@ -59,15 +72,21 @@ genWhitespaceChar =
     , AST.Continued <$> genNewlineChar
     ]
 
-genListF :: MonadGen m => m (f a) -> m (Compose [] f a)
+genListF
+  :: MonadGen m
+  => m (f a) -> m (Compose [] f a)
 genListF ma =
   Compose <$>
   Gen.list (Range.linear 0 10) ma
   
-genMaybeF :: MonadGen m => m (f a) -> m (Compose Maybe f a)
+genMaybeF
+  :: MonadGen m
+  => m (f a) -> m (Compose Maybe f a)
 genMaybeF ma = Compose <$> Gen.maybe ma
     
-genWhitespace1 :: MonadGen m => m (NonEmpty AST.WhitespaceChar)
+genWhitespace1
+  :: MonadGen m
+  => m (NonEmpty AST.WhitespaceChar)
 genWhitespace1 = Gen.nonEmpty (Range.linear 1 10) genWhitespaceChar
 
 genWhitespaceBefore
@@ -118,7 +137,9 @@ genWhitespaceAfter1F
   -> m (Compose (After (NonEmpty AST.WhitespaceChar)) f a)
 genWhitespaceAfter1F = fmap Compose . genWhitespaceAfter1
 
-genWhitespace :: MonadGen m => m [AST.WhitespaceChar]
+genWhitespace
+  :: MonadGen m
+  => m [AST.WhitespaceChar]
 genWhitespace = Gen.list (Range.linear 0 10) genWhitespaceChar
 
 genBetweenWhitespace
@@ -145,7 +166,9 @@ genBetweenWhitespace1F
   -> m (Compose (Between' (NonEmpty AST.WhitespaceChar)) f a)
 genBetweenWhitespace1F = fmap Compose . genBetweenWhitespace1
 
-genIfThenElse :: MonadGen m => m (AST.IfThenElse ())
+genIfThenElse
+  :: (MonadGen m, GenAtomExpr ctxt)
+  => m (AST.IfThenElse ctxt ())
 genIfThenElse =
   AST.IfThenElse <$>
   genBetweenWhitespace1F genOrTest <*>
@@ -161,13 +184,13 @@ genTermOp =
     , AST.TermMod
     ]
 
-genStarExpr :: MonadGen m => m (AST.StarExpr ())
+genStarExpr :: (MonadGen m, GenAtomExpr ctxt) => m (AST.StarExpr ctxt ())
 genStarExpr =
   AST.StarExpr <$>
   genWhitespaceBeforeF genExpr <*>
   pure ()
 
-genTestlistComp :: MonadGen m => m (AST.TestlistComp ())
+genTestlistComp :: (MonadGen m, GenAtomExpr ctxt) => m (AST.TestlistComp ctxt ())
 genTestlistComp =
   Gen.choice
     [ AST.TestlistCompFor <$>
@@ -184,7 +207,7 @@ genTestlistComp =
   where
     genTestOrStar = Gen.choice [ InL <$> genTest, InR <$> genStarExpr ]
 
-genTestList :: MonadGen m => m (AST.TestList ())
+genTestList :: (MonadGen m, GenAtomExpr ctxt) => m (AST.TestList ctxt ())
 genTestList =
   AST.TestList <$>
     genTest <*>
@@ -192,7 +215,7 @@ genTestList =
     Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
     pure ()
 
-genYieldArg :: MonadGen m => m (AST.YieldArg ())
+genYieldArg :: (MonadGen m, GenAtomExpr ctxt) => m (AST.YieldArg ctxt ())
 genYieldArg =
   Gen.choice
     [ AST.YieldArgFrom <$> genWhitespaceBefore1F genTest <*> pure ()
@@ -205,7 +228,7 @@ genYieldExpr =
   genMaybeF (genWhitespaceBefore1F genYieldArg) <*>
   pure ()
 
-genDictOrSetMaker :: MonadGen m => m (AST.DictOrSetMaker ())
+genDictOrSetMaker :: (MonadGen m, GenAtomExpr ctxt) => m (AST.DictOrSetMaker ctxt ())
 genDictOrSetMaker = pure AST.DictOrSetMaker
 
 genDigit :: MonadGen m => m AST.Digit
@@ -494,8 +517,38 @@ genBytesLiteral =
     ] <*>
   Gen.choice [ InL <$> genShortBytes, InR <$> genLongBytes ] <*>
   pure ()
-    
-genAtom :: MonadGen m => m (AST.Atom ())
+
+class GenAtomParen (ctxt :: AST.ExprContext) where
+  genAtomParen :: MonadGen m => m (AST.Atom ctxt ())
+
+instance GenAtomParen ('AST.FunDef 'AST.Normal) where
+  genAtomParen = 
+    AST.AtomParenYield <$>
+      genBetweenWhitespaceF
+        (genMaybeF $
+         Gen.choice [InL <$> genYieldExpr, InR <$> genTestlistComp]) <*>
+      pure ()
+
+genAtomParenNoYield
+  :: (MonadGen m, GenAtomExpr ctxt) => m (AST.Atom ctxt ())
+genAtomParenNoYield =
+  AST.AtomParenNoYield <$>
+  genBetweenWhitespaceF
+    (genMaybeF genTestlistComp) <*>
+  pure ()
+
+instance GenAtomParen ('AST.FunDef 'AST.Async) where
+  genAtomParen = genAtomParenNoYield
+  
+instance GenAtomParen 'AST.TopLevel where
+  genAtomParen = genAtomParenNoYield
+
+genAtom
+  :: ( MonadGen m
+     , GenAtomParen ctxt
+     , GenAtomExpr ctxt
+     )
+  => m (AST.Atom ctxt ())
 genAtom =
   Gen.recursive Gen.choice
     [ AST.AtomIdentifier <$> genIdentifier <*> pure ()  
@@ -510,11 +563,7 @@ genAtom =
     , pure $ AST.AtomTrue ()
     , pure $ AST.AtomFalse ()
     ]
-    [ AST.AtomParen <$>
-      genBetweenWhitespaceF
-        (genMaybeF $
-         Gen.choice [InL <$> genYieldExpr, InR <$> genTestlistComp]) <*>
-      pure ()
+    [ genAtomParen
     , AST.AtomBracket <$>
       genBetweenWhitespaceF (genMaybeF genTestlistComp) <*>
       pure ()  
@@ -526,36 +575,36 @@ genAtom =
     genStringOrBytes =
       Gen.choice [ InL <$> genStringLiteral, InR <$> genBytesLiteral ]
 
-genVarargsList :: MonadGen m => m (AST.VarargsList ())
+genVarargsList :: (MonadGen m, GenAtomExpr ctxt) => m (AST.VarargsList ctxt ())
 genVarargsList = pure AST.VarargsList
 
-genLambdefNocond :: MonadGen m => m (AST.LambdefNocond ())
+genLambdefNocond :: (MonadGen m, GenAtomExpr ctxt) => m (AST.LambdefNocond ctxt ())
 genLambdefNocond =
   AST.LambdefNocond <$>
   genMaybeF (genBetweenF genWhitespace1 genWhitespace genVarargsList) <*>
   genWhitespaceBeforeF genTestNocond <*>
   pure ()
 
-genTestNocond :: MonadGen m => m (AST.TestNocond ())
+genTestNocond :: (MonadGen m, GenAtomExpr ctxt) => m (AST.TestNocond ctxt ())
 genTestNocond =
   AST.TestNocond <$>
-  Gen.choice [ InL <$> genOrTest, InR <$> genLambdefNocond ] <*>
+  Gen.choice [ InL <$> genOrTest {-, InR <$> genLambdefNocond -} ] <*>
   pure ()
 
-genCompIf :: MonadGen m => m (AST.CompIf ())
+genCompIf :: (MonadGen m, GenAtomExpr ctxt) => m (AST.CompIf ctxt ())
 genCompIf =
   AST.CompIf <$>
   genWhitespaceBeforeF genTestNocond <*>
   genMaybeF (genWhitespaceBeforeF genCompIter) <*>
   pure ()
 
-genCompIter :: MonadGen m => m (AST.CompIter ())
+genCompIter :: (MonadGen m, GenAtomExpr ctxt) => m (AST.CompIter ctxt ())
 genCompIter =
   AST.CompIter <$>
   Gen.choice [ InL <$> genCompFor, InR <$> genCompIf ] <*>
   pure ()
 
-genExprList :: MonadGen m => m (AST.ExprList ())
+genExprList :: (MonadGen m, GenAtomExpr ctxt) => m (AST.ExprList ctxt ())
 genExprList =
   AST.ExprList <$>
   genSumOrStar <*>
@@ -566,7 +615,7 @@ genExprList =
     genSumOrStar =
       Gen.choice [InL <$> genExpr, InR <$> genStarExpr]
     
-genCompFor :: MonadGen m => m (AST.CompFor ())
+genCompFor :: (MonadGen m, GenAtomExpr ctxt) => m (AST.CompFor ctxt ())
 genCompFor =
   AST.CompFor <$>
   genBetweenWhitespaceF genExprList <*>
@@ -574,7 +623,7 @@ genCompFor =
   genMaybeF (genWhitespaceBeforeF genCompIter) <*>
   pure ()
   
-genArgument :: MonadGen m => m (AST.Argument ())
+genArgument :: (MonadGen m, GenAtomExpr ctxt) => m (AST.Argument ctxt ())
 genArgument =
   Gen.choice
     [ AST.ArgumentFor <$>
@@ -591,7 +640,7 @@ genArgument =
       pure () 
     ]
     
-genArgList :: MonadGen m => m (AST.ArgList ())
+genArgList :: (MonadGen m, GenAtomExpr ctxt) => m (AST.ArgList ctxt ())
 genArgList =
   AST.ArgList <$>
   genArgument <*>
@@ -600,11 +649,11 @@ genArgList =
   Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
   pure () 
 
-genSliceOp :: MonadGen m => m (AST.SliceOp ())
+genSliceOp :: (MonadGen m, GenAtomExpr ctxt) => m (AST.SliceOp ctxt ())
 genSliceOp =
   AST.SliceOp <$> genMaybeF (genWhitespaceBeforeF genTest) <*> pure ()
 
-genSubscript :: MonadGen m => m (AST.Subscript ())
+genSubscript :: (MonadGen m, GenAtomExpr ctxt) => m (AST.Subscript ctxt ())
 genSubscript =
   Gen.choice
     [ AST.SubscriptTest <$> genTest <*> pure ()
@@ -615,7 +664,7 @@ genSubscript =
       pure ()
     ]
 
-genSubscriptList :: MonadGen m => m (AST.SubscriptList ())
+genSubscriptList :: (MonadGen m, GenAtomExpr ctxt) => m (AST.SubscriptList ctxt ())
 genSubscriptList =
   AST.SubscriptList <$>
   genSubscript <*>
@@ -634,7 +683,7 @@ genIdentifier =
     (Gen.frequency [(1, Gen.upper), (1, Gen.lower), (26, pure '_')])) <*>
   pure ()
 
-genTrailer :: MonadGen m => m (AST.Trailer ())
+genTrailer :: (MonadGen m, GenAtomExpr ctxt) => m (AST.Trailer ctxt ())
 genTrailer =
   Gen.recursive Gen.choice
     [ AST.TrailerAccess <$>
@@ -648,16 +697,44 @@ genTrailer =
       genBetweenWhitespaceF (genMaybeF genSubscriptList) <*>
       pure ()
     ]
+
+class GenAtomExpr (ctxt :: AST.ExprContext) where
+  genAtomExpr
+    :: ( MonadGen m
+       
+       )
+    => m (AST.AtomExpr ctxt ())
+
+instance GenAtomExpr ('AST.FunDef 'AST.Normal) where
+  genAtomExpr = genAtomExprNoAwait
+  
+instance GenAtomExpr 'AST.TopLevel where
+  genAtomExpr = genAtomExprNoAwait
+  
+instance GenAtomExpr ('AST.FunDef 'AST.Async) where
+  genAtomExpr = genAtomExprAwait
     
-genAtomExpr :: MonadGen m => m (AST.AtomExpr ())
-genAtomExpr =
-  AST.AtomExpr <$>
+genAtomExprAwait :: MonadGen m => m (AST.AtomExpr ('AST.FunDef 'AST.Async) ())
+genAtomExprAwait =
+  AST.AtomExprAwait <$>
   genMaybeF (genWhitespaceAfter1 $ pure AST.KAwait) <*>
   genAtom <*>
   genListF (genWhitespaceBeforeF genTrailer) <*>
   pure ()
+  
+genAtomExprNoAwait
+  :: ( GenAtomExpr ctxt
+     , GenAtomParen ctxt
+     , MonadGen m
+     )
+  => m (AST.AtomExpr ctxt ())
+genAtomExprNoAwait =
+  AST.AtomExprNoAwait <$>
+  genAtom <*>
+  genListF (genWhitespaceBeforeF genTrailer) <*>
+  pure ()
     
-genPower :: MonadGen m => m (AST.Power ())
+genPower :: (MonadGen m, GenAtomExpr ctxt) => m (AST.Power ctxt ())
 genPower =
   AST.Power <$>
   genAtomExpr <*>
@@ -675,7 +752,7 @@ genFactorOp =
     , AST.FactorInv
     ]
     
-genFactor :: MonadGen m => m (AST.Factor ())
+genFactor :: (MonadGen m, GenAtomExpr ctxt) => m (AST.Factor ctxt ())
 genFactor =
   Gen.choice
     [ AST.FactorNone <$>
@@ -686,7 +763,7 @@ genFactor =
       pure ()
     ]
 
-genTerm :: MonadGen m => m (AST.Term ())
+genTerm :: (MonadGen m, GenAtomExpr ctxt) => m (AST.Term ctxt ())
 genTerm =
   AST.Term <$>
   genFactor <*>
@@ -696,7 +773,7 @@ genTerm =
       genFactor) <*>
   pure ()
 
-genArithExpr :: MonadGen m => m (AST.ArithExpr ())
+genArithExpr :: (MonadGen m, GenAtomExpr ctxt) => m (AST.ArithExpr ctxt ())
 genArithExpr =
   AST.ArithExpr <$>
   genTerm <*>
@@ -707,7 +784,7 @@ genArithExpr =
       genTerm) <*>
   pure ()
 
-genShiftExpr :: MonadGen m => m (AST.ShiftExpr ())
+genShiftExpr :: (MonadGen m, GenAtomExpr ctxt) => m (AST.ShiftExpr ctxt ())
 genShiftExpr =
   AST.ShiftExpr <$>
   genArithExpr <*>
@@ -718,7 +795,7 @@ genShiftExpr =
       genArithExpr) <*>
   pure ()
 
-genAndExpr :: MonadGen m => m (AST.AndExpr ())
+genAndExpr :: (MonadGen m, GenAtomExpr ctxt) => m (AST.AndExpr ctxt ())
 genAndExpr =
   AST.AndExpr <$>
   genShiftExpr <*>
@@ -728,7 +805,7 @@ genAndExpr =
       genShiftExpr) <*>
   pure ()
 
-genXorExpr :: MonadGen m => m (AST.XorExpr ())
+genXorExpr :: (MonadGen m, GenAtomExpr ctxt) => m (AST.XorExpr ctxt ())
 genXorExpr =
   AST.XorExpr <$>
   genAndExpr <*>
@@ -738,7 +815,7 @@ genXorExpr =
       genAndExpr) <*>
   pure ()
 
-genExpr :: MonadGen m => m (AST.Expr ())
+genExpr :: (MonadGen m, GenAtomExpr ctxt) => m (AST.Expr ctxt ())
 genExpr =
   AST.Expr <$>
   genXorExpr <*>
@@ -763,7 +840,7 @@ genCompOperator =
     , AST.CompNotIn <$> genWhitespace1 <*> genWhitespaceChar
     ]
 
-genComparison :: MonadGen m => m (AST.Comparison ())
+genComparison :: (MonadGen m, GenAtomExpr ctxt) => m (AST.Comparison ctxt ())
 genComparison =
   AST.Comparison <$>
   genExpr <*>
@@ -773,7 +850,7 @@ genComparison =
       genExpr) <*>
   pure ()
 
-genNotTest :: MonadGen m => m (AST.NotTest ())
+genNotTest :: (MonadGen m, GenAtomExpr ctxt) => m (AST.NotTest ctxt ())
 genNotTest =
   Gen.choice
     [ AST.NotTestNone <$> genComparison <*> pure ()
@@ -784,7 +861,7 @@ genNotTest =
       pure ()
     ]
     
-genAndTest :: MonadGen m => m (AST.AndTest ())
+genAndTest :: (MonadGen m, GenAtomExpr ctxt) => m (AST.AndTest ctxt ())
 genAndTest =
   AST.AndTest <$>
   genNotTest <*>
@@ -794,7 +871,7 @@ genAndTest =
       genAndTest) <*>
   pure ()
 
-genOrTest :: MonadGen m => m (AST.OrTest ())
+genOrTest :: (MonadGen m, GenAtomExpr ctxt) => m (AST.OrTest ctxt ())
 genOrTest =
   AST.OrTest <$>
   genAndTest <*>
@@ -804,7 +881,7 @@ genOrTest =
       genAndTest) <*>
   pure ()
 
-genTest :: MonadGen m => m (AST.Test ())
+genTest :: (MonadGen m, GenAtomExpr ctxt) => m (AST.Test ctxt ())
 genTest =
   Gen.choice
     [ AST.TestCond <$>

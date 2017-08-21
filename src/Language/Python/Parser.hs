@@ -1,6 +1,10 @@
 -- from https://docs.python.org/3.5/reference/grammar.html
 -- `test` is the production for an expression
 
+{-# language DataKinds #-}
+{-# language FlexibleContexts #-}
+{-# language FlexibleInstances #-}
+{-# language KindSignatures #-}
 module Language.Python.Parser where
 
 import GHC.Stack
@@ -136,23 +140,48 @@ betweenWhitespace1F
   -> m (Compose (Between' (NonEmpty WhitespaceChar)) f a)
 betweenWhitespace1F = fmap Compose . betweenWhitespace1
   
-ifThenElse :: DeltaParsing m => m (IfThenElse SrcInfo)
+ifThenElse
+  :: (AtomExprParsing ctxt, TestParsing ctxt, DeltaParsing m)
+  => m (IfThenElse ctxt SrcInfo)
 ifThenElse =
   IfThenElse <$>
   (string "if" *> betweenWhitespace1F orTest) <*>
   (string "else" *> whitespaceBefore1F test)
 
-test :: DeltaParsing m => m (Test SrcInfo)
-test = try testConditional <|> testLambdef
+class TestParsing (ctxt :: ExprContext) where
+  test :: DeltaParsing m => m (Test ctxt SrcInfo)
+
+instance TestParsing 'TopLevel where
+  test = testNoAwait
+  
+instance TestParsing ('FunDef 'Normal) where
+  test = testNoAwait
+  
+instance TestParsing ('FunDef 'Async) where
+  test = testAwait
+
+testAwait :: DeltaParsing m => m (Test ('FunDef 'Async) SrcInfo)
+testAwait = try testConditional <|> testLambdef
   where
-    testConditional :: DeltaParsing m => m (Test SrcInfo)
     testConditional =
       annotated $
       TestCond <$>
       orTest <*>
       optionalF (try $ whitespaceBefore1F ifThenElse)
 
-    testLambdef :: DeltaParsing m => m (Test SrcInfo)
+    testLambdef = unexpected $ error "testLamdef not implemented"
+    
+testNoAwait
+  :: (AtomExprParsing ctxt, TestParsing ctxt, DeltaParsing m)
+  => m (Test ctxt SrcInfo)
+testNoAwait = try testConditional <|> testLambdef
+  where
+    testConditional =
+      annotated $
+      TestCond <$>
+      orTest <*>
+      optionalF (try $ whitespaceBefore1F ifThenElse)
+
     testLambdef = unexpected $ error "testLamdef not implemented"
 
 kOr :: DeltaParsing m => m KOr
@@ -161,17 +190,19 @@ kOr = string "or" $> KOr
 kAnd :: DeltaParsing m => m KAnd
 kAnd = string "and" $> KAnd
       
-orTest :: DeltaParsing m => m (OrTest SrcInfo)
+orTest :: (AtomExprParsing ctxt, DeltaParsing m) => m (OrTest ctxt SrcInfo)
 orTest =
   annotated $
   OrTest <$>
   andTest <*>
   manyF (try $ beforeF (betweenWhitespace1 kOr) andTest)
 
-varargsList :: DeltaParsing m => m (VarargsList SrcInfo)
+varargsList :: DeltaParsing m => m (VarargsList ctxt SrcInfo)
 varargsList = error "varargsList not implemented"
   
-lambdefNocond :: DeltaParsing m => m (LambdefNocond SrcInfo)
+lambdefNocond
+  :: (AtomExprParsing ctxt, DeltaParsing m)
+  => m (LambdefNocond ctxt SrcInfo)
 lambdefNocond =
   annotated $
   LambdefNocond <$>
@@ -182,31 +213,33 @@ lambdefNocond =
       varargsList) <*>
   whitespaceBeforeF testNocond
 
-testNocond :: DeltaParsing m => m (TestNocond SrcInfo)
+testNocond
+  :: (AtomExprParsing ctxt, DeltaParsing m)
+  => m (TestNocond ctxt SrcInfo)
 testNocond =
   annotated $
   TestNocond <$>
   (try (InL <$> orTest) <|> (InR <$> lambdefNocond))
   
-compIf :: DeltaParsing m => m (CompIf SrcInfo)
+compIf :: (AtomExprParsing ctxt, DeltaParsing m) => m (CompIf ctxt SrcInfo)
 compIf =
   annotated $
   CompIf <$>
   (string "if" *> whitespaceBeforeF testNocond) <*>
   optionalF (try $ whitespaceBeforeF compIter)
   
-compIter :: DeltaParsing m => m (CompIter SrcInfo)
+compIter :: (AtomExprParsing ctxt, DeltaParsing m) => m (CompIter ctxt SrcInfo)
 compIter =
   annotated $
   CompIter <$> (try (InL <$> compFor) <|> (InR <$> compIf))
 
-starExpr :: DeltaParsing m => m (StarExpr SrcInfo)
+starExpr :: (AtomExprParsing ctxt, DeltaParsing m) => m (StarExpr ctxt SrcInfo)
 starExpr =
   annotated $
   StarExpr <$>
   (char '*' *> whitespaceBeforeF expr)
 
-exprList :: DeltaParsing m => m (ExprList SrcInfo)
+exprList :: (AtomExprParsing ctxt, DeltaParsing m) => m (ExprList ctxt SrcInfo)
 exprList =
   annotated $
   ExprList <$>
@@ -215,7 +248,7 @@ exprList =
   where
     exprOrStar = try (InL <$> expr) <|> (InR <$> starExpr)
     
-compFor :: DeltaParsing m => m (CompFor SrcInfo)
+compFor :: (AtomExprParsing ctxt, DeltaParsing m) => m (CompFor ctxt SrcInfo)
 compFor =
   annotated $
   CompFor <$>
@@ -633,10 +666,12 @@ between' ms ma = fmap Between' $ Between <$> ms <*> ma <*> ms
 comma :: DeltaParsing m => m Comma
 comma = char ',' $> Comma
 
-dictOrSetMaker :: DeltaParsing m => m (DictOrSetMaker SrcInfo)
+dictOrSetMaker :: DeltaParsing m => m (DictOrSetMaker ctxt SrcInfo)
 dictOrSetMaker = error "dictOrSetMaker not implemented"
 
-testlistComp :: DeltaParsing m => m (TestlistComp SrcInfo)
+testlistComp
+  :: (AtomExprParsing ctxt, TestParsing ctxt, DeltaParsing m)
+  => m (TestlistComp ctxt SrcInfo)
 testlistComp = try testlistCompFor <|> testlistCompList
   where
     testOrStar = try (InL <$> test) <|> (InR <$> starExpr)
@@ -652,7 +687,9 @@ testlistComp = try testlistCompFor <|> testlistCompList
       manyF (try $ beforeF (betweenWhitespace comma) testOrStar) <*>
       optional (try $ whitespaceBefore comma)
 
-testList :: DeltaParsing m => m (TestList SrcInfo)
+testList
+  :: (TestParsing ctxt, DeltaParsing m)
+  => m (TestList ctxt SrcInfo)
 testList =
   annotated $
   TestList <$>
@@ -660,7 +697,7 @@ testList =
   beforeF (betweenWhitespace comma) test <*>
   optional (try $ whitespaceBefore comma)
 
-yieldArg :: DeltaParsing m => m (YieldArg SrcInfo)
+yieldArg :: (TestParsing ctxt, DeltaParsing m) => m (YieldArg ctxt SrcInfo)
 yieldArg = try yieldArgFrom <|> yieldArgList
   where
     yieldArgFrom =
@@ -671,15 +708,53 @@ yieldArg = try yieldArgFrom <|> yieldArgList
       annotated $
       YieldArgList <$> testList
 
-yieldExpr :: DeltaParsing m => m (YieldExpr SrcInfo)
+yieldExpr
+  :: DeltaParsing m
+  => m (YieldExpr SrcInfo)
 yieldExpr =
   annotated $
   YieldExpr <$>
   (string "yield" *> optionalF (try $ whitespaceBefore1F yieldArg))
 
-atom :: DeltaParsing m => m (Atom SrcInfo)
-atom =
-  try atomParen <|>
+atomParenYield
+  :: DeltaParsing m
+  => m (Atom ('FunDef 'Normal) SrcInfo)
+atomParenYield =
+  annotated $
+  AtomParenYield <$>
+  between (char '(') (char ')')
+  (betweenWhitespaceF
+    (optionalF
+      (try $ (InL <$> try yieldExpr) <|> (InR <$> testlistComp))))
+
+atomParenNoYield
+  :: (AtomExprParsing ctxt, TestParsing ctxt, DeltaParsing m)
+  => m (Atom ctxt SrcInfo)
+atomParenNoYield =
+  annotated $
+  AtomParenNoYield <$>
+  between (char '(') (char ')')
+  (betweenWhitespaceF
+    (optionalF
+      (try testlistComp)))
+
+class (AtomExprParsing ctxt, TestParsing ctxt)
+  => AtomParsing (ctxt :: ExprContext) where
+  atom :: DeltaParsing m => m (Atom ctxt SrcInfo)
+
+instance AtomParsing ('FunDef 'Normal) where
+  atom = try atomParenYield <|> atomRest
+
+instance AtomParsing ('FunDef 'Async) where
+  atom = try atomParenNoYield <|> atomRest
+
+instance AtomParsing 'TopLevel where
+  atom = try atomParenNoYield <|> atomRest
+
+atomRest
+  :: (AtomExprParsing ctxt, TestParsing ctxt, DeltaParsing m)
+  => m (Atom ctxt SrcInfo)
+atomRest =
   try atomBracket <|>
   try atomCurly <|>
   try atomIdentifier <|>
@@ -691,13 +766,6 @@ atom =
   try atomTrue <|>
   atomFalse
   where
-    atomParen =
-      annotated $
-      AtomParen <$>
-      between (char '(') (char ')')
-      (betweenWhitespaceF
-        (optionalF
-          (try $ (InL <$> try yieldExpr) <|> (InR <$> testlistComp))))
     atomBracket =
       annotated $
       AtomBracket <$>
@@ -742,13 +810,15 @@ atom =
       annotated $
       string "False" $> AtomFalse
       
-sliceOp :: DeltaParsing m => m (SliceOp SrcInfo)
+sliceOp :: (TestParsing ctxt, DeltaParsing m) => m (SliceOp ctxt SrcInfo)
 sliceOp =
   annotated $
   SliceOp <$>
   (char ':' *> optionalF (try $ whitespaceBeforeF test))
   
-argument :: DeltaParsing m => m (Argument SrcInfo)
+argument
+  :: (AtomExprParsing ctxt, TestParsing ctxt, DeltaParsing m)
+  => m (Argument ctxt SrcInfo)
 argument = try argumentUnpack <|> try argumentDefault <|> argumentFor
   where
     argumentFor =
@@ -768,7 +838,7 @@ argument = try argumentUnpack <|> try argumentDefault <|> argumentFor
       whitespaceBeforeF test
 
       
-subscript :: DeltaParsing m => m (Subscript SrcInfo)
+subscript :: (TestParsing ctxt, DeltaParsing m) => m (Subscript ctxt SrcInfo)
 subscript = try subscriptSlice <|> subscriptTest
   where
     subscriptTest = annotated $ SubscriptTest <$> test
@@ -779,7 +849,9 @@ subscript = try subscriptSlice <|> subscriptTest
       (char ':' *> optionalF (try $ whitespaceBeforeF test)) <*>
       optionalF (try $ whitespaceBeforeF sliceOp)
       
-argList :: DeltaParsing m => m (ArgList SrcInfo)
+argList
+  :: (AtomExprParsing ctxt, TestParsing ctxt, DeltaParsing m)
+  => m (ArgList ctxt SrcInfo)
 argList =
   annotated $
   ArgList <$>
@@ -787,7 +859,7 @@ argList =
   manyF (try $ beforeF (betweenWhitespace comma) argument) <*>
   optional (try $ whitespaceBefore comma)
 
-subscriptList :: DeltaParsing m => m (SubscriptList SrcInfo)
+subscriptList :: (TestParsing ctxt, DeltaParsing m) => m (SubscriptList ctxt SrcInfo)
 subscriptList =
   annotated $
   SubscriptList <$>
@@ -795,7 +867,9 @@ subscriptList =
   optionalF (try $ beforeF (betweenWhitespace comma) subscript) <*>
   optional (try $ whitespaceBefore comma)
       
-trailer :: DeltaParsing m => m (Trailer SrcInfo)
+trailer
+  :: (AtomExprParsing ctxt, TestParsing ctxt, DeltaParsing m)
+  => m (Trailer ctxt SrcInfo)
 trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
   where
     trailerCall =
@@ -818,16 +892,43 @@ trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
       annotated $
       TrailerAccess <$>
       (char '.' *> whitespaceBeforeF identifier)
+
+class AtomExprParsing (ctxt :: ExprContext) where
+  atomExpr :: DeltaParsing m => m (AtomExpr ctxt SrcInfo)
+
+instance AtomExprParsing ('FunDef 'Normal) where
+  atomExpr = atomExprNoAwait
+  
+instance AtomExprParsing 'TopLevel where
+  atomExpr = atomExprNoAwait
+  
+instance AtomExprParsing ('FunDef 'Async) where
+  atomExpr = atomExprAwait
       
-atomExpr :: DeltaParsing m => m (AtomExpr SrcInfo)
-atomExpr =
+atomExprNoAwait
+  :: ( AtomParsing ctxt
+     , AtomExprParsing ctxt
+     , TestParsing ctxt
+     , DeltaParsing m
+     )
+  => m (AtomExpr ctxt SrcInfo)
+atomExprNoAwait =
   annotated $
-  AtomExpr <$>
-  optionalF (try $ string "await" *> whitespaceAfter1 (pure KAwait)) <*>
+  AtomExprNoAwait <$>
+  atom <*>
+  manyF (try $ whitespaceBeforeF trailer)
+      
+atomExprAwait
+  :: DeltaParsing m
+  => m (AtomExpr ('FunDef 'Async) SrcInfo)
+atomExprAwait =
+  annotated $
+  AtomExprAwait <$>
+  optionalF (string "await" *> whitespaceAfter1 (pure KAwait)) <*>
   atom <*>
   manyF (try $ whitespaceBeforeF trailer)
   
-power :: DeltaParsing m => m (Power SrcInfo)
+power :: (AtomExprParsing ctxt, DeltaParsing m) => m (Power ctxt SrcInfo)
 power =
   annotated $
   Power <$>
@@ -840,7 +941,7 @@ factorOp =
   try (char '+' $> FactorPos) <|>
   (char '~' $> FactorInv)
   
-factor :: DeltaParsing m => m (Factor SrcInfo)
+factor :: (AtomExprParsing ctxt, DeltaParsing m) => m (Factor ctxt SrcInfo)
 factor = try factorSome <|> factorNone
   where
     factorSome =
@@ -858,14 +959,14 @@ termOp =
   try (char '/' $> TermDiv) <|>
   (char '%' $> TermMod)
   
-term :: DeltaParsing m => m (Term SrcInfo)
+term :: (AtomExprParsing ctxt, DeltaParsing m) => m (Term ctxt SrcInfo)
 term =
   annotated $
   Term <$>
   factor <*>
   manyF (try $ beforeF (betweenWhitespace termOp) factor)
   
-arithExpr :: DeltaParsing m => m (ArithExpr SrcInfo)
+arithExpr :: (AtomExprParsing ctxt, DeltaParsing m) => m (ArithExpr ctxt SrcInfo)
 arithExpr =
   annotated $
   ArithExpr <$>
@@ -875,7 +976,7 @@ arithExpr =
     plusOrMinus =
       (Left <$> try (char '+' $> Plus)) <|> (Right <$> (char '-' $> Minus))
   
-shiftExpr :: DeltaParsing m => m (ShiftExpr SrcInfo)
+shiftExpr :: (AtomExprParsing ctxt, DeltaParsing m) => m (ShiftExpr ctxt SrcInfo)
 shiftExpr = 
   annotated $
   ShiftExpr <$>
@@ -886,21 +987,21 @@ shiftExpr =
       (Left <$> try (string "<<" $> DoubleLT)) <|>
       (Right <$> (string ">>" $> DoubleGT))
   
-andExpr :: DeltaParsing m => m (AndExpr SrcInfo)
+andExpr :: (AtomExprParsing ctxt, DeltaParsing m) => m (AndExpr ctxt SrcInfo)
 andExpr = 
   annotated $
   AndExpr <$>
   shiftExpr <*>
   manyF (try $ beforeF (betweenWhitespace $ char '&' $> Ampersand) shiftExpr)
 
-xorExpr :: DeltaParsing m => m (XorExpr SrcInfo)
+xorExpr :: (AtomExprParsing ctxt, DeltaParsing m) => m (XorExpr ctxt SrcInfo)
 xorExpr =
   annotated $
   XorExpr <$>
   andExpr <*>
   manyF (try $ beforeF (betweenWhitespace $ char '^' $> S.Caret) andExpr)
   
-expr :: DeltaParsing m => m (Expr SrcInfo)
+expr :: (AtomExprParsing ctxt, DeltaParsing m) => m (Expr ctxt SrcInfo)
 expr =
   annotated $
   Expr <$>
@@ -926,7 +1027,7 @@ compOperator =
     string "in" <*>
     whitespaceChar)
 
-comparison :: DeltaParsing m => m (Comparison SrcInfo)
+comparison :: (AtomExprParsing ctxt, DeltaParsing m) => m (Comparison ctxt SrcInfo)
 comparison =
   annotated $
   Comparison <$>
@@ -936,7 +1037,7 @@ comparison =
       (betweenWhitespace compOperator)
       expr)
     
-notTest :: DeltaParsing m => m (NotTest SrcInfo)
+notTest :: (AtomExprParsing ctxt, DeltaParsing m) => m (NotTest ctxt SrcInfo)
 notTest = try notTestSome <|> notTestNone
   where
     notTestSome =
@@ -945,7 +1046,7 @@ notTest = try notTestSome <|> notTestNone
       beforeF (whitespaceAfter1 $ string "not" $> KNot) notTest
     notTestNone = annotated $ NotTestNone <$> comparison
 
-andTest :: DeltaParsing m => m (AndTest SrcInfo)
+andTest :: (AtomExprParsing ctxt, DeltaParsing m) => m (AndTest ctxt SrcInfo)
 andTest =
   annotated $
   AndTest <$>

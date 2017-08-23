@@ -17,7 +17,8 @@ import Data.Separated.After (After(..))
 import Data.Separated.Before (Before(..))
 import Data.Separated.Between (Between(..), Between'(..))
 import Language.Python.AST
-import Language.Python.AST.BytesEscapeSeq
+import Language.Python.AST.EscapeSeq
+import Language.Python.AST.Digits
 import Language.Python.AST.Keywords
 import Language.Python.AST.ShortBytesChar
 import Language.Python.AST.ShortStringChar
@@ -186,9 +187,9 @@ shortString :: ShortString a -> Doc
 shortString s =
   case s of
     ShortStringSingle val _ ->
-      quotes $ foldMap (either shortStringCharSingle stringEscapeSeq) val
+      quotes $ foldMap (either shortStringCharSingle $ text . review _Escape) val
     ShortStringDouble val _ ->
-      doubleQuotes $ foldMap (either shortStringCharDouble stringEscapeSeq) val
+      doubleQuotes $ foldMap (either shortStringCharDouble $ text . review _Escape) val
       
 longStringChar :: LongStringChar -> Doc
 longStringChar s = char (_LongStringChar # s)
@@ -197,10 +198,10 @@ longString :: LongString a -> Doc
 longString s =
   case s of
     LongStringSingle val _ ->
-      tripled quotes $ foldMap (either longStringChar stringEscapeSeq) val
+      tripled quotes $ foldMap (either longStringChar $ text . review _Escape) val
     LongStringDouble val _ ->
       tripled doubleQuotes $
-      foldMap (either longStringChar stringEscapeSeq) val
+      foldMap (either longStringChar $ text . review _Escape) val
 
 bytesPrefix :: BytesPrefix -> Doc
 bytesPrefix b =
@@ -222,99 +223,37 @@ shortBytesCharDouble s = char (_ShortBytesCharDouble # s)
 shortBytesCharSingle :: ShortBytesChar SingleQuote -> Doc
 shortBytesCharSingle s = char (_ShortBytesCharSingle # s)
 
-bytesEscapeSeq :: BytesEscapeSeq -> Doc
-bytesEscapeSeq b = char '\\' <> char (_BytesEscapeSeq # b)
-
 shortBytes :: ShortBytes a -> Doc
 shortBytes s =
   case s of
     ShortBytesSingle val _ ->
-      quotes $ foldMap (either shortBytesCharSingle bytesEscapeSeq) val
+      quotes $ foldMap (either shortBytesCharSingle $ text . review _Escape) val
     ShortBytesDouble val _ ->
-      doubleQuotes $ foldMap (either shortBytesCharDouble bytesEscapeSeq) val
-      
-longBytesChar :: LongBytesChar -> Doc
-longBytesChar s = char (_LongBytesChar # s)
-      
+      doubleQuotes $ foldMap (either shortBytesCharDouble $ text . review _Escape) val
+
 longBytes :: LongBytes a -> Doc
 longBytes s =
   case s of
     LongBytesSingle val _ ->
-      tripled quotes $ foldMap (either longBytesChar bytesEscapeSeq) val
+      tripled quotes $ foldMap (either char $ text . review _Escape) val
     LongBytesDouble val _ ->
       tripled doubleQuotes $
-      foldMap (either longBytesChar bytesEscapeSeq) val
+      foldMap (either char $ text . review _Escape) val
 
 digit :: Digit -> Doc
-digit d =
-  case d of
-    Digit_0 -> char '0'
-    Digit_1 -> char '1'
-    Digit_2 -> char '2'
-    Digit_3 -> char '3'
-    Digit_4 -> char '4'
-    Digit_5 -> char '5'
-    Digit_6 -> char '6'
-    Digit_7 -> char '7'
-    Digit_8 -> char '8'
-    Digit_9 -> char '9'
+digit = text . printDigit
 
 nonZeroDigit :: NonZeroDigit -> Doc
-nonZeroDigit d =
-  case d of
-    NonZeroDigit_1 -> char '1'
-    NonZeroDigit_2 -> char '2'
-    NonZeroDigit_3 -> char '3'
-    NonZeroDigit_4 -> char '4'
-    NonZeroDigit_5 -> char '5'
-    NonZeroDigit_6 -> char '6'
-    NonZeroDigit_7 -> char '7'
-    NonZeroDigit_8 -> char '8'
-    NonZeroDigit_9 -> char '9'
+nonZeroDigit = text . printNonZeroDigit
 
 octDigit :: OctDigit -> Doc
-octDigit d =
-  case d of
-    OctDigit_0 -> char '0'
-    OctDigit_1 -> char '1'
-    OctDigit_2 -> char '2'
-    OctDigit_3 -> char '3'
-    OctDigit_4 -> char '4'
-    OctDigit_5 -> char '5'
-    OctDigit_6 -> char '6'
-    OctDigit_7 -> char '7'
+octDigit = text . printOctDigit
 
 hexDigit :: HexDigit -> Doc
-hexDigit d =
-  case d of
-    HexDigit_0 -> char '0'
-    HexDigit_1 -> char '1'
-    HexDigit_2 -> char '2'
-    HexDigit_3 -> char '3'
-    HexDigit_4 -> char '4'
-    HexDigit_5 -> char '5'
-    HexDigit_6 -> char '6'
-    HexDigit_7 -> char '7'
-    HexDigit_8 -> char '8'
-    HexDigit_9 -> char '9'
-    HexDigit_a -> char 'a'
-    HexDigit_A -> char 'A'
-    HexDigit_b -> char 'b'
-    HexDigit_B -> char 'B'
-    HexDigit_c -> char 'c'
-    HexDigit_C -> char 'C'
-    HexDigit_d -> char 'd'
-    HexDigit_D -> char 'D'
-    HexDigit_e -> char 'e'
-    HexDigit_E -> char 'E'
-    HexDigit_f -> char 'f'
-    HexDigit_F -> char 'F'
+hexDigit = text . printHexDigit
 
 binDigit :: BinDigit -> Doc
-binDigit d =
-  case d of
-    BinDigit_0 -> char '0'
-    BinDigit_1 -> char '1'
+binDigit = text . printBinDigit
 
 zero :: Zero -> Doc
 zero _ = char '0'
@@ -487,8 +426,10 @@ exprList (ExprList h t _) =
 
 compFor :: CompFor ctxt a -> Doc
 compFor (CompFor t e i _) =
-  text "for" <>
-  betweenWhitespace'F exprList t <>
+  beforeF
+    (betweenWhitespace' . const $ text "for")
+    (whitespaceAfterF exprList)
+    t <>
   text "in" <>
   whitespaceBeforeF orTest e <>
   foldMapF (whitespaceBeforeF compIter) i

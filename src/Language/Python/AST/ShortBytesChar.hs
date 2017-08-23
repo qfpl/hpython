@@ -25,7 +25,6 @@ _ShortBytesCharSingle =
   _shortStringChar_value
   (\case
       '\n' -> Nothing
-      '\\' -> Nothing
       '\'' -> Nothing
       c -> Just $ ShortBytesCharSingle c)
 
@@ -35,7 +34,6 @@ _ShortBytesCharDouble =
   _shortStringChar_value
   (\case
       '\n' -> Nothing
-      '\\' -> Nothing
       '"' -> Nothing
       c
         | isAscii c -> Just $ ShortBytesCharDouble c

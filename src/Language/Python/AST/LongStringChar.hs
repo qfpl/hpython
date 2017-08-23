@@ -16,6 +16,4 @@ _LongStringChar :: Prism' Char LongStringChar
 _LongStringChar =
   prism'
   _longStringChar_value
-  (\case
-      '\\' -> Nothing
-      c -> Just $ LongStringChar c)
+  (Just . LongStringChar)

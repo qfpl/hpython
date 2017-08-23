@@ -22,12 +22,13 @@ import Data.Separated.Between
 import Data.Text (Text)
 import Text.Show.Deriving
 
-import Language.Python.AST.BytesEscapeSeq
-import Language.Python.AST.LongBytesChar
-import Language.Python.AST.ShortBytesChar
-import Language.Python.AST.LongStringChar
-import Language.Python.AST.ShortStringChar
+import Language.Python.AST.EscapeSeq
+import Language.Python.AST.Digits
 import Language.Python.AST.Keywords
+import Language.Python.AST.LongBytesChar
+import Language.Python.AST.LongStringChar
+import Language.Python.AST.ShortBytesChar
+import Language.Python.AST.ShortStringChar
 import Language.Python.AST.Symbols
 
 type Token = After [WhitespaceChar]
@@ -53,12 +54,12 @@ newtype StringEscapeSeq = StringEscapeSeq Char
 data ShortString a
   = ShortStringSingle
   { _shortStringSingle_value
-    :: [Either (ShortStringChar SingleQuote) StringEscapeSeq]
+    :: [Either (ShortStringChar SingleQuote) EscapeSeq]
   , _shortString_ann :: a
   }
   | ShortStringDouble
   { _shortStringDouble_value
-    :: [Either (ShortStringChar DoubleQuote) StringEscapeSeq]
+    :: [Either (ShortStringChar DoubleQuote) EscapeSeq]
   , _shortString_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
@@ -66,12 +67,12 @@ data ShortString a
 data LongString a
   = LongStringSingle
   { _longStringSingle_value
-    :: [Either LongStringChar StringEscapeSeq]
+    :: [Either LongStringChar EscapeSeq]
   , _longStringSingle_ann :: a
   }
   | LongStringDouble
   { _longStringDouble_value
-    :: [Either LongStringChar StringEscapeSeq]
+    :: [Either LongStringChar EscapeSeq]
   , _longStringDouble_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -92,12 +93,12 @@ data BytesPrefix
 data ShortBytes a
   = ShortBytesSingle
   { _shortBytesSingle_value
-    :: [Either (ShortBytesChar SingleQuote) BytesEscapeSeq]
+    :: [Either (ShortBytesChar SingleQuote) EscapeSeq]
   , _shortBytes_ann :: a
   }
   | ShortBytesDouble
   { _shortBytesDouble_value
-    :: [Either (ShortBytesChar DoubleQuote) BytesEscapeSeq]
+    :: [Either (ShortBytesChar DoubleQuote) EscapeSeq]
   , _shortBytes_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -106,78 +107,15 @@ data ShortBytes a
 data LongBytes a
   = LongBytesSingle
   { _longBytesSingle_value
-    :: [Either LongBytesChar BytesEscapeSeq]
+    :: [Either Char EscapeSeq]
   , _longBytes_ann :: a
   }
   | LongBytesDouble
   { _longBytesDouble_value
-    :: [Either LongBytesChar BytesEscapeSeq]
+    :: [Either Char EscapeSeq]
   , _longBytes_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-
-data Digit
-  = Digit_0
-  | Digit_1
-  | Digit_2
-  | Digit_3
-  | Digit_4
-  | Digit_5
-  | Digit_6
-  | Digit_7
-  | Digit_8
-  | Digit_9
-  deriving (Eq, Show)
-  
-data NonZeroDigit
-  = NonZeroDigit_1
-  | NonZeroDigit_2
-  | NonZeroDigit_3
-  | NonZeroDigit_4
-  | NonZeroDigit_5
-  | NonZeroDigit_6
-  | NonZeroDigit_7
-  | NonZeroDigit_8
-  | NonZeroDigit_9
-  deriving (Eq, Show)
-
-data OctDigit
-  = OctDigit_0
-  | OctDigit_1
-  | OctDigit_2
-  | OctDigit_3
-  | OctDigit_4
-  | OctDigit_5
-  | OctDigit_6
-  | OctDigit_7
-  deriving (Eq, Show)
-
-data HexDigit
-  = HexDigit_0
-  | HexDigit_1
-  | HexDigit_2
-  | HexDigit_3
-  | HexDigit_4
-  | HexDigit_5
-  | HexDigit_6
-  | HexDigit_7
-  | HexDigit_8
-  | HexDigit_9
-  | HexDigit_a
-  | HexDigit_A
-  | HexDigit_b
-  | HexDigit_B
-  | HexDigit_c
-  | HexDigit_C
-  | HexDigit_d
-  | HexDigit_D
-  | HexDigit_e
-  | HexDigit_E
-  | HexDigit_f
-  | HexDigit_F
-  deriving (Eq, Show)
-
-data BinDigit = BinDigit_0 | BinDigit_1 deriving (Eq, Show)
 
 data Integer' a
   = IntegerDecimal
@@ -420,8 +358,14 @@ data ExprList (ctxt :: ExprContext) a
 
 data CompFor (ctxt :: ExprContext) a
   = CompFor
-  { _compFor_targets :: Compose (Between' [WhitespaceChar]) (ExprList ctxt) a
-  , _compFor_expr :: Compose (Before [WhitespaceChar]) (OrTest ctxt) a
+  { _compFor_targets
+    :: Compose
+         (Before (Between' (NonEmpty WhitespaceChar) KFor))
+         (Compose
+           (After (NonEmpty WhitespaceChar))
+           (ExprList ctxt))
+         a
+  , _compFor_expr :: Compose (Before (NonEmpty WhitespaceChar)) (OrTest ctxt) a
   , _compFor_iter
     :: Compose
          Maybe

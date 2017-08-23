@@ -25,7 +25,6 @@ _ShortStringCharSingle =
   _shortStringChar_value
   (\case
       '\n' -> Nothing
-      '\\' -> Nothing
       '\'' -> Nothing
       c -> Just $ ShortStringCharSingle c)
 
@@ -35,7 +34,6 @@ _ShortStringCharDouble =
   _shortStringChar_value
   (\case
       '\n' -> Nothing
-      '\\' -> Nothing
       '"' -> Nothing
       c -> Just $ ShortStringCharDouble c)
   

@@ -16,7 +16,8 @@ import qualified Data.Text as T
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import qualified Language.Python.AST as AST
-import qualified Language.Python.AST.BytesEscapeSeq as AST
+import qualified Language.Python.AST.Digits as AST
+import qualified Language.Python.AST.EscapeSeq as AST
 import qualified Language.Python.AST.Keywords as AST
 import qualified Language.Python.AST.LongBytesChar as AST
 import qualified Language.Python.AST.LongStringChar as AST
@@ -373,11 +374,6 @@ genShortStringCharDouble
 genShortStringCharDouble =
   Gen.just (fmap (^? AST._ShortStringCharDouble) Gen.ascii)
 
-genStringEscapeSeq
-  :: MonadGen m
-  => m AST.StringEscapeSeq
-genStringEscapeSeq = AST.StringEscapeSeq <$> Gen.ascii
-
 genShortString :: MonadGen m => m (AST.ShortString ())
 genShortString =
   Gen.choice
@@ -386,7 +382,7 @@ genShortString =
         (Range.linear 0 200)
         (Gen.choice
           [ Left <$> genShortStringCharSingle
-          , Right <$> genStringEscapeSeq
+          , Right <$> genEscapeSeq
           ]) <*>
       pure ()
     , AST.ShortStringDouble <$>
@@ -394,7 +390,7 @@ genShortString =
         (Range.linear 0 200)
         (Gen.choice
           [ Left <$> genShortStringCharDouble
-          , Right <$> genStringEscapeSeq
+          , Right <$> genEscapeSeq
           ])<*>
       pure ()
     ]
@@ -413,7 +409,7 @@ genLongString =
         (Range.linear 0 200)
         (Gen.choice
           [ Left <$> genLongStringChar
-          , Right <$> genStringEscapeSeq
+          , Right <$> genEscapeSeq
           ]) <*>
       pure ()
     , AST.LongStringDouble <$>
@@ -421,7 +417,7 @@ genLongString =
         (Range.linear 0 200)
         (Gen.choice
           [ Left <$> genLongStringChar
-          , Right <$> genStringEscapeSeq
+          , Right <$> genEscapeSeq
           ])<*>
       pure ()
     ]
@@ -447,16 +443,16 @@ genLongBytes =
       Gen.list
         (Range.linear 0 200)
         (Gen.choice
-          [ Left <$> genLongBytesChar
-          , Right <$> genBytesEscapeSeq
+          [ Left <$> Gen.ascii
+          , Right <$> genEscapeSeq
           ]) <*>
       pure ()
     , AST.LongBytesDouble <$>
       Gen.list
         (Range.linear 0 200)
         (Gen.choice
-          [ Left <$> genLongBytesChar
-          , Right <$> genBytesEscapeSeq
+          [ Left <$> Gen.ascii
+          , Right <$> genEscapeSeq
           ])<*>
       pure ()
     ]
@@ -473,11 +469,25 @@ genShortBytesCharDouble
 genShortBytesCharDouble =
   Gen.just (fmap (^? AST._ShortBytesCharDouble) Gen.ascii)
 
-genBytesEscapeSeq
+genEscapeSeq
   :: MonadGen m
-  => m AST.BytesEscapeSeq
-genBytesEscapeSeq =
-  Gen.just (fmap (^? AST._BytesEscapeSeq) Gen.ascii)
+  => m AST.EscapeSeq
+genEscapeSeq =
+  Gen.choice
+    [ pure AST.Slash_newline
+    , pure AST.Slash_backslash
+    , pure AST.Slash_singlequote
+    , pure AST.Slash_doublequote
+    , pure AST.Slash_a
+    , pure AST.Slash_f
+    , pure AST.Slash_b
+    , pure AST.Slash_n
+    , pure AST.Slash_r
+    , pure AST.Slash_t
+    , pure AST.Slash_v
+    , AST.Slash_octal <$> Gen.nonEmpty (Range.linear 1 10) genOctDigit
+    , AST.Slash_hex <$> Gen.nonEmpty (Range.linear 1 10) genHexDigit
+    ]
 
 genShortBytes :: MonadGen m => m (AST.ShortBytes ())
 genShortBytes =
@@ -487,7 +497,7 @@ genShortBytes =
         (Range.linear 0 200)
         (Gen.choice
           [ Left <$> genShortBytesCharSingle
-          , Right <$> genBytesEscapeSeq
+          , Right <$> genEscapeSeq
           ]) <*>
       pure ()
     , AST.ShortBytesDouble <$>
@@ -495,7 +505,7 @@ genShortBytes =
         (Range.linear 0 200)
         (Gen.choice
           [ Left <$> genShortBytesCharDouble
-          , Right <$> genBytesEscapeSeq
+          , Right <$> genEscapeSeq
           ])<*>
       pure ()
     ]
@@ -614,12 +624,14 @@ genExprList =
   where
     genSumOrStar =
       Gen.choice [InL <$> genExpr, InR <$> genStarExpr]
-    
+
 genCompFor :: (MonadGen m, GenAtomExpr ctxt) => m (AST.CompFor ctxt ())
 genCompFor =
   AST.CompFor <$>
-  genBetweenWhitespaceF genExprList <*>
-  genWhitespaceBeforeF genOrTest <*>
+  genBeforeF
+    (genBetweenWhitespace1 $ pure AST.KFor)
+    (genWhitespaceAfter1F genExprList) <*>
+  genWhitespaceBefore1F genOrTest <*>
   genMaybeF (genWhitespaceBeforeF genCompIter) <*>
   pure ()
   

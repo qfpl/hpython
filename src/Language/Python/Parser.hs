@@ -25,7 +25,8 @@ import Data.Separated.After (After(..))
 import Data.Separated.Before (Before(..))
 import Data.Separated.Between (Between(..), Between'(..))
 import Language.Python.AST
-import Language.Python.AST.BytesEscapeSeq
+import Language.Python.AST.Digits
+import Language.Python.AST.EscapeSeq
 import Language.Python.AST.Keywords
 import Language.Python.AST.LongBytesChar
 import Language.Python.AST.LongStringChar
@@ -139,7 +140,7 @@ betweenWhitespace1F
   => m (f a)
   -> m (Compose (Between' (NonEmpty WhitespaceChar)) f a)
 betweenWhitespace1F = fmap Compose . betweenWhitespace1
-  
+
 ifThenElse
   :: (AtomExprParsing ctxt, TestParsing ctxt, DeltaParsing m)
   => m (IfThenElse ctxt SrcInfo)
@@ -252,8 +253,10 @@ compFor :: (AtomExprParsing ctxt, DeltaParsing m) => m (CompFor ctxt SrcInfo)
 compFor =
   annotated $
   CompFor <$>
-  (string "for" *> betweenWhitespaceF exprList) <*>
-  (string "in" *> whitespaceBeforeF orTest) <*>
+  beforeF
+    (betweenWhitespace1 $ string "for" $> KFor)
+    (whitespaceAfter1F exprList) <*>
+  (string "in" *> whitespaceBefore1F orTest) <*>
   optionalF (try $ whitespaceBeforeF compIter)
 doubleAsterisk :: DeltaParsing m => m DoubleAsterisk
 doubleAsterisk = string "**" $> DoubleAsterisk
@@ -285,41 +288,33 @@ shortString = try shortStringSingle <|> shortStringDouble
       annotated $
       ShortStringSingle <$>
       (singleQuote *> manyTill charOrEscapeSingle (try singleQuote))
-      
+
     shortStringDouble =
       annotated $
       ShortStringDouble <$>
       (doubleQuote *> manyTill charOrEscapeDouble (try doubleQuote))
 
     charOrEscapeSingle =
-      try (Left <$> shortStringCharSingle) <|>
-      (Right <$> stringEscape)
+      try (Right <$> escapeSeq) <|>
+      (Left <$> shortStringCharSingle)
 
     charOrEscapeDouble =
-      try (Left <$> shortStringCharDouble) <|>
-      (Right <$> stringEscape)
-
-    stringEscape = StringEscapeSeq <$> (char '\\' *> anyChar)
+      try (Right <$> escapeSeq) <|>
+      (Left <$> shortStringCharDouble)
 
     shortStringCharSingle
       :: (HasCallStack, DeltaParsing m) => m (ShortStringChar SingleQuote)
     shortStringCharSingle =
-      -- (^?! _ShortStringCharSingle) <$>
-      -- oneOfSet
-        -- (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '\'')
       (\c -> fromMaybe (error $ show c) $ c ^? _ShortStringCharSingle) <$>
       oneOfSet
-        (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '\'')
+        (CharSet.ascii \\ CharSet.singleton '\'')
 
     shortStringCharDouble
       :: (HasCallStack, DeltaParsing m) => m (ShortStringChar DoubleQuote)
     shortStringCharDouble =
-      -- (^?! _ShortStringCharDouble) <$>
-      -- oneOfSet
-        -- (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '"')
       (\c -> fromMaybe (error $ show c) $ c ^? _ShortStringCharDouble) <$>
       oneOfSet
-        (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '"')
+        (CharSet.ascii \\ CharSet.singleton '"')
 
 longString :: (HasCallStack, DeltaParsing m) => m (LongString SrcInfo)
 longString = try longStringSingle <|> longStringDouble
@@ -328,23 +323,22 @@ longString = try longStringSingle <|> longStringDouble
       annotated $
       LongStringSingle <$>
       (tripleSinglequote *> manyTill charOrEscape (try tripleSinglequote))
-      
+
     longStringDouble =
       annotated $
       LongStringDouble <$>
       (tripleDoublequote *> manyTill charOrEscape (try tripleDoublequote))
 
     charOrEscape =
-      try (Left <$> longStringChar) <|> (Right <$> stringEscape)
-      
-    stringEscape = StringEscapeSeq <$> (char '\\' *> anyChar)
+      try (Right <$> escapeSeq) <|>
+      (Left <$> longStringChar)
 
     longStringChar
       :: (HasCallStack, DeltaParsing m) => m LongStringChar
     longStringChar =
       -- (^?! _LongStringChar) <$> satisfy (/= '\\')
       (\c -> fromMaybe (error $ show c) $ c ^? _LongStringChar) <$>
-      satisfy (/= '\\')
+      oneOfSet CharSet.ascii
       
 stringLiteral :: DeltaParsing m => m (StringLiteral SrcInfo)
 stringLiteral =
@@ -381,40 +375,26 @@ shortBytes = try shortBytesSingle <|> shortBytesDouble
       (doubleQuote *> manyTill charOrEscapeDouble (try doubleQuote))
 
     charOrEscapeSingle =
-      try (Left <$> shortBytesCharSingle) <|>
-      (Right <$> bytesEscape)
+      try (Right <$> escapeSeq) <|>
+      (Left <$> shortBytesCharSingle)
 
     charOrEscapeDouble =
-      try (Left <$> shortBytesCharDouble) <|>
-      (Right <$> bytesEscape)
-
-    bytesEscape
-      :: (HasCallStack, DeltaParsing m) => m BytesEscapeSeq
-    bytesEscape =
-      char '\\' *>
-      -- ((^?! _BytesEscapeSeq) <$> oneOfSet CharSet.ascii)
-      ((\c -> fromMaybe (error (show c)) $ c ^? _BytesEscapeSeq) <$>
-       oneOfSet CharSet.ascii)
+      try (Right <$> escapeSeq) <|>
+      (Left <$> shortBytesCharDouble)
 
     shortBytesCharSingle
       :: (HasCallStack, DeltaParsing m) => m (ShortBytesChar SingleQuote)
     shortBytesCharSingle =
-      -- (^?! _ShortBytesCharSingle) <$>
-      -- oneOfSet
-        -- (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '\'')
       (\c -> fromMaybe (error $ show c) $ c ^? _ShortBytesCharSingle) <$>
       oneOfSet
-        (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '\'')
+        (CharSet.ascii \\ CharSet.singleton '\'')
 
     shortBytesCharDouble
       :: (HasCallStack, DeltaParsing m) => m (ShortBytesChar DoubleQuote)
     shortBytesCharDouble =
-      -- (^?! _ShortBytesCharDouble) <$>
-      -- oneOfSet
-        -- (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '"')
       (\c -> fromMaybe (error $ show c) $ c ^? _ShortBytesCharDouble) <$>
       oneOfSet
-        (CharSet.ascii \\ CharSet.singleton '\\' \\ CharSet.singleton '"')
+        (CharSet.ascii \\ CharSet.singleton '"')
 
 tripleDoublequote :: DeltaParsing m => m ()
 tripleDoublequote = string "\"\"\"" $> ()
@@ -435,30 +415,15 @@ longBytes = try longBytesSingle <|> longBytesDouble
       annotated $
       LongBytesSingle <$>
       (tripleSinglequote *> manyTill charOrEscape (try tripleSinglequote))
-      
+
     longBytesDouble =
       annotated $
       LongBytesDouble <$>
       (tripleDoublequote *> manyTill charOrEscape (try tripleDoublequote))
 
     charOrEscape =
-      try (Left <$> longBytesChar) <|> (Right <$> bytesEscape)
-      
-    bytesEscape
-      :: (HasCallStack, DeltaParsing m) => m BytesEscapeSeq
-    bytesEscape =
-      -- char '\\' *>
-      -- ((^?! _BytesEscapeSeq) <$> oneOfSet CharSet.ascii)
-      char '\\' *>
-      ((\c -> fromMaybe (error $ show c) $ c ^? _BytesEscapeSeq) <$>
-       oneOfSet CharSet.ascii)
-      
-    longBytesChar
-      :: (HasCallStack, DeltaParsing m) => m LongBytesChar
-    longBytesChar =
-      -- (^?! _LongBytesChar) <$> oneOfSet (CharSet.ascii CharSet.\\ CharSet.singleton '\\')
-      (\c -> fromMaybe (error $ show c) $ c ^? _LongBytesChar) <$>
-      oneOfSet (CharSet.ascii CharSet.\\ CharSet.singleton '\\')
+      try (Right <$> escapeSeq) <|>
+      (Left <$> anyChar)
 
 bytesLiteral :: DeltaParsing m => m (BytesLiteral SrcInfo)
 bytesLiteral =

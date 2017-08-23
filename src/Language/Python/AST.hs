@@ -248,250 +248,256 @@ data CompOperator
   }
   deriving (Eq, Show)
 
-data Argument (ctxt :: ExprContext) a
+data Argument (atomType :: AtomType) (ctxt :: ExprContext) a
   = ArgumentFor
-  { _argumentFor_expr :: Test ctxt a
+  { _argumentFor_expr :: Test atomType ctxt a
   , _argumentFor_for
     :: Compose
          Maybe
          (Compose
            (Before [WhitespaceChar])
-           (CompFor ctxt))
+           (CompFor atomType ctxt))
          a
   , _argument_ann :: a    
   }
   | ArgumentDefault
-  { _argumentDefault_left :: Compose (After [WhitespaceChar]) (Test ctxt) a
-  , _argumentDefault_right :: Compose (Before [WhitespaceChar]) (Test ctxt) a
+  { _argumentDefault_left :: Compose (After [WhitespaceChar]) (Test atomType ctxt) a
+  , _argumentDefault_right :: Compose (Before [WhitespaceChar]) (Test atomType ctxt) a
   , _argument_ann :: a    
   }
   | ArgumentUnpack
   { _argumentUnpack_symbol :: Either Asterisk DoubleAsterisk
-  , _argumentUnpack_val :: Compose (Before [WhitespaceChar]) (Test ctxt) a
+  , _argumentUnpack_val :: Compose (Before [WhitespaceChar]) (Test atomType ctxt) a
   , _argument_ann :: a    
   }
   deriving (Functor, Foldable, Traversable)
 
-data ArgList (ctxt :: ExprContext) a
+data ArgList (atomType :: AtomType) (ctxt :: ExprContext) a
   = ArgList
-  { _argList_head :: Argument ctxt a
+  { _argList_head :: Argument atomType ctxt a
   , _argList_tail
     :: Compose
          []
          (Compose
            (Before (Between' [WhitespaceChar] Comma))
-           (Argument ctxt))
+           (Argument atomType ctxt))
          a
   , _argList_comma :: Maybe (Before [WhitespaceChar] Comma)
   , _argList_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
-data VarargsList (ctxt :: ExprContext) a
+data VarargsList (atomType :: AtomType) (ctxt :: ExprContext) a
   = VarargsList
   deriving (Functor, Foldable, Traversable)
 
-data LambdefNocond (ctxt :: ExprContext) a
+data LambdefNocond (atomType :: AtomType) (ctxt :: ExprContext) a
   = LambdefNocond
   { _lambdefNocond_args
     :: Compose
          Maybe
          (Compose
            (Between (NonEmpty WhitespaceChar) [WhitespaceChar])
-           (VarargsList ctxt))
+           (VarargsList atomType ctxt))
          a
   , _lambdefNocond_expr
     :: Compose
          (Before [WhitespaceChar])
-         (TestNocond ctxt)
+         (TestNocond atomType ctxt)
          a
   , _lambdefNocond_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
-data TestNocond (ctxt :: ExprContext) a
+data TestNocond (atomType :: AtomType) (ctxt :: ExprContext) a
   = TestNocond
-  { _expressionNocond_value :: Sum (OrTest ctxt) (LambdefNocond ctxt) a
+  { _expressionNocond_value :: Sum (OrTest atomType ctxt) (LambdefNocond atomType ctxt) a
   , _expressionNocond_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
-data CompIter (ctxt :: ExprContext) a
-  = CompIter
-  { _compIter_value :: Sum (CompFor ctxt) (CompIf ctxt) a
-  , _compIter_ann :: a
-  }
+data CompIter :: AtomType -> ExprContext -> * -> * where
+  CompIter ::
+    { _compIter_value :: Sum (CompFor atomType ctxt) (CompIf atomType ctxt) a
+    , _compIter_ann :: a
+    } -> CompIter 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data CompIf (ctxt :: ExprContext) a
-  = CompIf
-  { _compIf_expr :: Compose (Before [WhitespaceChar]) (TestNocond ctxt) a
-  , _compIf_iter
-    :: Compose
-         Maybe
-         (Compose (Before [WhitespaceChar]) (CompIter ctxt))
-         a
-  , _compIf_ann :: a
-  }
+data CompIf :: AtomType -> ExprContext -> * -> * where
+  CompIf ::
+    { _compIf_expr :: Compose (Before [WhitespaceChar]) (TestNocond atomType ctxt) a
+    , _compIf_iter
+      :: Compose
+          Maybe
+          (Compose (Before [WhitespaceChar]) (CompIter atomType ctxt))
+          a
+    , _compIf_ann :: a
+    } -> CompIf 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data StarExpr (ctxt :: ExprContext) a
+data StarExpr (atomType :: AtomType) (ctxt :: ExprContext) a
   = StarExpr
-  { _starExpr_value :: Compose (Before [WhitespaceChar]) (Expr ctxt) a
+  { _starExpr_value :: Compose (Before [WhitespaceChar]) (Expr 'Assignable ctxt) a
   , _starExpr_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
-data ExprList (ctxt :: ExprContext) a
-  = ExprList
-  { _exprList_head :: Sum (Expr ctxt) (StarExpr ctxt) a
-  , _exprList_tail
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (Sum (Expr ctxt) (StarExpr ctxt)))
-         a
-  , _exprList_ann :: a
-  }
+data ExprList :: AtomType -> ExprContext -> * -> * where
+  ExprList ::
+    { _exprList_head :: Sum (Expr atomType ctxt) (StarExpr atomType ctxt) a
+    , _exprList_tail
+      :: Compose
+          []
+          (Compose
+            (Before (Between' [WhitespaceChar] Comma))
+            (Sum (Expr atomType ctxt) (StarExpr atomType ctxt)))
+          a
+    , _exprList_ann :: a
+    } -> ExprList atomType ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data CompFor (ctxt :: ExprContext) a
-  = CompFor
-  { _compFor_targets
-    :: Compose
-         (Before (Between' (NonEmpty WhitespaceChar) KFor))
-         (Compose
-           (After (NonEmpty WhitespaceChar))
-           (ExprList ctxt))
-         a
-  , _compFor_expr :: Compose (Before (NonEmpty WhitespaceChar)) (OrTest ctxt) a
-  , _compFor_iter
-    :: Compose
-         Maybe
-         (Compose (Before [WhitespaceChar]) (CompIter ctxt))
-         a
-  , _compFor_ann :: a
-  }
+data CompFor :: AtomType -> ExprContext -> * -> * where
+  CompFor ::
+    { _compFor_targets
+      :: Compose
+          (Before (Between' (NonEmpty WhitespaceChar) KFor))
+          (Compose
+            (After (NonEmpty WhitespaceChar))
+            (ExprList 'Assignable ctxt))
+          a
+    , _compFor_expr :: Compose (Before (NonEmpty WhitespaceChar)) (OrTest atomExpr ctxt) a
+    , _compFor_iter
+      :: Compose
+          Maybe
+          (Compose (Before [WhitespaceChar]) (CompIter atomExpr ctxt))
+          a
+    , _compFor_ann :: a
+    } -> CompFor 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data SliceOp (ctxt :: ExprContext) a
-  = SliceOp
-  { _sliceOp_val
-    :: Compose
-         Maybe
-         (Compose (Before [WhitespaceChar]) (Test ctxt))
-         a
-  , _sliceOp_ann :: a
-  }
+data SliceOp :: AtomType -> ExprContext -> * -> * where
+  SliceOp ::
+    { _sliceOp_val
+      :: Compose
+          Maybe
+          (Compose (Before [WhitespaceChar]) (Test atomType ctxt))
+          a
+    , _sliceOp_ann :: a
+    } -> SliceOp 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data Subscript (ctxt :: ExprContext) a
-  = SubscriptTest
-  { _subscriptTest_val :: Test ctxt a
-  , _subscript_ann :: a
-  }
-  | SubscriptSlice
-  { _subscriptSlice_left
-    :: Compose
-         Maybe
-         (Compose (After [WhitespaceChar]) (Test ctxt))
-         a
-  , _subscriptSlice_right
-    :: Compose
-         Maybe
-         (Compose (Before [WhitespaceChar]) (Test ctxt))
-         a
-  , _subscriptSlice_sliceOp
-    :: Compose
-         Maybe
-         (Compose (Before [WhitespaceChar]) (SliceOp ctxt))
-         a 
-  , _subscript_ann :: a
-  }
+data Subscript :: AtomType -> ExprContext -> * -> * where
+  SubscriptTest ::
+    { _subscriptTest_val :: Test atomType ctxt a
+    , _subscript_ann :: a
+    } -> Subscript 'NotAssignable ctxt a
+  SubscriptSlice ::
+    { _subscriptSlice_left
+      :: Compose
+          Maybe
+          (Compose (After [WhitespaceChar]) (Test atomType ctxt))
+          a
+    , _subscriptSlice_right
+      :: Compose
+          Maybe
+          (Compose (Before [WhitespaceChar]) (Test atomType ctxt))
+          a
+    , _subscriptSlice_sliceOp
+      :: Compose
+          Maybe
+          (Compose (Before [WhitespaceChar]) (SliceOp atomType ctxt))
+          a 
+    , _subscript_ann :: a
+    } -> Subscript 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data SubscriptList (ctxt :: ExprContext) a
-  = SubscriptList
-  { _subscriptList_head :: Subscript ctxt a
-  , _subscriptList_tail
-    :: Compose
-         Maybe
-         (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (Subscript ctxt))
-         a
-  , _subscriptList_comma :: Maybe (Before [WhitespaceChar] Comma)
-  , _subscriptList_ann :: a
-  }
+data SubscriptList :: AtomType -> ExprContext -> * -> * where
+  SubscriptList ::
+    { _subscriptList_head :: Subscript atomType ctxt a
+    , _subscriptList_tail
+      :: Compose
+          Maybe
+          (Compose
+            (Before (Between' [WhitespaceChar] Comma))
+            (Subscript atomType ctxt))
+          a
+    , _subscriptList_comma :: Maybe (Before [WhitespaceChar] Comma)
+    , _subscriptList_ann :: a
+    } -> SubscriptList 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data Trailer (ctxt :: ExprContext) a
-  = TrailerCall
-  { _trailerCall_value
-    :: Compose
-         (Between' [WhitespaceChar])
-         (Compose
-           Maybe
-           (ArgList ctxt))
-         a
-  , _trailer_ann :: a
-  }
-  | TrailerSubscript
-  { _trailerSubscript_value
-    :: Compose
-         (Between' [WhitespaceChar])
-         (Compose
-           Maybe
-           (SubscriptList ctxt))
-         a
-  , _trailer_ann :: a
-  }
-  | TrailerAccess
-  { _trailerAccess_value :: Compose (Before [WhitespaceChar]) Identifier a
-  , _trailer_ann :: a
-  }
+data Trailer :: AtomType -> ExprContext -> * -> * where
+  TrailerCall ::
+    { _trailerCall_value
+      :: Compose
+          (Between' [WhitespaceChar])
+          (Compose
+            Maybe
+            (ArgList atomType ctxt))
+          a
+    , _trailer_ann :: a
+    } -> Trailer 'NotAssignable ctxt a
+  TrailerSubscript ::
+    { _trailerSubscript_value
+      :: Compose
+          (Between' [WhitespaceChar])
+          (Compose
+            Maybe
+            (SubscriptList atomType ctxt))
+          a
+    , _trailer_ann :: a
+    } -> Trailer 'NotAssignable ctxt a
+  TrailerAccess ::
+    { _trailerAccess_value :: Compose (Before [WhitespaceChar]) Identifier a
+    , _trailer_ann :: a
+    } -> Trailer 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
 data ExprContext = TopLevel | FunDef FunType
 data FunType = Normal | Async
+data AtomType = Assignable | NotAssignable
 
-data AtomExpr :: ExprContext -> * -> * where
+data AtomExpr :: AtomType -> ExprContext -> * -> * where
   AtomExprNoAwait ::
-    { _atomExpr_atom :: Atom ctxt a
+    { _atomExpr_atom :: Atom atomType ctxt a
     , _atomExpr_trailers
-      :: Compose [] (Compose (Before [WhitespaceChar]) (Trailer ctxt)) a
+      :: Compose [] (Compose (Before [WhitespaceChar]) (Trailer 'NotAssignable ctxt)) a
     , _atomExpr_ann :: a
-    } -> AtomExpr ctxt a
+    } -> AtomExpr atomType ctxt a
   AtomExprAwait ::
     { _atomExprAwait_await :: Compose Maybe (After (NonEmpty WhitespaceChar)) KAwait
-    , _atomExprAwait_atom :: Atom ('FunDef 'Async) a
+    , _atomExprAwait_atom :: Atom atomType ('FunDef 'Async) a
     , _atomExprAwait_trailers
       :: Compose
            []
            (Compose
              (Before [WhitespaceChar])
-             (Trailer ('FunDef 'Async)))
+             (Trailer 'NotAssignable ('FunDef 'Async)))
            a
     , _atomExprAwait_ann :: a
-    } -> AtomExpr ('FunDef 'Async) a
+    } -> AtomExpr atomType ('FunDef 'Async) a
 deriving instance Eq a => Eq (AtomExpr b a)
 deriving instance Functor (AtomExpr a)
 deriving instance Foldable (AtomExpr a)
 deriving instance Traversable (AtomExpr a)
 
-data Power (ctxt :: ExprContext) a
-  = Power
-  { _power_left :: AtomExpr ctxt a
-  , _power_right
-    :: Compose
-         Maybe
-         (Compose
-           (Before (After [WhitespaceChar] DoubleAsterisk))
-           (Factor ctxt))
-         a
-  , _power_ann :: a
-  }
+data Power :: AtomType -> ExprContext -> * -> * where
+  PowerOne ::
+    { _powerOne_value :: AtomExpr atomType ctxt a
+    , _power_ann :: a
+    } -> Power atomType ctxt a
+
+  PowerSome ::
+    { _power_left :: AtomExpr atomType ctxt a
+    , _power_right
+      :: Compose
+          Maybe
+          (Compose
+            (Before (After [WhitespaceChar] DoubleAsterisk))
+            (Factor atomExpr ctxt))
+          a
+    , _power_ann :: a
+    } -> Power 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
 data FactorOp
@@ -500,19 +506,20 @@ data FactorOp
   | FactorInv
   deriving (Eq, Show)
 
-data Factor (ctxt :: ExprContext) a
-  = FactorNone
-  { _factorNone_value :: Power ctxt a
-  , _factor_ann :: a
-  }
-  | FactorSome
-  { _factorSome_value
-    :: Compose
-         (Before (After [WhitespaceChar] FactorOp))
-         (Factor ctxt)
-         a
-  , _factor_ann :: a
-  }
+data Factor :: AtomType -> ExprContext -> * -> * where
+  FactorNone ::
+    { _factorNone_value :: Power atomType ctxt a
+    , _factor_ann :: a
+    } -> Factor atomType ctxt a
+
+  FactorSome ::
+    { _factorSome_value
+      :: Compose
+          (Before (After [WhitespaceChar] FactorOp))
+          (Factor atomType ctxt)
+          a
+    , _factor_ann :: a
+    } -> Factor 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
 data TermOp
@@ -523,77 +530,101 @@ data TermOp
   | TermMod
   deriving (Eq, Show)
 
-data Term (ctxt :: ExprContext) a
-  = Term
-  { _term_left :: Factor ctxt a
-  , _term_right
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [WhitespaceChar] TermOp))
-           (Factor ctxt))
-         a
-  , _term_ann :: a
-  }
+data Term :: AtomType -> ExprContext -> * -> * where
+  TermOne ::
+    { _termOne_value :: Factor atomType ctxt a
+    , _term_ann :: a
+    } -> Term atomType ctxt a
+
+  TermSome ::
+    { _termSome_left :: Factor atomType ctxt a
+    , _termSome_right
+      :: Compose
+          []
+          (Compose
+            (Before (Between' [WhitespaceChar] TermOp))
+            (Factor atomType ctxt))
+          a
+    , _term_ann :: a
+    } -> Term 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data ArithExpr (ctxt :: ExprContext) a
-  = ArithExpr
-  { _arithExpr_left :: Term ctxt a
-  , _arithExpr_right
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [WhitespaceChar] (Either Plus Minus)))
-           (Term ctxt))
-         a
-  , _arithExpr_ann :: a
-  }
+data ArithExpr :: AtomType -> ExprContext -> * -> * where
+  ArithExprOne ::
+    { _arithExpr_left :: Term atomType ctxt a
+    , _arithExpr_ann :: a
+    } -> ArithExpr atomType ctxt a
+
+  ArithExprSome ::
+    { _arithExpr_left :: Term atomType ctxt a
+    , _arithExpr_right
+      :: Compose
+          NonEmpty
+          (Compose
+            (Before (Between' [WhitespaceChar] (Either Plus Minus)))
+            (Term atomType ctxt))
+          a
+    , _arithExpr_ann :: a
+    } -> ArithExpr 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data ShiftExpr (ctxt :: ExprContext) a
-  = ShiftExpr
-  { _shiftExpr_left :: ArithExpr ctxt a
-  , _shiftExpr_right
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [WhitespaceChar] (Either DoubleLT DoubleGT)))
-           (ArithExpr ctxt))
-         a
-  , _shiftExpr_ann :: a
-  }
+data ShiftExpr :: AtomType -> ExprContext -> * -> * where
+  ShiftExprOne ::
+    { _shiftExprOne_value :: ArithExpr atomType ctxt a
+    , _shiftExpr_ann :: a
+    } -> ShiftExpr atomType ctxt a
+
+  ShiftExprMany ::
+    { _shiftExprMany_left :: ArithExpr atomType ctxt a
+    , _shiftExprMany_right
+      :: Compose
+          NonEmpty
+          (Compose
+            (Before (Between' [WhitespaceChar] (Either DoubleLT DoubleGT)))
+            (ArithExpr atomType ctxt))
+          a
+    , _shiftExpr_ann :: a
+    } -> ShiftExpr 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data AndExpr (ctxt :: ExprContext) a
-  = AndExpr
-  { _andExpr_left :: ShiftExpr ctxt a
-  , _andExprSome_right
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [WhitespaceChar] Ampersand))
-           (ShiftExpr ctxt))
-         a
-  , _andExpr_ann :: a
-  }
+data AndExpr :: AtomType -> ExprContext -> * -> * where
+  AndExprOne ::
+    { _andExprOne_value :: ShiftExpr atomType ctxt a
+    , _andExpr_ann :: a
+    } -> AndExpr atomType ctxt a
+
+  AndExprMany ::
+    { _andExprMany_left :: ShiftExpr atomType ctxt a
+    , _andExprMany_right
+      :: Compose
+          NonEmpty
+          (Compose
+            (Before (Between' [WhitespaceChar] Ampersand))
+            (ShiftExpr atomType ctxt))
+          a
+    , _andExpr_ann :: a
+    } -> AndExpr 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data XorExpr (ctxt :: ExprContext) a
-  = XorExpr
-  { _xorExpr_left :: AndExpr ctxt a
-  , _xorExprSome_right
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [WhitespaceChar] Caret))
-           (AndExpr ctxt))
-         a
-  , _xorExpr_ann :: a
-  }
+data XorExpr :: AtomType -> ExprContext -> * -> * where
+  XorExprOne ::
+    { _xorExprOne_value :: AndExpr atomType ctxt a
+    , _xorExpr_ann :: a
+    } -> XorExpr atomType ctxt a
+  XorExprSome ::
+    { _xorExprSome_left :: AndExpr atomType ctxt a
+    , _xorExprSome_right
+      :: Compose
+          []
+          (Compose
+            (Before (Between' [WhitespaceChar] Caret))
+            (AndExpr atomType ctxt))
+          a
+    , _xorExpr_ann :: a
+    } -> XorExpr 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data Expr (ctxt :: ExprContext) a
+data Expr (atomType :: AtomType) (ctxt :: ExprContext) a
   = Expr
   { _expr_left :: XorExpr ctxt a
   , _expr_right
@@ -607,62 +638,76 @@ data Expr (ctxt :: ExprContext) a
   }
   deriving (Functor, Foldable, Traversable)
 
-data Comparison (ctxt :: ExprContext) a
-  = Comparison
-  { _comparison_left :: Expr ctxt a
-  , _comparison_right
-    :: Compose
-         []
-         (Compose
-           (Before
-             (Between' [WhitespaceChar] CompOperator))
-           (Expr ctxt))
-         a
-  , _comparison_ann :: a
-  }
+data Comparison :: AtomType -> ExprContext -> * -> * where
+  ComparisonOne ::
+    { _comparisonOne_value :: Expr atomType ctxt a
+    , _comparison_ann :: a
+    } -> Comparison atomType ctxt a
+  ComparisonMany ::
+    { _comparisonMany_left :: Expr atomType ctxt a
+    , _comparisonMany_right
+      :: Compose
+          NonEmpty
+          (Compose
+            (Before
+              (Between' [WhitespaceChar] CompOperator))
+            (Expr atomType ctxt))
+          a
+    , _comparison_ann :: a
+    } -> Comparison 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data NotTest (ctxt :: ExprContext) a
-  = NotTestSome
-  { _notTestSome_value
-    :: Compose
-         (Before (After (NonEmpty WhitespaceChar) KNot))
-         (NotTest ctxt)
-         a
-  , _notTest_ann :: a
-  }
-  | NotTestNone
-  { _notTestNone_value :: Comparison ctxt a
-  , _notTest_ann :: a
-  }
+data NotTest :: AtomType -> ExprContext -> * -> * where
+  NotTestSome ::
+    { _notTestSome_value
+      :: Compose
+          (Before (After (NonEmpty WhitespaceChar) KNot))
+          (NotTest atomType ctxt)
+          a
+    , _notTest_ann :: a
+    } -> NotTest 'NotAssignable ctxt a
+  NotTestNone ::
+    { _notTestNone_value :: Comparison atomType ctxt a
+    , _notTest_ann :: a
+    } -> NotTest atomType ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data AndTest (ctxt :: ExprContext) a
-  = AndTest
-  { _andTest_left :: NotTest ctxt a
-  , _andTest_right
-    :: Compose
-         []
-         (Compose
-           (Before (Between' (NonEmpty WhitespaceChar) KAnd))
-           (AndTest ctxt))
-         a
-  , _andTest_ann :: a
-  }
+data AndTest :: AtomType -> ExprContext -> * -> * where
+  AndTestOne ::
+    { _andTestOne_value :: NotTest atomType ctxt a
+    , _andTest_ann :: a
+    } -> AndTest atomType ctxt a
+    
+  AndTestMany ::
+    { _andTestMany_left :: NotTest atomType ctxt a
+    , _andTestMany_right
+      :: Compose
+          NonEmpty
+          (Compose
+            (Before (Between' (NonEmpty WhitespaceChar) KAnd))
+            (AndTest atomType ctxt))
+          a
+    , _andTest_ann :: a
+    } -> AndTest 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data OrTest (ctxt :: ExprContext) a
-  = OrTest
-  { _orTest_left :: AndTest ctxt a
-  , _orTest_right
-    :: Compose
-         []
-         (Compose
-           (Before (Between' (NonEmpty WhitespaceChar) KOr))
-           (AndTest ctxt))
-         a
-  , _orTest_ann :: a
-  }
+data OrTest :: AtomType -> ExprContext -> * -> * where
+  OrTestOne ::
+    { _orTestOne_value :: AndTest atomType ctxt a
+    , _orTest_ann :: a
+    } -> OrTest atomType ctxt a
+
+  OrTestMany ::
+    { _orTestMany_left :: AndTest atomType ctxt a
+    , _orTestMany_right
+      :: Compose
+          NonEmpty
+          (Compose
+            (Before (Between' (NonEmpty WhitespaceChar) KOr))
+            (AndTest atomType ctxt))
+          a
+    , _orTest_ann :: a
+    } -> OrTest 'NotAssignable ctxt a
   deriving (Functor, Foldable, Traversable)
 
 data IfThenElse (ctxt :: ExprContext) a
@@ -672,15 +717,15 @@ data IfThenElse (ctxt :: ExprContext) a
   }
   deriving (Functor, Foldable, Traversable)
 
-data Test (ctxt :: ExprContext) a
+data Test (atomType :: AtomType) (ctxt :: ExprContext) a
   = TestCond
-  { _testCond_head :: OrTest ctxt a
+  { _testCond_head :: OrTest atomType ctxt a
   , _testCond_tail
     :: Compose
          Maybe
          (Compose
            (Before (NonEmpty WhitespaceChar))
-           (IfThenElse ctxt))
+           (IfThenElse atomType ctxt))
          a
   , _test_ann :: a
   }
@@ -719,55 +764,52 @@ data YieldExpr a
   , _yieldExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
-data TestlistComp (ctxt :: ExprContext) a
-  = TestlistCompFor
-  { _testlistComp_head :: Sum (Test ctxt) (StarExpr ctxt) a
-  , _testlistCompFor_tail :: Compose (Before [WhitespaceChar]) (CompFor ctxt) a
-  , _testlistComp_ann :: a
-  }
-  | TestlistCompList
-  { _testlistComp_head :: Sum (Test ctxt) (StarExpr ctxt) a
-  , _testlistCompList_tail
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (Sum (Test ctxt) (StarExpr ctxt)))
-         a
-  , _testlistCompList_comma :: Maybe (Before [WhitespaceChar] Comma)
-  , _testlistComp_ann :: a
-  }
+data TestlistComp :: AtomType -> ExprContext -> * -> * where
+  TestlistCompFor ::
+    { _testlistComp_head :: Sum (Test atomType ctxt) (StarExpr atomType ctxt) a
+    , _testlistCompFor_tail :: Compose (Before [WhitespaceChar]) (CompFor atomType ctxt) a
+    , _testlistComp_ann :: a
+    } -> TestlistComp 'NotAssignable ctxt a
+
+  TestlistCompList ::
+    { _testlistComp_head :: Sum (Test atomType ctxt) (StarExpr atomType ctxt) a
+    , _testlistCompList_tail
+      :: Compose
+          []
+          (Compose
+            (Before (Between' [WhitespaceChar] Comma))
+            (Sum (Test atomType ctxt) (StarExpr atomType ctxt)))
+          a
+    , _testlistCompList_comma :: Maybe (Before [WhitespaceChar] Comma)
+    , _testlistComp_ann :: a
+    } -> TestlistComp atomType ctxt a
   deriving (Functor, Foldable, Traversable)
 
-data DictOrSetMaker (ctxt :: ExprContext) a
+data DictOrSetMaker (atomType :: AtomType) (ctxt :: ExprContext) a
   = DictOrSetMaker
   deriving (Functor, Foldable, Traversable)
 
-data Atom :: ExprContext -> * -> * where
+data Atom :: AtomType -> ExprContext -> * -> * where
   AtomParenNoYield ::
     { _atomParenNoYield_val
       :: Compose
           (Between' [WhitespaceChar])
           (Compose
             Maybe
-            (TestlistComp ctxt))
+            (TestlistComp atomType ctxt))
           a
     , _atomParenNoYield_ann :: a
-    } -> Atom ctxt a
+    } -> Atom atomType ctxt a
 
   -- A yield expression can only be used within a normal function definition
   AtomParenYield ::
     { _atomParenYield_val
       :: Compose
           (Between' [WhitespaceChar])
-          (Compose
-            Maybe
-            (Sum
-              YieldExpr
-              (TestlistComp ('FunDef 'Normal))))
+          YieldExpr
           a
     , _atomParenYield_ann :: a
-    } -> Atom ('FunDef 'Normal) a
+    } -> Atom 'NotAssignable ('FunDef 'Normal) a
 
   AtomBracket ::
     { _atomBracket_val
@@ -775,10 +817,10 @@ data Atom :: ExprContext -> * -> * where
           (Between' [WhitespaceChar])
           (Compose
             Maybe
-            (TestlistComp ctxt))
+            (TestlistComp atomType ctxt))
           a
     , _atom_ann :: a
-    } -> Atom ctxt a
+    } -> Atom atomType ctxt a
 
   AtomCurly ::
     { _atomCurly_val
@@ -786,25 +828,25 @@ data Atom :: ExprContext -> * -> * where
           (Between' [WhitespaceChar])
           (Compose
             Maybe
-            (DictOrSetMaker ctxt))
+            (DictOrSetMaker atomType ctxt))
           a
     , _atom_ann :: a
-    } -> Atom ctxt a
+    } -> Atom atomType ctxt a
 
   AtomIdentifier ::
     { _atomIdentifier_value :: Identifier a
     , _atom_ann :: a
-    } -> Atom ctxt a
+    } -> Atom 'Assignable ctxt a
 
   AtomInteger ::
     { _atomInteger :: Integer' a
     , _atom_ann :: a
-    } -> Atom ctxt a
+    } -> Atom 'NotAssignable ctxt a
 
   AtomFloat ::
     { _atomFloat :: Float' a
     , _atom_ann :: a
-    } -> Atom ctxt a
+    } -> Atom 'NotAssignable ctxt a
 
   AtomString ::
     { _atomString_head :: Sum StringLiteral BytesLiteral a
@@ -816,23 +858,23 @@ data Atom :: ExprContext -> * -> * where
             (Sum StringLiteral BytesLiteral))
           a
     , _atom_ann :: a
-    } -> Atom ctxt a
+    } -> Atom 'NotAssignable ctxt a
 
   AtomEllipsis ::
     { _atom_ann :: a
-    } -> Atom ctxt a
+    } -> Atom 'NotAssignable ctxt a
 
   AtomNone ::
     { _atom_ann :: a
-    } -> Atom ctxt a
+    } -> Atom 'NotAssignable ctxt a
 
   AtomTrue ::
     { _atom_ann :: a
-    } -> Atom ctxt a
+    } -> Atom 'NotAssignable ctxt a
 
   AtomFalse ::
     { _atom_ann :: a
-    } -> Atom ctxt a
+    } -> Atom 'NotAssignable ctxt a
 deriving instance Eq a => Eq (Atom ctxt a)
 deriving instance Functor (Atom ctxt)
 deriving instance Foldable (Atom ctxt)

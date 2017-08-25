@@ -441,12 +441,12 @@ prodElim
   -> Product f g a -> r
 prodElim f g (Pair a b) = f a <> g b
 
-expr :: Expr ctxt a -> Doc
+expr :: Expr atomType ctxt a -> Doc
 expr (Expr l r _) =
   xorExpr l <>
   foldMapF (beforeF (betweenWhitespace' pipe) xorExpr) r
 
-comparison :: Comparison ctxt a -> Doc
+comparison :: Comparison atomType ctxt a -> Doc
 comparison (Comparison l r _) =
   expr l <>
   foldMapF
@@ -575,7 +575,7 @@ atomExpr (AtomExprNoAwait a trailers _) =
   atom a <>
   foldMapF (whitespaceBeforeF trailer) trailers
 
-power :: Power ctxt a -> Doc
+power :: Power atomType ctxt a -> Doc
 power (Power l r _) =
   atomExpr l <>
   foldMapF (beforeF (whitespaceAfter doubleAsterisk) factor) r
@@ -602,17 +602,17 @@ termOp t =
     TermDiv -> char '/'
     TermMod -> char '%'
 
-term :: Term ctxt a -> Doc
+term :: Term atomType ctxt a -> Doc
 term (Term l r _) =
   factor l <>
   foldMapF (beforeF (betweenWhitespace' termOp) factor) r
 
-arithExpr :: ArithExpr ctxt a -> Doc
+arithExpr :: ArithExpr atomType ctxt a -> Doc
 arithExpr (ArithExpr l r _) =
   term l <>
   foldMapF (beforeF (betweenWhitespace' (either plus minus)) term) r
   
-shiftExpr :: ShiftExpr ctxt a -> Doc
+shiftExpr :: ShiftExpr atomType ctxt a -> Doc
 shiftExpr (ShiftExpr l r _) =
   arithExpr l <>
   foldMapF
@@ -621,12 +621,12 @@ shiftExpr (ShiftExpr l r _) =
       arithExpr)
     r
   
-andExpr :: AndExpr ctxt a -> Doc
+andExpr :: AndExpr atomType ctxt a -> Doc
 andExpr (AndExpr l r _) =
   shiftExpr l <>
   foldMapF (beforeF (betweenWhitespace' ampersand) shiftExpr) r
 
-xorExpr :: XorExpr ctxt a -> Doc
+xorExpr :: XorExpr atomType ctxt a -> Doc
 xorExpr (XorExpr l r _) =
   andExpr l <>
   foldMapF (beforeF (betweenWhitespace' caret) andExpr) r
@@ -637,7 +637,7 @@ notTest n =
     NotTestSome val _ -> beforeF (whitespaceAfter kNot) notTest val
     NotTestNone val _ -> comparison val
       
-andTest :: AndTest ctxt a -> Doc
+andTest :: AndTest atomType ctxt a -> Doc
 andTest (AndTest l r _) =
   notTest l <>
   foldMapF
@@ -646,7 +646,7 @@ andTest (AndTest l r _) =
       andTest)
     r
 
-orTest :: OrTest ctxt a -> Doc
+orTest :: OrTest atomType ctxt a -> Doc
 orTest (OrTest l r _) =
   andTest l <>
   foldMapF (beforeF (betweenWhitespace' kOr) andTest) r

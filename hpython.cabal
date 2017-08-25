@@ -20,8 +20,11 @@ library
   exposed-modules:     Language.Python.AST
                        Language.Python.AST.BytesLiteral
                        Language.Python.AST.BytesPrefix
+                       Language.Python.AST.Comment
+                       Language.Python.AST.CompOperator
                        Language.Python.AST.EscapeSeq
                        Language.Python.AST.Digits
+                       Language.Python.AST.FactorOperator
                        Language.Python.AST.Float
                        Language.Python.AST.Identifier
                        Language.Python.AST.Imag
@@ -39,6 +42,7 @@ library
                        Language.Python.AST.StringPrefix
                        Language.Python.AST.Symbols
                        Language.Python.Parser
+                       Language.Python.Parser.IR
                        Language.Python.Printer
                        Data.Separated.After
                        Data.Separated.Before

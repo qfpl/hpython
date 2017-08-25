@@ -22,6 +22,8 @@ import Data.Separated.Between
 import Data.Text (Text)
 
 import Language.Python.AST.BytesLiteral
+import Language.Python.AST.CompOperator
+import Language.Python.AST.FactorOperator
 import Language.Python.AST.Float
 import Language.Python.AST.Identifier
 import Language.Python.AST.Imag
@@ -29,29 +31,6 @@ import Language.Python.AST.Integer
 import Language.Python.AST.Keywords
 import Language.Python.AST.StringLiteral
 import Language.Python.AST.Symbols
-
-data CompOperator
-  = CompLT
-  | CompGT
-  | CompEq
-  | CompGEq
-  | CompLEq
-  | CompNEq
-  | CompIs
-  { _compIs_spaceAfter :: WhitespaceChar
-  }
-  | CompIsNot
-  { _compIsNot_spaceBetween :: NonEmpty WhitespaceChar
-  , _compIsNot_spaceAfter :: WhitespaceChar
-  }
-  | CompIn
-  { _compIn_spaceAfter :: WhitespaceChar
-  }
-  | CompNotIn
-  { _compNotIn_spaceBetween :: NonEmpty WhitespaceChar
-  , _compNotIn_spaceAfter :: WhitespaceChar
-  }
-  deriving (Eq, Show)
 
 data Argument :: AtomType -> ExprContext -> * -> * where
   ArgumentFor ::
@@ -352,12 +331,6 @@ deriving instance Eq c => Eq (Power a b c)
 deriving instance Functor (Power a b)
 deriving instance Foldable (Power a b)
 deriving instance Traversable (Power a b)
-
-data FactorOp
-  = FactorNeg
-  | FactorPos
-  | FactorInv
-  deriving (Eq, Show)
 
 data Factor :: AtomType -> ExprContext -> * -> * where
   FactorNone ::
@@ -794,12 +767,6 @@ deriving instance Functor (Atom atomType ctxt)
 deriving instance Foldable (Atom atomType ctxt)
 deriving instance Traversable (Atom atomType ctxt)
 
-data Comment a
-  = Comment
-  { _comment_text :: Text
-  , _comment_ann :: a
-  } deriving (Functor, Foldable, Traversable)
-
 data PythonModule a
   = PythonModule
   { _pythonModule_content :: a
@@ -992,11 +959,6 @@ deriveShow ''Atom
 deriveEq1 ''Atom
 deriveShow1 ''Atom
 
-makeLenses ''Comment
-deriveEq ''Comment
-deriveShow ''Comment
-deriveEq1 ''Comment
-deriveShow1 ''Comment
 
 makeLenses ''PythonModule
 deriveEq ''PythonModule

@@ -18,13 +18,25 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Language.Python.AST
+                       Language.Python.AST.BytesLiteral
+                       Language.Python.AST.BytesPrefix
                        Language.Python.AST.EscapeSeq
                        Language.Python.AST.Digits
+                       Language.Python.AST.Float
+                       Language.Python.AST.Identifier
+                       Language.Python.AST.Imag
+                       Language.Python.AST.Integer
                        Language.Python.AST.Keywords
+                       Language.Python.AST.LongBytes
                        Language.Python.AST.LongBytesChar
+                       Language.Python.AST.LongString
                        Language.Python.AST.LongStringChar
+                       Language.Python.AST.ShortBytes
                        Language.Python.AST.ShortBytesChar
                        Language.Python.AST.ShortStringChar
+                       Language.Python.AST.ShortString
+                       Language.Python.AST.StringLiteral
+                       Language.Python.AST.StringPrefix
                        Language.Python.AST.Symbols
                        Language.Python.Parser
                        Language.Python.Printer

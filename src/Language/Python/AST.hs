@@ -13,217 +13,22 @@ module Language.Python.AST where
 
 import Papa hiding (Plus, Sum, Product)
 
-import Data.Eq.Deriving
+import Data.Deriving
 import Data.Functor.Compose
 import Data.Functor.Sum
 import Data.Separated.After
 import Data.Separated.Before
 import Data.Separated.Between
 import Data.Text (Text)
-import Text.Show.Deriving
 
-import Language.Python.AST.EscapeSeq
-import Language.Python.AST.Digits
+import Language.Python.AST.BytesLiteral
+import Language.Python.AST.Float
+import Language.Python.AST.Identifier
+import Language.Python.AST.Imag
+import Language.Python.AST.Integer
 import Language.Python.AST.Keywords
-import Language.Python.AST.LongBytesChar
-import Language.Python.AST.LongStringChar
-import Language.Python.AST.ShortBytesChar
-import Language.Python.AST.ShortStringChar
+import Language.Python.AST.StringLiteral
 import Language.Python.AST.Symbols
-
-type Token = After [WhitespaceChar]
-type TokenF = Compose (After [WhitespaceChar])
-
-data Identifier a
-  = Identifier
-  { _identifier_value :: Text
-  , _identifier_ann :: a
-  } deriving (Functor, Foldable, Traversable)
-
-data StringPrefix
-  = StringPrefix_r
-  | StringPrefix_u
-  | StringPrefix_R
-  | StringPrefix_U
-  deriving (Eq, Show)
-
-newtype StringEscapeSeq = StringEscapeSeq Char
-  deriving (Eq, Show)
-
--- | Strings between one single or double quote
-data ShortString a
-  = ShortStringSingle
-  { _shortStringSingle_value
-    :: [Either (ShortStringChar SingleQuote) EscapeSeq]
-  , _shortString_ann :: a
-  }
-  | ShortStringDouble
-  { _shortStringDouble_value
-    :: [Either (ShortStringChar DoubleQuote) EscapeSeq]
-  , _shortString_ann :: a
-  } deriving (Functor, Foldable, Traversable)
-
--- | Between three quotes
-data LongString a
-  = LongStringSingle
-  { _longStringSingle_value
-    :: [Either LongStringChar EscapeSeq]
-  , _longStringSingle_ann :: a
-  }
-  | LongStringDouble
-  { _longStringDouble_value
-    :: [Either LongStringChar EscapeSeq]
-  , _longStringDouble_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data BytesPrefix
-  = BytesPrefix_b
-  | BytesPrefix_B
-  | BytesPrefix_br
-  | BytesPrefix_Br
-  | BytesPrefix_bR
-  | BytesPrefix_BR
-  | BytesPrefix_rb
-  | BytesPrefix_rB
-  | BytesPrefix_Rb
-  | BytesPrefix_RB
-  deriving (Eq, Show)
-
-data ShortBytes a
-  = ShortBytesSingle
-  { _shortBytesSingle_value
-    :: [Either (ShortBytesChar SingleQuote) EscapeSeq]
-  , _shortBytes_ann :: a
-  }
-  | ShortBytesDouble
-  { _shortBytesDouble_value
-    :: [Either (ShortBytesChar DoubleQuote) EscapeSeq]
-  , _shortBytes_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
--- | Between triple quotes
-data LongBytes a
-  = LongBytesSingle
-  { _longBytesSingle_value
-    :: [Either Char EscapeSeq]
-  , _longBytes_ann :: a
-  }
-  | LongBytesDouble
-  { _longBytesDouble_value
-    :: [Either Char EscapeSeq]
-  , _longBytes_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data Integer' a
-  = IntegerDecimal
-  { _integerDecimal_value
-    :: Either (NonZeroDigit, [Digit]) (NonEmpty Zero)
-  , _integer_ann :: a
-  }
-  | IntegerOct
-  { _integerOct_value
-    :: Before
-         (Either Char_o Char_O)
-         (NonEmpty OctDigit)
-  , _integer_ann :: a
-  }
-  | IntegerHex
-  { _integerHex_value
-    :: Before
-         (Either Char_x Char_X)
-         (NonEmpty HexDigit)
-  , _integer_ann :: a
-  }
-  | IntegerBin
-  { _integerBin_value
-    :: Before
-         (Either Char_b Char_B)
-         (NonEmpty BinDigit)
-  , _integer_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data PointFloat
-  = WithDecimalPlaces (Maybe (NonEmpty Digit)) (NonEmpty Digit)
-  | NoDecimalPlaces (NonEmpty Digit)
-  deriving (Eq, Show)
-
-data Float' a
-  = FloatNoDecimal
-  { _floatNoDecimal_base :: NonEmpty Digit
-  , _float_exponent
-    :: Maybe (Before (Either Char_e Char_E) (NonEmpty Digit))
-  , _float_ann :: a
-  }
-  | FloatDecimalNoBase
-  { _floatDecimalNoBase_fraction :: NonEmpty Digit
-  , _float_exponent
-    :: Maybe (Before (Either Char_e Char_E) (NonEmpty Digit))
-  , _float_ann :: a
-  }
-  | FloatDecimalBase
-  { _floatDecimalBase_base :: NonEmpty Digit
-  , _floatDecimalBase_fraction :: Compose Maybe NonEmpty Digit
-  , _float_exponent
-    :: Maybe (Before (Either Char_e Char_E) (NonEmpty Digit))
-  , _float_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data Imag a
-  = Imag
-  { _imag_value
-    :: Compose
-         (After (Either Char_j Char_J))
-         (Sum Float' (Const (NonEmpty Digit)))
-         a
-  , _imag_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
-data StringLiteral a
-  = StringLiteral
-  { _stringLiteral_value
-    :: Compose
-         (Before (Maybe StringPrefix))
-         (Sum ShortString LongString)
-         a
-  , _stringLiteral_ann :: a
-  } deriving (Functor, Foldable, Traversable)
-
-data BytesLiteral a
-  = BytesLiteral
-  { _bytesLiteral_prefix :: BytesPrefix
-  , _bytesLiteral_value :: Sum ShortBytes LongBytes a
-  , _bytesLiteral_ann :: a
-  } deriving (Functor, Foldable, Traversable)
-
-data Literal a
-  = LiteralString
-  { _literalString_head :: Sum StringLiteral BytesLiteral a
-  , _literalString_tail
-    :: Compose
-         []
-         (Compose (Before [WhitespaceChar]) (Sum StringLiteral BytesLiteral))
-         a
-  , _literal_ann :: a
-  }
-  | LiteralInteger
-  { _literalInteger_value :: Integer' a
-  , _literal_ann :: a
-  }
-  | LiteralFloat
-  { _literalFloat_value :: Float' a
-  , _literal_ann :: a
-  }
-  | LiteralImag
-  { _literalImag_value :: Imag a
-  , _literal_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
 
 data CompOperator
   = CompLT
@@ -534,14 +339,14 @@ data Power :: AtomType -> ExprContext -> * -> * where
     , _powerOne_ann :: a
     } -> Power atomType ctxt a
 
-  PowerSome ::
-    { _powerSome_left :: AtomExpr 'NotAssignable ctxt a
-    , _powerSome_right
+  PowerMany ::
+    { _powerMany_left :: AtomExpr 'NotAssignable ctxt a
+    , _powerMany_right
       :: Compose
            (Before (After [WhitespaceChar] DoubleAsterisk))
            (Factor 'NotAssignable ctxt)
            a
-    , _powerSome_ann :: a
+    , _powerMany_ann :: a
     } -> Power 'NotAssignable ctxt a
 deriving instance Eq c => Eq (Power a b c)
 deriving instance Functor (Power a b)
@@ -560,7 +365,7 @@ data Factor :: AtomType -> ExprContext -> * -> * where
     , _factorNone_ann :: a
     } -> Factor atomType ctxt a
 
-  FactorSome ::
+  FactorMany ::
     { _factorSome_value
       :: Compose
           (Before (After [WhitespaceChar] FactorOp))
@@ -587,16 +392,16 @@ data Term :: AtomType -> ExprContext -> * -> * where
     , _termOne_ann :: a
     } -> Term atomType ctxt a
 
-  TermSome ::
-    { _termSome_left :: Factor 'NotAssignable ctxt a
-    , _termSome_right
+  TermMany ::
+    { _termMany_left :: Factor 'NotAssignable ctxt a
+    , _termMany_right
       :: Compose
           NonEmpty
           (Compose
             (Before (Between' [WhitespaceChar] TermOp))
             (Factor 'NotAssignable ctxt))
           a
-    , _termSome_ann :: a
+    , _termMany_ann :: a
     } -> Term 'NotAssignable ctxt a
 deriving instance Eq c => Eq (Term a b c)
 deriving instance Functor (Term a b)
@@ -959,6 +764,15 @@ data Atom :: AtomType -> ExprContext -> * -> * where
           a
     , _atomString_ann :: a
     } -> Atom 'NotAssignable ctxt a
+    
+  AtomImag ::
+    { _atomImag_value
+      :: Compose
+           (Before [WhitespaceChar])
+           Imag
+          a
+    , _atomString_ann :: a
+    } -> Atom 'NotAssignable ctxt a
 
   AtomEllipsis ::
     { _atomEllipsis_ann :: a
@@ -992,47 +806,7 @@ data PythonModule a
   , _pythonModule_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
-deriveEq ''ShortString
-deriveShow ''ShortString
-deriveEq1 ''ShortString
-deriveShow1 ''ShortString
-makeLenses ''ShortString
 
-deriveEq ''LongString
-deriveShow ''LongString
-deriveEq1 ''LongString
-deriveShow1 ''LongString
-makeLenses ''LongString
-
-deriveEq ''ShortBytes
-deriveShow ''ShortBytes
-deriveEq1 ''ShortBytes
-deriveShow1 ''ShortBytes
-makeLenses ''ShortBytes
-
-deriveEq ''LongBytes
-deriveShow ''LongBytes
-deriveEq1 ''LongBytes
-deriveShow1 ''LongBytes
-makeLenses ''LongBytes
-
-deriveEq ''Float'
-deriveShow ''Float'
-deriveEq1 ''Float'
-deriveShow1 ''Float'
-makeLenses ''Float'
-
-deriveEq ''StringLiteral
-deriveShow ''StringLiteral
-deriveEq1 ''StringLiteral
-deriveShow1 ''StringLiteral
-makeLenses ''StringLiteral
-
-deriveEq ''BytesLiteral
-deriveShow ''BytesLiteral
-deriveEq1 ''BytesLiteral
-deriveShow1 ''BytesLiteral
-makeLenses ''BytesLiteral
 
 deriveShow ''Comparison
 deriveEq1 ''Comparison
@@ -1069,12 +843,6 @@ deriveShow ''TestList
 deriveEq1 ''TestList
 deriveShow1 ''TestList
 makeLenses ''TestList
-
-deriveEq ''Identifier
-deriveShow ''Identifier
-deriveEq1 ''Identifier
-deriveShow1 ''Identifier
-makeLenses ''Identifier
 
 deriveShow ''Argument
 deriveEq1 ''Argument
@@ -1197,24 +965,6 @@ deriveShow ''Expr
 deriveEq1 ''Expr
 deriveShow1 ''Expr
 
-makeLenses ''Integer'
-deriveEq ''Integer'
-deriveShow ''Integer'
-deriveEq1 ''Integer'
-deriveShow1 ''Integer'
-
-makeLenses ''Imag
-deriveEq ''Imag
-deriveShow ''Imag
-deriveEq1 ''Imag
-deriveShow1 ''Imag
-
-makeLenses ''Literal
-deriveEq ''Literal
-deriveShow ''Literal
-deriveEq1 ''Literal
-deriveShow1 ''Literal
-
 makeLenses ''YieldArg
 deriveShow ''YieldArg
 deriveEq1 ''YieldArg
@@ -1253,6 +1003,3 @@ deriveEq ''PythonModule
 deriveShow ''PythonModule
 deriveEq1 ''PythonModule
 deriveShow1 ''PythonModule
-
-deriveEq1 ''NonEmpty
-deriveShow1 ''NonEmpty

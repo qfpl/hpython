@@ -14,30 +14,40 @@ import GHC.Stack
 import Prelude (error)
 
 import Papa hiding (Space, zero, o, Plus, (\\), Product, argument)
+import Data.CharSet ((\\))
 import Data.Functor.Compose
 import Data.Functor.Sum
+import Data.Separated.After (After(..))
+import Data.Separated.Before (Before(..))
+import Data.Separated.Between (Between(..), Between'(..))
 import Data.Set (Set)
-import Data.Text (Text)
 import Text.Trifecta as P hiding
   (stringLiteral, integer, octDigit, hexDigit, comma, colon)
 
-import Data.CharSet ((\\))
 import qualified Data.CharSet as CharSet
 import qualified Data.CharSet.Common as CharSet
 import qualified Data.Set as S
 import qualified Data.Text as T
 
-import Data.Separated.After (After(..))
-import Data.Separated.Before (Before(..))
-import Data.Separated.Between (Between(..), Between'(..))
 import Language.Python.AST
+import Language.Python.AST.BytesLiteral
+import Language.Python.AST.BytesPrefix
 import Language.Python.AST.Digits
 import Language.Python.AST.EscapeSeq
+import Language.Python.AST.Float
+import Language.Python.AST.Identifier
+import Language.Python.AST.Imag
+import Language.Python.AST.Integer
 import Language.Python.AST.Keywords
-import Language.Python.AST.LongBytesChar
+import Language.Python.AST.LongBytes
+import Language.Python.AST.LongString
 import Language.Python.AST.LongStringChar
+import Language.Python.AST.ShortBytes
 import Language.Python.AST.ShortBytesChar
+import Language.Python.AST.ShortString
 import Language.Python.AST.ShortStringChar
+import Language.Python.AST.StringLiteral
+import Language.Python.AST.StringPrefix
 import Language.Python.AST.Symbols as S
 
 data SrcInfo
@@ -755,23 +765,6 @@ imag =
   where
     floatOrInt = fmap InL float <|> fmap (InR . Const) (some1 digit')
 
-literal :: DeltaParsing m => m (Literal SrcInfo)
-literal =
-  try literalString <|>
-  try literalInteger <|>
-  try literalFloat <|>
-  literalImag
-  where
-    stringOrBytes = try (InL <$> stringLiteral) <|> (InR <$> bytesLiteral)
-    literalString =
-      annotated $
-      LiteralString <$>
-      stringOrBytes <*>
-      manyF (try $ whitespaceBeforeF stringOrBytes)
-    literalInteger = annotated $ LiteralInteger <$> integer
-    literalFloat = annotated $ LiteralFloat <$> float
-    literalImag = annotated $ LiteralImag <$> imag
-    
 optionalF :: DeltaParsing m => m (f a) -> m (Compose Maybe f a)
 optionalF m = Compose <$> optional m
 
@@ -1326,12 +1319,12 @@ class PowerParsing (atomType :: AtomType) (ctxt :: ExprContext) where
     => m (Power atomType ctxt SrcInfo)
 
 instance PowerParsing 'NotAssignable ctxt where
-  power = try powerSome <|> powerOne
+  power = try powerMany <|> powerOne
 
 instance PowerParsing 'Assignable ctxt where
   power = powerOne
 
-powerSome
+powerMany
   :: ( AtomExprParsing 'NotAssignable ctxt
      , AtomParsing 'NotAssignable ctxt
      , TestlistCompParsing 'NotAssignable
@@ -1342,9 +1335,9 @@ powerSome
      , DeltaParsing m
      )
   => m (Power 'NotAssignable ctxt SrcInfo)
-powerSome =
+powerMany =
   annotated $
-  PowerSome <$>
+  PowerMany <$>
   atomExpr <*>
   beforeF (whitespaceAfter doubleAsterisk) factor
 
@@ -1389,12 +1382,12 @@ class FactorParsing (atomType :: AtomType) (ctxt :: ExprContext) where
     => m (Factor atomType ctxt SrcInfo)
 
 instance FactorParsing 'NotAssignable ctxt where
-  factor = try factorSome <|> factorNone
+  factor = try factorMany <|> factorNone
 
 instance FactorParsing 'Assignable ctxt where
   factor = factorNone
 
-factorSome
+factorMany
   :: ( AtomExprParsing 'NotAssignable ctxt
      , AtomParsing 'NotAssignable ctxt
      , TestlistCompParsing 'NotAssignable
@@ -1405,9 +1398,9 @@ factorSome
      , DeltaParsing m
      )
   => m (Factor 'NotAssignable ctxt SrcInfo)
-factorSome =
+factorMany =
   annotated $
-  FactorSome <$>
+  FactorMany <$>
   beforeF (whitespaceAfter factorOp) factor
 
 factorNone
@@ -1449,12 +1442,12 @@ class TermParsing (atomType :: AtomType) (ctxt :: ExprContext) where
        ) => m (Term atomType ctxt SrcInfo)
 
 instance TermParsing 'NotAssignable ctxt where
-  term = try termSome <|> termOne
+  term = try termMany <|> termOne
 
 instance TermParsing 'Assignable ctxt where
   term = termOne
 
-termSome
+termMany
   :: ( AtomExprParsing 'NotAssignable ctxt
      , AtomParsing 'NotAssignable ctxt
      , TestlistCompParsing 'NotAssignable
@@ -1465,9 +1458,9 @@ termSome
      , DeltaParsing m
      )
   => m (Term 'NotAssignable ctxt SrcInfo)
-termSome =
+termMany =
   annotated $
-  TermSome <$>
+  TermMany <$>
   factor <*>
   some1F (try $ beforeF (betweenWhitespace termOp) factor)
 

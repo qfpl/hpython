@@ -32,8 +32,10 @@ import qualified Data.Text as T
 import Language.Python.AST
 import Language.Python.AST.BytesLiteral
 import Language.Python.AST.BytesPrefix
+import Language.Python.AST.CompOperator
 import Language.Python.AST.Digits
 import Language.Python.AST.EscapeSeq
+import Language.Python.AST.FactorOperator
 import Language.Python.AST.Float
 import Language.Python.AST.Identifier
 import Language.Python.AST.Imag
@@ -49,25 +51,8 @@ import Language.Python.AST.ShortStringChar
 import Language.Python.AST.StringLiteral
 import Language.Python.AST.StringPrefix
 import Language.Python.AST.Symbols as S
-
-data SrcInfo
-  = SrcInfo
-  { _srcCaret :: P.Caret
-  , _srcSpan :: Span
-  }
-  deriving (Eq, Show)
-
-annotated
-  :: ( Monad m
-     , Functor f
-     , DeltaParsing m
-     )
-  => m (SrcInfo -> f SrcInfo)
-  -> m (f SrcInfo)
-annotated m = do
-  c <- careting
-  f :~ s <- spanned m
-  pure . f $ SrcInfo c s
+import Language.Python.AST.TermOperator
+import Language.Python.Parser.SrcInfo
 
 leftParen :: DeltaParsing m => m LeftParen
 leftParen = char '(' $> LeftParen
@@ -1361,7 +1346,7 @@ powerOne =
   PowerOne <$>
   atomExpr
 
-factorOp :: DeltaParsing m => m FactorOp
+factorOp :: DeltaParsing m => m FactorOperator
 factorOp =
   try (char '-' $> FactorNeg) <|>
   try (char '+' $> FactorPos) <|>

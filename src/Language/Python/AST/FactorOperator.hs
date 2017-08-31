@@ -2,7 +2,7 @@ module Language.Python.AST.FactorOperator where
 
 import Papa
 
-data FactorOp
+data FactorOperator
   = FactorNeg
   | FactorPos
   | FactorInv

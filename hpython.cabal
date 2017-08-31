@@ -41,8 +41,11 @@ library
                        Language.Python.AST.StringLiteral
                        Language.Python.AST.StringPrefix
                        Language.Python.AST.Symbols
+                       Language.Python.AST.TermOperator
                        Language.Python.Parser
                        Language.Python.Parser.IR
+                       Language.Python.Parser.IR.Checker
+                       Language.Python.Parser.SrcInfo
                        Language.Python.Printer
                        Data.Separated.After
                        Data.Separated.Before
@@ -58,6 +61,9 @@ library
                      , trifecta >=1.6 && <1.7
                      , digit >=0.4 && <0.5
                      , containers >=0.5 && <0.6
+                     , mtl >=2.2 && <2.3
+                     , dlist >=0.8 && <0.9
+                     , validation >=0.5 && <0.6
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions:  NoImplicitPrelude

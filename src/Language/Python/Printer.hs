@@ -19,7 +19,10 @@ import qualified Data.Text as T
 import Language.Python.AST
 import Language.Python.AST.BytesLiteral
 import Language.Python.AST.BytesPrefix
+import Language.Python.AST.Comment
+import Language.Python.AST.CompOperator
 import Language.Python.AST.EscapeSeq
+import Language.Python.AST.FactorOperator
 import Language.Python.AST.Float
 import Language.Python.AST.Digits
 import Language.Python.AST.Identifier
@@ -577,7 +580,7 @@ power (PowerMany l r _) =
   atomExpr l <>
   beforeF (whitespaceAfter doubleAsterisk) factor r
 
-factorOp :: FactorOp -> Doc
+factorOp :: FactorOperator -> Doc
 factorOp f =
   case f of
     FactorNeg -> char '-'

@@ -29,6 +29,7 @@ import Language.Python.AST.Identifier
 import Language.Python.AST.Imag
 import Language.Python.AST.Integer
 import Language.Python.AST.Keywords
+import Language.Python.AST.TermOperator
 import Language.Python.AST.StringLiteral
 import Language.Python.AST.Symbols
 
@@ -280,8 +281,19 @@ deriving instance Foldable (Trailer a b)
 deriving instance Traversable (Trailer a b)
 
 data ExprContext = TopLevel | FunDef FunType
+data SExprContext :: ExprContext -> * where
+  STopLevel :: SExprContext 'TopLevel
+  SFunDef :: SFunType f -> SExprContext ('FunDef f)
+
 data FunType = Normal | Async
+data SFunType :: FunType -> * where
+  SNormal :: SFunType 'Normal
+  SAsync :: SFunType 'Async
+
 data AtomType = Assignable | NotAssignable
+data SAtomType :: AtomType -> * where
+  SAssignable :: SAtomType 'Assignable
+  SNotAssignable :: SAtomType 'NotAssignable
 
 data AtomExpr :: AtomType -> ExprContext -> * -> * where
   AtomExprNoAwait ::
@@ -333,7 +345,7 @@ deriving instance Foldable (Power a b)
 deriving instance Traversable (Power a b)
 
 data Factor :: AtomType -> ExprContext -> * -> * where
-  FactorNone ::
+  FactorOne ::
     { _factorNone_value :: Power atomType ctxt a
     , _factorNone_ann :: a
     } -> Factor atomType ctxt a
@@ -341,7 +353,7 @@ data Factor :: AtomType -> ExprContext -> * -> * where
   FactorMany ::
     { _factorSome_value
       :: Compose
-          (Before (After [WhitespaceChar] FactorOp))
+          (Before (After [WhitespaceChar] FactorOperator))
           (Factor 'NotAssignable ctxt)
           a
     , _factorSome_ann :: a
@@ -350,14 +362,6 @@ deriving instance Eq c => Eq (Factor a b c)
 deriving instance Functor (Factor a b)
 deriving instance Foldable (Factor a b)
 deriving instance Traversable (Factor a b)
-
-data TermOp
-  = TermMult
-  | TermAt
-  | TermFloorDiv
-  | TermDiv
-  | TermMod
-  deriving (Eq, Show)
 
 data Term :: AtomType -> ExprContext -> * -> * where
   TermOne ::
@@ -371,7 +375,7 @@ data Term :: AtomType -> ExprContext -> * -> * where
       :: Compose
           NonEmpty
           (Compose
-            (Before (Between' [WhitespaceChar] TermOp))
+            (Before (Between' [WhitespaceChar] TermOperator))
             (Factor 'NotAssignable ctxt))
           a
     , _termMany_ann :: a
@@ -500,8 +504,7 @@ data Comparison :: AtomType -> ExprContext -> * -> * where
       :: Compose
           NonEmpty
           (Compose
-            (Before
-              (Between' [WhitespaceChar] CompOperator))
+            (Before (Between' [WhitespaceChar] CompOperator))
             (Expr 'NotAssignable ctxt))
           a
     , _comparisonMany_ann :: a
@@ -520,7 +523,7 @@ data NotTest :: AtomType -> ExprContext -> * -> * where
           a
     , _notTestMany_ann :: a
     } -> NotTest 'NotAssignable ctxt a
-  NotTestNone ::
+  NotTestOne ::
     { _notTestNone_value :: Comparison atomType ctxt a
     , _notTestNone_ann :: a
     } -> NotTest atomType ctxt a
@@ -575,8 +578,16 @@ deriving instance Traversable (OrTest a b)
 
 data IfThenElse :: AtomType -> ExprContext -> * -> * where
   IfThenElse ::
-    { _ifThenElse_if :: Compose (Between' (NonEmpty WhitespaceChar)) (OrTest 'NotAssignable ctxt) a
-    , _ifThenElse_else :: Compose (Before (NonEmpty WhitespaceChar)) (Test 'NotAssignable ctxt) a
+    { _ifThenElse_if
+      :: Compose
+           (Between' (NonEmpty WhitespaceChar))
+           (OrTest 'NotAssignable ctxt)
+           a
+    , _ifThenElse_else
+      :: Compose
+           (Before (NonEmpty WhitespaceChar))
+           (Test 'NotAssignable ctxt)
+           a
     } -> IfThenElse 'NotAssignable ctxt a
 deriving instance Eq c => Eq (IfThenElse a b c)
 deriving instance Functor (IfThenElse a b)
@@ -773,8 +784,6 @@ data PythonModule a
   , _pythonModule_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
-
-
 deriveShow ''Comparison
 deriveEq1 ''Comparison
 deriveShow1 ''Comparison
@@ -958,7 +967,6 @@ makeLenses ''Atom
 deriveShow ''Atom
 deriveEq1 ''Atom
 deriveShow1 ''Atom
-
 
 makeLenses ''PythonModule
 deriveEq ''PythonModule

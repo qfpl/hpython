@@ -36,7 +36,7 @@ data Argument a
           (Before [WhitespaceChar])
           CompFor)
         a
-  , _argumentFor_ann :: a
+  , _argument_ann :: a
   }
   | ArgumentDefault
   { _argumentDefault_left
@@ -49,7 +49,7 @@ data Argument a
           (Before [WhitespaceChar])
           Test
           a
-  , _argumentDefault_ann :: a
+  , _argument_ann :: a
   }
   | ArgumentUnpack
   { _argumentUnpack_symbol :: Either Asterisk DoubleAsterisk
@@ -58,7 +58,7 @@ data Argument a
           (Before [WhitespaceChar])
           Test
           a
-  , _argumentUnpack_ann :: a
+  , _argument_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
@@ -133,7 +133,11 @@ data CompIf a
 
 data StarExpr a
   = StarExpr
-  { _starExpr_value :: Compose (Before [WhitespaceChar]) Expr a
+  { _starExpr_value
+    :: Compose
+         (Before [WhitespaceChar])
+         Expr
+         a
   , _starExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
 

@@ -8,6 +8,7 @@ module Language.Python.Parser.IR.Checker where
 
 import Control.Monad.Writer
 import Data.Functor.Compose
+import Data.Functor.Sum
 import Data.Validation
 import Papa
 
@@ -458,10 +459,151 @@ checkTrailer
   :: SyntaxConfig atomType ctxt
   -> IR.Trailer ann
   -> SyntaxChecker ann (Safe.Trailer atomType ctxt ann)
-checkTrailer = _
+checkTrailer cfg e =
+  case cfg ^. atomType of
+    Safe.SAssignable ->
+      syntaxError $ CannotAssignTo e (e ^. IR.trailer_ann)
+    Safe.SNotAssignable ->
+      case e of
+        IR.TrailerCall v ann ->
+          Safe.TrailerCall <$>
+          traverseOf (traverseCompose.traverseCompose) (checkArgList cfg) v <*>
+          pure ann
+        IR.TrailerSubscript v ann ->
+          Safe.TrailerSubscript <$>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (checkSubscriptList cfg)
+            v <*>
+          pure ann
+        IR.TrailerAccess v ann -> pure $ Safe.TrailerAccess v ann
+
+checkArgList
+  :: SyntaxConfig atomType ctxt
+  -> IR.ArgList ann
+  -> SyntaxChecker ann (Safe.ArgList atomType ctxt ann)
+checkArgList cfg (IR.ArgList h t comma ann) =
+  Safe.ArgList <$>
+  checkArgument cfg h <*>
+  traverseOf (traverseCompose.traverseCompose) (checkArgument cfg) t <*>
+  pure comma <*>
+  pure ann
+
+checkArgument
+  :: SyntaxConfig atomType ctxt
+  -> IR.Argument ann
+  -> SyntaxChecker ann (Safe.Argument atomType ctxt ann)
+checkArgument cfg e =
+  case cfg ^. atomType of
+    Safe.SAssignable ->
+      syntaxError $ CannotAssignTo e (e ^. IR.argument_ann)
+    Safe.SNotAssignable ->
+      case e of
+        IR.ArgumentFor e f ann ->
+          Safe.ArgumentFor <$>
+          checkTest cfg e <*>
+          traverseOf (traverseCompose.traverseCompose) (checkCompFor cfg) f <*>
+          pure ann
+        IR.ArgumentDefault l r ann ->
+          Safe.ArgumentDefault <$>
+          traverseOf
+            traverseCompose
+            (checkTest $ cfg & atomType .~ Safe.SAssignable)
+            l <*>
+          traverseOf
+            traverseCompose
+            (checkTest cfg)
+            r <*>
+          pure ann
+        IR.ArgumentUnpack sym val ann ->
+          Safe.ArgumentUnpack sym <$>
+          traverseOf traverseCompose (checkTest cfg) val <*>
+          pure ann
+
+checkCompFor
+  :: SyntaxConfig atomType ctxt
+  -> IR.CompFor ann
+  -> SyntaxChecker ann (Safe.CompFor atomType ctxt ann)
+checkCompFor cfg e =
+  case cfg ^. atomType of
+    Safe.SAssignable ->
+      syntaxError $ CannotAssignTo e (e ^. IR.compFor_ann)
+    Safe.SNotAssignable ->
+      case e of
+        IR.CompFor ts ex i ann ->
+          Safe.CompFor <$>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (checkExprList $ cfg & atomType .~ Safe.SAssignable)
+            ts <*>
+          traverseOf
+            traverseCompose
+            (checkOrTest cfg)
+            ex <*>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (checkCompIter cfg)
+            i <*>
+          pure ann
+
+checkExprList
+  :: SyntaxConfig atomType ctxt
+  -> IR.ExprList ann
+  -> SyntaxChecker ann (Safe.ExprList atomType ctxt ann)
+checkExprList cfg (IR.ExprList h t ann) =
+  Safe.ExprList <$>
+  checkExprOrStar h <*>
+  traverseOf (traverseCompose.traverseCompose) checkExprOrStar t <*>
+  pure ann
+  where
+    checkExprOrStar e =
+      case e of
+        InL a -> InL <$> checkExpr cfg a
+        InR a -> InR <$> checkStarExpr cfg a
+
+checkStarExpr
+  :: SyntaxConfig atomType ctxt
+  -> IR.StarExpr ann
+  -> SyntaxChecker ann (Safe.StarExpr atomType ctxt ann)
+checkStarExpr cfg (IR.StarExpr val ann) =
+  Safe.StarExpr <$>
+  traverseOf
+    traverseCompose
+    (checkExpr $ cfg & atomType .~ Safe.SAssignable) val <*>
+  pure ann
+
+checkCompIter
+  :: SyntaxConfig atomType ctxt
+  -> IR.CompIter ann
+  -> SyntaxChecker ann (Safe.CompIter atomType ctxt ann)
+checkCompIter cfg e@(IR.CompIter val ann) =
+  case cfg ^. atomType of
+    Safe.SAssignable ->
+      syntaxError $ CannotAssignTo e ann
+    Safe.SNotAssignable ->
+      Safe.CompIter <$>
+      checkCompForOrIf cfg val <*>
+      pure ann
+  where
+    checkCompForOrIf cfg e =
+      case e of
+        InL a -> InL <$> checkCompFor cfg a
+        InR a -> InR <$> checkCompIf cfg a
+
+checkCompIf
+  :: SyntaxConfig atomType ctxt
+  -> IR.CompIf ann
+  -> SyntaxChecker ann (Safe.CompIf atomType ctxt ann)
+checkCompIf cfg e = _
+
+checkSubscriptList
+  :: SyntaxConfig atomType ctxt
+  -> IR.SubscriptList ann
+  -> SyntaxChecker ann (Safe.SubscriptList atomType ctxt ann)
+checkSubscriptList cfg e = _
 
 checkAtom
   :: SyntaxConfig atomType ctxt
   -> IR.Atom ann
   -> SyntaxChecker ann (Safe.Atom atomType ctxt ann)
-checkAtom = _
+checkAtom cfg e = _

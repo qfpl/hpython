@@ -145,7 +145,11 @@ deriving instance Traversable (CompIf a b)
 
 data StarExpr (atomType :: AtomType) (ctxt :: ExprContext) a
   = StarExpr
-  { _starExpr_value :: Compose (Before [WhitespaceChar]) (Expr 'Assignable ctxt) a
+  { _starExpr_value
+    :: Compose
+         (Before [WhitespaceChar])
+         (Expr 'Assignable ctxt)
+         a
   , _starExpr_ann :: a
   }
 deriving instance Functor (StarExpr a b)
@@ -181,7 +185,9 @@ data CompFor :: AtomType -> ExprContext -> * -> * where
     , _compFor_iter
       :: Compose
           Maybe
-          (Compose (Before [WhitespaceChar]) (CompIter 'NotAssignable ctxt))
+          (Compose
+            (Before [WhitespaceChar])
+            (CompIter 'NotAssignable ctxt))
           a
     , _compFor_ann :: a
     } -> CompFor 'NotAssignable ctxt a

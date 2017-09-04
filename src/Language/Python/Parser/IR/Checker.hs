@@ -3,9 +3,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
 module Language.Python.Parser.IR.Checker where
 
+import Prelude (error)
 import Control.Monad.Writer
 import Data.Functor.Compose
 import Data.Functor.Sum
@@ -14,7 +14,7 @@ import Papa
 
 import qualified Data.DList as D
 
-import Language.Python.Parser.SrcInfo
+import Language.Python.Parser.IR.SyntaxConfig
 
 import qualified Language.Python.AST as Safe
 import qualified Language.Python.Parser.IR as IR
@@ -22,13 +22,8 @@ import qualified Language.Python.Parser.IR as IR
 data SyntaxError a
   = forall f. CannotAssignTo (f a) a
   | AwaitNotInAsyncFunction a
-
-data SyntaxConfig atomType ctxt
-  = SyntaxConfig
-  { _atomType :: Safe.SAtomType atomType
-  , _exprContext :: Safe.SExprContext ctxt
-  }
-makeLenses ''SyntaxConfig
+  | YieldNotInFunction a
+  | YieldInAsyncFunction a
 
 newtype SyntaxChecker ann a
   = SyntaxChecker
@@ -59,6 +54,7 @@ checkTest cfg e =
           checkOrTest cfg v <*>
           pure ann
         IR.TestCondIf _ _ ann -> syntaxError $ CannotAssignTo e ann
+        IR.TestLambdef -> error "checkTestLambdef not implemented"
     Safe.SNotAssignable ->
       case e of
         IR.TestCondNoIf v ann ->
@@ -70,6 +66,7 @@ checkTest cfg e =
           checkOrTest cfg h <*>
           traverseOf traverseCompose (checkIfThenElse cfg) t <*>
           pure ann
+        IR.TestLambdef -> error "checkTestLambdef not implemented"
 
 checkIfThenElse
   :: SyntaxConfig atomType ctxt
@@ -96,7 +93,7 @@ checkOrTest cfg e =
           Safe.OrTestOne <$>
           checkAndTest cfg val <*>
           pure ann
-        IR.OrTestMany l r ann ->
+        IR.OrTestMany _ _ ann ->
           syntaxError $ CannotAssignTo e ann
     Safe.SNotAssignable ->
       case e of
@@ -124,7 +121,7 @@ checkAndTest cfg e =
           Safe.AndTestOne <$>
           checkNotTest cfg val <*>
           pure ann
-        IR.AndTestMany l r ann ->
+        IR.AndTestMany _ _ ann ->
           syntaxError $ CannotAssignTo e ann
     Safe.SNotAssignable ->
       case e of
@@ -152,7 +149,7 @@ checkNotTest cfg e =
           Safe.NotTestOne <$>
           checkComparison cfg val <*>
           pure ann
-        IR.NotTestMany val ann ->
+        IR.NotTestMany _ ann ->
           syntaxError $ CannotAssignTo e ann
     Safe.SNotAssignable ->
       case e of
@@ -179,7 +176,7 @@ checkComparison cfg e =
           Safe.ComparisonOne <$>
           checkExpr cfg val <*>
           pure ann
-        IR.ComparisonMany l r ann ->
+        IR.ComparisonMany _ _ ann ->
           syntaxError $ CannotAssignTo e ann
     Safe.SNotAssignable ->
       case e of
@@ -207,7 +204,7 @@ checkExpr cfg e =
           Safe.ExprOne <$>
           checkXorExpr cfg val <*>
           pure ann
-        IR.ExprMany l r ann ->
+        IR.ExprMany _ _ ann ->
           syntaxError $ CannotAssignTo e ann
     Safe.SNotAssignable ->
       case e of
@@ -235,7 +232,7 @@ checkXorExpr cfg e =
           Safe.XorExprOne <$>
           checkAndExpr cfg val <*>
           pure ann
-        IR.XorExprMany l r ann ->
+        IR.XorExprMany _ _ ann ->
           syntaxError $ CannotAssignTo e ann
     Safe.SNotAssignable ->
       case e of
@@ -263,7 +260,7 @@ checkAndExpr cfg e =
           Safe.AndExprOne <$>
           checkShiftExpr cfg val <*>
           pure ann
-        IR.AndExprMany l r ann ->
+        IR.AndExprMany _ _ ann ->
           syntaxError $ CannotAssignTo e ann
     Safe.SNotAssignable ->
       case e of
@@ -291,7 +288,7 @@ checkShiftExpr cfg e =
           Safe.ShiftExprOne <$>
           checkArithExpr cfg val <*>
           pure ann
-        IR.ShiftExprMany l r ann ->
+        IR.ShiftExprMany _ _ ann ->
           syntaxError $ CannotAssignTo e ann
     Safe.SNotAssignable ->
       case e of
@@ -319,7 +316,7 @@ checkArithExpr cfg e =
           Safe.ArithExprOne <$>
           checkTerm cfg val <*>
           pure ann
-        IR.ArithExprMany l r ann ->
+        IR.ArithExprMany _ _ ann ->
           syntaxError $ CannotAssignTo e ann
     Safe.SNotAssignable ->
       case e of
@@ -347,7 +344,7 @@ checkTerm cfg e =
           Safe.TermOne <$>
           checkFactor cfg val <*>
           pure ann
-        IR.TermMany l r ann ->
+        IR.TermMany _ _ ann ->
           syntaxError $ CannotAssignTo e ann
     Safe.SNotAssignable ->
       case e of
@@ -375,7 +372,7 @@ checkFactor cfg e =
           Safe.FactorOne <$>
           checkPower cfg val <*>
           pure ann
-        IR.FactorMany val ann ->
+        IR.FactorMany _ ann ->
           syntaxError $ CannotAssignTo e ann
     Safe.SNotAssignable ->
       case e of
@@ -402,7 +399,7 @@ checkPower cfg e =
           Safe.PowerOne <$>
           checkAtomExpr cfg val <*>
           pure ann
-        IR.PowerMany l r ann ->
+        IR.PowerMany _ _ ann ->
           syntaxError $ CannotAssignTo e ann
     Safe.SNotAssignable ->
       case e of
@@ -499,9 +496,9 @@ checkArgument cfg e =
       syntaxError $ CannotAssignTo e (e ^. IR.argument_ann)
     Safe.SNotAssignable ->
       case e of
-        IR.ArgumentFor e f ann ->
+        IR.ArgumentFor ex f ann ->
           Safe.ArgumentFor <$>
-          checkTest cfg e <*>
+          checkTest cfg ex <*>
           traverseOf (traverseCompose.traverseCompose) (checkCompFor cfg) f <*>
           pure ann
         IR.ArgumentDefault l r ann ->
@@ -585,25 +582,227 @@ checkCompIter cfg e@(IR.CompIter val ann) =
       checkCompForOrIf cfg val <*>
       pure ann
   where
-    checkCompForOrIf cfg e =
-      case e of
-        InL a -> InL <$> checkCompFor cfg a
-        InR a -> InR <$> checkCompIf cfg a
+    checkCompForOrIf cfg' e' =
+      case e' of
+        InL a -> InL <$> checkCompFor cfg' a
+        InR a -> InR <$> checkCompIf cfg' a
 
 checkCompIf
   :: SyntaxConfig atomType ctxt
   -> IR.CompIf ann
   -> SyntaxChecker ann (Safe.CompIf atomType ctxt ann)
-checkCompIf cfg e = _
+checkCompIf cfg e@(IR.CompIf ex it ann) =
+  case cfg ^. atomType of
+    Safe.SAssignable ->
+      syntaxError $ CannotAssignTo e ann
+    Safe.SNotAssignable ->
+      Safe.CompIf <$>
+      traverseCompose (checkTestNocond cfg) ex <*>
+      traverseOf (traverseCompose.traverseCompose) (checkCompIter cfg) it <*>
+      pure ann
+
+checkTestNocond
+  :: SyntaxConfig atomType ctxt
+  -> IR.TestNocond ann
+  -> SyntaxChecker ann (Safe.TestNocond atomType ctxt ann)
+checkTestNocond cfg (IR.TestNocond v ann) =
+  Safe.TestNocond <$>
+  orTestOrLambdef v <*>
+  pure ann
+  where
+    orTestOrLambdef e =
+      case e of
+        InL a -> InL <$> checkOrTest cfg a
+        InR a -> InR <$> checkLambdefNocond cfg a
+
+checkLambdefNocond
+  :: SyntaxConfig atomType ctxt
+  -> IR.LambdefNocond ann
+  -> SyntaxChecker ann (Safe.LambdefNocond atomType ctxt ann)
+checkLambdefNocond cfg (IR.LambdefNocond args ex ann) =
+  Safe.LambdefNocond <$>
+  traverseOf (traverseCompose.traverseCompose) (checkVarargsList cfg) args <*>
+  traverseCompose (checkTestNocond cfg) ex <*>
+  pure ann
+
+checkVarargsList
+  :: SyntaxConfig atomType ctxt
+  -> IR.VarargsList ann
+  -> SyntaxChecker ann (Safe.VarargsList atomType ctxt ann)
+checkVarargsList _ _ = error "checkVarargsList not implemented"
 
 checkSubscriptList
   :: SyntaxConfig atomType ctxt
   -> IR.SubscriptList ann
   -> SyntaxChecker ann (Safe.SubscriptList atomType ctxt ann)
-checkSubscriptList cfg e = _
+checkSubscriptList cfg e@(IR.SubscriptList h t comma ann) =
+  case cfg ^. atomType of
+    Safe.SAssignable ->
+      syntaxError $ CannotAssignTo e ann
+    Safe.SNotAssignable ->
+      Safe.SubscriptList <$>
+      checkSubscript cfg h <*>
+      traverseOf (traverseCompose.traverseCompose) (checkSubscript cfg) t <*>
+      pure comma <*>
+      pure ann
+
+checkSubscript
+  :: SyntaxConfig atomType ctxt
+  -> IR.Subscript ann
+  -> SyntaxChecker ann (Safe.Subscript atomType ctxt ann)
+checkSubscript cfg e =
+  case cfg ^. atomType of
+    Safe.SAssignable ->
+      syntaxError $ CannotAssignTo e (e ^. IR.subscript_ann)
+    Safe.SNotAssignable ->
+      case e of
+        IR.SubscriptTest v ann ->
+          Safe.SubscriptTest <$>
+          checkTest cfg v <*>
+          pure ann
+        IR.SubscriptSlice l r sl ann ->
+          Safe.SubscriptSlice <$>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (checkTest cfg)
+            l <*>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (checkTest cfg)
+            r <*>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (checkSliceOp cfg)
+            sl <*>
+          pure ann
+
+checkSliceOp
+  :: SyntaxConfig atomType ctxt
+  -> IR.SliceOp ann
+  -> SyntaxChecker ann (Safe.SliceOp atomType ctxt ann)
+checkSliceOp cfg e@(IR.SliceOp v ann) =
+  case cfg ^. atomType of
+    Safe.SAssignable ->
+      syntaxError $ CannotAssignTo e ann
+    Safe.SNotAssignable ->
+      Safe.SliceOp <$>
+      traverseOf (traverseCompose.traverseCompose) (checkTest cfg) v <*>
+      pure ann
 
 checkAtom
   :: SyntaxConfig atomType ctxt
   -> IR.Atom ann
   -> SyntaxChecker ann (Safe.Atom atomType ctxt ann)
-checkAtom cfg e = _
+checkAtom cfg e =
+  case e of
+    IR.AtomParenNoYield v ann ->
+      Safe.AtomParenNoYield <$>
+      traverseOf
+        (traverseCompose.traverseCompose)
+        (checkTestlistComp cfg)
+        v <*>
+      pure ann
+    IR.AtomParenYield v ann ->
+      case (cfg  ^. atomType, cfg ^. exprContext) of
+        (Safe.SAssignable, _) ->
+          syntaxError $ CannotAssignTo e ann
+        (_, Safe.STopLevel) ->
+          syntaxError $ YieldNotInFunction ann
+        (_, Safe.SFunDef Safe.SAsync) ->
+          syntaxError $ YieldInAsyncFunction ann
+        (Safe.SNotAssignable, Safe.SFunDef Safe.SNormal) ->
+          Safe.AtomParenYield <$>
+          traverseCompose (checkYieldExpr cfg) v <*>
+          pure ann
+    IR.AtomBracket v ann ->
+      Safe.AtomBracket <$>
+      traverseOf
+        (traverseCompose.traverseCompose)
+        (checkTestlistComp cfg)
+        v <*>
+      pure ann
+    IR.AtomCurly v ann -> error "checkDictOrSetMaker not implemented"
+    IR.AtomIdentifier v ann ->
+      Safe.AtomIdentifier <$>
+      checkIdentifier cfg v <*>
+      pure ann
+    IR.AtomInteger v ann -> pure $ Safe.AtomInteger v ann
+    IR.AtomFloat v ann -> pure $ Safe.AtomFloat v ann
+    IR.AtomString h t ann -> pure $ Safe.AtomString h t ann
+    IR.AtomImag v ann -> pure $ Safe.AtomImag v ann
+    IR.AtomEllipsis ann -> pure $ Safe.AtomEllipsis ann
+    IR.AtomNone ann -> pure $ Safe.AtomNone ann
+    IR.AtomTrue ann -> pure $ Safe.AtomTrue ann
+    IR.AtomFalse ann -> pure $ Safe.AtomFalse ann
+
+checkYieldExpr
+  :: SyntaxConfig atomType ctxt
+  -> IR.YieldExpr ann
+  -> SyntaxChecker ann (Safe.YieldExpr ann)
+checkYieldExpr cfg (IR.YieldExpr val ann) =
+  Safe.YieldExpr <$>
+  traverseOf
+    (traverseCompose.traverseCompose)
+    (checkYieldArg $
+      cfg
+        & atomType .~ Safe.SNotAssignable
+        & exprContext .~ Safe.SFunDef Safe.SNormal)
+    val <*>
+  pure ann
+
+checkYieldArg
+  :: SyntaxConfig atomType ctxt
+  -> IR.YieldArg ann
+  -> SyntaxChecker ann (Safe.YieldArg atomType ctxt ann)
+checkYieldArg cfg e =
+  case e of
+    IR.YieldArgFrom v ann ->
+      case cfg ^. atomType of
+        Safe.SAssignable ->
+          syntaxError $ CannotAssignTo e ann
+        Safe.SNotAssignable ->
+          Safe.YieldArgFrom <$>
+          traverseCompose (checkTest cfg) v <*>
+          pure ann
+    IR.YieldArgList v ann ->
+      Safe.YieldArgList <$>
+      checkTestList cfg v <*>
+      pure ann
+
+checkTestList
+  :: SyntaxConfig atomType ctxt
+  -> IR.TestList ann
+  -> SyntaxChecker ann (Safe.TestList atomType ctxt ann)
+checkTestList cfg (IR.TestList h t comma ann) =
+  Safe.TestList <$>
+  checkTest cfg h <*>
+  traverseCompose (checkTest cfg) t <*>
+  pure comma <*>
+  pure ann
+
+checkTestlistComp
+  :: SyntaxConfig atomType ctxt
+  -> IR.TestlistComp ann
+  -> SyntaxChecker ann (Safe.TestlistComp atomType ctxt ann)
+checkTestlistComp cfg e =
+  case e of
+    IR.TestlistCompFor h t ann ->
+      case cfg ^. atomType of
+        Safe.SAssignable ->
+          syntaxError $ CannotAssignTo e ann
+        Safe.SNotAssignable ->
+          Safe.TestlistCompFor <$>
+          testOrStarExpr cfg h <*>
+          traverseCompose (checkCompFor cfg) t <*>
+          pure ann
+    IR.TestlistCompList h t comma ann ->
+      Safe.TestlistCompList <$>
+      testOrStarExpr cfg h <*>
+      traverseOf (traverseCompose.traverseCompose) (testOrStarExpr cfg) t <*>
+      pure comma <*>
+      pure ann
+  where
+    testOrStarExpr cfg e =
+      case e of
+        InL a -> InL <$> checkTest cfg a
+        InR a -> InR <$> checkStarExpr cfg a

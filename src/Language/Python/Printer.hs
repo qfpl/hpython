@@ -29,16 +29,17 @@ import Language.Python.AST.Identifier
 import Language.Python.AST.Imag
 import Language.Python.AST.Integer
 import Language.Python.AST.Keywords
+import Language.Python.AST.LongBytes
+import Language.Python.AST.LongString
+import Language.Python.AST.LongStringChar
 import Language.Python.AST.ShortBytes
 import Language.Python.AST.ShortBytesChar
 import Language.Python.AST.ShortString
 import Language.Python.AST.ShortStringChar
 import Language.Python.AST.StringLiteral
 import Language.Python.AST.StringPrefix
-import Language.Python.AST.LongBytes
-import Language.Python.AST.LongString
-import Language.Python.AST.LongStringChar
 import Language.Python.AST.Symbols
+import Language.Python.AST.TermOperator
 
 identifier :: Identifier a -> Doc
 identifier i = i ^. identifier_value . to T.unpack . to text
@@ -590,10 +591,10 @@ factorOp f =
 factor :: Factor atomType ctxt a -> Doc
 factor f =
   case f of
-    FactorNone val _ -> power val
+    FactorOne val _ -> power val
     FactorMany val _ -> beforeF (whitespaceAfter factorOp) factor val
 
-termOp :: TermOp -> Doc
+termOp :: TermOperator -> Doc
 termOp t =
   case t of
     TermMult -> char '*'
@@ -640,7 +641,7 @@ notTest :: NotTest atomType ctxt a -> Doc
 notTest n =
   case n of
     NotTestMany val _ -> beforeF (whitespaceAfter kNot) notTest val
-    NotTestNone val _ -> comparison val
+    NotTestOne val _ -> comparison val
       
 andTest :: AndTest atomType ctxt a -> Doc
 andTest (AndTestOne v _) = notTest v

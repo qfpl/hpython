@@ -129,6 +129,7 @@ data CompIf a
           (Before [WhitespaceChar])
           CompIter)
         a
+  , _compIf_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data StarExpr a
@@ -551,13 +552,21 @@ data DictOrSetMaker a
   deriving (Functor, Foldable, Traversable)
 
 data Atom a
-  = AtomParen
-  { _atomParen_val
+  = AtomParenNoYield
+  { _atomParenNoYield_val
     :: Compose
         (Between' [WhitespaceChar])
         (Compose
           Maybe
-          (Sum YieldExpr TestlistComp))
+          TestlistComp)
+        a
+  , _atomParen_ann :: a
+  }
+  | AtomParenYield
+  { _atomParenYield_val
+    :: Compose
+        (Between' [WhitespaceChar])
+        YieldExpr
         a
   , _atomParen_ann :: a
   }

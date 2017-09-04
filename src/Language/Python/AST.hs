@@ -130,7 +130,11 @@ deriving instance Traversable (CompIter a b)
 
 data CompIf :: AtomType -> ExprContext -> * -> * where
   CompIf ::
-    { _compIf_expr :: Compose (Before [WhitespaceChar]) (TestNocond 'NotAssignable ctxt) a
+    { _compIf_expr
+      :: Compose
+           (Before [WhitespaceChar])
+           (TestNocond 'NotAssignable ctxt)
+           a
     , _compIf_iter
       :: Compose
           Maybe
@@ -624,7 +628,11 @@ deriving instance Traversable (Test a b)
 data TestList (atomType :: AtomType) (ctxt :: ExprContext) a
   = TestList
   { _testList_head :: Test atomType ctxt a
-  , _testList_tail :: Compose (Before (Between' [WhitespaceChar] Comma)) (Test atomType ctxt) a
+  , _testList_tail
+    :: Compose
+         (Before (Between' [WhitespaceChar] Comma))
+         (Test atomType ctxt)
+         a
   , _testList_comma :: Maybe (Before [WhitespaceChar] Comma)
   , _testList_ann :: a
   }
@@ -632,7 +640,11 @@ data TestList (atomType :: AtomType) (ctxt :: ExprContext) a
 
 data YieldArg :: AtomType -> ExprContext -> * -> * where
   YieldArgFrom ::
-    { _yieldArgFrom_value :: Compose (Before (NonEmpty WhitespaceChar)) (Test 'NotAssignable ctxt) a
+    { _yieldArgFrom_value
+      :: Compose
+           (Before (NonEmpty WhitespaceChar))
+           (Test 'NotAssignable ctxt)
+           a
     , _yieldArgFrom_ann :: a
     } -> YieldArg 'NotAssignable ctxt a
   YieldArgList ::
@@ -658,8 +670,16 @@ data YieldExpr a
 
 data TestlistComp :: AtomType -> ExprContext -> * -> * where
   TestlistCompFor ::
-    { _testlistCompFor_head :: Sum (Test 'NotAssignable ctxt) (StarExpr 'NotAssignable ctxt) a
-    , _testlistCompFor_tail :: Compose (Before [WhitespaceChar]) (CompFor 'NotAssignable ctxt) a
+    { _testlistCompFor_head
+      :: Sum
+           (Test 'NotAssignable ctxt)
+           (StarExpr 'NotAssignable ctxt)
+           a
+    , _testlistCompFor_tail
+      :: Compose
+           (Before [WhitespaceChar])
+           (CompFor 'NotAssignable ctxt)
+           a
     , _testlistCompFor_ann :: a
     } -> TestlistComp 'NotAssignable ctxt a
 

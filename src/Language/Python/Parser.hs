@@ -29,7 +29,6 @@ import qualified Data.CharSet.Common as CharSet
 import qualified Data.Set as S
 import qualified Data.Text as T
 
-import Language.Python.AST
 import Language.Python.AST.BytesLiteral
 import Language.Python.AST.BytesPrefix
 import Language.Python.AST.CompOperator
@@ -52,6 +51,7 @@ import Language.Python.AST.StringLiteral
 import Language.Python.AST.StringPrefix
 import Language.Python.AST.Symbols as S
 import Language.Python.AST.TermOperator
+import Language.Python.Parser.IR
 import Language.Python.Parser.SrcInfo
 
 leftParen :: DeltaParsing m => m LeftParen
@@ -142,79 +142,27 @@ betweenWhitespace1F
   -> m (Compose (Between' (NonEmpty WhitespaceChar)) f a)
 betweenWhitespace1F = fmap Compose . betweenWhitespace1
 
-ifThenElse
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , TestParsing 'NotAssignable
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     , DeltaParsing m
-     )
-  => m (IfThenElse 'NotAssignable ctxt SrcInfo)
+ifThenElse :: DeltaParsing m => m (IfThenElse SrcInfo)
 ifThenElse =
   IfThenElse <$>
   (string "if" *> betweenWhitespace1F orTest) <*>
   (string "else" *> whitespaceBefore1F test)
 
-testLambdef = error "testLambdef not implemented"
 
-class TestParsing (atomType :: AtomType) where
-  test
-    :: ( OrTestParsing atomType ctxt
-       , AtomExprParsing atomType ctxt
-       , AtomParsing 'Assignable ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , TestParsing atomType
-       , TestParsing 'Assignable
-       , TestlistCompParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       , DeltaParsing m
-       )
-    => m (Test atomType ctxt SrcInfo)
+test :: DeltaParsing m => m (Test SrcInfo)
+test = try testCondIf <|> try testCondNoIf <|> testLambdef
+  where
+    testLambdef = error "testLambdef not implemented"
+    testCondIf =
+      annotated $
+      TestCondIf <$>
+      orTest <*>
+      whitespaceBefore1F ifThenElse
 
-instance TestParsing 'Assignable where
-  test = testCondNoIf
-
-instance TestParsing 'NotAssignable where
-  test = try testCondIf <|> try testCondNoIf <|> testLambdef
-
-testCondIf
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , TestParsing 'NotAssignable
-     , TestParsing 'Assignable
-     , OrTestParsing 'NotAssignable ctxt
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     , DeltaParsing m
-     )
-  => m (Test 'NotAssignable ctxt SrcInfo)
-testCondIf =
-  annotated $
-  TestCondIf <$>
-  orTest <*>
-  whitespaceBefore1F ifThenElse
-
-testCondNoIf
-  :: ( AtomExprParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , DeltaParsing m
-     , TestParsing atomType
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     , OrTestParsing atomType ctxt
-     )
-  => m (Test atomType ctxt SrcInfo)
-testCondNoIf =
-  annotated $
-  TestCondNoIf <$>
-  orTest
+    testCondNoIf =
+      annotated $
+      TestCondNoIf <$>
+      orTest
 
 kOr :: DeltaParsing m => m KOr
 kOr = string "or" $> KOr
@@ -222,74 +170,24 @@ kOr = string "or" $> KOr
 kAnd :: DeltaParsing m => m KAnd
 kAnd = string "and" $> KAnd
 
-class OrTestParsing (atomType :: AtomType) (ctxt :: ExprContext) where
-  orTest
-    :: ( AtomExprParsing atomType ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , AtomParsing 'Assignable ctxt
-       , TestParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       , TestlistCompParsing 'Assignable
-       , DeltaParsing m
-       )
-    => m (OrTest atomType ctxt SrcInfo)
+orTest :: DeltaParsing m => m (OrTest SrcInfo)
+orTest = try orTestMany <|> orTestOne
+  where
+    orTestOne =
+      annotated $
+      OrTestOne <$>
+      andTest
 
-instance OrTestParsing 'NotAssignable ctxt where
-  orTest = try orTestMany <|> orTestOne
+    orTestMany =
+      annotated $
+      OrTestMany <$>
+      andTest <*>
+      some1F (beforeF (betweenWhitespace1 kOr) andTest)
 
-instance OrTestParsing 'Assignable ctxt where
-  orTest = orTestOne
-
-orTestOne
-  :: ( AtomExprParsing atomType ctxt
-     , AndTestParsing atomType ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing atomType
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (OrTest atomType ctxt SrcInfo)
-orTestOne =
-  annotated $
-  OrTestOne <$>
-  andTest
-
-orTestMany
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (OrTest 'NotAssignable ctxt SrcInfo)
-orTestMany =
-  annotated $
-  OrTestMany <$>
-  andTest <*>
-  some1F (beforeF (betweenWhitespace1 kOr) andTest)
-
-varargsList :: DeltaParsing m => m (VarargsList atomType ctxt SrcInfo)
+varargsList :: DeltaParsing m => m (VarargsList SrcInfo)
 varargsList = error "varargsList not implemented"
 
-lambdefNocond
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , DeltaParsing m
-     , OrTestParsing 'NotAssignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     )
-  => m (LambdefNocond 'NotAssignable ctxt SrcInfo)
+lambdefNocond :: DeltaParsing m => m (LambdefNocond SrcInfo)
 lambdefNocond =
   annotated $
   LambdefNocond <$>
@@ -300,99 +198,30 @@ lambdefNocond =
       varargsList) <*>
   whitespaceBeforeF testNocond
 
-class TestNocondParsing (atomType :: AtomType) where
-  testNocond
-    :: ( AtomExprParsing atomType ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , AtomParsing 'Assignable ctxt
-       , DeltaParsing m
-       , TestParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       , TestlistCompParsing 'Assignable
-       , OrTestParsing atomType ctxt
-       )
-    => m (TestNocond atomType ctxt SrcInfo)
+testNocond :: DeltaParsing m => m (TestNocond SrcInfo)
+testNocond =
+  annotated $
+  TestNocond <$> (try (InL <$> orTest) <|> (InR <$> lambdefNocond))
 
-instance TestNocondParsing 'NotAssignable where
-  testNocond =
-    annotated $
-    TestNocond <$> (try (InL <$> orTest) <|> (InR <$> lambdefNocond))
-
-instance TestNocondParsing 'Assignable where
-  testNocond =
-    annotated $
-    TestNocond . InL <$> orTest
-
-compIf
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomExprParsing 'Assignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , DeltaParsing m
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     )
-  => m (CompIf 'NotAssignable ctxt SrcInfo)
+compIf :: DeltaParsing m => m (CompIf SrcInfo)
 compIf =
   annotated $
   CompIf <$>
   (string "if" *> whitespaceBeforeF testNocond) <*>
   optionalF (try $ whitespaceBeforeF compIter)
 
-compIter
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomExprParsing 'Assignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , DeltaParsing m
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     )
-  => m (CompIter 'NotAssignable ctxt SrcInfo)
+compIter :: DeltaParsing m => m (CompIter SrcInfo)
 compIter =
   annotated $
   CompIter <$> (try (InL <$> compFor) <|> (InR <$> compIf))
 
-starExpr
-  :: ( AtomExprParsing atomType ctxt
-     , AtomExprParsing 'Assignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (StarExpr atomType ctxt SrcInfo)
+starExpr :: DeltaParsing m => m (StarExpr SrcInfo)
 starExpr =
   annotated $
   StarExpr <$>
   (char '*' *> whitespaceBeforeF expr)
 
-exprList
-  :: ( AtomExprParsing atomType ctxt
-     , AtomExprParsing 'Assignable ctxt
-     , ExprParsing atomType ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing atomType
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (ExprList atomType ctxt SrcInfo)
+exprList :: DeltaParsing m => m (ExprList SrcInfo)
 exprList =
   annotated $
   ExprList <$>
@@ -402,18 +231,8 @@ exprList =
     exprOrStar = try (InL <$> expr) <|> (InR <$> starExpr)
 
 compFor
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomExprParsing 'Assignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , DeltaParsing m
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     )
-  => m (CompFor 'NotAssignable ctxt SrcInfo)
+  :: DeltaParsing m
+  => m (CompFor SrcInfo)
 compFor =
   annotated $
   CompFor <$>
@@ -782,92 +601,28 @@ between' ms ma = fmap Between' $ Between <$> ms <*> ma <*> ms
 comma :: DeltaParsing m => m Comma
 comma = char ',' $> Comma
 
-dictOrSetMaker :: DeltaParsing m => m (DictOrSetMaker atomType ctxt SrcInfo)
+dictOrSetMaker :: DeltaParsing m => m (DictOrSetMaker SrcInfo)
 dictOrSetMaker = error "dictOrSetMaker not implemented"
 
-class TestlistCompParsing (atomType :: AtomType) where
-  testlistComp
-    :: ( DeltaParsing m
-       , AtomExprParsing atomType ctxt
-       , AtomExprParsing 'Assignable ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , AtomParsing 'Assignable ctxt
-       , TestParsing atomType
-       , OrTestParsing atomType ctxt
-       , OrTestParsing 'NotAssignable ctxt
-       , OrTestParsing 'Assignable ctxt
-       , TestParsing 'Assignable
-       , TestlistCompParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       )
-    => m (TestlistComp atomType ctxt SrcInfo)
-
-instance TestlistCompParsing 'NotAssignable where
-  testlistComp = try testlistCompFor <|> testlistCompList
-
-instance TestlistCompParsing 'Assignable where
-  testlistComp = testlistCompList
-
-testlistCompFor
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomExprParsing 'Assignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , TestParsing 'NotAssignable
-     , TestParsing 'Assignable
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (TestlistComp 'NotAssignable ctxt SrcInfo)
-testlistCompFor =
-  annotated $
-  TestlistCompFor <$>
-  testOrStar <*>
-  whitespaceBeforeF compFor
+testlistComp :: DeltaParsing m => m (TestlistComp SrcInfo)
+testlistComp = try testlistCompFor <|> testlistCompList
   where
-    testOrStar = try (InL <$> test) <|> (InR <$> starExpr)
+    testlistCompFor =
+      annotated $
+      TestlistCompFor <$>
+      testOrStar <*>
+      whitespaceBeforeF compFor
 
-testlistCompList
-  :: ( AtomExprParsing atomType ctxt
-     , AtomExprParsing 'Assignable ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , TestParsing atomType
-     , TestParsing 'Assignable
-     , OrTestParsing atomType ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (TestlistComp atomType ctxt SrcInfo)
-testlistCompList =
-  annotated $
-  TestlistCompList <$>
-  testOrStar <*>
-  manyF (try $ beforeF (betweenWhitespace comma) testOrStar) <*>
-  optional (try $ whitespaceBefore comma)
-  where
-    testOrStar = try (InL <$> test) <|> (InR <$> starExpr)
+    testlistCompList =
+      annotated $
+      TestlistCompList <$>
+      testOrStar <*>
+      manyF (try $ beforeF (betweenWhitespace comma) testOrStar) <*>
+      optional (try $ whitespaceBefore comma)
 
-testList
-  :: ( TestParsing atomType
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , OrTestParsing atomType ctxt
-     , DeltaParsing m
-     , AtomExprParsing atomType ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     )
-  => m (TestList atomType ctxt SrcInfo)
+    testOrStar = try (InL <$> test) <|> (InR <$> starExpr)
+    
+testList :: DeltaParsing m => m (TestList SrcInfo)
 testList =
   annotated $
   TestList <$>
@@ -875,18 +630,7 @@ testList =
   beforeF (betweenWhitespace comma) test <*>
   optional (try $ whitespaceBefore comma)
 
-yieldArg
-  :: ( TestParsing 'NotAssignable
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , OrTestParsing 'NotAssignable ('FunDef 'Normal)
-     , AtomExprParsing 'NotAssignable ('FunDef 'Normal)
-     , AtomParsing 'NotAssignable ('FunDef 'Normal)
-     , AtomParsing 'Assignable ('FunDef 'Normal)
-     , DeltaParsing m
-     )
-  => m (YieldArg 'NotAssignable ('FunDef 'Normal) SrcInfo)
+yieldArg :: DeltaParsing m => m (YieldArg SrcInfo)
 yieldArg = try yieldArgFrom <|> yieldArgList
   where
     yieldArgFrom =
@@ -897,114 +641,37 @@ yieldArg = try yieldArgFrom <|> yieldArgList
       annotated $
       YieldArgList <$> testList
 
-yieldExpr
-  :: ( OrTestParsing 'NotAssignable ('FunDef 'Normal)
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (YieldExpr SrcInfo)
+yieldExpr :: DeltaParsing m => m (YieldExpr SrcInfo)
 yieldExpr =
   annotated $
   YieldExpr <$>
   (string "yield" *> optionalF (try $ whitespaceBefore1F yieldArg))
 
-atomParenYield
-  :: ( DeltaParsing m
-     , OrTestParsing 'NotAssignable ('FunDef 'Normal)
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     )
-  => m (Atom 'NotAssignable ('FunDef 'Normal) SrcInfo)
+atomParenYield :: DeltaParsing m => m (Atom SrcInfo)
 atomParenYield =
   annotated $
   AtomParenYield <$>
   between (char '(') (char ')') (betweenWhitespaceF yieldExpr)
 
-class AtomParsing (atomType :: AtomType) (ctxt :: ExprContext) where
-  atom
-    :: ( AtomExprParsing atomType ctxt
-       , TestParsing atomType
-       , TestParsing 'Assignable
-       , TestlistCompParsing atomType
-       , TestlistCompParsing 'Assignable
-       , OrTestParsing atomType ctxt
-       , DeltaParsing m
-       , AtomParsing 'NotAssignable ctxt
-       )
-    => m (Atom atomType ctxt SrcInfo)
-
-instance AtomParsing 'Assignable ('FunDef 'Async) where
-  atom = try atomAssign <|> atomIdentifierAsync
-
-instance AtomParsing 'Assignable ('FunDef 'Normal) where
-  atom = try atomAssign <|> atomIdentifierNormal
-
-instance AtomParsing 'Assignable 'TopLevel where
-  atom = try atomAssign <|> atomIdentifierToplevel
-
-instance AtomParsing 'NotAssignable ('FunDef 'Async) where
-  atom =
-    try atomNoAssign <|>
-    try atomAssign <|>
-    atomIdentifierAsync
-
-instance AtomParsing 'NotAssignable ('FunDef 'Normal) where
-  atom =
-    try atomParenYield <|>
-    try atomAssign <|>
-    try atomNoAssign <|>
-    atomIdentifierNormal
-
-instance AtomParsing 'NotAssignable 'TopLevel where
-  atom =
-    try atomNoAssign <|>
-    try atomAssign <|>
-    atomIdentifierToplevel
-
-atomIdentifierToplevel
-  :: ( DeltaParsing m
-     )
-  => m (Atom atomType 'TopLevel SrcInfo)
-atomIdentifierToplevel =
-  annotated $
-  AtomIdentifier <$> identifier alwaysKeywords
-
-atomIdentifierNormal
-  :: ( DeltaParsing m
-     )
-  => m (Atom atomType ('FunDef 'Normal) SrcInfo)
-atomIdentifierNormal =
-  annotated $
-  AtomIdentifier <$> identifier alwaysKeywords
-
-atomIdentifierAsync
-  :: ( DeltaParsing m
-     )
-  => m (Atom atomType ('FunDef 'Async) SrcInfo)
-atomIdentifierAsync =
-  annotated $
-  AtomIdentifier <$>
-  identifier (alwaysKeywords `S.union` S.fromList ["async", "await"])
-
-atomAssign
-  :: ( AtomExprParsing atomType ctxt
-     , AtomExprParsing 'Assignable ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , TestParsing atomType
-     , TestParsing 'Assignable
-     , OrTestParsing atomType ctxt
-     , TestlistCompParsing atomType
-     , DeltaParsing m
-     )
-  => m (Atom atomType ctxt SrcInfo)
-atomAssign =
+atom :: DeltaParsing m => m (Atom SrcInfo)
+atom =
+  try atomIdentifier <|>
+  try atomParenYield <|>
   try atomParenNoYield <|>
   try atomBracket <|>
-  atomCurly
+  try atomCurly <|>
+  try atomInteger <|>
+  try atomFloat <|>
+  try atomString <|>
+  try atomEllipsis <|>
+  try atomNone <|>
+  try atomTrue <|>
+  atomFalse
   where
+    atomIdentifier =
+      annotated $
+      AtomIdentifier <$> identifier alwaysKeywords
+
     atomParenNoYield =
       annotated $
       AtomParenNoYield <$>
@@ -1012,6 +679,7 @@ atomAssign =
       (betweenWhitespaceF
         (optionalF
           (try testlistComp)))
+
     atomBracket =
       annotated $
       AtomBracket <$>
@@ -1020,6 +688,7 @@ atomAssign =
         (char ']')
         (betweenWhitespaceF $
           optionalF $ try testlistComp)
+
     atomCurly =
       annotated $
       AtomCurly <$>
@@ -1029,77 +698,45 @@ atomAssign =
         (betweenWhitespaceF $
           optionalF $ try dictOrSetMaker)
 
-atomNoAssign
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , TestParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (Atom 'NotAssignable ctxt SrcInfo)
-atomNoAssign =
-  try atomInteger <|>
-  try atomFloat <|>
-  try atomString <|>
-  try atomEllipsis <|>
-  try atomNone <|>
-  try atomTrue <|>
-  atomFalse
-  where
     atomInteger =
       annotated $
       AtomInteger <$> integer
+
     atomFloat =
       annotated $
       AtomFloat <$> float
+
     stringOrBytes = (InL <$> try stringLiteral) <|> (InR <$> bytesLiteral)
+
     atomString =
       annotated $
       AtomString <$>
       stringOrBytes <*>
       manyF (try $ whitespaceBeforeF stringOrBytes)
+
     atomEllipsis =
       annotated $
       string "..." $> AtomEllipsis
+
     atomNone =
       annotated $
       string "None" $> AtomNone
+
     atomTrue =
       annotated $
       string "True" $> AtomTrue
+
     atomFalse =
       annotated $
       string "False" $> AtomFalse
 
-sliceOp
-  :: ( TestParsing 'NotAssignable
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , OrTestParsing 'NotAssignable ctxt
-     , AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , DeltaParsing m
-     )
-  => m (SliceOp 'NotAssignable ctxt SrcInfo)
+sliceOp :: DeltaParsing m => m (SliceOp SrcInfo)
 sliceOp =
   annotated $
   SliceOp <$>
   (char ':' *> optionalF (try $ whitespaceBeforeF test))
 
-argument
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomExprParsing 'Assignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , TestParsing 'NotAssignable
-     , TestParsing 'Assignable
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (Argument 'NotAssignable ctxt SrcInfo)
+argument :: DeltaParsing m => m (Argument SrcInfo)
 argument = try argumentUnpack <|> try argumentDefault <|> argumentFor
   where
     argumentFor =
@@ -1118,19 +755,7 @@ argument = try argumentUnpack <|> try argumentDefault <|> argumentFor
       (try (Right <$> doubleAsterisk) <|> (Left <$> asterisk)) <*>
       whitespaceBeforeF test
 
-
-subscript
-  :: ( TestParsing 'NotAssignable
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , OrTestParsing 'NotAssignable ctxt
-     , AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , DeltaParsing m
-     )
-  => m (Subscript 'NotAssignable ctxt SrcInfo)
+subscript :: DeltaParsing m => m (Subscript SrcInfo)
 subscript = try subscriptSlice <|> subscriptTest
   where
     subscriptTest = annotated $ SubscriptTest <$> test
@@ -1141,20 +766,7 @@ subscript = try subscriptSlice <|> subscriptTest
       (char ':' *> optionalF (try $ whitespaceBeforeF test)) <*>
       optionalF (try $ whitespaceBeforeF sliceOp)
 
-argList
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomExprParsing 'Assignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'NotAssignable
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (ArgList 'NotAssignable ctxt SrcInfo)
+argList :: DeltaParsing m => m (ArgList SrcInfo)
 argList =
   annotated $
   ArgList <$>
@@ -1162,18 +774,7 @@ argList =
   manyF (try $ beforeF (betweenWhitespace comma) argument) <*>
   optional (try $ whitespaceBefore comma)
 
-subscriptList
-  :: ( TestParsing 'NotAssignable
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     , OrTestParsing 'NotAssignable ctxt
-     , AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , DeltaParsing m
-     )
-  => m (SubscriptList 'NotAssignable ctxt SrcInfo)
+subscriptList :: DeltaParsing m => m (SubscriptList SrcInfo)
 subscriptList =
   annotated $
   SubscriptList <$>
@@ -1181,20 +782,7 @@ subscriptList =
   optionalF (try $ beforeF (betweenWhitespace comma) subscript) <*>
   optional (try $ whitespaceBefore comma)
 
-trailer
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomExprParsing 'Assignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'NotAssignable
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (Trailer 'NotAssignable ctxt SrcInfo)
+trailer :: DeltaParsing m => m (Trailer SrcInfo)
 trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
   where
     trailerCall =
@@ -1218,133 +806,34 @@ trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
       TrailerAccess <$>
       (char '.' *> whitespaceBeforeF (identifier alwaysKeywords))
 
-class AtomExprParsing (atomType :: AtomType) (ctxt :: ExprContext) where
-  atomExpr
-    :: ( AtomParsing atomType ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , OrTestParsing atomType ctxt
-       , OrTestParsing 'NotAssignable ctxt
-       , OrTestParsing 'Assignable ctxt
-       , TestParsing 'Assignable
-       , TestParsing atomType
-       , TestlistCompParsing atomType
-       , TestlistCompParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       , DeltaParsing m
-       )
-    => m (AtomExpr atomType ctxt SrcInfo)
+atomExpr :: DeltaParsing m => m (AtomExpr SrcInfo)
+atomExpr = atomExprNoAwait <|> atomExprAwait
+  where
+    atomExprNoAwait =
+      annotated $
+      AtomExprNoAwait <$>
+      atom <*>
+      manyF (try $ whitespaceBeforeF trailer)
 
-instance AtomExprParsing atomType ('FunDef 'Normal) where
-  atomExpr = atomExprNoAwait
+    atomExprAwait =
+      annotated $
+      AtomExprAwait <$>
+      optionalF (string "await" *> whitespaceAfter1 (pure KAwait)) <*>
+      atom <*>
+      manyF (try $ whitespaceBeforeF trailer)
+power :: DeltaParsing m => m (Power SrcInfo)
+power = try powerMany <|> powerOne
+  where
+    powerMany =
+      annotated $
+      PowerMany <$>
+      atomExpr <*>
+      beforeF (whitespaceAfter doubleAsterisk) factor
 
-instance AtomExprParsing atomType 'TopLevel where
-  atomExpr = atomExprNoAwait
-
-instance AtomExprParsing 'Assignable ('FunDef 'Async) where
-  atomExpr = atomExprNoAwait
-
-instance AtomExprParsing 'NotAssignable ('FunDef 'Async) where
-  atomExpr = atomExprAwait
-
-atomExprNoAwait
-  :: ( AtomParsing atomType ctxt
-     , AtomExprParsing atomType ctxt
-     , AtomExprParsing 'NotAssignable ctxt
-     , AtomExprParsing 'Assignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , AtomParsing 'Assignable ctxt
-     , TestParsing atomType
-     , TestParsing 'NotAssignable
-     , TestParsing 'Assignable
-     , OrTestParsing atomType ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestlistCompParsing atomType
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (AtomExpr atomType ctxt SrcInfo)
-atomExprNoAwait =
-  annotated $
-  AtomExprNoAwait <$>
-  atom <*>
-  manyF (try $ whitespaceBeforeF trailer)
-
-atomExprAwait
-  :: ( DeltaParsing m
-     , AtomParsing 'NotAssignable ('FunDef 'Async)
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     , TestParsing 'Assignable
-     , TestParsing 'NotAssignable
-     , OrTestParsing 'Assignable ('FunDef 'Async)
-     , OrTestParsing 'NotAssignable ('FunDef 'Async)
-     )
-  => m (AtomExpr 'NotAssignable ('FunDef 'Async) SrcInfo)
-atomExprAwait =
-  annotated $
-  AtomExprAwait <$>
-  optionalF (string "await" *> whitespaceAfter1 (pure KAwait)) <*>
-  atom <*>
-  manyF (try $ whitespaceBeforeF trailer)
-
-class PowerParsing (atomType :: AtomType) (ctxt :: ExprContext) where
-  power
-    :: ( AtomExprParsing atomType ctxt
-       , AtomParsing atomType ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , TestlistCompParsing 'NotAssignable
-       , TestlistCompParsing 'Assignable
-       , OrTestParsing 'NotAssignable ctxt
-       , OrTestParsing 'Assignable ctxt
-       , TestParsing 'Assignable
-       , DeltaParsing m
-       )
-    => m (Power atomType ctxt SrcInfo)
-
-instance PowerParsing 'NotAssignable ctxt where
-  power = try powerMany <|> powerOne
-
-instance PowerParsing 'Assignable ctxt where
-  power = powerOne
-
-powerMany
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , DeltaParsing m
-     )
-  => m (Power 'NotAssignable ctxt SrcInfo)
-powerMany =
-  annotated $
-  PowerMany <$>
-  atomExpr <*>
-  beforeF (whitespaceAfter doubleAsterisk) factor
-
-powerOne
-  :: ( AtomExprParsing atomType ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , TestlistCompParsing atomType
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , OrTestParsing atomType ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing atomType
-     , TestParsing 'Assignable
-     , DeltaParsing m
-     )
-  => m (Power atomType ctxt SrcInfo)
-powerOne =
-  annotated $
-  PowerOne <$>
-  atomExpr
+    powerOne =
+      annotated $
+      PowerOne <$>
+      atomExpr
 
 factorOp :: DeltaParsing m => m FactorOperator
 factorOp =
@@ -1352,60 +841,17 @@ factorOp =
   try (char '+' $> FactorPos) <|>
   (char '~' $> FactorInv)
 
-class FactorParsing (atomType :: AtomType) (ctxt :: ExprContext) where
-  factor
-    :: ( AtomExprParsing atomType ctxt
-       , AtomParsing atomType ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , TestlistCompParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       , OrTestParsing 'Assignable ctxt
-       , OrTestParsing 'NotAssignable ctxt
-       , TestParsing 'Assignable
-       , DeltaParsing m
-       )
-    => m (Factor atomType ctxt SrcInfo)
+factor :: DeltaParsing m => m (Factor SrcInfo)
+factor = try factorMany <|> factorNone
+  where
+    factorMany =
+      annotated $
+      FactorMany <$>
+      beforeF (whitespaceAfter factorOp) factor
 
-instance FactorParsing 'NotAssignable ctxt where
-  factor = try factorMany <|> factorNone
+    factorNone = annotated $ FactorOne <$> power
 
-instance FactorParsing 'Assignable ctxt where
-  factor = factorNone
-
-factorMany
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     , OrTestParsing 'Assignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , TestParsing 'Assignable
-     , DeltaParsing m
-     )
-  => m (Factor 'NotAssignable ctxt SrcInfo)
-factorMany =
-  annotated $
-  FactorMany <$>
-  beforeF (whitespaceAfter factorOp) factor
-
-factorNone
-  :: ( AtomExprParsing atomType ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , TestlistCompParsing atomType
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , OrTestParsing atomType ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , PowerParsing atomType ctxt
-     , DeltaParsing m
-     )
-  => m (Factor atomType ctxt SrcInfo)
-factorNone = annotated $ FactorNone <$> power
-
-termOp :: DeltaParsing m => m TermOp
+termOp :: DeltaParsing m => m TermOperator
 termOp =
   try (char '*' $> TermMult) <|>
   try (char '@' $> TermAt) <|>
@@ -1413,345 +859,89 @@ termOp =
   try (char '/' $> TermDiv) <|>
   (char '%' $> TermMod)
 
-class TermParsing (atomType :: AtomType) (ctxt :: ExprContext) where
-  term
-    :: ( AtomExprParsing atomType ctxt
-       , AtomParsing atomType ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , TestlistCompParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       , OrTestParsing 'NotAssignable ctxt
-       , OrTestParsing 'Assignable ctxt
-       , TestParsing 'Assignable
-       , DeltaParsing m
-       ) => m (Term atomType ctxt SrcInfo)
-
-instance TermParsing 'NotAssignable ctxt where
-  term = try termMany <|> termOne
-
-instance TermParsing 'Assignable ctxt where
-  term = termOne
-
-termMany
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     , OrTestParsing 'Assignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , TestParsing 'Assignable
-     , DeltaParsing m
-     )
-  => m (Term 'NotAssignable ctxt SrcInfo)
-termMany =
-  annotated $
-  TermMany <$>
-  factor <*>
-  some1F (try $ beforeF (betweenWhitespace termOp) factor)
-
-termOne
-  :: ( AtomExprParsing atomType ctxt
-     , FactorParsing atomType ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , TestlistCompParsing atomType
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , OrTestParsing 'Assignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , TestParsing 'Assignable
-     , DeltaParsing m
-     )
-  => m (Term atomType ctxt SrcInfo)
-termOne =
-  annotated $
-  TermOne <$>
-  factor
-
-class ArithExprParsing (atomType :: AtomType) (ctxt :: ExprContext) where
-  arithExpr
-    :: ( DeltaParsing m
-       , AtomExprParsing atomType ctxt
-       , AtomParsing atomType ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , TestlistCompParsing atomType
-       , TestlistCompParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       , OrTestParsing 'NotAssignable ctxt
-       , OrTestParsing 'Assignable ctxt
-       , TestParsing 'Assignable
-       )
-    => m (ArithExpr atomType ctxt SrcInfo)
-
-instance ArithExprParsing 'NotAssignable ctxt where
-  arithExpr = try arithExprMany <|> arithExprOne
-
-instance ArithExprParsing 'Assignable ctxt where
-  arithExpr = arithExprOne
-
-arithExprMany
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , DeltaParsing m
-     )
-  => m (ArithExpr 'NotAssignable ctxt SrcInfo)
-arithExprMany =
-  annotated $
-  ArithExprMany <$>
-  term <*>
-  some1F (try $ beforeF (betweenWhitespace plusOrMinus) term)
+term :: DeltaParsing m => m (Term SrcInfo)
+term = try termMany <|> termOne
   where
-    plusOrMinus =
-      (Left <$> try (char '+' $> Plus)) <|> (Right <$> (char '-' $> Minus))
+    termMany =
+      annotated $
+      TermMany <$>
+      factor <*>
+      some1F (try $ beforeF (betweenWhitespace termOp) factor)
 
-arithExprOne
-  :: ( AtomExprParsing atomType ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing atomType
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     , TermParsing atomType ctxt
-     , DeltaParsing m
-     )
-  => m (ArithExpr atomType ctxt SrcInfo)
-arithExprOne = annotated $ ArithExprOne <$> term
+    termOne =
+      annotated $
+      TermOne <$>
+      factor
 
-class ShiftExprParsing (atomType :: AtomType) (ctxt :: ExprContext) where
-  shiftExpr
-    :: ( AtomExprParsing atomType ctxt
-       , AtomParsing atomType ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , OrTestParsing 'NotAssignable ctxt
-       , OrTestParsing 'Assignable ctxt
-       , TestParsing 'Assignable
-       , TestlistCompParsing atomType
-       , TestlistCompParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       , DeltaParsing m
-       )
-    => m (ShiftExpr atomType ctxt SrcInfo)
-
-instance ShiftExprParsing 'NotAssignable ctxt where
-  shiftExpr = try shiftExprMany <|> shiftExprOne
-
-instance ShiftExprParsing 'Assignable ctxt where
-  shiftExpr = shiftExprOne
-
-shiftExprMany
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     , DeltaParsing m
-     )
-  => m (ShiftExpr 'NotAssignable ctxt SrcInfo)
-shiftExprMany =
-  annotated $
-  ShiftExprMany <$>
-  arithExpr <*>
-  some1F (try $ beforeF (betweenWhitespace shiftLeftOrRight) arithExpr)
+arithExpr :: DeltaParsing m => m (ArithExpr SrcInfo)
+arithExpr = try arithExprMany <|> arithExprOne
   where
-    shiftLeftOrRight =
-      (Left <$> try (string "<<" $> DoubleLT)) <|>
-      (Right <$> (string ">>" $> DoubleGT))
+    arithExprMany =
+      annotated $
+      ArithExprMany <$>
+      term <*>
+      some1F (try $ beforeF (betweenWhitespace plusOrMinus) term)
+      where
+        plusOrMinus =
+          (Left <$> try (char '+' $> Plus)) <|> (Right <$> (char '-' $> Minus))
 
-shiftExprOne
-  :: ( AtomExprParsing atomType ctxt
-     , ArithExprParsing atomType ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing atomType
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (ShiftExpr atomType ctxt SrcInfo)
-shiftExprOne =
-  annotated $ ShiftExprOne <$> arithExpr
+    arithExprOne = annotated $ ArithExprOne <$> term
 
-class AndExprParsing (atomType :: AtomType) (ctxt :: ExprContext) where
-  andExpr
-    :: ( AtomExprParsing atomType ctxt
-       , AtomParsing atomType ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , OrTestParsing 'NotAssignable ctxt
-       , OrTestParsing 'Assignable ctxt
-       , TestParsing 'Assignable
-       , TestlistCompParsing atomType
-       , TestlistCompParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       , DeltaParsing m
-       )
-    => m (AndExpr atomType ctxt SrcInfo)
+shiftExpr :: DeltaParsing m => m (ShiftExpr SrcInfo)
+shiftExpr = try shiftExprMany <|> shiftExprOne
+  where
+    shiftExprMany =
+      annotated $
+      ShiftExprMany <$>
+      arithExpr <*>
+      some1F (try $ beforeF (betweenWhitespace shiftLeftOrRight) arithExpr)
+      where
+        shiftLeftOrRight =
+          (Left <$> try (string "<<" $> DoubleLT)) <|>
+          (Right <$> (string ">>" $> DoubleGT))
 
-instance AndExprParsing 'NotAssignable ctxt where
-  andExpr = try andExprMany <|> andExprOne
+    shiftExprOne =
+      annotated $ ShiftExprOne <$> arithExpr
 
-instance AndExprParsing 'Assignable ctxt where
-  andExpr = andExprOne
+andExpr :: DeltaParsing m => m (AndExpr SrcInfo)
+andExpr = try andExprMany <|> andExprOne
+  where
+    andExprMany =
+      annotated $
+      AndExprMany <$>
+      shiftExpr <*>
+      some1F (try $ beforeF (betweenWhitespace $ char '&' $> Ampersand) shiftExpr)
 
-andExprMany
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     , DeltaParsing m
-     )
-  => m (AndExpr 'NotAssignable ctxt SrcInfo)
-andExprMany =
-  annotated $
-  AndExprMany <$>
-  shiftExpr <*>
-  some1F (try $ beforeF (betweenWhitespace $ char '&' $> Ampersand) shiftExpr)
+    andExprOne =
+      annotated $
+      AndExprOne <$>
+      shiftExpr
 
-andExprOne
-  :: ( AtomExprParsing atomType ctxt
-     , ShiftExprParsing atomType ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing atomType
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (AndExpr atomType ctxt SrcInfo)
-andExprOne =
-  annotated $
-  AndExprOne <$>
-  shiftExpr
+xorExpr :: DeltaParsing m => m (XorExpr SrcInfo)
+xorExpr = try xorExprMany <|> xorExprOne
+  where
+    xorExprMany =
+      annotated $
+      XorExprMany <$>
+      andExpr <*>
+      some1F (try $ beforeF (betweenWhitespace $ char '^' $> S.Caret) andExpr)
 
-class XorExprParsing (atomType :: AtomType) (ctxt :: ExprContext) where
-  xorExpr
-    :: ( AtomExprParsing atomType ctxt
-       , AtomParsing atomType ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , OrTestParsing 'NotAssignable ctxt
-       , OrTestParsing 'Assignable ctxt
-       , TestParsing 'Assignable
-       , TestlistCompParsing atomType
-       , TestlistCompParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       , DeltaParsing m
-       )
-    => m (XorExpr atomType ctxt SrcInfo)
-
-instance XorExprParsing 'NotAssignable ctxt where
-  xorExpr = try xorExprMany <|> xorExprOne
-
-instance XorExprParsing 'Assignable ctxt where
-  xorExpr = xorExprOne
-
-xorExprMany
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     , DeltaParsing m
-     )
-  => m (XorExpr 'NotAssignable ctxt SrcInfo)
-xorExprMany =
-  annotated $
-  XorExprMany <$>
-  andExpr <*>
-  some1F (try $ beforeF (betweenWhitespace $ char '^' $> S.Caret) andExpr)
-
-xorExprOne
-  :: ( AtomExprParsing atomType ctxt
-     , AndExprParsing atomType ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing atomType
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (XorExpr atomType ctxt SrcInfo)
-xorExprOne =
-  annotated $
-  XorExprOne <$>
-  andExpr
+    xorExprOne =
+      annotated $
+      XorExprOne <$>
+      andExpr
   
-class ExprParsing (atomType :: AtomType) (ctxt :: ExprContext) where
-  expr
-    :: ( AtomExprParsing atomType ctxt
-       , AtomParsing atomType ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , OrTestParsing 'NotAssignable ctxt
-       , OrTestParsing 'Assignable ctxt
-       , TestParsing 'Assignable
-       , TestlistCompParsing atomType
-       , TestlistCompParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       , DeltaParsing m
-       )
-    => m (Expr atomType ctxt SrcInfo)
+expr :: DeltaParsing m => m (Expr SrcInfo)
+expr = try exprMany <|> exprOne
+  where
+    exprMany =
+      annotated $
+      ExprMany <$>
+      xorExpr <*>
+      some1F (try $ beforeF (betweenWhitespace $ char '|' $> Pipe) xorExpr)
 
-instance ExprParsing 'NotAssignable ctxt where
-  expr = try exprMany <|> exprOne
-
-instance ExprParsing 'Assignable ctxt where
-  expr = exprOne
-
-exprMany
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , TestlistCompParsing 'Assignable
-     , DeltaParsing m
-     )
-  => m (Expr 'NotAssignable ctxt SrcInfo)
-exprMany =
-  annotated $
-  ExprMany <$>
-  xorExpr <*>
-  some1F (try $ beforeF (betweenWhitespace $ char '|' $> Pipe) xorExpr)
-
-exprOne
-  :: ( AtomExprParsing atomType ctxt
-     , XorExprParsing atomType ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing atomType
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (Expr atomType ctxt SrcInfo)
-exprOne =
-  annotated $ ExprOne <$> xorExpr
+    exprOne =
+      annotated $ ExprOne <$> xorExpr
 
 compOperator :: DeltaParsing m => m CompOperator
 compOperator =
@@ -1771,177 +961,48 @@ compOperator =
     (CompNotIn <$> some1 whitespaceChar) <*
     string "in" <*>
     whitespaceChar)
-  
-class ComparisonParsing (atomType :: AtomType) (ctxt :: ExprContext) where
-  comparison
-    :: ( AtomExprParsing atomType ctxt
-       , AtomParsing atomType ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , OrTestParsing 'NotAssignable ctxt
-       , OrTestParsing 'Assignable ctxt
-       , TestParsing 'Assignable
-       , TestlistCompParsing atomType
-       , TestlistCompParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       , DeltaParsing m
-       )
-    => m (Comparison atomType ctxt SrcInfo)
 
-instance ComparisonParsing 'NotAssignable ctxt where
-  comparison = try comparisonMany <|> comparisonOne
+comparison :: DeltaParsing m => m (Comparison SrcInfo)
+comparison = try comparisonMany <|> comparisonOne
+  where
+    comparisonMany =
+      annotated $
+      ComparisonMany <$>
+      expr <*>
+      some1F
+        (try $ beforeF
+          (betweenWhitespace compOperator)
+          expr)
 
-instance ComparisonParsing 'Assignable ctxt where
-  comparison = comparisonOne
+    comparisonOne =
+      annotated $ ComparisonOne <$> expr
+      
+notTest :: DeltaParsing m => m (NotTest SrcInfo)
+notTest = try notTestMany <|> notTestOne
+  where
+    notTestMany =
+      annotated $
+      NotTestMany <$>
+      beforeF (whitespaceAfter1 $ string "not" $> KNot) notTest
 
-comparisonMany
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (Comparison 'NotAssignable ctxt SrcInfo)
-comparisonMany =
-  annotated $
-  ComparisonMany <$>
-  expr <*>
-  some1F
-    (try $ beforeF
-      (betweenWhitespace compOperator)
-      expr)
+    notTestOne =
+      annotated $ NotTestOne <$> comparison
 
-comparisonOne
-  :: ( AtomExprParsing atomType ctxt
-     , ExprParsing atomType ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing atomType
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (Comparison atomType ctxt SrcInfo)
-comparisonOne =
-  annotated $ ComparisonOne <$> expr
-  
-class NotTestParsing (atomType :: AtomType) (ctxt :: ExprContext) where
-  notTest
-    :: ( AtomExprParsing atomType ctxt
-       , AtomParsing atomType ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , OrTestParsing 'NotAssignable ctxt
-       , OrTestParsing 'Assignable ctxt
-       , TestParsing 'Assignable
-       , TestlistCompParsing atomType
-       , TestlistCompParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       , DeltaParsing m
-       )
-    => m (NotTest atomType ctxt SrcInfo)
+andTest :: DeltaParsing m => m (AndTest SrcInfo)
+andTest = try andTestMany <|> andTestOne
+  where
+    andTestMany =
+      annotated $
+      AndTestMany <$>
+      notTest <*>
+      some1F
+        (try $
+          beforeF
+            (betweenWhitespace1 kAnd)
+            andTest)
 
-instance NotTestParsing 'NotAssignable ctxt where
-  notTest = try notTestMany <|> notTestOne
-
-instance NotTestParsing 'Assignable ctxt where
-  notTest = notTestOne
-
-notTestMany
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (NotTest 'NotAssignable ctxt SrcInfo)
-notTestMany =
-  annotated $
-  NotTestMany <$>
-  beforeF (whitespaceAfter1 $ string "not" $> KNot) notTest
-
-notTestOne
-  :: ( AtomExprParsing atomType ctxt
-     , ComparisonParsing atomType ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing atomType
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (NotTest atomType ctxt SrcInfo)
-notTestOne =
-  annotated $ NotTestNone <$> comparison
-
-class AndTestParsing (atomType :: AtomType) (ctxt :: ExprContext) where
-  andTest
-    :: ( AtomExprParsing atomType ctxt
-       , AtomParsing atomType ctxt
-       , AtomParsing 'NotAssignable ctxt
-       , OrTestParsing 'NotAssignable ctxt
-       , OrTestParsing 'Assignable ctxt
-       , TestParsing 'Assignable
-       , TestlistCompParsing atomType
-       , TestlistCompParsing 'Assignable
-       , TestlistCompParsing 'NotAssignable
-       , DeltaParsing m
-       )
-    => m (AndTest atomType ctxt SrcInfo)
-
-instance AndTestParsing 'NotAssignable ctxt where
-  andTest = try andTestMany <|> andTestOne
-
-instance AndTestParsing 'Assignable ctxt where
-  andTest = andTestOne
-
-andTestMany
-  :: ( AtomExprParsing 'NotAssignable ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (AndTest 'NotAssignable ctxt SrcInfo)
-andTestMany =
-  annotated $
-  AndTestMany <$>
-  notTest <*>
-  some1F
-    (try $
-      beforeF
-        (betweenWhitespace1 kAnd)
-        andTest)
-
-andTestOne
-  :: ( AtomExprParsing atomType ctxt
-     , NotTestParsing atomType ctxt
-     , AtomParsing atomType ctxt
-     , AtomParsing 'NotAssignable ctxt
-     , OrTestParsing 'NotAssignable ctxt
-     , OrTestParsing 'Assignable ctxt
-     , TestParsing 'Assignable
-     , TestlistCompParsing atomType
-     , TestlistCompParsing 'Assignable
-     , TestlistCompParsing 'NotAssignable
-     , DeltaParsing m
-     )
-  => m (AndTest atomType ctxt SrcInfo)
-andTestOne =
-  annotated $ AndTestOne <$> notTest
+    andTestOne =
+      annotated $ AndTestOne <$> notTest
 
 newlineChar :: CharParsing m => m NewlineChar
 newlineChar =

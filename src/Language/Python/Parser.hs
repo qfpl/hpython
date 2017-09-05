@@ -155,7 +155,7 @@ test = try testCond <|> testLambdef
       annotated $
       TestCond <$>
       orTest <*>
-      optionalF (whitespaceBefore1F ifThenElse)
+      optionalF (try $ whitespaceBefore1F ifThenElse)
 
 kOr :: DeltaParsing m => m KOr
 kOr = string "or" $> KOr

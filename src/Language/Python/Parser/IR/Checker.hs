@@ -95,27 +95,23 @@ checkTest
   -> IR.Test ann
   -> SyntaxChecker ann (Safe.Test atomType ctxt ann)
 checkTest cfg e =
-  case cfg ^. atomType of
-    Safe.SAssignable ->
-      case e of
-        IR.TestCondNoIf v ann ->
+  case e of
+    IR.TestCond h t ann ->
+      case t ^. _Wrapping Compose of
+        Nothing ->
           Safe.TestCondNoIf <$>
-          checkOrTest cfg v <*>
-          pure ann
-        IR.TestCondIf _ _ ann -> syntaxError $ CannotAssignTo LHSIf ann
-        IR.TestLambdef -> error "checkTestLambdef not implemented"
-    Safe.SNotAssignable ->
-      case e of
-        IR.TestCondNoIf v ann ->
-          Safe.TestCondNoIf <$>
-          checkOrTest cfg v <*>
-          pure ann
-        IR.TestCondIf h t ann ->
-          Safe.TestCondIf <$>
           checkOrTest cfg h <*>
-          traverseOf traverseCompose (checkIfThenElse cfg) t <*>
           pure ann
-        IR.TestLambdef -> error "checkTestLambdef not implemented"
+        Just t' ->
+          case cfg ^. atomType of
+            Safe.SAssignable ->
+              syntaxError $ CannotAssignTo LHSIf ann
+            Safe.SNotAssignable ->
+              Safe.TestCondIf <$>
+              checkOrTest cfg h <*>
+              traverseOf traverseCompose (checkIfThenElse cfg) t' <*>
+              pure ann
+    IR.TestLambdef -> error "checkTestLambdef not implemented"
 
 checkIfThenElse
   :: SyntaxConfig atomType ctxt

@@ -478,18 +478,16 @@ data IfThenElse a
   deriving (Functor, Foldable, Traversable)
 
 data Test a
-  = TestCondNoIf
-  { _testCondNoIf_value :: OrTest a
-  , _testCondNoIf_ann :: a
-  }
-  | TestCondIf
-  { _testCondIf_head :: OrTest a
-  , _testCondIf_tail
+  = TestCond
+  { _testCond_head :: OrTest a
+  , _testCond_tail
     :: Compose
-        (Before (NonEmpty WhitespaceChar))
-        IfThenElse
+         Maybe
+         (Compose
+           (Before (NonEmpty WhitespaceChar))
+           IfThenElse)
         a
-  , _testCondIf_ann :: a
+  , _testCond_ann :: a
   }
   | TestLambdef
   deriving (Functor, Foldable, Traversable)

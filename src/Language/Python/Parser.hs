@@ -148,19 +148,14 @@ ifThenElse =
 
 
 test :: DeltaParsing m => m (Test SrcInfo)
-test = try testCondIf <|> try testCondNoIf <|> testLambdef
+test = try testCond <|> testLambdef
   where
     testLambdef = error "testLambdef not implemented"
-    testCondIf =
+    testCond =
       annotated $
-      TestCondIf <$>
+      TestCond <$>
       orTest <*>
-      whitespaceBefore1F ifThenElse
-
-    testCondNoIf =
-      annotated $
-      TestCondNoIf <$>
-      orTest
+      optionalF (whitespaceBefore1F ifThenElse)
 
 kOr :: DeltaParsing m => m KOr
 kOr = string "or" $> KOr

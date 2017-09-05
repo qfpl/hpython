@@ -650,7 +650,7 @@ yieldExpr =
 
 atom :: DeltaParsing m => m (Atom SrcInfo)
 atom =
-  atomParen <|>
+  try atomParen <|>
   try atomBracket <|>
   try atomCurly <|>
   try atomInteger <|>
@@ -673,7 +673,7 @@ atom =
       parens
       (betweenWhitespaceF
         (optionalF
-          (fmap InL (try yieldExpr) <|> fmap InR testlistComp)))
+          (try $ (InL <$> try yieldExpr) <|> (InR <$> testlistComp))))
 
     atomBracket =
       annotated $

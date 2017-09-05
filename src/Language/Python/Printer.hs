@@ -568,7 +568,7 @@ trailer t =
 
 atomExpr :: AtomExpr atomType ctxt a -> Doc
 atomExpr (AtomExprAwait await a trailers _) =
-  foldMapF (whitespaceAfter kAwait) await <>
+  whitespaceAfter kAwait await <>
   atom a <>
   foldMapF (whitespaceBeforeF trailer) trailers
 atomExpr (AtomExprNoAwait a trailers _) =

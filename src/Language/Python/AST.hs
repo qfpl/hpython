@@ -318,7 +318,7 @@ data AtomExpr :: AtomType -> ExprContext -> * -> * where
     , _atomExpr_ann :: a
     } -> AtomExpr atomType ctxt a
   AtomExprAwait ::
-    { _atomExprAwait_await :: Compose Maybe (After (NonEmpty WhitespaceChar)) KAwait
+    { _atomExprAwait_await :: After (NonEmpty WhitespaceChar) KAwait
     , _atomExprAwait_atom :: Atom 'NotAssignable ('FunDef 'Async) a
     , _atomExprAwait_trailers
       :: Compose

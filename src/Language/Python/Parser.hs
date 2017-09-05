@@ -5,13 +5,13 @@
 {-# language DataKinds #-}
 {-# language FlexibleContexts #-}
 {-# language FlexibleInstances #-}
-{-# language KindSignatures #-}
 {-# language MultiParamTypeClasses #-}
 {-# language TypeFamilies #-}
 module Language.Python.Parser where
 
 import GHC.Stack
 import Prelude (error)
+import Debug.Trace
 
 import Papa hiding (Space, zero, o, Plus, (\\), Product, argument)
 import Data.CharSet ((\\))
@@ -20,13 +20,11 @@ import Data.Functor.Sum
 import Data.Separated.After (After(..))
 import Data.Separated.Before (Before(..))
 import Data.Separated.Between (Between(..), Between'(..))
-import Data.Set (Set)
 import Text.Trifecta as P hiding
   (stringLiteral, integer, octDigit, hexDigit, comma, colon)
 
 import qualified Data.CharSet as CharSet
 import qualified Data.CharSet.Common as CharSet
-import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Language.Python.AST.BytesLiteral
@@ -59,7 +57,7 @@ leftParen = char '(' $> LeftParen
 
 rightParen :: DeltaParsing m => m RightParen
 rightParen = char ')' $> RightParen
-  
+
 whitespaceChar :: CharParsing m => m WhitespaceChar
 whitespaceChar =
   (char ' ' $> Space) <|>
@@ -251,15 +249,17 @@ asterisk = char '*' $> Asterisk
 colon :: DeltaParsing m => m Colon
 colon = char ':' $> Colon
 
-identifier :: DeltaParsing m => Set String -> m (Identifier SrcInfo)
-identifier keywords = do
-  ident <- liftA2 (:) idStart (many idContinue)
-  when (ident `S.member` keywords) .
-    unexpected $ "keyword '" ++ ident ++ "'"
-  annotated . pure $ Identifier (T.pack ident)
-  where
-    idStart = try letter <|> char '_'
-    idContinue = try idStart <|> digit
+idStart :: DeltaParsing m => m Char
+idStart = try letter <|> char '_'
+
+idContinue :: DeltaParsing m => m Char
+idContinue = try idStart <|> digit
+
+identifier :: DeltaParsing m => m (Identifier SrcInfo)
+identifier =
+  annotated $
+  Identifier . T.pack <$>
+  liftA2 (:) idStart (many idContinue)
 
 stringPrefix :: DeltaParsing m => m StringPrefix
 stringPrefix =
@@ -621,7 +621,7 @@ testlistComp = try testlistCompFor <|> testlistCompList
       optional (try $ whitespaceBefore comma)
 
     testOrStar = try (InL <$> test) <|> (InR <$> starExpr)
-    
+
 testList :: DeltaParsing m => m (TestList SrcInfo)
 testList =
   annotated $
@@ -647,17 +647,10 @@ yieldExpr =
   YieldExpr <$>
   (string "yield" *> optionalF (try $ whitespaceBefore1F yieldArg))
 
-atomParenYield :: DeltaParsing m => m (Atom SrcInfo)
-atomParenYield =
-  annotated $
-  AtomParenYield <$>
-  between (char '(') (char ')') (betweenWhitespaceF yieldExpr)
 
 atom :: DeltaParsing m => m (Atom SrcInfo)
 atom =
-  try atomIdentifier <|>
-  try atomParenYield <|>
-  try atomParenNoYield <|>
+  atomParen <|>
   try atomBracket <|>
   try atomCurly <|>
   try atomInteger <|>
@@ -666,19 +659,21 @@ atom =
   try atomEllipsis <|>
   try atomNone <|>
   try atomTrue <|>
-  atomFalse
+  try atomFalse <|>
+  atomIdentifier
   where
     atomIdentifier =
       annotated $
-      AtomIdentifier <$> identifier alwaysKeywords
+      AtomIdentifier <$>
+      identifier
 
-    atomParenNoYield =
+    atomParen =
       annotated $
-      AtomParenNoYield <$>
-      between (char '(') (char ')')
+      AtomParen <$>
+      parens
       (betweenWhitespaceF
         (optionalF
-          (try testlistComp)))
+          (fmap InL (try yieldExpr) <|> fmap InR testlistComp)))
 
     atomBracket =
       annotated $
@@ -720,15 +715,15 @@ atom =
 
     atomNone =
       annotated $
-      string "None" $> AtomNone
+      (string "None" *> notFollowedBy idContinue) $> AtomNone
 
     atomTrue =
       annotated $
-      string "True" $> AtomTrue
+      (string "True" *> notFollowedBy idContinue) $> AtomTrue
 
     atomFalse =
       annotated $
-      string "False" $> AtomFalse
+      (string "False" *> notFollowedBy idContinue) $> AtomFalse
 
 sliceOp :: DeltaParsing m => m (SliceOp SrcInfo)
 sliceOp =
@@ -804,10 +799,10 @@ trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
     trailerAccess =
       annotated $
       TrailerAccess <$>
-      (char '.' *> whitespaceBeforeF (identifier alwaysKeywords))
+      (char '.' *> whitespaceBeforeF identifier)
 
 atomExpr :: DeltaParsing m => m (AtomExpr SrcInfo)
-atomExpr = atomExprNoAwait <|> atomExprAwait
+atomExpr = try atomExprAwait <|> atomExprNoAwait 
   where
     atomExprNoAwait =
       annotated $
@@ -818,9 +813,10 @@ atomExpr = atomExprNoAwait <|> atomExprAwait
     atomExprAwait =
       annotated $
       AtomExprAwait <$>
-      optionalF (string "await" *> whitespaceAfter1 (pure KAwait)) <*>
+      (string "await" *> whitespaceAfter1 (pure KAwait)) <*>
       atom <*>
       manyF (try $ whitespaceBeforeF trailer)
+
 power :: DeltaParsing m => m (Power SrcInfo)
 power = try powerMany <|> powerOne
   where
@@ -842,14 +838,14 @@ factorOp =
   (char '~' $> FactorInv)
 
 factor :: DeltaParsing m => m (Factor SrcInfo)
-factor = try factorMany <|> factorNone
+factor = try factorMany <|> factorOne
   where
     factorMany =
       annotated $
       FactorMany <$>
       beforeF (whitespaceAfter factorOp) factor
 
-    factorNone = annotated $ FactorOne <$> power
+    factorOne = annotated $ FactorOne <$> power
 
 termOp :: DeltaParsing m => m TermOperator
 termOp =
@@ -881,9 +877,6 @@ arithExpr = try arithExprMany <|> arithExprOne
       ArithExprMany <$>
       term <*>
       some1F (try $ beforeF (betweenWhitespace plusOrMinus) term)
-      where
-        plusOrMinus =
-          (Left <$> try (char '+' $> Plus)) <|> (Right <$> (char '-' $> Minus))
 
     arithExprOne = annotated $ ArithExprOne <$> term
 
@@ -976,7 +969,7 @@ comparison = try comparisonMany <|> comparisonOne
 
     comparisonOne =
       annotated $ ComparisonOne <$> expr
-      
+
 notTest :: DeltaParsing m => m (NotTest SrcInfo)
 notTest = try notTestMany <|> notTestOne
   where

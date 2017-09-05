@@ -861,7 +861,7 @@ genAtomExpr cfg =
       Gen.choice
         [ atomExprNoAwait cfg
         , AST.AtomExprAwait <$>
-          genMaybeF (genWhitespaceAfter1 $ pure AST.KAwait) <*>
+          genWhitespaceAfter1 (pure AST.KAwait) <*>
           genAtom cfg <*>
           genListF (genWhitespaceBeforeF $ genTrailer cfg) <*>
           pure ()

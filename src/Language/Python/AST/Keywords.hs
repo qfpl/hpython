@@ -1,11 +1,13 @@
+{-# language OverloadedStrings #-}
 module Language.Python.AST.Keywords where
 
 import Papa
 import Data.Set (Set)
+import Data.Text (Text)
 
 import qualified Data.Set as S
 
-alwaysKeywords :: Set String
+alwaysKeywords :: Set Text
 alwaysKeywords =
   S.fromList
   [ "False"

@@ -670,7 +670,7 @@ atom =
     atomParen =
       annotated $
       AtomParen <$>
-      parens
+      between (char '(') (char ')')
       (betweenWhitespaceF
         (optionalF
           (try $ (InL <$> try yieldExpr) <|> (InR <$> testlistComp))))

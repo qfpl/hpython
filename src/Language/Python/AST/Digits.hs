@@ -2,7 +2,7 @@
 module Language.Python.AST.Digits where
 
 import Papa
-import Data.Digit
+import Data.Digit hiding (Digit)
 
 data Digit
   = Digit_0

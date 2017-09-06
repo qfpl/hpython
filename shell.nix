@@ -6,7 +6,11 @@ let
                        then pkgs.haskellPackages
                        else pkgs.haskell.packages.${compiler};
 
-  drv = haskellPackages.callPackage ./hpython.nix {};
+  drv = haskellPackages.callPackage
+    ./hpython.nix
+    { tasty-hedgehog =
+        import ./tasty-hedgehog.nix { inherit pkgs haskellPackages; };
+    };
 
 in
 

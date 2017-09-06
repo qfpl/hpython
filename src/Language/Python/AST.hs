@@ -574,11 +574,11 @@ data OrTest :: AtomType -> ExprContext -> * -> * where
     { _orTestMany_left :: AndTest 'NotAssignable ctxt a
     , _orTestMany_right
       :: Compose
-          NonEmpty
-          (Compose
-            (Before (Between' (NonEmpty WhitespaceChar) KOr))
-            (AndTest 'NotAssignable ctxt))
-          a
+           NonEmpty
+           (Compose
+             (Before (Between' (NonEmpty WhitespaceChar) KOr))
+             (AndTest 'NotAssignable ctxt))
+           a
     , _orTestMany_ann :: a
     } -> OrTest 'NotAssignable ctxt a
 deriving instance Eq c => Eq (OrTest a b c)

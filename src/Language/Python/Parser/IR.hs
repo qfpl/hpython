@@ -274,152 +274,120 @@ data AtomExpr a
   } deriving (Functor, Foldable, Traversable)
 
 data Power a
-  = PowerOne
-  { _powerOne_value :: AtomExpr a
-  , _powerOne_ann :: a
-  }
-  | PowerMany
-  { _powerMany_left :: AtomExpr a
-  , _powerMany_right
+  = Power
+  { _power_left :: AtomExpr a
+  , _power_right
     :: Compose
-          (Before (After [WhitespaceChar] DoubleAsterisk))
-          Factor
-          a
-  , _powerMany_ann :: a
+         Maybe
+         (Compose
+           (Before (After [WhitespaceChar] DoubleAsterisk))
+           Factor)
+         a
+  , _power_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data Factor a
-  = FactorOne
-  { _factorNone_value :: Power a
-  , _factorNone_ann :: a
-  }
-  | FactorMany
-  { _factorSome_value
+  = Factor
+  { _factor_left :: Power a
+  , _factor_right
     :: Compose
-        (Before (After [WhitespaceChar] FactorOperator))
-        Factor
-        a
+         Maybe
+         (Compose
+           (Before (After [WhitespaceChar] FactorOperator))
+           Factor)
+         a
   , _factorSome_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data Term a
-  = TermOne
-  { _termOne_value :: Factor a
-  , _termOne_ann :: a
-  }
-  | TermMany
-  { _termMany_left :: Factor a
-  , _termMany_right
+  = Term
+  { _term_left :: Factor a
+  , _term_right
     :: Compose
-        NonEmpty
-        (Compose
-          (Before (Between' [WhitespaceChar] TermOperator))
-          Factor)
-        a
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] TermOperator))
+           Factor)
+         a
   , _termMany_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data ArithExpr a
-  = ArithExprOne
-  { _arithExprOne_value :: Term a
-  , _arithExprOne_ann :: a
-  }
-  | ArithExprMany
-  { _arithExprSome_left :: Term a
-  , _arithExprSome_right
+  = ArithExpr
+  { _arithExpr_left :: Term a
+  , _arithExpr_right
     :: Compose
-        NonEmpty
+        []
         (Compose
           (Before (Between' [WhitespaceChar] (Either Plus Minus)))
           Term)
         a
-  , _arithExprSome_ann :: a
+  , _arithExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data ShiftExpr a
-  = ShiftExprOne
-  { _shiftExprOne_value :: ArithExpr a
-  , _shiftExprOne_ann :: a
-  }
-  | ShiftExprMany
-  { _shiftExprMany_left :: ArithExpr a
-  , _shiftExprMany_right
+  = ShiftExpr
+  { _shiftExpr_left :: ArithExpr a
+  , _shiftExpr_right
     :: Compose
-        NonEmpty
-        (Compose
-          (Before (Between' [WhitespaceChar] (Either DoubleLT DoubleGT)))
-          ArithExpr)
-        a
-  , _shiftExprMany_ann :: a
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] (Either DoubleLT DoubleGT)))
+           ArithExpr)
+         a
+  , _shiftExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data AndExpr a
-  = AndExprOne
-  { _andExprOne_value :: ShiftExpr a
-  , _andExprOne_ann :: a
-  }
-  | AndExprMany
-  { _andExprMany_left :: ShiftExpr a
-  , _andExprMany_right
+  = AndExpr
+  { _andExpr_left :: ShiftExpr a
+  , _andExpr_right
     :: Compose
-        NonEmpty
-        (Compose
-          (Before (Between' [WhitespaceChar] Ampersand))
-          ShiftExpr)
-        a
-  , _andExprMany_ann :: a
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] Ampersand))
+           ShiftExpr)
+         a
+  , _andExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data XorExpr a
-  = XorExprOne
-  { _xorExprOne_value :: AndExpr a
-  , _xorExprOne_ann :: a
-  }
-  | XorExprMany
-  { _xorExprMany_left :: AndExpr a
-  , _xorExprMany_right
+  = XorExpr
+  { _xorExpr_left :: AndExpr a
+  , _xorExpr_right
     :: Compose
-        NonEmpty
-        (Compose
-          (Before (Between' [WhitespaceChar] Caret))
-          AndExpr)
-        a
-  , _xorExprMany_ann :: a
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] Caret))
+           AndExpr)
+         a
+  , _xorExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data Expr a
-  = ExprOne
-  { _exprOne_value :: XorExpr a
-  , _exprOne_ann :: a
-  }
-  | ExprMany
-  { _exprMany_left :: XorExpr a
-  , _exprMany_right
+  = Expr
+  { _expr_value :: XorExpr a
+  , _expr_right
     :: Compose
-        NonEmpty
-        (Compose
-          (Before (Between' [WhitespaceChar] Pipe))
-          XorExpr)
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] Pipe))
+           XorExpr)
         a
-  , _exprMany_ann :: a
+  , _expr_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data Comparison a
-  = ComparisonOne
-  { _comparisonOne_value :: Expr a
-  , _comparisonOne_ann :: a
-  }
-  | ComparisonMany
-  { _comparisonMany_left :: Expr a
-  , _comparisonMany_right
+  = Comparison
+  { _comparison_left :: Expr a
+  , _comparison_right
     :: Compose
-        NonEmpty
-        (Compose
-          (Before
-            (Between' [WhitespaceChar] CompOperator))
-          Expr)
-        a
-  , _comparisonMany_ann :: a
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] CompOperator))
+           Expr)
+         a
+  , _comparison_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data NotTest a
@@ -437,37 +405,29 @@ data NotTest a
   } deriving (Functor, Foldable, Traversable)
 
 data AndTest a
-  = AndTestOne
-  { _andTestOne_value :: NotTest a
-  , _andTestOne_ann :: a
-  }
-  | AndTestMany
-  { _andTestMany_left :: NotTest a
-  , _andTestMany_right
+  = AndTest
+  { _andTest_left :: NotTest a
+  , _andTest_right
     :: Compose
-        NonEmpty
-        (Compose
-          (Before (Between' (NonEmpty WhitespaceChar) KAnd))
-          AndTest)
-        a
-  , _andTestMany_ann :: a
+         []
+         (Compose
+           (Before (Between' (NonEmpty WhitespaceChar) KAnd))
+           AndTest)
+         a
+  , _andTest_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data OrTest a
-  = OrTestOne
-  { _orTestOne_value :: AndTest a
-  , _orTestOne_ann :: a
-  }
-  | OrTestMany
-  { _orTestMany_left :: AndTest a
-  , _orTestMany_right
+  = OrTest
+  { _orTest_left :: AndTest a
+  , _orTest_right
     :: Compose
-        NonEmpty
-        (Compose
-          (Before (Between' (NonEmpty WhitespaceChar) KOr))
-          AndTest)
-        a
-  , _orTestMany_ann :: a
+         []
+         (Compose
+           (Before (Between' (NonEmpty WhitespaceChar) KOr))
+           AndTest)
+         a
+  , _orTest_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data IfThenElse a

@@ -11,7 +11,6 @@ module Language.Python.Parser where
 
 import GHC.Stack
 import Prelude (error)
-import Debug.Trace
 
 import Papa hiding (Space, zero, o, Plus, (\\), Product, argument)
 import Data.CharSet ((\\))
@@ -164,18 +163,11 @@ kAnd :: DeltaParsing m => m KAnd
 kAnd = string "and" $> KAnd
 
 orTest :: DeltaParsing m => m (OrTest SrcInfo)
-orTest = try orTestMany <|> orTestOne
-  where
-    orTestOne =
-      annotated $
-      OrTestOne <$>
-      andTest
-
-    orTestMany =
-      annotated $
-      OrTestMany <$>
-      andTest <*>
-      some1F (beforeF (betweenWhitespace1 kOr) andTest)
+orTest =
+  annotated $
+  OrTest <$>
+  andTest <*>
+  manyF (beforeF (betweenWhitespace1 kOr) andTest)
 
 varargsList :: DeltaParsing m => m (VarargsList SrcInfo)
 varargsList = error "varargsList not implemented"
@@ -813,18 +805,11 @@ atomExpr = try atomExprAwait <|> atomExprNoAwait
       manyF (try $ whitespaceBeforeF trailer)
 
 power :: DeltaParsing m => m (Power SrcInfo)
-power = try powerMany <|> powerOne
-  where
-    powerMany =
-      annotated $
-      PowerMany <$>
-      atomExpr <*>
-      beforeF (whitespaceAfter doubleAsterisk) factor
-
-    powerOne =
-      annotated $
-      PowerOne <$>
-      atomExpr
+power =
+  annotated $
+  Power <$>
+  atomExpr <*>
+  optionalF (beforeF (whitespaceAfter doubleAsterisk) factor)
 
 factorOp :: DeltaParsing m => m FactorOperator
 factorOp =
@@ -833,14 +818,11 @@ factorOp =
   (char '~' $> FactorInv)
 
 factor :: DeltaParsing m => m (Factor SrcInfo)
-factor = try factorMany <|> factorOne
-  where
-    factorMany =
-      annotated $
-      FactorMany <$>
-      beforeF (whitespaceAfter factorOp) factor
-
-    factorOne = annotated $ FactorOne <$> power
+factor =
+  annotated $
+  Factor <$>
+  power <*>
+  optionalF (beforeF (whitespaceAfter factorOp) factor)
 
 termOp :: DeltaParsing m => m TermOperator
 termOp =
@@ -851,85 +833,50 @@ termOp =
   (char '%' $> TermMod)
 
 term :: DeltaParsing m => m (Term SrcInfo)
-term = try termMany <|> termOne
-  where
-    termMany =
-      annotated $
-      TermMany <$>
-      factor <*>
-      some1F (try $ beforeF (betweenWhitespace termOp) factor)
-
-    termOne =
-      annotated $
-      TermOne <$>
-      factor
+term =
+  annotated $
+  Term <$>
+  factor <*>
+  manyF (try $ beforeF (betweenWhitespace termOp) factor)
 
 arithExpr :: DeltaParsing m => m (ArithExpr SrcInfo)
-arithExpr = try arithExprMany <|> arithExprOne
-  where
-    arithExprMany =
-      annotated $
-      ArithExprMany <$>
-      term <*>
-      some1F (try $ beforeF (betweenWhitespace plusOrMinus) term)
-
-    arithExprOne = annotated $ ArithExprOne <$> term
+arithExpr =
+  annotated $
+  ArithExpr <$>
+  term <*>
+  manyF (try $ beforeF (betweenWhitespace plusOrMinus) term)
 
 shiftExpr :: DeltaParsing m => m (ShiftExpr SrcInfo)
-shiftExpr = try shiftExprMany <|> shiftExprOne
+shiftExpr =
+  annotated $
+  ShiftExpr <$>
+  arithExpr <*>
+  manyF (try $ beforeF (betweenWhitespace shiftLeftOrRight) arithExpr)
   where
-    shiftExprMany =
-      annotated $
-      ShiftExprMany <$>
-      arithExpr <*>
-      some1F (try $ beforeF (betweenWhitespace shiftLeftOrRight) arithExpr)
-      where
-        shiftLeftOrRight =
-          (Left <$> try (string "<<" $> DoubleLT)) <|>
-          (Right <$> (string ">>" $> DoubleGT))
-
-    shiftExprOne =
-      annotated $ ShiftExprOne <$> arithExpr
+    shiftLeftOrRight =
+      (symbol "<<" $> Left DoubleLT) <|>
+      (symbol ">>" $> Right DoubleGT)
 
 andExpr :: DeltaParsing m => m (AndExpr SrcInfo)
-andExpr = try andExprMany <|> andExprOne
-  where
-    andExprMany =
-      annotated $
-      AndExprMany <$>
-      shiftExpr <*>
-      some1F (try $ beforeF (betweenWhitespace $ char '&' $> Ampersand) shiftExpr)
-
-    andExprOne =
-      annotated $
-      AndExprOne <$>
-      shiftExpr
+andExpr =
+  annotated $
+  AndExpr <$>
+  shiftExpr <*>
+  manyF (try $ beforeF (betweenWhitespace $ char '&' $> Ampersand) shiftExpr)
 
 xorExpr :: DeltaParsing m => m (XorExpr SrcInfo)
-xorExpr = try xorExprMany <|> xorExprOne
-  where
-    xorExprMany =
-      annotated $
-      XorExprMany <$>
-      andExpr <*>
-      some1F (try $ beforeF (betweenWhitespace $ char '^' $> S.Caret) andExpr)
+xorExpr =
+  annotated $
+  XorExpr <$>
+  andExpr <*>
+  manyF (try $ beforeF (betweenWhitespace $ char '^' $> S.Caret) andExpr)
 
-    xorExprOne =
-      annotated $
-      XorExprOne <$>
-      andExpr
-  
 expr :: DeltaParsing m => m (Expr SrcInfo)
-expr = try exprMany <|> exprOne
-  where
-    exprMany =
-      annotated $
-      ExprMany <$>
-      xorExpr <*>
-      some1F (try $ beforeF (betweenWhitespace $ char '|' $> Pipe) xorExpr)
-
-    exprOne =
-      annotated $ ExprOne <$> xorExpr
+expr =
+  annotated $
+  Expr <$>
+  xorExpr <*>
+  manyF (try $ beforeF (betweenWhitespace $ char '|' $> Pipe) xorExpr)
 
 compOperator :: DeltaParsing m => m CompOperator
 compOperator =
@@ -951,19 +898,14 @@ compOperator =
     whitespaceChar)
 
 comparison :: DeltaParsing m => m (Comparison SrcInfo)
-comparison = try comparisonMany <|> comparisonOne
-  where
-    comparisonMany =
-      annotated $
-      ComparisonMany <$>
-      expr <*>
-      some1F
-        (try $ beforeF
-          (betweenWhitespace compOperator)
-          expr)
-
-    comparisonOne =
-      annotated $ ComparisonOne <$> expr
+comparison =
+  annotated $
+  Comparison <$>
+  expr <*>
+  manyF
+    (try $ beforeF
+      (betweenWhitespace compOperator)
+      expr)
 
 notTest :: DeltaParsing m => m (NotTest SrcInfo)
 notTest = try notTestMany <|> notTestOne
@@ -977,20 +919,11 @@ notTest = try notTestMany <|> notTestOne
       annotated $ NotTestOne <$> comparison
 
 andTest :: DeltaParsing m => m (AndTest SrcInfo)
-andTest = try andTestMany <|> andTestOne
-  where
-    andTestMany =
-      annotated $
-      AndTestMany <$>
-      notTest <*>
-      some1F
-        (try $
-          beforeF
-            (betweenWhitespace1 kAnd)
-            andTest)
-
-    andTestOne =
-      annotated $ AndTestOne <$> notTest
+andTest =
+  annotated $
+  AndTest <$>
+  notTest <*>
+  manyF (try $ beforeF (betweenWhitespace1 kAnd) andTest)
 
 newlineChar :: CharParsing m => m NewlineChar
 newlineChar =

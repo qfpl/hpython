@@ -8,7 +8,9 @@ let
   drv = haskellPackages.callPackage
     ./hpython.nix
     { tasty-hedgehog =
-        import ./tasty-hedgehog.nix { inherit pkgs haskellPackages; };
+        import ./nix/tasty-hedgehog.nix { inherit pkgs haskellPackages; };
+      digit = import ./nix/digit.nix { inherit pkgs haskellPackages; };
+      papa = import ./nix/papa.nix { inherit pkgs haskellPackages; };
     };
 
 in

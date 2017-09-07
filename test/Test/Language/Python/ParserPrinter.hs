@@ -123,7 +123,9 @@ prop_ast_is_valid_python assignability =
 
 makeParserPrinterTests :: IO [TestTree]
 makeParserPrinterTests = do
-  files <- over (mapped.mapped) (examplesDir </>) $ listDirectory examplesDir
+  files <-
+    fmap sort .
+    over (mapped.mapped) (examplesDir </>) $ listDirectory examplesDir
   contents <- traverse readFile files
   let
     filesExpectations =

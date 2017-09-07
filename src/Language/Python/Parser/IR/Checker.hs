@@ -117,14 +117,12 @@ checkIfThenElse
   :: SyntaxConfig atomType ctxt
   -> IR.IfThenElse ann
   -> SyntaxChecker ann (Safe.IfThenElse 'Safe.NotAssignable ctxt ann)
-checkIfThenElse cfg (IR.IfThenElse i e) =
+checkIfThenElse cfg (IR.IfThenElse i v1 e v2) =
   Safe.IfThenElse <$>
-  traverseOf
-    traverseCompose
-    (checkOrTest $ set atomType Safe.SNotAssignable cfg) i <*>
-  traverseOf
-    traverseCompose
-    (checkTest $ set atomType Safe.SNotAssignable cfg) e
+  pure i <*>
+  (checkOrTest $ set atomType Safe.SNotAssignable cfg) v1 <*>
+  pure e <*>
+  (checkTest $ set atomType Safe.SNotAssignable cfg) v2
 
 checkOrTest
   :: SyntaxConfig atomType ctxt
@@ -357,28 +355,26 @@ checkTerm cfg (IR.Term l r ann) =
           traverseOf
             (traverseCompose.traverseCompose)
             (checkFactor cfg)
-            (Compose $ r' :| rs')<*>
+            (Compose $ r' :| rs') <*>
           pure ann
 
 checkFactor
   :: SyntaxConfig atomType ctxt
   -> IR.Factor ann
   -> SyntaxChecker ann (Safe.Factor atomType ctxt ann)
-checkFactor cfg (IR.Factor l r ann) =
-  case getCompose r of
-    Nothing ->
-      Safe.FactorOne <$>
-      checkPower cfg l <*>
+checkFactor cfg e =
+  case e of
+    IR.FactorNone val ann ->
+      Safe.FactorNone <$>
+      checkPower cfg val <*>
       pure ann
-    Just r' ->
+    IR.FactorOne compOp val ann ->
       case cfg ^. atomType of
         Safe.SAssignable ->
           syntaxError $ CannotAssignTo LHSOperator ann
         Safe.SNotAssignable ->
-          Safe.FactorMany <$>
-          traverseCompose
-            (checkFactor cfg)
-            r' <*>
+          Safe.FactorOne compOp <$>
+          checkFactor cfg val <*>
           pure ann
 
 checkPower
@@ -407,9 +403,9 @@ checkAtomExpr
   :: SyntaxConfig atomType ctxt
   -> IR.AtomExpr ann
   -> SyntaxChecker ann (Safe.AtomExpr atomType ctxt ann)
-checkAtomExpr cfg e =
-  case e of
-    IR.AtomExprNoAwait a ts ann ->
+checkAtomExpr cfg (IR.AtomExpr kw a ts ann) =
+  case kw of
+    Nothing ->
       Safe.AtomExprNoAwait <$>
       checkAtom cfg a <*>
       traverseOf
@@ -417,10 +413,10 @@ checkAtomExpr cfg e =
         (checkTrailer $ set atomType Safe.SNotAssignable cfg)
         ts <*>
       pure ann
-    IR.AtomExprAwait kw a ts ann ->
+    Just kw' ->
       case (cfg ^. atomType, cfg ^. exprContext) of
         (Safe.SNotAssignable, Safe.SFunDef Safe.SAsync) ->
-          Safe.AtomExprAwait kw <$>
+          Safe.AtomExprAwait kw' <$>
           checkAtom cfg a <*>
           traverseOf
             (traverseCompose.traverseCompose)
@@ -454,8 +450,7 @@ checkTrailer cfg e =
           pure ann
         IR.TrailerSubscript v ann ->
           Safe.TrailerSubscript <$>
-          traverseOf
-            (traverseCompose.traverseCompose)
+          traverseCompose
             (checkSubscriptList cfg)
             v <*>
           pure ann
@@ -577,13 +572,13 @@ checkCompIf
   :: SyntaxConfig atomType ctxt
   -> IR.CompIf ann
   -> SyntaxChecker ann (Safe.CompIf atomType ctxt ann)
-checkCompIf cfg (IR.CompIf ex it ann) =
+checkCompIf cfg (IR.CompIf kw ex it ann) =
   case cfg ^. atomType of
     Safe.SAssignable ->
       syntaxError $ CannotAssignTo LHSIf ann
     Safe.SNotAssignable ->
-      Safe.CompIf <$>
-      traverseCompose (checkTestNocond cfg) ex <*>
+      Safe.CompIf kw <$>
+      checkTestNocond cfg ex <*>
       traverseOf (traverseCompose.traverseCompose) (checkCompIter cfg) it <*>
       pure ann
 
@@ -646,12 +641,13 @@ checkSubscript cfg e =
           Safe.SubscriptTest <$>
           checkTest cfg v <*>
           pure ann
-        IR.SubscriptSlice l r sl ann ->
+        IR.SubscriptSlice l colon r sl ann ->
           Safe.SubscriptSlice <$>
           traverseOf
             (traverseCompose.traverseCompose)
             (checkTest cfg)
             l <*>
+          pure colon <*>
           traverseOf
             (traverseCompose.traverseCompose)
             (checkTest cfg)

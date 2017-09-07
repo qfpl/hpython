@@ -130,11 +130,9 @@ deriving instance Traversable (CompIter a b)
 
 data CompIf :: AtomType -> ExprContext -> * -> * where
   CompIf ::
-    { _compIf_expr
-      :: Compose
-           (Before [WhitespaceChar])
-           (TestNocond 'NotAssignable ctxt)
-           a
+    { _compIf_if :: Between' (NonEmpty WhitespaceChar) KIf
+    , _compIf_expr
+      :: TestNocond 'NotAssignable ctxt a
     , _compIf_iter
       :: Compose
           Maybe
@@ -222,18 +220,21 @@ data Subscript :: AtomType -> ExprContext -> * -> * where
   SubscriptSlice ::
     { _subscriptSlice_left
       :: Compose
-          Maybe
-          (Compose (After [WhitespaceChar]) (Test 'NotAssignable ctxt))
-          a
+           (After [WhitespaceChar])
+           (Compose
+             Maybe
+             (Test 'NotAssignable ctxt))
+           a
+    , _subscriptSlice_colon :: After [WhitespaceChar] Colon
     , _subscriptSlice_right
       :: Compose
           Maybe
-          (Compose (Before [WhitespaceChar]) (Test 'NotAssignable ctxt))
+          (Compose (After [WhitespaceChar]) (Test 'NotAssignable ctxt))
           a
     , _subscriptSlice_sliceOp
       :: Compose
           Maybe
-          (Compose (Before [WhitespaceChar]) (SliceOp 'NotAssignable ctxt))
+          (Compose (After [WhitespaceChar]) (SliceOp 'NotAssignable ctxt))
           a 
     , _subscript_ann :: a
     } -> Subscript 'NotAssignable ctxt a
@@ -247,7 +248,7 @@ data SubscriptList :: AtomType -> ExprContext -> * -> * where
     { _subscriptList_head :: Subscript 'NotAssignable ctxt a
     , _subscriptList_tail
       :: Compose
-          Maybe
+          []
           (Compose
             (Before (Between' [WhitespaceChar] Comma))
             (Subscript 'NotAssignable ctxt))
@@ -275,9 +276,7 @@ data Trailer :: AtomType -> ExprContext -> * -> * where
     { _trailerSubscript_value
       :: Compose
           (Between' [WhitespaceChar])
-          (Compose
-            Maybe
-            (SubscriptList 'NotAssignable ctxt))
+          (SubscriptList 'NotAssignable ctxt)
           a
     , _trailer_ann :: a
     } -> Trailer 'NotAssignable ctxt a
@@ -344,7 +343,7 @@ data Power :: AtomType -> ExprContext -> * -> * where
     { _powerMany_left :: AtomExpr 'NotAssignable ctxt a
     , _powerMany_right
       :: Compose
-           (Before (After [WhitespaceChar] DoubleAsterisk))
+           (Before (Between' [WhitespaceChar] DoubleAsterisk))
            (Factor 'NotAssignable ctxt)
            a
     , _powerMany_ann :: a
@@ -355,18 +354,15 @@ deriving instance Foldable (Power a b)
 deriving instance Traversable (Power a b)
 
 data Factor :: AtomType -> ExprContext -> * -> * where
-  FactorOne ::
+  FactorNone ::
     { _factorNone_value :: Power atomType ctxt a
     , _factorNone_ann :: a
     } -> Factor atomType ctxt a
 
-  FactorMany ::
-    { _factorSome_value
-      :: Compose
-          (Before (After [WhitespaceChar] FactorOperator))
-          (Factor 'NotAssignable ctxt)
-          a
-    , _factorSome_ann :: a
+  FactorOne ::
+    { _factorOne_op :: After [WhitespaceChar] FactorOperator
+    , _factorOne_value :: Factor 'NotAssignable ctxt a
+    , _factorOne_ann :: a
     } -> Factor 'NotAssignable ctxt a
 deriving instance Eq c => Eq (Factor a b c)
 deriving instance Functor (Factor a b)
@@ -514,7 +510,7 @@ data Comparison :: AtomType -> ExprContext -> * -> * where
       :: Compose
           NonEmpty
           (Compose
-            (Before (Between' [WhitespaceChar] CompOperator))
+            (Before CompOperator)
             (Expr 'NotAssignable ctxt))
           a
     , _comparisonMany_ann :: a
@@ -588,16 +584,10 @@ deriving instance Traversable (OrTest a b)
 
 data IfThenElse :: AtomType -> ExprContext -> * -> * where
   IfThenElse ::
-    { _ifThenElse_if
-      :: Compose
-           (Between' (NonEmpty WhitespaceChar))
-           (OrTest 'NotAssignable ctxt)
-           a
-    , _ifThenElse_else
-      :: Compose
-           (Before (NonEmpty WhitespaceChar))
-           (Test 'NotAssignable ctxt)
-           a
+    { _ifThenElse_if :: Between' (NonEmpty WhitespaceChar) KIf
+    , _ifThenElse_value1 :: OrTest 'NotAssignable ctxt a
+    , _ifThenElse_else :: Between' (NonEmpty WhitespaceChar) KElse
+    , _ifThenElse_value2 :: Test 'NotAssignable ctxt a
     } -> IfThenElse 'NotAssignable ctxt a
 deriving instance Eq c => Eq (IfThenElse a b c)
 deriving instance Functor (IfThenElse a b)

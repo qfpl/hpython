@@ -303,10 +303,10 @@ float' f =
     FloatNoDecimal b e _ ->
       foldMap digit b <>
       ex e
-    FloatDecimalNoBase f e _ ->
-      char '.' <> foldMap digit f <> ex e 
-    FloatDecimalBase b f e _ ->
-      foldMap digit b <> char '.' <> foldMap digit f <> ex e
+    FloatDecimalNoBase f' e _ ->
+      char '.' <> foldMap digit f' <> ex e 
+    FloatDecimalBase b f' e _ ->
+      foldMap digit b <> char '.' <> foldMap digit f' <> ex e
   where
     ex =
       foldMap
@@ -352,33 +352,59 @@ whitespaceChar w =
     Continued nl -> char '\\' <> newlineChar nl
 
 ifThenElse :: IfThenElse atomType ctxt a -> Doc
-ifThenElse (IfThenElse i e) =
-  text "if" <>
-  betweenWhitespace'F orTest i <>
-  text "else" <>
-  whitespaceBeforeF test e
+ifThenElse (IfThenElse i v1 e v2) =
+  betweenWhitespace' (const $ text "if") i <>
+  orTest v1 <>
+  betweenWhitespace' (const $ text "else") e <>
+  test v2
 
 compOperator :: CompOperator -> Doc
 compOperator o =
   case o of
-    CompLT -> char '<'
-    CompGT -> char '>'
-    CompEq -> text "=="
-    CompNEq -> text "!="
-    CompLEq -> text "<="
-    CompGEq -> text ">="
-    CompIs s -> text "is" <> whitespaceChar s
-    CompIsNot s s' ->
+    CompLT b a ->
+      foldMap whitespaceChar b <>
+      char '<' <>
+      foldMap whitespaceChar a
+    CompGT b a ->
+      foldMap whitespaceChar b <>
+      char '>' <>
+      foldMap whitespaceChar a
+    CompEq b a ->
+      foldMap whitespaceChar b <>
+      text "==" <>
+      foldMap whitespaceChar a
+    CompNEq b a ->
+      foldMap whitespaceChar b <>
+      text "!=" <>
+      foldMap whitespaceChar a
+    CompLEq b a ->
+      foldMap whitespaceChar b <>
+      text "<=" <>
+      foldMap whitespaceChar a
+    CompGEq b a ->
+      foldMap whitespaceChar b <>
+      text ">=" <>
+      foldMap whitespaceChar a
+    CompIs b a ->
+      foldMap whitespaceChar b <>
       text "is" <>
-      foldMap whitespaceChar s <>
+      foldMap whitespaceChar a
+    CompIsNot b m a ->
+      foldMap whitespaceChar b <>
+      text "is" <>
+      foldMap whitespaceChar m <>
       text "not" <>
-      whitespaceChar s'
-    CompIn s -> text "in" <> whitespaceChar s
-    CompNotIn s s' ->
-      text "not" <>
-      foldMap whitespaceChar s <>
+      foldMap whitespaceChar a
+    CompIn b a ->
+      foldMap whitespaceChar b <>
       text "in" <>
-      whitespaceChar s'
+      foldMap whitespaceChar a
+    CompNotIn b m a ->
+      foldMap whitespaceChar b <>
+      text "not" <>
+      foldMap whitespaceChar m <>
+      text "in" <>
+      foldMap whitespaceChar a
 
 tupleElim :: Semigroup r => (a -> r) -> (b -> r) -> (a, b) -> r
 tupleElim f g (a, b) = f a <> g b
@@ -412,9 +438,9 @@ testNocond :: TestNocond atomType ctxt a -> Doc
 testNocond (TestNocond val _) = sumElim orTest lambdefNocond val
 
 compIf :: CompIf atomType ctxt a -> Doc
-compIf (CompIf e i _) =
-  text "if" <>
-  whitespaceBeforeF testNocond e <>
+compIf (CompIf kw e i _) =
+  betweenWhitespace' (const $ text "if") kw <>
+  testNocond e <>
   foldMapF (whitespaceBeforeF compIter) i
 
 exprList :: ExprList atomType ctxt a -> Doc
@@ -451,11 +477,7 @@ comparison :: Comparison atomType ctxt a -> Doc
 comparison (ComparisonOne v _) = expr v
 comparison (ComparisonMany l r _) =
   expr l <>
-  foldMapF
-    (beforeF
-      (betweenWhitespace' compOperator)
-      expr)
-    r
+  foldMapF (beforeF compOperator expr) r
 
 dictOrSetMaker :: DictOrSetMaker atomType ctxt a -> Doc
 dictOrSetMaker _ = error "dictOrSetMaker not implemented"
@@ -468,12 +490,12 @@ starExpr (StarExpr val _) =
 testlistComp :: TestlistComp atomType ctxt a -> Doc
 testlistComp t =
   case t of
-    TestlistCompFor h t _ ->
+    TestlistCompFor h t' _ ->
       testOrStar h <>
-      whitespaceBeforeF compFor t
-    TestlistCompList h t c _ ->
+      whitespaceBeforeF compFor t'
+    TestlistCompList h t' c _ ->
       testOrStar h <>
-      foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t <>
+      foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t' <>
       foldMap (whitespaceBefore comma) c
   where
     testOrStar = sumElim test starExpr
@@ -518,6 +540,7 @@ atom a =
     AtomNone _ -> text "None"
     AtomTrue _ -> text "True"
     AtomFalse _ -> text "False"
+    AtomImag v _ -> whitespaceBeforeF imag v
 
 argument :: Argument atomType ctxt a -> Doc
 argument a =
@@ -546,11 +569,11 @@ subscript :: Subscript atomType ctxt a -> Doc
 subscript s =
   case s of
     SubscriptTest val _ -> test val
-    SubscriptSlice l r o _ ->
-      foldMapF (whitespaceAfterF test) l <>
-      char ':' <>
-      foldMapF (whitespaceBeforeF test) r <>
-      foldMapF (whitespaceBeforeF sliceOp) o
+    SubscriptSlice l c r o _ ->
+      whitespaceAfterF (foldMapF test) l <>
+      whitespaceAfter (const $ text ":") c <>
+      foldMapF (whitespaceAfterF test) r <>
+      foldMapF (whitespaceAfterF sliceOp) o
 
 subscriptList :: SubscriptList atomType ctxt a -> Doc
 subscriptList (SubscriptList h t c _) =
@@ -563,7 +586,7 @@ trailer t =
   case t of
     TrailerCall val _ -> parens $ betweenWhitespace'F (foldMapF argList) val
     TrailerSubscript val _ ->
-      brackets $ betweenWhitespace'F (foldMapF subscriptList) val
+      brackets $ betweenWhitespace'F subscriptList val
     TrailerAccess val _ -> char '.' <> whitespaceBeforeF identifier val
 
 atomExpr :: AtomExpr atomType ctxt a -> Doc
@@ -579,7 +602,7 @@ power :: Power atomType ctxt a -> Doc
 power (PowerOne v _) = atomExpr v
 power (PowerMany l r _) =
   atomExpr l <>
-  beforeF (whitespaceAfter doubleAsterisk) factor r
+  beforeF (betweenWhitespace' doubleAsterisk) factor r
 
 factorOp :: FactorOperator -> Doc
 factorOp f =
@@ -591,8 +614,8 @@ factorOp f =
 factor :: Factor atomType ctxt a -> Doc
 factor f =
   case f of
-    FactorOne val _ -> power val
-    FactorMany val _ -> beforeF (whitespaceAfter factorOp) factor val
+    FactorNone val _ -> power val
+    FactorOne compOp val _ -> whitespaceAfter factorOp compOp <> factor val
 
 termOp :: TermOperator -> Doc
 termOp t =
@@ -663,9 +686,9 @@ test :: Test atomType ctxt a -> Doc
 test t =
   case t of
     TestCondNoIf v _ -> orTest v
-    TestCondIf h t _ ->
+    TestCondIf h t' _ ->
       orTest h <>
-      whitespaceBeforeF ifThenElse t
+      whitespaceBeforeF ifThenElse t'
     TestLambdef -> error "testLambdef not implemented"
 
 comment :: Comment a -> Doc

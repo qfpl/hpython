@@ -117,11 +117,8 @@ data CompIter a
 
 data CompIf a
   = CompIf
-  { _compIf_expr
-    :: Compose
-         (Before [WhitespaceChar])
-         TestNocond
-         a
+  { _compIf_if :: Between' (NonEmpty WhitespaceChar) KIf
+  , _compIf_expr :: TestNocond a
   , _compIf_iter
     :: Compose
         Maybe
@@ -191,18 +188,21 @@ data Subscript a
   | SubscriptSlice
   { _subscriptSlice_left
     :: Compose
-        Maybe
-        (Compose (After [WhitespaceChar]) Test)
-        a
+         (After [WhitespaceChar])
+         (Compose
+           Maybe
+           Test)
+         a
+  , _subscriptSlice_colon :: After [WhitespaceChar] Colon
   , _subscriptSlice_right
     :: Compose
         Maybe
-        (Compose (Before [WhitespaceChar]) Test)
+        (Compose (After [WhitespaceChar]) Test)
         a
   , _subscriptSlice_sliceOp
     :: Compose
         Maybe
-        (Compose (Before [WhitespaceChar]) SliceOp)
+        (Compose (After [WhitespaceChar]) SliceOp)
         a
   , _subscript_ann :: a
   } deriving (Functor, Foldable, Traversable)
@@ -212,7 +212,7 @@ data SubscriptList a
   { _subscriptList_head :: Subscript a
   , _subscriptList_tail
     :: Compose
-        Maybe
+        []
         (Compose
           (Before (Between' [WhitespaceChar] Comma))
           Subscript)
@@ -236,9 +236,7 @@ data Trailer a
   { _trailerSubscript_value
     :: Compose
         (Between' [WhitespaceChar])
-        (Compose
-          Maybe
-          SubscriptList)
+        SubscriptList
         a
   , _trailer_ann :: a
   }
@@ -248,8 +246,10 @@ data Trailer a
   } deriving (Functor, Foldable, Traversable)
 
 data AtomExpr a
-  = AtomExprNoAwait
-  { _atomExpr_atom :: Atom a
+  = AtomExpr
+  { _atomExpr_await
+    :: Maybe (After (NonEmpty WhitespaceChar) KAwait)
+  , _atomExpr_atom :: Atom a
   , _atomExpr_trailers
     :: Compose
           []
@@ -258,19 +258,6 @@ data AtomExpr a
             Trailer)
           a
   , _atomExpr_ann :: a
-  }
-  | AtomExprAwait
-  { _atomExprAwait_await
-    :: After (NonEmpty WhitespaceChar) KAwait
-  , _atomExprAwait_atom :: Atom a
-  , _atomExprAwait_trailers
-    :: Compose
-          []
-          (Compose
-            (Before [WhitespaceChar])
-            Trailer)
-          a
-  , _atomExprAwait_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data Power a
@@ -280,22 +267,20 @@ data Power a
     :: Compose
          Maybe
          (Compose
-           (Before (After [WhitespaceChar] DoubleAsterisk))
+           (Before (Between' [WhitespaceChar] DoubleAsterisk))
            Factor)
          a
   , _power_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data Factor a
-  = Factor
-  { _factor_left :: Power a
-  , _factor_right
-    :: Compose
-         Maybe
-         (Compose
-           (Before (After [WhitespaceChar] FactorOperator))
-           Factor)
-         a
+  = FactorNone
+  { _factorNone_value :: Power a
+  , _factor_ann :: a
+  }
+  | FactorOne
+  { _factorOne_op :: After [WhitespaceChar] FactorOperator
+  , _factorOne_value :: Factor a
   , _factorSome_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
@@ -384,7 +369,7 @@ data Comparison a
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] CompOperator))
+           (Before CompOperator)
            Expr)
          a
   , _comparison_ann :: a
@@ -432,8 +417,10 @@ data OrTest a
 
 data IfThenElse a
   = IfThenElse
-  { _ifThenElse_if :: Compose (Between' (NonEmpty WhitespaceChar)) OrTest a
-  , _ifThenElse_else :: Compose (Before (NonEmpty WhitespaceChar)) Test a
+  { _ifThenElse_if :: Between' (NonEmpty WhitespaceChar) KIf
+  , _ifThenElse_value1 :: OrTest a
+  , _ifThenElse_else :: Between' (NonEmpty WhitespaceChar) KElse
+  , _ifThenElse_value2 :: Test a
   }
   deriving (Functor, Foldable, Traversable)
 

@@ -142,14 +142,15 @@ betweenWhitespace1F = fmap Compose . betweenWhitespace1
 ifThenElse :: DeltaParsing m => m (IfThenElse SrcInfo)
 ifThenElse =
   IfThenElse <$>
-  (string "if" *> betweenWhitespace1F orTest) <*>
-  (string "else" *> whitespaceBefore1F test)
-
+  betweenWhitespace1 (string "if" $> KIf) <*>
+  orTest <*>
+  betweenWhitespace1 (string "else" $> KElse) <*>
+  test
 
 test :: DeltaParsing m => m (Test SrcInfo)
 test = try testCond <|> testLambdef
   where
-    testLambdef = error "testLambdef not implemented"
+    testLambdef = unexpected "testLambdef not implemented"
     testCond =
       annotated $
       TestCond <$>
@@ -167,7 +168,7 @@ orTest =
   annotated $
   OrTest <$>
   andTest <*>
-  manyF (beforeF (betweenWhitespace1 kOr) andTest)
+  manyF (try $ beforeF (betweenWhitespace1 kOr) andTest)
 
 varargsList :: DeltaParsing m => m (VarargsList SrcInfo)
 varargsList = error "varargsList not implemented"
@@ -192,7 +193,8 @@ compIf :: DeltaParsing m => m (CompIf SrcInfo)
 compIf =
   annotated $
   CompIf <$>
-  (string "if" *> whitespaceBeforeF testNocond) <*>
+  (betweenWhitespace1 $ string "if" $> KIf) <*>
+  testNocond <*>
   optionalF (try $ whitespaceBeforeF compIter)
 
 compIter :: DeltaParsing m => m (CompIter SrcInfo)
@@ -246,7 +248,7 @@ identifier :: DeltaParsing m => m (Identifier SrcInfo)
 identifier =
   annotated $
   Identifier . T.pack <$>
-  liftA2 (:) idStart (many idContinue)
+  liftA2 (:) idStart (many $ try idContinue)
 
 stringPrefix :: DeltaParsing m => m StringPrefix
 stringPrefix =
@@ -519,7 +521,7 @@ e = try (fmap Left $ char 'e' $> Char_e) <|> fmap Right (char 'E' $> Char_E)
 plusOrMinus :: DeltaParsing m => m (Either Plus Minus)
 plusOrMinus =
   try (fmap Left $ char '+' $> Plus) <|>
-  fmap Right (char '+' $> Minus)
+  fmap Right (char '-' $> Minus)
 
 float :: DeltaParsing m => m (Float' SrcInfo)
 float = try floatDecimalBase <|> try floatDecimalNoBase <|> floatNoDecimal
@@ -738,15 +740,19 @@ argument = try argumentUnpack <|> try argumentDefault <|> argumentFor
       whitespaceBeforeF test
 
 subscript :: DeltaParsing m => m (Subscript SrcInfo)
-subscript = try subscriptSlice <|> subscriptTest
+subscript = try subscriptTest <|> subscriptSlice
   where
-    subscriptTest = annotated $ SubscriptTest <$> test
+    subscriptTest =
+      annotated $
+      SubscriptTest <$>
+      test <* notFollowedBy (try $ many whitespaceChar *> char ':')
     subscriptSlice =
       annotated $
       SubscriptSlice <$>
+      whitespaceAfterF (optionalF $ try test) <*>
+      whitespaceAfter (char ':' $> Colon) <*>
       optionalF (try $ whitespaceAfterF test) <*>
-      (char ':' *> optionalF (try $ whitespaceBeforeF test)) <*>
-      optionalF (try $ whitespaceBeforeF sliceOp)
+      optionalF (try $ whitespaceAfterF sliceOp)
 
 argList :: DeltaParsing m => m (ArgList SrcInfo)
 argList =
@@ -761,7 +767,7 @@ subscriptList =
   annotated $
   SubscriptList <$>
   subscript <*>
-  optionalF (try $ beforeF (betweenWhitespace comma) subscript) <*>
+  manyF (try $ beforeF (betweenWhitespace comma) subscript) <*>
   optional (try $ whitespaceBefore comma)
 
 trailer :: DeltaParsing m => m (Trailer SrcInfo)
@@ -781,7 +787,7 @@ trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
       between
         (char '[')
         (char ']')
-        (betweenWhitespaceF . optionalF $ try subscriptList)
+        (betweenWhitespaceF subscriptList)
 
     trailerAccess =
       annotated $
@@ -789,27 +795,19 @@ trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
       (char '.' *> whitespaceBeforeF identifier)
 
 atomExpr :: DeltaParsing m => m (AtomExpr SrcInfo)
-atomExpr = try atomExprAwait <|> atomExprNoAwait 
-  where
-    atomExprNoAwait =
-      annotated $
-      AtomExprNoAwait <$>
-      atom <*>
-      manyF (try $ whitespaceBeforeF trailer)
-
-    atomExprAwait =
-      annotated $
-      AtomExprAwait <$>
-      (string "await" *> whitespaceAfter1 (pure KAwait)) <*>
-      atom <*>
-      manyF (try $ whitespaceBeforeF trailer)
+atomExpr =
+  annotated $
+  AtomExpr <$>
+  (optional . try $ string "await" *> whitespaceAfter1 (pure KAwait)) <*>
+  atom <*>
+  manyF (try $ whitespaceBeforeF trailer)
 
 power :: DeltaParsing m => m (Power SrcInfo)
 power =
   annotated $
   Power <$>
   atomExpr <*>
-  optionalF (beforeF (whitespaceAfter doubleAsterisk) factor)
+  optionalF (try $ beforeF (betweenWhitespace doubleAsterisk) factor)
 
 factorOp :: DeltaParsing m => m FactorOperator
 factorOp =
@@ -818,11 +816,14 @@ factorOp =
   (char '~' $> FactorInv)
 
 factor :: DeltaParsing m => m (Factor SrcInfo)
-factor =
-  annotated $
-  Factor <$>
-  power <*>
-  optionalF (beforeF (whitespaceAfter factorOp) factor)
+factor = try factorOne <|> factorNone
+  where
+    factorNone = annotated $ FactorNone <$> power
+    factorOne =
+      annotated $
+      FactorOne <$>
+      whitespaceAfter factorOp <*>
+      factor
 
 termOp :: DeltaParsing m => m TermOperator
 termOp =
@@ -880,32 +881,75 @@ expr =
 
 compOperator :: DeltaParsing m => m CompOperator
 compOperator =
-  try (string "==" $> CompEq) <|>
-  try (string ">=" $> CompGEq) <|>
-  try (string "!=" $> CompNEq) <|>
-  try (string "<=" $> CompLEq) <|>
-  try (char '<' $> CompLT) <|>
-  try (char '>' $> CompGT) <|>
-  try (string "is" *>
-    (CompIsNot <$> some1 whitespaceChar) <*
-    string "not" <*>
-    whitespaceChar) <|>
-  try (string "is" *> (CompIs <$> whitespaceChar)) <|>
-  try (string "in" *> (CompIn <$> whitespaceChar)) <|>
-  (string "not" *>
-    (CompNotIn <$> some1 whitespaceChar) <*
-    string "in" <*>
-    whitespaceChar)
+  try compEq <|>
+  try compGEq <|>
+  try compLEq <|>
+  try compNEq <|>
+  try compLT <|>
+  try compGT <|>
+  try compIsNot <|>
+  try compIs <|>
+  try compIn <|>
+  compNotIn
+  where
+    compEq =
+      CompEq <$>
+      (many (try whitespaceChar) <* string "==") <*>
+      many whitespaceChar
+
+    compGEq =
+      CompGEq <$>
+      (many (try whitespaceChar) <* string ">=") <*>
+      many whitespaceChar
+
+    compNEq =
+      CompNEq <$>
+      (many (try whitespaceChar) <* string "!=") <*>
+      many whitespaceChar
+
+    compLEq =
+      CompLEq <$>
+      (many (try whitespaceChar) <* string "<=") <*>
+      many whitespaceChar
+
+    compLT =
+      CompLT <$>
+      (many (try whitespaceChar) <* string "<") <*>
+      many whitespaceChar
+
+    compGT =
+      CompGT <$>
+      (many (try whitespaceChar) <* string ">") <*>
+      many whitespaceChar
+
+    compIsNot =
+      CompIsNot <$>
+      (some1 whitespaceChar <* string "is") <*>
+      (some1 whitespaceChar <* string "not") <*>
+      some1 whitespaceChar
+
+    compIs =
+      CompIs <$>
+      (some1 whitespaceChar <* string "is") <*>
+      some1 whitespaceChar
+
+    compIn =
+      CompIn <$>
+      (some1 whitespaceChar <* string "in") <*>
+      some1 whitespaceChar
+
+    compNotIn =
+      CompNotIn <$>
+      (some1 whitespaceChar <* string "not") <*>
+      (some1 whitespaceChar <* string "in") <*>
+      some1 whitespaceChar
 
 comparison :: DeltaParsing m => m (Comparison SrcInfo)
 comparison =
   annotated $
   Comparison <$>
   expr <*>
-  manyF
-    (try $ beforeF
-      (betweenWhitespace compOperator)
-      expr)
+  manyF (try $ beforeF compOperator expr)
 
 notTest :: DeltaParsing m => m (NotTest SrcInfo)
 notTest = try notTestMany <|> notTestOne

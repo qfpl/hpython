@@ -747,16 +747,46 @@ genExprList
   => SyntaxConfig atomType ctxt
   -> m (AST.ExprList atomType ctxt ())
 genExprList cfg =
-  AST.ExprList <$>
-  Gen.small (genSumOrStar cfg) <*>
-  genListF
-    (genBeforeF
-      (genBetweenWhitespace $ pure AST.Comma) . Gen.small $
-        genSumOrStar cfg) <*>
-  pure ()
+  case cfg ^. atomType of
+    AST.SAssignable -> 
+      Gen.choice
+        [ exprListSingleStarredComma cfg
+        , exprListSingle cfg
+        , exprListMany cfg
+        ]
+    AST.SNotAssignable ->
+      Gen.choice
+        [ exprListSingleStarredComma cfg
+        , exprListSingleStarredNoComma cfg
+        , exprListSingle cfg
+        , exprListMany cfg
+        ]
   where
+    exprListSingleStarredComma cfg' =
+     AST.ExprListSingleStarredComma <$>
+      Gen.small (genStarExpr cfg') <*>
+      genWhitespaceBefore (pure AST.Comma) <*>
+      pure ()
+    exprListSingleStarredNoComma cfg' =
+      AST.ExprListSingleStarredNoComma <$>
+      Gen.small (genStarExpr cfg') <*>
+      pure ()
+    exprListSingle cfg' =
+      AST.ExprListSingle <$>
+      Gen.small (genExpr cfg') <*>
+      Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+      pure ()
+    exprListMany cfg' =
+      AST.ExprListMany <$>
+      Gen.small (genSumOrStar cfg') <*>
+      genNonEmptyF
+        (genBeforeF
+          (genBetweenWhitespace $ pure AST.Comma) . Gen.small $
+            genSumOrStar cfg') <*>
+      Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+      pure ()
     genSumOrStar cfg' =
-      Gen.choice [InL <$> genExpr cfg, InR <$> genStarExpr cfg']
+      Gen.choice [InL <$> genExpr cfg', InR <$> genStarExpr cfg']
 
 genCompFor
   :: MonadGen m

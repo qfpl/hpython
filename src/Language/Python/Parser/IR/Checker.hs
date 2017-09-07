@@ -40,6 +40,7 @@ data InvalidLHS
   | LHSNone
   | LHSTrue
   | LHSFalse
+  | LHSSingleStarExpr
   deriving (Eq, Show, Ord)
 
 data SyntaxError a
@@ -528,11 +529,38 @@ checkExprList
   :: SyntaxConfig atomType ctxt
   -> IR.ExprList ann
   -> SyntaxChecker ann (Safe.ExprList atomType ctxt ann)
-checkExprList cfg (IR.ExprList h t ann) =
-  Safe.ExprList <$>
-  checkExprOrStar h <*>
-  traverseOf (traverseCompose.traverseCompose) checkExprOrStar t <*>
-  pure ann
+checkExprList cfg (IR.ExprList h t comma ann) =
+  case getCompose t of
+    [] -> case h of
+      InL expr ->
+        Safe.ExprListSingle <$>
+        checkExpr cfg expr <*>
+        pure comma <*>
+        pure ann
+      InR starred ->
+        case comma of
+          Nothing ->
+            case cfg ^. atomType of
+              Safe.SAssignable ->
+                syntaxError $ CannotAssignTo LHSSingleStarExpr ann
+              Safe.SNotAssignable ->
+                Safe.ExprListSingleStarredNoComma <$>
+                checkStarExpr cfg starred <*>
+                pure ann
+          Just comma' ->
+            Safe.ExprListSingleStarredComma <$>
+            checkStarExpr cfg starred <*>
+            pure comma' <*>
+            pure ann
+    (t':ts') ->
+      Safe.ExprListMany <$>
+      checkExprOrStar h <*>
+      traverseOf
+        (traverseCompose.traverseCompose)
+        checkExprOrStar
+        (Compose $ t' :| ts') <*>
+      pure comma <*>
+      pure ann
   where
     checkExprOrStar e =
       case e of

@@ -213,7 +213,8 @@ exprList =
   annotated $
   ExprList <$>
   exprOrStar <*>
-  manyF (try $ beforeF (betweenWhitespace comma) exprOrStar)
+  manyF (try $ beforeF (betweenWhitespace comma) exprOrStar) <*>
+  optional (try $ whitespaceBefore comma)
   where
     exprOrStar = try (InL <$> expr) <|> (InR <$> starExpr)
 

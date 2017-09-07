@@ -149,6 +149,7 @@ data ExprList a
           (Before (Between' [WhitespaceChar] Comma))
           (Sum Expr StarExpr))
         a
+  , _exprList_comma :: Maybe (Before [WhitespaceChar] Comma)
   , _exprList_ann :: a
   } deriving (Functor, Foldable, Traversable)
 

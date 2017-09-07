@@ -159,16 +159,34 @@ deriving instance Foldable (StarExpr a b)
 deriving instance Traversable (StarExpr a b)
 
 data ExprList :: AtomType -> ExprContext -> * -> * where
-  ExprList ::
-    { _exprList_head :: Sum (Expr atomType ctxt) (StarExpr atomType ctxt) a
-    , _exprList_tail
+  ExprListSingleStarredComma ::
+    { _exprListSingleStarredComma_value :: StarExpr atomType ctxt a
+    , _exprListSingleStarredComma_comma :: Before [WhitespaceChar] Comma
+    , _exprListSingleStarredComma_ann :: a
+    } -> ExprList atomType ctxt a
+
+  ExprListSingleStarredNoComma ::
+    { _exprListSingleStarredNoComma_value :: StarExpr 'NotAssignable ctxt a
+    , _exprListSingleStarredNoComma_ann :: a
+    } -> ExprList 'NotAssignable ctxt a
+
+  ExprListSingle ::
+    { _exprListSingle_value :: Expr atomType ctxt a
+    , _exprListSingle_comma :: Maybe (Before [WhitespaceChar] Comma)
+    , _exprListSingle_ann :: a
+    } -> ExprList atomType ctxt a
+
+  ExprListMany ::
+    { _exprListMany_head :: Sum (Expr atomType ctxt) (StarExpr atomType ctxt) a
+    , _exprListMany_tail
       :: Compose
-          []
-          (Compose
-            (Before (Between' [WhitespaceChar] Comma))
-            (Sum (Expr atomType ctxt) (StarExpr atomType ctxt)))
-          a
-    , _exprList_ann :: a
+           NonEmpty
+           (Compose
+             (Before (Between' [WhitespaceChar] Comma))
+             (Sum (Expr atomType ctxt) (StarExpr atomType ctxt)))
+           a
+    , _exprListMany_comma :: Maybe (Before [WhitespaceChar] Comma)
+    , _exprListMany_ann :: a
     } -> ExprList atomType ctxt a
 deriving instance Functor (ExprList a b)
 deriving instance Foldable (ExprList a b)

@@ -444,9 +444,15 @@ compIf (CompIf kw e i _) =
   foldMapF (whitespaceBeforeF compIter) i
 
 exprList :: ExprList atomType ctxt a -> Doc
-exprList (ExprList h t _) =
-  exprOrStar h <>
-  foldMapF (beforeF (betweenWhitespace' comma) exprOrStar) t
+exprList e =
+  case e of
+    ExprListSingleStarredNoComma s _ -> starExpr s
+    ExprListSingleStarredComma s c _ -> starExpr s <> whitespaceBefore comma c
+    ExprListSingle v c _ -> expr v <> foldMap (whitespaceBefore comma) c
+    ExprListMany h t c _ ->
+      exprOrStar h <>
+      foldMapF (beforeF (betweenWhitespace' comma) exprOrStar) t <>
+      foldMap (whitespaceBefore comma) c
   where
     exprOrStar = sumElim expr starExpr
 

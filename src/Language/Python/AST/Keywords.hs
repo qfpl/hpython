@@ -1,6 +1,48 @@
+{-# language OverloadedStrings #-}
 module Language.Python.AST.Keywords where
 
 import Papa
+import Data.Set (Set)
+import Data.Text (Text)
+
+import qualified Data.Set as S
+
+alwaysKeywords :: Set Text
+alwaysKeywords =
+  S.fromList
+  [ "False"
+  , "None"
+  , "True"
+  , "and"
+  , "as"
+  , "assert"
+  , "break"
+  , "continue"
+  , "def"
+  , "del"
+  , "elif"
+  , "else"
+  , "except"
+  , "finally"
+  , "for"
+  , "from"
+  , "global"
+  , "if"
+  , "import"
+  , "in"
+  , "is"
+  , "lambda"
+  , "nonlocal"
+  , "not"
+  , "or"
+  , "pass"
+  , "raise"
+  , "return"
+  , "try"
+  , "while"
+  , "with"
+  , "yield"
+  ]
 
 data KFalse = KFalse deriving (Eq, Show)
 data KNone = KNone deriving (Eq, Show)

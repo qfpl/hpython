@@ -594,18 +594,36 @@ comma = char ',' $> Comma
 dictOrSetMaker :: DeltaParsing m => m (DictOrSetMaker SrcInfo)
 dictOrSetMaker = error "dictOrSetMaker not implemented"
 
-testlistComp :: DeltaParsing m => m (TestlistComp SrcInfo)
-testlistComp = try testlistCompFor <|> testlistCompList
+tupleTestlistComp :: DeltaParsing m => m (TupleTestlistComp SrcInfo)
+tupleTestlistComp = try tupleTestlistCompFor <|> tupleTestlistCompList
   where
-    testlistCompFor =
+    tupleTestlistCompFor =
       annotated $
-      TestlistCompFor <$>
+      TupleTestlistCompFor <$>
       testOrStar <*>
       whitespaceBeforeF compFor
 
-    testlistCompList =
+    tupleTestlistCompList =
       annotated $
-      TestlistCompList <$>
+      TupleTestlistCompList <$>
+      testOrStar <*>
+      manyF (try $ beforeF (betweenWhitespace comma) testOrStar) <*>
+      optional (try $ whitespaceBefore comma)
+
+    testOrStar = try (InL <$> test) <|> (InR <$> starExpr)
+
+listTestlistComp :: DeltaParsing m => m (ListTestlistComp SrcInfo)
+listTestlistComp = try listTestlistCompFor <|> listTestlistCompList
+  where
+    listTestlistCompFor =
+      annotated $
+      ListTestlistCompFor <$>
+      testOrStar <*>
+      whitespaceBeforeF compFor
+
+    listTestlistCompList =
+      annotated $
+      ListTestlistCompList <$>
       testOrStar <*>
       manyF (try $ beforeF (betweenWhitespace comma) testOrStar) <*>
       optional (try $ whitespaceBefore comma)
@@ -663,7 +681,7 @@ atom =
       between (char '(') (char ')')
       (betweenWhitespaceF
         (optionalF
-          (try $ (InL <$> try yieldExpr) <|> (InR <$> testlistComp))))
+          (try $ (InL <$> try yieldExpr) <|> (InR <$> tupleTestlistComp))))
 
     atomBracket =
       annotated $
@@ -672,7 +690,7 @@ atom =
         (char '[')
         (char ']')
         (betweenWhitespaceF $
-          optionalF $ try testlistComp)
+          optionalF $ try listTestlistComp)
 
     atomCurly =
       annotated $

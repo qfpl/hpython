@@ -19,7 +19,6 @@ import Data.Functor.Sum
 import Data.Separated.After
 import Data.Separated.Before
 import Data.Separated.Between
-import Data.Text (Text)
 
 import Language.Python.AST.BytesLiteral
 import Language.Python.AST.CompOperator
@@ -676,37 +675,95 @@ data YieldExpr a
   , _yieldExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
-data TestlistComp :: AtomType -> ExprContext -> * -> * where
-  TestlistCompFor ::
-    { _testlistCompFor_head
-      :: Sum
-           (Test 'NotAssignable ctxt)
-           (StarExpr 'NotAssignable ctxt)
-           a
-    , _testlistCompFor_tail
-      :: Compose
-           (Before [WhitespaceChar])
-           (CompFor 'NotAssignable ctxt)
-           a
-    , _testlistCompFor_ann :: a
-    } -> TestlistComp 'NotAssignable ctxt a
-
-  TestlistCompList ::
-    { _testlistCompList_head :: Sum (Test atomType ctxt) (StarExpr atomType ctxt) a
-    , _testlistCompList_tail
+data ListTestlistComp :: AtomType -> ExprContext -> * -> * where
+  ListTestlistCompStarred ::
+    { _ListTestlistCompStarred_head :: StarExpr atomType ctxt a
+    , _ListTestlistCompStarred_tail
       :: Compose
           []
           (Compose
             (Before (Between' [WhitespaceChar] Comma))
             (Sum (Test atomType ctxt) (StarExpr atomType ctxt)))
           a
-    , _testlistCompList_comma :: Maybe (Before [WhitespaceChar] Comma)
-    , _testlistCompList_ann :: a
-    } -> TestlistComp atomType ctxt a
-deriving instance Eq c => Eq (TestlistComp a b c)
-deriving instance Functor (TestlistComp a b)
-deriving instance Foldable (TestlistComp a b)
-deriving instance Traversable (TestlistComp a b)
+    , _ListTestlistCompStarred_comma :: Maybe (Before [WhitespaceChar] Comma)
+    , _ListTestlistCompStarred_ann :: a
+    } -> ListTestlistComp atomType ctxt a
+
+  ListTestlistCompList ::
+    { _ListTestlistCompList_head :: Test atomType ctxt a
+    , _ListTestlistCompList_tail
+      :: Compose
+          []
+          (Compose
+            (Before (Between' [WhitespaceChar] Comma))
+            (Sum (Test atomType ctxt) (StarExpr atomType ctxt)))
+          a
+    , _ListTestlistCompList_comma :: Maybe (Before [WhitespaceChar] Comma)
+    , _ListTestlistCompList_ann :: a
+    } -> ListTestlistComp atomType ctxt a
+
+  ListTestlistCompFor ::
+    { _ListTestlistCompFor_head
+      :: Test 'NotAssignable ctxt a
+    , _ListTestlistCompFor_tail
+      :: Compose
+           (Before [WhitespaceChar])
+           (CompFor 'NotAssignable ctxt)
+           a
+    , _ListTestlistCompFor_ann :: a
+    } -> ListTestlistComp 'NotAssignable ctxt a
+deriving instance Eq c => Eq (ListTestlistComp a b c)
+deriving instance Functor (ListTestlistComp a b)
+deriving instance Foldable (ListTestlistComp a b)
+deriving instance Traversable (ListTestlistComp a b)
+
+data TupleTestlistComp :: AtomType -> ExprContext -> * -> * where
+  TupleTestlistCompStarredOne ::
+    { _tupleTestlistCompStarredOne_head :: StarExpr atomType ctxt a
+    , _tupleTestlistCompStarredOne_comma :: Before [WhitespaceChar] Comma
+    , _tupleTestlistCompStarredOne_ann :: a
+    } -> TupleTestlistComp atomType ctxt a
+
+  TupleTestlistCompStarredMany ::
+    { _tupleTestlistCompStarredMany_head :: StarExpr atomType ctxt a
+    , _tupleTestlistCompStarredMany_tail
+      :: Compose
+          NonEmpty
+          (Compose
+            (Before (Between' [WhitespaceChar] Comma))
+            (Sum (Test atomType ctxt) (StarExpr atomType ctxt)))
+          a
+    , _tupleTestlistCompStarredMany_comma :: Maybe (Before [WhitespaceChar] Comma)
+    , _tupleTestlistCompStarredMany_ann :: a
+    } -> TupleTestlistComp atomType ctxt a
+
+  TupleTestlistCompList ::
+    { _tupleTestlistCompList_head :: Test atomType ctxt a
+    , _tupleTestlistCompList_tail
+      :: Compose
+          []
+          (Compose
+            (Before (Between' [WhitespaceChar] Comma))
+            (Sum (Test atomType ctxt) (StarExpr atomType ctxt)))
+          a
+    , _tupleTestlistCompList_comma :: Maybe (Before [WhitespaceChar] Comma)
+    , _tupleTestlistCompList_ann :: a
+    } -> TupleTestlistComp atomType ctxt a
+
+  TupleTestlistCompFor ::
+    { _tupleTestlistCompFor_head
+      :: Test 'NotAssignable ctxt a
+    , _tupleTestlistCompFor_tail
+      :: Compose
+           (Before [WhitespaceChar])
+           (CompFor 'NotAssignable ctxt)
+           a
+    , _tupleTestlistCompFor_ann :: a
+    } -> TupleTestlistComp 'NotAssignable ctxt a
+deriving instance Eq c => Eq (TupleTestlistComp a b c)
+deriving instance Functor (TupleTestlistComp a b)
+deriving instance Foldable (TupleTestlistComp a b)
+deriving instance Traversable (TupleTestlistComp a b)
 
 data DictOrSetMaker (atomType :: AtomType) (ctxt :: ExprContext) a
   = DictOrSetMaker
@@ -719,7 +776,7 @@ data Atom :: AtomType -> ExprContext -> * -> * where
           (Between' [WhitespaceChar])
           (Compose
             Maybe
-            (TestlistComp atomType ctxt))
+            (TupleTestlistComp atomType ctxt))
           a
     , _atomParenNoYield_ann :: a
     } -> Atom atomType ctxt a
@@ -740,7 +797,7 @@ data Atom :: AtomType -> ExprContext -> * -> * where
           (Between' [WhitespaceChar])
           (Compose
             Maybe
-            (TestlistComp atomType ctxt))
+            (ListTestlistComp atomType ctxt))
           a
     , _atomBracket_ann :: a
     } -> Atom atomType ctxt a
@@ -986,10 +1043,15 @@ deriveShow ''YieldExpr
 deriveEq1 ''YieldExpr
 deriveShow1 ''YieldExpr
 
-makeLenses ''TestlistComp
-deriveShow ''TestlistComp
-deriveEq1 ''TestlistComp
-deriveShow1 ''TestlistComp
+makeLenses ''TupleTestlistComp
+deriveShow ''TupleTestlistComp
+deriveEq1 ''TupleTestlistComp
+deriveShow1 ''TupleTestlistComp
+
+makeLenses ''ListTestlistComp
+deriveShow ''ListTestlistComp
+deriveEq1 ''ListTestlistComp
+deriveShow1 ''ListTestlistComp
 
 makeLenses ''DictOrSetMaker
 deriveEq ''DictOrSetMaker

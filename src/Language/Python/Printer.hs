@@ -493,14 +493,38 @@ starExpr (StarExpr val _) =
   char '*' <>
   whitespaceBeforeF expr val
 
-testlistComp :: TestlistComp atomType ctxt a -> Doc
-testlistComp t =
+listTestlistComp :: ListTestlistComp atomType ctxt a -> Doc
+listTestlistComp t =
   case t of
-    TestlistCompFor h t' _ ->
-      testOrStar h <>
+    ListTestlistCompFor h t' _ ->
+      test h <>
       whitespaceBeforeF compFor t'
-    TestlistCompList h t' c _ ->
-      testOrStar h <>
+    ListTestlistCompList h t' c _ ->
+      test h <>
+      foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t' <>
+      foldMap (whitespaceBefore comma) c
+    ListTestlistCompStarred h t' c _ ->
+      starExpr h <>
+      foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t' <>
+      foldMap (whitespaceBefore comma) c
+  where
+    testOrStar = sumElim test starExpr
+    
+tupleTestlistComp :: TupleTestlistComp atomType ctxt a -> Doc
+tupleTestlistComp t =
+  case t of
+    TupleTestlistCompFor h t' _ ->
+      test h <>
+      whitespaceBeforeF compFor t'
+    TupleTestlistCompList h t' c _ ->
+      test h <>
+      foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t' <>
+      foldMap (whitespaceBefore comma) c
+    TupleTestlistCompStarredOne h c _ ->
+      starExpr h <>
+      whitespaceBefore comma c
+    TupleTestlistCompStarredMany h t' c _ ->
+      starExpr h <>
       foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t' <>
       foldMap (whitespaceBefore comma) c
   where
@@ -529,10 +553,10 @@ atom a =
     AtomParenYield val _ ->
       parens $ betweenWhitespace'F yieldExpr val
     AtomParenNoYield val _ ->
-      parens $ betweenWhitespace'F (foldMapF testlistComp) val
+      parens $ betweenWhitespace'F (foldMapF tupleTestlistComp) val
     AtomBracket val _ ->
       brackets $
-      betweenWhitespace'F (foldMapF testlistComp) val
+      betweenWhitespace'F (foldMapF listTestlistComp) val
     AtomCurly val _ ->
       braces $
       betweenWhitespace'F (foldMapF dictOrSetMaker) val

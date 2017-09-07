@@ -473,24 +473,44 @@ data YieldExpr a
   , _yieldExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
-data TestlistComp a
-  = TestlistCompFor
-  { _testlistCompFor_head :: Sum Test StarExpr a
-  , _testlistCompFor_tail :: Compose (Before [WhitespaceChar]) CompFor a
-  , _testlistCompFor_ann :: a
+data TupleTestlistComp a
+  = TupleTestlistCompFor
+  { _tupleTestlistCompFor_head :: Sum Test StarExpr a
+  , _tupleTestlistCompFor_tail :: Compose (Before [WhitespaceChar]) CompFor a
+  , _tupleTestlistCompFor_ann :: a
   }
 
-  | TestlistCompList
-  { _testlistCompList_head :: Sum Test StarExpr a
-  , _testlistCompList_tail
+  | TupleTestlistCompList
+  { _tupleTestlistCompList_head :: Sum Test StarExpr a
+  , _tupleTestlistCompList_tail
     :: Compose
         []
         (Compose
           (Before (Between' [WhitespaceChar] Comma))
           (Sum Test StarExpr))
         a
-  , _testlistCompList_comma :: Maybe (Before [WhitespaceChar] Comma)
-  , _testlistCompList_ann :: a
+  , _tupleTestlistCompList_comma :: Maybe (Before [WhitespaceChar] Comma)
+  , _tupleTestlistCompList_ann :: a
+  } deriving (Functor, Foldable, Traversable)
+
+data ListTestlistComp a
+  = ListTestlistCompFor
+  { _listTestlistCompFor_head :: Sum Test StarExpr a
+  , _listTestlistCompFor_tail :: Compose (Before [WhitespaceChar]) CompFor a
+  , _listTestlistCompFor_ann :: a
+  }
+
+  | ListTestlistCompList
+  { _listTestlistCompList_head :: Sum Test StarExpr a
+  , _listTestlistCompList_tail
+    :: Compose
+        []
+        (Compose
+          (Before (Between' [WhitespaceChar] Comma))
+          (Sum Test StarExpr))
+        a
+  , _listTestlistCompList_comma :: Maybe (Before [WhitespaceChar] Comma)
+  , _listTestlistCompList_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 data DictOrSetMaker a
@@ -504,7 +524,7 @@ data Atom a
         (Between' [WhitespaceChar])
         (Compose
           Maybe
-          (Sum YieldExpr TestlistComp))
+          (Sum YieldExpr TupleTestlistComp))
         a
   , _atom_ann :: a
   }
@@ -515,7 +535,7 @@ data Atom a
         (Between' [WhitespaceChar])
         (Compose
           Maybe
-          TestlistComp)
+          ListTestlistComp)
         a
   , _atom_ann :: a
   }
@@ -775,11 +795,17 @@ deriveShow ''YieldExpr
 deriveShow1 ''YieldExpr
 makeLenses ''YieldExpr
 
-deriveEq ''TestlistComp
-deriveEq1 ''TestlistComp
-deriveShow ''TestlistComp
-deriveShow1 ''TestlistComp
-makeLenses ''TestlistComp
+deriveEq ''ListTestlistComp
+deriveEq1 ''ListTestlistComp
+deriveShow ''ListTestlistComp
+deriveShow1 ''ListTestlistComp
+makeLenses ''ListTestlistComp
+
+deriveEq ''TupleTestlistComp
+deriveEq1 ''TupleTestlistComp
+deriveShow ''TupleTestlistComp
+deriveShow1 ''TupleTestlistComp
+makeLenses ''TupleTestlistComp
 
 deriveEq ''DictOrSetMaker
 deriveEq1 ''DictOrSetMaker

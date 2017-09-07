@@ -49,6 +49,10 @@ data SyntaxError a
   | YieldNotInFunction a
   | YieldInAsyncFunction a
   | IdentifierIsKeyword Text a
+  -- ^ *a for a in a
+  | UnpackingInComprehension a
+  -- ^ (*a)
+  | UnpackingInParens a
   deriving (Eq, Show, Ord)
 
 newtype SyntaxChecker ann a
@@ -732,7 +736,7 @@ checkAtom cfg e =
           Safe.AtomParenNoYield <$>
           traverseOf
             (traverseCompose.traverseCompose)
-            (checkTestlistComp cfg)
+            (checkTupleTestlistComp cfg)
             (v &
               _Wrapping Compose . between'._2._Wrapping Compose .~ Just a) <*>
           pure ann
@@ -740,7 +744,7 @@ checkAtom cfg e =
       Safe.AtomBracket <$>
       traverseOf
         (traverseCompose.traverseCompose)
-        (checkTestlistComp cfg)
+        (checkListTestlistComp cfg)
         v <*>
       pure ann
     IR.AtomCurly _ _ -> error "checkDictOrSetMaker not implemented"
@@ -842,27 +846,105 @@ checkTestList cfg (IR.TestList h t comma ann) =
   pure comma <*>
   pure ann
 
-checkTestlistComp
+checkTupleTestlistComp
   :: SyntaxConfig atomType ctxt
-  -> IR.TestlistComp ann
-  -> SyntaxChecker ann (Safe.TestlistComp atomType ctxt ann)
-checkTestlistComp cfg e =
+  -> IR.TupleTestlistComp ann
+  -> SyntaxChecker ann (Safe.TupleTestlistComp atomType ctxt ann)
+checkTupleTestlistComp cfg e =
   case e of
-    IR.TestlistCompFor h t ann ->
+    IR.TupleTestlistCompFor h t ann ->
       case cfg ^. atomType of
         Safe.SAssignable ->
           syntaxError $ CannotAssignTo LHSFor ann
         Safe.SNotAssignable ->
-          Safe.TestlistCompFor <$>
-          testOrStarExpr cfg h <*>
-          traverseCompose (checkCompFor cfg) t <*>
+          case h of
+            InR (IR.StarExpr _ ann') ->
+              syntaxError $ UnpackingInComprehension ann'
+            InL h' ->
+              Safe.TupleTestlistCompFor <$>
+              checkTest cfg h' <*>
+              traverseCompose (checkCompFor cfg) t <*>
+              pure ann
+
+    IR.TupleTestlistCompList h t comma ann ->
+      case h of
+        InL h' ->
+          Safe.TupleTestlistCompList <$>
+          checkTest cfg h' <*>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (testOrStarExpr cfg)
+            t <*>
+          pure comma <*>
           pure ann
-    IR.TestlistCompList h t comma ann ->
-      Safe.TestlistCompList <$>
-      testOrStarExpr cfg h <*>
-      traverseOf (traverseCompose.traverseCompose) (testOrStarExpr cfg) t <*>
-      pure comma <*>
-      pure ann
+        InR h' ->
+          case getCompose t of
+            [] ->
+              case comma of
+                Nothing ->
+                  syntaxError $ UnpackingInParens (h' ^. IR.starExpr_ann)
+                Just comma' ->  
+                  Safe.TupleTestlistCompStarredOne <$>
+                  checkStarExpr cfg h' <*>
+                  pure comma' <*>
+                  pure ann
+            (t':ts') ->
+              Safe.TupleTestlistCompStarredMany <$>
+              checkStarExpr cfg h' <*>
+              traverseOf
+                (traverseCompose.traverseCompose)
+                (testOrStarExpr cfg)
+                (Compose $ t' :| ts') <*>
+              pure comma <*>
+              pure ann
+
+  where
+    testOrStarExpr cfg' e' =
+      case e' of
+        InL a -> InL <$> checkTest cfg' a
+        InR a -> InR <$> checkStarExpr cfg' a
+
+checkListTestlistComp
+  :: SyntaxConfig atomType ctxt
+  -> IR.ListTestlistComp ann
+  -> SyntaxChecker ann (Safe.ListTestlistComp atomType ctxt ann)
+checkListTestlistComp cfg e =
+  case e of
+    IR.ListTestlistCompFor h t ann ->
+      case cfg ^. atomType of
+        Safe.SAssignable ->
+          syntaxError $ CannotAssignTo LHSFor ann
+        Safe.SNotAssignable ->
+          case h of
+            InR (IR.StarExpr _ ann') ->
+              syntaxError $ UnpackingInComprehension ann'
+            InL h' ->
+              Safe.ListTestlistCompFor <$>
+              checkTest cfg h' <*>
+              traverseCompose (checkCompFor cfg) t <*>
+              pure ann
+
+    IR.ListTestlistCompList h t comma ann ->
+      case h of
+        InL h' ->
+          Safe.ListTestlistCompList <$>
+          checkTest cfg h' <*>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (testOrStarExpr cfg)
+            t <*>
+          pure comma <*>
+          pure ann
+        InR h' ->
+          Safe.ListTestlistCompStarred <$>
+          checkStarExpr cfg h' <*>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (testOrStarExpr cfg)
+            t <*>
+          pure comma <*>
+          pure ann
+
   where
     testOrStarExpr cfg' e' =
       case e' of

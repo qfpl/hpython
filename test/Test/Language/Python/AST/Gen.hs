@@ -231,32 +231,87 @@ genStarExpr cfg =
     (Gen.scale predNat . genExpr $ cfg & atomType .~ AST.SAssignable) <*>
   pure ()
 
-genTestlistComp
+genListTestlistComp
   :: MonadGen m
   => SyntaxConfig atomType ctxt
-  -> m (AST.TestlistComp atomType ctxt ())
-genTestlistComp cfg =
+  -> m (AST.ListTestlistComp atomType ctxt ())
+genListTestlistComp cfg =
   case cfg ^. atomType of
     AST.SAssignable ->
-      Gen.choice [ Gen.scale predNat $ testlistCompList cfg ]
+      Gen.choice [ Gen.scale predNat $ listTestlistCompList cfg ]
     AST.SNotAssignable ->
       Gen.choice
-        [ Gen.scale predNat $ testlistCompList cfg
-        , AST.TestlistCompFor <$>
-          Gen.small (genTestOrStar cfg) <*>
+        [ Gen.scale predNat $ listTestlistCompList cfg
+        , AST.ListTestlistCompFor <$>
+          Gen.small (genTest cfg) <*>
           genWhitespaceBeforeF (Gen.small $ genCompFor cfg) <*>
           pure ()
         ]
   where
-    testlistCompList cfg' =
-      AST.TestlistCompList <$>
-      genTestOrStar cfg' <*>
-      genListF
-        (genBeforeF
-          (genBetweenWhitespace $ pure AST.Comma) .
-          Gen.scale predNat $ genTestOrStar cfg') <*>
-      Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
-      pure ()
+    listTestlistCompList cfg' =
+      Gen.choice
+        [ AST.ListTestlistCompStarred <$>
+          genStarExpr cfg' <*>
+          genListF
+            (genBeforeF
+              (genBetweenWhitespace $ pure AST.Comma) .
+              Gen.scale predNat $ genTestOrStar cfg') <*>
+          Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+          pure ()
+        , AST.ListTestlistCompList <$>
+          genTest cfg' <*>
+          genListF
+            (genBeforeF
+              (genBetweenWhitespace $ pure AST.Comma) .
+              Gen.scale predNat $ genTestOrStar cfg') <*>
+          Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+          pure ()
+        ]
+
+    genTestOrStar cfg' =
+      Gen.scale predNat $
+      Gen.choice [ InL <$> genTest cfg', InR <$> genStarExpr cfg' ]
+      
+genTupleTestlistComp
+  :: MonadGen m
+  => SyntaxConfig atomType ctxt
+  -> m (AST.TupleTestlistComp atomType ctxt ())
+genTupleTestlistComp cfg =
+  case cfg ^. atomType of
+    AST.SAssignable ->
+      Gen.choice [ Gen.scale predNat $ tupleTestlistCompList cfg ]
+    AST.SNotAssignable ->
+      Gen.choice
+        [ Gen.scale predNat $ tupleTestlistCompList cfg
+        , AST.TupleTestlistCompFor <$>
+          Gen.small (genTest cfg) <*>
+          genWhitespaceBeforeF (Gen.small $ genCompFor cfg) <*>
+          pure ()
+        ]
+  where
+    tupleTestlistCompList cfg' =
+      Gen.choice
+        [ AST.TupleTestlistCompStarredOne <$>
+          genStarExpr cfg' <*>
+          genWhitespaceBefore (pure AST.Comma) <*>
+          pure ()
+        , AST.TupleTestlistCompStarredMany <$>
+          genStarExpr cfg' <*>
+          genNonEmptyF
+            (genBeforeF
+              (genBetweenWhitespace $ pure AST.Comma) .
+              Gen.scale predNat $ genTestOrStar cfg') <*>
+          Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+          pure ()
+        , AST.TupleTestlistCompList <$>
+          genTest cfg' <*>
+          genListF
+            (genBeforeF
+              (genBetweenWhitespace $ pure AST.Comma) .
+              Gen.scale predNat $ genTestOrStar cfg') <*>
+          Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+          pure ()
+        ]
 
     genTestOrStar cfg' =
       Gen.scale predNat $
@@ -658,13 +713,13 @@ genAtom cfg =
 
     genAtomBracket cfg' =
       AST.AtomBracket <$>
-      genBetweenWhitespaceF (genMaybeF $ genTestlistComp cfg') <*>
+      genBetweenWhitespaceF (genMaybeF $ genListTestlistComp cfg') <*>
       pure ()
 
     genAtomParenNoYield cfg' =
       AST.AtomParenNoYield <$>
       genBetweenWhitespaceF
-        (genMaybeF $ genTestlistComp cfg') <*>
+        (genMaybeF $ genTupleTestlistComp cfg') <*>
       pure ()
 
     genAtomInteger _ = AST.AtomInteger <$> genInteger <*> pure ()

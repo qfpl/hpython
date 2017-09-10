@@ -24,7 +24,7 @@ data EscapeSeq
   | Slash_t
   | Slash_v
   | Slash_octal (NonEmpty OctDigit)
-  | Slash_hex (NonEmpty HexDigit)
+  | Slash_hex HexDigit (NonEmpty HexDigit)
   deriving (Eq, Show)
 
 escapeSeq :: CharParsing m => m EscapeSeq
@@ -42,7 +42,7 @@ escapeSeq =
    try (string "t" $> Slash_t) <|>
    try (string "v" $> Slash_v) <|>
    try (Slash_octal <$> some1 parseOctal) <|>
-   (Slash_hex <$> some1 parseHeXaDeCiMaL))
+   (Slash_hex <$> parseHeXaDeCiMaL <*> some1 parseHeXaDeCiMaL))
 
 _Escape :: Prism' String EscapeSeq
 _Escape =
@@ -61,7 +61,7 @@ _Escape =
         Slash_t -> "t"
         Slash_v -> "v"
         Slash_octal oct -> foldMap printOctDigit oct
-        Slash_hex hex -> 'x' : foldMap printHexDigit hex)
+        Slash_hex h hs -> 'x' : printHexDigit h <> foldMap printHexDigit hs)
     (\val -> case parseString escapeSeq mempty val of
         Success res -> Just res
         Failure _ -> Nothing)

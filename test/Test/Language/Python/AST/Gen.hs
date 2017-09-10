@@ -633,7 +633,7 @@ genEscapeSeq =
     , pure AST.Slash_t
     , pure AST.Slash_v
     , AST.Slash_octal <$> Gen.nonEmpty (Range.linear 1 10) genOctDigit
-    , AST.Slash_hex <$> Gen.nonEmpty (Range.linear 1 10) genHexDigit
+    , AST.Slash_hex <$> genHexDigit <*> Gen.nonEmpty (Range.linear 1 10) genHexDigit
     ]
 
 genShortBytes :: MonadGen m => m (AST.ShortBytes ())

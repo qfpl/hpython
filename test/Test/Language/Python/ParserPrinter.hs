@@ -112,7 +112,8 @@ prop_ast_is_valid_python assignability =
           [ "Input string caused a syntax error."
           , ""
           , "Input string:"
-          , show program
+          , program
+          , "( " ++ show program ++ " )"
           , ""
           , "Error message:"
           , ""

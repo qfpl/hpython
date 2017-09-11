@@ -30,6 +30,7 @@ import Language.Python.AST.Imag
 import Language.Python.AST.Integer
 import Language.Python.AST.Keywords
 import Language.Python.AST.LongBytes
+import Language.Python.AST.LongBytesChar
 import Language.Python.AST.LongString
 import Language.Python.AST.LongStringChar
 import Language.Python.AST.ShortBytes
@@ -195,25 +196,43 @@ shortStringCharSingle s = char (_ShortStringCharSingle # s)
 tripled :: (Doc -> Doc) -> Doc -> Doc
 tripled f = f . f . f
 
+escape :: EscapeSeq -> Doc
+escape = text . review _Escape
+
 shortString :: ShortString a -> Doc
 shortString s =
   case s of
     ShortStringSingle val _ ->
-      quotes $ foldMap (either shortStringCharSingle $ text . review _Escape) val
+      quotes $ foldMap (either shortStringCharSingle escape) val
     ShortStringDouble val _ ->
-      doubleQuotes $ foldMap (either shortStringCharDouble $ text . review _Escape) val
-      
+      doubleQuotes $ foldMap (either shortStringCharDouble escape) val
+
 longStringChar :: LongStringChar -> Doc
 longStringChar s = char (_LongStringChar # s)
-      
+
+longStringCharFinalSingle :: LongStringCharFinal SingleQuote -> Doc
+longStringCharFinalSingle s = char (_LongStringCharFinalSingle # s)
+
+longStringCharFinalDouble :: LongStringCharFinal DoubleQuote -> Doc
+longStringCharFinalDouble s = char (_LongStringCharFinalDouble # s)
+
 longString :: LongString a -> Doc
 longString s =
   case s of
-    LongStringSingle val _ ->
-      tripled quotes $ foldMap (either longStringChar $ text . review _Escape) val
-    LongStringDouble val _ ->
+    LongStringSingleEmpty _ -> tripled quotes mempty
+    LongStringDoubleEmpty _ -> tripled doubleQuotes mempty
+    LongStringSingle cs c _ ->
+      tripled quotes $
+      foldMap
+        (either longStringChar escape)
+        cs <>
+      either longStringCharFinalSingle escape c
+    LongStringDouble cs c _ ->
       tripled doubleQuotes $
-      foldMap (either longStringChar $ text . review _Escape) val
+      foldMap
+        (either longStringChar escape)
+        cs <>
+      either longStringCharFinalDouble escape c
 
 bytesPrefix :: BytesPrefix -> Doc
 bytesPrefix b =
@@ -243,14 +262,32 @@ shortBytes s =
     ShortBytesDouble val _ ->
       doubleQuotes $ foldMap (either shortBytesCharDouble $ text . review _Escape) val
 
+longBytesChar :: LongBytesChar -> Doc
+longBytesChar s = char (_LongBytesChar # s)
+
+longBytesCharFinalSingle :: LongBytesCharFinal SingleQuote -> Doc
+longBytesCharFinalSingle s = char (_LongBytesCharFinalSingle # s)
+
+longBytesCharFinalDouble :: LongBytesCharFinal DoubleQuote -> Doc
+longBytesCharFinalDouble s = char (_LongBytesCharFinalDouble # s)
+
 longBytes :: LongBytes a -> Doc
 longBytes s =
   case s of
-    LongBytesSingle val _ ->
-      tripled quotes $ foldMap (either char $ text . review _Escape) val
-    LongBytesDouble val _ ->
+    LongBytesSingleEmpty _ -> tripled quotes mempty
+    LongBytesDoubleEmpty _ -> tripled doubleQuotes mempty
+    LongBytesSingle cs c _ ->
+      tripled quotes $
+        foldMap
+          (either longBytesChar $ text . review _Escape)
+          cs <>
+        either longBytesCharFinalSingle (text . review _Escape) c
+    LongBytesDouble cs c _ ->
       tripled doubleQuotes $
-      foldMap (either char $ text . review _Escape) val
+      foldMap
+        (either longBytesChar $ text . review _Escape)
+        cs <>
+      either longBytesCharFinalDouble (text . review _Escape) c
 
 digit :: Digit -> Doc
 digit = text . printDigit

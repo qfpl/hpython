@@ -3,7 +3,7 @@ haskellPackages.callPackage
   (pkgs.fetchFromGitHub {
     owner = "qfpl";
     repo = "digit";
-    rev = "9e0c69abc01150c5e5a6af295cb290e6b4dc1009";
-    sha256 = "1w5qw3v4875r9rmgbzdhzvggaqhaskjadlxk8qpzypfl872i4pbf";
+    rev = "c02aadb4a471a357c5f93d0db40b5f26443dc344";
+    sha256 = "0rhzgqhkxn3rjpmnq4pwh7kfphc99z67wwh2vf2q1d48pnizw2j5";
   })
   {}

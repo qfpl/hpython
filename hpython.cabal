@@ -13,7 +13,7 @@ maintainer:          isaace71295@gmail.com
 copyright:           Copyright (C) 2017 Commonwealth Scientific and Industrial Research Organisation (CSIRO)
 category:            Language
 build-type:          Simple
-extra-source-files:  ChangeLog.md
+extra-source-files:  changelog.md
 cabal-version:       >=1.10
 tested-with:         GHC == 8.0.2
 

@@ -7,10 +7,10 @@ synopsis:            Write Python using Haskell
 -- description:         
 homepage:            https://github.com/qfpl/hpython
 license:             BSD3
-license-file:        LICENSE
+license-file:        LICENCE
 author:              Isaac Elliott
 maintainer:          isaace71295@gmail.com
--- copyright:           
+copyright:           Copyright (C) 2017 Commonwealth Scientific and Industrial Research Organisation (CSIRO)
 category:            Language
 build-type:          Simple
 extra-source-files:  ChangeLog.md

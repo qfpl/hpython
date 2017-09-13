@@ -1,0 +1,15 @@
+*~
+*#*
+
+# CABAL
+/dist
+/.cabal-sandbox
+/cabal.sandbox.config
+
+# Haskell Program Coverage
+/.hpc
+/*.tix
+
+# ctags
+TAGS
+

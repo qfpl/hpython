@@ -10,17 +10,18 @@ import Data.Deriving
 import Language.Python.AST.EscapeSeq
 import Language.Python.AST.ShortStringChar
 import Language.Python.AST.Symbols
+import Language.Python.AST.TripleString
 
 -- | Strings between one single or double quote
 data ShortString a
   = ShortStringSingle
   { _shortStringSingle_value
-    :: [Either (ShortStringChar SingleQuote) EscapeSeq]
+    :: TripleStringContent SingleQuote (ShortStringChar SingleQuote)
   , _shortString_ann :: a
   }
   | ShortStringDouble
   { _shortStringDouble_value
-    :: [Either (ShortStringChar DoubleQuote) EscapeSeq]
+    :: TripleStringContent DoubleQuote (ShortStringChar DoubleQuote)
   , _shortString_ann :: a
   } deriving (Functor, Foldable, Traversable)
 

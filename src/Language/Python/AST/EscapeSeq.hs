@@ -2,6 +2,7 @@ module Language.Python.AST.EscapeSeq
   ( EscapeSeq(..)
   , _Escape
   , escapeSeq
+  , isEscapeChar
   ) where
 
 import Papa
@@ -26,6 +27,21 @@ data EscapeSeq
   | Slash_octal (NonEmpty OctDigit)
   | Slash_hex HexDigit (NonEmpty HexDigit)
   deriving (Eq, Show)
+
+isEscapeChar :: Char -> Bool
+isEscapeChar c =
+  case c of
+    '\\' -> True
+    '\'' -> True
+    '"' -> True
+    'a' -> True
+    'f' -> True
+    'b' -> True
+    'n' -> True
+    'r' -> True
+    't' -> True
+    'v' -> True
+    _ -> False
 
 escapeSeq :: CharParsing m => m EscapeSeq
 escapeSeq =

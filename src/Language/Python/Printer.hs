@@ -41,6 +41,7 @@ import Language.Python.AST.StringLiteral
 import Language.Python.AST.StringPrefix
 import Language.Python.AST.Symbols
 import Language.Python.AST.TermOperator
+import Language.Python.AST.TripleString (tripleStringContent)
 
 identifier :: Identifier a -> Doc
 identifier i = i ^. identifier_value . to T.unpack . to text
@@ -203,9 +204,17 @@ shortString :: ShortString a -> Doc
 shortString s =
   case s of
     ShortStringSingle val _ ->
-      quotes $ foldMap (either shortStringCharSingle escape) val
+      quotes $
+      foldMapOf
+        tripleStringContent
+        (either escape shortStringCharSingle)
+        val
     ShortStringDouble val _ ->
-      doubleQuotes $ foldMap (either shortStringCharDouble escape) val
+      doubleQuotes $
+      foldMapOf
+        tripleStringContent
+        (either escape shortStringCharDouble)
+        val
 
 longStringChar :: LongStringChar -> Doc
 longStringChar s = char (_LongStringChar # s)
@@ -221,18 +230,18 @@ longString s =
   case s of
     LongStringSingleEmpty _ -> tripled quotes mempty
     LongStringDoubleEmpty _ -> tripled doubleQuotes mempty
-    LongStringSingle cs c _ ->
+    LongStringSingle cs _ ->
       tripled quotes $
-      foldMap
-        (either longStringChar escape)
-        cs <>
-      either longStringCharFinalSingle escape c
-    LongStringDouble cs c _ ->
+      foldMapOf
+        tripleStringContent
+        (either escape longStringChar)
+        cs
+    LongStringDouble cs _ ->
       tripled doubleQuotes $
-      foldMap
-        (either longStringChar escape)
-        cs <>
-      either longStringCharFinalDouble escape c
+      foldMapOf
+        tripleStringContent
+        (either escape longStringChar)
+        cs
 
 bytesPrefix :: BytesPrefix -> Doc
 bytesPrefix b =
@@ -258,9 +267,17 @@ shortBytes :: ShortBytes a -> Doc
 shortBytes s =
   case s of
     ShortBytesSingle val _ ->
-      quotes $ foldMap (either shortBytesCharSingle $ text . review _Escape) val
+      quotes $
+      foldMapOf
+        tripleStringContent
+        (either escape shortBytesCharSingle)
+        val
     ShortBytesDouble val _ ->
-      doubleQuotes $ foldMap (either shortBytesCharDouble $ text . review _Escape) val
+      doubleQuotes $
+      foldMapOf
+        tripleStringContent
+        (either escape shortBytesCharDouble)
+        val
 
 longBytesChar :: LongBytesChar -> Doc
 longBytesChar s = char (_LongBytesChar # s)
@@ -276,18 +293,18 @@ longBytes s =
   case s of
     LongBytesSingleEmpty _ -> tripled quotes mempty
     LongBytesDoubleEmpty _ -> tripled doubleQuotes mempty
-    LongBytesSingle cs c _ ->
+    LongBytesSingle cs _ ->
       tripled quotes $
-        foldMap
-          (either longBytesChar $ text . review _Escape)
-          cs <>
-        either longBytesCharFinalSingle (text . review _Escape) c
-    LongBytesDouble cs c _ ->
+      foldMapOf
+        tripleStringContent
+        (either escape longBytesChar)
+        cs
+    LongBytesDouble cs _ ->
       tripled doubleQuotes $
-      foldMap
-        (either longBytesChar $ text . review _Escape)
-        cs <>
-      either longBytesCharFinalDouble (text . review _Escape) c
+      foldMapOf
+        tripleStringContent
+        (either escape longBytesChar)
+        cs
 
 digit :: Digit -> Doc
 digit = text . printDigit

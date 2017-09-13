@@ -3,8 +3,10 @@
 {-# language GADTs #-}
 module Test.Language.Python.AST.Gen where
 
+import Prelude (error)
 import Papa
 
+import Control.Monad
 import Data.Functor.Compose
 import Data.Functor.Sum
 import Data.Separated.After (After(..))
@@ -14,6 +16,8 @@ import Hedgehog
 
 import qualified Data.Text as T
 import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Internal.Gen as Gen
+import qualified Hedgehog.Internal.Shrink as Shrink
 import qualified Hedgehog.Range as Range
 import qualified Language.Python.AST as AST
 import qualified Language.Python.AST.BytesLiteral as AST
@@ -39,6 +43,7 @@ import qualified Language.Python.AST.StringLiteral as AST
 import qualified Language.Python.AST.StringPrefix as AST
 import qualified Language.Python.AST.Symbols as AST
 import qualified Language.Python.AST.TermOperator as AST
+import qualified Language.Python.AST.TripleString as TS
 import Language.Python.Parser.IR.SyntaxConfig
 
 genBefore :: MonadGen m => m s -> m a -> m (Before s a)
@@ -268,7 +273,7 @@ genListTestlistComp cfg =
     genTestOrStar cfg' =
       Gen.small $
       Gen.choice [ InL <$> genTest cfg', InR <$> genStarExpr cfg' ]
-      
+
 genTupleTestlistComp
   :: MonadGen m
   => SyntaxConfig atomType ctxt
@@ -522,20 +527,10 @@ genShortString :: MonadGen m => m (AST.ShortString ())
 genShortString =
   Gen.choice
     [ AST.ShortStringSingle <$>
-      Gen.list
-        (Range.linear 0 200)
-        (Gen.choice
-          [ Left <$> genShortStringCharSingle
-          , Right <$> genEscapeSeq
-          ]) <*>
+      genTripleStringContent (Range.linear 0 20) <*>
       pure ()
     , AST.ShortStringDouble <$>
-      Gen.list
-        (Range.linear 0 200)
-        (Gen.choice
-          [ Left <$> genShortStringCharDouble
-          , Right <$> genEscapeSeq
-          ])<*>
+      genTripleStringContent (Range.linear 0 20) <*>
       pure ()
     ]
 
@@ -544,13 +539,13 @@ genLongStringChar
   => m AST.LongStringChar
 genLongStringChar =
   Gen.just (fmap (^? AST._LongStringChar) Gen.ascii)
-  
+
 genLongStringCharFinalSingle
   :: MonadGen m
   => m (AST.LongStringCharFinal AST.SingleQuote)
 genLongStringCharFinalSingle =
   Gen.just (fmap (^? AST._LongStringCharFinalSingle) Gen.ascii)
-  
+
 genLongStringCharFinalDouble
   :: MonadGen m
   => m (AST.LongStringCharFinal AST.DoubleQuote)
@@ -563,28 +558,10 @@ genLongString =
     [ pure $ AST.LongStringSingleEmpty ()
     , pure $ AST.LongStringDoubleEmpty ()
     , AST.LongStringSingle <$>
-      Gen.list
-        (Range.linear 0 200)
-        (Gen.choice
-          [ Left <$> genLongStringChar
-          , Right <$> genEscapeSeq
-          ]) <*>
-      (Gen.choice
-        [ Left <$> genLongStringCharFinalSingle
-        , Right <$> genEscapeSeq
-        ]) <*>
+      genTripleStringContent (Range.linear 0 20) <*>
       pure ()
     , AST.LongStringDouble <$>
-      Gen.list
-        (Range.linear 0 200)
-        (Gen.choice
-          [ Left <$> genLongStringChar
-          , Right <$> genEscapeSeq
-          ]) <*>
-      (Gen.choice
-        [ Left <$> genLongStringCharFinalDouble
-        , Right <$> genEscapeSeq
-        ]) <*>
+      genTripleStringContent (Range.linear 0 20) <*>
       pure ()
     ]
 
@@ -620,28 +597,10 @@ genLongBytes =
     [ pure $ AST.LongBytesSingleEmpty ()
     , pure $ AST.LongBytesDoubleEmpty ()
     , AST.LongBytesSingle <$>
-      Gen.list
-        (Range.linear 0 200)
-        (Gen.choice
-          [ Left <$> genLongBytesChar
-          , Right <$> genEscapeSeq
-          ]) <*>
-      (Gen.choice
-        [ Left <$> genLongBytesCharFinalSingle
-        , Right <$> genEscapeSeq
-        ]) <*>
+      genTripleStringContent (Range.linear 0 20) <*>
       pure ()
     , AST.LongBytesDouble <$>
-      Gen.list
-        (Range.linear 0 200)
-        (Gen.choice
-          [ Left <$> genLongBytesChar
-          , Right <$> genEscapeSeq
-          ]) <*>
-      (Gen.choice
-        [ Left <$> genLongBytesCharFinalDouble
-        , Right <$> genEscapeSeq
-        ]) <*>
+      genTripleStringContent (Range.linear 0 20) <*>
       pure ()
     ]
 
@@ -650,7 +609,7 @@ genShortBytesCharSingle
   => m (AST.ShortBytesChar AST.SingleQuote)
 genShortBytesCharSingle =
   Gen.just (fmap (^? AST._ShortBytesCharSingle) Gen.ascii)
-  
+
 genShortBytesCharDouble
   :: MonadGen m
   => m (AST.ShortBytesChar AST.DoubleQuote)
@@ -681,20 +640,10 @@ genShortBytes :: MonadGen m => m (AST.ShortBytes ())
 genShortBytes =
   Gen.choice
     [ AST.ShortBytesSingle <$>
-      Gen.list
-        (Range.linear 0 200)
-        (Gen.choice
-          [ Left <$> genShortBytesCharSingle
-          , Right <$> genEscapeSeq
-          ]) <*>
+      genTripleStringContent (Range.linear 0 20) <*>
       pure ()
     , AST.ShortBytesDouble <$>
-      Gen.list
-        (Range.linear 0 200)
-        (Gen.choice
-          [ Left <$> genShortBytesCharDouble
-          , Right <$> genEscapeSeq
-          ])<*>
+      genTripleStringContent (Range.linear 0 20) <*>
       pure ()
     ]
 
@@ -1351,3 +1300,31 @@ genTest cfg =
       AST.TestCondNoIf <$>
       Gen.small (genOrTest cfg') <*>
       pure ()
+
+genTripleStringContent
+  :: ( MonadGen m
+     , TS.AsChar a
+     , TS.TripleStringInside b
+     )
+  => Range Int
+  -> m (TS.TripleStringContent b a)
+genTripleStringContent range =
+  Gen.just $
+    preview TS._TripleStringContent <$>
+    Gen.string range (Gen.element [' '..'~'])
+
+genTripleStringContentSingle
+  :: ( MonadGen m
+     , TS.AsChar a
+     )
+  => Range Int
+  -> m (TS.TripleStringContent AST.SingleQuote a)
+genTripleStringContentSingle = genTripleStringContent
+
+genTripleStringContentDouble
+  :: ( MonadGen m
+     , TS.AsChar a
+     )
+  => Range Int
+  -> m (TS.TripleStringContent AST.DoubleQuote a)
+genTripleStringContentDouble = genTripleStringContent

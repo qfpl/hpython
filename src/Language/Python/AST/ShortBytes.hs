@@ -10,16 +10,17 @@ import Data.Deriving
 import Language.Python.AST.EscapeSeq
 import Language.Python.AST.ShortBytesChar
 import Language.Python.AST.Symbols
+import Language.Python.AST.TripleString
 
 data ShortBytes a
   = ShortBytesSingle
   { _shortBytesSingle_value
-    :: [Either (ShortBytesChar SingleQuote) EscapeSeq]
+    :: TripleStringContent SingleQuote (ShortBytesChar SingleQuote)
   , _shortBytes_ann :: a
   }
   | ShortBytesDouble
   { _shortBytesDouble_value
-    :: [Either (ShortBytesChar DoubleQuote) EscapeSeq]
+    :: TripleStringContent DoubleQuote (ShortBytesChar DoubleQuote)
   , _shortBytes_ann :: a
   }
   deriving (Functor, Foldable, Traversable)

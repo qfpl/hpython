@@ -1,4 +1,7 @@
-{-# language GADTs, StandaloneDeriving, LambdaCase #-}
+{-# language FlexibleInstances #-}
+{-# language GADTs #-}
+{-# language LambdaCase #-}
+{-# language StandaloneDeriving #-}
 module Language.Python.AST.ShortBytesChar
   ( ShortBytesChar
   , _ShortBytesCharSingle
@@ -15,11 +18,19 @@ import Data.CharSet as CharSet
 import Data.CharSet.Common as CharSet
 import GHC.Stack
 import Text.Parser.Char
+
 import Language.Python.AST.Symbols (SingleQuote, DoubleQuote)
+import Language.Python.AST.TripleString
 
 data ShortBytesChar inside where
   ShortBytesCharSingle :: Char -> ShortBytesChar SingleQuote
   ShortBytesCharDouble :: Char -> ShortBytesChar DoubleQuote
+
+instance AsChar (ShortBytesChar SingleQuote) where
+  _Char = _ShortBytesCharSingle
+  
+instance AsChar (ShortBytesChar DoubleQuote) where
+  _Char = _ShortBytesCharDouble
 
 _shortStringChar_value :: ShortBytesChar inside -> Char
 _shortStringChar_value (ShortBytesCharSingle c) = c

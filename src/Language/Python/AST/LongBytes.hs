@@ -10,6 +10,7 @@ import Data.Deriving
 import Language.Python.AST.LongBytesChar
 import Language.Python.AST.EscapeSeq
 import Language.Python.AST.Symbols
+import Language.Python.AST.TripleString
 
 -- | Between triple quotes
 data LongBytes a
@@ -20,17 +21,13 @@ data LongBytes a
   { _longBytes_ann :: a
   }
   | LongBytesSingle
-  { _longBytesSingle_init
-    :: [Either LongBytesChar EscapeSeq]
-  , _longBytesSingle_last
-    :: Either (LongBytesCharFinal SingleQuote) EscapeSeq
+  { _longBytesSingle_value
+    :: TripleStringContent SingleQuote LongBytesChar
   , _longBytes_ann :: a
   }
   | LongBytesDouble
-  { _longBytesDouble_init
-    :: [Either LongBytesChar EscapeSeq]
-  , _longBytesDouble_last
-    :: Either (LongBytesCharFinal DoubleQuote) EscapeSeq
+  { _longBytesDouble_value
+    :: TripleStringContent DoubleQuote LongBytesChar
   , _longBytes_ann :: a
   }
   deriving (Functor, Foldable, Traversable)

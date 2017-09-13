@@ -7,6 +7,7 @@ module Language.Python.AST.LongBytesChar
   , _LongBytesCharFinalSingle
   , _LongBytesCharFinalDouble
   , _longStringCharFinal_value
+  , parseLongBytesChar
   , parseLongBytesCharFinalSingle
   , parseLongBytesCharFinalDouble
   ) where
@@ -16,13 +17,18 @@ import Papa
 import Data.CharSet as CharSet
 import Data.CharSet.Common as CharSet
 import GHC.Stack
-import Language.Python.AST.Symbols
 import Text.Parser.Char
+
+import Language.Python.AST.Symbols
+import Language.Python.AST.TripleString
 
 newtype LongBytesChar
   = LongBytesChar
   { _longStringChar_value :: Char
   } deriving (Eq, Show)
+
+instance AsChar LongBytesChar where
+  _Char = _LongBytesChar
 
 _LongBytesChar :: Prism' Char LongBytesChar
 _LongBytesChar =
@@ -75,7 +81,17 @@ parseLongBytesCharFinalSingle =
 parseLongBytesCharFinalDouble
   :: ( HasCallStack
      , CharParsing m
-     ) => m (LongBytesCharFinal DoubleQuote)
+     )
+  => m (LongBytesCharFinal DoubleQuote)
 parseLongBytesCharFinalDouble =
   (\c -> fromMaybe (error $ show c) $ c ^? _LongBytesCharFinalDouble) <$>
   oneOfSet (CharSet.ascii CharSet.\\ CharSet.fromList "\\\"\0")
+
+parseLongBytesChar
+  :: ( HasCallStack
+     , CharParsing m
+     )
+  => m LongBytesChar
+parseLongBytesChar =
+  (\c -> fromMaybe (error $ show c) $ c ^? _LongBytesChar) <$>
+  oneOfSet CharSet.ascii

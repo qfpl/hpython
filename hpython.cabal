@@ -43,6 +43,7 @@ library
                        Language.Python.AST.StringPrefix
                        Language.Python.AST.Symbols
                        Language.Python.AST.TermOperator
+                       Language.Python.AST.TripleString
                        Language.Python.Parser
                        Language.Python.Parser.IR
                        Language.Python.Parser.IR.SyntaxConfig

@@ -18,20 +18,15 @@ import Data.Functor.Sum
 import Text.Parser.LookAhead
 import Data.Separated.After (After(..))
 import Data.Separated.Before (Before(..))
-import Data.Separated.Between (Between(..), Between'(..))
 import Text.Trifecta as P hiding
   (stringLiteral, integer, octDigit, hexDigit, comma, colon)
-
-import qualified Data.Text as T
 
 import Language.Python.AST.BytesLiteral
 import Language.Python.AST.BytesPrefix
 import Language.Python.AST.CompOperator
 import Language.Python.AST.Digits
-import Language.Python.AST.EscapeSeq
 import Language.Python.AST.FactorOperator
 import Language.Python.AST.Float
-import Language.Python.AST.Identifier
 import Language.Python.AST.Imag
 import Language.Python.AST.Integer
 import Language.Python.AST.Keywords
@@ -47,99 +42,13 @@ import Language.Python.AST.StringLiteral
 import Language.Python.AST.StringPrefix
 import Language.Python.AST.Symbols as S
 import Language.Python.AST.TermOperator
-import Language.Python.AST.StringContent
-import Language.Python.Parser.EscapeSeq
+import Language.Python.Parser.Combinators
 import Language.Python.Parser.IR
+import Language.Python.Parser.Identifier
 import Language.Python.Parser.SrcInfo
 import Language.Python.Parser.StringContent
-
-leftParen :: (DeltaParsing m, LookAheadParsing m) => m LeftParen
-leftParen = char '(' $> LeftParen
-
-rightParen :: (DeltaParsing m, LookAheadParsing m) => m RightParen
-rightParen = char ')' $> RightParen
-
-whitespaceChar :: CharParsing m => m WhitespaceChar
-whitespaceChar =
-  (char ' ' $> Space) <|>
-  (char '\t' $> Tab) <|>
-  fmap Continued (char '\\' *> newlineChar)
-
-whitespaceBefore :: CharParsing m => m a -> m (Before [WhitespaceChar] a)
-whitespaceBefore m = Before <$> many whitespaceChar <*> m
-
-whitespaceBeforeF
-  :: CharParsing m
-  => m (f a)
-  -> m (Compose (Before [WhitespaceChar]) f a)
-whitespaceBeforeF = fmap Compose . whitespaceBefore
-
-whitespaceBefore1
-  :: CharParsing m
-  => m a
-  -> m (Before (NonEmpty WhitespaceChar) a)
-whitespaceBefore1 m = Before <$> some1 whitespaceChar <*> m
-
-whitespaceBefore1F
-  :: CharParsing m
-  => m (f a)
-  -> m (Compose (Before (NonEmpty WhitespaceChar)) f a)
-whitespaceBefore1F = fmap Compose . whitespaceBefore1
-
-whitespaceAfter :: CharParsing m => m a -> m (After [WhitespaceChar] a)
-whitespaceAfter m = flip After <$> m <*> many whitespaceChar
-
-whitespaceAfterF
-  :: CharParsing m
-  => m (f a)
-  -> m (Compose (After [WhitespaceChar]) f a)
-whitespaceAfterF = fmap Compose . whitespaceAfter
-
-whitespaceAfter1
-  :: CharParsing m
-  => m a
-  -> m (After (NonEmpty WhitespaceChar) a)
-whitespaceAfter1 m = After <$> some1 whitespaceChar <*> m
-
-whitespaceAfter1F
-  :: CharParsing m
-  => m (f a)
-  -> m (Compose (After (NonEmpty WhitespaceChar)) f a)
-whitespaceAfter1F = fmap Compose . whitespaceAfter1
-
-betweenWhitespace
-  :: CharParsing m
-  => m a
-  -> m (Between' [WhitespaceChar] a)
-betweenWhitespace m =
-  fmap Between' $
-  Between <$>
-  many whitespaceChar <*>
-  m <*>
-  many whitespaceChar
-
-betweenWhitespaceF
-  :: CharParsing m
-  => m (f a)
-  -> m (Compose (Between' [WhitespaceChar]) f a)
-betweenWhitespaceF = fmap Compose . betweenWhitespace
-
-betweenWhitespace1
-  :: CharParsing m
-  => m a
-  -> m (Between' (NonEmpty WhitespaceChar) a)
-betweenWhitespace1 m =
-  fmap Between' $
-  Between <$>
-  some1 whitespaceChar <*>
-  m <*>
-  some1 whitespaceChar
-
-betweenWhitespace1F
-  :: CharParsing m
-  => m (f a)
-  -> m (Compose (Between' (NonEmpty WhitespaceChar)) f a)
-betweenWhitespace1F = fmap Compose . betweenWhitespace1
+import Language.Python.Parser.Symbols
+import Language.Python.Parser.VarargsList
 
 ifThenElse :: (DeltaParsing m, LookAheadParsing m) => m (IfThenElse SrcInfo)
 ifThenElse =
@@ -152,12 +61,19 @@ ifThenElse =
 test :: (DeltaParsing m, LookAheadParsing m) => m (Test SrcInfo)
 test = try testCond <|> testLambdef
   where
-    testLambdef = unexpected "testLambdef not implemented"
+    testLambdef = annotated $ TestLambdef <$> lambdef
     testCond =
       annotated $
       TestCond <$>
       orTest <*>
       optionalF (try $ whitespaceBefore1F ifThenElse)
+
+lambdef :: (DeltaParsing m, LookAheadParsing m) => m (Lambdef SrcInfo)
+lambdef =
+  annotated $
+  Lambdef <$>
+  (string "lambda" *> optionalF (whitespaceBefore1F $ varargsList test)) <*>
+  beforeF (betweenWhitespace colon) test
 
 kOr :: (DeltaParsing m, LookAheadParsing m) => m KOr
 kOr = string "or" $> KOr
@@ -172,9 +88,6 @@ orTest =
   andTest <*>
   manyF (try $ beforeF (betweenWhitespace1 kOr) andTest)
 
-varargsList :: (DeltaParsing m, LookAheadParsing m) => m (VarargsList SrcInfo)
-varargsList = error "varargsList not implemented"
-
 lambdefNocond :: (DeltaParsing m, LookAheadParsing m) => m (LambdefNocond SrcInfo)
 lambdefNocond =
   annotated $
@@ -183,7 +96,7 @@ lambdefNocond =
     (try $ betweenF
       (some1 whitespaceChar)
       (many whitespaceChar)
-      varargsList) <*>
+      (varargsList test)) <*>
   whitespaceBeforeF testNocond
 
 testNocond :: (DeltaParsing m, LookAheadParsing m) => m (TestNocond SrcInfo)
@@ -195,7 +108,7 @@ compIf :: (DeltaParsing m, LookAheadParsing m) => m (CompIf SrcInfo)
 compIf =
   annotated $
   CompIf <$>
-  (betweenWhitespace1 $ string "if" $> KIf) <*>
+  betweenWhitespace1 (string "if" $> KIf) <*>
   testNocond <*>
   optionalF (try $ whitespaceBeforeF compIter)
 
@@ -232,27 +145,6 @@ compFor =
   (string "in" *> whitespaceBefore1F orTest) <*>
   optionalF (try $ whitespaceBeforeF compIter)
 
-doubleAsterisk :: (DeltaParsing m, LookAheadParsing m) => m DoubleAsterisk
-doubleAsterisk = string "**" $> DoubleAsterisk
-
-asterisk :: (DeltaParsing m, LookAheadParsing m) => m Asterisk
-asterisk = char '*' $> Asterisk
-
-colon :: (DeltaParsing m, LookAheadParsing m) => m Colon
-colon = char ':' $> Colon
-
-idStart :: (DeltaParsing m, LookAheadParsing m) => m Char
-idStart = try letter <|> char '_'
-
-idContinue :: (DeltaParsing m, LookAheadParsing m) => m Char
-idContinue = try idStart <|> digit
-
-identifier :: (DeltaParsing m, LookAheadParsing m) => m (Identifier SrcInfo)
-identifier =
-  annotated $
-  Identifier . T.pack <$>
-  liftA2 (:) idStart (many $ try idContinue)
-
 stringPrefix :: (DeltaParsing m, LookAheadParsing m) => m StringPrefix
 stringPrefix =
   try (char 'r' $> StringPrefix_r) <|>
@@ -281,8 +173,7 @@ shortString = try shortStringSingle <|> shortStringDouble
 
 longString :: (HasCallStack, DeltaParsing m, LookAheadParsing m) => m (LongString SrcInfo)
 longString =
-  (try longStringDouble <|> longStringSingle)
-  -- (try longStringDoubleEmpty <|> longStringDouble)
+  try longStringDouble <|> longStringSingle
   where
     longStringSingle =
       annotated $
@@ -339,18 +230,6 @@ shortBytes = try shortBytesSingle <|> shortBytesDouble
         doubleQuote
         doubleQuote
         (parseStringContentDouble parseShortBytesCharDouble doubleQuote)
-
-tripleDoublequote :: (DeltaParsing m, LookAheadParsing m) => m ()
-tripleDoublequote = string "\"\"\"" $> ()
-
-tripleSinglequote :: (DeltaParsing m, LookAheadParsing m) => m ()
-tripleSinglequote = string "'''" $> ()
-
-doubleQuote :: (DeltaParsing m, LookAheadParsing m) => m ()
-doubleQuote = char '"' $> ()
-
-singleQuote :: (DeltaParsing m, LookAheadParsing m) => m ()
-singleQuote = char '\'' $> ()
 
 longBytes :: (DeltaParsing m, LookAheadParsing m) => m (LongBytes SrcInfo)
 longBytes =
@@ -417,24 +296,6 @@ digit' =
   try (char '8' $> Digit_8) <|>
   (char '9' $> Digit_9)
 
-zero :: (DeltaParsing m, LookAheadParsing m) => m Zero
-zero = char '0' $> Zero
-
-o :: (DeltaParsing m, LookAheadParsing m) => m (Either Char_o Char_O)
-o =
-  try (fmap Left $ char 'o' $> Char_o) <|>
-  fmap Right (char 'O' $> Char_O)
-
-x :: (DeltaParsing m, LookAheadParsing m) => m (Either Char_x Char_X)
-x =
-  try (fmap Left $ char 'x' $> Char_x) <|>
-  fmap Right (char 'X' $> Char_X)
-
-b :: (DeltaParsing m, LookAheadParsing m) => m (Either Char_b Char_B)
-b =
-  try (fmap Left $ char 'b' $> Char_b) <|>
-  fmap Right (char 'B' $> Char_B)
-
 octDigit :: (DeltaParsing m, LookAheadParsing m) => m OctDigit
 octDigit =
   try (char '0' $> OctDigit_0) <|>
@@ -489,23 +350,20 @@ integer =
     integerOct =
       annotated .
       fmap IntegerOct $
-      Before <$> (zero *> o) <*> some1 octDigit
+      Before <$> (zero *> oO) <*> some1 octDigit
     integerHex =
       annotated .
       fmap IntegerHex $
-      Before <$> (zero *> x) <*> some1 hexDigit
+      Before <$> (zero *> xX) <*> some1 hexDigit
     integerBin =
       annotated .
       fmap IntegerBin $
-      Before <$> (zero *> b) <*> some1 binDigit
-
-e :: (DeltaParsing m, LookAheadParsing m) => m (Either Char_e Char_E)
-e = try (fmap Left $ char 'e' $> Char_e) <|> fmap Right (char 'E' $> Char_E)
+      Before <$> (zero *> bB) <*> some1 binDigit
 
 plusOrMinus :: (DeltaParsing m, LookAheadParsing m) => m (Either Plus Minus)
 plusOrMinus =
-  try (fmap Left $ char '+' $> Plus) <|>
-  fmap Right (char '-' $> Minus)
+  try (fmap Left plus) <|>
+  fmap Right minus
 
 float :: (DeltaParsing m, LookAheadParsing m) => m (Float' SrcInfo)
 float = try floatDecimalBase <|> try floatDecimalNoBase <|> floatNoDecimal
@@ -529,50 +387,15 @@ float = try floatDecimalBase <|> try floatDecimalNoBase <|> floatNoDecimal
       try (some1 digit') <*>
       ex
 
-    ex = optional (try $ Before <$> e <*> some1 digit')
-
-j :: (DeltaParsing m, LookAheadParsing m) => m (Either Char_j Char_J)
-j = try (fmap Left $ char 'j' $> Char_j) <|> fmap Right (char 'J' $> Char_J)
+    ex = optional (try $ Before <$> eE <*> some1 digit')
 
 imag :: (DeltaParsing m, LookAheadParsing m) => m (Imag SrcInfo)
 imag =
   annotated . fmap Imag $
   Compose <$>
-  (flip After <$> floatOrInt <*> j)
+  (flip After <$> floatOrInt <*> jJ)
   where
     floatOrInt = fmap InL float <|> fmap (InR . Const) (some1 digit')
-
-optionalF :: (DeltaParsing m, LookAheadParsing m) => m (f a) -> m (Compose Maybe f a)
-optionalF m = Compose <$> optional m
-
-some1F :: (DeltaParsing m, LookAheadParsing m) => m (f a) -> m (Compose NonEmpty f a)
-some1F m = Compose <$> some1 m
-
-manyF :: (DeltaParsing m, LookAheadParsing m) => m (f a) -> m (Compose [] f a)
-manyF m = Compose <$> many m
-
-afterF :: (DeltaParsing m, LookAheadParsing m) => m s -> m (f a) -> m (Compose (After s) f a)
-afterF ms ma = fmap Compose $ flip After <$> ma <*> ms
-
-beforeF :: (DeltaParsing m, LookAheadParsing m) => m s -> m (f a) -> m (Compose (Before s) f a)
-beforeF ms ma = fmap Compose $ Before <$> ms <*> ma
-
-betweenF
-  :: (DeltaParsing m, LookAheadParsing m)
-  => m s
-  -> m t
-  -> m (f a)
-  -> m (Compose (Between s t) f a)
-betweenF ms mt ma = fmap Compose $ Between <$> ms <*> ma <*> mt
-
-between'F :: (DeltaParsing m, LookAheadParsing m) => m s -> m (f a) -> m (Compose (Between' s) f a)
-between'F ms ma = fmap (Compose . Between') $ Between <$> ms <*> ma <*> ms
-
-between' :: (DeltaParsing m, LookAheadParsing m) => m s -> m a -> m (Between' s a)
-between' ms ma = fmap Between' $ Between <$> ms <*> ma <*> ms
-
-comma :: (DeltaParsing m, LookAheadParsing m) => m Comma
-comma = char ',' $> Comma
 
 dictOrSetMaker :: (DeltaParsing m, LookAheadParsing m) => m (DictOrSetMaker SrcInfo)
 dictOrSetMaker = error "dictOrSetMaker not implemented"
@@ -970,9 +793,3 @@ andTest =
   AndTest <$>
   notTest <*>
   manyF (try $ beforeF (betweenWhitespace1 kAnd) andTest)
-
-newlineChar :: CharParsing m => m NewlineChar
-newlineChar =
-  (char '\r' $> CR) <|>
-  (char '\n' $> LF) <|>
-  (string "\r\n" $> CRLF)

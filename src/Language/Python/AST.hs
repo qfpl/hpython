@@ -28,9 +28,10 @@ import Language.Python.AST.Identifier
 import Language.Python.AST.Imag
 import Language.Python.AST.Integer
 import Language.Python.AST.Keywords
-import Language.Python.AST.TermOperator
 import Language.Python.AST.StringLiteral
 import Language.Python.AST.Symbols
+import Language.Python.AST.TermOperator
+import Language.Python.AST.VarargsList
 
 data Argument :: AtomType -> ExprContext -> * -> * where
   ArgumentFor ::
@@ -86,10 +87,6 @@ data ArgList (atomType :: AtomType) (ctxt :: ExprContext) a
   }
   deriving (Functor, Foldable, Traversable)
 
-data VarargsList (atomType :: AtomType) (ctxt :: ExprContext) a
-  = VarargsList
-  deriving (Functor, Foldable, Traversable)
-
 data LambdefNocond (atomType :: AtomType) (ctxt :: ExprContext) a
   = LambdefNocond
   { _lambdefNocond_args
@@ -97,7 +94,7 @@ data LambdefNocond (atomType :: AtomType) (ctxt :: ExprContext) a
          Maybe
          (Compose
            (Between (NonEmpty WhitespaceChar) [WhitespaceChar])
-           (VarargsList atomType ctxt))
+           (VarargsList (Test atomType ctxt)))
          a
   , _lambdefNocond_expr
     :: Compose
@@ -626,11 +623,35 @@ data Test :: AtomType -> ExprContext -> * -> * where
     , _testCondIf_ann :: a
     } -> Test 'NotAssignable ctxt a
 
-  TestLambdef :: Test atomType ctxt a
+  TestLambdef ::
+    { _testLambdef_value :: Lambdef 'NotAssignable ctxt a
+    , _testLambdef_ann :: a
+    } -> Test 'NotAssignable ctxt a
 deriving instance Eq c => Eq (Test a b c)
 deriving instance Functor (Test a b)
 deriving instance Foldable (Test a b)
 deriving instance Traversable (Test a b)
+
+data Lambdef :: AtomType -> ExprContext -> * -> * where
+  Lambdef ::
+    { _lambdef_varargs
+      :: Compose
+          Maybe
+          (Compose
+            (Before (NonEmpty WhitespaceChar))
+            (VarargsList (Test 'NotAssignable ctxt)))
+          a
+    , _lambdef_body
+      :: Compose
+           (Before (Between' [WhitespaceChar] Colon))
+           (Test 'NotAssignable ctxt)
+           a
+    , _lambdef_ann :: a
+    } -> Lambdef 'NotAssignable ctxt a
+deriving instance Eq c => Eq (Lambdef a b c)
+deriving instance Functor (Lambdef a b)
+deriving instance Foldable (Lambdef a b)
+deriving instance Traversable (Lambdef a b)
 
 data TestList (atomType :: AtomType) (ctxt :: ExprContext) a
   = TestList
@@ -922,12 +943,6 @@ deriveEq1 ''ArgList
 deriveShow1 ''ArgList
 makeLenses ''ArgList
 
-deriveEq ''VarargsList
-deriveShow ''VarargsList
-deriveEq1 ''VarargsList
-deriveShow1 ''VarargsList
-makeLenses ''VarargsList
-
 deriveEq ''LambdefNocond
 deriveShow ''LambdefNocond
 deriveEq1 ''LambdefNocond
@@ -1069,3 +1084,8 @@ deriveEq ''PythonModule
 deriveShow ''PythonModule
 deriveEq1 ''PythonModule
 deriveShow1 ''PythonModule
+
+makeLenses ''Lambdef
+deriveShow ''Lambdef
+deriveEq1 ''Lambdef
+deriveShow1 ''Lambdef

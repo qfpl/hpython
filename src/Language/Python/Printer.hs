@@ -3,7 +3,6 @@
 module Language.Python.Printer where
 
 import Prelude (error)
-
 import Papa hiding (Plus, Product, Sum, Space, zero, o, argument)
 
 import Data.Functor.Compose
@@ -42,6 +41,7 @@ import Language.Python.AST.StringPrefix
 import Language.Python.AST.Symbols
 import Language.Python.AST.TermOperator
 import Language.Python.AST.StringContent (stringContent)
+import Language.Python.AST.VarargsList
 
 identifier :: Identifier a -> Doc
 identifier i = i ^. identifier_value . to T.unpack . to text
@@ -469,12 +469,38 @@ asterisk _ = char '*'
 doubleAsterisk :: DoubleAsterisk -> Doc
 doubleAsterisk _ = text "**"
 
-
 compIter :: CompIter atomType ctxt a -> Doc
 compIter (CompIter val _) = sumElim compFor compIf val
 
-varargsList :: VarargsList atomType ctxt a -> Doc
-varargsList = error "varargsList not implemented" 
+varargsListArg :: (forall x. f x -> Doc) -> VarargsListArg f a -> Doc
+varargsListArg f (VarargsListArg l r _) =
+  identifier l <>
+  foldMapF (beforeF (betweenWhitespace' . const $ char '=') f) r
+
+varargsListStarPart :: (forall x. f x -> Doc) -> VarargsListStarPart f a -> Doc
+varargsListStarPart f (VarargsListStarPart h t r _) =
+  beforeF (betweenWhitespace' . const $ text "*") (foldMapF identifier) h <>
+  foldMapF (foldMapF $ varargsListArg f) t <>
+  foldMapF (foldMapF varargsListDoublestarArg) r
+
+varargsListDoublestarArg :: VarargsListDoublestarArg a -> Doc
+varargsListDoublestarArg (VarargsListDoublestarArg a _) =
+  text "**" <>
+  betweenWhitespace'F identifier a
+
+varargsList :: (forall x. f x -> Doc) -> VarargsList f a -> Doc
+varargsList f e =
+  case e of
+    VarargsListAll h t r _ ->
+      varargsListArg f h <>
+      foldMapF (foldMapF $ varargsListArg f) t <>
+      foldMapF (foldMapF (foldMapF starOrDouble)) r
+    VarargsListArgsKwargs a _ -> starOrDouble a
+  where
+    starOrDouble e' =
+      case e' of
+        InL a -> varargsListStarPart f a
+        InR a -> varargsListDoublestarArg a
 
 lambdefNocond :: LambdefNocond atomType ctxt a -> Doc
 lambdefNocond  (LambdefNocond a e _) =
@@ -483,7 +509,7 @@ lambdefNocond  (LambdefNocond a e _) =
     (betweenF
       (foldMap whitespaceChar)
       (foldMap whitespaceChar)
-      varargsList)
+      (varargsList test))
     a <>
   char ':' <>
   whitespaceBeforeF testNocond e
@@ -773,7 +799,13 @@ test t =
     TestCondIf h t' _ ->
       orTest h <>
       whitespaceBeforeF ifThenElse t'
-    TestLambdef -> error "testLambdef not implemented"
+    TestLambdef a _ -> lambdef a
+    
+lambdef :: Lambdef atomType ctxt a -> Doc
+lambdef (Lambdef a b _) =
+  text "lambda" <>
+  foldMapF (whitespaceBeforeF $ varargsList test) a <>
+  beforeF (betweenWhitespace' colon) test b
 
 comment :: Comment a -> Doc
 comment (Comment val _) = char '#' <> text (T.unpack val)

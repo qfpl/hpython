@@ -20,6 +20,7 @@ import qualified Data.Set as S
 
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
+import Language.Python.AST.VarargsList
 import Language.Python.Parser.IR.SyntaxConfig
 
 import qualified Language.Python.AST as Safe
@@ -41,6 +42,7 @@ data InvalidLHS
   | LHSTrue
   | LHSFalse
   | LHSSingleStarExpr
+  | LHSLambda
   deriving (Eq, Show, Ord)
 
 data SyntaxError a
@@ -116,7 +118,31 @@ checkTest cfg e =
               checkOrTest cfg h <*>
               traverseOf traverseCompose (checkIfThenElse cfg) t' <*>
               pure ann
-    IR.TestLambdef -> error "checkTestLambdef not implemented"
+    IR.TestLambdef l ann ->
+      case cfg ^. atomType of
+        Safe.SAssignable ->
+          syntaxError $ CannotAssignTo LHSLambda ann
+        Safe.SNotAssignable ->
+          Safe.TestLambdef <$>
+          checkLambdef cfg l <*>
+          pure ann
+
+checkLambdef
+  :: SyntaxConfig atomType ctxt
+  -> IR.Lambdef ann
+  -> SyntaxChecker ann (Safe.Lambdef 'Safe.NotAssignable ctxt ann)
+checkLambdef cfg (IR.Lambdef as b ann) =
+  case cfg ^. atomType of
+    Safe.SAssignable ->
+      syntaxError $ CannotAssignTo LHSLambda ann
+    Safe.SNotAssignable ->
+      Safe.Lambdef <$>
+      traverseOf
+        (traverseCompose.traverseCompose)
+        (checkVarargsList cfg)
+        as <*>
+      traverseCompose (checkTest cfg) b <*>
+      pure ann
 
 checkIfThenElse
   :: SyntaxConfig atomType ctxt
@@ -638,11 +664,54 @@ checkLambdefNocond cfg (IR.LambdefNocond args ex ann) =
   traverseCompose (checkTestNocond cfg) ex <*>
   pure ann
 
+checkVarargsListArg
+  :: SyntaxConfig atomType ctxt
+  -> VarargsListArg IR.Test ann
+  -> SyntaxChecker ann (VarargsListArg (Safe.Test atomType ctxt) ann)
+checkVarargsListArg cfg (VarargsListArg l r ann) =
+  VarargsListArg <$>
+  checkIdentifier cfg l <*>
+  traverseOf (traverseCompose.traverseCompose) (checkTest cfg) r <*>
+  pure ann
+
+checkVarargsListStarPart
+  :: SyntaxConfig atomType ctxt
+  -> VarargsListStarPart IR.Test ann
+  -> SyntaxChecker ann (VarargsListStarPart (Safe.Test atomType ctxt) ann)
+checkVarargsListStarPart cfg (VarargsListStarPart h t r ann) =
+  VarargsListStarPart <$>
+  traverseOf (traverseCompose.traverseCompose) (checkIdentifier cfg) h <*>
+  traverseOf (traverseCompose.traverseCompose) (checkVarargsListArg cfg) t <*>
+  pure r <*>
+  pure ann
+
 checkVarargsList
   :: SyntaxConfig atomType ctxt
-  -> IR.VarargsList ann
-  -> SyntaxChecker ann (Safe.VarargsList atomType ctxt ann)
-checkVarargsList _ _ = error "checkVarargsList not implemented"
+  -> VarargsList IR.Test ann
+  -> SyntaxChecker ann (VarargsList (Safe.Test atomType ctxt) ann)
+checkVarargsList cfg e =
+  case e of
+    VarargsListAll a b c ann ->
+      VarargsListAll <$>
+      checkVarargsListArg cfg a <*>
+      traverseOf
+        (traverseCompose.traverseCompose)
+        (checkVarargsListArg cfg)
+        b <*>
+      traverseOf
+        (traverseCompose.traverseCompose.traverseCompose)
+        starOrDouble
+        c <*>
+      pure ann
+    VarargsListArgsKwargs a ann ->
+      VarargsListArgsKwargs <$>
+      starOrDouble a <*>
+      pure ann
+  where
+    starOrDouble e' =
+      case e' of
+        InL a -> InL <$> checkVarargsListStarPart cfg a
+        InR a -> pure $ InR a
 
 checkSubscriptList
   :: SyntaxConfig atomType ctxt

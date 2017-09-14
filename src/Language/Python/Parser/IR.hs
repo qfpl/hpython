@@ -25,6 +25,7 @@ import Language.Python.AST.Keywords
 import Language.Python.AST.StringLiteral
 import Language.Python.AST.Symbols
 import Language.Python.AST.TermOperator
+import Language.Python.AST.VarargsList
 
 data Argument a
   = ArgumentFor
@@ -77,10 +78,6 @@ data ArgList a
   }
   deriving (Functor, Foldable, Traversable)
 
-data VarargsList a
-  = VarargsList
-  deriving (Functor, Foldable, Traversable)
-
 data LambdefNocond a
   = LambdefNocond
   { _lambdefNocond_args
@@ -88,7 +85,7 @@ data LambdefNocond a
          Maybe
          (Compose
            (Between (NonEmpty WhitespaceChar) [WhitespaceChar])
-           VarargsList)
+           (VarargsList Test))
          a
   , _lambdefNocond_expr
     :: Compose
@@ -435,9 +432,30 @@ data Test a
            (Before (NonEmpty WhitespaceChar))
            IfThenElse)
         a
-  , _testCond_ann :: a
+  , _test_ann :: a
   }
   | TestLambdef
+  { _testLambdef_value :: Lambdef a
+  , _test_ann :: a
+  }
+  deriving (Functor, Foldable, Traversable)
+
+data Lambdef a
+  = Lambdef
+  { _lambdef_varargs
+    :: Compose
+         Maybe
+         (Compose
+           (Before (NonEmpty WhitespaceChar))
+           (VarargsList Test))
+         a
+  , _lambdef_body
+    :: Compose
+         (Before (Between' [WhitespaceChar] Colon))
+         Test
+         a
+  , _lambdef_ann :: a
+  }
   deriving (Functor, Foldable, Traversable)
 
 data TestList a
@@ -657,12 +675,6 @@ deriveShow ''ArgList
 deriveShow1 ''ArgList
 makeLenses ''ArgList
 
-deriveEq ''VarargsList
-deriveEq1 ''VarargsList
-deriveShow ''VarargsList
-deriveShow1 ''VarargsList
-makeLenses ''VarargsList
-
 deriveEq ''LambdefNocond
 deriveEq1 ''LambdefNocond
 deriveShow ''LambdefNocond
@@ -818,3 +830,9 @@ deriveEq1 ''Atom
 deriveShow ''Atom
 deriveShow1 ''Atom
 makeLenses ''Atom
+
+deriveEq ''Lambdef
+deriveEq1 ''Lambdef
+deriveShow ''Lambdef
+deriveShow1 ''Lambdef
+makeLenses ''Lambdef

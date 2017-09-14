@@ -3,7 +3,6 @@
 {-# language GADTs #-}
 module Test.Language.Python.AST.Gen where
 
-import Prelude (error)
 import Papa
 
 import Control.Monad
@@ -44,6 +43,7 @@ import qualified Language.Python.AST.StringPrefix as AST
 import qualified Language.Python.AST.Symbols as AST
 import qualified Language.Python.AST.TermOperator as AST
 import qualified Language.Python.AST.StringContent as SC
+import qualified Language.Python.AST.VarargsList as AST
 import Language.Python.Parser.IR.SyntaxConfig
 
 genBefore :: MonadGen m => m s -> m a -> m (Before s a)
@@ -737,11 +737,79 @@ genAtom cfg =
     genStringOrBytes _ =
       Gen.choice [ InL <$> genStringLiteral, InR <$> genBytesLiteral ]
 
+genVarargsListArg
+  :: MonadGen m
+  => SyntaxConfig atomType ctxt
+  -> m (f ())
+  -> m (AST.VarargsListArg f ())
+genVarargsListArg cfg gen =
+  AST.VarargsListArg <$>
+  genIdentifier <*>
+  genMaybeF
+    (genBeforeF
+       (genBetweenWhitespace $ pure AST.Equals)
+       gen) <*>
+  pure ()
+
+genVarargsListStarPart
+  :: MonadGen m
+  => SyntaxConfig atomType ctxt
+  -> m (f ())
+  -> m (AST.VarargsListStarPart f ())
+genVarargsListStarPart cfg gen =
+  AST.VarargsListStarPart <$>
+  genBeforeF
+    (genBetweenWhitespace $ pure AST.Asterisk)
+    (genMaybeF genIdentifier) <*>
+  genListF
+    (genBeforeF
+      (genBetweenWhitespace $ pure AST.Comma)
+      (genVarargsListArg cfg gen)) <*>
+  genMaybeF
+    (genBeforeF
+      (genBetweenWhitespace $ pure AST.Comma)
+      (genVarargsListDoublestarArg cfg)) <*>
+  pure ()
+
+genVarargsListDoublestarArg
+  :: MonadGen m
+  => SyntaxConfig atomType ctxt
+  -> m (AST.VarargsListDoublestarArg ())
+genVarargsListDoublestarArg cfg =
+  AST.VarargsListDoublestarArg <$>
+  genBetweenWhitespaceF genIdentifier <*>
+  pure ()
+
 genVarargsList
   :: MonadGen m
   => SyntaxConfig atomType ctxt
-  -> m (AST.VarargsList atomType ctxt ())
-genVarargsList _ = pure AST.VarargsList
+  -> m (f ())
+  -> m (AST.VarargsList f ())
+genVarargsList cfg gen =
+  Gen.choice
+    [ Gen.small $
+      AST.VarargsListAll <$>
+      genVarargsListArg cfg gen <*>
+      genListF
+        (genBeforeF
+          (genBetweenWhitespace $ pure AST.Comma)
+          (genVarargsListArg cfg gen)) <*>
+      genMaybeF
+        (genBeforeF
+          (genBetweenWhitespace $ pure AST.Comma)
+          (genMaybeF genStarOrDouble)) <*>
+      pure ()
+    , Gen.small $
+      AST.VarargsListArgsKwargs <$>
+      genStarOrDouble <*>
+      pure ()
+    ]
+  where
+    genStarOrDouble =
+      Gen.choice
+        [ Gen.small $ InL <$> genVarargsListStarPart cfg gen
+        , InR <$> genVarargsListDoublestarArg cfg
+        ]
 
 genLambdefNocond
   :: MonadGen m
@@ -751,7 +819,7 @@ genLambdefNocond cfg =
   AST.LambdefNocond <$>
   genMaybeF
     (Gen.small . genBetweenF genWhitespace1 genWhitespace $
-      genVarargsList cfg) <*>
+      genVarargsList cfg (genTest cfg)) <*>
   genWhitespaceBeforeF (Gen.small $ genTestNocond cfg) <*>
   pure ()
 
@@ -1293,13 +1361,28 @@ genTest cfg =
             genWhitespace1
             (Gen.small $ genIfThenElse cfg) <*>
           pure ()
-        -- , pure AST.TestLambdef
+        , Gen.small $
+          AST.TestLambdef <$>
+          genLambdef cfg <*>
+          pure ()
         ]
   where
     testCondNoIf cfg' =
       AST.TestCondNoIf <$>
       Gen.small (genOrTest cfg') <*>
       pure ()
+
+genLambdef
+  :: MonadGen m
+  => SyntaxConfig 'AST.NotAssignable ctxt
+  -> m (AST.Lambdef 'AST.NotAssignable ctxt ())
+genLambdef cfg =
+  AST.Lambdef <$>
+  genMaybeF (genWhitespaceBefore1F . genVarargsList cfg $ genTest cfg) <*>
+  genBeforeF
+    (genBetweenWhitespace $ pure AST.Colon)
+    (genTest cfg) <*>
+  pure ()
 
 genStringContent
   :: ( MonadGen m

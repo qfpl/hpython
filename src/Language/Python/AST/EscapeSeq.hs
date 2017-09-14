@@ -1,13 +1,7 @@
-module Language.Python.AST.EscapeSeq
-  ( EscapeSeq(..)
-  , _Escape
-  , escapeSeq
-  , isEscapeChar
-  ) where
+module Language.Python.AST.EscapeSeq where
 
 import Papa
 import Data.Digit
-import Text.Parser.Char
 import Text.Trifecta
 
 import Language.Python.AST.Digits
@@ -43,23 +37,6 @@ isEscapeChar c =
     'v' -> True
     _ -> False
 
-escapeSeq :: CharParsing m => m EscapeSeq
-escapeSeq =
-  char '\\' *>
-  (try (string "newline" $> Slash_newline) <|>
-   try (string "\\" $> Slash_backslash) <|>
-   try (string "'" $> Slash_singlequote) <|>
-   try (string "\"" $> Slash_doublequote) <|>
-   try (string "a" $> Slash_a) <|>
-   try (string "f" $> Slash_f) <|>
-   try (string "b" $> Slash_b) <|>
-   try (string "n" $> Slash_n) <|>
-   try (string "r" $> Slash_r) <|>
-   try (string "t" $> Slash_t) <|>
-   try (string "v" $> Slash_v) <|>
-   try (Slash_octal <$> some1 parseOctal) <|>
-   (Slash_hex <$> parseHeXaDeCiMaL <*> some1 parseHeXaDeCiMaL))
-
 _Escape :: Prism' String EscapeSeq
 _Escape =
   prism'
@@ -78,6 +55,24 @@ _Escape =
         Slash_v -> "v"
         Slash_octal oct -> foldMap printOctDigit oct
         Slash_hex h hs -> 'x' : printHexDigit h <> foldMap printHexDigit hs)
-    (\val -> case parseString escapeSeq mempty val of
-        Success res -> Just res
-        Failure _ -> Nothing)
+    (\val -> case val of
+        "" -> Nothing
+        '\\' : rest -> case rest of
+          "newline" -> Just Slash_newline
+          "\\" -> Just Slash_backslash
+          "'" -> Just Slash_singlequote
+          "\"" -> Just Slash_doublequote
+          "a" -> Just Slash_a
+          "f" -> Just Slash_f
+          "b" -> Just Slash_b
+          "n" -> Just Slash_n
+          "r" -> Just Slash_r
+          "t" -> Just Slash_t
+          "v" -> Just Slash_v
+          _ -> case parseString (try oct <|> hex) mempty rest of
+            Success a -> Just a
+            Failure _ -> Nothing
+            where
+              oct = Slash_octal <$> some1 parseOctal
+              hex = Slash_hex <$> (char 'x' *> parseHeXaDeCiMaL) <*> some1 parseHeXaDeCiMaL
+        _ -> Nothing)

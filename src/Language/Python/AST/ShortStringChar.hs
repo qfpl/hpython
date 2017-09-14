@@ -20,7 +20,7 @@ import GHC.Stack
 import Text.Parser.Char
 
 import Language.Python.AST.Symbols (SingleQuote, DoubleQuote)
-import Language.Python.AST.TripleString
+import Language.Python.AST.StringContent
 
 data ShortStringChar inside where
   ShortStringCharSingle :: Char -> ShortStringChar SingleQuote

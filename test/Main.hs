@@ -4,7 +4,8 @@ import Papa
 import Test.Tasty
 
 import Test.Language.Python.ParserPrinter (makeParserPrinterTests)
-import Test.Language.Python.AST.TripleString (tripleStringTests)
+import Test.Language.Python.AST.EscapeSeq (escapeSeqTests)
+import Test.Language.Python.AST.StringContent (stringContentTests)
 
 main :: IO ()
 main = do
@@ -12,5 +13,6 @@ main = do
   defaultMain $
     testGroup "hpython-tests"
     [ testGroup "parser+printer" parserPrinterTests
-    , testGroup "TripleString" tripleStringTests
+    , testGroup "StringContent" stringContentTests
+    , testGroup "EscapeSeq" escapeSeqTests
     ]

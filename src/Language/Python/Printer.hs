@@ -41,7 +41,7 @@ import Language.Python.AST.StringLiteral
 import Language.Python.AST.StringPrefix
 import Language.Python.AST.Symbols
 import Language.Python.AST.TermOperator
-import Language.Python.AST.TripleString (tripleStringContent)
+import Language.Python.AST.StringContent (stringContent)
 
 identifier :: Identifier a -> Doc
 identifier i = i ^. identifier_value . to T.unpack . to text
@@ -206,13 +206,13 @@ shortString s =
     ShortStringSingle val _ ->
       quotes $
       foldMapOf
-        tripleStringContent
+        stringContent
         (either escape shortStringCharSingle)
         val
     ShortStringDouble val _ ->
       doubleQuotes $
       foldMapOf
-        tripleStringContent
+        stringContent
         (either escape shortStringCharDouble)
         val
 
@@ -233,13 +233,13 @@ longString s =
     LongStringSingle cs _ ->
       tripled quotes $
       foldMapOf
-        tripleStringContent
+        stringContent
         (either escape longStringChar)
         cs
     LongStringDouble cs _ ->
       tripled doubleQuotes $
       foldMapOf
-        tripleStringContent
+        stringContent
         (either escape longStringChar)
         cs
 
@@ -269,13 +269,13 @@ shortBytes s =
     ShortBytesSingle val _ ->
       quotes $
       foldMapOf
-        tripleStringContent
+        stringContent
         (either escape shortBytesCharSingle)
         val
     ShortBytesDouble val _ ->
       doubleQuotes $
       foldMapOf
-        tripleStringContent
+        stringContent
         (either escape shortBytesCharDouble)
         val
 
@@ -296,13 +296,13 @@ longBytes s =
     LongBytesSingle cs _ ->
       tripled quotes $
       foldMapOf
-        tripleStringContent
+        stringContent
         (either escape longBytesChar)
         cs
     LongBytesDouble cs _ ->
       tripled doubleQuotes $
       foldMapOf
-        tripleStringContent
+        stringContent
         (either escape longBytesChar)
         cs
 

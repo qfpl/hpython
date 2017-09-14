@@ -43,7 +43,7 @@ import qualified Language.Python.AST.StringLiteral as AST
 import qualified Language.Python.AST.StringPrefix as AST
 import qualified Language.Python.AST.Symbols as AST
 import qualified Language.Python.AST.TermOperator as AST
-import qualified Language.Python.AST.TripleString as TS
+import qualified Language.Python.AST.StringContent as SC
 import Language.Python.Parser.IR.SyntaxConfig
 
 genBefore :: MonadGen m => m s -> m a -> m (Before s a)
@@ -527,10 +527,10 @@ genShortString :: MonadGen m => m (AST.ShortString ())
 genShortString =
   Gen.choice
     [ AST.ShortStringSingle <$>
-      genTripleStringContent (Range.linear 0 20) <*>
+      genStringContent (Range.linear 0 20) <*>
       pure ()
     , AST.ShortStringDouble <$>
-      genTripleStringContent (Range.linear 0 20) <*>
+      genStringContent (Range.linear 0 20) <*>
       pure ()
     ]
 
@@ -558,10 +558,10 @@ genLongString =
     [ pure $ AST.LongStringSingleEmpty ()
     , pure $ AST.LongStringDoubleEmpty ()
     , AST.LongStringSingle <$>
-      genTripleStringContent (Range.linear 0 20) <*>
+      genStringContent (Range.linear 0 20) <*>
       pure ()
     , AST.LongStringDouble <$>
-      genTripleStringContent (Range.linear 0 20) <*>
+      genStringContent (Range.linear 0 20) <*>
       pure ()
     ]
 
@@ -597,10 +597,10 @@ genLongBytes =
     [ pure $ AST.LongBytesSingleEmpty ()
     , pure $ AST.LongBytesDoubleEmpty ()
     , AST.LongBytesSingle <$>
-      genTripleStringContent (Range.linear 0 20) <*>
+      genStringContent (Range.linear 0 20) <*>
       pure ()
     , AST.LongBytesDouble <$>
-      genTripleStringContent (Range.linear 0 20) <*>
+      genStringContent (Range.linear 0 20) <*>
       pure ()
     ]
 
@@ -640,10 +640,10 @@ genShortBytes :: MonadGen m => m (AST.ShortBytes ())
 genShortBytes =
   Gen.choice
     [ AST.ShortBytesSingle <$>
-      genTripleStringContent (Range.linear 0 20) <*>
+      genStringContent (Range.linear 0 20) <*>
       pure ()
     , AST.ShortBytesDouble <$>
-      genTripleStringContent (Range.linear 0 20) <*>
+      genStringContent (Range.linear 0 20) <*>
       pure ()
     ]
 
@@ -1301,30 +1301,30 @@ genTest cfg =
       Gen.small (genOrTest cfg') <*>
       pure ()
 
-genTripleStringContent
+genStringContent
   :: ( MonadGen m
-     , TS.AsChar a
-     , TS.TripleStringInside b
+     , SC.AsChar a
+     , SC.StringInside b
      )
   => Range Int
-  -> m (TS.TripleStringContent b a)
-genTripleStringContent range =
+  -> m (SC.StringContent b a)
+genStringContent range =
   Gen.just $
-    preview TS._TripleStringContent <$>
+    preview SC._StringContent <$>
     Gen.string range (Gen.element [' '..'~'])
 
-genTripleStringContentSingle
+genStringContentSingle
   :: ( MonadGen m
-     , TS.AsChar a
+     , SC.AsChar a
      )
   => Range Int
-  -> m (TS.TripleStringContent AST.SingleQuote a)
-genTripleStringContentSingle = genTripleStringContent
+  -> m (SC.StringContent AST.SingleQuote a)
+genStringContentSingle = genStringContent
 
-genTripleStringContentDouble
+genStringContentDouble
   :: ( MonadGen m
-     , TS.AsChar a
+     , SC.AsChar a
      )
   => Range Int
-  -> m (TS.TripleStringContent AST.DoubleQuote a)
-genTripleStringContentDouble = genTripleStringContent
+  -> m (SC.StringContent AST.DoubleQuote a)
+genStringContentDouble = genStringContent

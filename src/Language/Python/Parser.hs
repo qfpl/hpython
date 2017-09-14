@@ -47,9 +47,11 @@ import Language.Python.AST.StringLiteral
 import Language.Python.AST.StringPrefix
 import Language.Python.AST.Symbols as S
 import Language.Python.AST.TermOperator
-import Language.Python.AST.TripleString
+import Language.Python.AST.StringContent
+import Language.Python.Parser.EscapeSeq
 import Language.Python.Parser.IR
 import Language.Python.Parser.SrcInfo
+import Language.Python.Parser.StringContent
 
 leftParen :: (DeltaParsing m, LookAheadParsing m) => m LeftParen
 leftParen = char '(' $> LeftParen
@@ -267,7 +269,7 @@ shortString = try shortStringSingle <|> shortStringDouble
       between
         singleQuote
         singleQuote
-        (parseTripleStringContentSingle parseShortStringCharSingle singleQuote)
+        (parseStringContentSingle parseShortStringCharSingle singleQuote)
 
     shortStringDouble =
       annotated $
@@ -275,7 +277,7 @@ shortString = try shortStringSingle <|> shortStringDouble
       between
         doubleQuote
         doubleQuote
-        (parseTripleStringContentDouble parseShortStringCharDouble doubleQuote)
+        (parseStringContentDouble parseShortStringCharDouble doubleQuote)
 
 longString :: (HasCallStack, DeltaParsing m, LookAheadParsing m) => m (LongString SrcInfo)
 longString =
@@ -288,7 +290,7 @@ longString =
       between
         tripleSinglequote
         tripleSinglequote
-        (parseTripleStringContentSingle parseLongStringChar tripleSinglequote)
+        (parseStringContentSingle parseLongStringChar tripleSinglequote)
 
     longStringDouble =
       annotated $
@@ -296,7 +298,7 @@ longString =
       between
         tripleDoublequote
         tripleDoublequote
-        (parseTripleStringContentDouble parseLongStringChar tripleDoublequote)
+        (parseStringContentDouble parseLongStringChar tripleDoublequote)
 
 stringLiteral :: (DeltaParsing m, LookAheadParsing m) => m (StringLiteral SrcInfo)
 stringLiteral =
@@ -328,7 +330,7 @@ shortBytes = try shortBytesSingle <|> shortBytesDouble
       between
         singleQuote
         singleQuote
-        (parseTripleStringContentSingle parseShortBytesCharSingle singleQuote)
+        (parseStringContentSingle parseShortBytesCharSingle singleQuote)
 
     shortBytesDouble =
       annotated $
@@ -336,7 +338,7 @@ shortBytes = try shortBytesSingle <|> shortBytesDouble
       between
         doubleQuote
         doubleQuote
-        (parseTripleStringContentDouble parseShortBytesCharDouble doubleQuote)
+        (parseStringContentDouble parseShortBytesCharDouble doubleQuote)
 
 tripleDoublequote :: (DeltaParsing m, LookAheadParsing m) => m ()
 tripleDoublequote = string "\"\"\"" $> ()
@@ -373,7 +375,7 @@ longBytes =
       between
         tripleSinglequote
         tripleSinglequote
-        (parseTripleStringContentSingle parseLongBytesChar tripleSinglequote)
+        (parseStringContentSingle parseLongBytesChar tripleSinglequote)
 
     longBytesDouble =
       annotated $
@@ -381,7 +383,7 @@ longBytes =
       between
         tripleDoublequote
         tripleDoublequote
-        (parseTripleStringContentDouble parseLongBytesChar tripleDoublequote)
+        (parseStringContentDouble parseLongBytesChar tripleDoublequote)
 
 bytesLiteral :: (DeltaParsing m, LookAheadParsing m) => m (BytesLiteral SrcInfo)
 bytesLiteral =

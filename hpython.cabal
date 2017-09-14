@@ -42,12 +42,14 @@ library
                        Language.Python.AST.StringLiteral
                        Language.Python.AST.StringPrefix
                        Language.Python.AST.Symbols
+                       Language.Python.AST.StringContent
                        Language.Python.AST.TermOperator
-                       Language.Python.AST.TripleString
                        Language.Python.Parser
                        Language.Python.Parser.IR
                        Language.Python.Parser.IR.SyntaxConfig
                        Language.Python.Parser.IR.Checker
+                       Language.Python.Parser.EscapeSeq
+                       Language.Python.Parser.StringContent
                        Language.Python.Parser.SrcInfo
                        Language.Python.Printer
                        Data.Separated.After

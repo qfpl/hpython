@@ -10,7 +10,7 @@ import Data.Deriving
 import Language.Python.AST.EscapeSeq
 import Language.Python.AST.LongStringChar
 import Language.Python.AST.Symbols
-import Language.Python.AST.TripleString
+import Language.Python.AST.StringContent
 
 -- | Between three quotes
 data LongString a
@@ -22,12 +22,12 @@ data LongString a
   }
   | LongStringSingle
   { _longStringSingle_value
-    :: TripleStringContent SingleQuote LongStringChar
+    :: StringContent SingleQuote LongStringChar
   , _longString_ann :: a
   }
   | LongStringDouble
   { _longStringDouble_value
-    :: TripleStringContent DoubleQuote LongStringChar
+    :: StringContent DoubleQuote LongStringChar
   , _longString_ann :: a
   }
   deriving (Functor, Foldable, Traversable)

@@ -50,6 +50,7 @@ library
                        Language.Python.Parser.IR
                        Language.Python.Parser.IR.SyntaxConfig
                        Language.Python.Parser.IR.Checker
+                       Language.Python.Parser.IR.VarargsList
                        Language.Python.Parser.EscapeSeq
                        Language.Python.Parser.Identifier
                        Language.Python.Parser.StringContent
@@ -57,6 +58,7 @@ library
                        Language.Python.Parser.Symbols
                        Language.Python.Parser.VarargsList
                        Language.Python.Printer
+                       Data.Functor.Sum.Lens
                        Data.Separated.After
                        Data.Separated.Before
                        Data.Separated.Between

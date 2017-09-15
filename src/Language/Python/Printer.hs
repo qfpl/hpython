@@ -483,7 +483,7 @@ varargsListStarPart f e =
     VarargsListStarPartEmpty _ -> mempty
     VarargsListStarPart h t r _ ->
       beforeF (betweenWhitespace' . const $ text "*") identifier h <>
-      foldMapF (foldMapF $ varargsListArg f) t <>
+      foldMapF (beforeF (betweenWhitespace' comma) $ varargsListArg f) t <>
       foldMapF (beforeF (betweenWhitespace' comma) varargsListDoublestarArg) r
 
 varargsListDoublestarArg :: VarargsListDoublestarArg a -> Doc
@@ -493,15 +493,18 @@ varargsListDoublestarArg (VarargsListDoublestarArg a _) =
 
 varargsList :: (forall x. f x -> Doc) -> VarargsList f a -> Doc
 varargsList f e =
-  case e of
-    VarargsListAll h t r _ ->
-      varargsListArg f h <>
-      foldMapF (foldMapF $ varargsListArg f) t <>
-      foldMapF
-        (beforeF
-          (betweenWhitespace' comma)
-          (foldMapF $ starOrDouble f)) r
-    VarargsListArgsKwargs a _ -> starOrDouble f a
+  Just e &
+    (outside _VarargsListAll .~
+       (\(h, t, r, _) ->
+         varargsListArg f h <>
+         foldMapF (beforeF (betweenWhitespace' comma) $ varargsListArg f) t <>
+         foldMapF
+           (beforeF
+             (betweenWhitespace' comma)
+             (foldMapF $ starOrDouble f)) r) $
+     outside _VarargsListArgsKwargs .~
+       (\(a, _) -> starOrDouble f a) $
+     error "incomplete pattern")
   where
     starOrDouble
       :: (forall x. f x -> Doc)

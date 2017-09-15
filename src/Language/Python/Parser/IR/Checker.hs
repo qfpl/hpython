@@ -20,11 +20,12 @@ import qualified Data.Set as S
 
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
-import Language.Python.AST.VarargsList
 import Language.Python.Parser.IR.SyntaxConfig
 
 import qualified Language.Python.AST as Safe
+import qualified Language.Python.AST.VarargsList as Safe
 import qualified Language.Python.Parser.IR as IR
+import qualified Language.Python.Parser.IR.VarargsList as IR
 
 data InvalidLHS
   = LHSIf
@@ -55,6 +56,7 @@ data SyntaxError a
   | UnpackingInComprehension a
   -- ^ (*a)
   | UnpackingInParens a
+  | DuplicateArguments [Identifier a] a
   deriving (Eq, Show, Ord)
 
 newtype SyntaxChecker ann a
@@ -76,6 +78,16 @@ runChecker c =
 
 syntaxError :: SyntaxError ann -> SyntaxChecker ann a
 syntaxError = SyntaxChecker . AccFailure . D.singleton
+
+liftError
+  :: (b -> SyntaxError ann)
+  -> SyntaxChecker ann (Either b a)
+  -> SyntaxChecker ann a
+liftError f err =
+  SyntaxChecker $ case runSyntaxChecker err of
+    AccSuccess (Left e) -> AccFailure $ D.singleton (f e)
+    AccSuccess (Right a) -> AccSuccess a
+    AccFailure es -> AccFailure es
 
 traverseCompose
   :: Traversable f
@@ -666,23 +678,23 @@ checkLambdefNocond cfg (IR.LambdefNocond args ex ann) =
 
 checkVarargsListArg
   :: SyntaxConfig atomType ctxt
-  -> VarargsListArg IR.Test ann
-  -> SyntaxChecker ann (VarargsListArg (Safe.Test atomType ctxt) ann)
-checkVarargsListArg cfg (VarargsListArg l r ann) =
-  VarargsListArg <$>
+  -> Safe.VarargsListArg IR.Test ann
+  -> SyntaxChecker ann (Safe.VarargsListArg (Safe.Test atomType ctxt) ann)
+checkVarargsListArg cfg (Safe.VarargsListArg l r ann) =
+  Safe.VarargsListArg <$>
   checkIdentifier cfg l <*>
   traverseOf (traverseCompose.traverseCompose) (checkTest cfg) r <*>
   pure ann
 
 checkVarargsListStarPart
   :: SyntaxConfig atomType ctxt
-  -> VarargsListStarPart IR.Test ann
-  -> SyntaxChecker ann (VarargsListStarPart (Safe.Test atomType ctxt) ann)
+  -> Safe.VarargsListStarPart IR.Test ann
+  -> SyntaxChecker ann (Safe.VarargsListStarPart (Safe.Test atomType ctxt) ann)
 checkVarargsListStarPart cfg e =
   case e of
-    VarargsListStarPartEmpty ann -> pure $ VarargsListStarPartEmpty ann
-    VarargsListStarPart h t r ann ->
-      VarargsListStarPart <$>
+    Safe.VarargsListStarPartEmpty ann -> pure $ Safe.VarargsListStarPartEmpty ann
+    Safe.VarargsListStarPart h t r ann ->
+      Safe.VarargsListStarPart <$>
       traverseCompose (checkIdentifier cfg) h <*>
       traverseOf
         (traverseCompose.traverseCompose)
@@ -693,26 +705,30 @@ checkVarargsListStarPart cfg e =
 
 checkVarargsList
   :: SyntaxConfig atomType ctxt
-  -> VarargsList IR.Test ann
-  -> SyntaxChecker ann (VarargsList (Safe.Test atomType ctxt) ann)
+  -> IR.VarargsList IR.Test ann
+  -> SyntaxChecker ann (Safe.VarargsList (Safe.Test atomType ctxt) ann)
 checkVarargsList cfg e =
   case e of
-    VarargsListAll a b c ann ->
-      VarargsListAll <$>
-      checkVarargsListArg cfg a <*>
-      traverseOf
-        (traverseCompose.traverseCompose)
-        (checkVarargsListArg cfg)
-        b <*>
-      traverseOf
-        (traverseCompose.traverseCompose.traverseCompose)
-        starOrDouble
-        c <*>
-      pure ann
-    VarargsListArgsKwargs a ann ->
-      VarargsListArgsKwargs <$>
-      starOrDouble a <*>
-      pure ann
+    IR.VarargsListAll a b c ann ->
+      liftError
+        (\(Safe.DuplicateArgumentsError e) -> DuplicateArguments e ann) $
+        Safe.mkVarargsListAll <$>
+        checkVarargsListArg cfg a <*>
+        traverseOf
+          (traverseCompose.traverseCompose)
+          (checkVarargsListArg cfg)
+          b <*>
+        traverseOf
+          (traverseCompose.traverseCompose.traverseCompose)
+          starOrDouble
+          c <*>
+        pure ann
+    IR.VarargsListArgsKwargs a ann ->
+      liftError
+        (\(Safe.DuplicateArgumentsError e) -> DuplicateArguments e ann) $
+        Safe.mkVarargsListArgsKwargs <$>
+        starOrDouble a <*>
+        pure ann
   where
     starOrDouble e' =
       case e' of

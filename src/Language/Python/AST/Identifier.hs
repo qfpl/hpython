@@ -12,10 +12,8 @@ data Identifier a
   = Identifier
   { _identifier_value :: Text
   , _identifier_ann :: a
-  } deriving (Functor, Foldable, Traversable)
+  } deriving (Eq, Show, Functor, Foldable, Traversable, Ord)
 
-deriveEq ''Identifier
-deriveShow ''Identifier
 deriveEq1 ''Identifier
 deriveShow1 ''Identifier
 makeLenses ''Identifier

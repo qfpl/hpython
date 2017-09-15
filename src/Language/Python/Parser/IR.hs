@@ -25,7 +25,7 @@ import Language.Python.AST.Keywords
 import Language.Python.AST.StringLiteral
 import Language.Python.AST.Symbols
 import Language.Python.AST.TermOperator
-import Language.Python.AST.VarargsList
+import Language.Python.Parser.IR.VarargsList
 
 data Argument a
   = ArgumentFor

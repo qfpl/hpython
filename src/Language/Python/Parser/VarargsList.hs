@@ -5,7 +5,8 @@ import Data.Functor.Sum
 import Text.Parser.LookAhead
 import Text.Trifecta hiding (comma)
 
-import Language.Python.AST.VarargsList
+import Language.Python.AST.VarargsList hiding (VarargsList)
+import Language.Python.Parser.IR.VarargsList
 import Language.Python.Parser.Combinators
 import Language.Python.Parser.Identifier
 import Language.Python.Parser.SrcInfo

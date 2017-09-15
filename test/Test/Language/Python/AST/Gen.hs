@@ -790,8 +790,9 @@ genVarargsList
   -> m (AST.VarargsList f ())
 genVarargsList cfg gen =
   Gen.choice
-    [ Gen.small $
-      AST.VarargsListAll <$>
+    [ Gen.small . Gen.just $
+      fmap (review AST._VarargsListAll) $
+      (,,,) <$>
       genVarargsListArg cfg gen <*>
       genListF
         (genBeforeF
@@ -802,8 +803,9 @@ genVarargsList cfg gen =
           (genBetweenWhitespace $ pure AST.Comma)
           (genMaybeF genStarOrDouble)) <*>
       pure ()
-    , Gen.small $
-      AST.VarargsListArgsKwargs <$>
+    , Gen.small . Gen.just $
+      fmap (review AST._VarargsListArgsKwargs) $
+      (,) <$>
       genStarOrDouble <*>
       pure ()
     ]

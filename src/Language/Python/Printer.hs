@@ -478,10 +478,13 @@ varargsListArg f (VarargsListArg l r _) =
   foldMapF (beforeF (betweenWhitespace' . const $ char '=') f) r
 
 varargsListStarPart :: (forall x. f x -> Doc) -> VarargsListStarPart f a -> Doc
-varargsListStarPart f (VarargsListStarPart h t r _) =
-  beforeF (betweenWhitespace' . const $ text "*") (foldMapF identifier) h <>
-  foldMapF (foldMapF $ varargsListArg f) t <>
-  foldMapF (foldMapF varargsListDoublestarArg) r
+varargsListStarPart f e =
+  case e of
+    VarargsListStarPartEmpty _ -> mempty
+    VarargsListStarPart h t r _ ->
+      beforeF (betweenWhitespace' . const $ text "*") identifier h <>
+      foldMapF (foldMapF $ varargsListArg f) t <>
+      foldMapF (beforeF (betweenWhitespace' comma) varargsListDoublestarArg) r
 
 varargsListDoublestarArg :: VarargsListDoublestarArg a -> Doc
 varargsListDoublestarArg (VarargsListDoublestarArg a _) =
@@ -494,13 +497,20 @@ varargsList f e =
     VarargsListAll h t r _ ->
       varargsListArg f h <>
       foldMapF (foldMapF $ varargsListArg f) t <>
-      foldMapF (foldMapF (foldMapF starOrDouble)) r
-    VarargsListArgsKwargs a _ -> starOrDouble a
+      foldMapF
+        (beforeF
+          (betweenWhitespace' comma)
+          (foldMapF $ starOrDouble f)) r
+    VarargsListArgsKwargs a _ -> starOrDouble f a
   where
-    starOrDouble e' =
-      case e' of
-        InL a -> varargsListStarPart f a
-        InR a -> varargsListDoublestarArg a
+    starOrDouble
+      :: (forall x. f x -> Doc)
+      -> Sum (VarargsListStarPart f) VarargsListDoublestarArg a
+      -> Doc
+    starOrDouble f' =
+      sumElim
+        (varargsListStarPart f')
+        varargsListDoublestarArg
 
 lambdefNocond :: LambdefNocond atomType ctxt a -> Doc
 lambdefNocond  (LambdefNocond a e _) =

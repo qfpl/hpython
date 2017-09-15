@@ -678,12 +678,18 @@ checkVarargsListStarPart
   :: SyntaxConfig atomType ctxt
   -> VarargsListStarPart IR.Test ann
   -> SyntaxChecker ann (VarargsListStarPart (Safe.Test atomType ctxt) ann)
-checkVarargsListStarPart cfg (VarargsListStarPart h t r ann) =
-  VarargsListStarPart <$>
-  traverseOf (traverseCompose.traverseCompose) (checkIdentifier cfg) h <*>
-  traverseOf (traverseCompose.traverseCompose) (checkVarargsListArg cfg) t <*>
-  pure r <*>
-  pure ann
+checkVarargsListStarPart cfg e =
+  case e of
+    VarargsListStarPartEmpty ann -> pure $ VarargsListStarPartEmpty ann
+    VarargsListStarPart h t r ann ->
+      VarargsListStarPart <$>
+      traverseCompose (checkIdentifier cfg) h <*>
+      traverseOf
+        (traverseCompose.traverseCompose)
+        (checkVarargsListArg cfg)
+        t <*>
+      pure r <*>
+      pure ann
 
 checkVarargsList
   :: SyntaxConfig atomType ctxt

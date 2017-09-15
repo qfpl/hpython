@@ -53,22 +53,23 @@ deriving instance (Eq1 test, Eq a) => Eq (VarargsList test a)
 deriving instance (Show1 test, Show a) => Show (VarargsList test a)
 
 data VarargsListStarPart test a
-  = VarargsListStarPart
-  { _varargsListStarPart_head
+  = VarargsListStarPartEmpty
+  { _varargsListStarPart_ann :: a
+  }
+  | VarargsListStarPart
+  { _varargsListStarPart_starred
     :: Compose
          (Before (Between' [WhitespaceChar] Asterisk))
-         (Compose
-           Maybe
-           Identifier)
+         Identifier
          a
-  , _varargsListStarPart_tail
+  , _varargsListStarPart_defaults
     :: Compose
          []
          (Compose
            (Before (Between' [WhitespaceChar] Comma))
            (VarargsListArg test))
          a
-  , _varargsListStarPart_rest
+  , _varargsListStarPart_kwargs
     :: Compose
          Maybe
          (Compose

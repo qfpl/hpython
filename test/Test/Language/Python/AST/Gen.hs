@@ -757,19 +757,22 @@ genVarargsListStarPart
   -> m (f ())
   -> m (AST.VarargsListStarPart f ())
 genVarargsListStarPart cfg gen =
-  AST.VarargsListStarPart <$>
-  genBeforeF
-    (genBetweenWhitespace $ pure AST.Asterisk)
-    (genMaybeF genIdentifier) <*>
-  genListF
-    (genBeforeF
-      (genBetweenWhitespace $ pure AST.Comma)
-      (genVarargsListArg cfg gen)) <*>
-  genMaybeF
-    (genBeforeF
-      (genBetweenWhitespace $ pure AST.Comma)
-      (genVarargsListDoublestarArg cfg)) <*>
-  pure ()
+  Gen.choice
+    [ pure $ AST.VarargsListStarPartEmpty ()
+    , AST.VarargsListStarPart <$>
+      genBeforeF
+        (genBetweenWhitespace $ pure AST.Asterisk)
+        genIdentifier <*>
+      genListF
+        (genBeforeF
+          (genBetweenWhitespace $ pure AST.Comma)
+          (Gen.small $ genVarargsListArg cfg gen)) <*>
+      genMaybeF
+        (genBeforeF
+          (genBetweenWhitespace $ pure AST.Comma)
+          (genVarargsListDoublestarArg cfg)) <*>
+      pure ()
+    ]
 
 genVarargsListDoublestarArg
   :: MonadGen m

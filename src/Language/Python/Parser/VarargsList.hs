@@ -33,10 +33,14 @@ varargsListStarPart
   -> m (VarargsListStarPart f SrcInfo)
 varargsListStarPart p =
   annotated $
-  VarargsListStarPart <$>
-  beforeF (betweenWhitespace asterisk) (optionalF identifier) <*>
-  manyF (beforeF (betweenWhitespace comma) (varargsListArg p)) <*>
-  optionalF (beforeF (betweenWhitespace comma) varargsListDoublestarArg)
+  try varargsListStarPartSome <|>
+  pure VarargsListStarPartEmpty
+  where
+    varargsListStarPartSome =
+      VarargsListStarPart <$>
+      beforeF (betweenWhitespace asterisk) identifier <*>
+      manyF (beforeF (betweenWhitespace comma) (varargsListArg p)) <*>
+      optionalF (beforeF (betweenWhitespace comma) varargsListDoublestarArg)
 
 varargsListDoublestarArg
   :: ( DeltaParsing m

@@ -1,13 +1,15 @@
 {-# language DeriveFunctor #-}
 {-# language DeriveFoldable #-}
 {-# language DeriveTraversable #-}
+{-# language FlexibleContexts #-}
 {-# language KindSignatures #-}
 {-# language RankNTypes #-}
 {-# language StandaloneDeriving #-}
 {-# language TemplateHaskell #-}
+{-# language OverloadedStrings #-}
 module Language.Python.AST.VarargsList
   ( HasArgs(..)
-  , DuplicateArgumentsError(..)
+  , VarargsError(..)
   , VarargsList
   , mkVarargsListAll
   , mkVarargsListArgsKwargs
@@ -50,13 +52,14 @@ import Data.Functor.Sum.Lens
 import Language.Python.AST.Identifier
 import Language.Python.AST.Symbols
 
-newtype DuplicateArgumentsError a
+data VarargsError test a
   = DuplicateArgumentsError [Identifier a]
+  | DefaultBeforeNonDefault [VarargsListArg test a]
   deriving (Eq, Show)
 
 duplicates :: (a -> a -> Bool) -> [a] -> [a]
-duplicates eq [] = []
-duplicates eq [a] = []
+duplicates _ [] = []
+duplicates _ [_] = []
 duplicates eq (a:as) =
   let (yes, no) = partition (eq a) as
   in
@@ -64,27 +67,69 @@ duplicates eq (a:as) =
     then duplicates eq no
     else a : duplicates eq no
 
-class HasArgs s where
-  args :: Fold (s a) (Identifier a)
+defaultBeforeNonDefault :: [VarargsListArg test a] -> Bool
+defaultBeforeNonDefault = go False
+  where
+    go _ [] = False
+    go seenDefault (a:as) =
+      case a of
+        VarargsListArg _ (Compose r) _ ->
+          case r of
+            Nothing -> seenDefault || go seenDefault as
+            Just _ -> go True as
 
-instance HasArgs (VarargsListArg test) where
-  args f (VarargsListArg a b ann) =
+_IdVarargsListArg :: Prism' (VarargsListArg test a) (Identifier a)
+_IdVarargsListArg =
+  prism'
+    (\a -> VarargsListArg a (Compose Nothing) $ _identifier_ann a)
+    (\(VarargsListArg a b ann) -> const (a { _identifier_ann = ann}) <$> getCompose b)
+
+idWrapped f = fmap (^?! _IdVarargsListArg) . f . review _IdVarargsListArg
+
+class HasArgs s where
+  -- |
+  -- Retrieves all the argument names in a structure, including the names in starred args
+  -- and double-starred args.
+  argNames :: Fold (s test a) (Identifier a)
+
+  -- |
+  -- Retrieves all the arguments in a structure, *excluding* starred arguments and double-starred
+  -- arguments
+  args :: Fold (s test a) (VarargsListArg test a)
+
+instance HasArgs VarargsListArg where
+  argNames f (VarargsListArg a b ann) =
     VarargsListArg <$> f a <*> pure b <*> pure ann
 
+  args f = f
+
 instance HasArgs VarargsListDoublestarArg where
-  args f (VarargsListDoublestarArg a ann) =
+  argNames f (VarargsListDoublestarArg a ann) =
     VarargsListDoublestarArg <$>
     traverseOf (_Wrapped.between'._2) f a <*>
     pure ann
 
-instance HasArgs (VarargsListStarPart test) where
-  args f (VarargsListStarPart a b c ann) =
+  args _ (VarargsListDoublestarArg a ann) =
+    VarargsListDoublestarArg <$>
+    pure a <*>
+    pure ann
+
+instance HasArgs VarargsListStarPart where
+  argNames f (VarargsListStarPart a b c ann) =
     VarargsListStarPart <$>
     traverseOf (_Wrapped.before._2) f a <*>
+    traverseOf (_Wrapped.traverse._Wrapped.before._2.argNames) f b <*>
+    traverseOf (_Wrapped.traverse._Wrapped.before._2.argNames) f c <*>
+    pure ann
+  argNames _ (VarargsListStarPartEmpty ann) = pure $ VarargsListStarPartEmpty ann
+
+  args f (VarargsListStarPart a b c ann) =
+    VarargsListStarPart <$>
+    pure a <*>
     traverseOf (_Wrapped.traverse._Wrapped.before._2.args) f b <*>
     traverseOf (_Wrapped.traverse._Wrapped.before._2.args) f c <*>
     pure ann
-  args f (VarargsListStarPartEmpty ann) = pure $ VarargsListStarPartEmpty ann
+  args _ (VarargsListStarPartEmpty ann) = pure $ VarargsListStarPartEmpty ann
 
 mkVarargsListAll
   :: VarargsListArg test a
@@ -104,18 +149,27 @@ mkVarargsListAll
              Maybe
              (Sum
                (VarargsListStarPart test)
-               (VarargsListDoublestarArg))))
+               (VarargsListDoublestarArg test))))
        a
   -> a
-  -> Either (DuplicateArgumentsError a) (VarargsList test a)
+  -> Either (VarargsError test a) (VarargsList test a)
 mkVarargsListAll a bs c ann =
-  let allArgs =
-        (a ^.. args) <>
-        (bs ^.. _Wrapped.folded._Wrapped.before._2.args) <>
+  let allArgNames =
+        (a ^.. argNames) <>
+        (bs ^.. _Wrapped.folded._Wrapped.before._2.argNames) <>
         (c ^.. _Wrapped.folded._Wrapped.before._2.
-               _Wrapped.folded.failing (_InL.args) (_InR.args))
-  in case duplicates ((==) `on` _identifier_value) allArgs of
-    [] -> Right $ VarargsListAll a bs c ann
+               _Wrapped.folded.failing (_InL.argNames) (_InR.argNames))
+  in case duplicates ((==) `on` _identifier_value) allArgNames of
+    [] ->
+      let allArgs =
+            (a ^.. args) <>
+            (bs ^.. _Wrapped.folded._Wrapped.before._2.args) <>
+            (c ^.. _Wrapped.folded._Wrapped.before._2.
+              _Wrapped.folded.failing (_InL.args) (_InR.args))
+      in
+        if defaultBeforeNonDefault allArgs
+        then Left $ DefaultBeforeNonDefault allArgs
+        else Right $ VarargsListAll a bs c ann
     dups -> Left $ DuplicateArgumentsError dups
 
 _VarargsListAll
@@ -138,7 +192,7 @@ _VarargsListAll
                   Maybe
                   (Sum
                     (VarargsListStarPart test)
-                    VarargsListDoublestarArg)))
+                    (VarargsListDoublestarArg test))))
            a
        , a
        )
@@ -156,15 +210,20 @@ _VarargsListAll =
 mkVarargsListArgsKwargs
   :: Sum
        (VarargsListStarPart test)
-       VarargsListDoublestarArg
+       (VarargsListDoublestarArg test)
        a
   -> a
-  -> Either (DuplicateArgumentsError a) (VarargsList test a)
+  -> Either (VarargsError test a) (VarargsList test a)
 mkVarargsListArgsKwargs a ann =
-  let allArgs =
-        a ^.. failing (_InL.args) (_InR.args)
-  in case duplicates ((==) `on` _identifier_value) allArgs of
-    [] -> Right $ VarargsListArgsKwargs a ann
+  let allArgNames =
+        a ^.. failing (_InL.argNames) (_InR.argNames)
+  in case duplicates ((==) `on` _identifier_value) allArgNames of
+    [] ->
+      let allArgs =
+            a ^.. failing (_InL.args) (_InR.args)
+      in if defaultBeforeNonDefault allArgs
+         then Left $ DefaultBeforeNonDefault allArgs
+         else Right $ VarargsListArgsKwargs a ann
     dups -> Left $ DuplicateArgumentsError dups
 
 _VarargsListArgsKwargs
@@ -172,7 +231,7 @@ _VarargsListArgsKwargs
        (Maybe (VarargsList test a))
        ( Sum
            (VarargsListStarPart test)
-           VarargsListDoublestarArg
+           (VarargsListDoublestarArg test)
            a
        , a
        )
@@ -206,7 +265,7 @@ data VarargsList test a
              Maybe
              (Sum
                (VarargsListStarPart test)
-               VarargsListDoublestarArg)))
+               (VarargsListDoublestarArg test))))
          a
   , _varargsList_ann :: a
   }
@@ -214,7 +273,7 @@ data VarargsList test a
   { _varargsListArgsKwargs_value
       :: Sum
            (VarargsListStarPart test)
-           VarargsListDoublestarArg
+           (VarargsListDoublestarArg test)
            a
   , _varargsList_ann :: a
   }
@@ -244,7 +303,7 @@ data VarargsListStarPart test a
          Maybe
          (Compose
            (Before (Between' [WhitespaceChar] Comma))
-           VarargsListDoublestarArg)
+           (VarargsListDoublestarArg test))
          a
   , _varargsListStarPart_ann :: a
   }
@@ -252,7 +311,7 @@ data VarargsListStarPart test a
 deriving instance (Eq1 test, Eq a) => Eq (VarargsListStarPart test a)
 deriving instance (Show1 test, Show a) => Show (VarargsListStarPart test a)
 
-data VarargsListDoublestarArg a
+data VarargsListDoublestarArg (test :: * -> *) a
   = VarargsListDoublestarArg
   { _varargsListDoublestarArg_value
     :: Compose

@@ -686,6 +686,12 @@ checkVarargsListArg cfg (Safe.VarargsListArg l r ann) =
   traverseOf (traverseCompose.traverseCompose) (checkTest cfg) r <*>
   pure ann
 
+checkVarargsListDoublestarArg
+  :: Safe.VarargsListDoublestarArg IR.Test ann
+  -> SyntaxChecker ann (Safe.VarargsListDoublestarArg (Safe.Test atomType ctxt) ann)
+checkVarargsListDoublestarArg (Safe.VarargsListDoublestarArg a ann) =
+  pure $ Safe.VarargsListDoublestarArg a ann
+
 checkVarargsListStarPart
   :: SyntaxConfig atomType ctxt
   -> Safe.VarargsListStarPart IR.Test ann
@@ -700,7 +706,10 @@ checkVarargsListStarPart cfg e =
         (traverseCompose.traverseCompose)
         (checkVarargsListArg cfg)
         t <*>
-      pure r <*>
+      traverseOf
+        (traverseCompose.traverseCompose)
+        checkVarargsListDoublestarArg
+        r <*>
       pure ann
 
 checkVarargsList
@@ -711,7 +720,7 @@ checkVarargsList cfg e =
   case e of
     IR.VarargsListAll a b c ann ->
       liftError
-        (\(Safe.DuplicateArgumentsError e) -> DuplicateArguments e ann) $
+        (\(Safe.DuplicateArgumentsError e') -> DuplicateArguments e' ann) $
         Safe.mkVarargsListAll <$>
         checkVarargsListArg cfg a <*>
         traverseOf
@@ -725,7 +734,7 @@ checkVarargsList cfg e =
         pure ann
     IR.VarargsListArgsKwargs a ann ->
       liftError
-        (\(Safe.DuplicateArgumentsError e) -> DuplicateArguments e ann) $
+        (\(Safe.DuplicateArgumentsError e') -> DuplicateArguments e' ann) $
         Safe.mkVarargsListArgsKwargs <$>
         starOrDouble a <*>
         pure ann
@@ -733,7 +742,7 @@ checkVarargsList cfg e =
     starOrDouble e' =
       case e' of
         InL a -> InL <$> checkVarargsListStarPart cfg a
-        InR a -> pure $ InR a
+        InR a -> InR <$> checkVarargsListDoublestarArg a
 
 checkSubscriptList
   :: SyntaxConfig atomType ctxt

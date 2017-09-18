@@ -777,7 +777,7 @@ genVarargsListStarPart cfg gen =
 genVarargsListDoublestarArg
   :: MonadGen m
   => SyntaxConfig atomType ctxt
-  -> m (AST.VarargsListDoublestarArg ())
+  -> m (AST.VarargsListDoublestarArg test ())
 genVarargsListDoublestarArg cfg =
   AST.VarargsListDoublestarArg <$>
   genBetweenWhitespaceF genIdentifier <*>

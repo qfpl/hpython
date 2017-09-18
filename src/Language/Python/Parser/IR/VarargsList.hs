@@ -40,7 +40,7 @@ data VarargsList test a
              Maybe
              (Sum
                (VarargsListStarPart test)
-               VarargsListDoublestarArg)))
+               (VarargsListDoublestarArg test))))
          a
   , _varargsList_ann :: a
   }
@@ -48,7 +48,7 @@ data VarargsList test a
   { _varargsListArgsKwargs_value
       :: Sum
            (VarargsListStarPart test)
-           VarargsListDoublestarArg
+           (VarargsListDoublestarArg test)
            a
   , _varargsList_ann :: a
   }

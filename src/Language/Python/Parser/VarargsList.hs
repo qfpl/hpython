@@ -47,7 +47,7 @@ varargsListDoublestarArg
   :: ( DeltaParsing m
      , LookAheadParsing m
      )
-  => m (VarargsListDoublestarArg SrcInfo)
+  => m (VarargsListDoublestarArg test SrcInfo)
 varargsListDoublestarArg =
   annotated $
   VarargsListDoublestarArg <$>

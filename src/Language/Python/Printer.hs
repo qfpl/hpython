@@ -486,7 +486,7 @@ varargsListStarPart f e =
       foldMapF (beforeF (betweenWhitespace' comma) $ varargsListArg f) t <>
       foldMapF (beforeF (betweenWhitespace' comma) varargsListDoublestarArg) r
 
-varargsListDoublestarArg :: VarargsListDoublestarArg a -> Doc
+varargsListDoublestarArg :: VarargsListDoublestarArg test a -> Doc
 varargsListDoublestarArg (VarargsListDoublestarArg a _) =
   text "**" <>
   betweenWhitespace'F identifier a
@@ -508,7 +508,7 @@ varargsList f e =
   where
     starOrDouble
       :: (forall x. f x -> Doc)
-      -> Sum (VarargsListStarPart f) VarargsListDoublestarArg a
+      -> Sum (VarargsListStarPart f) (VarargsListDoublestarArg f) a
       -> Doc
     starOrDouble f' =
       sumElim

@@ -16,13 +16,13 @@ import Text.Trifecta hiding (render, runUnspaced)
 import qualified Text.PrettyPrint.ANSI.Leijen as WL
 import qualified Text.PrettyPrint as HPJ
 
-import Language.Python.Parser.IR.SyntaxConfig
+import Language.Python.IR.SyntaxConfig
 
-import qualified Language.Python.Parser as Parse
-import qualified Language.Python.Parser.IR.Checker as Check
-import qualified Language.Python.Printer as Print
-import qualified Language.Python.AST as AST
-import qualified Test.Language.Python.AST.Gen as GenAST
+import qualified Language.Python.Expr.Parser as Parse
+import qualified Language.Python.Expr.IR.Checker as Check
+import qualified Language.Python.Expr.Printer as Print
+import qualified Language.Python.Expr.AST as AST
+import qualified Test.Language.Python.Expr.Gen as GenAST
 
 import Text.Parser.Unspaced
 
@@ -37,11 +37,11 @@ parse_print_expr_id input =
         checkResult =
           (fmap Print.test . Check.runChecker $
             Check.checkTest
-              (SyntaxConfig AST.SNotAssignable AST.STopLevel)
+              (SyntaxConfig SNotAssignable STopLevel)
               unchecked) <!>
           (fmap Print.test . Check.runChecker $
             Check.checkTest
-              (SyntaxConfig AST.SAssignable AST.STopLevel)
+              (SyntaxConfig SAssignable STopLevel)
               unchecked)
       in
         case checkResult of
@@ -101,10 +101,10 @@ checkSyntax input = do
         Just "Indentation" -> SyntaxError errorMsg
         _ -> SyntaxCorrect
 
-prop_ast_is_valid_python :: AST.SAtomType atomType -> Property
+prop_ast_is_valid_python :: SAtomType atomType -> Property
 prop_ast_is_valid_python assignability =
   property $ do
-    expr <- forAll (GenAST.genTest $ SyntaxConfig assignability AST.STopLevel)
+    expr <- forAll (GenAST.genTest $ SyntaxConfig assignability STopLevel)
     let program = HPJ.render $ Print.test expr
     res <- liftIO $ checkSyntax program
     case res of
@@ -138,9 +138,9 @@ makeParserPrinterTests = do
     properties =
       [ testProperty
           "AST is valid python - assignable" $
-          prop_ast_is_valid_python AST.SAssignable
+          prop_ast_is_valid_python SAssignable
       , testProperty
           "AST is valid python - not assignable" $
-          prop_ast_is_valid_python AST.SNotAssignable
+          prop_ast_is_valid_python SNotAssignable
       ]
   (properties ++) <$> testSpecs spec

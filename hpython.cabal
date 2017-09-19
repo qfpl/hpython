@@ -18,46 +18,47 @@ cabal-version:       >=1.10
 tested-with:         GHC == 8.0.2
 
 library
-  exposed-modules:     Language.Python.AST
-                       Language.Python.AST.BytesLiteral
-                       Language.Python.AST.BytesPrefix
+  exposed-modules:
                        Language.Python.AST.Comment
-                       Language.Python.AST.CompOperator
-                       Language.Python.AST.EscapeSeq
-                       Language.Python.AST.Digits
-                       Language.Python.AST.FactorOperator
-                       Language.Python.AST.Float
                        Language.Python.AST.Identifier
-                       Language.Python.AST.Imag
-                       Language.Python.AST.Integer
                        Language.Python.AST.Keywords
-                       Language.Python.AST.LongBytes
-                       Language.Python.AST.LongBytesChar
-                       Language.Python.AST.LongString
-                       Language.Python.AST.LongStringChar
-                       Language.Python.AST.ShortBytes
-                       Language.Python.AST.ShortBytesChar
-                       Language.Python.AST.ShortStringChar
-                       Language.Python.AST.ShortString
-                       Language.Python.AST.StringLiteral
-                       Language.Python.AST.StringPrefix
                        Language.Python.AST.Symbols
-                       Language.Python.AST.StringContent
-                       Language.Python.AST.TermOperator
-                       Language.Python.AST.VarargsList
-                       Language.Python.Parser
+                       Language.Python.Expr.AST
+                       Language.Python.Expr.AST.BytesLiteral
+                       Language.Python.Expr.AST.BytesPrefix
+                       Language.Python.Expr.AST.CompOperator
+                       Language.Python.Expr.AST.EscapeSeq
+                       Language.Python.Expr.AST.Digits
+                       Language.Python.Expr.AST.FactorOperator
+                       Language.Python.Expr.AST.Float
+                       Language.Python.Expr.AST.Imag
+                       Language.Python.Expr.AST.Integer
+                       Language.Python.Expr.AST.LongBytes
+                       Language.Python.Expr.AST.LongBytesChar
+                       Language.Python.Expr.AST.LongString
+                       Language.Python.Expr.AST.LongStringChar
+                       Language.Python.Expr.AST.ShortBytes
+                       Language.Python.Expr.AST.ShortBytesChar
+                       Language.Python.Expr.AST.ShortStringChar
+                       Language.Python.Expr.AST.ShortString
+                       Language.Python.Expr.AST.StringLiteral
+                       Language.Python.Expr.AST.StringPrefix
+                       Language.Python.Expr.AST.StringContent
+                       Language.Python.Expr.AST.TermOperator
+                       Language.Python.Expr.AST.VarargsList
+                       Language.Python.Expr.IR
+                       Language.Python.Expr.Parser
+                       Language.Python.Expr.IR.Checker
+                       Language.Python.Expr.IR.VarargsList
+                       Language.Python.Expr.Parser.EscapeSeq
+                       Language.Python.Expr.Parser.StringContent
+                       Language.Python.Expr.Parser.VarargsList
+                       Language.Python.Expr.Printer
+                       Language.Python.IR.SyntaxConfig
                        Language.Python.Parser.Combinators
-                       Language.Python.Parser.IR
-                       Language.Python.Parser.IR.SyntaxConfig
-                       Language.Python.Parser.IR.Checker
-                       Language.Python.Parser.IR.VarargsList
-                       Language.Python.Parser.EscapeSeq
                        Language.Python.Parser.Identifier
-                       Language.Python.Parser.StringContent
                        Language.Python.Parser.SrcInfo
                        Language.Python.Parser.Symbols
-                       Language.Python.Parser.VarargsList
-                       Language.Python.Printer
                        Data.Functor.Sum.Lens
                        Data.Separated.After
                        Data.Separated.Before
@@ -87,7 +88,9 @@ test-suite hpython-tests
     hs-source-dirs:      test
     main-is:             Main.hs
     other-modules:       Test.Language.Python.ParserPrinter
-                       , Test.Language.Python.AST.Gen
+                         Test.Language.Python.Expr.AST.EscapeSeq
+                         Test.Language.Python.Expr.AST.StringContent
+                         Test.Language.Python.Expr.Gen
     build-depends:       base >=4.9 && <4.10
                        , ansi-wl-pprint >=0.6 && <0.7
                        , directory >=1.3 && <1.4

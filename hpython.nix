@@ -1,7 +1,8 @@
 { mkDerivation, ansi-wl-pprint, base, charset, containers
 , deriving-compat, digit, directory, dlist, filepath, hedgehog, mtl
 , papa, parsers, pretty, process, stdenv, tasty, tasty-hedgehog
-, tasty-hspec, text, transformers, trifecta, validation
+, tasty-hspec, text, transformers, trifecta, unordered-containers
+, validation
 }:
 mkDerivation {
   pname = "hpython";
@@ -9,7 +10,8 @@ mkDerivation {
   src = ./.;
   libraryHaskellDepends = [
     base charset containers deriving-compat digit dlist mtl papa
-    parsers pretty text transformers trifecta validation
+    parsers pretty text transformers trifecta unordered-containers
+    validation
   ];
   testHaskellDepends = [
     ansi-wl-pprint base directory filepath hedgehog papa pretty process

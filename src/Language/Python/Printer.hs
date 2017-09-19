@@ -3,7 +3,6 @@
 module Language.Python.Printer where
 
 import Prelude (error)
-
 import Papa hiding (Plus, Product, Sum, Space, zero, o, argument)
 
 import Data.Functor.Compose
@@ -42,6 +41,7 @@ import Language.Python.AST.StringPrefix
 import Language.Python.AST.Symbols
 import Language.Python.AST.TermOperator
 import Language.Python.AST.StringContent (stringContent)
+import Language.Python.AST.VarargsList
 
 identifier :: Identifier a -> Doc
 identifier i = i ^. identifier_value . to T.unpack . to text
@@ -469,12 +469,51 @@ asterisk _ = char '*'
 doubleAsterisk :: DoubleAsterisk -> Doc
 doubleAsterisk _ = text "**"
 
-
 compIter :: CompIter atomType ctxt a -> Doc
 compIter (CompIter val _) = sumElim compFor compIf val
 
-varargsList :: VarargsList atomType ctxt a -> Doc
-varargsList = error "varargsList not implemented" 
+varargsListArg :: (forall x. f x -> Doc) -> VarargsListArg f a -> Doc
+varargsListArg f (VarargsListArg l r _) =
+  identifier l <>
+  foldMapF (beforeF (betweenWhitespace' . const $ char '=') f) r
+
+varargsListStarPart :: (forall x. f x -> Doc) -> VarargsListStarPart f a -> Doc
+varargsListStarPart f e =
+  case e of
+    VarargsListStarPartEmpty _ -> mempty
+    VarargsListStarPart h t r _ ->
+      beforeF (betweenWhitespace' . const $ text "*") identifier h <>
+      foldMapF (beforeF (betweenWhitespace' comma) $ varargsListArg f) t <>
+      foldMapF (beforeF (betweenWhitespace' comma) varargsListDoublestarArg) r
+
+varargsListDoublestarArg :: VarargsListDoublestarArg test a -> Doc
+varargsListDoublestarArg (VarargsListDoublestarArg a _) =
+  text "**" <>
+  betweenWhitespace'F identifier a
+
+varargsList :: (forall x. f x -> Doc) -> VarargsList f a -> Doc
+varargsList f e =
+  Just e &
+    (outside _VarargsListAll .~
+       (\(h, t, r, _) ->
+         varargsListArg f h <>
+         foldMapF (beforeF (betweenWhitespace' comma) $ varargsListArg f) t <>
+         foldMapF
+           (beforeF
+             (betweenWhitespace' comma)
+             (foldMapF $ starOrDouble f)) r) $
+     outside _VarargsListArgsKwargs .~
+       (\(a, _) -> starOrDouble f a) $
+     error "incomplete pattern")
+  where
+    starOrDouble
+      :: (forall x. f x -> Doc)
+      -> Sum (VarargsListStarPart f) (VarargsListDoublestarArg f) a
+      -> Doc
+    starOrDouble f' =
+      sumElim
+        (varargsListStarPart f')
+        varargsListDoublestarArg
 
 lambdefNocond :: LambdefNocond atomType ctxt a -> Doc
 lambdefNocond  (LambdefNocond a e _) =
@@ -483,7 +522,7 @@ lambdefNocond  (LambdefNocond a e _) =
     (betweenF
       (foldMap whitespaceChar)
       (foldMap whitespaceChar)
-      varargsList)
+      (varargsList test))
     a <>
   char ':' <>
   whitespaceBeforeF testNocond e
@@ -539,8 +578,36 @@ comparison (ComparisonMany l r _) =
   expr l <>
   foldMapF (beforeF compOperator expr) r
 
+dictItem :: DictItem atomType ctxt a -> Doc
+dictItem (DictItem k c v _) =
+  test k <>
+  betweenWhitespace' colon c <>
+  test v
+
+dictUnpacking :: DictUnpacking atomType ctxt a -> Doc
+dictUnpacking (DictUnpacking v _) =
+  beforeF (betweenWhitespace' doubleAsterisk) expr v
+
 dictOrSetMaker :: DictOrSetMaker atomType ctxt a -> Doc
-dictOrSetMaker _ = error "dictOrSetMaker not implemented"
+dictOrSetMaker e =
+  case e of
+    DictOrSetMakerDictComp h t _ ->
+      dictItem h <>
+      compFor t
+    DictOrSetMakerDictUnpack h t c _ ->
+      itemOrUnpacking h <>
+      foldMapF (beforeF (betweenWhitespace' comma) itemOrUnpacking) t <>
+      foldMap (betweenWhitespace' comma) c
+    DictOrSetMakerSetComp h t _ ->
+      test h <>
+      compFor t
+    DictOrSetMakerSetUnpack h t c _ ->
+      testOrStar h <>
+      foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t <>
+      foldMap (betweenWhitespace' comma) c
+  where
+    itemOrUnpacking = sumElim dictItem dictUnpacking
+    testOrStar = sumElim test starExpr
 
 starExpr :: StarExpr atomType ctxt a -> Doc
 starExpr (StarExpr val _) =
@@ -552,7 +619,7 @@ listTestlistComp t =
   case t of
     ListTestlistCompFor h t' _ ->
       test h <>
-      whitespaceBeforeF compFor t'
+      compFor t'
     ListTestlistCompList h t' c _ ->
       test h <>
       foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t' <>
@@ -569,7 +636,7 @@ tupleTestlistComp t =
   case t of
     TupleTestlistCompFor h t' _ ->
       test h <>
-      whitespaceBeforeF compFor t'
+      compFor t'
     TupleTestlistCompList h t' c _ ->
       test h <>
       foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t' <>
@@ -631,7 +698,7 @@ argument a =
   case a of
     ArgumentFor e f _ ->
       test e <>
-      foldMapF (whitespaceBeforeF compFor) f
+      foldMapF compFor f
     ArgumentDefault l r _ ->
       whitespaceAfterF test l <>
       char '=' <>
@@ -773,7 +840,13 @@ test t =
     TestCondIf h t' _ ->
       orTest h <>
       whitespaceBeforeF ifThenElse t'
-    TestLambdef -> error "testLambdef not implemented"
+    TestLambdef a _ -> lambdef a
+    
+lambdef :: Lambdef atomType ctxt a -> Doc
+lambdef (Lambdef a b _) =
+  text "lambda" <>
+  foldMapF (whitespaceBeforeF $ varargsList test) a <>
+  beforeF (betweenWhitespace' colon) test b
 
 comment :: Comment a -> Doc
 comment (Comment val _) = char '#' <> text (T.unpack val)

@@ -3,10 +3,8 @@
 {-# language GADTs #-}
 module Test.Language.Python.AST.Gen where
 
-import Prelude (error)
 import Papa
 
-import Control.Monad
 import Data.Functor.Compose
 import Data.Functor.Sum
 import Data.Separated.After (After(..))
@@ -16,8 +14,6 @@ import Hedgehog
 
 import qualified Data.Text as T
 import qualified Hedgehog.Gen as Gen
-import qualified Hedgehog.Internal.Gen as Gen
-import qualified Hedgehog.Internal.Shrink as Shrink
 import qualified Hedgehog.Range as Range
 import qualified Language.Python.AST as AST
 import qualified Language.Python.AST.BytesLiteral as AST
@@ -44,6 +40,7 @@ import qualified Language.Python.AST.StringPrefix as AST
 import qualified Language.Python.AST.Symbols as AST
 import qualified Language.Python.AST.TermOperator as AST
 import qualified Language.Python.AST.StringContent as SC
+import qualified Language.Python.AST.VarargsList as AST
 import Language.Python.Parser.IR.SyntaxConfig
 
 genBefore :: MonadGen m => m s -> m a -> m (Before s a)
@@ -246,7 +243,7 @@ genListTestlistComp cfg =
         [ Gen.small $ listTestlistCompList cfg
         , AST.ListTestlistCompFor <$>
           Gen.small (genTest cfg) <*>
-          genWhitespaceBeforeF (Gen.small $ genCompFor cfg) <*>
+          Gen.small (genCompFor cfg) <*>
           pure ()
         ]
   where
@@ -287,7 +284,7 @@ genTupleTestlistComp cfg =
         [ Gen.small $ tupleTestlistCompList cfg
         , AST.TupleTestlistCompFor <$>
           Gen.small (genTest cfg) <*>
-          genWhitespaceBeforeF (Gen.small $ genCompFor cfg) <*>
+          Gen.small (genCompFor cfg) <*>
           pure ()
         ]
   where
@@ -352,7 +349,7 @@ genYieldArg cfg =
 
 genYieldExpr
   :: MonadGen m
-  => SyntaxConfig atomType cfg
+  => SyntaxConfig 'AST.NotAssignable cfg
   -> m (AST.YieldExpr ())
 genYieldExpr cfg =
   Gen.small $
@@ -364,11 +361,65 @@ genYieldExpr cfg =
        & exprContext .~ AST.SFunDef AST.SNormal) <*>
   pure ()
 
+genDictItem
+  :: MonadGen m
+  => SyntaxConfig 'AST.NotAssignable cfg
+  -> m (AST.DictItem 'AST.NotAssignable cfg ())
+genDictItem cfg =
+  AST.DictItem <$>
+  genTest cfg <*>
+  genBetweenWhitespace (pure AST.Colon) <*>
+  genTest cfg <*>
+  pure ()
+
+genDictUnpacking
+  :: MonadGen m
+  => SyntaxConfig 'AST.NotAssignable cfg
+  -> m (AST.DictUnpacking 'AST.NotAssignable cfg ())
+genDictUnpacking cfg =
+  AST.DictUnpacking <$>
+  genBeforeF
+    (genBetweenWhitespace $ pure AST.DoubleAsterisk)
+    (genExpr cfg) <*>
+  pure ()
+
 genDictOrSetMaker
   :: MonadGen m
-  => SyntaxConfig atomType ctxt
-  -> m (AST.DictOrSetMaker atomType ctxt ())
-genDictOrSetMaker _ = pure AST.DictOrSetMaker
+  => SyntaxConfig 'AST.NotAssignable ctxt
+  -> m (AST.DictOrSetMaker 'AST.NotAssignable ctxt ())
+genDictOrSetMaker cfg =
+  Gen.choice
+    [ AST.DictOrSetMakerDictComp <$>
+      genDictItem cfg <*>
+      genCompFor cfg <*>
+      pure ()
+    , AST.DictOrSetMakerDictUnpack <$>
+      genItemOrUnpacking <*>
+      genListF
+        (genBeforeF
+          (genBetweenWhitespace $ pure AST.Comma)
+          genItemOrUnpacking) <*>
+      Gen.maybe (genBetweenWhitespace $ pure AST.Comma) <*>
+      pure ()
+    , AST.DictOrSetMakerSetComp <$>
+      genTest cfg <*>
+      genCompFor cfg <*>
+      pure ()
+    , AST.DictOrSetMakerSetUnpack <$>
+      genTestOrStar <*>
+      genListF
+        (genBeforeF
+          (genBetweenWhitespace $ pure AST.Comma)
+          genTestOrStar) <*>
+      Gen.maybe (genBetweenWhitespace $ pure AST.Comma) <*>
+      pure ()
+    ]
+  where
+    genItemOrUnpacking =
+      Gen.choice [ InL <$> genDictItem cfg, InR <$> genDictUnpacking cfg ]
+
+    genTestOrStar =
+      Gen.choice [ InL <$> genTest cfg, InR <$> genStarExpr cfg ]
 
 genDigit :: MonadGen m => m AST.Digit
 genDigit =
@@ -674,7 +725,7 @@ genAtom cfg =
     (AST.SNotAssignable, AST.SFunDef AST.SNormal) ->
       Gen.recursive Gen.choice
         normalNonRec
-        (normalRec cfg ++ [ genAtomParenYield cfg ])
+        (normalRec cfg ++ [ genAtomParenYield cfg, genAtomCurly cfg ])
     (AST.SNotAssignable, _) ->
       Gen.recursive Gen.choice
         (normalNonRec ++
@@ -687,7 +738,7 @@ genAtom cfg =
           , genAtomTrue cfg
           , genAtomFalse cfg
           ])
-        (normalRec cfg)
+        (normalRec cfg ++ [genAtomCurly cfg])
     _ -> Gen.recursive Gen.choice normalNonRec $ normalRec cfg
   where
     normalNonRec = 
@@ -696,10 +747,12 @@ genAtom cfg =
     normalRec cfg' =
       [ genAtomParenNoYield cfg'
       , genAtomBracket cfg'
-      -- , AST.AtomCurly <$>
-      -- genBetweenWhitespaceF (genMaybeF genDictOrSetMaker) <*>
-      -- pure ()  
       ]
+
+    genAtomCurly cfg' =
+      AST.AtomCurly <$>
+      genBetweenWhitespaceF (genMaybeF $ genDictOrSetMaker cfg') <*>
+      pure ()  
 
     genAtomBracket cfg' =
       AST.AtomBracket <$>
@@ -737,21 +790,94 @@ genAtom cfg =
     genStringOrBytes _ =
       Gen.choice [ InL <$> genStringLiteral, InR <$> genBytesLiteral ]
 
+genVarargsListArg
+  :: MonadGen m
+  => SyntaxConfig 'AST.NotAssignable ctxt
+  -> m (f ())
+  -> m (AST.VarargsListArg f ())
+genVarargsListArg _ gen =
+  AST.VarargsListArg <$>
+  genIdentifier <*>
+  genMaybeF
+    (genBeforeF
+       (genBetweenWhitespace $ pure AST.Equals)
+       gen) <*>
+  pure ()
+
+genVarargsListStarPart
+  :: MonadGen m
+  => SyntaxConfig 'AST.NotAssignable ctxt
+  -> m (f ())
+  -> m (AST.VarargsListStarPart f ())
+genVarargsListStarPart cfg gen =
+  Gen.choice
+    [ pure $ AST.VarargsListStarPartEmpty ()
+    , AST.VarargsListStarPart <$>
+      genBeforeF
+        (genBetweenWhitespace $ pure AST.Asterisk)
+        genIdentifier <*>
+      genListF
+        (genBeforeF
+          (genBetweenWhitespace $ pure AST.Comma)
+          (Gen.small $ genVarargsListArg cfg gen)) <*>
+      genMaybeF
+        (genBeforeF
+          (genBetweenWhitespace $ pure AST.Comma)
+          (genVarargsListDoublestarArg cfg)) <*>
+      pure ()
+    ]
+
+genVarargsListDoublestarArg
+  :: MonadGen m
+  => SyntaxConfig 'AST.NotAssignable ctxt
+  -> m (AST.VarargsListDoublestarArg test ())
+genVarargsListDoublestarArg _ =
+  AST.VarargsListDoublestarArg <$>
+  genBetweenWhitespaceF genIdentifier <*>
+  pure ()
+
 genVarargsList
   :: MonadGen m
-  => SyntaxConfig atomType ctxt
-  -> m (AST.VarargsList atomType ctxt ())
-genVarargsList _ = pure AST.VarargsList
+  => SyntaxConfig 'AST.NotAssignable ctxt
+  -> m (f ())
+  -> m (AST.VarargsList f ())
+genVarargsList cfg gen =
+  Gen.choice
+    [ Gen.small . Gen.just $
+      fmap (review AST._VarargsListAll) $
+      (,,,) <$>
+      genVarargsListArg cfg gen <*>
+      genListF
+        (genBeforeF
+          (genBetweenWhitespace $ pure AST.Comma)
+          (genVarargsListArg cfg gen)) <*>
+      genMaybeF
+        (genBeforeF
+          (genBetweenWhitespace $ pure AST.Comma)
+          (genMaybeF genStarOrDouble)) <*>
+      pure ()
+    , Gen.small . Gen.just $
+      fmap (review AST._VarargsListArgsKwargs) $
+      (,) <$>
+      genStarOrDouble <*>
+      pure ()
+    ]
+  where
+    genStarOrDouble =
+      Gen.choice
+        [ Gen.small $ InL <$> genVarargsListStarPart cfg gen
+        , InR <$> genVarargsListDoublestarArg cfg
+        ]
 
 genLambdefNocond
   :: MonadGen m
-  => SyntaxConfig atomType ctxt
-  -> m (AST.LambdefNocond atomType ctxt ())
+  => SyntaxConfig 'AST.NotAssignable ctxt
+  -> m (AST.LambdefNocond 'AST.NotAssignable ctxt ())
 genLambdefNocond cfg =
   AST.LambdefNocond <$>
   genMaybeF
     (Gen.small . genBetweenF genWhitespace1 genWhitespace $
-      genVarargsList cfg) <*>
+      genVarargsList cfg (genTest cfg)) <*>
   genWhitespaceBeforeF (Gen.small $ genTestNocond cfg) <*>
   pure ()
 
@@ -855,7 +981,7 @@ genArgument cfg =
   Gen.choice
     [ AST.ArgumentFor <$>
       Gen.small (genTest cfg) <*>
-      genMaybeF (Gen.small . genWhitespaceBeforeF $ genCompFor cfg) <*>
+      genMaybeF (Gen.small $ genCompFor cfg) <*>
       pure ()
     , AST.ArgumentDefault <$>
       genWhitespaceAfterF
@@ -1293,13 +1419,28 @@ genTest cfg =
             genWhitespace1
             (Gen.small $ genIfThenElse cfg) <*>
           pure ()
-        -- , pure AST.TestLambdef
+        , Gen.small $
+          AST.TestLambdef <$>
+          genLambdef cfg <*>
+          pure ()
         ]
   where
     testCondNoIf cfg' =
       AST.TestCondNoIf <$>
       Gen.small (genOrTest cfg') <*>
       pure ()
+
+genLambdef
+  :: MonadGen m
+  => SyntaxConfig 'AST.NotAssignable ctxt
+  -> m (AST.Lambdef 'AST.NotAssignable ctxt ())
+genLambdef cfg =
+  AST.Lambdef <$>
+  genMaybeF (genWhitespaceBefore1F . genVarargsList cfg $ genTest cfg) <*>
+  genBeforeF
+    (genBetweenWhitespace $ pure AST.Colon)
+    (genTest cfg) <*>
+  pure ()
 
 genStringContent
   :: ( MonadGen m

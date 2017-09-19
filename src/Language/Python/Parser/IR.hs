@@ -6,9 +6,10 @@
 {-# language TemplateHaskell #-}
 module Language.Python.Parser.IR where
 
-import Papa hiding (Plus, Sum)
+import Papa hiding (Plus, Sum, Product)
 import Data.Deriving
 import Data.Functor.Compose
+import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Separated.After
 import Data.Separated.Before
@@ -25,6 +26,7 @@ import Language.Python.AST.Keywords
 import Language.Python.AST.StringLiteral
 import Language.Python.AST.Symbols
 import Language.Python.AST.TermOperator
+import Language.Python.Parser.IR.VarargsList
 
 data Argument a
   = ArgumentFor
@@ -32,9 +34,7 @@ data Argument a
   , _argumentFor_for
     :: Compose
         Maybe
-        (Compose
-          (Before [WhitespaceChar])
-          CompFor)
+        CompFor
         a
   , _argument_ann :: a
   }
@@ -77,10 +77,6 @@ data ArgList a
   }
   deriving (Functor, Foldable, Traversable)
 
-data VarargsList a
-  = VarargsList
-  deriving (Functor, Foldable, Traversable)
-
 data LambdefNocond a
   = LambdefNocond
   { _lambdefNocond_args
@@ -88,7 +84,7 @@ data LambdefNocond a
          Maybe
          (Compose
            (Between (NonEmpty WhitespaceChar) [WhitespaceChar])
-           VarargsList)
+           (VarargsList Test))
          a
   , _lambdefNocond_expr
     :: Compose
@@ -435,9 +431,30 @@ data Test a
            (Before (NonEmpty WhitespaceChar))
            IfThenElse)
         a
-  , _testCond_ann :: a
+  , _test_ann :: a
   }
   | TestLambdef
+  { _testLambdef_value :: Lambdef a
+  , _test_ann :: a
+  }
+  deriving (Functor, Foldable, Traversable)
+
+data Lambdef a
+  = Lambdef
+  { _lambdef_varargs
+    :: Compose
+         Maybe
+         (Compose
+           (Before (NonEmpty WhitespaceChar))
+           (VarargsList Test))
+         a
+  , _lambdef_body
+    :: Compose
+         (Before (Between' [WhitespaceChar] Colon))
+         Test
+         a
+  , _lambdef_ann :: a
+  }
   deriving (Functor, Foldable, Traversable)
 
 data TestList a
@@ -476,7 +493,7 @@ data YieldExpr a
 data TupleTestlistComp a
   = TupleTestlistCompFor
   { _tupleTestlistCompFor_head :: Sum Test StarExpr a
-  , _tupleTestlistCompFor_tail :: Compose (Before [WhitespaceChar]) CompFor a
+  , _tupleTestlistCompFor_tail :: CompFor a
   , _tupleTestlistCompFor_ann :: a
   }
 
@@ -496,7 +513,7 @@ data TupleTestlistComp a
 data ListTestlistComp a
   = ListTestlistCompFor
   { _listTestlistCompFor_head :: Sum Test StarExpr a
-  , _listTestlistCompFor_tail :: Compose (Before [WhitespaceChar]) CompFor a
+  , _listTestlistCompFor_tail :: CompFor a
   , _listTestlistCompFor_ann :: a
   }
 
@@ -513,9 +530,61 @@ data ListTestlistComp a
   , _listTestlistCompList_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
+data DictItem a
+  = DictItem
+  { _dictItem_key :: Test a
+  , _dictItem_colon :: Between' [WhitespaceChar] Colon
+  , _dictItem_value :: Test a
+  , _dictItem_ann :: a
+  } deriving (Functor, Foldable, Traversable)
+
+data DictUnpacking a
+  = DictUnpacking
+  { _dictUnpacking_value
+     :: Compose
+          (Before (Between' [WhitespaceChar] DoubleAsterisk))
+          Expr
+          a
+  , _dictUnpacking_ann :: a
+  } deriving (Functor, Foldable, Traversable)
+
 data DictOrSetMaker a
-  = DictOrSetMaker
+  = DictOrSetMakerDict
+  { _dictOrSetMakerDict_head
+    :: Sum
+         DictItem
+         DictUnpacking
+         a
+  , _dictOrSetMakerDict_tail
+    :: Sum
+         CompFor
+         (Compose
+           (After (Maybe (Between' [WhitespaceChar] Comma)))
+           (Compose
+             []
+             (Compose
+               (Before (Between' [WhitespaceChar] Comma))
+               (Sum DictItem DictUnpacking))))
+         a
+  , _dictOrSetMaker_ann :: a
+  }
+  | DictOrSetMakerSet
+  { _dictOrSetMakerSet_head :: Sum Test StarExpr a
+  , _dictOrSetMakerSet_tail
+    :: Sum
+         CompFor
+         (Compose
+           (After (Maybe (Between' [WhitespaceChar] Comma)))
+           (Compose
+             []
+             (Compose
+               (Before (Between' [WhitespaceChar] Comma))
+               (Sum Test StarExpr))))
+         a
+  , _dictOrSetMaker_ann :: a
+  }
   deriving (Functor, Foldable, Traversable)
+
 
 data Atom a
   = AtomParen
@@ -656,12 +725,6 @@ deriveEq1 ''ArgList
 deriveShow ''ArgList
 deriveShow1 ''ArgList
 makeLenses ''ArgList
-
-deriveEq ''VarargsList
-deriveEq1 ''VarargsList
-deriveShow ''VarargsList
-deriveShow1 ''VarargsList
-makeLenses ''VarargsList
 
 deriveEq ''LambdefNocond
 deriveEq1 ''LambdefNocond
@@ -807,14 +870,32 @@ deriveShow ''TupleTestlistComp
 deriveShow1 ''TupleTestlistComp
 makeLenses ''TupleTestlistComp
 
-deriveEq ''DictOrSetMaker
-deriveEq1 ''DictOrSetMaker
-deriveShow ''DictOrSetMaker
-deriveShow1 ''DictOrSetMaker
-makeLenses ''DictOrSetMaker
-
 deriveEq ''Atom
 deriveEq1 ''Atom
 deriveShow ''Atom
 deriveShow1 ''Atom
 makeLenses ''Atom
+
+deriveEq ''Lambdef
+deriveEq1 ''Lambdef
+deriveShow ''Lambdef
+deriveShow1 ''Lambdef
+makeLenses ''Lambdef
+
+deriveEq ''DictItem
+deriveEq1 ''DictItem
+deriveShow ''DictItem
+deriveShow1 ''DictItem
+makeLenses ''DictItem
+
+deriveEq ''DictUnpacking
+deriveEq1 ''DictUnpacking
+deriveShow ''DictUnpacking
+deriveShow1 ''DictUnpacking
+makeLenses ''DictUnpacking
+
+deriveEq ''DictOrSetMaker
+deriveEq1 ''DictOrSetMaker
+deriveShow ''DictOrSetMaker
+deriveShow1 ''DictOrSetMaker
+makeLenses ''DictOrSetMaker

@@ -39,9 +39,7 @@ data Argument :: AtomType -> ExprContext -> * -> * where
     , _argumentFor_for
       :: Compose
           Maybe
-          (Compose
-            (Before [WhitespaceChar])
-            (CompFor 'NotAssignable ctxt))
+          (CompFor 'NotAssignable ctxt)
           a
     , _argumentFor_ann :: a
     } -> Argument 'NotAssignable ctxt a
@@ -727,10 +725,7 @@ data ListTestlistComp :: AtomType -> ExprContext -> * -> * where
     { _ListTestlistCompFor_head
       :: Test 'NotAssignable ctxt a
     , _ListTestlistCompFor_tail
-      :: Compose
-           (Before [WhitespaceChar])
-           (CompFor 'NotAssignable ctxt)
-           a
+      :: CompFor 'NotAssignable ctxt a
     , _ListTestlistCompFor_ann :: a
     } -> ListTestlistComp 'NotAssignable ctxt a
 deriving instance Eq c => Eq (ListTestlistComp a b c)
@@ -775,10 +770,7 @@ data TupleTestlistComp :: AtomType -> ExprContext -> * -> * where
     { _tupleTestlistCompFor_head
       :: Test 'NotAssignable ctxt a
     , _tupleTestlistCompFor_tail
-      :: Compose
-           (Before [WhitespaceChar])
-           (CompFor 'NotAssignable ctxt)
-           a
+      :: CompFor 'NotAssignable ctxt a
     , _tupleTestlistCompFor_ann :: a
     } -> TupleTestlistComp 'NotAssignable ctxt a
 deriving instance Eq c => Eq (TupleTestlistComp a b c)
@@ -786,9 +778,88 @@ deriving instance Functor (TupleTestlistComp a b)
 deriving instance Foldable (TupleTestlistComp a b)
 deriving instance Traversable (TupleTestlistComp a b)
 
-data DictOrSetMaker (atomType :: AtomType) (ctxt :: ExprContext) a
-  = DictOrSetMaker
-  deriving (Functor, Foldable, Traversable)
+data DictItem (atomType :: AtomType) (ctxt :: ExprContext) a where
+  DictItem ::
+    { _dictItem_key :: Test 'NotAssignable ctxt a
+    , _dictItem_colon :: Between' [WhitespaceChar] Colon
+    , _dictItem_value :: Test 'NotAssignable ctxt a
+    , _dictItem_ann :: a
+    } -> DictItem 'NotAssignable ctxt a
+deriving instance Eq c => Eq (DictItem a b c)
+deriving instance Show c => Show (DictItem a b c)
+deriving instance Functor (DictItem a b)
+deriving instance Foldable (DictItem a b)
+deriving instance Traversable (DictItem a b)
+
+data DictUnpacking (atomType :: AtomType) (ctxt :: ExprContext) a where
+  DictUnpacking ::
+    { _dictUnpacking_value
+      :: Compose
+            (Before (Between' [WhitespaceChar] DoubleAsterisk))
+            (Expr 'NotAssignable ctxt)
+            a
+    , _dictUnpacking_ann :: a
+    } -> DictUnpacking 'NotAssignable ctxt a
+deriving instance Eq c => Eq (DictUnpacking a b c)
+deriving instance Show c => Show (DictUnpacking a b c)
+deriving instance Functor (DictUnpacking a b)
+deriving instance Foldable (DictUnpacking a b)
+deriving instance Traversable (DictUnpacking a b)
+
+data DictOrSetMaker (atomType :: AtomType) (ctxt :: ExprContext) a where
+  DictOrSetMakerDictComp ::
+    { _dictOrSetMakerDictComp_head :: DictItem 'NotAssignable ctxt a
+    , _dictOrSetMakerDictComp_tail :: CompFor 'NotAssignable ctxt a
+    , _dictOrSetMakerDictComp_ann :: a
+    } -> DictOrSetMaker 'NotAssignable ctxt a
+  DictOrSetMakerDictUnpack ::
+    { _dictOrSetMakerDictUnpack_head
+      :: Sum
+           (DictItem 'NotAssignable ctxt)
+           (DictUnpacking 'NotAssignable ctxt)
+           a
+    , _dictOrSetMakerDictUnpack_tail
+      :: Compose
+           []
+           (Compose
+             (Before (Between' [WhitespaceChar] Comma))
+             (Sum
+               (DictItem 'NotAssignable ctxt)
+               (DictUnpacking 'NotAssignable ctxt)))
+           a
+    , _dictOrSetMakerDictUnpack_comma
+      :: Maybe (Between' [WhitespaceChar] Comma)
+    , _dictOrSetMakerDictUnpack_ann :: a
+    } -> DictOrSetMaker 'NotAssignable ctxt a
+  DictOrSetMakerSetComp ::
+    { _dictOrSetMakerSetComp_head :: Test 'NotAssignable ctxt a
+    , _dictOrSetMakerSetComp_tail :: CompFor 'NotAssignable ctxt a
+    , _dictOrSetMakerSetComp_ann :: a
+    } -> DictOrSetMaker 'NotAssignable ctxt a
+  DictOrSetMakerSetUnpack ::
+    { _dictOrSetMakerSetUnpack_head
+      :: Sum
+           (Test 'NotAssignable ctxt)
+           (StarExpr 'NotAssignable ctxt)
+           a
+    , _dictOrSetMakerSetUnpack_tail
+      :: Compose
+           []
+           (Compose
+             (Before (Between' [WhitespaceChar] Comma))
+             (Sum
+               (Test 'NotAssignable ctxt)
+               (StarExpr 'NotAssignable ctxt)))
+           a
+    , _dictOrSetMakerSetUnpack_comma
+      :: Maybe (Between' [WhitespaceChar] Comma)
+    , _dictOrSetMakerSetUnpack_ann :: a
+    } -> DictOrSetMaker 'NotAssignable ctxt a
+deriving instance Eq c => Eq (DictOrSetMaker a b c)
+deriving instance Show c => Show (DictOrSetMaker a b c)
+deriving instance Functor (DictOrSetMaker a b)
+deriving instance Foldable (DictOrSetMaker a b)
+deriving instance Traversable (DictOrSetMaker a b)
 
 data Atom :: AtomType -> ExprContext -> * -> * where
   AtomParenNoYield ::
@@ -829,10 +900,10 @@ data Atom :: AtomType -> ExprContext -> * -> * where
           (Between' [WhitespaceChar])
           (Compose
             Maybe
-            (DictOrSetMaker atomType ctxt))
+            (DictOrSetMaker 'NotAssignable ctxt))
           a
     , _atomCurly_ann :: a
-    } -> Atom atomType ctxt a
+    } -> Atom 'NotAssignable ctxt a
 
   AtomIdentifier ::
     { _atomIdentifier_value :: Identifier a
@@ -1069,8 +1140,6 @@ deriveEq1 ''ListTestlistComp
 deriveShow1 ''ListTestlistComp
 
 makeLenses ''DictOrSetMaker
-deriveEq ''DictOrSetMaker
-deriveShow ''DictOrSetMaker
 deriveEq1 ''DictOrSetMaker
 deriveShow1 ''DictOrSetMaker
 
@@ -1089,3 +1158,11 @@ makeLenses ''Lambdef
 deriveShow ''Lambdef
 deriveEq1 ''Lambdef
 deriveShow1 ''Lambdef
+
+makeLenses ''DictUnpacking
+deriveEq1 ''DictUnpacking
+deriveShow1 ''DictUnpacking
+
+makeLenses ''DictItem
+deriveEq1 ''DictItem
+deriveShow1 ''DictItem

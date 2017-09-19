@@ -10,7 +10,6 @@
 module Language.Python.Parser where
 
 import GHC.Stack
-import Prelude (error)
 
 import Papa hiding (Space, zero, o, Plus, (\\), Product, argument)
 import Data.Functor.Compose
@@ -19,7 +18,7 @@ import Text.Parser.LookAhead
 import Data.Separated.After (After(..))
 import Data.Separated.Before (Before(..))
 import Text.Trifecta as P hiding
-  (stringLiteral, integer, octDigit, hexDigit, comma, colon)
+  (Unspaced(..), stringLiteral, integer, octDigit, hexDigit, comma, colon)
 
 import Language.Python.AST.BytesLiteral
 import Language.Python.AST.BytesPrefix
@@ -50,7 +49,9 @@ import Language.Python.Parser.StringContent
 import Language.Python.Parser.Symbols
 import Language.Python.Parser.VarargsList
 
-ifThenElse :: (DeltaParsing m, LookAheadParsing m) => m (IfThenElse SrcInfo)
+import Text.Parser.Unspaced
+
+ifThenElse :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (IfThenElse SrcInfo)
 ifThenElse =
   IfThenElse <$>
   betweenWhitespace1 (string "if" $> KIf) <*>
@@ -58,7 +59,7 @@ ifThenElse =
   betweenWhitespace1 (string "else" $> KElse) <*>
   test
 
-test :: (DeltaParsing m, LookAheadParsing m) => m (Test SrcInfo)
+test :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Test SrcInfo)
 test = try testCond <|> testLambdef
   where
     testLambdef = annotated $ TestLambdef <$> lambdef
@@ -68,7 +69,7 @@ test = try testCond <|> testLambdef
       orTest <*>
       optionalF (try $ whitespaceBefore1F ifThenElse)
 
-lambdef :: (DeltaParsing m, LookAheadParsing m) => m (Lambdef SrcInfo)
+lambdef :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Lambdef SrcInfo)
 lambdef =
   annotated $
   Lambdef <$>
@@ -81,14 +82,14 @@ kOr = string "or" $> KOr
 kAnd :: (DeltaParsing m, LookAheadParsing m) => m KAnd
 kAnd = string "and" $> KAnd
 
-orTest :: (DeltaParsing m, LookAheadParsing m) => m (OrTest SrcInfo)
+orTest :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (OrTest SrcInfo)
 orTest =
   annotated $
   OrTest <$>
   andTest <*>
   manyF (try $ beforeF (betweenWhitespace1 kOr) andTest)
 
-lambdefNocond :: (DeltaParsing m, LookAheadParsing m) => m (LambdefNocond SrcInfo)
+lambdefNocond :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (LambdefNocond SrcInfo)
 lambdefNocond =
   annotated $
   LambdefNocond <$>
@@ -99,12 +100,12 @@ lambdefNocond =
       (varargsList test)) <*>
   whitespaceBeforeF testNocond
 
-testNocond :: (DeltaParsing m, LookAheadParsing m) => m (TestNocond SrcInfo)
+testNocond :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (TestNocond SrcInfo)
 testNocond =
   annotated $
   TestNocond <$> (try (InL <$> orTest) <|> (InR <$> lambdefNocond))
 
-compIf :: (DeltaParsing m, LookAheadParsing m) => m (CompIf SrcInfo)
+compIf :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (CompIf SrcInfo)
 compIf =
   annotated $
   CompIf <$>
@@ -112,18 +113,18 @@ compIf =
   testNocond <*>
   optionalF (try $ whitespaceBeforeF compIter)
 
-compIter :: (DeltaParsing m, LookAheadParsing m) => m (CompIter SrcInfo)
+compIter :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (CompIter SrcInfo)
 compIter =
   annotated $
   CompIter <$> (try (InL <$> compFor) <|> (InR <$> compIf))
 
-starExpr :: (DeltaParsing m, LookAheadParsing m) => m (StarExpr SrcInfo)
+starExpr :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (StarExpr SrcInfo)
 starExpr =
   annotated $
   StarExpr <$>
   (char '*' *> whitespaceBeforeF expr)
 
-exprList :: (DeltaParsing m, LookAheadParsing m) => m (ExprList SrcInfo)
+exprList :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (ExprList SrcInfo)
 exprList =
   annotated $
   ExprList <$>
@@ -135,7 +136,7 @@ exprList =
 
 compFor
   :: (DeltaParsing m, LookAheadParsing m)
-  => m (CompFor SrcInfo)
+  => Unspaced m (CompFor SrcInfo)
 compFor =
   annotated $
   CompFor <$>
@@ -152,7 +153,7 @@ stringPrefix =
   try (char 'R' $> StringPrefix_R) <|>
   (char 'u' $> StringPrefix_U)
 
-shortString :: (HasCallStack, DeltaParsing m, LookAheadParsing m) => m (ShortString SrcInfo)
+shortString :: (HasCallStack, DeltaParsing m, LookAheadParsing m) => Unspaced m (ShortString SrcInfo)
 shortString = try shortStringSingle <|> shortStringDouble
   where
     shortStringSingle =
@@ -171,7 +172,7 @@ shortString = try shortStringSingle <|> shortStringDouble
         doubleQuote
         (parseStringContentDouble parseShortStringCharDouble doubleQuote)
 
-longString :: (HasCallStack, DeltaParsing m, LookAheadParsing m) => m (LongString SrcInfo)
+longString :: (HasCallStack, DeltaParsing m, LookAheadParsing m) => Unspaced m (LongString SrcInfo)
 longString =
   try longStringDouble <|> longStringSingle
   where
@@ -191,7 +192,7 @@ longString =
         tripleDoublequote
         (parseStringContentDouble parseLongStringChar tripleDoublequote)
 
-stringLiteral :: (DeltaParsing m, LookAheadParsing m) => m (StringLiteral SrcInfo)
+stringLiteral :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (StringLiteral SrcInfo)
 stringLiteral =
   annotated $
   StringLiteral <$>
@@ -212,7 +213,7 @@ bytesPrefix =
   try (string "Rb" $> BytesPrefix_Rb) <|>
   (string "RB" $> BytesPrefix_RB)
 
-shortBytes :: (DeltaParsing m, LookAheadParsing m) => m (ShortBytes SrcInfo)
+shortBytes :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (ShortBytes SrcInfo)
 shortBytes = try shortBytesSingle <|> shortBytesDouble
   where
     shortBytesSingle =
@@ -231,7 +232,7 @@ shortBytes = try shortBytesSingle <|> shortBytesDouble
         doubleQuote
         (parseStringContentDouble parseShortBytesCharDouble doubleQuote)
 
-longBytes :: (DeltaParsing m, LookAheadParsing m) => m (LongBytes SrcInfo)
+longBytes :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (LongBytes SrcInfo)
 longBytes =
   (try longBytesSingle <|> longBytesSingleEmpty) <|>
   (try longBytesDouble <|> longBytesDoubleEmpty)
@@ -264,7 +265,7 @@ longBytes =
         tripleDoublequote
         (parseStringContentDouble parseLongBytesChar tripleDoublequote)
 
-bytesLiteral :: (DeltaParsing m, LookAheadParsing m) => m (BytesLiteral SrcInfo)
+bytesLiteral :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (BytesLiteral SrcInfo)
 bytesLiteral =
   annotated $
   BytesLiteral <$>
@@ -335,7 +336,7 @@ hexDigit =
 binDigit :: (DeltaParsing m, LookAheadParsing m) => m BinDigit
 binDigit = try (char '0' $> BinDigit_0) <|> (char '1' $> BinDigit_1)
 
-integer :: (DeltaParsing m, LookAheadParsing m) => m (Integer' SrcInfo)
+integer :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Integer' SrcInfo)
 integer =
   try integerBin <|>
   try integerOct <|>
@@ -365,7 +366,7 @@ plusOrMinus =
   try (fmap Left plus) <|>
   fmap Right minus
 
-float :: (DeltaParsing m, LookAheadParsing m) => m (Float' SrcInfo)
+float :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Float' SrcInfo)
 float = try floatDecimalBase <|> try floatDecimalNoBase <|> floatNoDecimal
   where
     floatDecimalBase =
@@ -389,7 +390,7 @@ float = try floatDecimalBase <|> try floatDecimalNoBase <|> floatNoDecimal
 
     ex = optional (try $ Before <$> eE <*> some1 digit')
 
-imag :: (DeltaParsing m, LookAheadParsing m) => m (Imag SrcInfo)
+imag :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Imag SrcInfo)
 imag =
   annotated . fmap Imag $
   Compose <$>
@@ -397,17 +398,68 @@ imag =
   where
     floatOrInt = fmap InL float <|> fmap (InR . Const) (some1 digit')
 
-dictOrSetMaker :: (DeltaParsing m, LookAheadParsing m) => m (DictOrSetMaker SrcInfo)
-dictOrSetMaker = error "dictOrSetMaker not implemented"
+dictItem
+  :: ( DeltaParsing m
+     , LookAheadParsing m
+     )
+  => Unspaced m (DictItem SrcInfo)
+dictItem =
+  annotated $
+  DictItem <$>
+  test <*>
+  betweenWhitespace colon <*>
+  test
 
-tupleTestlistComp :: (DeltaParsing m, LookAheadParsing m) => m (TupleTestlistComp SrcInfo)
+dictUnpacking
+  :: ( DeltaParsing m
+     , LookAheadParsing m
+     )
+  => Unspaced m (DictUnpacking SrcInfo)
+dictUnpacking =
+  annotated $
+  DictUnpacking <$>
+  beforeF (betweenWhitespace doubleAsterisk) expr
+
+dictOrSetMaker :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (DictOrSetMaker SrcInfo)
+dictOrSetMaker = try dictOrSetMakerDict <|> dictOrSetMakerSet
+  where
+    dictOrSetMakerDict =
+      annotated $
+      DictOrSetMakerDict <$>
+      itemOrUnpacking <*>
+      dictCompOrList
+
+    itemOrUnpacking = try (InL <$> dictItem) <|> (InR <$> dictUnpacking)
+
+    dictCompOrList =
+      (InL <$> try compFor) <|>
+      (InR <$> afterF
+        (optional . try $ betweenWhitespace comma)
+        (manyF . try $ beforeF (betweenWhitespace comma) itemOrUnpacking))
+
+    dictOrSetMakerSet =
+      annotated $
+      DictOrSetMakerSet <$>
+      testOrStar <*>
+      setCompOrList
+
+    testOrStar = try (InL <$> test) <|> (InR <$> starExpr)
+
+    setCompOrList =
+      (InL <$> try compFor) <|>
+      (InR <$> afterF
+        (optional . try $ betweenWhitespace comma)
+        (manyF . try $ beforeF (betweenWhitespace comma) testOrStar))
+
+
+tupleTestlistComp :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (TupleTestlistComp SrcInfo)
 tupleTestlistComp = try tupleTestlistCompFor <|> tupleTestlistCompList
   where
     tupleTestlistCompFor =
       annotated $
       TupleTestlistCompFor <$>
       testOrStar <*>
-      whitespaceBeforeF compFor
+      compFor
 
     tupleTestlistCompList =
       annotated $
@@ -418,14 +470,14 @@ tupleTestlistComp = try tupleTestlistCompFor <|> tupleTestlistCompList
 
     testOrStar = try (InL <$> test) <|> (InR <$> starExpr)
 
-listTestlistComp :: (DeltaParsing m, LookAheadParsing m) => m (ListTestlistComp SrcInfo)
+listTestlistComp :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (ListTestlistComp SrcInfo)
 listTestlistComp = try listTestlistCompFor <|> listTestlistCompList
   where
     listTestlistCompFor =
       annotated $
       ListTestlistCompFor <$>
       testOrStar <*>
-      whitespaceBeforeF compFor
+      compFor
 
     listTestlistCompList =
       annotated $
@@ -436,7 +488,7 @@ listTestlistComp = try listTestlistCompFor <|> listTestlistCompList
 
     testOrStar = try (InL <$> test) <|> (InR <$> starExpr)
 
-testList :: (DeltaParsing m, LookAheadParsing m) => m (TestList SrcInfo)
+testList :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (TestList SrcInfo)
 testList =
   annotated $
   TestList <$>
@@ -444,7 +496,7 @@ testList =
   beforeF (betweenWhitespace comma) test <*>
   optional (try $ whitespaceBefore comma)
 
-yieldArg :: (DeltaParsing m, LookAheadParsing m) => m (YieldArg SrcInfo)
+yieldArg :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (YieldArg SrcInfo)
 yieldArg = try yieldArgFrom <|> yieldArgList
   where
     yieldArgFrom =
@@ -455,14 +507,14 @@ yieldArg = try yieldArgFrom <|> yieldArgList
       annotated $
       YieldArgList <$> testList
 
-yieldExpr :: (DeltaParsing m, LookAheadParsing m) => m (YieldExpr SrcInfo)
+yieldExpr :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (YieldExpr SrcInfo)
 yieldExpr =
   annotated $
   YieldExpr <$>
   (string "yield" *> optionalF (try $ whitespaceBefore1F yieldArg))
 
 
-atom :: (DeltaParsing m, LookAheadParsing m) => m (Atom SrcInfo)
+atom :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Atom SrcInfo)
 atom =
   try atomParen <|>
   try atomBracket <|>
@@ -539,20 +591,20 @@ atom =
       annotated $
       (string "False" *> notFollowedBy idContinue) $> AtomFalse
 
-sliceOp :: (DeltaParsing m, LookAheadParsing m) => m (SliceOp SrcInfo)
+sliceOp :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (SliceOp SrcInfo)
 sliceOp =
   annotated $
   SliceOp <$>
   (char ':' *> optionalF (try $ whitespaceBeforeF test))
 
-argument :: (DeltaParsing m, LookAheadParsing m) => m (Argument SrcInfo)
+argument :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Argument SrcInfo)
 argument = try argumentUnpack <|> try argumentDefault <|> argumentFor
   where
     argumentFor =
       annotated $
       ArgumentFor <$>
       test <*>
-      optionalF (try $ whitespaceBeforeF compFor)
+      optionalF (try compFor)
     argumentDefault =
       annotated $
       ArgumentDefault <$>
@@ -564,7 +616,7 @@ argument = try argumentUnpack <|> try argumentDefault <|> argumentFor
       (try (Right <$> doubleAsterisk) <|> (Left <$> asterisk)) <*>
       whitespaceBeforeF test
 
-subscript :: (DeltaParsing m, LookAheadParsing m) => m (Subscript SrcInfo)
+subscript :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Subscript SrcInfo)
 subscript = try subscriptTest <|> subscriptSlice
   where
     subscriptTest =
@@ -579,7 +631,7 @@ subscript = try subscriptTest <|> subscriptSlice
       optionalF (try $ whitespaceAfterF test) <*>
       optionalF (try $ whitespaceAfterF sliceOp)
 
-argList :: (DeltaParsing m, LookAheadParsing m) => m (ArgList SrcInfo)
+argList :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (ArgList SrcInfo)
 argList =
   annotated $
   ArgList <$>
@@ -587,7 +639,7 @@ argList =
   manyF (try $ beforeF (betweenWhitespace comma) argument) <*>
   optional (try $ whitespaceBefore comma)
 
-subscriptList :: (DeltaParsing m, LookAheadParsing m) => m (SubscriptList SrcInfo)
+subscriptList :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (SubscriptList SrcInfo)
 subscriptList =
   annotated $
   SubscriptList <$>
@@ -595,7 +647,7 @@ subscriptList =
   manyF (try $ beforeF (betweenWhitespace comma) subscript) <*>
   optional (try $ whitespaceBefore comma)
 
-trailer :: (DeltaParsing m, LookAheadParsing m) => m (Trailer SrcInfo)
+trailer :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Trailer SrcInfo)
 trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
   where
     trailerCall =
@@ -619,7 +671,7 @@ trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
       TrailerAccess <$>
       (char '.' *> whitespaceBeforeF identifier)
 
-atomExpr :: (DeltaParsing m, LookAheadParsing m) => m (AtomExpr SrcInfo)
+atomExpr :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (AtomExpr SrcInfo)
 atomExpr =
   annotated $
   AtomExpr <$>
@@ -627,7 +679,7 @@ atomExpr =
   atom <*>
   manyF (try $ whitespaceBeforeF trailer)
 
-power :: (DeltaParsing m, LookAheadParsing m) => m (Power SrcInfo)
+power :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Power SrcInfo)
 power =
   annotated $
   Power <$>
@@ -640,7 +692,7 @@ factorOp =
   try (char '+' $> FactorPos) <|>
   (char '~' $> FactorInv)
 
-factor :: (DeltaParsing m, LookAheadParsing m) => m (Factor SrcInfo)
+factor :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Factor SrcInfo)
 factor = try factorOne <|> factorNone
   where
     factorNone = annotated $ FactorNone <$> power
@@ -658,21 +710,21 @@ termOp =
   try (char '/' $> TermDiv) <|>
   (char '%' $> TermMod)
 
-term :: (DeltaParsing m, LookAheadParsing m) => m (Term SrcInfo)
+term :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Term SrcInfo)
 term =
   annotated $
   Term <$>
   factor <*>
   manyF (try $ beforeF (betweenWhitespace termOp) factor)
 
-arithExpr :: (DeltaParsing m, LookAheadParsing m) => m (ArithExpr SrcInfo)
+arithExpr :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (ArithExpr SrcInfo)
 arithExpr =
   annotated $
   ArithExpr <$>
   term <*>
   manyF (try $ beforeF (betweenWhitespace plusOrMinus) term)
 
-shiftExpr :: (DeltaParsing m, LookAheadParsing m) => m (ShiftExpr SrcInfo)
+shiftExpr :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (ShiftExpr SrcInfo)
 shiftExpr =
   annotated $
   ShiftExpr <$>
@@ -683,21 +735,21 @@ shiftExpr =
       (symbol "<<" $> Left DoubleLT) <|>
       (symbol ">>" $> Right DoubleGT)
 
-andExpr :: (DeltaParsing m, LookAheadParsing m) => m (AndExpr SrcInfo)
+andExpr :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (AndExpr SrcInfo)
 andExpr =
   annotated $
   AndExpr <$>
   shiftExpr <*>
   manyF (try $ beforeF (betweenWhitespace $ char '&' $> Ampersand) shiftExpr)
 
-xorExpr :: (DeltaParsing m, LookAheadParsing m) => m (XorExpr SrcInfo)
+xorExpr :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (XorExpr SrcInfo)
 xorExpr =
   annotated $
   XorExpr <$>
   andExpr <*>
   manyF (try $ beforeF (betweenWhitespace $ char '^' $> S.Caret) andExpr)
 
-expr :: (DeltaParsing m, LookAheadParsing m) => m (Expr SrcInfo)
+expr :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Expr SrcInfo)
 expr =
   annotated $
   Expr <$>
@@ -769,14 +821,14 @@ compOperator =
       (some1 whitespaceChar <* string "in") <*>
       some1 whitespaceChar
 
-comparison :: (DeltaParsing m, LookAheadParsing m) => m (Comparison SrcInfo)
+comparison :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Comparison SrcInfo)
 comparison =
   annotated $
   Comparison <$>
   expr <*>
   manyF (try $ beforeF compOperator expr)
 
-notTest :: (DeltaParsing m, LookAheadParsing m) => m (NotTest SrcInfo)
+notTest :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (NotTest SrcInfo)
 notTest = try notTestMany <|> notTestOne
   where
     notTestMany =
@@ -787,7 +839,7 @@ notTest = try notTestMany <|> notTestOne
     notTestOne =
       annotated $ NotTestOne <$> comparison
 
-andTest :: (DeltaParsing m, LookAheadParsing m) => m (AndTest SrcInfo)
+andTest :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (AndTest SrcInfo)
 andTest =
   annotated $
   AndTest <$>

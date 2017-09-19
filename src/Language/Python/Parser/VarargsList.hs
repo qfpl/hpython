@@ -3,7 +3,7 @@ module Language.Python.Parser.VarargsList where
 import Papa
 import Data.Functor.Sum
 import Text.Parser.LookAhead
-import Text.Trifecta hiding (comma)
+import Text.Trifecta hiding (Unspaced(..), comma)
 
 import Language.Python.AST.VarargsList hiding (VarargsList)
 import Language.Python.Parser.IR.VarargsList
@@ -12,13 +12,15 @@ import Language.Python.Parser.Identifier
 import Language.Python.Parser.SrcInfo
 import Language.Python.Parser.Symbols
 
+import Text.Parser.Unspaced
+
 varargsListArg
   :: ( DeltaParsing m
      , LookAheadParsing m
      , Functor f
      )
-  => m (f SrcInfo)
-  -> m (VarargsListArg f SrcInfo)
+  => Unspaced m (f SrcInfo)
+  -> Unspaced m (VarargsListArg f SrcInfo)
 varargsListArg p =
   annotated $
   VarargsListArg <$>
@@ -30,8 +32,8 @@ varargsListStarPart
      , LookAheadParsing m
      , Functor f
      )
-  => m (f SrcInfo)
-  -> m (VarargsListStarPart f SrcInfo)
+  => Unspaced m (f SrcInfo)
+  -> Unspaced m (VarargsListStarPart f SrcInfo)
 varargsListStarPart p =
   annotated $
   try varargsListStarPartSome <|>
@@ -47,7 +49,7 @@ varargsListDoublestarArg
   :: ( DeltaParsing m
      , LookAheadParsing m
      )
-  => m (VarargsListDoublestarArg test SrcInfo)
+  => Unspaced m (VarargsListDoublestarArg test SrcInfo)
 varargsListDoublestarArg =
   annotated $
   VarargsListDoublestarArg <$>
@@ -59,8 +61,8 @@ varargsList
      , LookAheadParsing m
      , Functor f
      )
-  => m (f SrcInfo)
-  -> m (VarargsList f SrcInfo)
+  => Unspaced m (f SrcInfo)
+  -> Unspaced m (VarargsList f SrcInfo)
 varargsList p = try varargsListAll <|> varargsListArgsKwargs
   where
     varargsListAll =

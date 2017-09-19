@@ -11,7 +11,7 @@ import System.Process
 import Test.Tasty
 import Test.Tasty.Hspec
 import Test.Tasty.Hedgehog
-import Text.Trifecta hiding (render)
+import Text.Trifecta hiding (render, runUnspaced)
 
 import qualified Text.PrettyPrint.ANSI.Leijen as WL
 import qualified Text.PrettyPrint as HPJ
@@ -24,12 +24,14 @@ import qualified Language.Python.Printer as Print
 import qualified Language.Python.AST as AST
 import qualified Test.Language.Python.AST.Gen as GenAST
 
+import Text.Parser.Unspaced
+
 examplesDir :: FilePath
 examplesDir = "test" </> "examples" </> "expressions" </> "valid"
 
 parse_print_expr_id :: String -> Expectation
 parse_print_expr_id input =
-  case parseString (Parse.test <* eof) mempty input of
+  case parseString (runUnspaced $ Parse.test <* eof) mempty input of
     Success unchecked ->
       let
         checkResult =

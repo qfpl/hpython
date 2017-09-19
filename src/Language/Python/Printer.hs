@@ -578,8 +578,36 @@ comparison (ComparisonMany l r _) =
   expr l <>
   foldMapF (beforeF compOperator expr) r
 
+dictItem :: DictItem atomType ctxt a -> Doc
+dictItem (DictItem k c v _) =
+  test k <>
+  betweenWhitespace' colon c <>
+  test v
+
+dictUnpacking :: DictUnpacking atomType ctxt a -> Doc
+dictUnpacking (DictUnpacking v _) =
+  beforeF (betweenWhitespace' doubleAsterisk) expr v
+
 dictOrSetMaker :: DictOrSetMaker atomType ctxt a -> Doc
-dictOrSetMaker _ = error "dictOrSetMaker not implemented"
+dictOrSetMaker e =
+  case e of
+    DictOrSetMakerDictComp h t _ ->
+      dictItem h <>
+      compFor t
+    DictOrSetMakerDictUnpack h t c _ ->
+      itemOrUnpacking h <>
+      foldMapF (beforeF (betweenWhitespace' comma) itemOrUnpacking) t <>
+      foldMap (betweenWhitespace' comma) c
+    DictOrSetMakerSetComp h t _ ->
+      test h <>
+      compFor t
+    DictOrSetMakerSetUnpack h t c _ ->
+      testOrStar h <>
+      foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t <>
+      foldMap (betweenWhitespace' comma) c
+  where
+    itemOrUnpacking = sumElim dictItem dictUnpacking
+    testOrStar = sumElim test starExpr
 
 starExpr :: StarExpr atomType ctxt a -> Doc
 starExpr (StarExpr val _) =
@@ -591,7 +619,7 @@ listTestlistComp t =
   case t of
     ListTestlistCompFor h t' _ ->
       test h <>
-      whitespaceBeforeF compFor t'
+      compFor t'
     ListTestlistCompList h t' c _ ->
       test h <>
       foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t' <>
@@ -608,7 +636,7 @@ tupleTestlistComp t =
   case t of
     TupleTestlistCompFor h t' _ ->
       test h <>
-      whitespaceBeforeF compFor t'
+      compFor t'
     TupleTestlistCompList h t' c _ ->
       test h <>
       foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t' <>
@@ -670,7 +698,7 @@ argument a =
   case a of
     ArgumentFor e f _ ->
       test e <>
-      foldMapF (whitespaceBeforeF compFor) f
+      foldMapF compFor f
     ArgumentDefault l r _ ->
       whitespaceAfterF test l <>
       char '=' <>

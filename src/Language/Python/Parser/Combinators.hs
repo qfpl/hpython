@@ -6,6 +6,7 @@ import Data.Separated.After
 import Data.Separated.Before
 import Data.Separated.Between
 import Text.Parser.Char
+import Text.Parser.Combinators (try)
 
 import Language.Python.AST.Symbols
 import Language.Python.Parser.Symbols
@@ -23,7 +24,7 @@ whitespaceBefore1
   :: CharParsing m
   => m a
   -> m (Before (NonEmpty WhitespaceChar) a)
-whitespaceBefore1 m = Before <$> some1 whitespaceChar <*> m
+whitespaceBefore1 m = Before <$> some1 (try whitespaceChar) <*> m
 
 whitespaceBefore1F
   :: CharParsing m
@@ -44,7 +45,7 @@ whitespaceAfter1
   :: CharParsing m
   => m a
   -> m (After (NonEmpty WhitespaceChar) a)
-whitespaceAfter1 m = After <$> some1 whitespaceChar <*> m
+whitespaceAfter1 m = flip After <$> m <*> some1 (try whitespaceChar)
 
 whitespaceAfter1F
   :: CharParsing m
@@ -76,9 +77,9 @@ betweenWhitespace1
 betweenWhitespace1 m =
   fmap Between' $
   Between <$>
-  some1 whitespaceChar <*>
+  some1 (try whitespaceChar) <*>
   m <*>
-  some1 whitespaceChar
+  some1 (try whitespaceChar)
 
 betweenWhitespace1F
   :: CharParsing m

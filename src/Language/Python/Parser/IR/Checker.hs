@@ -6,10 +6,10 @@
 {-# LANGUAGE RankNTypes #-}
 module Language.Python.Parser.IR.Checker where
 
-import Prelude (error)
 import Control.Monad.Writer hiding (Alt)
 import Data.Functor.Compose
 import Data.Functor.Sum
+import Data.Separated.After
 import Data.Separated.Between
 import Data.Text (Text)
 import Data.Validation
@@ -44,6 +44,7 @@ data InvalidLHS
   | LHSFalse
   | LHSSingleStarExpr
   | LHSLambda
+  | LHSDictOrSet
   deriving (Eq, Show, Ord)
 
 data SyntaxError a
@@ -523,7 +524,7 @@ checkArgument cfg e =
         IR.ArgumentFor ex f ann ->
           Safe.ArgumentFor <$>
           checkTest cfg ex <*>
-          traverseOf (traverseCompose.traverseCompose) (checkCompFor cfg) f <*>
+          traverseCompose (checkCompFor cfg) f <*>
           pure ann
         IR.ArgumentDefault l r ann ->
           Safe.ArgumentDefault <$>
@@ -847,7 +848,17 @@ checkAtom cfg e =
         (checkListTestlistComp cfg)
         v <*>
       pure ann
-    IR.AtomCurly _ _ -> error "checkDictOrSetMaker not implemented"
+    IR.AtomCurly v ann ->
+      case cfg ^. atomType of
+        Safe.SAssignable ->
+          syntaxError $ CannotAssignTo LHSDictOrSet ann
+        Safe.SNotAssignable ->
+          Safe.AtomCurly <$>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (checkDictOrSetMaker cfg)
+            v <*>
+          pure ann
     IR.AtomIdentifier v ann ->
       Safe.AtomIdentifier <$>
       checkIdentifier cfg v <*>
@@ -900,6 +911,82 @@ checkAtom cfg e =
           syntaxError $ CannotAssignTo LHSFalse ann
         Safe.SNotAssignable ->
           pure $ Safe.AtomFalse ann
+
+checkDictItem
+  :: SyntaxConfig 'Safe.NotAssignable ctxt
+  -> IR.DictItem ann
+  -> SyntaxChecker ann (Safe.DictItem 'Safe.NotAssignable ctxt ann)
+checkDictItem cfg (IR.DictItem k c v ann) =
+  Safe.DictItem <$>
+  checkTest cfg k <*>
+  pure c <*>
+  checkTest cfg v <*>
+  pure ann
+
+checkDictOrSetMaker
+  :: SyntaxConfig 'Safe.NotAssignable ctxt
+  -> IR.DictOrSetMaker ann
+  -> SyntaxChecker ann (Safe.DictOrSetMaker 'Safe.NotAssignable ctxt ann)
+checkDictOrSetMaker cfg e =
+  case e of
+    IR.DictOrSetMakerDict h t ann ->
+      case t of
+        InL t' ->
+          case h of
+            InL h' ->
+              Safe.DictOrSetMakerDictComp <$>
+              checkDictItem cfg h' <*>
+              checkCompFor cfg t' <*>
+              pure ann
+            InR _ ->
+              syntaxError $ UnpackingInComprehension ann
+        InR t' ->
+          Safe.DictOrSetMakerDictUnpack <$>
+          itemOrUnpacking cfg h <*>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (itemOrUnpacking cfg)
+            (t' ^. _Wrapped.after._2) <*>
+          pure (t' ^? _Wrapped.after._1._Just) <*>
+          pure ann
+    IR.DictOrSetMakerSet h t ann ->
+      case t of
+        InL t' ->
+          case h of
+            InL h' ->
+              Safe.DictOrSetMakerSetComp <$>
+              checkTest cfg h' <*>
+              checkCompFor cfg t' <*>
+              pure ann
+            InR _ ->
+              syntaxError $ UnpackingInComprehension ann
+        InR t' ->
+          Safe.DictOrSetMakerSetUnpack <$>
+          testOrStar cfg h <*>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (testOrStar cfg)
+            (t' ^. _Wrapped.after._2) <*>
+          pure (t' ^? _Wrapped.after._1._Just) <*>
+          pure ann
+  where
+    itemOrUnpacking cfg' e' =
+      case e' of
+        InL e'' -> InL <$> checkDictItem cfg' e''
+        InR e'' -> InR <$> checkDictUnpacking cfg' e''
+    testOrStar cfg' e' =
+      case e' of
+        InL e'' -> InL <$> checkTest cfg' e''
+        InR e'' -> InR <$> checkStarExpr cfg' e''
+
+checkDictUnpacking
+  :: SyntaxConfig 'Safe.NotAssignable ctxt
+  -> IR.DictUnpacking ann
+  -> SyntaxChecker ann (Safe.DictUnpacking 'Safe.NotAssignable ctxt ann)
+checkDictUnpacking cfg (IR.DictUnpacking v ann) =
+  Safe.DictUnpacking <$>
+  traverseCompose (checkExpr cfg) v <*>
+  pure ann
 
 checkYieldExpr
   :: SyntaxConfig atomType ctxt
@@ -963,7 +1050,7 @@ checkTupleTestlistComp cfg e =
             InL h' ->
               Safe.TupleTestlistCompFor <$>
               checkTest cfg h' <*>
-              traverseCompose (checkCompFor cfg) t <*>
+              checkCompFor cfg t <*>
               pure ann
 
     IR.TupleTestlistCompList h t comma ann ->
@@ -1021,7 +1108,7 @@ checkListTestlistComp cfg e =
             InL h' ->
               Safe.ListTestlistCompFor <$>
               checkTest cfg h' <*>
-              traverseCompose (checkCompFor cfg) t <*>
+              checkCompFor cfg t <*>
               pure ann
 
     IR.ListTestlistCompList h t comma ann ->

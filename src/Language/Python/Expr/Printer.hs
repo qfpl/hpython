@@ -17,8 +17,6 @@ import qualified Data.Text as T
 
 import Language.Python.AST.Comment
 import Language.Python.AST.Identifier
-import Language.Python.AST.Keywords
-import Language.Python.AST.Symbols
 import Language.Python.Expr.AST
 import Language.Python.Expr.AST.BytesLiteral
 import Language.Python.Expr.AST.BytesPrefix
@@ -41,144 +39,12 @@ import Language.Python.Expr.AST.StringLiteral
 import Language.Python.Expr.AST.StringPrefix
 import Language.Python.Expr.AST.TermOperator
 import Language.Python.Expr.AST.StringContent (stringContent)
-import Language.Python.Expr.AST.VarargsList
+import Language.Python.Printer.ArgsList
+import Language.Python.Printer.Keywords
+import Language.Python.Printer.Symbols
 
 identifier :: Identifier a -> Doc
 identifier i = i ^. identifier_value . to T.unpack . to text
-
-leftParen :: LeftParen -> Doc
-leftParen _ = char '('
-
-rightParen :: RightParen -> Doc
-rightParen _ = char ')'
-
-plus :: Plus -> Doc
-plus _ = char '+'
-
-minus :: Minus -> Doc
-minus _ = char '-'
-
-ampersand :: Ampersand -> Doc
-ampersand _ = char '&'
-
-doubleLT :: DoubleLT -> Doc
-doubleLT _ = text "<<"
-
-doubleGT :: DoubleGT -> Doc
-doubleGT _ = text ">>"
-
-comma :: Comma -> Doc
-comma _ = char ','
-
-caret :: Caret -> Doc
-caret _ = char '^'
-
-pipe :: Pipe -> Doc
-pipe _ = char '|'
-
-colon :: Colon -> Doc
-colon _ = char ':'
-
-kAwait :: KAwait -> Doc
-kAwait _ = text "await"
-
-kOr :: KOr -> Doc
-kOr _ = text "or"
-
-kAnd :: KAnd -> Doc
-kAnd _ = text "and"
-
-kNot :: KNot -> Doc
-kNot _ = text "not"
-
-foldMapF :: (Foldable f, Monoid r) => (g a -> r) -> Compose f g a -> r
-foldMapF f = foldMap f . getCompose
-
-before :: Semigroup r => (s -> r) -> (a -> r) -> Before s a -> r
-before f g (Before s a) = f s <> g a
-
-beforeF
-  :: Semigroup r
-  => (s -> r)
-  -> (forall x. f x -> r)
-  -> Compose (Before s) f a
-  -> r
-beforeF f g = before f g . getCompose
-
-after :: Semigroup r => (s -> r) -> (a -> r) -> After s a -> r
-after f g (After s a) = g a <> f s
-
-afterF
-  :: Semigroup r
-  => (s -> r)
-  -> (forall x. f x -> r)
-  -> Compose (After s) f a
-  -> r
-afterF f g = after f g . getCompose
-
-between
-  :: Semigroup r
-  => (s -> r)
-  -> (t -> r)
-  -> (a -> r)
-  -> Between s t a
-  -> r
-between f g h (Between s a t) = f s <> h a <> g t
-
-betweenF
-  :: Semigroup r
-  => (s -> r)
-  -> (t -> r)
-  -> (forall x. f x -> r)
-  -> Compose (Between s t) f a
-  -> r
-betweenF f g h = between f g h . getCompose
-
-between'
-  :: Semigroup r
-  => (s -> r)
-  -> (a -> r)
-  -> Between' s a
-  -> r
-between' f g (Between' (Between s a t)) = f s <> g a <> f t
-
-
-whitespaceAfterF
-  :: Foldable g
-  => (forall x. f x -> Doc)
-  -> Compose (After (g WhitespaceChar)) f a
-  -> Doc
-whitespaceAfterF f = after (foldMap whitespaceChar) f . getCompose
-
-whitespaceAfter
-  :: Foldable g
-  => (a -> Doc) -> After (g WhitespaceChar) a -> Doc
-whitespaceAfter = after (foldMap whitespaceChar)
-
-whitespaceBefore
-  :: Foldable g
-  => (a -> Doc)
-  -> Before (g WhitespaceChar) a -> Doc
-whitespaceBefore = before (foldMap whitespaceChar)
-
-whitespaceBeforeF
-  :: Foldable g
-  => (forall x. f x -> Doc)
-  -> Compose (Before (g WhitespaceChar)) f a
-  -> Doc
-whitespaceBeforeF f = before (foldMap whitespaceChar) f . getCompose
-
-betweenWhitespace'F
-  :: Foldable g
-  => (forall x. f x -> Doc)
-  -> Compose (Between' (g WhitespaceChar)) f a
-  -> Doc
-betweenWhitespace'F f = between' (foldMap whitespaceChar) f . getCompose
-
-betweenWhitespace'
-  :: Foldable f
-  => (a -> Doc) -> Between' (f WhitespaceChar) a -> Doc
-betweenWhitespace' = between' (foldMap whitespaceChar)
 
 stringPrefix :: StringPrefix -> Doc
 stringPrefix sp =
@@ -193,9 +59,6 @@ shortStringCharDouble s = char (_ShortStringCharDouble # s)
 
 shortStringCharSingle :: ShortStringChar SingleQuote -> Doc
 shortStringCharSingle s = char (_ShortStringCharSingle # s)
-
-tripled :: (Doc -> Doc) -> Doc -> Doc
-tripled f = f . f . f
 
 escape :: EscapeSeq -> Doc
 escape = text . review _Escape
@@ -391,20 +254,6 @@ bytesLiteral (BytesLiteral prefix val _) =
   bytesPrefix prefix <>
   sumElim shortBytes longBytes val
 
-newlineChar :: NewlineChar -> Doc
-newlineChar n =
-  case n of
-    CR -> char '\r'
-    LF -> char '\n'
-    CRLF -> text "\r\n"
-
-whitespaceChar :: WhitespaceChar -> Doc
-whitespaceChar w =
-  case w of
-    Space -> char ' '
-    Tab -> char '\t'
-    Continued nl -> char '\\' <> newlineChar nl
-
 ifThenElse :: IfThenElse atomType ctxt a -> Doc
 ifThenElse (IfThenElse i v1 e v2) =
   betweenWhitespace' (const $ text "if") i <>
@@ -463,57 +312,8 @@ compOperator o =
 tupleElim :: Semigroup r => (a -> r) -> (b -> r) -> (a, b) -> r
 tupleElim f g (a, b) = f a <> g b
 
-asterisk :: Asterisk -> Doc
-asterisk _ = char '*'
-
-doubleAsterisk :: DoubleAsterisk -> Doc
-doubleAsterisk _ = text "**"
-
 compIter :: CompIter atomType ctxt a -> Doc
 compIter (CompIter val _) = sumElim compFor compIf val
-
-varargsListArg :: (forall x. f x -> Doc) -> VarargsListArg f a -> Doc
-varargsListArg f (VarargsListArg l r _) =
-  identifier l <>
-  foldMapF (beforeF (betweenWhitespace' . const $ char '=') f) r
-
-varargsListStarPart :: (forall x. f x -> Doc) -> VarargsListStarPart f a -> Doc
-varargsListStarPart f e =
-  case e of
-    VarargsListStarPartEmpty _ -> mempty
-    VarargsListStarPart h t r _ ->
-      beforeF (betweenWhitespace' . const $ text "*") identifier h <>
-      foldMapF (beforeF (betweenWhitespace' comma) $ varargsListArg f) t <>
-      foldMapF (beforeF (betweenWhitespace' comma) varargsListDoublestarArg) r
-
-varargsListDoublestarArg :: VarargsListDoublestarArg test a -> Doc
-varargsListDoublestarArg (VarargsListDoublestarArg a _) =
-  text "**" <>
-  betweenWhitespace'F identifier a
-
-varargsList :: (forall x. f x -> Doc) -> VarargsList f a -> Doc
-varargsList f e =
-  Just e &
-    (outside _VarargsListAll .~
-       (\(h, t, r, _) ->
-         varargsListArg f h <>
-         foldMapF (beforeF (betweenWhitespace' comma) $ varargsListArg f) t <>
-         foldMapF
-           (beforeF
-             (betweenWhitespace' comma)
-             (foldMapF $ starOrDouble f)) r) $
-     outside _VarargsListArgsKwargs .~
-       (\(a, _) -> starOrDouble f a) $
-     error "incomplete pattern")
-  where
-    starOrDouble
-      :: (forall x. f x -> Doc)
-      -> Sum (VarargsListStarPart f) (VarargsListDoublestarArg f) a
-      -> Doc
-    starOrDouble f' =
-      sumElim
-        (varargsListStarPart f')
-        varargsListDoublestarArg
 
 lambdefNocond :: LambdefNocond atomType ctxt a -> Doc
 lambdefNocond  (LambdefNocond a e _) =
@@ -522,7 +322,7 @@ lambdefNocond  (LambdefNocond a e _) =
     (betweenF
       (foldMap whitespaceChar)
       (foldMap whitespaceChar)
-      (varargsList test))
+      (argsList test))
     a <>
   char ':' <>
   whitespaceBeforeF testNocond e
@@ -845,7 +645,7 @@ test t =
 lambdef :: Lambdef atomType ctxt a -> Doc
 lambdef (Lambdef a b _) =
   text "lambda" <>
-  foldMapF (whitespaceBeforeF $ varargsList test) a <>
+  foldMapF (whitespaceBeforeF $ argsList test) a <>
   beforeF (betweenWhitespace' colon) test b
 
 comment :: Comment a -> Doc

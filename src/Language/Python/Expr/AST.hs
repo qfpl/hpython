@@ -20,6 +20,7 @@ import Data.Separated.After
 import Data.Separated.Before
 import Data.Separated.Between
 
+import Language.Python.AST.ArgsList
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
@@ -31,7 +32,6 @@ import Language.Python.Expr.AST.Imag
 import Language.Python.Expr.AST.Integer
 import Language.Python.Expr.AST.StringLiteral
 import Language.Python.Expr.AST.TermOperator
-import Language.Python.Expr.AST.VarargsList
 import Language.Python.IR.SyntaxConfig
 
 data Argument :: AtomType -> ExprContext -> * -> * where
@@ -93,7 +93,7 @@ data LambdefNocond (atomType :: AtomType) (ctxt :: ExprContext) a
          Maybe
          (Compose
            (Between (NonEmpty WhitespaceChar) [WhitespaceChar])
-           (VarargsList (Test atomType ctxt)))
+           (ArgsList Identifier (Test atomType ctxt)))
          a
   , _lambdefNocond_expr
     :: Compose
@@ -618,12 +618,12 @@ deriving instance Traversable (Test a b)
 
 data Lambdef :: AtomType -> ExprContext -> * -> * where
   Lambdef ::
-    { _lambdef_varargs
+    { _lambdef_Args
       :: Compose
           Maybe
           (Compose
             (Before (NonEmpty WhitespaceChar))
-            (VarargsList (Test 'NotAssignable ctxt)))
+            (ArgsList Identifier (Test 'NotAssignable ctxt)))
           a
     , _lambdef_body
       :: Compose

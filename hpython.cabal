@@ -19,6 +19,7 @@ tested-with:         GHC == 8.0.2
 
 library
   exposed-modules:
+                       Language.Python.AST.ArgsList
                        Language.Python.AST.Comment
                        Language.Python.AST.Identifier
                        Language.Python.AST.Keywords
@@ -45,20 +46,23 @@ library
                        Language.Python.Expr.AST.StringPrefix
                        Language.Python.Expr.AST.StringContent
                        Language.Python.Expr.AST.TermOperator
-                       Language.Python.Expr.AST.VarargsList
                        Language.Python.Expr.IR
-                       Language.Python.Expr.Parser
                        Language.Python.Expr.IR.Checker
-                       Language.Python.Expr.IR.VarargsList
+                       Language.Python.Expr.Parser
                        Language.Python.Expr.Parser.EscapeSeq
                        Language.Python.Expr.Parser.StringContent
-                       Language.Python.Expr.Parser.VarargsList
                        Language.Python.Expr.Printer
+                       Language.Python.IR.ArgsList
+                       Language.Python.IR.SyntaxChecker
                        Language.Python.IR.SyntaxConfig
+                       Language.Python.Parser.ArgsList
                        Language.Python.Parser.Combinators
                        Language.Python.Parser.Identifier
                        Language.Python.Parser.SrcInfo
                        Language.Python.Parser.Symbols
+                       Language.Python.Printer.ArgsList
+                       Language.Python.Printer.Combinators
+                       Language.Python.Printer.Keywords
                        Data.Functor.Sum.Lens
                        Data.Separated.After
                        Data.Separated.Before

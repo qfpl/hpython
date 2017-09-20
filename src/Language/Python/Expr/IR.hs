@@ -9,7 +9,6 @@ module Language.Python.Expr.IR where
 import Papa hiding (Plus, Sum, Product)
 import Data.Deriving
 import Data.Functor.Compose
-import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Separated.After
 import Data.Separated.Before
@@ -18,6 +17,7 @@ import Data.Separated.Between
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
+import Language.Python.IR.ArgsList
 import Language.Python.Expr.AST.BytesLiteral
 import Language.Python.Expr.AST.CompOperator
 import Language.Python.Expr.AST.FactorOperator
@@ -26,7 +26,6 @@ import Language.Python.Expr.AST.Imag
 import Language.Python.Expr.AST.Integer
 import Language.Python.Expr.AST.StringLiteral
 import Language.Python.Expr.AST.TermOperator
-import Language.Python.Expr.IR.VarargsList
 
 data Argument a
   = ArgumentFor
@@ -84,7 +83,7 @@ data LambdefNocond a
          Maybe
          (Compose
            (Between (NonEmpty WhitespaceChar) [WhitespaceChar])
-           (VarargsList Test))
+           (ArgsList Identifier Test))
          a
   , _lambdefNocond_expr
     :: Compose
@@ -441,12 +440,12 @@ data Test a
 
 data Lambdef a
   = Lambdef
-  { _lambdef_varargs
+  { _lambdef_args
     :: Compose
          Maybe
          (Compose
            (Before (NonEmpty WhitespaceChar))
-           (VarargsList Test))
+           (ArgsList Identifier Test))
          a
   , _lambdef_body
     :: Compose

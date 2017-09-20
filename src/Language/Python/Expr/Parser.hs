@@ -43,7 +43,7 @@ import Language.Python.Expr.AST.StringPrefix
 import Language.Python.Expr.AST.TermOperator
 import Language.Python.Expr.IR
 import Language.Python.Expr.Parser.StringContent
-import Language.Python.Expr.Parser.VarargsList
+import Language.Python.Parser.ArgsList
 import Language.Python.Parser.Combinators
 import Language.Python.Parser.Identifier
 import Language.Python.Parser.SrcInfo
@@ -73,7 +73,8 @@ lambdef :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Lambdef SrcInfo)
 lambdef =
   annotated $
   Lambdef <$>
-  (string "lambda" *> optionalF (whitespaceBefore1F $ varargsList test)) <*>
+  (string "lambda" *>
+   optionalF (whitespaceBefore1F $ argsList test identifier)) <*>
   beforeF (betweenWhitespace colon) test
 
 kOr :: (DeltaParsing m, LookAheadParsing m) => m KOr
@@ -97,7 +98,7 @@ lambdefNocond =
     (try $ betweenF
       (some1 whitespaceChar)
       (many whitespaceChar)
-      (varargsList test)) <*>
+      (argsList test identifier)) <*>
   whitespaceBeforeF testNocond
 
 testNocond :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (TestNocond SrcInfo)

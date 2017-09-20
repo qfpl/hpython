@@ -1,94 +1,26 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 module Language.Python.Expr.IR.Checker where
 
-import Control.Monad.Writer hiding (Alt)
 import Data.Functor.Compose
 import Data.Functor.Sum
 import Data.Separated.After
 import Data.Separated.Between
-import Data.Text (Text)
-import Data.Validation
 import Papa
 
-import qualified Data.DList as D
 import qualified Data.Set as S
 
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
 import Language.Python.IR.SyntaxConfig
+import Language.Python.IR.SyntaxChecker
+import Language.Python.IR.Checker.ArgsList
 
 import qualified Language.Python.Expr.AST as Safe
-import qualified Language.Python.Expr.AST.VarargsList as Safe
 import qualified Language.Python.Expr.IR as IR
-import qualified Language.Python.Expr.IR.VarargsList as IR
-
-data InvalidLHS
-  = LHSIf
-  | LHSOperator
-  | LHSAwaitExpr
-  | LHSTrailer
-  | LHSArgument
-  | LHSFor
-  | LHSIfOrFor
-  | LHSSubscript
-  | LHSYieldExpr
-  | LHSLiteral
-  | LHSEllipsis
-  | LHSNone
-  | LHSTrue
-  | LHSFalse
-  | LHSSingleStarExpr
-  | LHSLambda
-  | LHSDictOrSet
-  deriving (Eq, Show, Ord)
-
-data SyntaxError a
-  = CannotAssignTo InvalidLHS a
-  | AwaitNotInAsyncFunction a
-  | YieldNotInFunction a
-  | YieldInAsyncFunction a
-  | IdentifierIsKeyword Text a
-  -- ^ *a for a in a
-  | UnpackingInComprehension a
-  -- ^ (*a)
-  | UnpackingInParens a
-  | DuplicateArguments [Identifier a] a
-  deriving (Eq, Show, Ord)
-
-newtype SyntaxChecker ann a
-  = SyntaxChecker
-  { runSyntaxChecker :: AccValidation (D.DList (SyntaxError ann)) a
-  } deriving
-  ( Functor
-  , Applicative
-  )
-
-instance Alt (SyntaxChecker ann) where
-  SyntaxChecker a <!> SyntaxChecker b = SyntaxChecker $ a <!> b
-
-runChecker :: SyntaxChecker ann a -> Either [SyntaxError ann] a
-runChecker c =
-  case runSyntaxChecker c of
-    AccFailure es -> Left $ D.toList es
-    AccSuccess a -> Right a
-
-syntaxError :: SyntaxError ann -> SyntaxChecker ann a
-syntaxError = SyntaxChecker . AccFailure . D.singleton
-
-liftError
-  :: (b -> SyntaxError ann)
-  -> SyntaxChecker ann (Either b a)
-  -> SyntaxChecker ann a
-liftError f err =
-  SyntaxChecker $ case runSyntaxChecker err of
-    AccSuccess (Left e) -> AccFailure $ D.singleton (f e)
-    AccSuccess (Right a) -> AccSuccess a
-    AccFailure es -> AccFailure es
 
 traverseCompose
   :: Traversable f
@@ -152,7 +84,7 @@ checkLambdef cfg (IR.Lambdef as b ann) =
       Safe.Lambdef <$>
       traverseOf
         (traverseCompose.traverseCompose)
-        (checkVarargsList cfg)
+        (checkArgsList cfg checkTest checkIdentifier)
         as <*>
       traverseCompose (checkTest cfg) b <*>
       pure ann
@@ -673,77 +605,12 @@ checkLambdefNocond
   -> SyntaxChecker ann (Safe.LambdefNocond atomType ctxt ann)
 checkLambdefNocond cfg (IR.LambdefNocond args ex ann) =
   Safe.LambdefNocond <$>
-  traverseOf (traverseCompose.traverseCompose) (checkVarargsList cfg) args <*>
+  traverseOf
+    (traverseCompose.traverseCompose)
+    (checkArgsList cfg checkTest checkIdentifier)
+    args <*>
   traverseCompose (checkTestNocond cfg) ex <*>
   pure ann
-
-checkVarargsListArg
-  :: SyntaxConfig atomType ctxt
-  -> Safe.VarargsListArg IR.Test ann
-  -> SyntaxChecker ann (Safe.VarargsListArg (Safe.Test atomType ctxt) ann)
-checkVarargsListArg cfg (Safe.VarargsListArg l r ann) =
-  Safe.VarargsListArg <$>
-  checkIdentifier cfg l <*>
-  traverseOf (traverseCompose.traverseCompose) (checkTest cfg) r <*>
-  pure ann
-
-checkVarargsListDoublestarArg
-  :: Safe.VarargsListDoublestarArg IR.Test ann
-  -> SyntaxChecker ann (Safe.VarargsListDoublestarArg (Safe.Test atomType ctxt) ann)
-checkVarargsListDoublestarArg (Safe.VarargsListDoublestarArg a ann) =
-  pure $ Safe.VarargsListDoublestarArg a ann
-
-checkVarargsListStarPart
-  :: SyntaxConfig atomType ctxt
-  -> Safe.VarargsListStarPart IR.Test ann
-  -> SyntaxChecker ann (Safe.VarargsListStarPart (Safe.Test atomType ctxt) ann)
-checkVarargsListStarPart cfg e =
-  case e of
-    Safe.VarargsListStarPartEmpty ann -> pure $ Safe.VarargsListStarPartEmpty ann
-    Safe.VarargsListStarPart h t r ann ->
-      Safe.VarargsListStarPart <$>
-      traverseCompose (checkIdentifier cfg) h <*>
-      traverseOf
-        (traverseCompose.traverseCompose)
-        (checkVarargsListArg cfg)
-        t <*>
-      traverseOf
-        (traverseCompose.traverseCompose)
-        checkVarargsListDoublestarArg
-        r <*>
-      pure ann
-
-checkVarargsList
-  :: SyntaxConfig atomType ctxt
-  -> IR.VarargsList IR.Test ann
-  -> SyntaxChecker ann (Safe.VarargsList (Safe.Test atomType ctxt) ann)
-checkVarargsList cfg e =
-  case e of
-    IR.VarargsListAll a b c ann ->
-      liftError
-        (\(Safe.DuplicateArgumentsError e') -> DuplicateArguments e' ann) $
-        Safe.mkVarargsListAll <$>
-        checkVarargsListArg cfg a <*>
-        traverseOf
-          (traverseCompose.traverseCompose)
-          (checkVarargsListArg cfg)
-          b <*>
-        traverseOf
-          (traverseCompose.traverseCompose.traverseCompose)
-          starOrDouble
-          c <*>
-        pure ann
-    IR.VarargsListArgsKwargs a ann ->
-      liftError
-        (\(Safe.DuplicateArgumentsError e') -> DuplicateArguments e' ann) $
-        Safe.mkVarargsListArgsKwargs <$>
-        starOrDouble a <*>
-        pure ann
-  where
-    starOrDouble e' =
-      case e' of
-        InL a -> InL <$> checkVarargsListStarPart cfg a
-        InR a -> InR <$> checkVarargsListDoublestarArg a
 
 checkSubscriptList
   :: SyntaxConfig atomType ctxt

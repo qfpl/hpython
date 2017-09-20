@@ -1,10 +1,14 @@
 {-# language RankNTypes #-}
 module Language.Python.Printer.ArgsList where
 
-import Papa
+import Prelude (error)
+import Papa hiding (Sum)
+import Data.Functor.Sum
 import Text.PrettyPrint hiding ((<>), comma, colon)
 
 import Language.Python.AST.ArgsList
+import Language.Python.Printer.Combinators
+import Language.Python.Printer.Symbols
 
 argsListArg
   :: (forall x. name x -> Doc)
@@ -25,8 +29,14 @@ argsListStarPart renderName f e =
     ArgsListStarPartEmpty _ -> mempty
     ArgsListStarPart h t r _ ->
       beforeF (betweenWhitespace' . const $ text "*") renderName h <>
-      foldMapF (beforeF (betweenWhitespace' comma) $ argsListArg f) t <>
-      foldMapF (beforeF (betweenWhitespace' comma) argsListDoublestarArg) r
+      foldMapF
+        (beforeF
+          (betweenWhitespace' comma)
+          (argsListArg renderName f)) t <>
+      foldMapF
+        (beforeF
+          (betweenWhitespace' comma)
+          (argsListDoublestarArg renderName)) r
 
 argsListDoublestarArg
   :: (forall x. name x -> Doc)
@@ -37,7 +47,8 @@ argsListDoublestarArg renderName (ArgsListDoublestarArg a _) =
   betweenWhitespace'F renderName a
 
 argsList
-  :: (forall x. name x -> Doc)
+  :: HasName name
+  => (forall x. name x -> Doc)
   -> (forall x. f x -> Doc)
   -> ArgsList name f a
   -> Doc
@@ -45,21 +56,25 @@ argsList renderName f e =
   Just e &
     (outside _ArgsListAll .~
        (\(h, t, r, _) ->
-         argsListArg f h <>
-         foldMapF (beforeF (betweenWhitespace' comma) $ argsListArg f) t <>
+         argsListArg renderName f h <>
          foldMapF
            (beforeF
              (betweenWhitespace' comma)
-             (foldMapF $ starOrDouble f)) r) $
+             (argsListArg renderName f)) t <>
+         foldMapF
+           (beforeF
+             (betweenWhitespace' comma)
+             (foldMapF $ starOrDouble renderName f)) r) $
      outside _ArgsListArgsKwargs .~
-       (\(a, _) -> starOrDouble f a) $
+       (\(a, _) -> starOrDouble renderName f a) $
      error "incomplete pattern")
   where
     starOrDouble
-      :: (forall x. f x -> Doc)
-      -> Sum (ArgsListStarPart f) (ArgsListDoublestarArg f) a
+      :: (forall x. name x -> Doc)
+      -> (forall x. f x -> Doc)
+      -> Sum (ArgsListStarPart name f) (ArgsListDoublestarArg name f) a
       -> Doc
-    starOrDouble f' =
+    starOrDouble renderName' f' =
       sumElim
-        (argsListStarPart f')
-        argsListDoublestarArg
+        (argsListStarPart renderName' f')
+        (argsListDoublestarArg renderName')

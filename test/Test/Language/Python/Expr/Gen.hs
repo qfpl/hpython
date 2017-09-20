@@ -5,11 +5,7 @@ module Test.Language.Python.Expr.Gen where
 
 import Papa
 
-import Data.Functor.Compose
 import Data.Functor.Sum
-import Data.Separated.After (After(..))
-import Data.Separated.Before (Before(..))
-import Data.Separated.Between (Between(..), Between'(..))
 import Hedgehog
 
 import qualified Data.Text as T
@@ -40,164 +36,10 @@ import qualified Language.Python.Expr.AST.StringLiteral as AST
 import qualified Language.Python.Expr.AST.StringPrefix as AST
 import qualified Language.Python.Expr.AST.TermOperator as AST
 import qualified Language.Python.Expr.AST.StringContent as SC
-import qualified Language.Python.Expr.AST.VarargsList as AST
 import Language.Python.IR.SyntaxConfig
 
-genBefore :: MonadGen m => m s -> m a -> m (Before s a)
-genBefore = liftA2 Before
-
-genBeforeF
-  :: MonadGen m
-  => m s
-  -> m (f a)
-  -> m (Compose (Before s) f a)
-genBeforeF ms = fmap Compose . genBefore ms
-
-genAfter
-  :: MonadGen m
-  => m s -> m a -> m (After s a)
-genAfter = liftA2 After
-
-genAfterF
-  :: MonadGen m
-  => m s
-  -> m (f a)
-  -> m (Compose (After s) f a)
-genAfterF ms = fmap Compose . genAfter ms
-
-genBetween
-  :: MonadGen m
-  => m s -> m t -> m a -> m (Between s t a)
-genBetween ms mt ma = Between <$> ms <*> ma <*> mt
-
-genBetweenF
-  :: MonadGen m
-  => m s
-  -> m t
-  -> m (f a)
-  -> m (Compose (Between s t) f a)
-genBetweenF ms mt = fmap Compose . genBetween ms mt
-
-genBetween'
-  :: MonadGen m
-  => m s -> m a -> m (Between' s a)
-genBetween' ms ma = Between' <$> genBetween ms ms ma
-
-genNewlineChar
-  :: MonadGen m
-  => m AST.NewlineChar
-genNewlineChar = Gen.element [AST.CR, AST.LF, AST.CRLF]
-
-genWhitespaceChar
-  :: MonadGen m
-  => m AST.WhitespaceChar
-genWhitespaceChar =
-  Gen.choice
-    [ pure AST.Space
-    , pure AST.Tab
-    , AST.Continued <$> genNewlineChar
-    ]
-
-genListF
-  :: MonadGen m
-  => m (f a) -> m (Compose [] f a)
-genListF ma =
-  Compose <$>
-  Gen.list (Range.linear 0 10) ma
-
-genNonEmptyF
-  :: MonadGen m
-  => m (f a) -> m (Compose NonEmpty f a)
-genNonEmptyF ma =
-  Compose <$>
-  Gen.nonEmpty (Range.linear 1 10) ma
-
-genMaybeF
-  :: MonadGen m
-  => m (f a) -> m (Compose Maybe f a)
-genMaybeF ma = Compose <$> Gen.maybe ma
-
-genWhitespace1
-  :: MonadGen m
-  => m (NonEmpty AST.WhitespaceChar)
-genWhitespace1 = Gen.nonEmpty (Range.linear 1 10) genWhitespaceChar
-
-genWhitespaceBefore
-  :: MonadGen m
-  => m a
-  -> m (Before [AST.WhitespaceChar] a)
-genWhitespaceBefore ma = Before <$> genWhitespace <*> ma
-
-genWhitespaceBeforeF
-  :: MonadGen m
-  => m (f a)
-  -> m (Compose (Before [AST.WhitespaceChar]) f a)
-genWhitespaceBeforeF = fmap Compose . genWhitespaceBefore
-
-genWhitespaceBefore1
-  :: MonadGen m
-  => m a
-  -> m (Before (NonEmpty AST.WhitespaceChar) a)
-genWhitespaceBefore1 ma = Before <$> genWhitespace1 <*> ma
-
-genWhitespaceBefore1F
-  :: MonadGen m
-  => m (f a)
-  -> m (Compose (Before (NonEmpty AST.WhitespaceChar)) f a)
-genWhitespaceBefore1F = fmap Compose . genWhitespaceBefore1
-
-genWhitespaceAfter
-  :: MonadGen m
-  => m a
-  -> m (After [AST.WhitespaceChar] a)
-genWhitespaceAfter ma = After <$> genWhitespace <*> ma
-
-genWhitespaceAfterF
-  :: MonadGen m
-  => m (f a)
-  -> m (Compose (After [AST.WhitespaceChar]) f a)
-genWhitespaceAfterF = fmap Compose . genWhitespaceAfter
-
-genWhitespaceAfter1
-  :: MonadGen m
-  => m a
-  -> m (After (NonEmpty AST.WhitespaceChar) a)
-genWhitespaceAfter1 ma = After <$> genWhitespace1 <*> ma
-
-genWhitespaceAfter1F
-  :: MonadGen m
-  => m (f a)
-  -> m (Compose (After (NonEmpty AST.WhitespaceChar)) f a)
-genWhitespaceAfter1F = fmap Compose . genWhitespaceAfter1
-
-genWhitespace
-  :: MonadGen m
-  => m [AST.WhitespaceChar]
-genWhitespace = Gen.list (Range.linear 0 10) genWhitespaceChar
-
-genBetweenWhitespace
-  :: MonadGen m
-  => m a
-  -> m (Between' [AST.WhitespaceChar] a)
-genBetweenWhitespace = genBetween' genWhitespace
-
-genBetweenWhitespaceF
-  :: MonadGen m
-  => m (f a)
-  -> m (Compose (Between' [AST.WhitespaceChar]) f a)
-genBetweenWhitespaceF = fmap Compose . genBetweenWhitespace
-
-genBetweenWhitespace1
-  :: MonadGen m
-  => m a
-  -> m (Between' (NonEmpty AST.WhitespaceChar) a)
-genBetweenWhitespace1 = genBetween' genWhitespace1
-
-genBetweenWhitespace1F
-  :: MonadGen m
-  => m (f a)
-  -> m (Compose (Between' (NonEmpty AST.WhitespaceChar)) f a)
-genBetweenWhitespace1F = fmap Compose . genBetweenWhitespace1
+import Test.Language.Python.Gen.ArgList
+import Test.Language.Python.Gen.Combinators
 
 genIfThenElse
   :: MonadGen m
@@ -790,85 +632,6 @@ genAtom cfg =
     genStringOrBytes _ =
       Gen.choice [ InL <$> genStringLiteral, InR <$> genBytesLiteral ]
 
-genVarargsListArg
-  :: MonadGen m
-  => SyntaxConfig 'NotAssignable ctxt
-  -> m (f ())
-  -> m (AST.VarargsListArg f ())
-genVarargsListArg _ gen =
-  AST.VarargsListArg <$>
-  genIdentifier <*>
-  genMaybeF
-    (genBeforeF
-       (genBetweenWhitespace $ pure AST.Equals)
-       gen) <*>
-  pure ()
-
-genVarargsListStarPart
-  :: MonadGen m
-  => SyntaxConfig 'NotAssignable ctxt
-  -> m (f ())
-  -> m (AST.VarargsListStarPart f ())
-genVarargsListStarPart cfg gen =
-  Gen.choice
-    [ pure $ AST.VarargsListStarPartEmpty ()
-    , AST.VarargsListStarPart <$>
-      genBeforeF
-        (genBetweenWhitespace $ pure AST.Asterisk)
-        genIdentifier <*>
-      genListF
-        (genBeforeF
-          (genBetweenWhitespace $ pure AST.Comma)
-          (Gen.small $ genVarargsListArg cfg gen)) <*>
-      genMaybeF
-        (genBeforeF
-          (genBetweenWhitespace $ pure AST.Comma)
-          (genVarargsListDoublestarArg cfg)) <*>
-      pure ()
-    ]
-
-genVarargsListDoublestarArg
-  :: MonadGen m
-  => SyntaxConfig 'NotAssignable ctxt
-  -> m (AST.VarargsListDoublestarArg test ())
-genVarargsListDoublestarArg _ =
-  AST.VarargsListDoublestarArg <$>
-  genBetweenWhitespaceF genIdentifier <*>
-  pure ()
-
-genVarargsList
-  :: MonadGen m
-  => SyntaxConfig 'NotAssignable ctxt
-  -> m (f ())
-  -> m (AST.VarargsList f ())
-genVarargsList cfg gen =
-  Gen.choice
-    [ Gen.small . Gen.just $
-      fmap (review AST._VarargsListAll) $
-      (,,,) <$>
-      genVarargsListArg cfg gen <*>
-      genListF
-        (genBeforeF
-          (genBetweenWhitespace $ pure AST.Comma)
-          (genVarargsListArg cfg gen)) <*>
-      genMaybeF
-        (genBeforeF
-          (genBetweenWhitespace $ pure AST.Comma)
-          (genMaybeF genStarOrDouble)) <*>
-      pure ()
-    , Gen.small . Gen.just $
-      fmap (review AST._VarargsListArgsKwargs) $
-      (,) <$>
-      genStarOrDouble <*>
-      pure ()
-    ]
-  where
-    genStarOrDouble =
-      Gen.choice
-        [ Gen.small $ InL <$> genVarargsListStarPart cfg gen
-        , InR <$> genVarargsListDoublestarArg cfg
-        ]
-
 genLambdefNocond
   :: MonadGen m
   => SyntaxConfig 'NotAssignable ctxt
@@ -877,7 +640,7 @@ genLambdefNocond cfg =
   AST.LambdefNocond <$>
   genMaybeF
     (Gen.small . genBetweenF genWhitespace1 genWhitespace $
-      genVarargsList cfg (genTest cfg)) <*>
+      genArgsList cfg genIdentifier (genTest cfg)) <*>
   genWhitespaceBeforeF (Gen.small $ genTestNocond cfg) <*>
   pure ()
 
@@ -1436,7 +1199,7 @@ genLambdef
   -> m (AST.Lambdef 'NotAssignable ctxt ())
 genLambdef cfg =
   AST.Lambdef <$>
-  genMaybeF (genWhitespaceBefore1F . genVarargsList cfg $ genTest cfg) <*>
+  genMaybeF (genWhitespaceBefore1F . genArgsList cfg genIdentifier $ genTest cfg) <*>
   genBeforeF
     (genBetweenWhitespace $ pure AST.Colon)
     (genTest cfg) <*>

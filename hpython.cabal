@@ -53,6 +53,7 @@ library
                        Language.Python.Expr.Parser.StringContent
                        Language.Python.Expr.Printer
                        Language.Python.IR.ArgsList
+                       Language.Python.IR.Checker.ArgsList
                        Language.Python.IR.SyntaxChecker
                        Language.Python.IR.SyntaxConfig
                        Language.Python.Parser.ArgsList
@@ -63,6 +64,7 @@ library
                        Language.Python.Printer.ArgsList
                        Language.Python.Printer.Combinators
                        Language.Python.Printer.Keywords
+                       Language.Python.Printer.Symbols
                        Data.Functor.Sum.Lens
                        Data.Separated.After
                        Data.Separated.Before
@@ -91,10 +93,13 @@ test-suite hpython-tests
     type:                exitcode-stdio-1.0
     hs-source-dirs:      test
     main-is:             Main.hs
-    other-modules:       Test.Language.Python.ParserPrinter
+    other-modules:
                          Test.Language.Python.Expr.AST.EscapeSeq
                          Test.Language.Python.Expr.AST.StringContent
                          Test.Language.Python.Expr.Gen
+                         Test.Language.Python.Gen.ArgList
+                         Test.Language.Python.Gen.Combinators
+                         Test.Language.Python.ParserPrinter
     build-depends:       base >=4.9 && <4.10
                        , ansi-wl-pprint >=0.6 && <0.7
                        , directory >=1.3 && <1.4

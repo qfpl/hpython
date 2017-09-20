@@ -2,21 +2,16 @@
 {-# language RankNTypes #-}
 module Language.Python.Expr.Printer where
 
-import Prelude (error)
 import Papa hiding (Plus, Product, Sum, Space, zero, o, argument)
 
-import Data.Functor.Compose
 import Data.Functor.Product
-import Data.Functor.Sum
-import Data.Separated.After (After(..))
-import Data.Separated.Before (Before(..))
-import Data.Separated.Between (Between(..), Between'(..))
 import Text.PrettyPrint hiding ((<>), comma, colon)
 
 import qualified Data.Text as T
 
 import Language.Python.AST.Comment
 import Language.Python.AST.Identifier
+import Language.Python.AST.Symbols
 import Language.Python.Expr.AST
 import Language.Python.Expr.AST.BytesLiteral
 import Language.Python.Expr.AST.BytesPrefix
@@ -40,6 +35,7 @@ import Language.Python.Expr.AST.StringPrefix
 import Language.Python.Expr.AST.TermOperator
 import Language.Python.Expr.AST.StringContent (stringContent)
 import Language.Python.Printer.ArgsList
+import Language.Python.Printer.Combinators
 import Language.Python.Printer.Keywords
 import Language.Python.Printer.Symbols
 
@@ -231,10 +227,6 @@ float' f =
           (either (const $ char 'e') (const $ char 'E')) $
           foldMap digit)
 
-sumElim :: (forall x. f x -> r) -> (forall x. g x -> r) -> Sum f g a -> r
-sumElim f _ (InL a) = f a
-sumElim _ g (InR a) = g a
-
 imag :: Imag a -> Doc
 imag (Imag val _) =
   afterF
@@ -322,7 +314,7 @@ lambdefNocond  (LambdefNocond a e _) =
     (betweenF
       (foldMap whitespaceChar)
       (foldMap whitespaceChar)
-      (argsList test))
+      (argsList identifier test))
     a <>
   char ':' <>
   whitespaceBeforeF testNocond e
@@ -645,7 +637,7 @@ test t =
 lambdef :: Lambdef atomType ctxt a -> Doc
 lambdef (Lambdef a b _) =
   text "lambda" <>
-  foldMapF (whitespaceBeforeF $ argsList test) a <>
+  foldMapF (whitespaceBeforeF $ argsList identifier test) a <>
   beforeF (betweenWhitespace' colon) test b
 
 comment :: Comment a -> Doc

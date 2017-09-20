@@ -16,12 +16,12 @@ import Text.Trifecta hiding (render, runUnspaced)
 import qualified Text.PrettyPrint.ANSI.Leijen as WL
 import qualified Text.PrettyPrint as HPJ
 
+import Language.Python.IR.SyntaxChecker
 import Language.Python.IR.SyntaxConfig
 
 import qualified Language.Python.Expr.Parser as Parse
-import qualified Language.Python.Expr.IR.Checker as Check
 import qualified Language.Python.Expr.Printer as Print
-import qualified Language.Python.Expr.AST as AST
+import qualified Language.Python.Expr.IR.Checker as Check
 import qualified Test.Language.Python.Expr.Gen as GenAST
 
 import Text.Parser.Unspaced
@@ -35,11 +35,11 @@ parse_print_expr_id input =
     Success unchecked ->
       let
         checkResult =
-          (fmap Print.test . Check.runChecker $
+          (fmap Print.test . runChecker $
             Check.checkTest
               (SyntaxConfig SNotAssignable STopLevel)
               unchecked) <!>
-          (fmap Print.test . Check.runChecker $
+          (fmap Print.test . runChecker $
             Check.checkTest
               (SyntaxConfig SAssignable STopLevel)
               unchecked)

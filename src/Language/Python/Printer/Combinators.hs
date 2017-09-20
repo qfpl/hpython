@@ -1,7 +1,7 @@
 {-# language RankNTypes #-}
 module Language.Python.Printer.Combinators where
 
-import Papa
+import Papa hiding (Sum)
 import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
@@ -12,6 +12,10 @@ import Text.PrettyPrint hiding ((<>), comma, colon)
 
 import Language.Python.AST.Symbols
 import Language.Python.Printer.Symbols
+
+sumElim :: (forall x. f x -> r) -> (forall x. g x -> r) -> Sum f g a -> r
+sumElim f _ (InL a) = f a
+sumElim _ g (InR a) = g a
 
 tripled :: (Doc -> Doc) -> Doc -> Doc
 tripled f = f . f . f

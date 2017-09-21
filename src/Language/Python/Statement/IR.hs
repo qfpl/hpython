@@ -6,9 +6,10 @@
 {-# language TemplateHaskell #-}
 module Language.Python.Statement.IR where
 
-import Papa hiding (Sum)
+import Papa hiding (Sum, Product)
 import Data.Deriving
 import Data.Functor.Compose
+import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Separated.Before
 import Data.Separated.Between
@@ -17,6 +18,8 @@ import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.Expr.IR
+import Language.Python.IR.ArgsList
+import Language.Python.IR.Indentation
 
 data Statement a
   = StatementSimple
@@ -52,7 +55,7 @@ data CompoundStatement a
   { _compoundStatementWith_value :: WithStatement a
   , _compoundStatement_ann :: a
   }
-  | CompoundStatementFuncdef
+  | CompoundStatementFuncDef
   { _compoundStatementFuncDef_value :: FuncDef a
   , _compoundStatement_ann :: a
   }
@@ -71,6 +74,97 @@ data CompoundStatement a
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (CompoundStatement a)
 deriving instance Show a => Show (CompoundStatement a)
+
+data Decorated a
+  = Decorated
+  { _decorated_decorators :: Compose NonEmpty Decorator a
+  , _decorated_body :: Sum (Sum ClassDef FuncDef) AsyncFuncDef a
+  , _decorated_ann :: a
+  }
+  deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Decorated a)
+deriving instance Show a => Show (Decorated a)
+
+data AsyncFuncDef a
+  = AsyncFuncDef
+  { _asyncFuncDef_value
+    :: Compose
+         (Before (NonEmpty WhitespaceChar))
+         FuncDef
+         a
+  , _asyncFuncDef_ann :: a
+  }
+  deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (AsyncFuncDef a)
+deriving instance Show a => Show (AsyncFuncDef a)
+
+data Decorator a
+  = Decorator
+  { _decorator_name
+    :: Compose
+         (Before [WhitespaceChar])
+         DottedName
+         a
+  , _decorator_args
+    :: Compose
+         Maybe
+         (Compose
+           (Between' [WhitespaceChar])
+           (Compose
+             Maybe
+             ArgList))
+         a
+  , _decorator_newline :: NewlineChar
+  , _decorator_ann :: a
+  }
+  deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Decorator a)
+deriving instance Show a => Show (Decorator a)
+
+data ClassDef a
+  = ClassDef
+  { _classDef_name
+    :: Compose
+         (Before (NonEmpty WhitespaceChar))
+         Identifier
+         a
+  , _classDef_args
+    :: Compose
+         Maybe
+         (Compose
+           (Before [WhitespaceChar])
+           (Compose
+             (Between' [WhitespaceChar])
+             (Compose
+               Maybe
+               ArgList)))
+         a
+  , _classDef_body
+    :: Compose
+         (Before (Between' [WhitespaceChar] Colon))
+         Suite
+         a
+  , _classDef_ann :: a
+  }
+  deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (ClassDef a)
+deriving instance Show a => Show (ClassDef a)
+
+data Suite a
+  = SuiteSingle
+  { _suiteSingle_value :: SimpleStatement a
+  , _suite_ann :: a
+  }
+  | SuiteMulti
+  { _suiteMulti_newline :: NewlineChar
+  , _suiteMulti_indent :: Indent a
+  , _suiteMulti_statements :: Compose NonEmpty Statement a
+  , _suiteMulti_dedent :: Dedent a
+  , _suiteMulti_ann :: a
+  }
+  deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Suite a)
+deriving instance Show a => Show (Suite a)
 
 data FuncDef a
   = FuncDef
@@ -99,8 +193,8 @@ data FuncDef a
   , _funcDef_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (CompoundStatement a)
-deriving instance Show a => Show (CompoundStatement a)
+deriving instance Eq a => Eq (FuncDef a)
+deriving instance Show a => Show (FuncDef a)
 
 data Parameters a
   = Parameters
@@ -109,9 +203,29 @@ data Parameters a
          (Between' [WhitespaceChar])
          (Compose
            Maybe
-           TypedArgsList)
+           (ArgsList TypedArg Test))
          a
+  , _parameters_ann :: a
   }
+  deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Parameters a)
+deriving instance Show a => Show (Parameters a)
+
+data TypedArg a
+  = TypedArg
+  { _typedArg_value :: Identifier a
+  , _typedArg_type
+    :: Compose
+         Maybe
+         (Compose
+           (Before (Between' [WhitespaceChar] Colon))
+           Test)
+         a
+  , _typedArg_ann :: a
+  }
+  deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (TypedArg a)
+deriving instance Show a => Show (TypedArg a)
 
 data WithStatement a
   = WithStatement
@@ -162,6 +276,7 @@ data AsyncStatement a
          (Sum
            (Sum FuncDef WhileStatement)
            ForStatement)
+         a
   , _asyncStatement_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -261,7 +376,7 @@ deriving instance Show a => Show (ForStatement a)
 
 data TryStatement a
   = TryStatementExcepts
-  { _tryStatement_body
+  { _tryStatement_try
     :: Compose
          (Before (Between' [WhitespaceChar] Colon))
          Suite
@@ -286,20 +401,22 @@ data TryStatement a
     :: Compose
          Maybe
          (Compose
-           (Before (Between [WhitespaceChar] Colon))
+           (Before (Between' [WhitespaceChar] Colon))
            Suite)
+         a
   , _tryStatement_ann :: a
   }
   | TryStatementFinally
-  { _tryStatement_body
+  { _tryStatement_try
     :: Compose
          (Before (Between' [WhitespaceChar] Colon))
          Suite
          a
   , _tryStatementFinally_finally
     :: Compose
-         (Before (Between [WhitespaceChar] Colon))
+         (Before (Between' [WhitespaceChar] Colon))
          Suite
+         a
   , _tryStatement_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -316,8 +433,8 @@ data ExceptClause a
            (Compose
              Maybe
              (Compose
-               (Between' (NonEmpty WhitespaceChar) KAs
-               Identifier))))
+               (Before (Between' (NonEmpty WhitespaceChar) KAs))
+               Identifier)))
          a
   , _exceptClause_ann :: a
   }
@@ -337,6 +454,7 @@ data SimpleStatement a
          a
   , _simpleStatement_semicolon :: Maybe (Before [WhitespaceChar] Semicolon)
   , _simpleStatement_newline :: Before [WhitespaceChar] NewlineChar
+  , _simpleStatement_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (SimpleStatement a)
@@ -500,9 +618,9 @@ data ImportFrom a
          (Const (NonEmpty (Either Dot Ellipsis)))
          a
   , _importFrom_import
-    :: Sum
+    :: Compose
          (Before (NonEmpty WhitespaceChar))
-         (Compose
+         (Sum
            (Sum
              (Const Asterisk)
              (Compose
@@ -569,7 +687,7 @@ data DottedAsNames a
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] KAs))
+           (Before (Between' [WhitespaceChar] Comma))
            DottedAsName)
          a
   , _dottedAsNames_ann :: a
@@ -669,3 +787,79 @@ deriveShow1 ''ImportName
 makeLenses ''ImportFrom
 deriveEq1 ''ImportFrom
 deriveShow1 ''ImportFrom
+
+makeLenses ''Decorator
+deriveEq1 ''Decorator
+deriveShow1 ''Decorator
+
+makeLenses ''ClassDef
+deriveEq1 ''ClassDef
+deriveShow1 ''ClassDef
+
+makeLenses ''FuncDef
+deriveEq1 ''FuncDef
+deriveShow1 ''FuncDef
+
+makeLenses ''AsyncFuncDef
+deriveEq1 ''AsyncFuncDef
+deriveShow1 ''AsyncFuncDef
+
+makeLenses ''Suite
+deriveEq1 ''Suite
+deriveShow1 ''Suite
+
+makeLenses ''Statement
+deriveEq1 ''Statement
+deriveShow1 ''Statement
+
+makeLenses ''Parameters
+deriveEq1 ''Parameters
+deriveShow1 ''Parameters
+
+makeLenses ''TypedArg
+deriveEq1 ''TypedArg
+deriveShow1 ''TypedArg
+
+makeLenses ''WithItem
+deriveEq1 ''WithItem
+deriveShow1 ''WithItem
+
+makeLenses ''WithStatement
+deriveEq1 ''WithStatement
+deriveShow1 ''WithStatement
+
+makeLenses ''WhileStatement
+deriveEq1 ''WhileStatement
+deriveShow1 ''WhileStatement
+
+makeLenses ''ForStatement
+deriveEq1 ''ForStatement
+deriveShow1 ''ForStatement
+
+makeLenses ''ExceptClause
+deriveEq1 ''ExceptClause
+deriveShow1 ''ExceptClause
+
+makeLenses ''SimpleStatement
+deriveEq1 ''SimpleStatement
+deriveShow1 ''SimpleStatement
+
+makeLenses ''CompoundStatement
+deriveEq1 ''CompoundStatement
+deriveShow1 ''CompoundStatement
+
+makeLenses ''IfStatement
+deriveEq1 ''IfStatement
+deriveShow1 ''IfStatement
+
+makeLenses ''TryStatement
+deriveEq1 ''TryStatement
+deriveShow1 ''TryStatement
+
+makeLenses ''Decorated
+deriveEq1 ''Decorated
+deriveShow1 ''Decorated
+
+makeLenses ''AsyncStatement
+deriveEq1 ''AsyncStatement
+deriveShow1 ''AsyncStatement

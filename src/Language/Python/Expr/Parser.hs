@@ -46,6 +46,7 @@ import Language.Python.Expr.Parser.StringContent
 import Language.Python.Parser.ArgsList
 import Language.Python.Parser.Combinators
 import Language.Python.Parser.Identifier
+import Language.Python.Parser.Keywords
 import Language.Python.Parser.SrcInfo
 import Language.Python.Parser.Symbols
 
@@ -76,12 +77,6 @@ lambdef =
   (string "lambda" *>
    optionalF (whitespaceBefore1F $ argsList test identifier)) <*>
   beforeF (betweenWhitespace colon) test
-
-kOr :: (DeltaParsing m, LookAheadParsing m) => m KOr
-kOr = string "or" $> KOr
-
-kAnd :: (DeltaParsing m, LookAheadParsing m) => m KAnd
-kAnd = string "and" $> KAnd
 
 orTest :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (OrTest SrcInfo)
 orTest =

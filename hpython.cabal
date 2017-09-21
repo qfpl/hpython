@@ -53,18 +53,23 @@ library
                        Language.Python.Expr.Parser.StringContent
                        Language.Python.Expr.Printer
                        Language.Python.IR.ArgsList
+                       Language.Python.IR.Indentation
                        Language.Python.IR.Checker.ArgsList
                        Language.Python.IR.SyntaxChecker
                        Language.Python.IR.SyntaxConfig
                        Language.Python.Parser.ArgsList
                        Language.Python.Parser.Combinators
                        Language.Python.Parser.Identifier
+                       Language.Python.Parser.Keywords
                        Language.Python.Parser.SrcInfo
                        Language.Python.Parser.Symbols
                        Language.Python.Printer.ArgsList
                        Language.Python.Printer.Combinators
                        Language.Python.Printer.Keywords
                        Language.Python.Printer.Symbols
+                       Language.Python.Statement.AST
+                       Language.Python.Statement.IR
+                       Language.Python.Statement.Parser
                        Data.Functor.Sum.Lens
                        Data.Separated.After
                        Data.Separated.Before

@@ -27,6 +27,9 @@ asterisk = char '*' $> Asterisk
 colon :: CharParsing m => m Colon
 colon = char ':' $> Colon
 
+semicolon :: CharParsing m => m Semicolon
+semicolon = char ';' $> Semicolon
+
 tripleDoublequote :: CharParsing m => m TripleDoubleQuote
 tripleDoublequote = string "\"\"\"" $> TripleDoubleQuote
 
@@ -76,6 +79,9 @@ jJ =
 comma :: CharParsing m => m Comma
 comma = char ',' $> Comma
 
+dot :: CharParsing m => m Dot
+dot = char '.' $> Dot
+
 whitespaceChar :: CharParsing m => m WhitespaceChar
 whitespaceChar =
   (char ' ' $> Space) <|>
@@ -84,3 +90,9 @@ whitespaceChar =
   
 equals :: CharParsing m => m Equals
 equals = char '=' $> Equals
+
+ellipsis :: CharParsing m => m Ellipsis
+ellipsis = string "..." $> Ellipsis
+
+rightArrow :: CharParsing m => m RightArrow
+rightArrow = string "->" $> RightArrow

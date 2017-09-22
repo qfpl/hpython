@@ -6,7 +6,7 @@
 {-# language TemplateHaskell #-}
 module Language.Python.Statement.IR where
 
-import Papa hiding (Sum, Product)
+import Papa hiding (Sum, Product, Space)
 import Data.Deriving
 import Data.Functor.Compose
 import Data.Functor.Product
@@ -19,7 +19,6 @@ import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.Expr.IR
 import Language.Python.IR.ArgsList
-import Language.Python.IR.Indentation
 
 data Statement a
   = StatementSimple
@@ -157,9 +156,13 @@ data Suite a
   }
   | SuiteMulti
   { _suiteMulti_newline :: NewlineChar
-  , _suiteMulti_indent :: Indent a
-  , _suiteMulti_statements :: Compose NonEmpty Statement a
-  , _suiteMulti_dedent :: Dedent a
+  , _suiteMulti_statements
+    :: Compose
+         NonEmpty
+         (Compose
+           (Before (NonEmpty IndentationChar))
+           Statement)
+         a
   , _suiteMulti_ann :: a
   }
   deriving (Functor, Foldable, Traversable)

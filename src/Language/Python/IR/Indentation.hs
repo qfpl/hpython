@@ -22,6 +22,14 @@ data Dedent a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+data Absolute b a
+  = Absolute
+  { _absolute_indentation :: [WhitespaceChar]
+  , _absolute_value :: b
+  , _absolute_ann :: a
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
 makeLenses ''Indent
 deriveEq1 ''Indent
 deriveShow1 ''Indent

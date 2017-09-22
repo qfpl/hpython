@@ -5,7 +5,9 @@ import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
 import Text.Parser.LookAhead
+import Data.Separated.Before (Before(..))
 import Text.Trifecta hiding (Unspaced(..), comma, dot, colon)
+import Language.Python.AST.Symbols
 import Language.Python.Expr.Parser
 import Language.Python.Parser.ArgsList
 import Language.Python.Parser.Combinators
@@ -185,10 +187,11 @@ importFrom =
 
     importPart =
       whitespaceBefore1F $
-      (try (InL . InL . Const <$> asterisk) <|>
-       try (InL . InR <$>
-            betweenF leftParen rightParen (betweenWhitespaceF importAsNames)) <|>
-       (InR <$> importAsNames))
+      try (InL . InL . Const <$> asterisk) <|>
+      try
+        (InL . InR <$>
+          betweenF leftParen rightParen (betweenWhitespaceF importAsNames)) <|>
+       (InR <$> importAsNames)
 
 importAsNames :: DeltaParsing m => Unspaced m (ImportAsNames SrcInfo)
 importAsNames =
@@ -479,7 +482,17 @@ suite = annotated $ try suiteSingle <|> suiteMulti
 
     suiteMulti =
       SuiteMulti <$>
-      _ <*>
-      _ <*>
-      _ <*>
-      _
+      newlineChar <*>
+      suiteStatements
+
+    someIndentation =
+      (formFeed *> some1 indentationChar) <?> "some indentation"
+
+    sameIndent IndentSpace = char ' ' $> IndentSpace
+    sameIndent IndentTab = char '\t' $> IndentTab
+
+    suiteStatements = do
+      indent <- someIndentation
+      st <- statement
+      Compose . (Compose (Before indent st) :|) <$>
+        many (beforeF (traverse sameIndent indent) statement)

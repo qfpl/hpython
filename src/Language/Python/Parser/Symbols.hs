@@ -87,7 +87,7 @@ whitespaceChar =
   (char ' ' $> Space) <|>
   (char '\t' $> Tab) <|>
   fmap Continued (char '\\' *> newlineChar)
-  
+
 equals :: CharParsing m => m Equals
 equals = char '=' $> Equals
 
@@ -96,3 +96,14 @@ ellipsis = string "..." $> Ellipsis
 
 rightArrow :: CharParsing m => m RightArrow
 rightArrow = string "->" $> RightArrow
+
+formFeed :: CharParsing m => m FormFeed
+formFeed = char '\f' $> FormFeed
+
+indentationChar :: CharParsing m => m IndentationChar
+indentationChar =
+  (char ' ' $> IndentSpace) <|>
+  (char '\t' $> IndentTab) <|>
+  (IndentContinued <$>
+   (char '\\' *> newlineChar) <*>
+   many indentationChar)

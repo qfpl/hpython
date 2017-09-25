@@ -20,7 +20,7 @@ import Text.Parser.LookAhead
 import Language.Python.AST.Symbols
 import Language.Python.Parser.Symbols
 
-class (CharParsing m, MonadPlus m) => IndentationParsing m where
+class (LookAheadParsing m, CharParsing m, MonadPlus m) => IndentationParsing m where
   indentedF :: m (f a) -> m (Compose (Before (NonEmpty IndentationChar)) f a)
   absoluteF :: m (f a) -> m (Compose (Before (NonEmpty IndentationChar)) f a)
 
@@ -61,11 +61,11 @@ indentLevel (i :| is) = go 0 (i:is)
         IndentTab -> go (level + 8 - (level `mod` 8)) cs
         IndentContinued _ _ -> level
 
-instance (CharParsing m, MonadPlus m) => IndentationParsing (IndentationParserT m) where
+instance (LookAheadParsing m, CharParsing m, MonadPlus m) => IndentationParsing (IndentationParserT m) where
   indentedF m = IndentationParserT $ do
     (previousIndentLevel :| _) <- ask
     someIndent <-
-      (optional formFeed *> some1 indentationChar) <?>
+      (lookAhead $ optional formFeed *> some1 indentationChar) <?>
       ("indent to indentation level greater than " <> show previousIndentLevel)
     let currentIndentLevel = indentLevel someIndent
     case compare currentIndentLevel previousIndentLevel of
@@ -86,7 +86,7 @@ instance (CharParsing m, MonadPlus m) => IndentationParsing (IndentationParserT 
       ("indentation level " <> show previousIndentLevel)
     let currentIndentLevel = indentLevel someIndent
     case compare currentIndentLevel previousIndentLevel of
-      LT -> 
+      LT ->
         unexpected $
         "dedent to indentation level " <> show currentIndentLevel
       GT ->

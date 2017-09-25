@@ -8,9 +8,9 @@ import Language.Python.AST.Symbols
 
 newlineChar :: CharParsing m => m NewlineChar
 newlineChar =
-  (char '\r' $> CR) <|>
+  ((char '\r' $> CR) <|>
   (char '\n' $> LF) <|>
-  (string "\r\n" $> CRLF)
+  (string "\r\n" $> CRLF)) <?> "newline"
 
 leftParen :: CharParsing m => m LeftParen
 leftParen = char '(' $> LeftParen
@@ -102,8 +102,8 @@ formFeed = char '\f' $> FormFeed
 
 indentationChar :: CharParsing m => m IndentationChar
 indentationChar =
-  (char ' ' $> IndentSpace) <|>
+  ((char ' ' $> IndentSpace) <|>
   (char '\t' $> IndentTab) <|>
-  (IndentContinued <$>
-   (char '\\' *> newlineChar) <*>
-   many indentationChar)
+  (IndentContinued <$> (char '\\' *> try newlineChar) <*>
+   many indentationChar)) <?> "indentation character"
+  

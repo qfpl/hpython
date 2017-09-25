@@ -20,6 +20,17 @@ resultShouldBe supplied exemplar =
       , show $ _errDoc e
       ]
 
+shouldFail :: (Show a, HasCallStack) => Result a -> Expectation
+shouldFail res =
+  case res of
+    Success _ ->
+      expectationFailure $ unlines
+      [ "Expected failed parse, but got an success:"
+      , ""
+      , show res
+      ]
+    Failure _ -> shouldBe () ()
+
 indentationParse :: IndentationParserT Parser a -> String -> Result a
 indentationParse m =
   parseString (runIndentationParserT m $ 0 :| []) mempty
@@ -55,6 +66,35 @@ indentationSpec =
         , "\tbar"
         , "\tbaz"
         ]) `resultShouldBe` ()
+    it "fails" $ do
+      shouldFail $
+        indentationParse funcDefParser (unlines
+        [ "def funcName():"
+        , " foo"
+        , "  bar"
+        , " baz"
+        ])
+      shouldFail $
+        indentationParse funcDefParser (unlines
+        [ "def funcName():"
+        , "   foo"
+        , "  bar"
+        , "   baz"
+        ])
+      shouldFail $
+        indentationParse funcDefParser (unlines
+        [ "def funcName():"
+        , "\tfoo"
+        , "\t\tbar"
+        , "\tbaz"
+        ])
+      shouldFail $
+        indentationParse funcDefParser (unlines
+        [ "def funcName():"
+        , "foo"
+        , "bar"
+        , "baz"
+        ])
 
 makeIndentationTests :: IO [TestTree]
 makeIndentationTests = testSpecs indentationSpec

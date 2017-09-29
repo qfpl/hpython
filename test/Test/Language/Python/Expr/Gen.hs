@@ -92,7 +92,7 @@ genListTestlistComp cfg =
     listTestlistCompList cfg' =
       Gen.choice
         [ AST.ListTestlistCompStarred <$>
-          genStarExpr cfg' <*>
+          Gen.small (genStarExpr cfg') <*>
           genListF
             (genBeforeF
               (genBetweenWhitespace $ pure AST.Comma) .
@@ -100,7 +100,7 @@ genListTestlistComp cfg =
           Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
           pure ()
         , AST.ListTestlistCompList <$>
-          genTest cfg' <*>
+          Gen.small (genTest cfg') <*>
           genListF
             (genBeforeF
               (genBetweenWhitespace $ pure AST.Comma) .
@@ -133,11 +133,11 @@ genTupleTestlistComp cfg =
     tupleTestlistCompList cfg' =
       Gen.choice
         [ AST.TupleTestlistCompStarredOne <$>
-          genStarExpr cfg' <*>
+          Gen.small (genStarExpr cfg') <*>
           genWhitespaceBefore (pure AST.Comma) <*>
           pure ()
         , AST.TupleTestlistCompStarredMany <$>
-          genStarExpr cfg' <*>
+          Gen.small (genStarExpr cfg') <*>
           genNonEmptyF
             (genBeforeF
               (genBetweenWhitespace $ pure AST.Comma) .
@@ -145,7 +145,7 @@ genTupleTestlistComp cfg =
           Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
           pure ()
         , AST.TupleTestlistCompList <$>
-          genTest cfg' <*>
+          Gen.small (genTest cfg') <*>
           genListF
             (genBeforeF
               (genBetweenWhitespace $ pure AST.Comma) .
@@ -186,7 +186,6 @@ genYieldArg cfg =
         ]
   where
     yieldArgList cfg' =
-      Gen.small $
       AST.YieldArgList <$> genTestList cfg' <*> pure ()
 
 genYieldExpr
@@ -209,9 +208,9 @@ genDictItem
   -> m (AST.DictItem 'NotAssignable cfg ())
 genDictItem cfg =
   AST.DictItem <$>
-  genTest cfg <*>
+  Gen.small (genTest cfg) <*>
   genBetweenWhitespace (pure AST.Colon) <*>
-  genTest cfg <*>
+  Gen.small (genTest cfg) <*>
   pure ()
 
 genDictUnpacking
@@ -222,7 +221,7 @@ genDictUnpacking cfg =
   AST.DictUnpacking <$>
   genBeforeF
     (genBetweenWhitespace $ pure AST.DoubleAsterisk)
-    (genExpr cfg) <*>
+    (Gen.small $ genExpr cfg) <*>
   pure ()
 
 genDictOrSetMaker
@@ -232,27 +231,27 @@ genDictOrSetMaker
 genDictOrSetMaker cfg =
   Gen.choice
     [ AST.DictOrSetMakerDictComp <$>
-      genDictItem cfg <*>
-      genCompFor cfg <*>
+      Gen.small (genDictItem cfg) <*>
+      Gen.small (genCompFor cfg) <*>
       pure ()
     , AST.DictOrSetMakerDictUnpack <$>
-      genItemOrUnpacking <*>
+      Gen.small genItemOrUnpacking <*>
       genListF
         (genBeforeF
           (genBetweenWhitespace $ pure AST.Comma)
-          genItemOrUnpacking) <*>
+          (Gen.small genItemOrUnpacking)) <*>
       Gen.maybe (genBetweenWhitespace $ pure AST.Comma) <*>
       pure ()
     , AST.DictOrSetMakerSetComp <$>
-      genTest cfg <*>
-      genCompFor cfg <*>
+      Gen.small (genTest cfg) <*>
+      Gen.small (genCompFor cfg) <*>
       pure ()
     , AST.DictOrSetMakerSetUnpack <$>
-      genTestOrStar <*>
+      Gen.small genTestOrStar <*>
       genListF
         (genBeforeF
           (genBetweenWhitespace $ pure AST.Comma)
-          genTestOrStar) <*>
+          (Gen.small genTestOrStar)) <*>
       Gen.maybe (genBetweenWhitespace $ pure AST.Comma) <*>
       pure ()
     ]
@@ -291,7 +290,7 @@ genNonZeroDigit =
     , AST.NonZeroDigit_8
     , AST.NonZeroDigit_9
     ]
-    
+
 genOctDigit :: MonadGen m => m AST.OctDigit
 genOctDigit =
   Gen.element
@@ -304,7 +303,7 @@ genOctDigit =
     , AST.OctDigit_6
     , AST.OctDigit_7
     ]
-    
+
 genHexDigit :: MonadGen m => m AST.HexDigit
 genHexDigit =
   Gen.element
@@ -651,7 +650,11 @@ genTestNocond
 genTestNocond cfg =
   Gen.small $
   AST.TestNocond <$>
-  Gen.choice [ InL <$> genOrTest cfg {-, InR <$> genLambdefNocond -} ] <*>
+  (case cfg ^. atomType of
+    SNotAssignable ->
+      Gen.choice [ InL <$> genOrTest cfg, InR <$> genLambdefNocond cfg ]
+    SAssignable ->
+      Gen.choice [ InL <$> genOrTest cfg ]) <*>
   pure ()
 
 genCompIf
@@ -661,7 +664,7 @@ genCompIf
 genCompIf cfg =
   AST.CompIf <$>
   genBetweenWhitespace1 (pure AST.KIf) <*>
-  (Gen.small $ genTestNocond cfg) <*>
+  Gen.small (genTestNocond cfg) <*>
   genMaybeF
     (Gen.small . genWhitespaceBeforeF $ genCompIter cfg) <*>
   pure ()
@@ -819,21 +822,31 @@ genIdentifier =
 
 genTrailer
   :: MonadGen m
-  => SyntaxConfig 'NotAssignable ctxt
-  -> m (AST.Trailer 'NotAssignable ctxt ())
+  => SyntaxConfig atomType ctxt
+  -> m (AST.Trailer atomType ctxt ())
 genTrailer cfg =
-  Gen.recursive Gen.choice
-    [ AST.TrailerAccess <$>
-      genWhitespaceBeforeF genIdentifier <*>
-      pure ()
-    ]
-    [ AST.TrailerCall <$>
-      genBetweenWhitespaceF (genMaybeF $ genArgList cfg) <*>
-      pure ()
-    , AST.TrailerSubscript <$>
-      genBetweenWhitespaceF (genSubscriptList cfg) <*>
-      pure ()
-    ]
+  case cfg ^. atomType of
+    SNotAssignable ->
+      Gen.recursive
+        Gen.choice
+        (commonNonRec cfg) $
+        commonRec cfg ++
+        [ AST.TrailerCall <$>
+          genBetweenWhitespaceF (genMaybeF $ genArgList cfg) <*>
+          pure ()
+        ]
+    SAssignable -> Gen.recursive Gen.choice (commonNonRec cfg) (commonRec cfg)
+  where
+    commonNonRec _ =
+      [ AST.TrailerAccess <$>
+        genWhitespaceBeforeF genIdentifier <*>
+        pure ()
+      ]
+    commonRec cfg' =
+      [ AST.TrailerSubscript <$>
+        genBetweenWhitespaceF (genSubscriptList $ cfg' & atomType .~ SNotAssignable) <*>
+        pure ()
+      ]
 
 genAtomExpr
   :: MonadGen m
@@ -854,10 +867,9 @@ genAtomExpr cfg =
   where
     atomExprNoAwait cfg' =
       AST.AtomExprNoAwait <$>
-      Gen.small (genAtom cfg') <*>
+      Gen.small (genAtom $ cfg' & atomType .~ SNotAssignable) <*>
       genListF
-        (Gen.small . genWhitespaceBeforeF . genTrailer $
-          cfg' & atomType .~ SNotAssignable) <*>
+        (Gen.small . genWhitespaceBeforeF . genTrailer $ cfg') <*>
       pure ()
 
 genPower

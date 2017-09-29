@@ -1,7 +1,11 @@
+{-# language DataKinds #-}
 {-# language DeriveFunctor #-}
 {-# language DeriveFoldable #-}
 {-# language DeriveTraversable #-}
+{-# language GADTs #-}
+{-# language KindSignatures #-}
 {-# language TemplateHaskell #-}
+{-# language TypeFamilies #-}
 module Language.Python.AST.Symbols where
 
 import Papa

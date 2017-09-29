@@ -1,9 +1,12 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Test.Language.Python.ParserPrinter (makeParserPrinterTests) where
 
 import Papa
 import Prelude (error)
 import Control.Monad.IO.Class
+import Data.Functor.Compose
+import Data.Separated.Before
 import Hedgehog
 import System.Directory
 import System.FilePath
@@ -13,12 +16,17 @@ import Test.Tasty.Hspec
 import Test.Tasty.Hedgehog
 import Text.Trifecta hiding (render, runUnspaced)
 
+import qualified Hedgehog.Gen as Gen
 import qualified Text.PrettyPrint.ANSI.Leijen as WL
 import qualified Text.PrettyPrint as HPJ
 
 import Language.Python.IR.SyntaxChecker
 import Language.Python.IR.SyntaxConfig
 
+import qualified Language.Python.Expr.AST as AST
+import qualified Language.Python.AST.Identifier as AST
+import qualified Language.Python.Expr.AST.Integer as AST
+import qualified Language.Python.Expr.AST.Digits as AST
 import qualified Language.Python.Expr.Parser as Parse
 import qualified Language.Python.Expr.Printer as Print
 import qualified Language.Python.Expr.IR.Checker as Check
@@ -104,7 +112,11 @@ checkSyntax input = do
 prop_ast_is_valid_python :: SAtomType atomType -> Property
 prop_ast_is_valid_python assignability =
   property $ do
-    expr <- forAll (GenAST.genTest $ SyntaxConfig assignability STopLevel)
+    expr <-
+      forAll .
+      Gen.resize 100 .
+      GenAST.genTest $
+      SyntaxConfig assignability STopLevel
     let program = HPJ.render $ Print.test expr
     res <- liftIO $ checkSyntax program
     case res of
@@ -123,6 +135,30 @@ prop_ast_is_valid_python assignability =
           ]
         failure
       SyntaxCorrect -> success
+
+regressions :: Spec
+regressions = do
+  describe "regressions" $ do
+    it "1.a should be disallowed" $ do
+      let
+        expr =
+          AST.AtomExprNoAwait
+            (AST.AtomInteger
+              (AST.IntegerDecimal (Left (AST.NonZeroDigit_1, [])) ())
+              ())
+            (Compose
+              [ Compose . Before [] $
+                AST.TrailerAccess
+                (Compose $ Before [] (AST.Identifier "a" ()))
+                ()
+              ])
+            ()
+        program = HPJ.render $ Print.atomExpr expr
+      res <- checkSyntax program
+      case res of
+        SyntaxCorrect -> () `shouldBe` ()
+        SyntaxError err ->
+          expectationFailure $ "Failure:\n\n" ++ err ++ "\n"
 
 makeParserPrinterTests :: IO [TestTree]
 makeParserPrinterTests = do
@@ -143,4 +179,4 @@ makeParserPrinterTests = do
           "AST is valid python - not assignable" $
           prop_ast_is_valid_python SNotAssignable
       ]
-  (properties ++) <$> testSpecs spec
+  (properties ++ ) <$> liftA2 (++) (testSpecs regressions) (testSpecs spec)

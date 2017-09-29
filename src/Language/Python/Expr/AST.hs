@@ -283,7 +283,7 @@ data Trailer :: AtomType -> ExprContext -> * -> * where
             Maybe
             (ArgList 'NotAssignable ctxt))
           a
-    , _trailer_ann :: a
+    , _trailerCall_ann :: a
     } -> Trailer 'NotAssignable ctxt a
   TrailerSubscript ::
     { _trailerSubscript_value
@@ -291,12 +291,12 @@ data Trailer :: AtomType -> ExprContext -> * -> * where
           (Between' [WhitespaceChar])
           (SubscriptList 'NotAssignable ctxt)
           a
-    , _trailer_ann :: a
-    } -> Trailer 'NotAssignable ctxt a
+    , _trailerSubscript_ann :: a
+    } -> Trailer atomType ctxt a
   TrailerAccess ::
     { _trailerAccess_value :: Compose (Before [WhitespaceChar]) Identifier a
-    , _trailer_ann :: a
-    } -> Trailer 'NotAssignable ctxt a
+    , _trailerAccess_ann :: a
+    } -> Trailer atomType ctxt a
 deriving instance Eq c => Eq (Trailer a b c)
 deriving instance Functor (Trailer a b)
 deriving instance Foldable (Trailer a b)
@@ -304,13 +304,13 @@ deriving instance Traversable (Trailer a b)
 
 data AtomExpr :: AtomType -> ExprContext -> * -> * where
   AtomExprNoAwait ::
-    { _atomExpr_atom :: Atom atomType ctxt a
+    { _atomExpr_atom :: Atom 'NotAssignable ctxt a
     , _atomExpr_trailers
       :: Compose
            []
            (Compose
              (Before [WhitespaceChar])
-             (Trailer 'NotAssignable ctxt))
+             (Trailer atomType ctxt))
            a
     , _atomExpr_ann :: a
     } -> AtomExpr atomType ctxt a
@@ -322,10 +322,10 @@ data AtomExpr :: AtomType -> ExprContext -> * -> * where
            []
            (Compose
              (Before [WhitespaceChar])
-             (Trailer 'NotAssignable ('FunDef 'Async)))
+             (Trailer atomType ('FunDef 'Async)))
            a
     , _atomExprAwait_ann :: a
-    } -> AtomExpr 'NotAssignable ('FunDef 'Async) a
+    } -> AtomExpr atomType ('FunDef 'Async) a
 deriving instance Eq a => Eq (AtomExpr c b a)
 deriving instance Functor (AtomExpr b a)
 deriving instance Foldable (AtomExpr b a)

@@ -365,7 +365,7 @@ withItem =
   annotated $
   WithItem <$>
   test <*>
-  optionalF (try $ beforeF (betweenWhitespace1 kAs) identifier)
+  optionalF (try $ beforeF (betweenWhitespace1 kAs) expr)
 
 withStatement
   :: ( LookAheadParsing m

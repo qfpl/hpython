@@ -383,10 +383,10 @@ checkAtomExpr cfg (IR.AtomExpr kw a ts ann) =
   case kw of
     Nothing ->
       Safe.AtomExprNoAwait <$>
-      checkAtom cfg a <*>
+      checkAtom (cfg & atomType .~ SNotAssignable) a <*>
       traverseOf
         (traverseCompose.traverseCompose)
-        (checkTrailer $ set atomType SNotAssignable cfg)
+        (checkTrailer cfg)
         ts <*>
       pure ann
     Just kw' ->

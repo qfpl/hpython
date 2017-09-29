@@ -263,7 +263,7 @@ data WithItem a
          Maybe
          (Compose
            (Before (Between' (NonEmpty WhitespaceChar) KAs))
-           Identifier)
+           Expr)
          a
   , _withItem_ann :: a
   }

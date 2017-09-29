@@ -23,6 +23,7 @@ library
                        Language.Python.AST.Comment
                        Language.Python.AST.Identifier
                        Language.Python.AST.Keywords
+                       Language.Python.AST.StatementList
                        Language.Python.AST.Symbols
                        Language.Python.Expr.AST
                        Language.Python.Expr.AST.BytesLiteral
@@ -95,7 +96,6 @@ library
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions:  NoImplicitPrelude
-
 test-suite hpython-tests
     type:                exitcode-stdio-1.0
     hs-source-dirs:      test

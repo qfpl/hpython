@@ -19,6 +19,7 @@ import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.Expr.IR
 import Language.Python.IR.ArgsList
+import Language.Python.Statement.AST.AugAssign
 
 data Statement a
   = StatementSimple
@@ -462,22 +463,6 @@ data SimpleStatement a
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (SimpleStatement a)
 deriving instance Show a => Show (SimpleStatement a)
-
-data AugAssign
-  = PlusEquals
-  | MinusEquals
-  | StarEquals
-  | AtEquals
-  | SlashEquals
-  | PercentEquals
-  | AmphersandEquals
-  | PipeEquals
-  | CaretEquals
-  | ShiftLeftEquals
-  | ShiftRightEquals
-  | DoubleStarEquals
-  | DoubleSlashEquals
-  deriving (Eq, Show)
 
 data SmallStatement a
   = SmallStatementExpr

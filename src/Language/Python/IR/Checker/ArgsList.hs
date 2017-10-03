@@ -7,16 +7,16 @@ import Data.Functor.Sum
 import qualified Language.Python.AST.ArgsList as Safe
 import qualified Language.Python.IR.ArgsList as IR
 import Language.Python.IR.SyntaxChecker
-import Language.Python.IR.SyntaxConfig
+import Language.Python.IR.ExprConfig
 
 checkArgsListArg
-  :: SyntaxConfig atomType ctxt -- ^ Desired syntax configuration
+  :: ExprConfig atomType ctxt -- ^ Desired syntax configuration
   -> ( forall atomType' ctxt'
-     . SyntaxConfig atomType' ctxt'
+     . ExprConfig atomType' ctxt'
     -> unchecked ann
     -> SyntaxChecker ann (checked atomType' ctxt' ann)) -- ^ Test-checking function
   -> ( forall atomType' ctxt'
-     . SyntaxConfig atomType' ctxt'
+     . ExprConfig atomType' ctxt'
     -> uncheckedName ann
     -> SyntaxChecker ann (checkedName ann)) -- ^ Name-checking function
   -> Safe.ArgsListArg uncheckedName unchecked ann -- ^ Item to check
@@ -36,9 +36,9 @@ checkArgsListArg cfg check checkName (Safe.ArgsListArg l r ann) =
   pure ann
 
 checkArgsListDoublestarArg
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> ( forall atomType' ctxt'
-     . SyntaxConfig atomType' ctxt'
+     . ExprConfig atomType' ctxt'
     -> uncheckedName ann
     -> SyntaxChecker ann (checkedName ann))
   -> Safe.ArgsListDoublestarArg uncheckedName unchecked ann
@@ -54,13 +54,13 @@ checkArgsListDoublestarArg cfg checkName (Safe.ArgsListDoublestarArg a ann) =
   pure ann
 
 checkArgsListStarPart
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> ( forall atomType' ctxt'
-     . SyntaxConfig atomType' ctxt'
+     . ExprConfig atomType' ctxt'
     -> unchecked ann
     -> SyntaxChecker ann (checked atomType' ctxt' ann))
   -> ( forall atomType' ctxt'
-     . SyntaxConfig atomType' ctxt'
+     . ExprConfig atomType' ctxt'
     -> uncheckedName ann
     -> SyntaxChecker ann (checkedName ann))
   -> Safe.ArgsListStarPart uncheckedName unchecked ann
@@ -88,13 +88,13 @@ checkArgsListStarPart cfg check checkName e =
 
 checkArgsList
   :: Safe.HasName checkedName
-  => SyntaxConfig atomType ctxt
+  => ExprConfig atomType ctxt
   -> ( forall atomType' ctxt'
-     . SyntaxConfig atomType' ctxt'
+     . ExprConfig atomType' ctxt'
     -> unchecked ann
     -> SyntaxChecker ann (checked atomType' ctxt' ann))
   -> ( forall atomType' ctxt'
-     . SyntaxConfig atomType' ctxt'
+     . ExprConfig atomType' ctxt'
     -> uncheckedName ann
     -> SyntaxChecker ann (checkedName ann))
   -> IR.ArgsList uncheckedName unchecked ann

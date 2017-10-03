@@ -16,6 +16,7 @@ import Language.Python.Parser.Keywords
 import Language.Python.Parser.SrcInfo
 import Language.Python.Parser.Symbols
 import Language.Python.Statement.IR
+import Language.Python.Statement.Parser.AugAssign
 
 import Text.Parser.Unspaced
 
@@ -55,21 +56,6 @@ testlistStarExpr =
   optional (try $ betweenWhitespace comma)
   where
     testOrStar = (InL <$> try test) <|> (InR <$> starExpr)
-
-augAssign :: DeltaParsing m => Unspaced m AugAssign
-augAssign =
-  (string "+=" $> PlusEquals) <|>
-  (string "-=" $> MinusEquals) <|>
-  (try (string "*=") $> StarEquals) <|>
-  (string "@=" $> AtEquals) <|>
-  (try (string "/=") $> SlashEquals) <|>
-  (string "&=" $> AmphersandEquals) <|>
-  (string "|=" $> PipeEquals) <|>
-  (string "^=" $> CaretEquals) <|>
-  (string "<<=" $> ShiftLeftEquals) <|>
-  (string ">>=" $> ShiftRightEquals) <|>
-  (string "**=" $> DoubleStarEquals) <|>
-  (string "//=" $> DoubleSlashEquals)
 
 smallStatement
   :: ( LookAheadParsing m

@@ -6,7 +6,7 @@ import Data.Functor.Sum
 import Hedgehog
 import Language.Python.AST.ArgsList
 import Language.Python.AST.Symbols
-import Language.Python.IR.SyntaxConfig
+import Language.Python.IR.ExprConfig
 
 import Test.Language.Python.Gen.Combinators
 
@@ -14,7 +14,7 @@ import qualified Hedgehog.Gen as Gen
 
 genArgsListArg
   :: MonadGen m
-  => SyntaxConfig 'NotAssignable ctxt
+  => ExprConfig 'NotAssignable ctxt
   -> m (name ())
   -> m (f ())
   -> m (ArgsListArg name f ())
@@ -29,7 +29,7 @@ genArgsListArg _ genName gen =
 
 genArgsListStarPart
   :: MonadGen m
-  => SyntaxConfig 'NotAssignable ctxt
+  => ExprConfig 'NotAssignable ctxt
   -> m (name ())
   -> m (f ())
   -> m (ArgsListStarPart name f ())
@@ -53,7 +53,7 @@ genArgsListStarPart cfg genName gen =
 
 genArgsListDoublestarArg
   :: MonadGen m
-  => SyntaxConfig 'NotAssignable ctxt
+  => ExprConfig 'NotAssignable ctxt
   -> m (name ())
   -> m (ArgsListDoublestarArg name test ())
 genArgsListDoublestarArg _ genName =
@@ -65,7 +65,7 @@ genArgsList
   :: ( HasName name
      , MonadGen m
      )
-  => SyntaxConfig 'NotAssignable ctxt
+  => ExprConfig 'NotAssignable ctxt
   -> m (name ())
   -> m (f ())
   -> m (ArgsList name f ())

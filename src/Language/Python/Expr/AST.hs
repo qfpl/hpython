@@ -32,9 +32,9 @@ import Language.Python.Expr.AST.Imag
 import Language.Python.Expr.AST.Integer
 import Language.Python.Expr.AST.StringLiteral
 import Language.Python.Expr.AST.TermOperator
-import Language.Python.IR.SyntaxConfig
+import Language.Python.IR.ExprConfig
 
-data Argument :: AtomType -> ExprContext -> * -> * where
+data Argument :: AtomType -> DefinitionContext -> * -> * where
   ArgumentFor ::
     { _argumentFor_expr :: Test 'NotAssignable ctxt a
     , _argumentFor_for
@@ -71,7 +71,7 @@ deriving instance Functor (Argument a b)
 deriving instance Foldable (Argument a b)
 deriving instance Traversable (Argument a b)
 
-data ArgList (atomType :: AtomType) (ctxt :: ExprContext) a
+data ArgList (atomType :: AtomType) (ctxt :: DefinitionContext) a
   = ArgList
   { _argList_head :: Argument atomType ctxt a
   , _argList_tail
@@ -86,7 +86,7 @@ data ArgList (atomType :: AtomType) (ctxt :: ExprContext) a
   }
   deriving (Functor, Foldable, Traversable)
 
-data LambdefNocond (atomType :: AtomType) (ctxt :: ExprContext) a
+data LambdefNocond (atomType :: AtomType) (ctxt :: DefinitionContext) a
   = LambdefNocond
   { _lambdefNocond_args
     :: Compose
@@ -104,7 +104,7 @@ data LambdefNocond (atomType :: AtomType) (ctxt :: ExprContext) a
   }
   deriving (Functor, Foldable, Traversable)
 
-data TestNocond (atomType :: AtomType) (ctxt :: ExprContext) a
+data TestNocond (atomType :: AtomType) (ctxt :: DefinitionContext) a
   = TestNocond
   { _expressionNocond_value :: Sum (OrTest atomType ctxt) (LambdefNocond atomType ctxt) a
   , _expressionNocond_ann :: a
@@ -113,7 +113,7 @@ deriving instance Functor (TestNocond a b)
 deriving instance Foldable (TestNocond a b)
 deriving instance Traversable (TestNocond a b)
 
-data CompIter :: AtomType -> ExprContext -> * -> * where
+data CompIter :: AtomType -> DefinitionContext -> * -> * where
   CompIter ::
     { _compIter_value :: Sum (CompFor 'NotAssignable ctxt) (CompIf 'NotAssignable ctxt) a
     , _compIter_ann :: a
@@ -123,7 +123,7 @@ deriving instance Functor (CompIter a b)
 deriving instance Foldable (CompIter a b)
 deriving instance Traversable (CompIter a b)
 
-data CompIf :: AtomType -> ExprContext -> * -> * where
+data CompIf :: AtomType -> DefinitionContext -> * -> * where
   CompIf ::
     { _compIf_if :: Between' (NonEmpty WhitespaceChar) KIf
     , _compIf_expr
@@ -140,7 +140,7 @@ deriving instance Functor (CompIf a b)
 deriving instance Foldable (CompIf a b)
 deriving instance Traversable (CompIf a b)
 
-data StarExpr (atomType :: AtomType) (ctxt :: ExprContext) a
+data StarExpr (atomType :: AtomType) (ctxt :: DefinitionContext) a
   = StarExpr
   { _starExpr_value
     :: Compose
@@ -153,7 +153,7 @@ deriving instance Functor (StarExpr a b)
 deriving instance Foldable (StarExpr a b)
 deriving instance Traversable (StarExpr a b)
 
-data ExprList :: AtomType -> ExprContext -> * -> * where
+data ExprList :: AtomType -> DefinitionContext -> * -> * where
   ExprListSingleStarredComma ::
     { _exprListSingleStarredComma_value :: StarExpr atomType ctxt a
     , _exprListSingleStarredComma_comma :: Before [WhitespaceChar] Comma
@@ -187,7 +187,7 @@ deriving instance Functor (ExprList a b)
 deriving instance Foldable (ExprList a b)
 deriving instance Traversable (ExprList a b)
 
-data CompFor :: AtomType -> ExprContext -> * -> * where
+data CompFor :: AtomType -> DefinitionContext -> * -> * where
   CompFor ::
     { _compFor_targets
       :: Compose
@@ -211,7 +211,7 @@ deriving instance Functor (CompFor a b)
 deriving instance Foldable (CompFor a b)
 deriving instance Traversable (CompFor a b)
 
-data SliceOp :: AtomType -> ExprContext -> * -> * where
+data SliceOp :: AtomType -> DefinitionContext -> * -> * where
   SliceOp ::
     { _sliceOp_val
       :: Compose
@@ -225,7 +225,7 @@ deriving instance Functor (SliceOp a b)
 deriving instance Foldable (SliceOp a b)
 deriving instance Traversable (SliceOp a b)
 
-data Subscript :: AtomType -> ExprContext -> * -> * where
+data Subscript :: AtomType -> DefinitionContext -> * -> * where
   SubscriptTest ::
     { _subscriptTest_val :: Test 'NotAssignable ctxt a
     , _subscript_ann :: a
@@ -256,7 +256,7 @@ deriving instance Functor (Subscript a b)
 deriving instance Foldable (Subscript a b)
 deriving instance Traversable (Subscript a b)
 
-data SubscriptList :: AtomType -> ExprContext -> * -> * where
+data SubscriptList :: AtomType -> DefinitionContext -> * -> * where
   SubscriptList ::
     { _subscriptList_head :: Subscript 'NotAssignable ctxt a
     , _subscriptList_tail
@@ -274,7 +274,7 @@ deriving instance Functor (SubscriptList a b)
 deriving instance Foldable (SubscriptList a b)
 deriving instance Traversable (SubscriptList a b)
 
-data Trailer :: AtomType -> ExprContext -> * -> * where
+data Trailer :: AtomType -> DefinitionContext -> * -> * where
   TrailerCall ::
     { _trailerCall_value
       :: Compose
@@ -302,7 +302,7 @@ deriving instance Functor (Trailer a b)
 deriving instance Foldable (Trailer a b)
 deriving instance Traversable (Trailer a b)
 
-data AtomExpr :: AtomType -> ExprContext -> * -> * where
+data AtomExpr :: AtomType -> DefinitionContext -> * -> * where
   AtomExprNoAwait ::
     { _atomExpr_atom :: Atom 'NotAssignable ctxt a
     , _atomExpr_trailers
@@ -331,7 +331,7 @@ deriving instance Functor (AtomExpr b a)
 deriving instance Foldable (AtomExpr b a)
 deriving instance Traversable (AtomExpr b a)
 
-data Power :: AtomType -> ExprContext -> * -> * where
+data Power :: AtomType -> DefinitionContext -> * -> * where
   PowerOne ::
     { _powerOne_value :: AtomExpr atomType ctxt a
     , _powerOne_ann :: a
@@ -351,7 +351,7 @@ deriving instance Functor (Power a b)
 deriving instance Foldable (Power a b)
 deriving instance Traversable (Power a b)
 
-data Factor :: AtomType -> ExprContext -> * -> * where
+data Factor :: AtomType -> DefinitionContext -> * -> * where
   FactorNone ::
     { _factorNone_value :: Power atomType ctxt a
     , _factorNone_ann :: a
@@ -367,7 +367,7 @@ deriving instance Functor (Factor a b)
 deriving instance Foldable (Factor a b)
 deriving instance Traversable (Factor a b)
 
-data Term :: AtomType -> ExprContext -> * -> * where
+data Term :: AtomType -> DefinitionContext -> * -> * where
   TermOne ::
     { _termOne_value :: Factor atomType ctxt a
     , _termOne_ann :: a
@@ -389,7 +389,7 @@ deriving instance Functor (Term a b)
 deriving instance Foldable (Term a b)
 deriving instance Traversable (Term a b)
 
-data ArithExpr :: AtomType -> ExprContext -> * -> * where
+data ArithExpr :: AtomType -> DefinitionContext -> * -> * where
   ArithExprOne ::
     { _arithExprOne_value :: Term atomType ctxt a
     , _arithExprOne_ann :: a
@@ -411,7 +411,7 @@ deriving instance Functor (ArithExpr a b)
 deriving instance Foldable (ArithExpr a b)
 deriving instance Traversable (ArithExpr a b)
 
-data ShiftExpr :: AtomType -> ExprContext -> * -> * where
+data ShiftExpr :: AtomType -> DefinitionContext -> * -> * where
   ShiftExprOne ::
     { _shiftExprOne_value :: ArithExpr atomType ctxt a
     , _shiftExprOne_ann :: a
@@ -433,7 +433,7 @@ deriving instance Functor (ShiftExpr a b)
 deriving instance Foldable (ShiftExpr a b)
 deriving instance Traversable (ShiftExpr a b)
 
-data AndExpr :: AtomType -> ExprContext -> * -> * where
+data AndExpr :: AtomType -> DefinitionContext -> * -> * where
   AndExprOne ::
     { _andExprOne_value :: ShiftExpr atomType ctxt a
     , _andExprOne_ann :: a
@@ -455,7 +455,7 @@ deriving instance Functor (AndExpr a b)
 deriving instance Foldable (AndExpr a b)
 deriving instance Traversable (AndExpr a b)
 
-data XorExpr :: AtomType -> ExprContext -> * -> * where
+data XorExpr :: AtomType -> DefinitionContext -> * -> * where
   XorExprOne ::
     { _xorExprOne_value :: AndExpr atomType ctxt a
     , _xorExprOne_ann :: a
@@ -476,7 +476,7 @@ deriving instance Functor (XorExpr a b)
 deriving instance Foldable (XorExpr a b)
 deriving instance Traversable (XorExpr a b)
 
-data Expr :: AtomType -> ExprContext -> * -> * where
+data Expr :: AtomType -> DefinitionContext -> * -> * where
   ExprOne ::
     { _exprOne_value :: XorExpr atomType ctxt a
     , _exprOne_ann :: a
@@ -497,7 +497,7 @@ deriving instance Functor (Expr a b)
 deriving instance Foldable (Expr a b)
 deriving instance Traversable (Expr a b)
 
-data Comparison :: AtomType -> ExprContext -> * -> * where
+data Comparison :: AtomType -> DefinitionContext -> * -> * where
   ComparisonOne ::
     { _comparisonOne_value :: Expr atomType ctxt a
     , _comparisonOne_ann :: a
@@ -518,7 +518,7 @@ deriving instance Functor (Comparison a b)
 deriving instance Foldable (Comparison a b)
 deriving instance Traversable (Comparison a b)
 
-data NotTest :: AtomType -> ExprContext -> * -> * where
+data NotTest :: AtomType -> DefinitionContext -> * -> * where
   NotTestMany ::
     { _notTestMany_value
       :: Compose
@@ -536,7 +536,7 @@ deriving instance Functor (NotTest a b)
 deriving instance Foldable (NotTest a b)
 deriving instance Traversable (NotTest a b)
 
-data AndTest :: AtomType -> ExprContext -> * -> * where
+data AndTest :: AtomType -> DefinitionContext -> * -> * where
   AndTestOne ::
     { _andTestOne_value :: NotTest atomType ctxt a
     , _andTestOne_ann :: a
@@ -558,7 +558,7 @@ deriving instance Functor (AndTest a b)
 deriving instance Foldable (AndTest a b)
 deriving instance Traversable (AndTest a b)
 
-data OrTest :: AtomType -> ExprContext -> * -> * where
+data OrTest :: AtomType -> DefinitionContext -> * -> * where
   OrTestOne ::
     { _orTestOne_value :: AndTest atomType ctxt a
     , _orTestOne_ann :: a
@@ -580,7 +580,7 @@ deriving instance Functor (OrTest a b)
 deriving instance Foldable (OrTest a b)
 deriving instance Traversable (OrTest a b)
 
-data IfThenElse :: AtomType -> ExprContext -> * -> * where
+data IfThenElse :: AtomType -> DefinitionContext -> * -> * where
   IfThenElse ::
     { _ifThenElse_if :: Between' (NonEmpty WhitespaceChar) KIf
     , _ifThenElse_value1 :: OrTest 'NotAssignable ctxt a
@@ -592,7 +592,7 @@ deriving instance Functor (IfThenElse a b)
 deriving instance Foldable (IfThenElse a b)
 deriving instance Traversable (IfThenElse a b)
 
-data Test :: AtomType -> ExprContext -> * -> * where
+data Test :: AtomType -> DefinitionContext -> * -> * where
   TestCondNoIf ::
     { _testCondNoIf_value :: OrTest atomType ctxt a
     , _testCondNoIf_ann :: a
@@ -616,7 +616,7 @@ deriving instance Functor (Test a b)
 deriving instance Foldable (Test a b)
 deriving instance Traversable (Test a b)
 
-data Lambdef :: AtomType -> ExprContext -> * -> * where
+data Lambdef :: AtomType -> DefinitionContext -> * -> * where
   Lambdef ::
     { _lambdef_Args
       :: Compose
@@ -637,7 +637,7 @@ deriving instance Functor (Lambdef a b)
 deriving instance Foldable (Lambdef a b)
 deriving instance Traversable (Lambdef a b)
 
-data TestList (atomType :: AtomType) (ctxt :: ExprContext) a
+data TestList (atomType :: AtomType) (ctxt :: DefinitionContext) a
   = TestList
   { _testList_head :: Test atomType ctxt a
   , _testList_tail
@@ -650,7 +650,7 @@ data TestList (atomType :: AtomType) (ctxt :: ExprContext) a
   }
   deriving (Functor, Foldable, Traversable)
 
-data YieldArg :: AtomType -> ExprContext -> * -> * where
+data YieldArg :: AtomType -> DefinitionContext -> * -> * where
   YieldArgFrom ::
     { _yieldArgFrom_value
       :: Compose
@@ -680,7 +680,7 @@ data YieldExpr a
   , _yieldExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
-data ListTestlistComp :: AtomType -> ExprContext -> * -> * where
+data ListTestlistComp :: AtomType -> DefinitionContext -> * -> * where
   ListTestlistCompStarred ::
     { _ListTestlistCompStarred_head :: StarExpr atomType ctxt a
     , _ListTestlistCompStarred_tail
@@ -719,7 +719,7 @@ deriving instance Functor (ListTestlistComp a b)
 deriving instance Foldable (ListTestlistComp a b)
 deriving instance Traversable (ListTestlistComp a b)
 
-data TupleTestlistComp :: AtomType -> ExprContext -> * -> * where
+data TupleTestlistComp :: AtomType -> DefinitionContext -> * -> * where
   TupleTestlistCompStarredOne ::
     { _tupleTestlistCompStarredOne_head :: StarExpr atomType ctxt a
     , _tupleTestlistCompStarredOne_comma :: Before [WhitespaceChar] Comma
@@ -764,7 +764,7 @@ deriving instance Functor (TupleTestlistComp a b)
 deriving instance Foldable (TupleTestlistComp a b)
 deriving instance Traversable (TupleTestlistComp a b)
 
-data DictItem (atomType :: AtomType) (ctxt :: ExprContext) a where
+data DictItem (atomType :: AtomType) (ctxt :: DefinitionContext) a where
   DictItem ::
     { _dictItem_key :: Test 'NotAssignable ctxt a
     , _dictItem_colon :: Between' [WhitespaceChar] Colon
@@ -777,7 +777,7 @@ deriving instance Functor (DictItem a b)
 deriving instance Foldable (DictItem a b)
 deriving instance Traversable (DictItem a b)
 
-data DictUnpacking (atomType :: AtomType) (ctxt :: ExprContext) a where
+data DictUnpacking (atomType :: AtomType) (ctxt :: DefinitionContext) a where
   DictUnpacking ::
     { _dictUnpacking_value
       :: Compose
@@ -792,7 +792,7 @@ deriving instance Functor (DictUnpacking a b)
 deriving instance Foldable (DictUnpacking a b)
 deriving instance Traversable (DictUnpacking a b)
 
-data DictOrSetMaker (atomType :: AtomType) (ctxt :: ExprContext) a where
+data DictOrSetMaker (atomType :: AtomType) (ctxt :: DefinitionContext) a where
   DictOrSetMakerDictComp ::
     { _dictOrSetMakerDictComp_head :: DictItem 'NotAssignable ctxt a
     , _dictOrSetMakerDictComp_tail :: CompFor 'NotAssignable ctxt a
@@ -847,7 +847,7 @@ deriving instance Functor (DictOrSetMaker a b)
 deriving instance Foldable (DictOrSetMaker a b)
 deriving instance Traversable (DictOrSetMaker a b)
 
-data Atom :: AtomType -> ExprContext -> * -> * where
+data Atom :: AtomType -> DefinitionContext -> * -> * where
   AtomParenNoYield ::
     { _atomParenNoYield_val
       :: Compose

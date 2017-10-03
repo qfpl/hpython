@@ -15,7 +15,7 @@ import qualified Data.Set as S
 
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
-import Language.Python.IR.SyntaxConfig
+import Language.Python.IR.ExprConfig
 import Language.Python.IR.SyntaxChecker
 import Language.Python.IR.Checker.ArgsList
 
@@ -28,13 +28,13 @@ traverseCompose
 traverseCompose = _Wrapping Compose . traverse
 
 checkIdentifier
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> Identifier ann
   -> SyntaxChecker ann (Identifier ann)
 checkIdentifier cfg e@(Identifier v ann) =
   let
     extraKeywords =
-      case cfg ^. exprContext of
+      case cfg ^. definitionContext of
         SFunDef SAsync -> S.fromList ["async", "await"]
         _ -> S.empty
   in
@@ -43,7 +43,7 @@ checkIdentifier cfg e@(Identifier v ann) =
     else pure e
 
 checkTest
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.Test ann
   -> SyntaxChecker ann (Safe.Test atomType ctxt ann)
 checkTest cfg e =
@@ -73,7 +73,7 @@ checkTest cfg e =
           pure ann
 
 checkLambdef
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.Lambdef ann
   -> SyntaxChecker ann (Safe.Lambdef 'NotAssignable ctxt ann)
 checkLambdef cfg (IR.Lambdef as b ann) =
@@ -90,7 +90,7 @@ checkLambdef cfg (IR.Lambdef as b ann) =
       pure ann
 
 checkIfThenElse
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.IfThenElse ann
   -> SyntaxChecker ann (Safe.IfThenElse 'NotAssignable ctxt ann)
 checkIfThenElse cfg (IR.IfThenElse i v1 e v2) =
@@ -101,7 +101,7 @@ checkIfThenElse cfg (IR.IfThenElse i v1 e v2) =
   (checkTest $ set atomType SNotAssignable cfg) v2
 
 checkOrTest
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.OrTest ann
   -> SyntaxChecker ann (Safe.OrTest atomType ctxt ann)
 checkOrTest cfg (IR.OrTest l r ann) =
@@ -124,7 +124,7 @@ checkOrTest cfg (IR.OrTest l r ann) =
           pure ann
 
 checkAndTest
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.AndTest ann
   -> SyntaxChecker ann (Safe.AndTest atomType ctxt ann)
 checkAndTest cfg (IR.AndTest l r ann) =
@@ -147,7 +147,7 @@ checkAndTest cfg (IR.AndTest l r ann) =
           pure ann
 
 checkNotTest
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.NotTest ann
   -> SyntaxChecker ann (Safe.NotTest atomType ctxt ann)
 checkNotTest cfg e =
@@ -174,7 +174,7 @@ checkNotTest cfg e =
           pure ann
 
 checkComparison
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.Comparison ann
   -> SyntaxChecker ann (Safe.Comparison atomType ctxt ann)
 checkComparison cfg (IR.Comparison l r ann) =
@@ -197,7 +197,7 @@ checkComparison cfg (IR.Comparison l r ann) =
           pure ann
 
 checkExpr
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.Expr ann
   -> SyntaxChecker ann (Safe.Expr atomType ctxt ann)
 checkExpr cfg (IR.Expr l r ann) =
@@ -220,7 +220,7 @@ checkExpr cfg (IR.Expr l r ann) =
           pure ann
 
 checkXorExpr
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.XorExpr ann
   -> SyntaxChecker ann (Safe.XorExpr atomType ctxt ann)
 checkXorExpr cfg (IR.XorExpr l r ann) =
@@ -243,7 +243,7 @@ checkXorExpr cfg (IR.XorExpr l r ann) =
           pure ann
 
 checkAndExpr
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.AndExpr ann
   -> SyntaxChecker ann (Safe.AndExpr atomType ctxt ann)
 checkAndExpr cfg (IR.AndExpr l r ann) =
@@ -266,7 +266,7 @@ checkAndExpr cfg (IR.AndExpr l r ann) =
           pure ann
 
 checkShiftExpr
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.ShiftExpr ann
   -> SyntaxChecker ann (Safe.ShiftExpr atomType ctxt ann)
 checkShiftExpr cfg (IR.ShiftExpr l r ann) =
@@ -289,7 +289,7 @@ checkShiftExpr cfg (IR.ShiftExpr l r ann) =
           pure ann
 
 checkArithExpr
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.ArithExpr ann
   -> SyntaxChecker ann (Safe.ArithExpr atomType ctxt ann)
 checkArithExpr cfg (IR.ArithExpr l r ann) =
@@ -312,7 +312,7 @@ checkArithExpr cfg (IR.ArithExpr l r ann) =
           pure ann
 
 checkTerm
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.Term ann
   -> SyntaxChecker ann (Safe.Term atomType ctxt ann)
 checkTerm cfg (IR.Term l r ann) =
@@ -335,7 +335,7 @@ checkTerm cfg (IR.Term l r ann) =
           pure ann
 
 checkFactor
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.Factor ann
   -> SyntaxChecker ann (Safe.Factor atomType ctxt ann)
 checkFactor cfg e =
@@ -354,7 +354,7 @@ checkFactor cfg e =
           pure ann
 
 checkPower
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.Power ann
   -> SyntaxChecker ann (Safe.Power atomType ctxt ann)
 checkPower cfg (IR.Power l r ann) =
@@ -376,7 +376,7 @@ checkPower cfg (IR.Power l r ann) =
           pure ann
 
 checkAtomExpr
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.AtomExpr ann
   -> SyntaxChecker ann (Safe.AtomExpr atomType ctxt ann)
 checkAtomExpr cfg (IR.AtomExpr kw a ts ann) =
@@ -390,7 +390,7 @@ checkAtomExpr cfg (IR.AtomExpr kw a ts ann) =
         ts <*>
       pure ann
     Just kw' ->
-      case (cfg ^. atomType, cfg ^. exprContext) of
+      case (cfg ^. atomType, cfg ^. definitionContext) of
         (SNotAssignable, SFunDef SAsync) ->
           Safe.AtomExprAwait kw' <$>
           checkAtom cfg a <*>
@@ -411,7 +411,7 @@ checkAtomExpr cfg (IR.AtomExpr kw a ts ann) =
           syntaxError (AwaitNotInAsyncFunction ann)
 
 checkTrailer
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.Trailer ann
   -> SyntaxChecker ann (Safe.Trailer atomType ctxt ann)
 checkTrailer cfg e =
@@ -433,7 +433,7 @@ checkTrailer cfg e =
         IR.TrailerAccess v ann -> pure $ Safe.TrailerAccess v ann
 
 checkArgList
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.ArgList ann
   -> SyntaxChecker ann (Safe.ArgList atomType ctxt ann)
 checkArgList cfg (IR.ArgList h t comma ann) =
@@ -444,7 +444,7 @@ checkArgList cfg (IR.ArgList h t comma ann) =
   pure ann
 
 checkArgument
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.Argument ann
   -> SyntaxChecker ann (Safe.Argument atomType ctxt ann)
 checkArgument cfg e =
@@ -475,7 +475,7 @@ checkArgument cfg e =
           pure ann
 
 checkCompFor
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.CompFor ann
   -> SyntaxChecker ann (Safe.CompFor atomType ctxt ann)
 checkCompFor cfg e =
@@ -501,7 +501,7 @@ checkCompFor cfg e =
           pure ann
 
 checkExprList
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.ExprList ann
   -> SyntaxChecker ann (Safe.ExprList atomType ctxt ann)
 checkExprList cfg (IR.ExprList h t comma ann) =
@@ -543,7 +543,7 @@ checkExprList cfg (IR.ExprList h t comma ann) =
         InR a -> InR <$> checkStarExpr cfg a
 
 checkStarExpr
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.StarExpr ann
   -> SyntaxChecker ann (Safe.StarExpr atomType ctxt ann)
 checkStarExpr cfg (IR.StarExpr val ann) =
@@ -554,7 +554,7 @@ checkStarExpr cfg (IR.StarExpr val ann) =
   pure ann
 
 checkCompIter
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.CompIter ann
   -> SyntaxChecker ann (Safe.CompIter atomType ctxt ann)
 checkCompIter cfg (IR.CompIter val ann) =
@@ -572,7 +572,7 @@ checkCompIter cfg (IR.CompIter val ann) =
         InR a -> InR <$> checkCompIf cfg' a
 
 checkCompIf
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.CompIf ann
   -> SyntaxChecker ann (Safe.CompIf atomType ctxt ann)
 checkCompIf cfg (IR.CompIf kw ex it ann) =
@@ -586,7 +586,7 @@ checkCompIf cfg (IR.CompIf kw ex it ann) =
       pure ann
 
 checkTestNocond
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.TestNocond ann
   -> SyntaxChecker ann (Safe.TestNocond atomType ctxt ann)
 checkTestNocond cfg (IR.TestNocond v ann) =
@@ -600,7 +600,7 @@ checkTestNocond cfg (IR.TestNocond v ann) =
         InR a -> InR <$> checkLambdefNocond cfg a
 
 checkLambdefNocond
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.LambdefNocond ann
   -> SyntaxChecker ann (Safe.LambdefNocond atomType ctxt ann)
 checkLambdefNocond cfg (IR.LambdefNocond args ex ann) =
@@ -613,7 +613,7 @@ checkLambdefNocond cfg (IR.LambdefNocond args ex ann) =
   pure ann
 
 checkSubscriptList
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.SubscriptList ann
   -> SyntaxChecker ann (Safe.SubscriptList atomType ctxt ann)
 checkSubscriptList cfg (IR.SubscriptList h t comma ann) =
@@ -628,7 +628,7 @@ checkSubscriptList cfg (IR.SubscriptList h t comma ann) =
       pure ann
 
 checkSubscript
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.Subscript ann
   -> SyntaxChecker ann (Safe.Subscript atomType ctxt ann)
 checkSubscript cfg e =
@@ -659,7 +659,7 @@ checkSubscript cfg e =
           pure ann
 
 checkSliceOp
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.SliceOp ann
   -> SyntaxChecker ann (Safe.SliceOp atomType ctxt ann)
 checkSliceOp cfg (IR.SliceOp v ann) =
@@ -672,7 +672,7 @@ checkSliceOp cfg (IR.SliceOp v ann) =
       pure ann
 
 checkAtom
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.Atom ann
   -> SyntaxChecker ann (Safe.Atom atomType ctxt ann)
 checkAtom cfg e =
@@ -686,7 +686,7 @@ checkAtom cfg e =
                _Wrapping Compose . between'._2._Wrapping Compose .~ Nothing)
             ann
         Just (InL a) ->
-          case (cfg  ^. atomType, cfg ^. exprContext) of
+          case (cfg  ^. atomType, cfg ^. definitionContext) of
             (SAssignable, _) ->
               syntaxError $ CannotAssignTo LHSYieldExpr ann
             (_, STopLevel) ->
@@ -780,7 +780,7 @@ checkAtom cfg e =
           pure $ Safe.AtomFalse ann
 
 checkDictItem
-  :: SyntaxConfig 'NotAssignable ctxt
+  :: ExprConfig 'NotAssignable ctxt
   -> IR.DictItem ann
   -> SyntaxChecker ann (Safe.DictItem 'NotAssignable ctxt ann)
 checkDictItem cfg (IR.DictItem k c v ann) =
@@ -791,7 +791,7 @@ checkDictItem cfg (IR.DictItem k c v ann) =
   pure ann
 
 checkDictOrSetMaker
-  :: SyntaxConfig 'NotAssignable ctxt
+  :: ExprConfig 'NotAssignable ctxt
   -> IR.DictOrSetMaker ann
   -> SyntaxChecker ann (Safe.DictOrSetMaker 'NotAssignable ctxt ann)
 checkDictOrSetMaker cfg e =
@@ -847,7 +847,7 @@ checkDictOrSetMaker cfg e =
         InR e'' -> InR <$> checkStarExpr cfg' e''
 
 checkDictUnpacking
-  :: SyntaxConfig 'NotAssignable ctxt
+  :: ExprConfig 'NotAssignable ctxt
   -> IR.DictUnpacking ann
   -> SyntaxChecker ann (Safe.DictUnpacking 'NotAssignable ctxt ann)
 checkDictUnpacking cfg (IR.DictUnpacking v ann) =
@@ -856,7 +856,7 @@ checkDictUnpacking cfg (IR.DictUnpacking v ann) =
   pure ann
 
 checkYieldExpr
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.YieldExpr ann
   -> SyntaxChecker ann (Safe.YieldExpr ann)
 checkYieldExpr cfg (IR.YieldExpr val ann) =
@@ -866,12 +866,12 @@ checkYieldExpr cfg (IR.YieldExpr val ann) =
     (checkYieldArg $
       cfg
         & atomType .~ SNotAssignable
-        & exprContext .~ SFunDef SNormal)
+        & definitionContext .~ SFunDef SNormal)
     val <*>
   pure ann
 
 checkYieldArg
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.YieldArg ann
   -> SyntaxChecker ann (Safe.YieldArg atomType ctxt ann)
 checkYieldArg cfg e =
@@ -890,7 +890,7 @@ checkYieldArg cfg e =
       pure ann
 
 checkTestList
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.TestList ann
   -> SyntaxChecker ann (Safe.TestList atomType ctxt ann)
 checkTestList cfg (IR.TestList h t comma ann) =
@@ -901,7 +901,7 @@ checkTestList cfg (IR.TestList h t comma ann) =
   pure ann
 
 checkTupleTestlistComp
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.TupleTestlistComp ann
   -> SyntaxChecker ann (Safe.TupleTestlistComp atomType ctxt ann)
 checkTupleTestlistComp cfg e =
@@ -959,7 +959,7 @@ checkTupleTestlistComp cfg e =
         InR a -> InR <$> checkStarExpr cfg' a
 
 checkListTestlistComp
-  :: SyntaxConfig atomType ctxt
+  :: ExprConfig atomType ctxt
   -> IR.ListTestlistComp ann
   -> SyntaxChecker ann (Safe.ListTestlistComp atomType ctxt ann)
 checkListTestlistComp cfg e =

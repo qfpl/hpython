@@ -6,6 +6,7 @@
 {-# language KindSignatures #-}
 {-# language StandaloneDeriving #-}
 {-# language TemplateHaskell #-}
+{-# language TypeOperators #-}
 module Language.Python.Statement.AST where
 
 import Papa hiding (Sum, Product, Space)
@@ -15,46 +16,49 @@ import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Separated.Before
 import Data.Separated.Between
+import Data.Singletons.Prelude ((:==))
 
+import Language.Python.AST.ArgsList
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.Expr.AST
-import Language.Python.AST.ArgsList
-import Language.Python.IR.SyntaxConfig
+import Language.Python.Statement.AST.AugAssign
+import Language.Python.IR.ExprConfig
+import Language.Python.IR.StatementConfig
 
-data Statement (ctxt :: ExprContext) a
+data Statement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   = StatementSimple
-  { _statementSimple_value :: SimpleStatement ctxt a
+  { _statementSimple_value :: SimpleStatement lctxt ctxt a
   , _statementSimple_ann :: a
   }
   | StatementCompound
-  { _statementCompound_value :: CompoundStatement ctxt a
+  { _statementCompound_value :: CompoundStatement lctxt ctxt a
   , _statementCompound_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (Statement ctxt a)
-deriving instance Show a => Show (Statement ctxt a)
+deriving instance Eq a => Eq (Statement lctxt ctxt a)
+deriving instance Show a => Show (Statement lctxt ctxt a)
 
-data CompoundStatement (ctxt :: ExprContext) a
+data CompoundStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   = CompoundStatementIf
-  { _compoundStatementIf_value :: IfStatement ctxt a
+  { _compoundStatementIf_value :: IfStatement lctxt ctxt a
   , _compoundStatement_ann :: a
   }
   | CompoundStatementWhile
-  { _compoundStatementWhile_value :: WhileStatement ctxt a
+  { _compoundStatementWhile_value :: WhileStatement lctxt ctxt a
   , _compoundStatement_ann :: a
   }
   | CompoundStatementFor
-  { _compoundStatementFor_value :: ForStatement ctxt a
+  { _compoundStatementFor_value :: ForStatement lctxt ctxt a
   , _compoundStatement_ann :: a
   }
   | CompoundStatementTry
-  { _compoundStatementTry_value :: TryStatement ctxt a
+  { _compoundStatementTry_value :: TryStatement lctxt ctxt a
   , _compoundStatement_ann :: a
   }
   | CompoundStatementWith
-  { _compoundStatementWith_value :: WithStatement ctxt a
+  { _compoundStatementWith_value :: WithStatement lctxt ctxt a
   , _compoundStatement_ann :: a
   }
   | CompoundStatementFuncDef
@@ -70,14 +74,14 @@ data CompoundStatement (ctxt :: ExprContext) a
   , _compoundStatement_ann :: a
   }
   | CompoundStatementAsync
-  { _compoundStatementAsyncIf_value :: AsyncStatement ctxt a
+  { _compoundStatementAsyncIf_value :: AsyncStatement lctxt ctxt a
   , _compoundStatement_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (CompoundStatement ctxt a)
-deriving instance Show a => Show (CompoundStatement ctxt a)
+deriving instance Eq a => Eq (CompoundStatement lctxt ctxt a)
+deriving instance Show a => Show (CompoundStatement lctxt ctxt a)
 
-data Decorated (ctxt :: ExprContext) a
+data Decorated (ctxt :: DefinitionContext) a
   = Decorated
   { _decorated_decorators :: Compose NonEmpty (Decorator ctxt) a
   , _decorated_body :: Sum (Sum (ClassDef ctxt) (FuncDef ctxt)) (AsyncFuncDef ctxt) a
@@ -87,7 +91,7 @@ data Decorated (ctxt :: ExprContext) a
 deriving instance Eq a => Eq (Decorated ctxt a)
 deriving instance Show a => Show (Decorated ctxt a)
 
-data AsyncFuncDef (ctxt :: ExprContext) a
+data AsyncFuncDef (ctxt :: DefinitionContext) a
   = AsyncFuncDef
   { _asyncFuncDef_value
     :: Compose
@@ -100,7 +104,7 @@ data AsyncFuncDef (ctxt :: ExprContext) a
 deriving instance Eq a => Eq (AsyncFuncDef ctxt a)
 deriving instance Show a => Show (AsyncFuncDef ctxt a)
 
-data Decorator (ctxt :: ExprContext) a
+data Decorator (ctxt :: DefinitionContext) a
   = Decorator
   { _decorator_name
     :: Compose
@@ -123,7 +127,7 @@ data Decorator (ctxt :: ExprContext) a
 deriving instance Eq a => Eq (Decorator ctxt a)
 deriving instance Show a => Show (Decorator ctxt a)
 
-data ClassDef (ctxt :: ExprContext) a
+data ClassDef (ctxt :: DefinitionContext) a
   = ClassDef
   { _classDef_name
     :: Compose
@@ -144,7 +148,7 @@ data ClassDef (ctxt :: ExprContext) a
   , _classDef_body
     :: Compose
          (Before (Between' [WhitespaceChar] Colon))
-         (Suite ctxt)
+         (Suite 'NotInLoop ctxt)
          a
   , _classDef_ann :: a
   }
@@ -152,9 +156,9 @@ data ClassDef (ctxt :: ExprContext) a
 deriving instance Eq a => Eq (ClassDef ctxt a)
 deriving instance Show a => Show (ClassDef ctxt a)
 
-data Suite (ctxt :: ExprContext) a
+data Suite (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   = SuiteSingle
-  { _suiteSingle_value :: SimpleStatement ctxt a
+  { _suiteSingle_value :: SimpleStatement lctxt ctxt a
   , _suite_ann :: a
   }
   | SuiteMulti
@@ -164,15 +168,15 @@ data Suite (ctxt :: ExprContext) a
          NonEmpty
          (Compose
            (Before (NonEmpty IndentationChar))
-           (Statement ctxt))
+           (Statement lctxt ctxt))
          a
   , _suiteMulti_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (Suite ctxt a)
-deriving instance Show a => Show (Suite ctxt a)
+deriving instance Eq a => Eq (Suite lctxt ctxt a)
+deriving instance Show a => Show (Suite lctxt ctxt a)
 
-data FuncDef (ctxt :: ExprContext) a
+data FuncDef (ctxt :: DefinitionContext) (a :: *)
   = FuncDef
   { _funcDef_name
     :: Compose
@@ -194,7 +198,7 @@ data FuncDef (ctxt :: ExprContext) a
   , _funcDef_body
     :: Compose
          (Before (Between' [WhitespaceChar] Colon))
-         (Suite ctxt)
+         (Suite 'NotInLoop ('FunDef 'Normal))
          a
   , _funcDef_ann :: a
   }
@@ -202,7 +206,7 @@ data FuncDef (ctxt :: ExprContext) a
 deriving instance Eq a => Eq (FuncDef ctxt a)
 deriving instance Show a => Show (FuncDef ctxt a)
 
-data Parameters (ctxt :: ExprContext) a
+data Parameters (ctxt :: DefinitionContext) a
   = Parameters
   { _parameters_value
     :: Compose
@@ -233,7 +237,7 @@ data TypedArg a
 deriving instance Eq a => Eq (TypedArg a)
 deriving instance Show a => Show (TypedArg a)
 
-data WithStatement (ctxt :: ExprContext) a
+data WithStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   = WithStatement
   { _withStatement_itemHead
     :: Compose
@@ -250,15 +254,15 @@ data WithStatement (ctxt :: ExprContext) a
   , _withStatement_suite
     :: Compose
          (Before (Between' [WhitespaceChar] Colon))
-         (Suite ctxt)
+         (Suite lctxt ctxt)
          a
   , _withStatement_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (WithStatement ctxt a)
-deriving instance Show a => Show (WithStatement ctxt a)
+deriving instance Eq a => Eq (WithStatement lctxt ctxt a)
+deriving instance Show a => Show (WithStatement lctxt ctxt a)
 
-data WithItem (ctxt :: ExprContext) a
+data WithItem (ctxt :: DefinitionContext) a
   = WithItem
   { _withItem_left :: Test 'NotAssignable ctxt a
   , _withItem_right
@@ -274,24 +278,26 @@ data WithItem (ctxt :: ExprContext) a
 deriving instance Eq a => Eq (WithItem ctxt a)
 deriving instance Show a => Show (WithItem ctxt a)
 
-data AsyncStatement (ctxt :: ExprContext) a where
+data AsyncStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
   AsyncStatement ::
     { _asyncStatement_value
       :: Compose
           (Before (NonEmpty WhitespaceChar))
           (Sum
-            (Sum (FuncDef ('FunDef 'Async)) (WithStatement ('FunDef 'Async)))
-            (ForStatement ('FunDef 'Async)))
+            (Sum
+              (FuncDef ('FunDef 'Async))
+              (WithStatement lctxt ('FunDef 'Async)))
+            (ForStatement lctxt ('FunDef 'Async)))
           a
     , _asyncStatement_ann :: a
-    } -> AsyncStatement ('FunDef 'Async) a
-deriving instance Functor (AsyncStatement ctxt)
-deriving instance Foldable (AsyncStatement ctxt)
-deriving instance Traversable (AsyncStatement ctxt)
-deriving instance Eq a => Eq (AsyncStatement ctxt a)
-deriving instance Show a => Show (AsyncStatement ctxt a)
+    } -> AsyncStatement lctxt ('FunDef 'Async) a
+deriving instance Functor (AsyncStatement lctxt ctxt)
+deriving instance Foldable (AsyncStatement lctxt ctxt)
+deriving instance Traversable (AsyncStatement lctxt ctxt)
+deriving instance Eq a => Eq (AsyncStatement lctxt ctxt a)
+deriving instance Show a => Show (AsyncStatement lctxt ctxt a)
 
-data IfStatement (ctxt :: ExprContext) a
+data IfStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   = IfStatement
   { _ifStatement_cond
     :: Compose
@@ -301,7 +307,7 @@ data IfStatement (ctxt :: ExprContext) a
   , _ifStatement_then
     :: Compose
          (Before (Between' [WhitespaceChar] Colon))
-         (Suite ctxt)
+         (Suite lctxt ctxt)
          a
   , _ifStatement_elifs
     :: Compose
@@ -312,22 +318,22 @@ data IfStatement (ctxt :: ExprContext) a
              (Test 'NotAssignable ctxt))
            (Compose
              (Before (Between' [WhitespaceChar] Colon))
-             (Suite ctxt)))
+             (Suite lctxt ctxt)))
          a
   , _ifStatement_else
     :: Compose
          Maybe
          (Compose
            (Before (Between' [WhitespaceChar] Colon))
-           (Suite ctxt))
+           (Suite lctxt ctxt))
          a
   , _ifStatement_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (IfStatement ctxt a)
-deriving instance Show a => Show (IfStatement ctxt a)
+deriving instance Eq a => Eq (IfStatement lctxt ctxt a)
+deriving instance Show a => Show (IfStatement lctxt ctxt a)
 
-data WhileStatement (ctxt :: ExprContext) a
+data WhileStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   = WhileStatement
   { _whileStatement_cond
     :: Compose
@@ -337,22 +343,22 @@ data WhileStatement (ctxt :: ExprContext) a
   , _whileStatement_body
     :: Compose
          (Before (Between' [WhitespaceChar] Colon))
-         (Suite ctxt)
+         (Suite 'InLoop ctxt)
          a
   , _whileStatement_else
     :: Compose
          Maybe
          (Compose
            (Before (Between' [WhitespaceChar] Colon))
-           (Suite ctxt))
+           (Suite lctxt ctxt))
          a
   , _whileStatement_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (WhileStatement ctxt a)
-deriving instance Show a => Show (WhileStatement ctxt a)
+deriving instance Eq a => Eq (WhileStatement lctxt ctxt a)
+deriving instance Show a => Show (WhileStatement lctxt ctxt a)
 
-data ForStatement (ctxt :: ExprContext) a
+data ForStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   = ForStatement
   { _forStatement_for
     :: Compose
@@ -367,27 +373,27 @@ data ForStatement (ctxt :: ExprContext) a
   , _forStatement_body
     :: Compose
          (Before (Between' [WhitespaceChar] Colon))
-         (Suite ctxt)
+         (Suite 'InLoop ctxt)
          a
   , _forStatement_else
     :: Compose
          Maybe
          (Compose
            (Before (Between' [WhitespaceChar] Colon))
-           (Suite ctxt))
+           (Suite lctxt ctxt))
          a
   , _forStatement_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (ForStatement ctxt a)
-deriving instance Show a => Show (ForStatement ctxt a)
+deriving instance Eq a => Eq (ForStatement lctxt ctxt a)
+deriving instance Show a => Show (ForStatement lctxt ctxt a)
 
-data TryStatement (ctxt :: ExprContext) a
+data TryStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   = TryStatementExcepts
   { _tryStatement_try
     :: Compose
          (Before (Between' [WhitespaceChar] Colon))
-         (Suite ctxt)
+         (Suite lctxt ctxt)
          a
   , _tryStatementExcepts_excepts
     :: Compose
@@ -396,21 +402,21 @@ data TryStatement (ctxt :: ExprContext) a
            (ExceptClause ctxt)
            (Compose
              (Before (Between' [WhitespaceChar] Colon))
-             (Suite ctxt)))
+             (Suite lctxt ctxt)))
          a
   , _tryStatementExcepts_else
     :: Compose
          Maybe
          (Compose
            (Before (Between' [WhitespaceChar] Colon))
-           (Suite ctxt))
+           (Suite lctxt ctxt))
          a
   , _tryStatementExcepts_finally
     :: Compose
          Maybe
          (Compose
            (Before (Between' [WhitespaceChar] Colon))
-           (Suite ctxt))
+           (Suite lctxt ctxt))
          a
   , _tryStatement_ann :: a
   }
@@ -418,20 +424,20 @@ data TryStatement (ctxt :: ExprContext) a
   { _tryStatement_try
     :: Compose
          (Before (Between' [WhitespaceChar] Colon))
-         (Suite ctxt)
+         (Suite lctxt ctxt)
          a
   , _tryStatementFinally_finally
     :: Compose
          (Before (Between' [WhitespaceChar] Colon))
-         (Suite ctxt)
+         (Suite lctxt ctxt)
          a
   , _tryStatement_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (TryStatement ctxt a)
-deriving instance Show a => Show (TryStatement ctxt a)
+deriving instance Eq a => Eq (TryStatement lctxt ctxt a)
+deriving instance Show a => Show (TryStatement lctxt ctxt a)
 
-data ExceptClause (ctxt :: ExprContext) a
+data ExceptClause (ctxt :: DefinitionContext) a
   = ExceptClause
   { _exceptClause_value
     :: Compose
@@ -450,146 +456,159 @@ data ExceptClause (ctxt :: ExprContext) a
 deriving instance Eq a => Eq (ExceptClause ctxt a)
 deriving instance Show a => Show (ExceptClause ctxt a)
 
-data SimpleStatement (ctxt :: ExprContext) a
+data SimpleStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   = SimpleStatement
-  { _simpleStatement_head :: SmallStatement ctxt a
+  { _simpleStatement_head :: SmallStatement lctxt ctxt a
   , _simpleStatement_tail
     :: Compose
          []
          (Compose
            (Before (Between' [WhitespaceChar] Semicolon))
-           (SmallStatement ctxt))
+           (SmallStatement lctxt ctxt))
          a
   , _simpleStatement_semicolon :: Maybe (Before [WhitespaceChar] Semicolon)
   , _simpleStatement_newline :: Before [WhitespaceChar] NewlineChar
   , _simpleStatement_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (SimpleStatement ctxt a)
-deriving instance Show a => Show (SimpleStatement ctxt a)
+deriving instance Eq a => Eq (SimpleStatement lctxt ctxt a)
+deriving instance Show a => Show (SimpleStatement lctxt ctxt a)
 
-data AugAssign
-  = PlusEquals
-  | MinusEquals
-  | StarEquals
-  | AtEquals
-  | SlashEquals
-  | PercentEquals
-  | AmphersandEquals
-  | PipeEquals
-  | CaretEquals
-  | ShiftLeftEquals
-  | ShiftRightEquals
-  | DoubleStarEquals
-  | DoubleSlashEquals
-  deriving (Eq, Show)
+data SmallStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
+  SmallStatementExpr ::
+    { _smallStatementExpr_left :: TestlistStarExpr 'Assignable ctxt a
+    , _smallStatementExpr_right
+      :: Sum
+          (Compose
+            (Before (Between' [WhitespaceChar] AugAssign))
+            (Sum YieldExpr (TestList 'NotAssignable ctxt)))
+          (Compose
+            []
+            (Compose
+              (Before (Between' [WhitespaceChar] Equals))
+              (Sum YieldExpr (TestlistStarExpr 'NotAssignable ctxt))))
+          a
+    , _smallStatement_ann :: a
+    } -> SmallStatement lctxt ctxt a
 
-data SmallStatement (ctxt :: ExprContext) a
-  = SmallStatementExpr
-  { _smallStatementExpr_left :: TestlistStarExpr 'Assignable ctxt a
-  , _smallStatementExpr_right
-    :: Sum
-         (Compose
-           (Before (Between' [WhitespaceChar] AugAssign))
-           (Sum YieldExpr (TestList 'NotAssignable ctxt)))
-         (Compose
-           []
-           (Compose
-             (Before (Between' [WhitespaceChar] Equals))
-             (Sum YieldExpr (TestlistStarExpr 'NotAssignable ctxt))))
-         a
-  , _smallStatement_ann :: a
-  }
-  | SmallStatementDel
-  { _smallStatementDel_value
-    :: Compose
-         (Before (NonEmpty WhitespaceChar))
-         (ExprList 'Assignable ctxt)
-         a
-  , _smallStatement_ann :: a
-  }
-  | SmallStatementPass
-  { _smallStatement_ann :: a
-  }
-  | SmallStatementFlow
-  { _smallStatementFlow_value :: FlowStatement ctxt a
-  , _smallStatement_ann :: a
-  }
-  | SmallStatementImport
-  { _smallStatementImport_value :: ImportStatement a
-  , _smallStatement_ann :: a
-  }
-  | SmallStatementGlobal
-  { _smallStatementGlobal_head :: Identifier a
-  , _smallStatementGlobal_tail
-    :: Compose
+  SmallStatementDel ::
+    { _smallStatementDel_value
+      :: Compose
+          (Before (NonEmpty WhitespaceChar))
+          (ExprList 'Assignable ctxt)
+          a
+    , _smallStatement_ann :: a
+    } -> SmallStatement lctxt ctxt a
+
+  SmallStatementPass ::
+    { _smallStatement_ann :: a
+    } -> SmallStatement lctxt ctxt a
+
+  SmallStatementFlow ::
+    { _smallStatementFlow_value :: FlowStatement lctxt ctxt a
+    , _smallStatement_ann :: a
+    } -> SmallStatement lctxt ctxt a
+
+  SmallStatementImport ::
+    { _smallStatementImport_value :: ImportStatement a
+    , _smallStatement_ann :: a
+    } -> SmallStatement lctxt ctxt a
+
+  SmallStatementGlobal ::
+    { _smallStatementGlobal_head :: Identifier a
+    , _smallStatementGlobal_tail
+      :: Compose
+          []
+          (Compose
+            (Before (Between' [WhitespaceChar] Comma))
+            Identifier)
+          a
+    , _smallStatement_ann :: a
+    } -> SmallStatement lctxt ctxt a
+
+  SmallStatementNonlocal
+    :: ((ctxt :== 'TopLevel) ~ 'False)
+    => Identifier a
+    -> Compose
          []
          (Compose
            (Before (Between' [WhitespaceChar] Comma))
            Identifier)
          a
-  , _smallStatement_ann :: a
-  }
-  | SmallStatementNonlocal
-  { _smallStatementNonLocal_head :: Identifier a
-  , _smallStatementNonLocal_tail
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           Identifier)
-         a
-  , _smallStatement_ann :: a
-  }
-  | SmallStatementAssert
-  { _smallStatementAssert_head :: Test 'NotAssignable ctxt a
-  , _smallStatementAssert_tail
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (Test 'NotAssignable ctxt))
-         a
-  , _smallStatement_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (SmallStatement ctxt a)
-deriving instance Show a => Show (SmallStatement ctxt a)
+    -> a
+    -> SmallStatement lctxt ctxt a
 
-data FlowStatement (ctxt :: ExprContext) a
-  = FlowStatementBreak
-  { _flowStatement_ann :: a
-  }
-  | FlowStatementContinue
-  { _flowStatement_ann :: a
-  }
-  | FlowStatementReturn
-  { _flowStatementReturn_value
-    :: Compose
-         Maybe
-         (Compose
-           (Before (NonEmpty WhitespaceChar))
-           (TestList 'NotAssignable ctxt))
-         a
-  , _flowStatement_ann :: a
-  }
-  | FlowStatementRaise
-  { _flowStatementRaise_value
-    :: Compose
-         Maybe
-         (Compose
-           (Before (NonEmpty WhitespaceChar))
-           (RaiseStatement ctxt))
-         a
-  , _flowStatement_ann :: a
-  }
-  | FlowStatementYield
-  { _flowStatementYield_value :: YieldExpr a
-  , _flowStatement_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (FlowStatement ctxt a)
-deriving instance Show a => Show (FlowStatement ctxt a)
+  SmallStatementAssert ::
+    { _smallStatementAssert_head :: Test 'NotAssignable ctxt a
+    , _smallStatementAssert_tail
+      :: Compose
+          []
+          (Compose
+            (Before (Between' [WhitespaceChar] Comma))
+            (Test 'NotAssignable ctxt))
+          a
+    , _smallStatement_ann :: a
+    } -> SmallStatement lctxt ctxt a
+
+deriving instance Functor (SmallStatement lctxt ctxt)
+deriving instance Foldable (SmallStatement lctxt ctxt)
+deriving instance Traversable (SmallStatement lctxt ctxt)
+deriving instance Eq a => Eq (SmallStatement lctxt ctxt a)
+deriving instance Show a => Show (SmallStatement lctxt ctxt a)
+
+_smallStatementNonlocal_head :: SmallStatement lctxt ctxt a -> Identifier a
+_smallStatementNonlocal_head (SmallStatementNonlocal a _ _) = a
+
+_smallStatementNonlocal_tail
+  :: SmallStatement lctxt ctxt a
+  -> Compose
+      []
+      (Compose
+        (Before (Between' [WhitespaceChar] Comma))
+        Identifier)
+      a
+_smallStatementNonlocal_tail (SmallStatementNonlocal _ a _) = a
+
+_smallStatementNonlocal_ann :: SmallStatement lctxt ctxt a -> a
+_smallStatementNonlocal_ann (SmallStatementNonlocal _ _ a) = a
+
+data FlowStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
+  FlowStatementBreak ::
+    { _flowStatementBreak_ann :: a
+    } -> FlowStatement 'InLoop ctxt a
+  FlowStatementContinue ::
+    { _flowStatementContinue_ann :: a
+    } -> FlowStatement 'InLoop ctxt a
+  FlowStatementReturn ::
+    { _flowStatementReturn_value
+      :: Compose
+          Maybe
+          (Compose
+            (Before (NonEmpty WhitespaceChar))
+            (TestList 'NotAssignable ('FunDef b)))
+          a
+    , _flowStatementReturn_ann :: a
+    } -> FlowStatement lctxt ('FunDef b) a
+  FlowStatementRaise ::
+    { _flowStatementRaise_value
+      :: Compose
+          Maybe
+          (Compose
+            (Before (NonEmpty WhitespaceChar))
+            (RaiseStatement ctxt))
+          a
+    , _flowStatementRaise_ann :: a
+    } -> FlowStatement lctxt ctxt a
+  FlowStatementYield ::
+    { _flowStatementYield_value :: YieldExpr a
+    , _flowStatementYield_ann :: a
+    } -> FlowStatement lctxt ('FunDef 'Normal) a
+
+deriving instance Functor (FlowStatement lctxt ctxt)
+deriving instance Foldable (FlowStatement lctxt ctxt)
+deriving instance Traversable (FlowStatement lctxt ctxt)
+deriving instance Eq a => Eq (FlowStatement lctxt ctxt a)
+deriving instance Show a => Show (FlowStatement lctxt ctxt a)
 
 data ImportStatement a
   = ImportStatementName
@@ -602,7 +621,7 @@ data ImportStatement a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-data RaiseStatement (ctxt :: ExprContext) a
+data RaiseStatement (ctxt :: DefinitionContext) a
   = RaiseStatement
   { _raiseStatement_left :: Test 'NotAssignable ctxt a
   , _raiseStatement_right
@@ -732,7 +751,7 @@ data DottedName a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-data TestlistStarExpr (assignable :: AtomType) (ctxt :: ExprContext) a
+data TestlistStarExpr (assignable :: AtomType) (ctxt :: DefinitionContext) a
   = TestlistStarExpr
   { _testlistStarExpr_head
     :: Sum (Test assignable ctxt) (StarExpr assignable ctxt) a

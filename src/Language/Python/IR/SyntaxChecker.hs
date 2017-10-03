@@ -39,6 +39,7 @@ data SyntaxError a
   -- ^ (*a)
   | UnpackingInParens a
   | DuplicateArguments [Identifier a] a
+  | NonlocalAtModuleLevel a
   deriving (Eq, Show, Ord)
 
 newtype SyntaxChecker ann a

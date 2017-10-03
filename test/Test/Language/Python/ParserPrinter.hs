@@ -21,7 +21,7 @@ import qualified Text.PrettyPrint.ANSI.Leijen as WL
 import qualified Text.PrettyPrint as HPJ
 
 import Language.Python.IR.SyntaxChecker
-import Language.Python.IR.SyntaxConfig
+import Language.Python.IR.ExprConfig
 
 import qualified Language.Python.Expr.AST as AST
 import qualified Language.Python.AST.Identifier as AST
@@ -45,11 +45,11 @@ parse_print_expr_id input =
         checkResult =
           (fmap Print.test . runChecker $
             Check.checkTest
-              (SyntaxConfig SNotAssignable STopLevel)
+              (ExprConfig SNotAssignable STopLevel)
               unchecked) <!>
           (fmap Print.test . runChecker $
             Check.checkTest
-              (SyntaxConfig SAssignable STopLevel)
+              (ExprConfig SAssignable STopLevel)
               unchecked)
       in
         case checkResult of
@@ -116,7 +116,7 @@ prop_ast_is_valid_python assignability =
       forAll .
       Gen.resize 100 .
       GenAST.genTest $
-      SyntaxConfig assignability STopLevel
+      ExprConfig assignability STopLevel
     let program = HPJ.render $ Print.test expr
     res <- liftIO $ checkSyntax program
     case res of

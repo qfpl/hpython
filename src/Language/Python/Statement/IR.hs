@@ -20,6 +20,7 @@ import Language.Python.AST.Symbols
 import Language.Python.Expr.IR
 import Language.Python.IR.ArgsList
 import Language.Python.Statement.AST.AugAssign
+import Language.Python.Statement.AST.DottedName
 
 data Statement a
   = StatementSimple
@@ -278,7 +279,7 @@ data AsyncStatement a
     :: Compose
          (Before (NonEmpty WhitespaceChar))
          (Sum
-           (Sum FuncDef WhileStatement)
+           (Sum FuncDef WithStatement)
            ForStatement)
          a
   , _asyncStatement_ann :: a
@@ -698,20 +699,6 @@ data DottedAsName a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-data DottedName a
-  = DottedName
-  { _dottedName_head :: Identifier a
-  , _dottedName_tail
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [WhitespaceChar] Dot))
-           Identifier)
-         a
-  , _dottedName_ann :: a
-  }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-
 data TestlistStarExpr a
   = TestlistStarExpr
   { _testlistStarExpr_head
@@ -747,10 +734,6 @@ deriveShow1 ''DottedAsName
 makeLenses ''ImportAsName
 deriveEq1 ''ImportAsName
 deriveShow1 ''ImportAsName
-
-makeLenses ''DottedName
-deriveEq1 ''DottedName
-deriveShow1 ''DottedName
 
 makeLenses ''DottedAsNames
 deriveEq1 ''DottedAsNames

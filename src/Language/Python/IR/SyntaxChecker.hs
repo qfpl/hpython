@@ -40,6 +40,10 @@ data SyntaxError a
   | UnpackingInParens a
   | DuplicateArguments [Identifier a] a
   | NonlocalAtModuleLevel a
+  | AsyncNotInAsyncFunction a
+  | ReturnOutsideFunction a
+  | BreakOutsideLoop a
+  | ContinueOutsideLoop a
   deriving (Eq, Show, Ord)
 
 newtype SyntaxChecker ann a

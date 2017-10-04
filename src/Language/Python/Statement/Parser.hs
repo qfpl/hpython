@@ -17,6 +17,7 @@ import Language.Python.Parser.SrcInfo
 import Language.Python.Parser.Symbols
 import Language.Python.Statement.IR
 import Language.Python.Statement.Parser.AugAssign
+import Language.Python.Statement.Parser.DottedName
 
 import Text.Parser.Unspaced
 
@@ -144,13 +145,6 @@ dottedAsName =
   dottedName <*>
   optionalF (try $ beforeF (betweenWhitespace1 kAs) identifier)
 
-dottedName :: DeltaParsing m => Unspaced m (DottedName SrcInfo)
-dottedName =
-  annotated $
-  DottedName <$>
-  identifier <*>
-  manyF (beforeF (betweenWhitespace dot) identifier)
-
 importName :: DeltaParsing m => Unspaced m (ImportName SrcInfo)
 importName =
   annotated $
@@ -248,7 +242,7 @@ asyncStatement =
   (string "async" *>
    whitespaceBefore1F
      ((InL . InL <$> try funcDef) <|>
-      (InL . InR <$> try whileStatement) <|>
+      (InL . InR <$> try withStatement) <|>
       (InR <$> forStatement)))
 
 asyncFuncDef

@@ -70,12 +70,14 @@ library
                        Language.Python.Printer.Combinators
                        Language.Python.Printer.Keywords
                        Language.Python.Printer.Symbols
-                       Language.Python.Statement.AST
                        Language.Python.Statement.AST.AugAssign
+                       Language.Python.Statement.AST.DottedName
+                       Language.Python.Statement.AST.Imports
                        Language.Python.Statement.IR
                        -- Language.Python.Statement.IR.Checker
                        Language.Python.Statement.Parser
                        Language.Python.Statement.Parser.AugAssign
+                       Language.Python.Statement.Parser.DottedName
                        Data.Functor.Sum.Lens
                        Data.Separated.After
                        Data.Separated.Before

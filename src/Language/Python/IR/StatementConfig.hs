@@ -14,9 +14,9 @@ data LoopContext = InLoop | NotInLoop
 genSingletons [''LoopContext]
 promoteEqInstances [''LoopContext]
 
-data StatementConfig loopContext
+data StatementConfig (loopContext :: LoopContext)
   = StatementConfig
-  { _loopContext :: loopContext
+  { _loopContext :: SLoopContext loopContext
   }
 
 makeLenses ''StatementConfig

@@ -7,6 +7,7 @@ import Data.Validation
 import qualified Data.DList as D
 
 import Language.Python.AST.Identifier
+import Language.Python.AST.IndentedLines
 
 data InvalidLHS
   = LHSIf
@@ -44,6 +45,7 @@ data SyntaxError a
   | ReturnOutsideFunction a
   | BreakOutsideLoop a
   | ContinueOutsideLoop a
+  | IndentationError (IndentationError a)
   deriving (Eq, Show, Ord)
 
 newtype SyntaxChecker ann a

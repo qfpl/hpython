@@ -4,8 +4,8 @@ import Papa hiding (Sum, Product)
 import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
-import Text.Parser.LookAhead
 import Data.Separated.Before (Before(..))
+import Text.Parser.LookAhead
 import Text.Trifecta hiding (Unspaced(..), comma, dot, colon)
 import Language.Python.AST.Symbols
 import Language.Python.Expr.Parser
@@ -18,6 +18,7 @@ import Language.Python.Parser.Symbols
 import Language.Python.Statement.IR
 import Language.Python.Statement.Parser.AugAssign
 import Language.Python.Statement.Parser.DottedName
+import Language.Python.Statement.Parser.Imports
 
 import Text.Parser.Unspaced
 
@@ -124,69 +125,6 @@ smallStatement =
       SmallStatementAssert <$>
       test <*>
       manyF (beforeF (betweenWhitespace comma) test)
-
-importStatement :: DeltaParsing m => Unspaced m (ImportStatement SrcInfo)
-importStatement =
-  annotated $
-  try (ImportStatementName <$> importName) <|>
-  (ImportStatementFrom <$> importFrom)
-
-dottedAsNames :: DeltaParsing m => Unspaced m (DottedAsNames SrcInfo)
-dottedAsNames =
-  annotated $
-  DottedAsNames <$>
-  dottedAsName <*>
-  manyF (beforeF (betweenWhitespace comma) dottedAsName)
-
-dottedAsName :: DeltaParsing m => Unspaced m (DottedAsName SrcInfo)
-dottedAsName =
-  annotated $
-  DottedAsName <$>
-  dottedName <*>
-  optionalF (try $ beforeF (betweenWhitespace1 kAs) identifier)
-
-importName :: DeltaParsing m => Unspaced m (ImportName SrcInfo)
-importName =
-  annotated $
-  ImportName <$>
-  whitespaceBefore1F dottedAsNames
-
-importFrom :: DeltaParsing m => Unspaced m (ImportFrom SrcInfo)
-importFrom =
-  annotated $
-  ImportFrom <$>
-  (string "from" *> fromPart) <*>
-  (string "import" *> importPart)
-  where
-    dotOrEllipsis = (Left <$> try dot) <|> (Right <$> ellipsis)
-    fromPart =
-      (InL <$>
-        try (beforeF (many $ betweenWhitespace dotOrEllipsis) dottedName)) <|>
-      (InR . Const <$>
-        some1 dotOrEllipsis)
-
-    importPart =
-      whitespaceBefore1F $
-      try (InL . InL . Const <$> asterisk) <|>
-      try
-        (InL . InR <$>
-          betweenF leftParen rightParen (betweenWhitespaceF importAsNames)) <|>
-       (InR <$> importAsNames)
-
-importAsNames :: DeltaParsing m => Unspaced m (ImportAsNames SrcInfo)
-importAsNames =
-  annotated $
-  ImportAsNames <$>
-  importAsName <*>
-  manyF (beforeF (betweenWhitespace comma) importAsName) <*>
-  optional (try $ betweenWhitespace comma)
-
-importAsName :: DeltaParsing m => Unspaced m (ImportAsName SrcInfo)
-importAsName =
-  annotated $
-  ImportAsName <$>
-  identifier <*>
-  optionalF (try $ beforeF (betweenWhitespace1 kAs) identifier)
 
 flowStatement
   :: ( LookAheadParsing m

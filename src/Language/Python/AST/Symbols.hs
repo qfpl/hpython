@@ -30,13 +30,13 @@ data Char_J = Char_J deriving (Eq, Show)
 data Zero = Zero deriving (Eq, Show)
 data LeftParen = LeftParen deriving (Eq, Show)
 data RightParen = RightParen deriving (Eq, Show)
-data NewlineChar = CR | LF | CRLF deriving (Eq, Show)
+data NewlineChar = CR | LF | CRLF deriving (Eq, Show, Ord)
 data WhitespaceChar = Space | Tab | Continued NewlineChar deriving (Eq, Show)
 data IndentationChar
   = IndentSpace
   | IndentTab
   | IndentContinued NewlineChar [IndentationChar]
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 data Comma = Comma deriving (Eq, Show)
 data Hash = Hash deriving (Eq, Show)
 data Colon = Colon deriving (Eq, Show)

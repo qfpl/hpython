@@ -4,7 +4,7 @@
 {-# language KindSignatures #-}
 {-# language StandaloneDeriving #-}
 {-# language TemplateHaskell #-}
-module Language.Python.AST.Imports where
+module Language.Python.Statement.AST.Imports where
 
 import Papa hiding (Sum)
 import Data.Deriving

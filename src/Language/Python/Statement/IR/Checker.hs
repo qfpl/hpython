@@ -6,6 +6,7 @@
 module Language.Python.Statement.IR.Checker where
 
 import Papa hiding (Sum, Product)
+import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Functor.Sum.Lens
@@ -14,8 +15,9 @@ import Data.Separated.Before
 import qualified Language.Python.Statement.AST as Safe
 import qualified Language.Python.Statement.IR as IR
 
-import Language.Python.IR.Checker.ArgsList
+import Language.Python.AST.IndentedLines
 import Language.Python.Expr.IR.Checker
+import Language.Python.IR.Checker.ArgsList
 import Language.Python.IR.ExprConfig
 import Language.Python.IR.SyntaxChecker
 import Language.Python.IR.StatementConfig
@@ -511,11 +513,37 @@ checkTestlistStarExpr
   :: ExprConfig assignable ctxt
   -> IR.TestlistStarExpr ann
   -> SyntaxChecker ann (Safe.TestlistStarExpr assignable ctxt ann)
-checkTestlistStarExpr cfg s = _
+checkTestlistStarExpr ecfg (IR.TestlistStarExpr h t c ann) =
+  Safe.TestlistStarExpr <$>
+  testOrStar ecfg h <*>
+  traverseOf
+    (_Wrapped.traverse._Wrapped.traverse)
+    (testOrStar ecfg)
+    t <*>
+  pure c <*>
+  pure ann
+  where
+    testOrStar ecfg' (InL a) = InL <$> checkTest ecfg a
+    testOrStar ecfg' (InR a) = InR <$> checkStarExpr ecfg a
 
 checkSuite
   :: ExprConfig assignable dctxt
   -> StatementConfig lctxt
   -> IR.Suite ann
   -> SyntaxChecker ann (Safe.Suite lctxt dctxt ann)
-checkSuite ecfg scfg s = _
+checkSuite ecfg scfg s =
+  case s of
+    IR.SuiteSingle v ann ->
+      Safe.SuiteSingle <$>
+      checkSimpleStatement ecfg scfg v <*>
+      pure ann
+    IR.SuiteMulti n ls ann ->
+      Safe.SuiteMulti n <$>
+      traverseOf
+        _Wrapped
+        (liftError (IndentationError . ($ ann)) .
+         fmap mkIndentationLines .
+         traverseOf (traverse._2) (checkStatement ecfg scfg) .
+         fmap (view before . getCompose))
+        ls <*>
+      pure ann

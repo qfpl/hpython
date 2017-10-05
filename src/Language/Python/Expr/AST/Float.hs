@@ -7,6 +7,7 @@ module Language.Python.Expr.AST.Float where
 import Papa
 import Data.Deriving
 import Data.Functor.Compose
+import Data.Orphans.NonEmpty
 import Data.Separated.Before
 
 import Language.Python.AST.Symbols
@@ -33,9 +34,6 @@ data Float' a
   , _float_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-
-deriveEq1 ''NonEmpty
-deriveShow1 ''NonEmpty
 
 deriveEq ''Float'
 deriveShow ''Float'

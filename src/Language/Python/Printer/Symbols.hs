@@ -57,3 +57,6 @@ asterisk _ = char '*'
 
 doubleAsterisk :: DoubleAsterisk -> Doc
 doubleAsterisk _ = text "**"
+
+semicolon :: Semicolon -> Doc
+semicolon _ = text ";"

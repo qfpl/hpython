@@ -22,8 +22,8 @@ library
                        Language.Python.AST.ArgsList
                        Language.Python.AST.Comment
                        Language.Python.AST.Identifier
+                       Language.Python.AST.IndentedLines
                        Language.Python.AST.Keywords
-                       Language.Python.AST.StatementList
                        Language.Python.AST.Symbols
                        Language.Python.Expr.AST
                        Language.Python.Expr.AST.BytesLiteral
@@ -74,7 +74,7 @@ library
                        Language.Python.Statement.AST.DottedName
                        Language.Python.Statement.AST.Imports
                        Language.Python.Statement.IR
-                       -- Language.Python.Statement.IR.Checker
+                       Language.Python.Statement.IR.Checker
                        Language.Python.Statement.Parser
                        Language.Python.Statement.Parser.AugAssign
                        Language.Python.Statement.Parser.DottedName
@@ -82,6 +82,7 @@ library
                        Data.Separated.After
                        Data.Separated.Before
                        Data.Separated.Between
+                       Data.Orphans.NonEmpty
                        Text.Parser.Unspaced
   build-depends:       base >=4.9 && <4.10
                      , text >= 1.2 && <1.3

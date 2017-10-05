@@ -2,8 +2,10 @@
 {-# language DeriveFunctor #-}
 {-# language DeriveFoldable #-}
 {-# language DeriveTraversable #-}
+{-# language FlexibleInstances #-}
 {-# language GADTs #-}
 {-# language KindSignatures #-}
+{-# language MultiParamTypeClasses #-}
 {-# language StandaloneDeriving #-}
 {-# language TemplateHaskell #-}
 {-# language TypeOperators #-}
@@ -20,6 +22,7 @@ import Data.Singletons.Prelude ((:==))
 
 import Language.Python.AST.ArgsList
 import Language.Python.AST.Identifier
+import Language.Python.AST.IndentedLines
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.Expr.AST
@@ -166,12 +169,7 @@ data Suite (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   | SuiteMulti
   { _suiteMulti_newline :: NewlineChar
   , _suiteMulti_statements
-    :: Compose
-         NonEmpty
-         (Compose
-           (Before (NonEmpty IndentationChar))
-           (Statement lctxt ctxt))
-         a
+    :: Compose IndentedLines (Statement lctxt ctxt) a
   , _suiteMulti_ann :: a
   }
   deriving (Functor, Foldable, Traversable)

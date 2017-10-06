@@ -36,11 +36,9 @@ import Language.Python.Expr.AST.TermOperator
 import Language.Python.Expr.AST.StringContent (stringContent)
 import Language.Python.Printer.ArgsList
 import Language.Python.Printer.Combinators
+import Language.Python.Printer.Identifier
 import Language.Python.Printer.Keywords
 import Language.Python.Printer.Symbols
-
-identifier :: Identifier a -> Doc
-identifier i = i ^. identifier_value . to T.unpack . to text
 
 stringPrefix :: StringPrefix -> Doc
 stringPrefix sp =

@@ -3,7 +3,7 @@
 {-# language DeriveTraversable #-}
 {-# language KindSignatures #-}
 {-# language TemplateHaskell #-}
-module Language.Python.Statement.AST.DottedName where
+module Language.Python.AST.DottedName where
 
 import Papa
 import Data.Deriving

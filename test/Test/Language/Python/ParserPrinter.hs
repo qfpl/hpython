@@ -22,6 +22,7 @@ import qualified Text.PrettyPrint as HPJ
 
 import Language.Python.IR.SyntaxChecker
 import Language.Python.IR.ExprConfig
+import Language.Python.IR.StatementConfig
 
 import qualified Language.Python.Expr.AST as AST
 import qualified Language.Python.AST.Identifier as AST
@@ -31,6 +32,7 @@ import qualified Language.Python.Expr.Parser as Parse
 import qualified Language.Python.Expr.Printer as Print
 import qualified Language.Python.Expr.IR.Checker as Check
 import qualified Test.Language.Python.Expr.Gen as GenAST
+import qualified Test.Language.Python.Statement.Gen as GenAST
 
 import Text.Parser.Unspaced
 
@@ -107,10 +109,11 @@ checkSyntax input = do
       pure $ case errString of
         Just "Syntax" -> SyntaxError errorMsg
         Just "Indentation" -> SyntaxError errorMsg
+        Just "Tab" -> SyntaxError errorMsg
         _ -> SyntaxCorrect
 
-prop_ast_is_valid_python :: SAtomType atomType -> Property
-prop_ast_is_valid_python assignability =
+prop_expr_ast_is_valid_python :: SAtomType atomType -> Property
+prop_expr_ast_is_valid_python assignability =
   property $ do
     expr <-
       forAll .
@@ -118,6 +121,35 @@ prop_ast_is_valid_python assignability =
       GenAST.genTest $
       ExprConfig assignability STopLevel
     let program = HPJ.render $ Print.test expr
+    res <- liftIO $ checkSyntax program
+    case res of
+      SyntaxError pythonError -> do
+        footnote $
+          unlines
+          [ "Input string caused a syntax error."
+          , ""
+          , "Input string:"
+          , program
+          , "( " ++ show program ++ " )"
+          , ""
+          , "Error message:"
+          , ""
+          , pythonError
+          ]
+        failure
+      SyntaxCorrect -> success
+
+prop_statement_ast_is_valid_python
+  :: StatementConfig lctxt
+  -> ExprContext assignability dctxt
+  -> Property
+prop_statement_ast_is_valid_python scfg ecfg =
+  property $ do
+    st <-
+      forAll .
+      Gen.resize 100 .
+      GenAST.genStatement scfg ecfg
+    let program = HPJ.render $ Print.test st
     res <- liftIO $ checkSyntax program
     case res of
       SyntaxError pythonError -> do
@@ -173,10 +205,10 @@ makeParserPrinterTests = do
     spec = traverse_ (uncurry it) filesExpectations
     properties =
       [ testProperty
-          "AST is valid python - assignable" $
-          prop_ast_is_valid_python SAssignable
+          "Expression AST is valid python - assignable" $
+          prop_expr_ast_is_valid_python SAssignable
       , testProperty
-          "AST is valid python - not assignable" $
-          prop_ast_is_valid_python SNotAssignable
+          "Expression AST is valid python - not assignable" $
+          prop_expr_ast_is_valid_python SNotAssignable
       ]
   (properties ++ ) <$> liftA2 (++) (testSpecs regressions) (testSpecs spec)

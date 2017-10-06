@@ -7,6 +7,7 @@
 {-# language TemplateHaskell #-}
 module Language.Python.AST.IndentedLines
   ( IndentedLines
+  , getIndentedLines
   , IndentationError(..)
   , Indentable(..)
   , mkIndentationLines

@@ -13,3 +13,6 @@ kAnd = string "and" $> KAnd
 
 kAs :: CharParsing m => m KAs
 kAs = string "as" $> KAs
+
+kFrom :: CharParsing m => m KFrom
+kFrom = string "from" $> KFrom

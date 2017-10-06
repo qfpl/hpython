@@ -14,13 +14,13 @@ import Data.Functor.Sum
 import Data.Separated.Before
 import Data.Separated.Between
 
+import Language.Python.AST.DottedName
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.Expr.IR
 import Language.Python.IR.ArgsList
 import Language.Python.Statement.AST.AugAssign
-import Language.Python.Statement.AST.DottedName
 import Language.Python.Statement.AST.Imports
 
 data Statement a
@@ -502,7 +502,11 @@ data SmallStatement a
   , _smallStatement_ann :: a
   }
   | SmallStatementGlobal
-  { _smallStatementGlobal_head :: Identifier a
+  { _smallStatementGlobal_head
+    :: Compose
+         (Before (NonEmpty WhitespaceChar))
+         Identifier
+         a
   , _smallStatementGlobal_tail
     :: Compose
          []
@@ -513,7 +517,11 @@ data SmallStatement a
   , _smallStatement_ann :: a
   }
   | SmallStatementNonlocal
-  { _smallStatementNonLocal_head :: Identifier a
+  { _smallStatementNonLocal_head
+    :: Compose
+         (Before (NonEmpty WhitespaceChar))
+         Identifier
+         a
   , _smallStatementNonLocal_tail
     :: Compose
          []
@@ -524,10 +532,14 @@ data SmallStatement a
   , _smallStatement_ann :: a
   }
   | SmallStatementAssert
-  { _smallStatementAssert_head :: Test a
+  { _smallStatementAssert_head
+    :: Compose
+         (Before (NonEmpty WhitespaceChar))
+         Test
+         a
   , _smallStatementAssert_tail
     :: Compose
-         []
+         Maybe
          (Compose
            (Before (Between' [WhitespaceChar] Comma))
            Test)
@@ -580,8 +592,10 @@ data RaiseStatement a
     :: Compose
          Maybe
          (Compose
-           (Before (NonEmpty WhitespaceChar))
-           Test)
+           (Before KFrom)
+           (Compose
+             (Before (NonEmpty WhitespaceChar))
+             Test))
          a
   , _raiseStatement_ann :: a
   }

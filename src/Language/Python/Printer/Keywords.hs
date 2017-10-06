@@ -15,3 +15,9 @@ kAnd _ = text "and"
 
 kNot :: KNot -> Doc
 kNot _ = text "not"
+
+kAs :: KAs -> Doc
+kAs _ = text "as"
+
+kFrom :: KFrom -> Doc
+kFrom _ = text "from"

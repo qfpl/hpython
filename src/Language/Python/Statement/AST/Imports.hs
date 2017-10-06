@@ -13,10 +13,10 @@ import Data.Functor.Sum
 import Data.Separated.Before
 import Data.Separated.Between
 
+import Language.Python.AST.DottedName
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
-import Language.Python.Statement.AST.DottedName
 
 data ImportStatement a
   = ImportStatementName

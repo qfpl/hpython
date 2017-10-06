@@ -5,12 +5,12 @@ import Data.Functor.Sum
 import Text.Trifecta hiding (Unspaced(..), comma, dot, colon)
 
 import Language.Python.Parser.Combinators
+import Language.Python.Parser.DottedName
 import Language.Python.Parser.Identifier
 import Language.Python.Parser.Keywords
 import Language.Python.Parser.SrcInfo
 import Language.Python.Parser.Symbols
 import Language.Python.Statement.AST.Imports
-import Language.Python.Statement.Parser.DottedName
 
 import Text.Parser.Unspaced
 

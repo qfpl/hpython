@@ -21,13 +21,13 @@ import Data.Separated.Between
 import Data.Singletons.Prelude ((:==))
 
 import Language.Python.AST.ArgsList
+import Language.Python.AST.DottedName
 import Language.Python.AST.Identifier
 import Language.Python.AST.IndentedLines
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.Expr.AST
 import Language.Python.Statement.AST.AugAssign
-import Language.Python.Statement.AST.DottedName
 import Language.Python.Statement.AST.Imports
 import Language.Python.IR.ExprConfig
 import Language.Python.IR.StatementConfig
@@ -515,7 +515,11 @@ data SmallStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
     } -> SmallStatement lctxt ctxt a
 
   SmallStatementGlobal ::
-    { _smallStatementGlobal_head :: Identifier a
+    { _smallStatementGlobal_head
+      :: Compose
+           (Before (NonEmpty WhitespaceChar))
+           Identifier
+           a
     , _smallStatementGlobal_tail
       :: Compose
           []
@@ -528,7 +532,10 @@ data SmallStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
 
   SmallStatementNonlocal
     :: ((ctxt :== 'TopLevel) ~ 'False)
-    => Identifier a
+    => Compose
+         (Before (NonEmpty WhitespaceChar))
+         Identifier
+         a
     -> Compose
          []
          (Compose
@@ -539,10 +546,14 @@ data SmallStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
     -> SmallStatement lctxt ctxt a
 
   SmallStatementAssert ::
-    { _smallStatementAssert_head :: Test 'NotAssignable ctxt a
+    { _smallStatementAssert_head
+      :: Compose
+           (Before (NonEmpty WhitespaceChar))
+           (Test 'NotAssignable ctxt)
+           a
     , _smallStatementAssert_tail
       :: Compose
-          []
+          Maybe
           (Compose
             (Before (Between' [WhitespaceChar] Comma))
             (Test 'NotAssignable ctxt))
@@ -556,7 +567,9 @@ deriving instance Traversable (SmallStatement lctxt ctxt)
 deriving instance Eq a => Eq (SmallStatement lctxt ctxt a)
 deriving instance Show a => Show (SmallStatement lctxt ctxt a)
 
-_smallStatementNonlocal_head :: SmallStatement lctxt ctxt a -> Identifier a
+_smallStatementNonlocal_head
+  :: SmallStatement lctxt ctxt a
+  -> Compose (Before (NonEmpty WhitespaceChar)) Identifier a
 _smallStatementNonlocal_head (SmallStatementNonlocal a _ _) = a
 
 _smallStatementNonlocal_tail
@@ -617,8 +630,10 @@ data RaiseStatement (ctxt :: DefinitionContext) a
     :: Compose
          Maybe
          (Compose
-           (Before (NonEmpty WhitespaceChar))
-           (Test 'NotAssignable ctxt))
+           (Before KFrom)
+           (Compose
+             (Before (NonEmpty WhitespaceChar))
+             (Test 'NotAssignable ctxt)))
          a
   , _raiseStatement_ann :: a
   }

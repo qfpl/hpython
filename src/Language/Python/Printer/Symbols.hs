@@ -60,3 +60,25 @@ doubleAsterisk _ = text "**"
 
 semicolon :: Semicolon -> Doc
 semicolon _ = text ";"
+
+equals :: Equals -> Doc
+equals _ = text "="
+
+dot :: Dot -> Doc
+dot _ = text "."
+
+ellipsis :: Ellipsis -> Doc
+ellipsis _ = text "..."
+
+rightArrow :: RightArrow -> Doc
+rightArrow _ = text "->"
+
+indentationChar :: IndentationChar -> Doc
+indentationChar c =
+  case c of
+    IndentSpace -> text " "
+    IndentTab -> text "\t"
+    IndentContinued n i ->
+      text "\\" <>
+      newlineChar n <>
+      foldMap indentationChar i

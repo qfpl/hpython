@@ -9,7 +9,6 @@ import Papa hiding (Sum, Product)
 import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
-import Data.Functor.Sum.Lens
 import Data.Separated.Before
 
 import qualified Language.Python.Statement.AST as Safe
@@ -21,9 +20,6 @@ import Language.Python.IR.Checker.ArgsList
 import Language.Python.IR.ExprConfig
 import Language.Python.IR.SyntaxChecker
 import Language.Python.IR.StatementConfig
-
-import Language.Python.Expr.IR as EI
-import Language.Python.Expr.AST as EA
 
 checkStatement
   :: ExprConfig assignable dctxt
@@ -94,7 +90,7 @@ checkCompoundStatement ecfg scfg s =
       pure ann
     IR.CompoundStatementDecorated v ann ->
       Safe.CompoundStatementDecorated <$>
-      checkDecorated ecfg scfg v <*>
+      checkDecorated ecfg v <*>
       pure ann
     IR.CompoundStatementAsync v ann ->
       Safe.CompoundStatementAsync <$>
@@ -306,10 +302,9 @@ checkClassDef ecfg (IR.ClassDef n a b ann) =
 
 checkDecorated
   :: ExprConfig assignable dctxt
-  -> StatementConfig lctxt
   -> IR.Decorated ann
   -> SyntaxChecker ann (Safe.Decorated dctxt ann)
-checkDecorated ecfg scfg (IR.Decorated d b ann) =
+checkDecorated ecfg (IR.Decorated d b ann) =
   Safe.Decorated <$>
   traverseOf (_Wrapped.traverse) (checkDecorator ecfg) d <*>
   (case b of
@@ -442,7 +437,10 @@ checkSmallStatement ecfg scfg s =
         SFunDef _ -> pure $ Safe.SmallStatementNonlocal h t ann
     IR.SmallStatementAssert h t ann ->
       Safe.SmallStatementAssert <$>
-      checkTest (ecfg & atomType .~ SNotAssignable) h <*>
+      traverseOf
+        (_Wrapped.traverse)
+        (checkTest $ ecfg & atomType .~ SNotAssignable)
+        h <*>
       traverseOf
         (_Wrapped.traverse._Wrapped.before._2)
         (checkTest $ ecfg & atomType .~ SNotAssignable)
@@ -504,7 +502,7 @@ checkRaiseStatement ecfg (IR.RaiseStatement l r ann) =
   Safe.RaiseStatement <$>
   checkTest (ecfg & atomType .~ SNotAssignable) l <*>
   traverseOf
-    (_Wrapped.traverse._Wrapped.traverse)
+    (_Wrapped.traverse._Wrapped.traverse._Wrapped.traverse)
     (checkTest $ ecfg & atomType .~ SNotAssignable)
     r <*>
   pure ann
@@ -515,16 +513,16 @@ checkTestlistStarExpr
   -> SyntaxChecker ann (Safe.TestlistStarExpr assignable ctxt ann)
 checkTestlistStarExpr ecfg (IR.TestlistStarExpr h t c ann) =
   Safe.TestlistStarExpr <$>
-  testOrStar ecfg h <*>
+  testOrStar h <*>
   traverseOf
     (_Wrapped.traverse._Wrapped.traverse)
-    (testOrStar ecfg)
+    testOrStar
     t <*>
   pure c <*>
   pure ann
   where
-    testOrStar ecfg' (InL a) = InL <$> checkTest ecfg a
-    testOrStar ecfg' (InR a) = InR <$> checkStarExpr ecfg a
+    testOrStar (InL a) = InL <$> checkTest ecfg a
+    testOrStar (InR a) = InR <$> checkStarExpr ecfg a
 
 checkSuite
   :: ExprConfig assignable dctxt

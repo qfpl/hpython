@@ -11,13 +11,13 @@ import Language.Python.AST.Symbols
 import Language.Python.Expr.Parser
 import Language.Python.Parser.ArgsList
 import Language.Python.Parser.Combinators
+import Language.Python.Parser.DottedName
 import Language.Python.Parser.Identifier
 import Language.Python.Parser.Keywords
 import Language.Python.Parser.SrcInfo
 import Language.Python.Parser.Symbols
 import Language.Python.Statement.IR
 import Language.Python.Statement.Parser.AugAssign
-import Language.Python.Statement.Parser.DottedName
 import Language.Python.Statement.Parser.Imports
 
 import Text.Parser.Unspaced
@@ -113,18 +113,20 @@ smallStatement =
     smallStatementGlobal =
       SmallStatementGlobal <$>
       (string "global" *>
-       identifier) <*>
+       whitespaceBefore1F identifier) <*>
       manyF (beforeF (betweenWhitespace comma) identifier)
 
     smallStatementNonlocal =
       SmallStatementNonlocal <$>
-      identifier <*>
+      (string "nonlocal" *>
+       whitespaceBefore1F identifier) <*>
       manyF (beforeF (betweenWhitespace comma) identifier)
 
     smallStatementAssert =
       SmallStatementAssert <$>
-      test <*>
-      manyF (beforeF (betweenWhitespace comma) test)
+      (string "assert" *>
+       whitespaceBefore1F test) <*>
+      optionalF (beforeF (betweenWhitespace comma) test)
 
 flowStatement
   :: ( LookAheadParsing m
@@ -150,7 +152,7 @@ raiseStatement =
   annotated $
   RaiseStatement <$>
   test <*>
-  optionalF (try $ whitespaceBefore1F test)
+  optionalF (try . beforeF kFrom $ whitespaceBefore1F test)
 
 compoundStatement
   :: ( LookAheadParsing m

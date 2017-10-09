@@ -46,6 +46,9 @@ data SyntaxError a
   | BreakOutsideLoop a
   | ContinueOutsideLoop a
   | IndentationError (IndentationError a)
+  | AugAssignListLHS a
+  | TopLevelUnpacking a
+  | MultipleUnpackingsInLHS a
   deriving (Eq, Show, Ord)
 
 newtype SyntaxChecker ann a

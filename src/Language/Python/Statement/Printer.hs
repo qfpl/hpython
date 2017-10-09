@@ -15,6 +15,7 @@ import Language.Python.Printer.IndentedLines
 import Language.Python.Printer.Keywords
 import Language.Python.Printer.Symbols
 import Language.Python.Statement.AST
+import Language.Python.Statement.AST.TestlistStarExpr
 import Language.Python.Statement.Printer.AugAssign
 import Language.Python.Statement.Printer.Imports
 
@@ -35,32 +36,36 @@ simpleStatement (SimpleStatement h t s n _) =
   whitespaceBefore newlineChar n
 
 testlistStarExpr :: TestlistStarExpr assignable ectxt a -> Doc
-testlistStarExpr (TestlistStarExpr h t c _) =
-  sumElim test starExpr h <>
-  foldMapOf
-    (_Wrapped.folded)
-    (beforeF (betweenWhitespace' comma) (sumElim test starExpr))
-    t <>
-  foldMap (betweenWhitespace' comma) c
+testlistStarExpr s =
+  case s of
+    TestlistStarExprSingle v _ -> test v
+    TestlistStarExprSingleComma v c _ ->
+      sumElim test starExpr v <>
+      betweenWhitespace' comma c
+    _
+      | Just (h, t, c, _) <- Just s ^? _TestlistStarExprMany ->
+          sumElim test starExpr h <>
+          foldMapOf
+            (_Wrapped.folded)
+            (beforeF (betweenWhitespace' comma) (sumElim test starExpr))
+            t <>
+          foldMap (betweenWhitespace' comma) c
 
 smallStatement :: SmallStatement lctxt ectxt a -> Doc
 smallStatement s =
   case s of
-    SmallStatementExpr l r _ ->
+    SmallStatementExpr v _ -> test v
+    SmallStatementAssign l r _ ->
       testlistStarExpr l <>
-      (case r of
-         InL a ->
-           beforeF
-             (betweenWhitespace' augAssign)
-             (sumElim yieldExpr testList)
-             a
-         InR a ->
-           foldMapOf
-             (_Wrapped.folded)
-             (beforeF
-               (betweenWhitespace' equals)
-               (sumElim yieldExpr testlistStarExpr))
-             a)
+      foldMapOf
+        (_Wrapped.folded)
+        (beforeF
+          (betweenWhitespace' equals)
+          (sumElim yieldExpr testlistStarExpr))
+        r
+    SmallStatementAugAssign l r _ ->
+      test l <>
+      beforeF (betweenWhitespace' augAssign) (sumElim yieldExpr testList) r
     SmallStatementDel v _ ->
       text "del" <>
       whitespaceBeforeF exprList v

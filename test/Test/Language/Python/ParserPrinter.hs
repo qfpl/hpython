@@ -3,7 +3,7 @@
 module Test.Language.Python.ParserPrinter (makeParserPrinterTests) where
 
 import Papa
-import Prelude (error)
+import Prelude (error, undefined)
 import Control.Monad.IO.Class
 import Data.Functor.Compose
 import Data.Separated.Before
@@ -31,6 +31,7 @@ import qualified Language.Python.Expr.AST.Digits as AST
 import qualified Language.Python.Expr.Parser as Parse
 import qualified Language.Python.Expr.Printer as Print
 import qualified Language.Python.Expr.IR.Checker as Check
+import qualified Language.Python.Statement.Printer as Print
 import qualified Test.Language.Python.Expr.Gen as GenAST
 import qualified Test.Language.Python.Statement.Gen as GenAST
 
@@ -141,15 +142,12 @@ prop_expr_ast_is_valid_python assignability =
 
 prop_statement_ast_is_valid_python
   :: StatementConfig lctxt
-  -> ExprContext assignability dctxt
+  -> ExprConfig assignability dctxt
   -> Property
 prop_statement_ast_is_valid_python scfg ecfg =
   property $ do
-    st <-
-      forAll .
-      Gen.resize 100 .
-      GenAST.genStatement scfg ecfg
-    let program = HPJ.render $ Print.test st
+    st <- forAll $ GenAST.genStatement scfg ecfg
+    let program = HPJ.render $ Print.statement st
     res <- liftIO $ checkSyntax program
     case res of
       SyntaxError pythonError -> do
@@ -210,5 +208,10 @@ makeParserPrinterTests = do
       , testProperty
           "Expression AST is valid python - not assignable" $
           prop_expr_ast_is_valid_python SNotAssignable
+      , testProperty
+          "Statement AST is valid python" $
+          prop_statement_ast_is_valid_python
+            (StatementConfig SNotInLoop)
+            (ExprConfig undefined STopLevel)
       ]
   (properties ++ ) <$> liftA2 (++) (testSpecs regressions) (testSpecs spec)

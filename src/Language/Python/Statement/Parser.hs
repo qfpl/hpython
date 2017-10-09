@@ -17,6 +17,7 @@ import Language.Python.Parser.Keywords
 import Language.Python.Parser.SrcInfo
 import Language.Python.Parser.Symbols
 import Language.Python.Statement.IR
+import Language.Python.Statement.IR.TestlistStarExpr
 import Language.Python.Statement.Parser.AugAssign
 import Language.Python.Statement.Parser.Imports
 

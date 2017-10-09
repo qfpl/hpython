@@ -453,7 +453,7 @@ yieldArg y =
     YieldArgFrom val _ -> text "from" <> whitespaceBeforeF test val
     YieldArgList val _ -> testList val
 
-yieldExpr :: YieldExpr a -> Doc
+yieldExpr :: YieldExpr ctxt a -> Doc
 yieldExpr (YieldExpr val _) =
   text "yield" <>
   foldMapF (whitespaceBeforeF yieldArg) val

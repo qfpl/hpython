@@ -86,7 +86,7 @@ checkLambdef cfg (IR.Lambdef as b ann) =
         (traverseCompose.traverseCompose)
         (checkArgsList cfg checkTest checkIdentifier)
         as <*>
-      traverseCompose (checkTest cfg) b <*>
+      traverseCompose (checkTest $ cfg & definitionContext .~ SFunDef SNormal) b <*>
       pure ann
 
 checkIfThenElse
@@ -383,7 +383,7 @@ checkAtomExpr cfg (IR.AtomExpr kw a ts ann) =
   case kw of
     Nothing ->
       Safe.AtomExprNoAwait <$>
-      checkAtom (cfg & atomType .~ SNotAssignable) a <*>
+      checkAtom cfg a <*>
       traverseOf
         (traverseCompose.traverseCompose)
         (checkTrailer cfg)
@@ -609,7 +609,7 @@ checkLambdefNocond cfg (IR.LambdefNocond args ex ann) =
     (traverseCompose.traverseCompose)
     (checkArgsList cfg checkTest checkIdentifier)
     args <*>
-  traverseCompose (checkTestNocond cfg) ex <*>
+  traverseCompose (checkTestNocond $ cfg & definitionContext .~ SFunDef SNormal) ex <*>
   pure ann
 
 checkSubscriptList
@@ -856,9 +856,9 @@ checkDictUnpacking cfg (IR.DictUnpacking v ann) =
   pure ann
 
 checkYieldExpr
-  :: ExprConfig atomType ctxt
+  :: ExprConfig atomType ('FunDef 'Normal)
   -> IR.YieldExpr ann
-  -> SyntaxChecker ann (Safe.YieldExpr ann)
+  -> SyntaxChecker ann (Safe.YieldExpr ('FunDef 'Normal) ann)
 checkYieldExpr cfg (IR.YieldExpr val ann) =
   Safe.YieldExpr <$>
   traverseOf

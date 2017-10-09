@@ -29,6 +29,7 @@ import Language.Python.AST.Symbols
 import Language.Python.Expr.AST
 import Language.Python.Statement.AST.AugAssign
 import Language.Python.Statement.AST.Imports
+import Language.Python.Statement.AST.TestlistStarExpr
 import Language.Python.IR.ExprConfig
 import Language.Python.IR.StatementConfig
 
@@ -79,7 +80,7 @@ data CompoundStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   , _compoundStatement_ann :: a
   }
   | CompoundStatementAsync
-  { _compoundStatementAsyncIf_value :: AsyncStatement lctxt ctxt a
+  { _compoundStatementAsyncIf_value :: AsyncStatement lctxt ('FunDef 'Async) a
   , _compoundStatement_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -198,7 +199,7 @@ data FuncDef (ctxt :: DefinitionContext) (a :: *)
   , _funcDef_body
     :: Compose
          (Before (Between' [WhitespaceChar] Colon))
-         (Suite 'NotInLoop ('FunDef 'Normal))
+         (Suite 'NotInLoop ctxt)
          a
   , _funcDef_ann :: a
   }
@@ -476,19 +477,30 @@ deriving instance Show a => Show (SimpleStatement lctxt ctxt a)
 
 data SmallStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
   SmallStatementExpr ::
-    { _smallStatementExpr_left :: TestlistStarExpr 'Assignable ctxt a
-    , _smallStatementExpr_right
-      :: Sum
-          (Compose
+    { _smallStatementExpr_value :: Test 'NotAssignable ctxt a
+    , _smallStatementExpr_ann :: a
+    } -> SmallStatement lctxt ctxt a
+
+  SmallStatementAssign ::
+    { _smallStatementAssign_left :: TestlistStarExpr 'Assignable ctxt a
+    , _smallStatementAssign_right
+      :: Compose
+           NonEmpty
+           (Compose
+             (Before (Between' [WhitespaceChar] Equals))
+             (Sum (YieldExpr ctxt) (TestlistStarExpr 'NotAssignable ctxt)))
+         a
+    , _smallStatementAssign_ann :: a
+    } -> SmallStatement lctxt ctxt a
+
+  SmallStatementAugAssign ::
+    { _smallStatementAugAssign_left :: Test 'Assignable ctxt a
+    , _smallStatementAugAssign_right
+      :: Compose
             (Before (Between' [WhitespaceChar] AugAssign))
-            (Sum YieldExpr (TestList 'NotAssignable ctxt)))
-          (Compose
-            []
-            (Compose
-              (Before (Between' [WhitespaceChar] Equals))
-              (Sum YieldExpr (TestlistStarExpr 'NotAssignable ctxt))))
+            (Sum (YieldExpr ctxt) (TestList 'NotAssignable ctxt))
           a
-    , _smallStatement_ann :: a
+    , _smallStatementAugAssign_ann :: a
     } -> SmallStatement lctxt ctxt a
 
   SmallStatementDel ::
@@ -613,9 +625,9 @@ data FlowStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
     , _flowStatementRaise_ann :: a
     } -> FlowStatement lctxt ctxt a
   FlowStatementYield ::
-    { _flowStatementYield_value :: YieldExpr a
+    { _flowStatementYield_value :: YieldExpr ctxt a
     , _flowStatementYield_ann :: a
-    } -> FlowStatement lctxt ('FunDef 'Normal) a
+    } -> FlowStatement lctxt ctxt a
 
 deriving instance Functor (FlowStatement lctxt ctxt)
 deriving instance Foldable (FlowStatement lctxt ctxt)
@@ -639,29 +651,9 @@ data RaiseStatement (ctxt :: DefinitionContext) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-data TestlistStarExpr (assignable :: AtomType) (ctxt :: DefinitionContext) a
-  = TestlistStarExpr
-  { _testlistStarExpr_head
-    :: Sum (Test assignable ctxt) (StarExpr assignable ctxt) a
-  , _testlistStarExpr_tail
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (Sum (Test assignable ctxt) (StarExpr assignable ctxt)))
-         a
-  , _testlistStarExpr_comma :: Maybe (Between' [WhitespaceChar] Comma)
-  , _testlistStarExpr_ann :: a
-  }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-
 makeLenses ''SmallStatement
 deriveEq1 ''SmallStatement
 deriveShow1 ''SmallStatement
-
-makeLenses ''TestlistStarExpr
-deriveEq1 ''TestlistStarExpr
-deriveShow1 ''TestlistStarExpr
 
 makeLenses ''RaiseStatement
 deriveEq1 ''RaiseStatement

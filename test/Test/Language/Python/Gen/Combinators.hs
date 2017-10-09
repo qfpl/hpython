@@ -157,6 +157,18 @@ genNewlineChar
   => m NewlineChar
 genNewlineChar = Gen.element [CR, LF, CRLF]
 
+genIndentationChar
+  :: MonadGen m
+  => m IndentationChar
+genIndentationChar =
+  Gen.recursive
+    Gen.choice
+    [ pure IndentSpace, pure IndentTab ]
+    [ IndentContinued <$>
+      genNewlineChar <*>
+      Gen.list (Range.linear 0 10) genIndentationChar
+    ]
+
 genWhitespaceChar
   :: MonadGen m
   => m WhitespaceChar

@@ -11,8 +11,13 @@ import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Separated.Before
 
+import qualified Language.Python.Expr.AST as Safe
+import qualified Language.Python.Expr.IR as IR
+
 import qualified Language.Python.Statement.AST as Safe
+import qualified Language.Python.Statement.AST.TestlistStarExpr as Safe
 import qualified Language.Python.Statement.IR as IR
+import qualified Language.Python.Statement.IR.TestlistStarExpr as IR
 
 import Language.Python.AST.IndentedLines
 import Language.Python.Expr.IR.Checker
@@ -20,6 +25,7 @@ import Language.Python.IR.Checker.ArgsList
 import Language.Python.IR.ExprConfig
 import Language.Python.IR.SyntaxChecker
 import Language.Python.IR.StatementConfig
+import Language.Python.Statement.IR.Checker.TestlistStarExpr
 
 checkStatement
   :: ExprConfig assignable dctxt
@@ -249,9 +255,7 @@ checkFuncDef ecfg (IR.FuncDef n p t b ann) =
     t <*>
   traverseOf
     (_Wrapped.traverse)
-    (checkSuite
-      (ecfg & definitionContext .~ SFunDef SNormal)
-      (StatementConfig SNotInLoop))
+    (checkSuite ecfg (StatementConfig SNotInLoop))
     b <*>
   pure ann
 
@@ -343,7 +347,7 @@ checkAsyncStatement
   :: ExprConfig assignable dctxt
   -> StatementConfig lctxt
   -> IR.AsyncStatement ann
-  -> SyntaxChecker ann (Safe.AsyncStatement lctxt dctxt ann)
+  -> SyntaxChecker ann (Safe.AsyncStatement lctxt ('FunDef 'Async) ann)
 checkAsyncStatement ecfg scfg (IR.AsyncStatement v ann) =
   case ecfg ^. definitionContext of
     SFunDef SAsync ->
@@ -400,22 +404,34 @@ checkSmallStatement
 checkSmallStatement ecfg scfg s =
   case s of
     IR.SmallStatementExpr l r ann ->
-      Safe.SmallStatementExpr <$>
-      checkTestlistStarExpr (ecfg & atomType .~ SAssignable) l <*>
-      (case r of
-         InL a ->
-           InL <$>
-           traverseOf
-             (_Wrapped.before._2)
-             (yieldOrTestList ecfg)
-             a
-         InR a ->
-           InR <$>
-           traverseOf
-             (_Wrapped.traverse._Wrapped.traverse)
-             (yieldOrTestlistStarExpr ecfg)
-             a) <*>
-      pure ann
+      case (l, r) of
+        (IR.TestlistStarExpr a (Compose []) Nothing _, InL b) ->
+          Safe.SmallStatementAugAssign <$>
+          (case a of
+             InL a' -> checkTest (ecfg & atomType .~ SAssignable) a'
+             InR _ -> syntaxError $ CannotAssignTo LHSSingleStarExpr ann) <*>
+          traverseOf
+            (_Wrapped.traverse)
+            (yieldOrTestList ecfg)
+            b <*>
+          pure ann
+        (_, InL _) ->
+          syntaxError $ AugAssignListLHS ann
+        (IR.TestlistStarExpr a (Compose []) Nothing _, InR (Compose [])) ->
+          case a of
+            InL a' ->
+              Safe.SmallStatementExpr <$>
+              checkTest (ecfg & atomType .~ SNotAssignable) a' <*>
+              pure ann
+            InR _ -> syntaxError $ TopLevelUnpacking ann
+        (_, InR (Compose (a:as))) ->
+          Safe.SmallStatementAssign <$>
+          checkTestlistStarExpr (ecfg & atomType .~ SAssignable) l <*>
+          traverseOf
+            (_Wrapped.traverse._Wrapped.traverse)
+            (yieldOrTestlistStarExpr ecfg)
+            (Compose $ a :| as) <*>
+          pure ann
     IR.SmallStatementDel v ann ->
       Safe.SmallStatementDel <$>
       traverseOf
@@ -447,10 +463,24 @@ checkSmallStatement ecfg scfg s =
         t <*>
       pure ann
   where
-    yieldOrTestList cfg (InL a) = InL <$> checkYieldExpr cfg a
+    yieldOrTestList
+      :: ExprConfig as dctxt
+      -> Sum IR.YieldExpr IR.TestList ann
+      -> SyntaxChecker ann (Sum (Safe.YieldExpr dctxt) (Safe.TestList 'NotAssignable dctxt) ann)
+    yieldOrTestList cfg (InL a) =
+      case cfg ^. definitionContext of
+        SFunDef SNormal -> InL <$> checkYieldExpr cfg a
+        _ -> syntaxError $ YieldNotInFunction (a ^. IR.yieldExpr_ann)
     yieldOrTestList cfg (InR a) = InR <$> checkTestList (cfg & atomType .~ SNotAssignable) a
 
-    yieldOrTestlistStarExpr cfg (InL a) = InL <$> checkYieldExpr cfg a
+    yieldOrTestlistStarExpr
+      :: ExprConfig as dctxt
+      -> Sum IR.YieldExpr IR.TestlistStarExpr ann
+      -> SyntaxChecker ann (Sum (Safe.YieldExpr dctxt) (Safe.TestlistStarExpr 'NotAssignable dctxt) ann)
+    yieldOrTestlistStarExpr cfg (InL a) =
+      case cfg ^. definitionContext of
+        SFunDef SNormal -> InL <$> checkYieldExpr cfg a
+        _ -> syntaxError $ YieldNotInFunction (a ^. IR.yieldExpr_ann)
     yieldOrTestlistStarExpr cfg (InR a) = InR <$> checkTestlistStarExpr (cfg & atomType .~ SNotAssignable) a
 
 checkFlowStatement
@@ -507,23 +537,6 @@ checkRaiseStatement ecfg (IR.RaiseStatement l r ann) =
     r <*>
   pure ann
 
-checkTestlistStarExpr
-  :: ExprConfig assignable ctxt
-  -> IR.TestlistStarExpr ann
-  -> SyntaxChecker ann (Safe.TestlistStarExpr assignable ctxt ann)
-checkTestlistStarExpr ecfg (IR.TestlistStarExpr h t c ann) =
-  Safe.TestlistStarExpr <$>
-  testOrStar h <*>
-  traverseOf
-    (_Wrapped.traverse._Wrapped.traverse)
-    testOrStar
-    t <*>
-  pure c <*>
-  pure ann
-  where
-    testOrStar (InL a) = InL <$> checkTest ecfg a
-    testOrStar (InR a) = InR <$> checkStarExpr ecfg a
-
 checkSuite
   :: ExprConfig assignable dctxt
   -> StatementConfig lctxt
@@ -540,7 +553,7 @@ checkSuite ecfg scfg s =
       traverseOf
         _Wrapped
         (liftError (IndentationError . ($ ann)) .
-         fmap mkIndentationLines .
+         fmap mkIndentedLines .
          traverseOf (traverse._2) (checkStatement ecfg scfg) .
          fmap (view before . getCompose))
         ls <*>

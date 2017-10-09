@@ -71,11 +71,14 @@ library
                        Language.Python.Printer.ArgsList
                        Language.Python.Printer.Combinators
                        Language.Python.Printer.DottedName
+                       Language.Python.Printer.Identifier
                        Language.Python.Printer.IndentedLines
                        Language.Python.Printer.Keywords
                        Language.Python.Printer.Symbols
+                       Language.Python.Statement.AST
                        Language.Python.Statement.AST.AugAssign
                        Language.Python.Statement.AST.Imports
+                       Language.Python.Statement.AST.TestlistStarExpr
                        Language.Python.Statement.IR
                        Language.Python.Statement.IR.Checker
                        Language.Python.Statement.Parser
@@ -117,11 +120,15 @@ test-suite hpython-tests
                          Test.Language.Python.Expr.AST.EscapeSeq
                          Test.Language.Python.Expr.AST.StringContent
                          Test.Language.Python.Expr.Gen
-                         Test.Language.Python.Gen.ArgList
+                         Test.Language.Python.Gen.ArgsList
                          Test.Language.Python.Gen.Combinators
+                         Test.Language.Python.Gen.DottedName
+                         Test.Language.Python.Gen.Identifier
+                         Test.Language.Python.Gen.IndentedLines
                          Test.Language.Python.ParserPrinter
                          Test.Language.Python.Parser.Indentation
                          Test.Language.Python.Statement.Gen
+                         Test.Language.Python.Statement.TestlistStarExpr
     build-depends:       base >=4.9 && <4.10
                        , ansi-wl-pprint >=0.6 && <0.7
                        , directory >=1.3 && <1.4

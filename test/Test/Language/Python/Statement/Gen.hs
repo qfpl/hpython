@@ -1,11 +1,14 @@
+{-# language DataKinds #-}
 module Test.Language.Python.Statement.Gen where
 
 import Papa
 import Hedgehog
 
+import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
 import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
@@ -14,8 +17,13 @@ import Language.Python.IR.ExprConfig
 import Language.Python.IR.StatementConfig
 
 import Test.Language.Python.Expr.Gen
+import Test.Language.Python.Gen.ArgsList
 import Test.Language.Python.Gen.Combinators
+import Test.Language.Python.Gen.DottedName
+import Test.Language.Python.Gen.Identifier
+import Test.Language.Python.Gen.IndentedLines
 import Test.Language.Python.Statement.AugAssign
+import Test.Language.Python.Statement.TestlistStarExpr
 
 genStatement
   :: MonadGen m
@@ -56,46 +64,32 @@ genSmallStatement
 genSmallStatement scfg ecfg =
   Gen.choice
     [ SmallStatementExpr <$>
+      genTest (ecfg & atomType .~ SNotAssignable) <*>
+      pure ()
+    , SmallStatementAssign <$>
       genTestlistStarExpr (ecfg & atomType .~ SAssignable) <*>
-      Gen.choice
-        [ InL <$>
-          genBeforeF
-            (genBetweenWhitespace genAugAssign)
-            (Gen.choice
-              [ InL <$> genYieldExpr (ecfg & atomType .~ SNotAssignable)
-              , InR <$> genTestList (ecfg & atomType .~ SNotAssignable)
-              ])
-        , InR <$>
-          genListF
-            (genBeforeF
-              (genBetweenWhitespace $ pure Equals)
-              (Gen.choice
-                [ InL <$> genYieldExpr (ecfg & atomType .~ SNotAssignable)
-                , InR <$> genTestlistStarExpr (ecfg & atomType .~ SNotAssignable)
-                ]))
-        ] <*>
+      genNonEmptyF
+        (genBeforeF
+          (genBetweenWhitespace $ pure Equals)
+          (Gen.choice $
+            (case ecfg ^. definitionContext of
+              SFunDef SNormal ->
+                [ InL <$> genYieldExpr (ecfg & atomType .~ SNotAssignable) ]
+              _ -> []) <>
+            [ InR <$> genTestlistStarExpr (ecfg & atomType .~ SNotAssignable) ])) <*>
+      pure ()
+    , SmallStatementAugAssign <$>
+      genTest (ecfg & atomType .~ SAssignable) <*>
+      genBeforeF
+        (genBetweenWhitespace genAugAssign)
+        (Gen.choice $
+          (case ecfg ^. definitionContext of
+             SFunDef SNormal ->
+               [ InL <$> genYieldExpr (ecfg & atomType .~ SNotAssignable) ]
+             _ -> []) <>
+          [ InR <$> genTestList (ecfg & atomType .~ SNotAssignable) ]) <*>
       pure ()
     ]
-
-genTestlistStarExpr
-  :: MonadGen m
-  => ExprConfig as dc
-  -> m (TestlistStarExpr as dc ())
-genTestlistStarExpr ecfg =
-  TestlistStarExpr <$>
-  Gen.choice
-    [ InL <$> genTest ecfg
-    , InR <$> genStarExpr ecfg
-    ] <*>
-  genListF
-    (genBeforeF
-      (genBetweenWhitespace $ pure Comma)
-      (Gen.choice
-        [ InL <$> genTest ecfg
-        , InR <$> genStarExpr ecfg
-        ])) <*>
-  Gen.maybe (genBetweenWhitespace $ pure Comma) <*>
-  pure ()
 
 genCompoundStatement
   :: MonadGen m
@@ -110,10 +104,12 @@ genCompoundStatement scfg ecfg =
     , CompoundStatementFor <$> genForStatement scfg ecfg <*> pure ()
     , CompoundStatementTry <$> genTryStatement scfg ecfg <*> pure ()
     , CompoundStatementWith <$> genWithStatement scfg ecfg <*> pure ()
-    , CompoundStatementFuncDef <$> genFuncDef scfg ecfg <*> pure ()
-    , CompoundStatementClassDef <$> genClassDef scfg ecfg <*> pure ()
-    , CompoundStatementDecorated <$> genDecorated scfg ecfg <*> pure ()
-    , CompoundStatementAsync <$> genAsyncStatement scfg ecfg <*> pure ()
+    , CompoundStatementFuncDef <$> genFuncDef ecfg <*> pure ()
+    , CompoundStatementClassDef <$> genClassDef ecfg <*> pure ()
+    , CompoundStatementDecorated <$> genDecorated ecfg <*> pure ()
+    , CompoundStatementAsync <$>
+      genAsyncStatement scfg (ecfg & definitionContext .~ SFunDef SAsync) <*>
+      pure ()
     ]
 
 genIfStatement
@@ -253,35 +249,132 @@ genWithItem ecfg =
 
 genFuncDef
   :: MonadGen m
-  => StatementConfig lc
-  -> ExprConfig as dc
+  => ExprConfig as dc
   -> m (FuncDef dc ())
-genFuncDef scfg ecfg = _
+genFuncDef ecfg =
+  FuncDef <$>
+  genWhitespaceBefore1F genIdentifier <*>
+  genWhitespaceBeforeF (genParameters ecfg) <*>
+  genMaybeF
+    (genBeforeF
+       (genBetweenWhitespace $ pure RightArrow)
+       (genTest $ ecfg & atomType .~ SNotAssignable)) <*>
+  genBeforeF
+    (genBetweenWhitespace $ pure Colon)
+    (Gen.small $ genSuite (StatementConfig SNotInLoop) ecfg) <*>
+  pure ()
+
+genParameters
+  :: MonadGen m
+  => ExprConfig as dc
+  -> m (Parameters dc ())
+genParameters ecfg =
+  Parameters <$>
+  genBetweenWhitespaceF
+    (genMaybeF
+      (genArgsList
+        (ecfg & atomType .~ SNotAssignable)
+        (genTypedArg ecfg)
+        (genTest $ ecfg & atomType .~ SNotAssignable))) <*>
+  pure ()
+
+genTypedArg
+  :: MonadGen m
+  => ExprConfig as dc
+  -> m (TypedArg ())
+genTypedArg ecfg =
+  TypedArg <$>
+  genIdentifier <*>
+  genMaybeF
+    (genBeforeF
+      (genBetweenWhitespace $ pure Colon)
+      (genTest $ ecfg
+        & atomType .~ SNotAssignable
+        & definitionContext .~ SFunDef SNormal)) <*>
+  pure ()
 
 genClassDef
   :: MonadGen m
-  => StatementConfig lc
-  -> ExprConfig as dc
+  => ExprConfig as dc
   -> m (ClassDef dc ())
-genClassDef scfg ecfg = _
+genClassDef ecfg =
+  ClassDef <$>
+  genWhitespaceBefore1F genIdentifier <*>
+  genMaybeF
+    (genWhitespaceBeforeF .
+     genBetweenWhitespaceF .
+     genMaybeF .
+     genArgList $ ecfg & atomType .~ SNotAssignable) <*>
+  genBeforeF
+    (genBetweenWhitespace $ pure Colon)
+    (Gen.small $ genSuite (StatementConfig SNotInLoop) ecfg) <*>
+  pure ()
 
 genDecorated
   :: MonadGen m
-  => StatementConfig lc
-  -> ExprConfig as dc
+  => ExprConfig as dc
   -> m (Decorated dc ())
-genDecorated scfg ecfg = _
+genDecorated ecfg =
+  Decorated <$>
+  genNonEmptyF (genDecorator ecfg) <*>
+  Gen.choice
+    [ Gen.small $ InL . InL <$> genClassDef ecfg
+    , Gen.small $ InL . InR <$> genFuncDef ecfg
+    , Gen.small $ InR <$> genAsyncFuncDef ecfg
+    ] <*>
+  pure ()
+
+genAsyncFuncDef
+  :: MonadGen m
+  => ExprConfig as dc
+  -> m (AsyncFuncDef dc ())
+genAsyncFuncDef ecfg =
+  AsyncFuncDef <$>
+  genWhitespaceBefore1F
+    (Gen.small .
+     genFuncDef $ ecfg & definitionContext .~ SFunDef SAsync) <*>
+  pure ()
+
+genDecorator
+  :: MonadGen m
+  => ExprConfig as dc
+  -> m (Decorator dc ())
+genDecorator ecfg =
+  Decorator <$>
+  genWhitespaceBeforeF genDottedName <*>
+  genMaybeF
+    (genBetweenWhitespaceF
+       (genMaybeF .
+        genArgList $ ecfg & atomType .~ SNotAssignable)) <*>
+  genNewlineChar <*>
+  pure ()
 
 genAsyncStatement
   :: MonadGen m
   => StatementConfig lc
-  -> ExprConfig as dc
-  -> m (AsyncStatement lc dc ())
-genAsyncStatement scfg ecfg = _
+  -> ExprConfig as ('FunDef 'Async)
+  -> m (AsyncStatement lc ('FunDef 'Async) ())
+genAsyncStatement scfg ecfg =
+  AsyncStatement <$>
+  genWhitespaceBefore1F
+    (Gen.choice
+      [ Gen.small $ InL . InL <$> genFuncDef ecfg
+      , Gen.small $ InL . InR <$> genWithStatement scfg ecfg
+      , Gen.small $ InR <$> genForStatement scfg ecfg
+      ]) <*>
+  pure ()
 
 genSuite
   :: MonadGen m
   => StatementConfig lc
   -> ExprConfig as dc
   -> m (Suite lc dc ())
-genSuite scfg ecfg = _
+genSuite scfg ecfg =
+  Gen.choice
+    [ SuiteSingle <$> genSimpleStatement scfg ecfg <*> pure ()
+    , SuiteMulti <$>
+      genNewlineChar <*>
+      (Compose <$>
+      genIndentedLines (Range.constant 1 10) (genStatement scfg ecfg)) <*>
+      pure ()
+    ]

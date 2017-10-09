@@ -10,7 +10,7 @@ module Language.Python.AST.IndentedLines
   , getIndentedLines
   , IndentationError(..)
   , Indentable(..)
-  , mkIndentationLines
+  , mkIndentedLines
   , getIndentLevel
   , getMinIndentLevel
   , getMaxIndentLevel
@@ -113,10 +113,10 @@ validateIndentation desired desiredMinLevel desiredMaxLevel (i, a) =
       then Left $ ExpectedLevel Eq desired
       else Right (i, a)
 
-mkIndentationLines
+mkIndentedLines
   :: NonEmpty (NonEmpty IndentationChar, s lctxt ctxt a)
   -> Either (b -> IndentationError b) (IndentedLines (s lctxt ctxt a))
-mkIndentationLines ls@((i, _) :| _) =
+mkIndentedLines ls@((i, _) :| _) =
   let
     minLevel = minIndentLevel i
     maxLevel = maxIndentLevel i

@@ -1,5 +1,5 @@
 {-# language DataKinds #-}
-module Test.Language.Python.Gen.ArgList where
+module Test.Language.Python.Gen.ArgsList where
 
 import Papa hiding (Sum)
 import Data.Functor.Sum

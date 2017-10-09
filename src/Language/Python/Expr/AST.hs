@@ -98,7 +98,7 @@ data LambdefNocond (atomType :: AtomType) (ctxt :: DefinitionContext) a
   , _lambdefNocond_expr
     :: Compose
          (Before [WhitespaceChar])
-         (TestNocond atomType ctxt)
+         (TestNocond atomType ('FunDef 'Normal))
          a
   , _lambdefNocond_ann :: a
   }
@@ -304,7 +304,7 @@ deriving instance Traversable (Trailer a b)
 
 data AtomExpr :: AtomType -> DefinitionContext -> * -> * where
   AtomExprNoAwait ::
-    { _atomExpr_atom :: Atom 'NotAssignable ctxt a
+    { _atomExpr_atom :: Atom atomType ctxt a
     , _atomExpr_trailers
       :: Compose
            []
@@ -628,7 +628,7 @@ data Lambdef :: AtomType -> DefinitionContext -> * -> * where
     , _lambdef_body
       :: Compose
            (Before (Between' [WhitespaceChar] Colon))
-           (Test 'NotAssignable ctxt)
+           (Test 'NotAssignable ('FunDef 'Normal))
            a
     , _lambdef_ann :: a
     } -> Lambdef 'NotAssignable ctxt a
@@ -668,17 +668,22 @@ deriving instance Functor (YieldArg a b)
 deriving instance Foldable (YieldArg a b)
 deriving instance Traversable (YieldArg a b)
 
-data YieldExpr a
-  = YieldExpr
-  { _yieldExpr_value
-    :: Compose
-        Maybe
-        (Compose
-          (Before (NonEmpty WhitespaceChar))
-          (YieldArg 'NotAssignable ('FunDef 'Normal)))
-        a
-  , _yieldExpr_ann :: a
-  } deriving (Functor, Foldable, Traversable)
+data YieldExpr (ctxt :: DefinitionContext) a where
+  YieldExpr ::
+    { _yieldExpr_value
+      :: Compose
+          Maybe
+          (Compose
+            (Before (NonEmpty WhitespaceChar))
+            (YieldArg 'NotAssignable ('FunDef 'Normal)))
+          a
+    , _yieldExpr_ann :: a
+    } -> YieldExpr ('FunDef 'Normal) a
+deriving instance Eq a => Eq (YieldExpr ctxt a)
+deriving instance Show a => Show (YieldExpr ctxt a)
+deriving instance Functor (YieldExpr ctxt)
+deriving instance Foldable (YieldExpr ctxt)
+deriving instance Traversable (YieldExpr ctxt)
 
 data ListTestlistComp :: AtomType -> DefinitionContext -> * -> * where
   ListTestlistCompStarred ::
@@ -864,10 +869,10 @@ data Atom :: AtomType -> DefinitionContext -> * -> * where
     { _atomParenYield_val
       :: Compose
           (Between' [WhitespaceChar])
-          YieldExpr
+          (YieldExpr ctxt)
           a
     , _atomParenYield_ann :: a
-    } -> Atom 'NotAssignable ('FunDef 'Normal) a
+    } -> Atom 'NotAssignable ctxt a
 
   AtomBracket ::
     { _atomBracket_val
@@ -1110,8 +1115,6 @@ deriveEq1 ''YieldArg
 deriveShow1 ''YieldArg
 
 makeLenses ''YieldExpr
-deriveEq ''YieldExpr
-deriveShow ''YieldExpr
 deriveEq1 ''YieldExpr
 deriveShow1 ''YieldExpr
 

@@ -38,8 +38,9 @@ import qualified Language.Python.Expr.AST.TermOperator as AST
 import qualified Language.Python.Expr.AST.StringContent as SC
 import Language.Python.IR.ExprConfig
 
-import Test.Language.Python.Gen.ArgList
+import Test.Language.Python.Gen.ArgsList
 import Test.Language.Python.Gen.Combinators
+import Test.Language.Python.Gen.Identifier
 
 genIfThenElse
   :: MonadGen m
@@ -190,8 +191,8 @@ genYieldArg cfg =
 
 genYieldExpr
   :: MonadGen m
-  => ExprConfig 'NotAssignable cfg
-  -> m (AST.YieldExpr ())
+  => ExprConfig 'NotAssignable ('FunDef 'Normal)
+  -> m (AST.YieldExpr ('FunDef 'Normal) ())
 genYieldExpr cfg =
   Gen.small $
   AST.YieldExpr <$>
@@ -640,7 +641,10 @@ genLambdefNocond cfg =
   genMaybeF
     (Gen.small . genBetweenF genWhitespace1 genWhitespace $
       genArgsList cfg genIdentifier (genTest cfg)) <*>
-  genWhitespaceBeforeF (Gen.small $ genTestNocond cfg) <*>
+  genWhitespaceBeforeF
+    (Gen.small .
+     genTestNocond $
+     cfg & definitionContext .~ SFunDef SNormal) <*>
   pure ()
 
 genTestNocond
@@ -812,14 +816,6 @@ genSubscriptList cfg =
   Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
   pure ()
 
-genIdentifier :: MonadGen m => m (AST.Identifier ())
-genIdentifier =
-  AST.Identifier <$>
-  (T.pack <$> Gen.list
-    (Range.linear 1 10)
-    (Gen.frequency [(1, Gen.upper), (1, Gen.lower), (26, pure '_')])) <*>
-  pure ()
-
 genTrailer
   :: MonadGen m
   => ExprConfig atomType ctxt
@@ -867,7 +863,7 @@ genAtomExpr cfg =
   where
     atomExprNoAwait cfg' =
       AST.AtomExprNoAwait <$>
-      Gen.small (genAtom $ cfg' & atomType .~ SNotAssignable) <*>
+      Gen.small (genAtom cfg') <*>
       genListF
         (Gen.small . genWhitespaceBeforeF . genTrailer $ cfg') <*>
       pure ()
@@ -1214,7 +1210,7 @@ genLambdef cfg =
   genMaybeF (genWhitespaceBefore1F . genArgsList cfg genIdentifier $ genTest cfg) <*>
   genBeforeF
     (genBetweenWhitespace $ pure AST.Colon)
-    (genTest cfg) <*>
+    (genTest $ cfg & definitionContext .~ SFunDef SNormal) <*>
   pure ()
 
 genStringContent

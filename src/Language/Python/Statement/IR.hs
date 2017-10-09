@@ -22,6 +22,7 @@ import Language.Python.Expr.IR
 import Language.Python.IR.ArgsList
 import Language.Python.Statement.AST.AugAssign
 import Language.Python.Statement.AST.Imports
+import Language.Python.Statement.IR.TestlistStarExpr
 
 data Statement a
   = StatementSimple
@@ -601,29 +602,9 @@ data RaiseStatement a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-data TestlistStarExpr a
-  = TestlistStarExpr
-  { _testlistStarExpr_head
-    :: Sum Test StarExpr a
-  , _testlistStarExpr_tail
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (Sum Test StarExpr))
-         a
-  , _testlistStarExpr_comma :: Maybe (Between' [WhitespaceChar] Comma)
-  , _testlistStarExpr_ann :: a
-  }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-
 makeLenses ''SmallStatement
 deriveEq1 ''SmallStatement
 deriveShow1 ''SmallStatement
-
-makeLenses ''TestlistStarExpr
-deriveEq1 ''TestlistStarExpr
-deriveShow1 ''TestlistStarExpr
 
 makeLenses ''RaiseStatement
 deriveEq1 ''RaiseStatement

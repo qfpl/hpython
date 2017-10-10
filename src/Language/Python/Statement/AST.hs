@@ -68,7 +68,7 @@ data CompoundStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   , _compoundStatement_ann :: a
   }
   | CompoundStatementFuncDef
-  { _compoundStatementFuncDef_value :: FuncDef ctxt a
+  { _compoundStatementFuncDef_value :: FuncDef ctxt ('FunDef 'Normal) a
   , _compoundStatement_ann :: a
   }
   | CompoundStatementClassDef
@@ -80,7 +80,7 @@ data CompoundStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   , _compoundStatement_ann :: a
   }
   | CompoundStatementAsync
-  { _compoundStatementAsyncIf_value :: AsyncStatement lctxt ('FunDef 'Async) a
+  { _compoundStatementAsyncIf_value :: AsyncStatement lctxt ctxt a
   , _compoundStatement_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -90,7 +90,12 @@ deriving instance Show a => Show (CompoundStatement lctxt ctxt a)
 data Decorated (ctxt :: DefinitionContext) a
   = Decorated
   { _decorated_decorators :: Compose NonEmpty (Decorator ctxt) a
-  , _decorated_body :: Sum (Sum (ClassDef ctxt) (FuncDef ctxt)) (AsyncFuncDef ctxt) a
+  , _decorated_body
+    :: Sum
+         (Sum
+           (ClassDef ctxt)
+           (FuncDef ctxt ('FunDef 'Normal)))
+         (AsyncFuncDef ctxt) a
   , _decorated_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -102,7 +107,7 @@ data AsyncFuncDef (ctxt :: DefinitionContext) a
   { _asyncFuncDef_value
     :: Compose
          (Before (NonEmpty WhitespaceChar))
-         (FuncDef ('FunDef 'Async))
+         (FuncDef ctxt ('FunDef 'Async))
          a
   , _asyncFuncDef_ann :: a
   }
@@ -177,7 +182,7 @@ data Suite (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
 deriving instance Eq a => Eq (Suite lctxt ctxt a)
 deriving instance Show a => Show (Suite lctxt ctxt a)
 
-data FuncDef (ctxt :: DefinitionContext) (a :: *)
+data FuncDef (outer :: DefinitionContext) (inner :: DefinitionContext) (a :: *)
   = FuncDef
   { _funcDef_name
     :: Compose
@@ -187,25 +192,25 @@ data FuncDef (ctxt :: DefinitionContext) (a :: *)
   , _funcDef_parameters
     :: Compose
          (Before [WhitespaceChar])
-         (Parameters ctxt)
+         (Parameters outer)
          a
   , _funcDef_type
     :: Compose
          Maybe
          (Compose
            (Before (Between' [WhitespaceChar] RightArrow))
-           (Test 'NotAssignable ctxt))
+           (Test 'NotAssignable outer))
          a
   , _funcDef_body
     :: Compose
          (Before (Between' [WhitespaceChar] Colon))
-         (Suite 'NotInLoop ctxt)
+         (Suite 'NotInLoop inner)
          a
   , _funcDef_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (FuncDef ctxt a)
-deriving instance Show a => Show (FuncDef ctxt a)
+deriving instance Eq a => Eq (FuncDef outer inner a)
+deriving instance Show a => Show (FuncDef outer inner a)
 
 data Parameters (ctxt :: DefinitionContext) a
   = Parameters
@@ -286,7 +291,7 @@ data AsyncStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
           (Before (NonEmpty WhitespaceChar))
           (Sum
             (Sum
-              (FuncDef ('FunDef 'Async))
+              (FuncDef ('FunDef 'Async) ('FunDef 'Async))
               (WithStatement lctxt ('FunDef 'Async)))
             (ForStatement lctxt ('FunDef 'Async)))
           a
@@ -483,13 +488,18 @@ data SmallStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
 
   SmallStatementAssign ::
     { _smallStatementAssign_left :: TestlistStarExpr 'Assignable ctxt a
-    , _smallStatementAssign_right
+    , _smallStatementAssign_middle
       :: Compose
-           NonEmpty
+           []
            (Compose
              (Before (Between' [WhitespaceChar] Equals))
-             (Sum (YieldExpr ctxt) (TestlistStarExpr 'NotAssignable ctxt)))
+             (TestlistStarExpr 'Assignable ctxt))
          a
+    , _smallStatementAssign_right
+        :: Compose
+             (Before (Between' [WhitespaceChar] Equals))
+             (Sum (YieldExpr ctxt) (TestlistStarExpr 'NotAssignable ctxt))
+           a
     , _smallStatementAssign_ann :: a
     } -> SmallStatement lctxt ctxt a
 

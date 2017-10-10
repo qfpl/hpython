@@ -594,8 +594,19 @@ sliceOp =
   (char ':' *> optionalF (try $ whitespaceBeforeF test))
 
 argument :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Argument SrcInfo)
-argument = try argumentUnpack <|> try argumentDefault <|> argumentFor
+argument =
+  try argumentUnpack <|>
+  try argumentDefault <|>
+  try argumentForParens <|>
+  argumentFor
   where
+    argumentForParens =
+      annotated $
+      ArgumentForParens <$>
+      whitespaceAfter leftParen <*>
+      test <*>
+      compFor <*>
+      whitespaceBefore rightParen
     argumentFor =
       annotated $
       ArgumentFor <$>

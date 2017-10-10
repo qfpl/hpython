@@ -486,9 +486,12 @@ atom a =
 argument :: Argument atomType ctxt a -> Doc
 argument a =
   case a of
-    ArgumentFor e f _ ->
+    ArgumentExpr e _ -> test e
+    ArgumentFor l e f r _ ->
+      whitespaceAfter leftParen l <>
       test e <>
-      foldMapF compFor f
+      compFor f <>
+      whitespaceBefore rightParen r
     ArgumentDefault l r _ ->
       whitespaceAfterF test l <>
       char '=' <>
@@ -498,10 +501,16 @@ argument a =
       whitespaceBeforeF test val
 
 argList :: ArgList atomType ctxt a -> Doc
-argList (ArgList h t c _) =
-  argument h <>
-  foldMapF (beforeF (betweenWhitespace' comma) argument) t <>
-  foldMap (whitespaceBefore comma) c
+argList e =
+  case e of
+    ArgListMany h t c _ ->
+      argument h <>
+      foldMapF (beforeF (betweenWhitespace' comma) argument) t <>
+      foldMap (whitespaceBefore comma) c
+    ArgListSingleFor e f c _ ->
+      test e <>
+      compFor f <>
+      foldMap (whitespaceBefore comma) c
 
 sliceOp :: SliceOp atomType ctxt a -> Doc
 sliceOp (SliceOp val _) = char ':' <> foldMapF (whitespaceBeforeF test) val

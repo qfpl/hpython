@@ -749,9 +749,14 @@ genArgument
   -> m (AST.Argument 'NotAssignable ctxt ())
 genArgument cfg =
   Gen.choice
-    [ AST.ArgumentFor <$>
+    [ AST.ArgumentExpr <$>
+      genTest (cfg & atomType .~ SNotAssignable) <*>
+      pure ()
+    , AST.ArgumentFor <$>
+      genWhitespaceAfter (pure AST.LeftParen) <*>
       Gen.small (genTest cfg) <*>
-      genMaybeF (Gen.small $ genCompFor cfg) <*>
+      Gen.small (genCompFor cfg) <*>
+      genWhitespaceBefore (pure AST.RightParen) <*>
       pure ()
     , AST.ArgumentDefault <$>
       genWhitespaceAfterF
@@ -769,14 +774,22 @@ genArgList
   => ExprConfig 'NotAssignable ctxt
   -> m (AST.ArgList 'NotAssignable ctxt ())
 genArgList cfg =
-  AST.ArgList <$>
-  Gen.small (genArgument $ cfg & atomType .~ SNotAssignable) <*>
-  genListF
-    (genBeforeF
-       (genBetweenWhitespace $ pure AST.Comma)
-       (Gen.small . genArgument $ cfg & atomType .~ SNotAssignable)) <*>
-  Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
-  pure ()
+  Gen.choice
+    [ AST.ArgListSingleFor <$>
+      genTest (cfg & atomType .~ SNotAssignable) <*>
+      genCompFor (cfg & atomType .~ SNotAssignable) <*>
+      Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+      pure ()
+    , AST.ArgListMany <$>
+      Gen.small (genArgument $ cfg & atomType .~ SNotAssignable) <*>
+      genListF
+        (genBeforeF
+          (genBetweenWhitespace $ pure AST.Comma)
+          (Gen.small .
+           genArgument $ cfg & atomType .~ SNotAssignable)) <*>
+      Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+      pure ()
+    ]
 
 genSliceOp
   :: MonadGen m

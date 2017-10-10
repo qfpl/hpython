@@ -35,13 +35,16 @@ import Language.Python.Expr.AST.TermOperator
 import Language.Python.IR.ExprConfig
 
 data Argument :: AtomType -> DefinitionContext -> * -> * where
+  ArgumentExpr ::
+    { _argumentExpr_value :: Test 'NotAssignable ctxt a
+    , _argumentExpr_ann :: a
+    } -> Argument 'NotAssignable ctxt a
   ArgumentFor ::
-    { _argumentFor_expr :: Test 'NotAssignable ctxt a
+    { _argumentFor_lparen :: After [WhitespaceChar] LeftParen
+    , _argumentFor_expr :: Test 'NotAssignable ctxt a
     , _argumentFor_for
-      :: Compose
-          Maybe
-          (CompFor 'NotAssignable ctxt)
-          a
+      :: CompFor 'NotAssignable ctxt a
+    , _argumentFor_rparen :: Before [WhitespaceChar] RightParen
     , _argumentFor_ann :: a
     } -> Argument 'NotAssignable ctxt a
   ArgumentDefault ::
@@ -72,14 +75,20 @@ deriving instance Foldable (Argument a b)
 deriving instance Traversable (Argument a b)
 
 data ArgList (atomType :: AtomType) (ctxt :: DefinitionContext) a
-  = ArgList
-  { _argList_head :: Argument atomType ctxt a
+  = ArgListSingleFor
+  { _argListSingleFor_expr :: Test 'NotAssignable ctxt a
+  , _argListSingleFor_for :: CompFor 'NotAssignable ctxt a
+  , _argListSingleFor_comma :: Maybe (Before [WhitespaceChar] Comma)
+  , _argListSingleFor_ann :: a
+  }
+  | ArgListMany
+  { _argList_head :: Argument 'NotAssignable ctxt a
   , _argList_tail
     :: Compose
          []
          (Compose
            (Before (Between' [WhitespaceChar] Comma))
-           (Argument atomType ctxt))
+           (Argument 'NotAssignable ctxt))
          a
   , _argList_comma :: Maybe (Before [WhitespaceChar] Comma)
   , _argList_ann :: a

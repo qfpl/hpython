@@ -68,15 +68,18 @@ genSmallStatement scfg ecfg =
       pure ()
     , SmallStatementAssign <$>
       genTestlistStarExpr (ecfg & atomType .~ SAssignable) <*>
-      genNonEmptyF
+      genListF
         (genBeforeF
           (genBetweenWhitespace $ pure Equals)
-          (Gen.choice $
-            (case ecfg ^. definitionContext of
-              SFunDef SNormal ->
-                [ InL <$> genYieldExpr (ecfg & atomType .~ SNotAssignable) ]
-              _ -> []) <>
-            [ InR <$> genTestlistStarExpr (ecfg & atomType .~ SNotAssignable) ])) <*>
+          (genTestlistStarExpr (ecfg & atomType .~ SAssignable))) <*>
+      genBeforeF
+        (genBetweenWhitespace $ pure Equals)
+        (Gen.choice $
+          (case ecfg ^. definitionContext of
+             SFunDef SNormal ->
+               [ InL <$> genYieldExpr (ecfg & atomType .~ SNotAssignable) ]
+             _ -> []) <>
+          [ InR <$> genTestlistStarExpr (ecfg & atomType .~ SNotAssignable) ]) <*>
       pure ()
     , SmallStatementAugAssign <$>
       genTest (ecfg & atomType .~ SAssignable) <*>
@@ -98,19 +101,23 @@ genCompoundStatement
   -> m (CompoundStatement lc dc ())
 genCompoundStatement scfg ecfg =
   Gen.small $
-  Gen.choice
+  Gen.choice $
     [ CompoundStatementIf <$> genIfStatement scfg ecfg <*> pure ()
     , CompoundStatementWhile <$> genWhileStatement scfg ecfg <*> pure ()
     , CompoundStatementFor <$> genForStatement scfg ecfg <*> pure ()
     , CompoundStatementTry <$> genTryStatement scfg ecfg <*> pure ()
     , CompoundStatementWith <$> genWithStatement scfg ecfg <*> pure ()
-    , CompoundStatementFuncDef <$> genFuncDef ecfg <*> pure ()
+    , CompoundStatementFuncDef <$> genFuncDef ecfg (SFunDef SNormal) <*> pure ()
     , CompoundStatementClassDef <$> genClassDef ecfg <*> pure ()
     , CompoundStatementDecorated <$> genDecorated ecfg <*> pure ()
-    , CompoundStatementAsync <$>
-      genAsyncStatement scfg (ecfg & definitionContext .~ SFunDef SAsync) <*>
-      pure ()
-    ]
+    ] <>
+    (case ecfg ^. definitionContext of
+       SFunDef SAsync ->
+         [ CompoundStatementAsync <$>
+           genAsyncStatement scfg (ecfg & definitionContext .~ SFunDef SAsync) <*>
+           pure ()
+         ]
+       _ -> [])
 
 genIfStatement
   :: MonadGen m
@@ -250,18 +257,20 @@ genWithItem ecfg =
 genFuncDef
   :: MonadGen m
   => ExprConfig as dc
-  -> m (FuncDef dc ())
-genFuncDef ecfg =
+  -> SDefinitionContext inner
+  -> m (FuncDef dc inner ())
+genFuncDef ecfg inner =
   FuncDef <$>
   genWhitespaceBefore1F genIdentifier <*>
   genWhitespaceBeforeF (genParameters ecfg) <*>
   genMaybeF
     (genBeforeF
        (genBetweenWhitespace $ pure RightArrow)
-       (genTest $ ecfg & atomType .~ SNotAssignable)) <*>
+       (genTest $ ecfg
+         & atomType .~ SNotAssignable)) <*>
   genBeforeF
     (genBetweenWhitespace $ pure Colon)
-    (Gen.small $ genSuite (StatementConfig SNotInLoop) ecfg) <*>
+    (Gen.small $ genSuite (StatementConfig SNotInLoop) (ecfg & definitionContext .~ inner)) <*>
   pure ()
 
 genParameters
@@ -319,7 +328,7 @@ genDecorated ecfg =
   genNonEmptyF (genDecorator ecfg) <*>
   Gen.choice
     [ Gen.small $ InL . InL <$> genClassDef ecfg
-    , Gen.small $ InL . InR <$> genFuncDef ecfg
+    , Gen.small $ InL . InR <$> genFuncDef ecfg (SFunDef SNormal)
     , Gen.small $ InR <$> genAsyncFuncDef ecfg
     ] <*>
   pure ()
@@ -331,8 +340,8 @@ genAsyncFuncDef
 genAsyncFuncDef ecfg =
   AsyncFuncDef <$>
   genWhitespaceBefore1F
-    (Gen.small .
-     genFuncDef $ ecfg & definitionContext .~ SFunDef SAsync) <*>
+    (Gen.small $
+     genFuncDef ecfg (SFunDef SAsync)) <*>
   pure ()
 
 genDecorator
@@ -358,7 +367,7 @@ genAsyncStatement scfg ecfg =
   AsyncStatement <$>
   genWhitespaceBefore1F
     (Gen.choice
-      [ Gen.small $ InL . InL <$> genFuncDef ecfg
+      [ Gen.small $ InL . InL <$> genFuncDef ecfg (SFunDef SAsync)
       , Gen.small $ InL . InR <$> genWithStatement scfg ecfg
       , Gen.small $ InR <$> genForStatement scfg ecfg
       ]) <*>

@@ -13,7 +13,7 @@ data InvalidLHS
   = LHSIf
   | LHSOperator
   | LHSAwaitExpr
-  | LHSTrailer
+  | LHSFunCall
   | LHSArgument
   | LHSFor
   | LHSIfOrFor
@@ -49,6 +49,7 @@ data SyntaxError a
   | AugAssignListLHS a
   | TopLevelUnpacking a
   | MultipleUnpackingsInLHS a
+  | UnparenthesisedGeneratorInArgs a
   deriving (Eq, Show, Ord)
 
 newtype SyntaxChecker ann a

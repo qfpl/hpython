@@ -55,13 +55,17 @@ smallStatement :: SmallStatement lctxt ectxt a -> Doc
 smallStatement s =
   case s of
     SmallStatementExpr v _ -> test v
-    SmallStatementAssign l r _ ->
+    SmallStatementAssign l m r _ ->
       testlistStarExpr l <>
       foldMapOf
         (_Wrapped.folded)
         (beforeF
           (betweenWhitespace' equals)
-          (sumElim yieldExpr testlistStarExpr))
+          testlistStarExpr)
+        m <>
+      beforeF
+        (betweenWhitespace' equals)
+        (sumElim yieldExpr testlistStarExpr)
         r
     SmallStatementAugAssign l r _ ->
       test l <>
@@ -138,7 +142,6 @@ ifStatement :: IfStatement lctxt ectxt a -> Doc
 ifStatement (IfStatement c t elif el _) =
   text "if" <>
   whitespaceBeforeF test c <>
-  text "then" <>
   beforeF (betweenWhitespace' colon) suite t <>
   foldMapOf
     (_Wrapped.folded)
@@ -236,7 +239,7 @@ asyncStatement (AsyncStatement v _) =
     (sumElim (sumElim funcDef withStatement) forStatement)
     v
 
-funcDef :: FuncDef ctxt a -> Doc
+funcDef :: FuncDef outer inner a -> Doc
 funcDef (FuncDef n p t b _) =
   text "def" <>
   whitespaceBeforeF identifier n <>

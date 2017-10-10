@@ -77,7 +77,9 @@ _TestlistStarExprMany =
     (\(a, b, c, d) ->
        case toListOf (_Wrapped.folded._Wrapped.before._2.filtered isStar) b of
          [] -> Just $ TestlistStarExprMany a b c d
-         [_] -> Just $ TestlistStarExprMany a b c d
+         [_]
+           | isStar a -> Nothing
+           | otherwise -> Just $ TestlistStarExprMany a b c d
          _ -> Nothing)
     (\case
         Just (TestlistStarExprMany a b c d) -> Just (a, b, c, d)

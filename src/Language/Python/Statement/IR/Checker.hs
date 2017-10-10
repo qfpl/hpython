@@ -1,6 +1,7 @@
 {-# language DataKinds #-}
 {-# language FlexibleInstances #-}
 {-# language GADTs #-}
+{-# language LambdaCase #-}
 {-# language MultiParamTypeClasses #-}
 {-# language RankNTypes #-}
 module Language.Python.Statement.IR.Checker where
@@ -88,7 +89,7 @@ checkCompoundStatement ecfg scfg s =
       pure ann
     IR.CompoundStatementFuncDef v ann ->
       Safe.CompoundStatementFuncDef <$>
-      checkFuncDef ecfg v <*>
+      checkFuncDef ecfg (SFunDef SNormal) v <*>
       pure ann
     IR.CompoundStatementClassDef v ann ->
       Safe.CompoundStatementClassDef <$>
@@ -99,9 +100,12 @@ checkCompoundStatement ecfg scfg s =
       checkDecorated ecfg v <*>
       pure ann
     IR.CompoundStatementAsync v ann ->
-      Safe.CompoundStatementAsync <$>
-      checkAsyncStatement ecfg scfg v <*>
-      pure ann
+      case ecfg ^. definitionContext of
+        SFunDef SAsync ->
+          Safe.CompoundStatementAsync <$>
+          checkAsyncStatement ecfg scfg v <*>
+          pure ann
+        _ -> syntaxError $ AsyncNotInAsyncFunction ann
 
 checkWhileStatement
   :: ExprConfig assignable dctxt
@@ -244,9 +248,10 @@ checkWithItem ecfg (IR.WithItem l r ann) =
 
 checkFuncDef
   :: ExprConfig assignable dctxt
+  -> SDefinitionContext inner
   -> IR.FuncDef ann
-  -> SyntaxChecker ann (Safe.FuncDef dctxt ann)
-checkFuncDef ecfg (IR.FuncDef n p t b ann) =
+  -> SyntaxChecker ann (Safe.FuncDef dctxt inner ann)
+checkFuncDef ecfg inner (IR.FuncDef n p t b ann) =
   Safe.FuncDef n <$>
   traverseOf (_Wrapped.traverse) (checkParameters ecfg) p <*>
   traverseOf
@@ -255,7 +260,7 @@ checkFuncDef ecfg (IR.FuncDef n p t b ann) =
     t <*>
   traverseOf
     (_Wrapped.traverse)
-    (checkSuite ecfg (StatementConfig SNotInLoop))
+    (checkSuite (ecfg & definitionContext .~ inner) (StatementConfig SNotInLoop))
     b <*>
   pure ann
 
@@ -313,7 +318,7 @@ checkDecorated ecfg (IR.Decorated d b ann) =
   traverseOf (_Wrapped.traverse) (checkDecorator ecfg) d <*>
   (case b of
      InL (InL a) -> InL . InL <$> checkClassDef ecfg a
-     InL (InR a) -> InL . InR <$> checkFuncDef ecfg a
+     InL (InR a) -> InL . InR <$> checkFuncDef ecfg (SFunDef SNormal) a
      InR a -> InR <$> checkAsyncFuncDef ecfg a
      ) <*>
   pure ann
@@ -326,7 +331,7 @@ checkAsyncFuncDef ecfg (IR.AsyncFuncDef v ann) =
   Safe.AsyncFuncDef <$>
   traverseOf
     (_Wrapped.traverse)
-    (checkFuncDef $ ecfg & definitionContext .~ SFunDef SAsync)
+    (checkFuncDef ecfg (SFunDef SAsync))
     v <*>
   pure ann
 
@@ -344,23 +349,20 @@ checkDecorator ecfg (IR.Decorator n a nl ann) =
   pure ann
 
 checkAsyncStatement
-  :: ExprConfig assignable dctxt
+  :: ExprConfig assignable ('FunDef 'Async)
   -> StatementConfig lctxt
   -> IR.AsyncStatement ann
   -> SyntaxChecker ann (Safe.AsyncStatement lctxt ('FunDef 'Async) ann)
 checkAsyncStatement ecfg scfg (IR.AsyncStatement v ann) =
-  case ecfg ^. definitionContext of
-    SFunDef SAsync ->
-      Safe.AsyncStatement <$>
-      traverseOf
-        (_Wrapped.traverse)
-        (\a -> case a of
-            InL (InL a') -> InL . InL <$> checkFuncDef ecfg a'
-            InL (InR a') -> InL . InR <$> checkWithStatement ecfg scfg a'
-            InR a' -> InR <$> checkForStatement ecfg scfg a')
-        v <*>
-      pure ann
-    _ -> syntaxError $ AsyncNotInAsyncFunction ann
+  Safe.AsyncStatement <$>
+  traverseOf
+    (_Wrapped.traverse)
+    (\a -> case a of
+        InL (InL a') -> InL . InL <$> checkFuncDef ecfg (SFunDef SAsync) a'
+        InL (InR a') -> InL . InR <$> checkWithStatement ecfg scfg a'
+        InR a' -> InR <$> checkForStatement ecfg scfg a')
+    v <*>
+  pure ann
 
 checkIfStatement
   :: ExprConfig assignable dctxt
@@ -424,14 +426,19 @@ checkSmallStatement ecfg scfg s =
               checkTest (ecfg & atomType .~ SNotAssignable) a' <*>
               pure ann
             InR _ -> syntaxError $ TopLevelUnpacking ann
-        (_, InR (Compose (a:as))) ->
-          Safe.SmallStatementAssign <$>
-          checkTestlistStarExpr (ecfg & atomType .~ SAssignable) l <*>
-          traverseOf
-            (_Wrapped.traverse._Wrapped.traverse)
-            (yieldOrTestlistStarExpr ecfg)
-            (Compose $ a :| as) <*>
-          pure ann
+        (_, InR (Compose as)) ->
+          case unsnoc as of
+            Just (as', a') ->
+              Safe.SmallStatementAssign <$>
+              checkTestlistStarExpr (ecfg & atomType .~ SAssignable) l <*>
+              traverseOf
+                (_Wrapped.traverse._Wrapped.traverse)
+                (\case
+                    InL _ -> syntaxError $ CannotAssignTo LHSYieldExpr ann
+                    InR a'' -> checkTestlistStarExpr (ecfg & atomType .~ SAssignable) a'')
+                (Compose as') <*>
+              traverseOf (_Wrapped.traverse) (yieldOrTestlistStarExpr ecfg) a' <*>
+              pure ann
     IR.SmallStatementDel v ann ->
       Safe.SmallStatementDel <$>
       traverseOf

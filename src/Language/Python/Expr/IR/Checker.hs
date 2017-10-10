@@ -415,33 +415,46 @@ checkTrailer
   -> IR.Trailer ann
   -> SyntaxChecker ann (Safe.Trailer atomType ctxt ann)
 checkTrailer cfg e =
-  case cfg ^. atomType of
-    SAssignable ->
-      syntaxError $ CannotAssignTo LHSTrailer (e ^. IR.trailer_ann)
-    SNotAssignable ->
-      case e of
-        IR.TrailerCall v ann ->
+  case e of
+    IR.TrailerCall v ann ->
+      case cfg ^. atomType of
+        SAssignable -> syntaxError $ CannotAssignTo LHSFunCall ann
+        SNotAssignable ->
           Safe.TrailerCall <$>
           traverseOf (traverseCompose.traverseCompose) (checkArgList cfg) v <*>
           pure ann
-        IR.TrailerSubscript v ann ->
-          Safe.TrailerSubscript <$>
-          traverseCompose
-            (checkSubscriptList cfg)
-            v <*>
-          pure ann
-        IR.TrailerAccess v ann -> pure $ Safe.TrailerAccess v ann
+    IR.TrailerSubscript v ann ->
+      Safe.TrailerSubscript <$>
+      traverseCompose
+        (checkSubscriptList $ cfg & atomType .~ SNotAssignable)
+        v <*>
+      pure ann
+    IR.TrailerAccess v ann -> pure $ Safe.TrailerAccess v ann
 
 checkArgList
   :: ExprConfig atomType ctxt
   -> IR.ArgList ann
   -> SyntaxChecker ann (Safe.ArgList atomType ctxt ann)
 checkArgList cfg (IR.ArgList h t comma ann) =
-  Safe.ArgList <$>
-  checkArgument cfg h <*>
-  traverseOf (traverseCompose.traverseCompose) (checkArgument cfg) t <*>
-  pure comma <*>
-  pure ann
+  case (h, t) of
+    (IR.ArgumentFor e (Compose (Just f)) _, Compose []) ->
+      Safe.ArgListSingleFor <$>
+      checkTest (cfg & atomType .~ SNotAssignable) e <*>
+      checkCompFor (cfg & atomType .~ SNotAssignable) f <*>
+      pure comma <*>
+      pure ann
+    _ ->
+      Safe.ArgListMany <$>
+      checkArgument (cfg & atomType .~ SNotAssignable) h <*>
+      traverseOf
+        (_Wrapped.traverse._Wrapped.traverse)
+        (checkArgument $ cfg & atomType .~ SNotAssignable)
+        t <*>
+      pure comma <*>
+      pure ann
+  where
+    forWithoutParens (IR.ArgumentFor _ (Compose (Just _)) _) = True
+    forWithoutParens _ = False
 
 checkArgument
   :: ExprConfig atomType ctxt
@@ -453,10 +466,15 @@ checkArgument cfg e =
       syntaxError $ CannotAssignTo LHSArgument (e ^. IR.argument_ann)
     SNotAssignable ->
       case e of
-        IR.ArgumentFor ex f ann ->
-          Safe.ArgumentFor <$>
-          checkTest cfg ex <*>
-          traverseCompose (checkCompFor cfg) f <*>
+        IR.ArgumentFor e (Compose Nothing) ann ->
+          Safe.ArgumentExpr <$> checkTest cfg e <*> pure ann
+        IR.ArgumentFor _ (Compose (Just _)) ann ->
+          syntaxError $ UnparenthesisedGeneratorInArgs ann
+        IR.ArgumentForParens l e f r ann ->
+          Safe.ArgumentFor l <$>
+          checkTest cfg e <*>
+          checkCompFor cfg f <*>
+          pure r <*>
           pure ann
         IR.ArgumentDefault l r ann ->
           Safe.ArgumentDefault <$>

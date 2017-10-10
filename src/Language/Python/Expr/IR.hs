@@ -37,6 +37,13 @@ data Argument a
         a
   , _argument_ann :: a
   }
+  | ArgumentForParens
+  { _argumentForParens_lparen :: After [WhitespaceChar] LeftParen
+  , _argumentForParens_expr :: Test a
+  , _argumentForParens_for :: CompFor a
+  , _argumentForParens_rparen :: Before [WhitespaceChar] RightParen
+  , _argument_ann :: a
+  }
   | ArgumentDefault
   { _argumentDefault_left
     :: Compose

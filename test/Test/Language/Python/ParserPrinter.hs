@@ -49,10 +49,6 @@ parse_print_expr_id input =
           (fmap Print.test . runChecker $
             Check.checkTest
               (ExprConfig SNotAssignable STopLevel)
-              unchecked) <!>
-          (fmap Print.test . runChecker $
-            Check.checkTest
-              (ExprConfig SAssignable STopLevel)
               unchecked)
       in
         case checkResult of

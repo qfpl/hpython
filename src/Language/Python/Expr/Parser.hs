@@ -49,6 +49,7 @@ import Language.Python.Parser.Identifier
 import Language.Python.Parser.Keywords
 import Language.Python.Parser.SrcInfo
 import Language.Python.Parser.Symbols
+import Language.Python.Parser.TestlistStarExpr
 
 import Text.Parser.Unspaced
 
@@ -138,7 +139,7 @@ compFor =
   CompFor <$>
   beforeF
     (betweenWhitespace1 $ string "for" $> KFor)
-    (whitespaceAfter1F exprList) <*>
+    (whitespaceAfter1F $ testlistStarExpr expr starExpr) <*>
   (string "in" *> whitespaceBefore1F orTest) <*>
   optionalF (try $ whitespaceBeforeF compIter)
 

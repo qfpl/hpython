@@ -8,10 +8,8 @@ import Papa
 import Data.Functor.Sum
 import Hedgehog
 
-import qualified Data.Text as T
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
-import qualified Language.Python.AST.Identifier as AST
 import qualified Language.Python.AST.Keywords as AST
 import qualified Language.Python.AST.Symbols as AST
 import qualified Language.Python.Expr.AST as AST
@@ -41,6 +39,7 @@ import Language.Python.IR.ExprConfig
 import Test.Language.Python.Gen.ArgsList
 import Test.Language.Python.Gen.Combinators
 import Test.Language.Python.Gen.Identifier
+import Test.Language.Python.Gen.TestlistStarExpr
 
 genIfThenElse
   :: MonadGen m
@@ -737,7 +736,9 @@ genCompFor cfg =
   AST.CompFor <$>
   genBeforeF
     (genBetweenWhitespace1 $ pure AST.KFor)
-    (genWhitespaceAfter1F . Gen.small . genExprList $
+    (genWhitespaceAfter1F .
+     Gen.small .
+     genTestlistStarExpr genExpr genStarExpr $
       cfg & atomType .~ SAssignable) <*>
   genWhitespaceBefore1F (Gen.small $ genOrTest cfg) <*>
   genMaybeF (genWhitespaceBeforeF . Gen.small $ genCompIter cfg) <*>

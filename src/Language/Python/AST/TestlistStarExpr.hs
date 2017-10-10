@@ -5,7 +5,7 @@
 {-# language KindSignatures #-}
 {-# language LambdaCase #-}
 {-# language TemplateHaskell #-}
-module Language.Python.Statement.AST.TestlistStarExpr
+module Language.Python.AST.TestlistStarExpr
   ( TestlistStarExpr
     ( TestlistStarExprSingle
     , TestlistStarExprSingleComma
@@ -24,50 +24,53 @@ module Language.Python.Statement.AST.TestlistStarExpr
 
 import Papa hiding (Sum)
 import Data.Deriving
+import Data.Functor.Classes
 import Data.Functor.Compose
 import Data.Functor.Sum
 import Data.Separated.Before
 import Data.Separated.Between
 
 import Language.Python.AST.Symbols
-import Language.Python.Expr.AST
 import Language.Python.IR.ExprConfig
 
-data TestlistStarExpr (assignable :: AtomType) (ctxt :: DefinitionContext) a
+import Data.Orphans.NonEmpty()
+
+data TestlistStarExpr test starExpr (as :: AtomType) (ctxt :: DefinitionContext) a
   = TestlistStarExprSingle
-  { _testlistStarExprSingle_value :: Test assignable ctxt a
+  { _testlistStarExprSingle_value :: test as ctxt a
   , _testlistStarExprSingle_ann :: a
   }
   | TestlistStarExprSingleComma
   { _testlistStarExprSingleComma_value
-    :: Sum (Test assignable ctxt) (StarExpr assignable ctxt) a
+    :: Sum (test as ctxt) (starExpr as ctxt) a
   , _testlistStarExprSingleComma_comma :: Between' [WhitespaceChar] Comma
   , _testlistStarExprSingleComma_ann :: a
   }
   | TestlistStarExprMany
   { _testlistStarExpr_head
-    :: Sum (Test assignable ctxt) (StarExpr assignable ctxt) a
+    :: Sum (test as ctxt) (starExpr as ctxt) a
   , _testlistStarExpr_tail
     :: Compose
          NonEmpty
          (Compose
            (Before (Between' [WhitespaceChar] Comma))
-           (Sum (Test assignable ctxt) (StarExpr assignable ctxt)))
+           (Sum (test as ctxt) (starExpr as ctxt)))
          a
   , _testlistStarExpr_comma :: Maybe (Between' [WhitespaceChar] Comma)
   , _testlistStarExpr_ann :: a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
+$(return [])
 
 _TestlistStarExprMany
   :: Prism'
-       (Maybe (TestlistStarExpr as ctxt a))
-       ( Sum (Test as ctxt) (StarExpr as ctxt) a
+       (Maybe (TestlistStarExpr test starExpr as ctxt a))
+       ( Sum (test as ctxt) (starExpr as ctxt) a
        , Compose
            NonEmpty
            (Compose
              (Before (Between' [WhitespaceChar] Comma))
-             (Sum (Test as ctxt) (StarExpr as ctxt)))
+             (Sum (test as ctxt) (starExpr as ctxt)))
            a
        , Maybe (Between' [WhitespaceChar] Comma)
        , a
@@ -88,5 +91,10 @@ _TestlistStarExprMany =
     isStar (InL _) = False
     isStar (InR _) = True
 
-deriveEq1 ''TestlistStarExpr
-deriveShow1 ''TestlistStarExpr
+instance (Eq1 (test as ctxt), Eq1 (starExpr as ctxt)) =>
+  Eq1 (TestlistStarExpr test starExpr as ctxt) where
+  liftEq = $(makeLiftEq ''TestlistStarExpr)
+
+instance (Show1 (test as ctxt), Show1 (starExpr as ctxt)) =>
+  Show1 (TestlistStarExpr test starExpr as ctxt) where
+  liftShowsPrec = $(makeLiftShowsPrec ''TestlistStarExpr)

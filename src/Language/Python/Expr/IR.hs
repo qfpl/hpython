@@ -18,6 +18,7 @@ import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.IR.ArgsList
+import Language.Python.IR.TestlistStarExpr
 import Language.Python.Expr.AST.BytesLiteral
 import Language.Python.Expr.AST.CompOperator
 import Language.Python.Expr.AST.FactorOperator
@@ -162,7 +163,7 @@ data CompFor a
         (Before (Between' (NonEmpty WhitespaceChar) KFor))
         (Compose
           (After (NonEmpty WhitespaceChar))
-          ExprList)
+          (TestlistStarExpr Expr StarExpr))
         a
   , _compFor_expr :: Compose (Before (NonEmpty WhitespaceChar)) OrTest a
   , _compFor_iter

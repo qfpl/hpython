@@ -26,10 +26,10 @@ import Language.Python.AST.Identifier
 import Language.Python.AST.IndentedLines
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
+import Language.Python.AST.TestlistStarExpr
 import Language.Python.Expr.AST
 import Language.Python.Statement.AST.AugAssign
 import Language.Python.Statement.AST.Imports
-import Language.Python.Statement.AST.TestlistStarExpr
 import Language.Python.IR.ExprConfig
 import Language.Python.IR.StatementConfig
 
@@ -369,7 +369,7 @@ data ForStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   { _forStatement_for
     :: Compose
          (Between' (NonEmpty WhitespaceChar))
-         (ExprList 'Assignable ctxt)
+         (TestlistStarExpr Expr StarExpr 'Assignable ctxt)
          a
   , _forStatement_in
     :: Compose
@@ -487,18 +487,18 @@ data SmallStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
     } -> SmallStatement lctxt ctxt a
 
   SmallStatementAssign ::
-    { _smallStatementAssign_left :: TestlistStarExpr 'Assignable ctxt a
+    { _smallStatementAssign_left :: TestlistStarExpr Test StarExpr 'Assignable ctxt a
     , _smallStatementAssign_middle
       :: Compose
            []
            (Compose
              (Before (Between' [WhitespaceChar] Equals))
-             (TestlistStarExpr 'Assignable ctxt))
+             (TestlistStarExpr Test StarExpr 'Assignable ctxt))
          a
     , _smallStatementAssign_right
         :: Compose
              (Before (Between' [WhitespaceChar] Equals))
-             (Sum (YieldExpr ctxt) (TestlistStarExpr 'NotAssignable ctxt))
+             (Sum (YieldExpr ctxt) (TestlistStarExpr Test StarExpr 'NotAssignable ctxt))
            a
     , _smallStatementAssign_ann :: a
     } -> SmallStatement lctxt ctxt a

@@ -22,8 +22,8 @@ import Test.Language.Python.Gen.Combinators
 import Test.Language.Python.Gen.DottedName
 import Test.Language.Python.Gen.Identifier
 import Test.Language.Python.Gen.IndentedLines
+import Test.Language.Python.Gen.TestlistStarExpr
 import Test.Language.Python.Statement.AugAssign
-import Test.Language.Python.Statement.TestlistStarExpr
 
 genStatement
   :: MonadGen m
@@ -67,11 +67,11 @@ genSmallStatement scfg ecfg =
       genTest (ecfg & atomType .~ SNotAssignable) <*>
       pure ()
     , SmallStatementAssign <$>
-      genTestlistStarExpr (ecfg & atomType .~ SAssignable) <*>
+      genTestlistStarExpr genTest genStarExpr (ecfg & atomType .~ SAssignable) <*>
       genListF
         (genBeforeF
           (genBetweenWhitespace $ pure Equals)
-          (genTestlistStarExpr (ecfg & atomType .~ SAssignable))) <*>
+          (genTestlistStarExpr genTest genStarExpr (ecfg & atomType .~ SAssignable))) <*>
       genBeforeF
         (genBetweenWhitespace $ pure Equals)
         (Gen.choice $
@@ -79,7 +79,7 @@ genSmallStatement scfg ecfg =
              SFunDef SNormal ->
                [ InL <$> genYieldExpr (ecfg & atomType .~ SNotAssignable) ]
              _ -> []) <>
-          [ InR <$> genTestlistStarExpr (ecfg & atomType .~ SNotAssignable) ]) <*>
+          [ InR <$> genTestlistStarExpr genTest genStarExpr (ecfg & atomType .~ SNotAssignable) ]) <*>
       pure ()
     , SmallStatementAugAssign <$>
       genTest (ecfg & atomType .~ SAssignable) <*>
@@ -166,7 +166,7 @@ genForStatement
   -> m (ForStatement lc dc ())
 genForStatement scfg ecfg =
   ForStatement <$>
-  genBetweenWhitespace1F (genExprList $ ecfg & atomType .~ SAssignable) <*>
+  genBetweenWhitespace1F (genTestlistStarExpr genExpr genStarExpr $ ecfg & atomType .~ SAssignable) <*>
   genWhitespaceBefore1F (genTestList $ ecfg & atomType .~ SNotAssignable) <*>
   genBeforeF
     (genBetweenWhitespace $ pure Colon)

@@ -1,20 +1,23 @@
-module Language.Python.Statement.IR.Checker.TestlistStarExpr where
+module Language.Python.IR.Checker.TestlistStarExpr where
 
 import Papa hiding (Sum)
 import Data.Functor.Compose
 import Data.Functor.Sum
 import Language.Python.IR.ExprConfig
 import Language.Python.IR.SyntaxChecker
-import Language.Python.Expr.IR.Checker
 
-import qualified Language.Python.Statement.AST.TestlistStarExpr as Safe
-import qualified Language.Python.Statement.IR.TestlistStarExpr as IR
+import qualified Language.Python.AST.TestlistStarExpr as Safe
+import qualified Language.Python.IR.TestlistStarExpr as IR
 
+{-
 checkTestlistStarExpr
   :: ExprConfig assignable ctxt
+  -> _
+  -> _
   -> IR.TestlistStarExpr ann
-  -> SyntaxChecker ann (Safe.TestlistStarExpr assignable ctxt ann)
-checkTestlistStarExpr ecfg (IR.TestlistStarExpr h t c ann) =
+  -> SyntaxChecker ann (Safe.TestlistStarExpr test starExpr assignable ctxt ann)
+-}
+checkTestlistStarExpr checkTest checkStarExpr ecfg (IR.TestlistStarExpr h t c ann) =
   case (h, t, c) of
     (InL h', Compose [], Nothing) ->
       Safe.TestlistStarExprSingle <$>

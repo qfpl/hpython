@@ -4,7 +4,7 @@
 {-# language KindSignatures #-}
 {-# language TemplateHaskell #-}
 
-module Language.Python.Statement.IR.TestlistStarExpr where
+module Language.Python.IR.TestlistStarExpr where
 
 import Papa hiding (Sum)
 import Data.Deriving
@@ -14,18 +14,17 @@ import Data.Separated.Before
 import Data.Separated.Between
 
 import Language.Python.AST.Symbols
-import Language.Python.Expr.IR
 
-data TestlistStarExpr a
+data TestlistStarExpr test starExpr a
   = TestlistStarExpr
   { _testlistStarExpr_head
-    :: Sum Test StarExpr a
+    :: Sum test starExpr a
   , _testlistStarExpr_tail
     :: Compose
          []
          (Compose
            (Before (Between' [WhitespaceChar] Comma))
-           (Sum Test StarExpr))
+           (Sum test starExpr))
          a
   , _testlistStarExpr_comma :: Maybe (Between' [WhitespaceChar] Comma)
   , _testlistStarExpr_ann :: a

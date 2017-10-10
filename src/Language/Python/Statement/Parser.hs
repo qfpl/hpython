@@ -16,8 +16,8 @@ import Language.Python.Parser.Identifier
 import Language.Python.Parser.Keywords
 import Language.Python.Parser.SrcInfo
 import Language.Python.Parser.Symbols
+import Language.Python.Parser.TestlistStarExpr
 import Language.Python.Statement.IR
-import Language.Python.Statement.IR.TestlistStarExpr
 import Language.Python.Statement.Parser.AugAssign
 import Language.Python.Statement.Parser.Imports
 
@@ -46,20 +46,6 @@ simpleStatement =
   optional (try $ whitespaceBefore semicolon) <*>
   whitespaceBefore newlineChar
 
-testlistStarExpr
-  :: ( LookAheadParsing m
-     , DeltaParsing m
-     )
-  => Unspaced m (TestlistStarExpr SrcInfo)
-testlistStarExpr =
-  annotated $
-  TestlistStarExpr <$>
-  testOrStar <*>
-  manyF (try $ beforeF (betweenWhitespace comma) testOrStar) <*>
-  optional (try $ betweenWhitespace comma)
-  where
-    testOrStar = (InL <$> try test) <|> (InR <$> starExpr)
-
 smallStatement
   :: ( LookAheadParsing m
      , DeltaParsing m
@@ -86,11 +72,11 @@ smallStatement =
       manyF
         (beforeF
           (betweenWhitespace equals)
-          ((InL <$> try yieldExpr) <|> (InR <$> testlistStarExpr)))
+          ((InL <$> try yieldExpr) <|> (InR <$> testlistStarExpr test starExpr)))
 
     smallStatementExpr =
       SmallStatementExpr <$>
-      testlistStarExpr <*>
+      testlistStarExpr test starExpr <*>
       ((InL <$> try augAssignSequence) <|>
        (InR <$> regularAssignSequence))
 
@@ -366,7 +352,7 @@ forStatement =
   annotated $
   ForStatement <$>
   (string "for" *>
-   betweenWhitespace1F exprList) <*>
+   betweenWhitespace1F (testlistStarExpr expr starExpr)) <*>
   (string "in" *>
    whitespaceBefore1F testList) <*>
   beforeF (betweenWhitespace colon) suite <*>

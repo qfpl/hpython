@@ -39,6 +39,7 @@ import Language.Python.Printer.Combinators
 import Language.Python.Printer.Identifier
 import Language.Python.Printer.Keywords
 import Language.Python.Printer.Symbols
+import Language.Python.Printer.TestlistStarExpr
 
 stringPrefix :: StringPrefix -> Doc
 stringPrefix sp =
@@ -343,7 +344,7 @@ compFor :: CompFor atomType ctxt a -> Doc
 compFor (CompFor t e i _) =
   beforeF
     (betweenWhitespace' . const $ text "for")
-    (whitespaceAfterF exprList)
+    (whitespaceAfterF $ testlistStarExpr expr starExpr)
     t <>
   text "in" <>
   whitespaceBeforeF orTest e <>

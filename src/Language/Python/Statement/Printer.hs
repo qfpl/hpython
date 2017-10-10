@@ -14,8 +14,8 @@ import Language.Python.Printer.Identifier
 import Language.Python.Printer.IndentedLines
 import Language.Python.Printer.Keywords
 import Language.Python.Printer.Symbols
+import Language.Python.Printer.TestlistStarExpr
 import Language.Python.Statement.AST
-import Language.Python.Statement.AST.TestlistStarExpr
 import Language.Python.Statement.Printer.AugAssign
 import Language.Python.Statement.Printer.Imports
 
@@ -35,37 +35,21 @@ simpleStatement (SimpleStatement h t s n _) =
   foldMap (whitespaceBefore semicolon) s <>
   whitespaceBefore newlineChar n
 
-testlistStarExpr :: TestlistStarExpr assignable ectxt a -> Doc
-testlistStarExpr s =
-  case s of
-    TestlistStarExprSingle v _ -> test v
-    TestlistStarExprSingleComma v c _ ->
-      sumElim test starExpr v <>
-      betweenWhitespace' comma c
-    _
-      | Just (h, t, c, _) <- Just s ^? _TestlistStarExprMany ->
-          sumElim test starExpr h <>
-          foldMapOf
-            (_Wrapped.folded)
-            (beforeF (betweenWhitespace' comma) (sumElim test starExpr))
-            t <>
-          foldMap (betweenWhitespace' comma) c
-
 smallStatement :: SmallStatement lctxt ectxt a -> Doc
 smallStatement s =
   case s of
     SmallStatementExpr v _ -> test v
     SmallStatementAssign l m r _ ->
-      testlistStarExpr l <>
+      testlistStarExpr test starExpr l <>
       foldMapOf
         (_Wrapped.folded)
         (beforeF
           (betweenWhitespace' equals)
-          testlistStarExpr)
+          (testlistStarExpr test starExpr))
         m <>
       beforeF
         (betweenWhitespace' equals)
-        (sumElim yieldExpr testlistStarExpr)
+        (sumElim yieldExpr $ testlistStarExpr test starExpr)
         r
     SmallStatementAugAssign l r _ ->
       test l <>
@@ -170,7 +154,7 @@ whileStatement (WhileStatement c b e _) =
 forStatement :: ForStatement lctxt ectxt a -> Doc
 forStatement (ForStatement f i b e _) =
   text "for" <>
-  betweenWhitespace'F exprList f <>
+  betweenWhitespace'F (testlistStarExpr expr starExpr) f <>
   text "in" <>
   whitespaceBeforeF testList i <>
   beforeF (betweenWhitespace' colon) suite b <>

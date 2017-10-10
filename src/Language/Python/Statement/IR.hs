@@ -20,9 +20,9 @@ import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.Expr.IR
 import Language.Python.IR.ArgsList
+import Language.Python.IR.TestlistStarExpr
 import Language.Python.Statement.AST.AugAssign
 import Language.Python.Statement.AST.Imports
-import Language.Python.Statement.IR.TestlistStarExpr
 
 data Statement a
   = StatementSimple
@@ -356,7 +356,7 @@ data ForStatement a
   { _forStatement_for
     :: Compose
          (Between' (NonEmpty WhitespaceChar))
-         ExprList
+         (TestlistStarExpr Expr StarExpr)
          a
   , _forStatement_in
     :: Compose
@@ -469,7 +469,7 @@ deriving instance Show a => Show (SimpleStatement a)
 
 data SmallStatement a
   = SmallStatementExpr
-  { _smallStatementExpr_left :: TestlistStarExpr a
+  { _smallStatementExpr_left :: TestlistStarExpr Test StarExpr a
   , _smallStatementExpr_right
     :: Sum
          (Compose
@@ -479,7 +479,7 @@ data SmallStatement a
            []
            (Compose
              (Before (Between' [WhitespaceChar] Equals))
-             (Sum YieldExpr TestlistStarExpr)))
+             (Sum YieldExpr (TestlistStarExpr Test StarExpr))))
          a
   , _smallStatement_ann :: a
   }

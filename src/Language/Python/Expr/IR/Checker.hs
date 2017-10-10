@@ -18,6 +18,7 @@ import Language.Python.AST.Keywords
 import Language.Python.IR.ExprConfig
 import Language.Python.IR.SyntaxChecker
 import Language.Python.IR.Checker.ArgsList
+import Language.Python.IR.Checker.TestlistStarExpr
 
 import qualified Language.Python.Expr.AST as Safe
 import qualified Language.Python.Expr.IR as IR
@@ -506,7 +507,7 @@ checkCompFor cfg e =
           Safe.CompFor <$>
           traverseOf
             (traverseCompose.traverseCompose)
-            (checkExprList $ cfg & atomType .~ SAssignable)
+            (checkTestlistStarExpr checkExpr checkStarExpr $ cfg & atomType .~ SAssignable)
             ts <*>
           traverseOf
             traverseCompose

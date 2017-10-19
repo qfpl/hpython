@@ -5,8 +5,11 @@
 module Test.Language.Python.Expr.Gen where
 
 import Papa
+import Prelude (div)
 
 import Data.Functor.Compose
+import Data.Separated.Before
+import Data.Separated.Between
 import Language.Python.AST.Identifier
 
 import Data.Functor.Sum
@@ -1151,7 +1154,8 @@ genAndTest
   :: MonadGen m
   => ExprConfig atomType ctxt
   -> m (AST.AndTest atomType ctxt ())
-genAndTest cfg =
+genAndTest cfg = do
+  n <- Gen.int (Range.linear 1 10)
   case cfg ^. atomType of
     SAssignable -> andTestOne cfg
     SNotAssignable ->
@@ -1159,10 +1163,10 @@ genAndTest cfg =
         [ andTestOne cfg
         , AST.AndTestMany <$>
           Gen.small (genNotTest cfg) <*>
-          genNonEmptyF
+          (Compose <$> Gen.nonEmpty (Range.singleton n)
             (genBeforeF
               (genBetween' genWhitespace1 $ pure AST.KAnd)
-              (Gen.small $ genNotTest cfg)) <*>
+              (Gen.scale (`div` Size n) $ genNotTest cfg))) <*>
           pure ()
         ]
   where

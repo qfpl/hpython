@@ -2,7 +2,6 @@
 module Test.Language.Python.Gen.ArgsList where
 
 import Data.Functor.Compose
-import Prelude (undefined)
 
 import Papa hiding (Sum)
 import Data.Functor.Sum
@@ -14,6 +13,7 @@ import Language.Python.IR.ExprConfig
 import Test.Language.Python.Gen.Combinators
 
 import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 
 genArgsListArg
   :: MonadGen m
@@ -36,17 +36,30 @@ genArgsListStarPart
   -> m (name ())
   -> m (f ())
   -> m (ArgsListStarPart name f ())
-genArgsListStarPart cfg genName gen =
-  Gen.choice
+genArgsListStarPart cfg genName gen = do
+  n <- Size <$> Gen.integral_ (Range.linear 0 20)
+  Gen.recursive
+    Gen.choice
     [ pure $ ArgsListStarPartEmpty ()
     , ArgsListStarPart <$>
+      genBeforeF
+        (genBetweenWhitespace $ pure Asterisk)
+        genName <*>
+      pure (Compose []) <*>
+      genMaybeF
+        (genBeforeF
+          (genBetweenWhitespace $ pure Comma)
+          (genArgsListDoublestarArg cfg genName)) <*>
+      pure ()
+    ]
+    [ ArgsListStarPart <$>
       genBeforeF
         (genBetweenWhitespace $ pure Asterisk)
         genName <*>
       genListF
         (genBeforeF
           (genBetweenWhitespace $ pure Comma)
-          (Gen.small $ genArgsListArg cfg genName gen)) <*>
+          (Gen.resize n $ genArgsListArg cfg genName gen)) <*>
       genMaybeF
         (genBeforeF
           (genBetweenWhitespace $ pure Comma)
@@ -72,29 +85,30 @@ genArgsList
   -> m (name ())
   -> m (f ())
   -> m (ArgsList name f ())
-genArgsList cfg genName gen =
+genArgsList cfg genName gen = do
+  n <- Size <$> Gen.integral_ (Range.linear 0 20)
   Gen.recursive
     Gen.choice
-    [ Gen.small . Gen.just $
+    [ Gen.just $
       fmap (review _ArgsListArgsKwargs) $
       (,) <$>
-      genStarOrDouble <*>
+      (InR <$> genArgsListDoublestarArg cfg genName) <*>
       pure ()
     ]
-    [ Gen.small . Gen.just $
+    [ Gen.just $
       fmap (review _ArgsListAll) $
       (,,,) <$>
-      genArgsListArg cfg genName gen <*>
+      Gen.resize n (genArgsListArg cfg genName gen) <*>
       genListF
         (genBeforeF
           (genBetweenWhitespace $ pure Comma)
-          (genArgsListArg cfg genName gen)) <*>
+          (Gen.resize n $ genArgsListArg cfg genName gen)) <*>
       genMaybeF
         (genBeforeF
           (genBetweenWhitespace $ pure Comma)
           (genMaybeF genStarOrDouble)) <*>
       pure ()
-    , Gen.small . Gen.just $
+    , Gen.just $
       fmap (review _ArgsListArgsKwargs) $
       (,) <$>
       genStarOrDouble <*>

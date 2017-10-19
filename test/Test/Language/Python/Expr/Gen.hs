@@ -1231,7 +1231,7 @@ genLambdef cfg =
   AST.Lambdef <$>
   genMaybeF
     (genWhitespaceBefore1F .
-     genArgsList cfg (pure $ Identifier "test" ()) $ genTest cfg) <*>
+     genArgsList cfg genIdentifier $ genTest cfg) <*>
   genBeforeF
     (genBetweenWhitespace $ pure AST.Colon)
     (genTest $ cfg & definitionContext .~ SFunDef SNormal) <*>

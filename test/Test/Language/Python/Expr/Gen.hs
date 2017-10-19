@@ -1196,9 +1196,10 @@ genTest cfg =
   case cfg ^. atomType of
     SAssignable -> testCondNoIf cfg
     SNotAssignable ->
-      Gen.choice
-        [ testCondNoIf cfg
-        , AST.TestCondIf <$>
+      Gen.recursive
+        Gen.choice
+        [ testCondNoIf cfg ]
+        [ AST.TestCondIf <$>
           Gen.small (genOrTest cfg) <*>
           genBeforeF
             genWhitespace1

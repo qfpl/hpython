@@ -143,7 +143,7 @@ checkAndTest cfg (IR.AndTest l r ann) =
           checkNotTest cfg l <*>
           traverseOf
             (traverseCompose.traverseCompose)
-            (checkAndTest cfg)
+            (checkNotTest cfg)
             (Compose $ r' :| rs') <*>
           pure ann
 

@@ -852,4 +852,4 @@ andTest =
   annotated $
   AndTest <$>
   notTest <*>
-  manyF (try $ beforeF (betweenWhitespace1 kAnd) andTest)
+  manyF (try $ beforeF (betweenWhitespace1 kAnd) notTest)

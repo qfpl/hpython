@@ -559,7 +559,7 @@ data AndTest :: AtomType -> DefinitionContext -> * -> * where
           NonEmpty
           (Compose
             (Before (Between' (NonEmpty WhitespaceChar) KAnd))
-            (AndTest 'NotAssignable ctxt))
+            (NotTest 'NotAssignable ctxt))
           a
     , _andTestMany_ann :: a
     } -> AndTest 'NotAssignable ctxt a

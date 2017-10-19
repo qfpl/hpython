@@ -616,7 +616,7 @@ notTest n =
   case n of
     NotTestMany val _ -> beforeF (whitespaceAfter kNot) notTest val
     NotTestOne val _ -> comparison val
-      
+
 andTest :: AndTest atomType ctxt a -> Doc
 andTest (AndTestOne v _) = notTest v
 andTest (AndTestMany l r _) =
@@ -624,7 +624,7 @@ andTest (AndTestMany l r _) =
   foldMapF
     (beforeF
       (betweenWhitespace' kAnd)
-      andTest)
+      notTest)
     r
 
 orTest :: OrTest atomType ctxt a -> Doc

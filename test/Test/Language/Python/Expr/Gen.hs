@@ -1,9 +1,13 @@
 {-# language DataKinds #-}
 {-# language FlexibleInstances #-}
 {-# language GADTs #-}
+{-# language OverloadedStrings #-}
 module Test.Language.Python.Expr.Gen where
 
 import Papa
+
+import Data.Functor.Compose
+import Language.Python.AST.Identifier
 
 import Data.Functor.Sum
 import Hedgehog
@@ -567,7 +571,7 @@ genAtom cfg =
       Gen.recursive Gen.choice
         normalNonRec
         (normalRec cfg ++ [ genAtomParenYield cfg, genAtomCurly cfg ])
-    (SNotAssignable, _) ->
+    (SNotAssignable, _) -> 
       Gen.recursive Gen.choice
         (normalNonRec ++
           [ genAtomInteger cfg
@@ -921,9 +925,10 @@ genFactor cfg =
   case cfg ^. atomType of
     SAssignable -> factorNone cfg
     SNotAssignable ->
-      Gen.choice
-        [ factorNone cfg
-        , AST.FactorOne <$>
+      Gen.recursive
+        Gen.choice
+        [ factorNone cfg ]
+        [ AST.FactorOne <$>
           genWhitespaceAfter genFactorOp <*>
           Gen.small (genFactor cfg) <*>
           pure ()
@@ -1055,6 +1060,7 @@ genXorExpr cfg =
       AST.XorExprOne <$>
       Gen.small (genAndExpr cfg') <*>
       pure ()
+
 genExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
@@ -1126,12 +1132,13 @@ genNotTest cfg =
   case cfg ^. atomType of
     SAssignable -> notTestOne cfg
     SNotAssignable ->
-      Gen.choice
-        [ notTestOne cfg
-        , AST.NotTestMany <$>
+      Gen.recursive
+        Gen.choice
+        [ notTestOne cfg ]
+        [ AST.NotTestMany <$>
           genBeforeF
             (genWhitespaceAfter1 $ pure AST.KNot)
-            (Gen.small $ genNotTest cfg) <*>
+            (genNotTest cfg) <*>
           pure ()
         ]
   where
@@ -1155,7 +1162,7 @@ genAndTest cfg =
           genNonEmptyF
             (genBeforeF
               (genBetween' genWhitespace1 $ pure AST.KAnd)
-              (Gen.small $ genAndTest cfg)) <*>
+              (Gen.small $ genNotTest cfg)) <*>
           pure ()
         ]
   where
@@ -1222,7 +1229,9 @@ genLambdef
   -> m (AST.Lambdef 'NotAssignable ctxt ())
 genLambdef cfg =
   AST.Lambdef <$>
-  genMaybeF (genWhitespaceBefore1F . genArgsList cfg genIdentifier $ genTest cfg) <*>
+  genMaybeF
+    (genWhitespaceBefore1F .
+     genArgsList cfg (pure $ Identifier "test" ()) $ genTest cfg) <*>
   genBeforeF
     (genBetweenWhitespace $ pure AST.Colon)
     (genTest $ cfg & definitionContext .~ SFunDef SNormal) <*>

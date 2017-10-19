@@ -1,6 +1,9 @@
 {-# language DataKinds #-}
 module Test.Language.Python.Gen.ArgsList where
 
+import Data.Functor.Compose
+import Prelude (undefined)
+
 import Papa hiding (Sum)
 import Data.Functor.Sum
 import Hedgehog
@@ -70,7 +73,14 @@ genArgsList
   -> m (f ())
   -> m (ArgsList name f ())
 genArgsList cfg genName gen =
-  Gen.choice
+  Gen.recursive
+    Gen.choice
+    [ Gen.small . Gen.just $
+      fmap (review _ArgsListArgsKwargs) $
+      (,) <$>
+      genStarOrDouble <*>
+      pure ()
+    ]
     [ Gen.small . Gen.just $
       fmap (review _ArgsListAll) $
       (,,,) <$>

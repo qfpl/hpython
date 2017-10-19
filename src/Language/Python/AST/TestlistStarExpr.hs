@@ -33,8 +33,6 @@ import Data.Separated.Between
 import Language.Python.AST.Symbols
 import Language.Python.IR.ExprConfig
 
-import Data.Orphans.NonEmpty()
-
 data TestlistStarExpr test starExpr (as :: AtomType) (ctxt :: DefinitionContext) a
   = TestlistStarExprSingle
   { _testlistStarExprSingle_value :: test as ctxt a

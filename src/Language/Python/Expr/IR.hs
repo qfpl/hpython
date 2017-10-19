@@ -401,7 +401,7 @@ data AndTest a
          []
          (Compose
            (Before (Between' (NonEmpty WhitespaceChar) KAnd))
-           AndTest)
+           NotTest)
          a
   , _andTest_ann :: a
   } deriving (Functor, Foldable, Traversable)

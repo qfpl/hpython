@@ -90,7 +90,7 @@ duplicates eq (a:as) =
 defaultBeforeNonDefault :: [ArgsListArg name test a] -> Bool
 defaultBeforeNonDefault = go False
   where
-    go _ [] = False
+    go seenDefault [] = seenDefault
     go seenDefault (a:as) =
       case a of
         ArgsListArg _ (Compose r) _ ->

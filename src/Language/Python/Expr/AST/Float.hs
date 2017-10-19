@@ -7,7 +7,6 @@ module Language.Python.Expr.AST.Float where
 import Papa
 import Data.Deriving
 import Data.Functor.Compose
-import Data.Orphans.NonEmpty
 import Data.Separated.Before
 
 import Language.Python.AST.Symbols

@@ -661,94 +661,72 @@ data RaiseStatement (ctxt :: DefinitionContext) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-makeLenses ''SmallStatement
 deriveEq1 ''SmallStatement
 deriveShow1 ''SmallStatement
 
-makeLenses ''RaiseStatement
 deriveEq1 ''RaiseStatement
 deriveShow1 ''RaiseStatement
 
-makeLenses ''FlowStatement
 deriveEq1 ''FlowStatement
 deriveShow1 ''FlowStatement
 
-makeLenses ''Decorator
 deriveEq1 ''Decorator
 deriveShow1 ''Decorator
 
-makeLenses ''ClassDef
 deriveEq1 ''ClassDef
 deriveShow1 ''ClassDef
 
-makeLenses ''FuncDef
 deriveEq1 ''FuncDef
 deriveShow1 ''FuncDef
 
-makeLenses ''AsyncFuncDef
 deriveEq1 ''AsyncFuncDef
 deriveShow1 ''AsyncFuncDef
 
-makeLenses ''Suite
 deriveEq1 ''Suite
 deriveShow1 ''Suite
 
-makeLenses ''Statement
 deriveEq1 ''Statement
 deriveShow1 ''Statement
 
-makeLenses ''Parameters
 deriveEq1 ''Parameters
 deriveShow1 ''Parameters
 
-makeLenses ''TypedArg
 deriveEq1 ''TypedArg
 deriveShow1 ''TypedArg
 
-makeLenses ''WithItem
 deriveEq1 ''WithItem
 deriveShow1 ''WithItem
 
-makeLenses ''WithStatement
 deriveEq1 ''WithStatement
 deriveShow1 ''WithStatement
 
-makeLenses ''WhileStatement
 deriveEq1 ''WhileStatement
 deriveShow1 ''WhileStatement
 
-makeLenses ''ForStatement
 deriveEq1 ''ForStatement
 deriveShow1 ''ForStatement
 
-makeLenses ''ExceptClause
 deriveEq1 ''ExceptClause
 deriveShow1 ''ExceptClause
 
-makeLenses ''SimpleStatement
 deriveEq1 ''SimpleStatement
 deriveShow1 ''SimpleStatement
 
-makeLenses ''CompoundStatement
 deriveEq1 ''CompoundStatement
 deriveShow1 ''CompoundStatement
 
-makeLenses ''IfStatement
 deriveEq1 ''IfStatement
 deriveShow1 ''IfStatement
 
-makeLenses ''TryStatement
 deriveEq1 ''TryStatement
 deriveShow1 ''TryStatement
 
-makeLenses ''Decorated
 deriveEq1 ''Decorated
 deriveShow1 ''Decorated
 
-makeLenses ''AsyncStatement
 deriveEq1 ''AsyncStatement
 deriveShow1 ''AsyncStatement
 
 instance HasName TypedArg where
   named (TypedArg ident _ _) = named ident
-  namedIdentifier = typedArg_value
+  namedIdentifier = lens _typedArg_value (\s a -> s { _typedArg_value = a })

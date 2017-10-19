@@ -20,7 +20,6 @@ module Language.Python.AST.IndentedLines
 import Papa
 import Data.Deriving
 import Data.Functor.Classes
-import Data.Orphans.NonEmpty
 import GHC.Natural
 
 import Language.Python.AST.Symbols

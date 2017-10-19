@@ -971,197 +971,158 @@ data PythonModule a
 deriveShow ''Comparison
 deriveEq1 ''Comparison
 deriveShow1 ''Comparison
-makeLenses ''Comparison
 
 deriveShow ''NotTest
 deriveEq1 ''NotTest
 deriveShow1 ''NotTest
-makeLenses ''NotTest
 
 deriveShow ''AndTest
 deriveEq1 ''AndTest
 deriveShow1 ''AndTest
-makeLenses ''AndTest
 
 deriveShow ''OrTest
 deriveEq1 ''OrTest
 deriveShow1 ''OrTest
-makeLenses ''OrTest
 
 deriveShow ''IfThenElse
 deriveEq1 ''IfThenElse
 deriveShow1 ''IfThenElse
-makeLenses ''IfThenElse
 
 deriveShow ''Test
 deriveEq1 ''Test
 deriveShow1 ''Test
-makeLenses ''Test
 
 deriveEq ''TestList
 deriveShow ''TestList
 deriveEq1 ''TestList
 deriveShow1 ''TestList
-makeLenses ''TestList
 
 deriveShow ''Argument
 deriveEq1 ''Argument
 deriveShow1 ''Argument
-makeLenses ''Argument
 
 deriveEq ''ArgList
 deriveShow ''ArgList
 deriveEq1 ''ArgList
 deriveShow1 ''ArgList
-makeLenses ''ArgList
 
 deriveEq ''LambdefNocond
 deriveShow ''LambdefNocond
 deriveEq1 ''LambdefNocond
 deriveShow1 ''LambdefNocond
-makeLenses ''LambdefNocond
 
 deriveEq ''TestNocond
 deriveShow ''TestNocond
 deriveEq1 ''TestNocond
 deriveShow1 ''TestNocond
-makeLenses ''TestNocond
 
-makeLenses ''CompIter
 deriveShow ''CompIter
 deriveEq1 ''CompIter
 deriveShow1 ''CompIter
 
-makeLenses ''CompIf
 deriveShow ''CompIf
 deriveEq1 ''CompIf
 deriveShow1 ''CompIf
 
-makeLenses ''StarExpr
 deriveEq ''StarExpr
 deriveShow ''StarExpr
 deriveEq1 ''StarExpr
 deriveShow1 ''StarExpr
 
-makeLenses ''ExprList
 deriveEq ''ExprList
 deriveShow ''ExprList
 deriveEq1 ''ExprList
 deriveShow1 ''ExprList
 
-makeLenses ''SliceOp
 deriveShow ''SliceOp
 deriveEq1 ''SliceOp
 deriveShow1 ''SliceOp
 
-makeLenses ''Subscript
 deriveShow ''Subscript
 deriveEq1 ''Subscript
 deriveShow1 ''Subscript
 
-makeLenses ''SubscriptList
 deriveShow ''SubscriptList
 deriveEq1 ''SubscriptList
 deriveShow1 ''SubscriptList
 
-makeLenses ''CompFor
 deriveShow ''CompFor
 deriveEq1 ''CompFor
 deriveShow1 ''CompFor
 
-makeLenses ''Trailer
 deriveShow ''Trailer
 deriveEq1 ''Trailer
 deriveShow1 ''Trailer
 
-makeLenses ''AtomExpr
 deriveShow ''AtomExpr
 deriveEq1 ''AtomExpr
 deriveShow1 ''AtomExpr
 
-makeLenses ''Power
 deriveShow ''Power
 deriveEq1 ''Power
 deriveShow1 ''Power
 
-makeLenses ''Factor
 deriveShow ''Factor
 deriveEq1 ''Factor
 deriveShow1 ''Factor
 
-makeLenses ''Term
 deriveShow ''Term
 deriveEq1 ''Term
 deriveShow1 ''Term
 
-makeLenses ''ArithExpr
 deriveShow ''ArithExpr
 deriveEq1 ''ArithExpr
 deriveShow1 ''ArithExpr
 
-makeLenses ''ShiftExpr
 deriveShow ''ShiftExpr
 deriveEq1 ''ShiftExpr
 deriveShow1 ''ShiftExpr
 
-makeLenses ''AndExpr
 deriveShow ''AndExpr
 deriveEq1 ''AndExpr
 deriveShow1 ''AndExpr
 
-makeLenses ''XorExpr
 deriveShow ''XorExpr
 deriveEq1 ''XorExpr
 deriveShow1 ''XorExpr
   
-makeLenses ''Expr
 deriveShow ''Expr
 deriveEq1 ''Expr
 deriveShow1 ''Expr
 
-makeLenses ''YieldArg
 deriveShow ''YieldArg
 deriveEq1 ''YieldArg
 deriveShow1 ''YieldArg
 
-makeLenses ''YieldExpr
 deriveEq1 ''YieldExpr
 deriveShow1 ''YieldExpr
 
-makeLenses ''TupleTestlistComp
 deriveShow ''TupleTestlistComp
 deriveEq1 ''TupleTestlistComp
 deriveShow1 ''TupleTestlistComp
 
-makeLenses ''ListTestlistComp
 deriveShow ''ListTestlistComp
 deriveEq1 ''ListTestlistComp
 deriveShow1 ''ListTestlistComp
 
-makeLenses ''DictOrSetMaker
 deriveEq1 ''DictOrSetMaker
 deriveShow1 ''DictOrSetMaker
 
-makeLenses ''Atom
 deriveShow ''Atom
 deriveEq1 ''Atom
 deriveShow1 ''Atom
 
-makeLenses ''PythonModule
 deriveEq ''PythonModule
 deriveShow ''PythonModule
 deriveEq1 ''PythonModule
 deriveShow1 ''PythonModule
 
-makeLenses ''Lambdef
 deriveShow ''Lambdef
 deriveEq1 ''Lambdef
 deriveShow1 ''Lambdef
 
-makeLenses ''DictUnpacking
 deriveEq1 ''DictUnpacking
 deriveShow1 ''DictUnpacking
 
-makeLenses ''DictItem
 deriveEq1 ''DictItem
 deriveShow1 ''DictItem

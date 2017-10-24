@@ -168,6 +168,7 @@ tryStatement s =
   case s of
     TryStatementExcepts t ex el f _ ->
       text "try" <>
+      beforeF (betweenWhitespace' colon) suite t <>
       foldMapOf
         (_Wrapped.folded)
         (prodElim exceptClause $ beforeF (betweenWhitespace' colon) suite)
@@ -256,7 +257,7 @@ classDef (ClassDef n a b _) =
     (parens .
      whitespaceBeforeF
        (betweenWhitespace'F $
-        foldMapOf (_Wrapped.folded) argList))
+        foldMapOf (_Wrapped.folded) (argList test compFor)))
     a <>
   beforeF (betweenWhitespace' colon) suite b
 
@@ -271,7 +272,9 @@ decorator (Decorator name args n _) =
   whitespaceBeforeF dottedName name <>
   foldMapOf
     (_Wrapped.folded)
-    (parens . betweenWhitespace'F (foldMapOf (_Wrapped.folded) argList))
+    (parens .
+     betweenWhitespace'F
+       (foldMapOf (_Wrapped.folded) (argList test compFor)))
     args <>
   newlineChar n
 

@@ -18,6 +18,7 @@ import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.IR.ArgsList
+import Language.Python.IR.ArgumentList
 import Language.Python.IR.TestlistStarExpr
 import Language.Python.Expr.AST.BytesLiteral
 import Language.Python.Expr.AST.CompOperator
@@ -232,7 +233,7 @@ data Trailer a
         (Between' [WhitespaceChar])
         (Compose
           Maybe
-          ArgList)
+          (ArgumentList Identifier Test))
         a
   , _trailer_ann :: a
   }

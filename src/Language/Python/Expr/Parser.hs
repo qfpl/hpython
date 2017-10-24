@@ -14,9 +14,9 @@ import GHC.Stack
 import Papa hiding (Space, zero, o, Plus, (\\), Product, argument)
 import Data.Functor.Compose
 import Data.Functor.Sum
-import Text.Parser.LookAhead
 import Data.Separated.After (After(..))
 import Data.Separated.Before (Before(..))
+import Text.Parser.LookAhead
 import Text.Trifecta as P hiding
   (Unspaced(..), stringLiteral, integer, octDigit, hexDigit, comma, colon)
 
@@ -44,6 +44,7 @@ import Language.Python.Expr.AST.TermOperator
 import Language.Python.Expr.IR
 import Language.Python.Expr.Parser.StringContent
 import Language.Python.Parser.ArgsList
+import Language.Python.Parser.ArgumentList
 import Language.Python.Parser.Combinators
 import Language.Python.Parser.Identifier
 import Language.Python.Parser.Keywords
@@ -664,7 +665,7 @@ trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
       between
         (char '(')
         (char ')')
-        (betweenWhitespaceF . optionalF $ try argList)
+        (betweenWhitespaceF . optionalF $ try (argumentList identifier test))
 
     trailerSubscript =
       annotated $

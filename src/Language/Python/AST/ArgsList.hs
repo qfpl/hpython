@@ -3,14 +3,17 @@
 {-# language DeriveTraversable #-}
 {-# language FlexibleContexts #-}
 {-# language KindSignatures #-}
+{-# language LambdaCase #-}
+{-# language OverloadedStrings #-}
 {-# language RankNTypes #-}
 {-# language StandaloneDeriving #-}
 {-# language TemplateHaskell #-}
-{-# language OverloadedStrings #-}
+{-# language TypeFamilies #-}
 module Language.Python.AST.ArgsList
   ( HasArgs(..)
   , HasName(..)
-  , ArgsError(..)
+  , KeywordArgument(..)
+  , PositionalArgument(..)
   , ArgsList
   , mkArgsListAll
   , mkArgsListArgsKwargs
@@ -52,12 +55,8 @@ import Data.Functor.Sum.Lens
 import Data.Text (Text)
 
 import Language.Python.AST.Identifier
+import Language.Python.AST.IsArgList
 import Language.Python.AST.Symbols
-
-data ArgsError a
-  = DuplicateArgumentsError [Identifier a]
-  | DefaultBeforeNonDefault [Identifier a]
-  deriving (Eq, Show)
 
 data ArgsListArg name test a
   = ArgsListArg
@@ -86,17 +85,6 @@ duplicates eq (a:as) =
     if null yes
     then duplicates eq no
     else a : duplicates eq no
-
-defaultBeforeNonDefault :: [ArgsListArg name test a] -> Bool
-defaultBeforeNonDefault = go False
-  where
-    go seenDefault [] = seenDefault
-    go seenDefault (a:as) =
-      case a of
-        ArgsListArg _ (Compose r) _ ->
-          case r of
-            Nothing -> seenDefault || go seenDefault as
-            Just _ -> go True as
 
 class HasArgs s where
   -- |
@@ -177,7 +165,7 @@ mkArgsListAll
                (ArgsListDoublestarArg name test))))
        a
   -> a
-  -> Either (ArgsError a) (ArgsList name test a)
+  -> Either (ArgumentError (ArgsList name test a)) (ArgsList name test a)
 mkArgsListAll a bs c ann =
   let allArgNames =
         (a ^.. argNames) <>
@@ -185,23 +173,8 @@ mkArgsListAll a bs c ann =
         (c ^.. _Wrapped.folded._Wrapped.before._2.
                _Wrapped.folded.failing (_InL.argNames) (_InR.argNames))
   in case duplicates ((==) `on` named) allArgNames of
-    [] ->
-      let allArgs =
-            (a ^.. args) <>
-            (bs ^.. _Wrapped.folded._Wrapped.before._2.args) <>
-            (c ^.. _Wrapped.folded._Wrapped.before._2.
-              _Wrapped.folded.failing (_InL.args) (_InR.args))
-      in
-        if defaultBeforeNonDefault allArgs
-        then
-          Left .
-          DefaultBeforeNonDefault $
-          fmap (view namedIdentifier) allArgs
-        else Right $ ArgsListAll a bs c ann
-    dups ->
-      Left .
-      DuplicateArgumentsError $
-      fmap (view namedIdentifier) dups
+    [] -> keywordBeforePositional $ ArgsListAll a bs c ann
+    dups -> Left DuplicateArguments
 
 _ArgsListAll
   :: HasName name
@@ -246,24 +219,13 @@ mkArgsListArgsKwargs
        (ArgsListDoublestarArg name test)
        a
   -> a
-  -> Either (ArgsError a) (ArgsList name test a)
+  -> Either (ArgumentError (ArgsList name test a)) (ArgsList name test a)
 mkArgsListArgsKwargs a ann =
   let allArgNames =
         a ^.. failing (_InL.argNames) (_InR.argNames)
   in case duplicates ((==) `on` named) allArgNames of
-    [] ->
-      let allArgs =
-            a ^.. failing (_InL.args) (_InR.args)
-      in if defaultBeforeNonDefault allArgs
-         then
-           Left .
-           DefaultBeforeNonDefault $
-           fmap (view namedIdentifier) allArgs
-         else Right $ ArgsListArgsKwargs a ann
-    dups ->
-      Left .
-      DuplicateArgumentsError $
-      fmap (view namedIdentifier) dups
+    [] -> keywordBeforePositional $ ArgsListArgsKwargs a ann
+    dups -> Left DuplicateArguments
 
 _ArgsListArgsKwargs
   :: HasName name
@@ -320,6 +282,53 @@ data ArgsList name test a
   deriving (Functor, Foldable, Traversable)
 deriving instance (Eq1 test, Eq1 name, Eq a, Eq (name a)) => Eq (ArgsList name test a)
 deriving instance (Show1 test, Show1 name, Show a, Show (name a)) => Show (ArgsList name test a)
+
+instance IsArgList (ArgsList name test a) where
+  data KeywordArgument (ArgsList name test a)
+    = KAKeywordArg (name a) (test a)
+
+  data PositionalArgument (ArgsList name test a)
+    = PADoublestarArg (name a)
+    | PASinglestarArg (name a)
+    | PAPositionalArg (name a)
+
+  arguments =
+    \case
+        ArgsListAll h t r _ ->
+          fromArgslistarg h :
+          toListOf (_Wrapped.folded._Wrapped.folded.to fromArgslistarg) t <>
+          (toListOf (_Wrapped.folded._Wrapped.folded._Wrapped.folded) r >>=
+           starOrDouble)
+        ArgsListArgsKwargs a _ -> starOrDouble a
+    where
+      starOrDouble a =
+        case a of
+          InL a' -> fromStarpart a'
+          InR a' ->
+            pure .
+            Right .
+            PADoublestarArg $
+            a' ^. to _argsListDoublestarArg_value._Wrapped.between'._2
+
+      fromArgslistarg a =
+        case getCompose $ _argsListArg_right a of
+          Nothing ->
+            Right $ PAPositionalArg (_argsListArg_left a)
+          Just r ->
+            Left $ KAKeywordArg (_argsListArg_left a) (r ^. _Wrapped.before._2)
+
+      fromStarpart a =
+        case a of
+          ArgsListStarPartEmpty _ -> []
+          ArgsListStarPart s d k _ ->
+            (s ^. _Wrapped.before._2.to (Right . PASinglestarArg)) :
+            (d ^.. _Wrapped.folded._Wrapped.before._2.to fromArgslistarg) <>
+            (k ^..
+               _Wrapped.folded.
+               _Wrapped.folded.
+               to _argsListDoublestarArg_value.
+               _Wrapped.between'._2.
+               to (Right . PADoublestarArg))
 
 data ArgsListStarPart name test a
   = ArgsListStarPartEmpty

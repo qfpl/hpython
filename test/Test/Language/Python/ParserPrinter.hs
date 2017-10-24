@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Test.Language.Python.ParserPrinter (makeParserPrinterTests, prop_expr_ast_is_valid_python) where
+module Test.Language.Python.ParserPrinter (makeParserPrinterTests, prop_statement_ast_is_valid_python) where
 
 import Papa
 import Prelude (error, undefined)

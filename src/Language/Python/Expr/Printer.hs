@@ -3,6 +3,7 @@
 module Language.Python.Expr.Printer where
 
 import Papa hiding (Plus, Product, Sum, Space, zero, o, argument)
+import Prelude (error)
 
 import Data.Functor.Product
 import Text.PrettyPrint hiding ((<>), comma, colon)
@@ -10,9 +11,9 @@ import Text.PrettyPrint hiding ((<>), comma, colon)
 import qualified Data.Text as T
 
 import Language.Python.AST.Comment
-import Language.Python.AST.Identifier
 import Language.Python.AST.Symbols
 import Language.Python.Expr.AST
+import Language.Python.Expr.AST.ArgList
 import Language.Python.Expr.AST.BytesLiteral
 import Language.Python.Expr.AST.BytesPrefix
 import Language.Python.Expr.AST.CompOperator
@@ -216,7 +217,7 @@ float' f =
       foldMap digit b <>
       ex e
     FloatDecimalNoBase f' e _ ->
-      char '.' <> foldMap digit f' <> ex e 
+      char '.' <> foldMap digit f' <> ex e
     FloatDecimalBase b f' e _ ->
       foldMap digit b <> char '.' <> foldMap digit f' <> ex e
   where
@@ -239,7 +240,7 @@ stringLiteral (StringLiteral val _) =
     (foldMap stringPrefix)
     (sumElim shortString longString)
   val
-  
+
 bytesLiteral :: BytesLiteral a -> Doc
 bytesLiteral (BytesLiteral prefix val _) =
   bytesPrefix prefix <>
@@ -421,7 +422,7 @@ listTestlistComp t =
       foldMap (whitespaceBefore comma) c
   where
     testOrStar = sumElim test starExpr
-    
+
 tupleTestlistComp :: TupleTestlistComp atomType ctxt a -> Doc
 tupleTestlistComp t =
   case t of
@@ -484,34 +485,42 @@ atom a =
     AtomFalse _ -> text "False"
     AtomImag v _ -> whitespaceBeforeF imag v
 
-argument :: Argument atomType ctxt a -> Doc
-argument a =
+argument
+  :: (forall x as dctxt. test as dctxt x -> Doc)
+  -> (forall x as dctxt. compFor as dctxt x -> Doc)
+  -> Argument test compFor atomType ctxt a
+  -> Doc
+argument t cf a =
   case a of
-    ArgumentExpr e _ -> test e
+    ArgumentExpr e _ -> t e
     ArgumentFor l e f r _ ->
       whitespaceAfter leftParen l <>
-      test e <>
-      compFor f <>
+      t e <>
+      cf f <>
       whitespaceBefore rightParen r
     ArgumentDefault l r _ ->
-      whitespaceAfterF test l <>
+      whitespaceAfterF t l <>
       char '=' <>
-      whitespaceBeforeF test r
+      whitespaceBeforeF t r
     ArgumentUnpack s val _ ->
       either asterisk doubleAsterisk s <>
-      whitespaceBeforeF test val
+      whitespaceBeforeF t val
 
-argList :: ArgList atomType ctxt a -> Doc
-argList e =
-  case e of
-    ArgListMany h t c _ ->
-      argument h <>
-      foldMapF (beforeF (betweenWhitespace' comma) argument) t <>
-      foldMap (whitespaceBefore comma) c
-    ArgListSingleFor e f c _ ->
-      test e <>
-      compFor f <>
-      foldMap (whitespaceBefore comma) c
+argList
+  :: (forall x as dctxt. test as dctxt x -> Doc)
+  -> (forall x as dctxt. compFor as dctxt x -> Doc)
+  -> ArgList test compFor atomType ctxt a -> Doc
+argList _test _compFor al =
+  Just al &
+    (outside _ArgListMany .~ (\(h, t, c, _) ->
+      argument _test _compFor h <>
+      foldMapF (beforeF (betweenWhitespace' comma) (argument _test _compFor)) t <>
+      foldMap (whitespaceBefore comma) c) $
+     outside _ArgListSingleFor .~ (\(e, f, c, _) ->
+       _test e <>
+       _compFor f <>
+       foldMap (whitespaceBefore comma) c) $
+     error "incomplete pattern")
 
 sliceOp :: SliceOp atomType ctxt a -> Doc
 sliceOp (SliceOp val _) = char ':' <> foldMapF (whitespaceBeforeF test) val
@@ -535,7 +544,9 @@ subscriptList (SubscriptList h t c _) =
 trailer :: Trailer atomType ctxt a -> Doc
 trailer t =
   case t of
-    TrailerCall val _ -> parens $ betweenWhitespace'F (foldMapF argList) val
+    TrailerCall val _ ->
+      parens $
+      betweenWhitespace'F (foldMapF $ argumentList identifier test) val
     TrailerSubscript val _ ->
       brackets $ betweenWhitespace'F subscriptList val
     TrailerAccess val _ -> char '.' <> whitespaceBeforeF identifier val
@@ -588,7 +599,7 @@ arithExpr (ArithExprOne v _) = term v
 arithExpr (ArithExprMany l r _) =
   term l <>
   foldMapF (beforeF (betweenWhitespace' (either plus minus)) term) r
-  
+
 shiftExpr :: ShiftExpr atomType ctxt a -> Doc
 shiftExpr (ShiftExprOne v _) = arithExpr v
 shiftExpr (ShiftExprMany l r _) =
@@ -598,7 +609,7 @@ shiftExpr (ShiftExprMany l r _) =
       (betweenWhitespace' (either doubleLT doubleGT))
       arithExpr)
     r
-  
+
 andExpr :: AndExpr atomType ctxt a -> Doc
 andExpr (AndExprOne v _) = shiftExpr v
 andExpr (AndExprMany l r _) =
@@ -641,7 +652,7 @@ test t =
       orTest h <>
       whitespaceBeforeF ifThenElse t'
     TestLambdef a _ -> lambdef a
-    
+
 lambdef :: Lambdef atomType ctxt a -> Doc
 lambdef (Lambdef a b _) =
   text "lambda" <>

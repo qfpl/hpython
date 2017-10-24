@@ -1,8 +1,9 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
+{-# language DataKinds #-}
+{-# language ExistentialQuantification #-}
+{-# language GADTs #-}
+{-# language LambdaCase #-}
+{-# language OverloadedStrings #-}
+{-# language RankNTypes #-}
 module Language.Python.Expr.IR.Checker where
 
 import Data.Functor.Compose
@@ -18,9 +19,12 @@ import Language.Python.AST.Keywords
 import Language.Python.IR.ExprConfig
 import Language.Python.IR.SyntaxChecker
 import Language.Python.IR.Checker.ArgsList
+import Language.Python.IR.Checker.ArgumentList
 import Language.Python.IR.Checker.TestlistStarExpr
 
+import qualified Language.Python.AST.IsArgList as Safe
 import qualified Language.Python.Expr.AST as Safe
+import qualified Language.Python.Expr.AST.ArgList as Safe
 import qualified Language.Python.Expr.IR as IR
 
 traverseCompose
@@ -422,7 +426,10 @@ checkTrailer cfg e =
         SAssignable -> syntaxError $ CannotAssignTo LHSFunCall ann
         SNotAssignable ->
           Safe.TrailerCall <$>
-          traverseOf (traverseCompose.traverseCompose) (checkArgList cfg) v <*>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (checkArgumentList checkTest checkCompFor cfg)
+            v <*>
           pure ann
     IR.TrailerSubscript v ann ->
       Safe.TrailerSubscript <$>
@@ -433,64 +440,106 @@ checkTrailer cfg e =
     IR.TrailerAccess v ann -> pure $ Safe.TrailerAccess v ann
 
 checkArgList
-  :: ExprConfig atomType ctxt
+  :: ( forall as dctxt
+     . ExprConfig as dctxt
+    -> IR.Test ann
+    -> SyntaxChecker
+         ann
+         (test as dctxt ann)
+     )
+  -> ( forall as dctxt
+     . ExprConfig as dctxt
+    -> IR.CompFor ann
+    -> SyntaxChecker
+         ann
+         (compFor as dctxt ann)
+     )
+  -> ExprConfig atomType ctxt
   -> IR.ArgList ann
-  -> SyntaxChecker ann (Safe.ArgList atomType ctxt ann)
-checkArgList cfg (IR.ArgList h t comma ann) =
+  -> SyntaxChecker
+       ann
+       (Safe.ArgList test compFor atomType ctxt ann)
+checkArgList _checkTest _checkCompFor cfg (IR.ArgList h t comma ann) =
   case (h, t) of
     (IR.ArgumentFor e (Compose (Just f)) _, Compose []) ->
-      Safe.ArgListSingleFor <$>
-      checkTest (cfg & atomType .~ SNotAssignable) e <*>
-      checkCompFor (cfg & atomType .~ SNotAssignable) f <*>
-      pure comma <*>
-      pure ann
+      liftError
+        absurd
+        (Safe.mkArgListSingleFor <$>
+        _checkTest (cfg & atomType .~ SNotAssignable) e <*>
+        _checkCompFor (cfg & atomType .~ SNotAssignable) f <*>
+        pure comma <*>
+        pure ann)
     _ ->
-      Safe.ArgListMany <$>
-      checkArgument (cfg & atomType .~ SNotAssignable) h <*>
-      traverseOf
-        (_Wrapped.traverse._Wrapped.traverse)
-        (checkArgument $ cfg & atomType .~ SNotAssignable)
-        t <*>
-      pure comma <*>
-      pure ann
+      liftError
+        (\case
+            Safe.KeywordBeforePositional (Safe.KAKeywordArg e' _) ->
+              KeywordBeforePositional ann
+            Safe.DuplicateArguments -> DuplicateArguments ann)
+        (Safe.mkArgListMany <$>
+         checkArgument
+           _checkTest
+           _checkCompFor
+           (cfg & atomType .~ SNotAssignable) h <*>
+         traverseOf
+           (_Wrapped.traverse._Wrapped.traverse)
+           (checkArgument _checkTest _checkCompFor $ cfg & atomType .~ SNotAssignable)
+           t <*>
+         pure comma <*>
+         pure ann)
   where
     forWithoutParens (IR.ArgumentFor _ (Compose (Just _)) _) = True
     forWithoutParens _ = False
 
 checkArgument
-  :: ExprConfig atomType ctxt
+  :: ( forall as dctxt
+     . ExprConfig as dctxt
+    -> IR.Test ann
+    -> SyntaxChecker
+         ann
+         (test as dctxt ann)
+     )
+  -> ( forall as dctxt
+     . ExprConfig as dctxt
+    -> IR.CompFor ann
+    -> SyntaxChecker
+         ann
+         (compFor as dctxt ann)
+     )
+  -> ExprConfig as dctxt
   -> IR.Argument ann
-  -> SyntaxChecker ann (Safe.Argument atomType ctxt ann)
-checkArgument cfg e =
+  -> SyntaxChecker
+       ann
+       (Safe.Argument test compFor as dctxt ann)
+checkArgument _checkTest _checkCompFor cfg e =
   case cfg ^. atomType of
     SAssignable ->
       syntaxError $ CannotAssignTo LHSArgument (e ^. IR.argument_ann)
     SNotAssignable ->
       case e of
         IR.ArgumentFor e (Compose Nothing) ann ->
-          Safe.ArgumentExpr <$> checkTest cfg e <*> pure ann
+          Safe.ArgumentExpr <$> _checkTest cfg e <*> pure ann
         IR.ArgumentFor _ (Compose (Just _)) ann ->
           syntaxError $ UnparenthesisedGeneratorInArgs ann
         IR.ArgumentForParens l e f r ann ->
           Safe.ArgumentFor l <$>
-          checkTest cfg e <*>
-          checkCompFor cfg f <*>
+          _checkTest cfg e <*>
+          _checkCompFor cfg f <*>
           pure r <*>
           pure ann
         IR.ArgumentDefault l r ann ->
           Safe.ArgumentDefault <$>
           traverseOf
             traverseCompose
-            (checkTest $ cfg & atomType .~ SAssignable)
+            (_checkTest $ cfg & atomType .~ SAssignable)
             l <*>
           traverseOf
             traverseCompose
-            (checkTest cfg)
+            (_checkTest cfg)
             r <*>
           pure ann
         IR.ArgumentUnpack sym val ann ->
           Safe.ArgumentUnpack sym <$>
-          traverseOf traverseCompose (checkTest cfg) val <*>
+          traverseOf traverseCompose (_checkTest cfg) val <*>
           pure ann
 
 checkCompFor

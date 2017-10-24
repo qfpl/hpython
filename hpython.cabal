@@ -20,14 +20,17 @@ tested-with:         GHC == 8.0.2
 library
   exposed-modules:
                        Language.Python.AST.ArgsList
+                       Language.Python.AST.ArgumentList
                        Language.Python.AST.Comment
                        Language.Python.AST.DottedName
                        Language.Python.AST.Identifier
                        Language.Python.AST.IndentedLines
+                       Language.Python.AST.IsArgList
                        Language.Python.AST.Keywords
                        Language.Python.AST.Symbols
                        Language.Python.AST.TestlistStarExpr
                        Language.Python.Expr.AST
+                       Language.Python.Expr.AST.ArgList
                        Language.Python.Expr.AST.BytesLiteral
                        Language.Python.Expr.AST.BytesPrefix
                        Language.Python.Expr.AST.CompOperator
@@ -56,14 +59,17 @@ library
                        Language.Python.Expr.Parser.StringContent
                        Language.Python.Expr.Printer
                        Language.Python.IR.ArgsList
+                       Language.Python.IR.ArgumentList
                        Language.Python.IR.Indentation
                        Language.Python.IR.Checker.ArgsList
+                       Language.Python.IR.Checker.ArgumentList
                        Language.Python.IR.Checker.TestlistStarExpr
                        Language.Python.IR.ExprConfig
                        Language.Python.IR.StatementConfig
                        Language.Python.IR.SyntaxChecker
                        Language.Python.IR.TestlistStarExpr
                        Language.Python.Parser.ArgsList
+                       Language.Python.Parser.ArgumentList
                        Language.Python.Parser.Combinators
                        Language.Python.Parser.DottedName
                        Language.Python.Parser.Identifier
@@ -73,6 +79,7 @@ library
                        Language.Python.Parser.Symbols
                        Language.Python.Parser.TestlistStarExpr
                        Language.Python.Printer.ArgsList
+                       Language.Python.Printer.ArgumentList
                        Language.Python.Printer.Combinators
                        Language.Python.Printer.DottedName
                        Language.Python.Printer.Identifier

@@ -6,9 +6,10 @@
 {-# language FlexibleInstances #-}
 {-# language GADTs #-}
 {-# language KindSignatures #-}
+{-# language RecordWildCards #-}
 {-# language StandaloneDeriving #-}
 {-# language TemplateHaskell #-}
-{-# language RecordWildCards #-}
+{-# language TypeFamilies #-}
 module Language.Python.Expr.AST where
 
 import Papa hiding (Plus, Sum, Product)
@@ -21,10 +22,12 @@ import Data.Separated.Before
 import Data.Separated.Between
 
 import Language.Python.AST.ArgsList
+import Language.Python.AST.ArgumentList
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.AST.TestlistStarExpr
+import Language.Python.Expr.AST.ArgList
 import Language.Python.Expr.AST.BytesLiteral
 import Language.Python.Expr.AST.CompOperator
 import Language.Python.Expr.AST.FactorOperator
@@ -34,67 +37,6 @@ import Language.Python.Expr.AST.Integer
 import Language.Python.Expr.AST.StringLiteral
 import Language.Python.Expr.AST.TermOperator
 import Language.Python.IR.ExprConfig
-
-data Argument :: AtomType -> DefinitionContext -> * -> * where
-  ArgumentExpr ::
-    { _argumentExpr_value :: Test 'NotAssignable ctxt a
-    , _argumentExpr_ann :: a
-    } -> Argument 'NotAssignable ctxt a
-  ArgumentFor ::
-    { _argumentFor_lparen :: After [WhitespaceChar] LeftParen
-    , _argumentFor_expr :: Test 'NotAssignable ctxt a
-    , _argumentFor_for
-      :: CompFor 'NotAssignable ctxt a
-    , _argumentFor_rparen :: Before [WhitespaceChar] RightParen
-    , _argumentFor_ann :: a
-    } -> Argument 'NotAssignable ctxt a
-  ArgumentDefault ::
-    { _argumentDefault_left
-      :: Compose
-           (After [WhitespaceChar])
-           (Test 'Assignable ctxt)
-           a
-    , _argumentDefault_right
-      :: Compose
-           (Before [WhitespaceChar])
-           (Test 'NotAssignable ctxt)
-           a
-    , _argumentDefault_ann :: a
-    } -> Argument 'NotAssignable ctxt a
-  ArgumentUnpack ::
-    { _argumentUnpack_symbol :: Either Asterisk DoubleAsterisk
-    , _argumentUnpack_val
-      :: Compose
-           (Before [WhitespaceChar])
-           (Test 'NotAssignable ctxt)
-           a
-    , _argumentUnpack_ann :: a
-    } -> Argument 'NotAssignable ctxt a
-deriving instance Eq c => Eq (Argument a b c)
-deriving instance Functor (Argument a b)
-deriving instance Foldable (Argument a b)
-deriving instance Traversable (Argument a b)
-
-data ArgList (atomType :: AtomType) (ctxt :: DefinitionContext) a
-  = ArgListSingleFor
-  { _argListSingleFor_expr :: Test 'NotAssignable ctxt a
-  , _argListSingleFor_for :: CompFor 'NotAssignable ctxt a
-  , _argListSingleFor_comma :: Maybe (Before [WhitespaceChar] Comma)
-  , _argListSingleFor_ann :: a
-  }
-  | ArgListMany
-  { _argList_head :: Argument 'NotAssignable ctxt a
-  , _argList_tail
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (Argument 'NotAssignable ctxt))
-         a
-  , _argList_comma :: Maybe (Before [WhitespaceChar] Comma)
-  , _argList_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
 
 data LambdefNocond (atomType :: AtomType) (ctxt :: DefinitionContext) a
   = LambdefNocond
@@ -291,7 +233,7 @@ data Trailer :: AtomType -> DefinitionContext -> * -> * where
           (Between' [WhitespaceChar])
           (Compose
             Maybe
-            (ArgList 'NotAssignable ctxt))
+            (ArgumentList Identifier Test 'NotAssignable ctxt))
           a
     , _trailerCall_ann :: a
     } -> Trailer 'NotAssignable ctxt a
@@ -996,15 +938,6 @@ deriveEq ''TestList
 deriveShow ''TestList
 deriveEq1 ''TestList
 deriveShow1 ''TestList
-
-deriveShow ''Argument
-deriveEq1 ''Argument
-deriveShow1 ''Argument
-
-deriveEq ''ArgList
-deriveShow ''ArgList
-deriveEq1 ''ArgList
-deriveShow1 ''ArgList
 
 deriveEq ''LambdefNocond
 deriveShow ''LambdefNocond

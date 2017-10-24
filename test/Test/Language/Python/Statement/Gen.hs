@@ -313,7 +313,8 @@ genClassDef ecfg =
     (genWhitespaceBeforeF .
      genBetweenWhitespaceF .
      genMaybeF .
-     genArgList $ ecfg & atomType .~ SNotAssignable) <*>
+     genArgList genTest genCompFor $
+     ecfg & atomType .~ SNotAssignable) <*>
   genBeforeF
     (genBetweenWhitespace $ pure Colon)
     (Gen.small $ genSuite (StatementConfig SNotInLoop) ecfg) <*>
@@ -354,7 +355,8 @@ genDecorator ecfg =
   genMaybeF
     (genBetweenWhitespaceF
        (genMaybeF .
-        genArgList $ ecfg & atomType .~ SNotAssignable)) <*>
+        genArgList genTest genCompFor $
+        ecfg & atomType .~ SNotAssignable)) <*>
   genNewlineChar <*>
   pure ()
 

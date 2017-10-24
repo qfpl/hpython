@@ -301,7 +301,7 @@ checkClassDef ecfg (IR.ClassDef n a b ann) =
   Safe.ClassDef n <$>
   traverseOf
     (_Wrapped.traverse._Wrapped.traverse._Wrapped.traverse._Wrapped.traverse)
-    (checkArgList $ ecfg & atomType .~ SNotAssignable)
+    (checkArgList checkTest checkCompFor $ ecfg & atomType .~ SNotAssignable)
     a <*>
   traverseOf
     (_Wrapped.traverse)
@@ -343,7 +343,7 @@ checkDecorator ecfg (IR.Decorator n a nl ann) =
   Safe.Decorator n <$>
   traverseOf
     (_Wrapped.traverse._Wrapped.traverse._Wrapped.traverse)
-    (checkArgList $ ecfg & atomType .~ SNotAssignable)
+    (checkArgList checkTest checkCompFor $ ecfg & atomType .~ SNotAssignable)
     a <*>
   pure nl <*>
   pure ann

@@ -1,3 +1,4 @@
+{-# language LambdaCase #-}
 {-# language RankNTypes #-}
 module Language.Python.IR.Checker.ArgsList where
 
@@ -5,6 +6,7 @@ import Papa
 import Data.Functor.Sum
 
 import qualified Language.Python.AST.ArgsList as Safe
+import qualified Language.Python.AST.IsArgList as Safe
 import qualified Language.Python.IR.ArgsList as IR
 import Language.Python.IR.SyntaxChecker
 import Language.Python.IR.ExprConfig
@@ -108,7 +110,10 @@ checkArgsList cfg check checkName e =
   case e of
     IR.ArgsListAll a b c ann ->
       liftError
-        (\(Safe.DuplicateArgumentsError e') -> DuplicateArguments e' ann) $
+        (\case
+            Safe.DuplicateArguments -> DuplicateArguments ann
+            Safe.KeywordBeforePositional (Safe.KAKeywordArg e' _) ->
+              KeywordBeforePositional ann) $
         Safe.mkArgsListAll <$>
         checkArgsListArg cfg check checkName a <*>
         traverseOf
@@ -122,7 +127,7 @@ checkArgsList cfg check checkName e =
         pure ann
     IR.ArgsListArgsKwargs a ann ->
       liftError
-        (\(Safe.DuplicateArgumentsError e') -> DuplicateArguments e' ann) $
+        (\Safe.DuplicateArguments -> DuplicateArguments ann) $
         Safe.mkArgsListArgsKwargs <$>
         starOrDouble a <*>
         pure ann

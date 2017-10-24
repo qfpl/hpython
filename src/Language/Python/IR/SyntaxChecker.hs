@@ -6,7 +6,6 @@ import Data.Text (Text)
 import Data.Validation
 import qualified Data.DList as D
 
-import Language.Python.AST.Identifier
 import Language.Python.AST.IndentedLines
 
 data InvalidLHS
@@ -39,7 +38,7 @@ data SyntaxError a
   | UnpackingInComprehension a
   -- ^ (*a)
   | UnpackingInParens a
-  | DuplicateArguments [Identifier a] a
+  | DuplicateArguments a
   | NonlocalAtModuleLevel a
   | AsyncNotInAsyncFunction a
   | ReturnOutsideFunction a
@@ -50,6 +49,8 @@ data SyntaxError a
   | TopLevelUnpacking a
   | MultipleUnpackingsInLHS a
   | UnparenthesisedGeneratorInArgs a
+  | KeywordBeforePositional a
+  | KeywordBeforePositionalExpr a
   deriving (Eq, Show, Ord)
 
 newtype SyntaxChecker ann a

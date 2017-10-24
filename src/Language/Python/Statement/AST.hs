@@ -28,6 +28,7 @@ import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.AST.TestlistStarExpr
 import Language.Python.Expr.AST
+import Language.Python.Expr.AST.ArgList
 import Language.Python.Statement.AST.AugAssign
 import Language.Python.Statement.AST.Imports
 import Language.Python.IR.ExprConfig
@@ -129,7 +130,7 @@ data Decorator (ctxt :: DefinitionContext) a
            (Between' [WhitespaceChar])
            (Compose
              Maybe
-             (ArgList 'NotAssignable ctxt)))
+             (ArgumentList Identifier Test 'NotAssignable ctxt)))
          a
   , _decorator_newline :: NewlineChar
   , _decorator_ann :: a
@@ -154,7 +155,7 @@ data ClassDef (ctxt :: DefinitionContext) a
              (Between' [WhitespaceChar])
              (Compose
                Maybe
-               (ArgList 'NotAssignable ctxt))))
+               (ArgumentList Identifier Test 'NotAssignable ctxt))))
          a
   , _classDef_body
     :: Compose

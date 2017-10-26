@@ -41,12 +41,14 @@ data KeywordsArguments name expr a
          a
   , _keywordsArguments_tail
     :: Compose
-         (Before (Between' [WhitespaceChar] Comma))
-         (Sum
-           (KeywordItem name expr)
-           (Compose
-             (Before (Between' [WhitespaceChar] DoubleAsterisk))
-             expr))
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] Comma))
+           (Sum
+             (KeywordItem name expr)
+             (Compose
+               (Before (Between' [WhitespaceChar] DoubleAsterisk))
+               expr)))
          a
   , _keywordsArguments_ann :: a
   }
@@ -65,7 +67,7 @@ data PositionalArguments expr a
     :: Compose
         []
         (Compose
-          (Before (Between' [WhitespaceChar] Asterisk))
+          (Before (Between' [WhitespaceChar] Comma))
           (Compose
             (Before (Maybe (Between' [WhitespaceChar] Asterisk)))
             expr))
@@ -124,10 +126,7 @@ data ArgumentList name expr a
   }
   | ArgumentListUnpacking
   { _argumentListUnpacking_starredAndKeywords
-    :: Compose
-        (Before (Between' [WhitespaceChar] Comma))
-        (StarredAndKeywords name expr)
-        a
+    :: StarredAndKeywords name expr a
   , _argumentListUnpacking_keywords
     :: Compose
         Maybe

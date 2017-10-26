@@ -18,6 +18,7 @@ import Language.Python.IR.StatementConfig
 
 import Test.Language.Python.Expr.Gen
 import Test.Language.Python.Gen.ArgsList
+import Test.Language.Python.Gen.ArgumentList
 import Test.Language.Python.Gen.Combinators
 import Test.Language.Python.Gen.DottedName
 import Test.Language.Python.Gen.Identifier
@@ -312,9 +313,8 @@ genClassDef ecfg =
   genMaybeF
     (genWhitespaceBeforeF .
      genBetweenWhitespaceF .
-     genMaybeF .
-     genArgList genTest genCompFor $
-     ecfg & atomType .~ SNotAssignable) <*>
+     genMaybeF $
+     genArgumentList (ecfg & atomType .~ SNotAssignable) genIdentifier genTest) <*>
   genBeforeF
     (genBetweenWhitespace $ pure Colon)
     (Gen.small $ genSuite (StatementConfig SNotInLoop) ecfg) <*>
@@ -354,9 +354,8 @@ genDecorator ecfg =
   genWhitespaceBeforeF genDottedName <*>
   genMaybeF
     (genBetweenWhitespaceF
-       (genMaybeF .
-        genArgList genTest genCompFor $
-        ecfg & atomType .~ SNotAssignable)) <*>
+       (genMaybeF $
+        genArgumentList (ecfg & atomType .~ SNotAssignable) genIdentifier genTest)) <*>
   genNewlineChar <*>
   pure ()
 

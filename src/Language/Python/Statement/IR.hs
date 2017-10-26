@@ -20,6 +20,7 @@ import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.Expr.IR
 import Language.Python.IR.ArgsList
+import Language.Python.IR.ArgumentList
 import Language.Python.IR.TestlistStarExpr
 import Language.Python.Statement.AST.AugAssign
 import Language.Python.Statement.AST.Imports
@@ -115,7 +116,7 @@ data Decorator a
            (Between' [WhitespaceChar])
            (Compose
              Maybe
-             ArgList))
+             (ArgumentList Identifier Test)))
          a
   , _decorator_newline :: NewlineChar
   , _decorator_ann :: a
@@ -140,7 +141,7 @@ data ClassDef a
              (Between' [WhitespaceChar])
              (Compose
                Maybe
-               ArgList)))
+               (ArgumentList Identifier Test))))
          a
   , _classDef_body
     :: Compose

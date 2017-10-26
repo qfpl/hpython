@@ -46,6 +46,7 @@ import qualified Language.Python.Expr.AST.StringContent as SC
 import Language.Python.IR.ExprConfig
 
 import Test.Language.Python.Gen.ArgsList
+import Test.Language.Python.Gen.ArgumentList
 import Test.Language.Python.Gen.Combinators
 import Test.Language.Python.Gen.Identifier
 import Test.Language.Python.Gen.TestlistStarExpr
@@ -867,7 +868,7 @@ genTrailer cfg =
         commonRec cfg ++
         [ AST.TrailerCall <$>
           genBetweenWhitespaceF
-            (genMaybeF $ genArgList genTest genCompFor cfg) <*>
+            (genMaybeF $ genArgumentList cfg genIdentifier genTest) <*>
           pure ()
         ]
     SAssignable -> Gen.recursive Gen.choice (commonNonRec cfg) (commonRec cfg)

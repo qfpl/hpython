@@ -23,6 +23,7 @@ import qualified Language.Python.Statement.IR as IR
 import Language.Python.AST.IndentedLines
 import Language.Python.Expr.IR.Checker
 import Language.Python.IR.Checker.ArgsList
+import Language.Python.IR.Checker.ArgumentList
 import Language.Python.IR.Checker.TestlistStarExpr
 import Language.Python.IR.ExprConfig
 import Language.Python.IR.SyntaxChecker
@@ -301,7 +302,7 @@ checkClassDef ecfg (IR.ClassDef n a b ann) =
   Safe.ClassDef n <$>
   traverseOf
     (_Wrapped.traverse._Wrapped.traverse._Wrapped.traverse._Wrapped.traverse)
-    (checkArgList checkTest checkCompFor $ ecfg & atomType .~ SNotAssignable)
+    (checkArgumentList (ecfg & atomType .~ SNotAssignable) checkIdentifier checkTest)
     a <*>
   traverseOf
     (_Wrapped.traverse)
@@ -343,7 +344,7 @@ checkDecorator ecfg (IR.Decorator n a nl ann) =
   Safe.Decorator n <$>
   traverseOf
     (_Wrapped.traverse._Wrapped.traverse._Wrapped.traverse)
-    (checkArgList checkTest checkCompFor $ ecfg & atomType .~ SNotAssignable)
+    (checkArgumentList (ecfg & atomType .~ SNotAssignable) checkIdentifier checkTest)
     a <*>
   pure nl <*>
   pure ann

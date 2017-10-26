@@ -428,7 +428,7 @@ checkTrailer cfg e =
           Safe.TrailerCall <$>
           traverseOf
             (traverseCompose.traverseCompose)
-            (checkArgumentList checkTest checkCompFor cfg)
+            (checkArgumentList cfg checkIdentifier checkTest)
             v <*>
           pure ann
     IR.TrailerSubscript v ann ->
@@ -472,7 +472,7 @@ checkArgList _checkTest _checkCompFor cfg (IR.ArgList h t comma ann) =
     _ ->
       liftError
         (\case
-            Safe.KeywordBeforePositional (Safe.KAKeywordArg e' _) ->
+            Safe.KeywordBeforePositional _ ->
               KeywordBeforePositional ann
             Safe.DuplicateArguments -> DuplicateArguments ann)
         (Safe.mkArgListMany <$>
@@ -486,24 +486,21 @@ checkArgList _checkTest _checkCompFor cfg (IR.ArgList h t comma ann) =
            t <*>
          pure comma <*>
          pure ann)
-  where
-    forWithoutParens (IR.ArgumentFor _ (Compose (Just _)) _) = True
-    forWithoutParens _ = False
 
 checkArgument
-  :: ( forall as dctxt
-     . ExprConfig as dctxt
+  :: ( forall as' dctxt'
+     . ExprConfig as' dctxt'
     -> IR.Test ann
     -> SyntaxChecker
          ann
-         (test as dctxt ann)
+         (test as' dctxt' ann)
      )
-  -> ( forall as dctxt
-     . ExprConfig as dctxt
+  -> ( forall as' dctxt'
+     . ExprConfig as' dctxt'
     -> IR.CompFor ann
     -> SyntaxChecker
          ann
-         (compFor as dctxt ann)
+         (compFor as' dctxt' ann)
      )
   -> ExprConfig as dctxt
   -> IR.Argument ann
@@ -516,13 +513,13 @@ checkArgument _checkTest _checkCompFor cfg e =
       syntaxError $ CannotAssignTo LHSArgument (e ^. IR.argument_ann)
     SNotAssignable ->
       case e of
-        IR.ArgumentFor e (Compose Nothing) ann ->
-          Safe.ArgumentExpr <$> _checkTest cfg e <*> pure ann
+        IR.ArgumentFor e' (Compose Nothing) ann ->
+          Safe.ArgumentExpr <$> _checkTest cfg e' <*> pure ann
         IR.ArgumentFor _ (Compose (Just _)) ann ->
           syntaxError $ UnparenthesisedGeneratorInArgs ann
-        IR.ArgumentForParens l e f r ann ->
+        IR.ArgumentForParens l e' f r ann ->
           Safe.ArgumentFor l <$>
-          _checkTest cfg e <*>
+          _checkTest cfg e' <*>
           _checkCompFor cfg f <*>
           pure r <*>
           pure ann

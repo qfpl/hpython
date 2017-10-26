@@ -8,6 +8,7 @@ import Text.PrettyPrint hiding ((<>), semicolon, equals, comma, colon)
 
 import Language.Python.Expr.Printer
 import Language.Python.Printer.ArgsList
+import Language.Python.Printer.ArgumentList
 import Language.Python.Printer.Combinators
 import Language.Python.Printer.DottedName
 import Language.Python.Printer.Identifier
@@ -257,7 +258,7 @@ classDef (ClassDef n a b _) =
     (parens .
      whitespaceBeforeF
        (betweenWhitespace'F $
-        foldMapOf (_Wrapped.folded) (argList test compFor)))
+        foldMapOf (_Wrapped.folded) (argumentList identifier test)))
     a <>
   beforeF (betweenWhitespace' colon) suite b
 
@@ -274,7 +275,7 @@ decorator (Decorator name args n _) =
     (_Wrapped.folded)
     (parens .
      betweenWhitespace'F
-       (foldMapOf (_Wrapped.folded) (argList test compFor)))
+       (foldMapOf (_Wrapped.folded) (argumentList identifier test)))
     args <>
   newlineChar n
 

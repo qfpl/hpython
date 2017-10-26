@@ -10,6 +10,7 @@ import Text.Trifecta hiding (Unspaced(..), comma, dot, colon)
 import Language.Python.AST.Symbols
 import Language.Python.Expr.Parser
 import Language.Python.Parser.ArgsList
+import Language.Python.Parser.ArgumentList
 import Language.Python.Parser.Combinators
 import Language.Python.Parser.DottedName
 import Language.Python.Parser.Identifier
@@ -193,7 +194,7 @@ decorator =
   Decorator <$>
   (char '@' *>
    whitespaceBeforeF dottedName) <*>
-  optionalF (try . betweenWhitespaceF . optionalF $ try argList) <*>
+  optionalF (try . betweenWhitespaceF . optionalF $ try (argumentList identifier test)) <*>
   newlineChar
 
 decorated
@@ -225,7 +226,7 @@ classDef =
      parens .
      betweenWhitespaceF .
      optionalF $
-     try argList) <*>
+     try (argumentList identifier test)) <*>
   beforeF (betweenWhitespace colon) suite
 
 typedArg

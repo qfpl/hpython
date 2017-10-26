@@ -61,12 +61,14 @@ data KeywordsArguments name expr as dctxt a where
            a
     , _keywordsArguments_tail
       :: Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (Sum
-             (KeywordItem name expr 'NotAssignable dctxt)
-             (Compose
-               (Before (Between' [WhitespaceChar] DoubleAsterisk))
-               (expr 'NotAssignable dctxt)))
+           []
+           (Compose
+             (Before (Between' [WhitespaceChar] Comma))
+             (Sum
+               (KeywordItem name expr 'NotAssignable dctxt)
+               (Compose
+                 (Before (Between' [WhitespaceChar] DoubleAsterisk))
+                 (expr 'NotAssignable dctxt))))
            a
     , _keywordsArguments_ann :: a
     } -> KeywordsArguments name expr 'NotAssignable dctxt a
@@ -85,7 +87,7 @@ data PositionalArguments expr (as :: AtomType) (dctxt :: DefinitionContext) a wh
       :: Compose
           []
           (Compose
-            (Before (Between' [WhitespaceChar] Asterisk))
+            (Before (Between' [WhitespaceChar] Comma))
             (Compose
               (Before (Maybe (Between' [WhitespaceChar] Asterisk)))
               (expr 'NotAssignable dctxt)))
@@ -144,10 +146,7 @@ data ArgumentList name expr (as :: AtomType) (dctxt :: DefinitionContext) a wher
     } -> ArgumentList name expr 'NotAssignable dctxt a
   ArgumentListUnpacking ::
     { _argumentListUnpacking_starredAndKeywords
-      :: Compose
-          (Before (Between' [WhitespaceChar] Comma))
-          (StarredAndKeywords name expr 'NotAssignable dctxt)
-          a
+      :: StarredAndKeywords name expr 'NotAssignable dctxt a
     , _argumentListUnpacking_keywords
       :: Compose
           Maybe
@@ -167,25 +166,24 @@ deriving instance (Foldable name, Foldable (expr as dctxt)) => Foldable (Argumen
 deriving instance (Traversable name, Traversable (expr as dctxt)) => Traversable (ArgumentList name expr as dctxt)
 
 mkArgumentListAll
-  :: ( PositionalArguments expr 'NotAssignable dctxt a
-     , Compose
-         Maybe
-         (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (StarredAndKeywords name expr 'NotAssignable dctxt))
-         a
-     , Compose
-         Maybe
-         (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (KeywordsArguments name expr 'NotAssignable dctxt))
-         a
-     , a
-     )
+  :: PositionalArguments expr 'NotAssignable dctxt a
+  -> Compose
+       Maybe
+       (Compose
+         (Before (Between' [WhitespaceChar] Comma))
+         (StarredAndKeywords name expr 'NotAssignable dctxt))
+       a
+  -> Compose
+       Maybe
+       (Compose
+         (Before (Between' [WhitespaceChar] Comma))
+         (KeywordsArguments name expr 'NotAssignable dctxt))
+       a
+  -> a
   -> Either
        (ArgumentError (ArgumentList name expr 'NotAssignable dctxt a))
        (ArgumentList name expr 'NotAssignable dctxt a)
-mkArgumentListAll (a, b, c, d) =
+mkArgumentListAll a b c d =
   let res = ArgumentListAll a b c d
   in keywordBeforePositional res
 
@@ -209,38 +207,31 @@ _ArgumentListAll
        )
 _ArgumentListAll =
   prism'
-    (either (const Nothing) Just . mkArgumentListAll)
+    (\(a, b, c, d) -> either (const Nothing) Just $ mkArgumentListAll a b c d)
     (\case
         Just (ArgumentListAll a b c d) -> Just (a, b, c, d)
         _ -> Nothing)
 
 mkArgumentListUnpacking
-  :: ( Compose
+  :: StarredAndKeywords name expr 'NotAssignable dctxt a
+  -> Compose
+       Maybe
+       (Compose
          (Before (Between' [WhitespaceChar] Comma))
-         (StarredAndKeywords name expr 'NotAssignable dctxt)
-         a
-     , Compose
-         Maybe
-         (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (KeywordsArguments name expr 'NotAssignable dctxt))
-         a
-     , a
-     )
+         (KeywordsArguments name expr 'NotAssignable dctxt))
+       a
+  -> a
   -> Either
        (ArgumentError (ArgumentList name expr 'NotAssignable dctxt a))
        (ArgumentList name expr 'NotAssignable dctxt a)
-mkArgumentListUnpacking (a, b, c) =
+mkArgumentListUnpacking a b c =
   let res = ArgumentListUnpacking a b c
   in keywordBeforePositional res
 
 _ArgumentListUnpacking
   :: Prism'
        (Maybe (ArgumentList name expr 'NotAssignable dctxt a))
-       ( Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (StarredAndKeywords name expr 'NotAssignable dctxt)
-           a
+       ( StarredAndKeywords name expr 'NotAssignable dctxt a
        , Compose
            Maybe
            (Compose
@@ -251,19 +242,18 @@ _ArgumentListUnpacking
        )
 _ArgumentListUnpacking =
   prism'
-    (either (const Nothing) Just . mkArgumentListUnpacking)
+    (\(a, b, c) -> either (const Nothing) Just $ mkArgumentListUnpacking a b c)
     (\case
         Just (ArgumentListUnpacking a b c) -> Just (a, b, c)
         _ -> Nothing)
 
 mkArgumentListKeywords
-  :: ( KeywordsArguments name expr 'NotAssignable dctxt a
-     , a
-     )
+  :: KeywordsArguments name expr 'NotAssignable dctxt a
+  -> a
   -> Either
        (ArgumentError (ArgumentList name expr 'NotAssignable dctxt a))
        (ArgumentList name expr 'NotAssignable dctxt a)
-mkArgumentListKeywords (a, b) =
+mkArgumentListKeywords a b =
   let res = ArgumentListKeywords a b
   in keywordBeforePositional res
 
@@ -275,7 +265,7 @@ _ArgumentListKeywords
        )
 _ArgumentListKeywords =
   prism'
-    (either (const Nothing) Just . mkArgumentListKeywords)
+    (\(a, b) -> either (const Nothing) Just $ mkArgumentListKeywords a b)
     (\case
         Just (ArgumentListKeywords a b) -> Just (a, b)
         _ -> Nothing)
@@ -303,7 +293,7 @@ instance IsArgList (ArgumentList name expr as dctxt a) where
         maybe [] fromStarredAndKeywords (ss ^? _Wrapped._Just._Wrapped.before._2) <>
         maybe [] fromKeywords (ks ^? _Wrapped._Just._Wrapped.before._2)
       ArgumentListUnpacking ss ks _ ->
-        fromStarredAndKeywords (ss ^. _Wrapped.before._2) <>
+        fromStarredAndKeywords ss <>
         maybe [] fromKeywords (ks ^? _Wrapped._Just._Wrapped.before._2)
       ArgumentListKeywords ks _ ->
         fromKeywords ks
@@ -339,7 +329,7 @@ instance IsArgList (ArgumentList name expr as dctxt a) where
              (PositionalArgument (ArgumentList name expr as dctxt a))]
       fromKeywords (KeywordsArguments h t _) =
         keyOrUnpack h :
-        fmap keyOrUnpack (t ^.. _Wrapped.folded)
+        fmap keyOrUnpack (t ^.. _Wrapped.folded._Wrapped.folded)
         where
           keyOrUnpack x =
             Left $

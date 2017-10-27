@@ -30,10 +30,9 @@ data LongString a
     :: StringContent DoubleQuote LongStringChar
   , _longString_ann :: a
   }
-  deriving (Functor, Foldable, Traversable)
+  deriving (Eq, Show, Ord, Functor, Foldable, Traversable)
 
-deriveEq ''LongString
-deriveShow ''LongString
 deriveEq1 ''LongString
 deriveShow1 ''LongString
+deriveOrd1 ''LongString
 makeLenses ''LongString

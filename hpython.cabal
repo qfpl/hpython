@@ -30,7 +30,6 @@ library
                        Language.Python.AST.Symbols
                        Language.Python.AST.TestlistStarExpr
                        Language.Python.Expr.AST
-                       Language.Python.Expr.AST.ArgList
                        Language.Python.Expr.AST.BytesLiteral
                        Language.Python.Expr.AST.BytesPrefix
                        Language.Python.Expr.AST.CompOperator

@@ -15,7 +15,7 @@ data Digit
   | Digit_7
   | Digit_8
   | Digit_9
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 instance D0 Digit where
   d0 =
@@ -107,7 +107,7 @@ data NonZeroDigit
   | NonZeroDigit_7
   | NonZeroDigit_8
   | NonZeroDigit_9
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 instance D1 NonZeroDigit where
   d1 =
@@ -190,7 +190,7 @@ data OctDigit
   | OctDigit_5
   | OctDigit_6
   | OctDigit_7
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 instance D0 OctDigit where
   d0 =
@@ -279,7 +279,7 @@ data HexDigit
   | HexDigit_E
   | HexDigit_f
   | HexDigit_F
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 instance D0 HexDigit where
   d0 =
@@ -457,7 +457,7 @@ instance DF HexDigit where
           HexDigit_F -> Just ()
           _ -> Nothing)
 
-data BinDigit = BinDigit_0 | BinDigit_1 deriving (Eq, Show)
+data BinDigit = BinDigit_0 | BinDigit_1 deriving (Eq, Ord, Show)
 
 instance D0 BinDigit where
   d0 =

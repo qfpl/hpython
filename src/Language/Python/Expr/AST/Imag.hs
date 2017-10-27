@@ -24,10 +24,9 @@ data Imag a
          a
   , _imag_ann :: a
   }
-  deriving (Functor, Foldable, Traversable)
+  deriving (Eq, Show, Ord, Functor, Foldable, Traversable)
 
-makeLenses ''Imag
-deriveEq ''Imag
-deriveShow ''Imag
 deriveEq1 ''Imag
 deriveShow1 ''Imag
+deriveOrd1 ''Imag
+makeLenses ''Imag

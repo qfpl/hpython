@@ -25,7 +25,7 @@ import Language.Python.Expr.AST.StringContent
 newtype LongBytesChar
   = LongBytesChar
   { _longStringChar_value :: Char
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Ord)
 
 instance AsChar LongBytesChar where
   _Char = _LongBytesChar
@@ -43,7 +43,7 @@ _LongBytesChar =
 newtype LongBytesCharFinal a
   = LongBytesCharFinal
   { _longStringCharFinal_value :: Char
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Ord)
 
 _LongBytesCharFinalSingle :: Prism' Char (LongBytesCharFinal SingleQuote)
 _LongBytesCharFinalSingle =

@@ -3,14 +3,15 @@ module Data.Separated.After where
 
 import Papa
 
-import Data.Eq.Deriving
-import Text.Show.Deriving
+import Data.Deriving
 
 data After s a = After s a
-  deriving (Eq, Foldable, Functor, Traversable, Show)
+  deriving (Eq, Ord, Foldable, Functor, Traversable, Show)
 
 deriveEq1 ''After
 deriveShow1 ''After
+deriveOrd1 ''After
+deriveRead1 ''After
 
 instance Bifunctor After where
   bimap f g (After s a) = After (f s) (g a)

@@ -29,7 +29,6 @@ import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.AST.TestlistStarExpr
 import Language.Python.Expr.AST
-import Language.Python.Expr.AST.ArgList
 import Language.Python.Statement.AST.AugAssign
 import Language.Python.Statement.AST.Imports
 import Language.Python.IR.ExprConfig
@@ -244,6 +243,7 @@ data TypedArg a
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (TypedArg a)
 deriving instance Show a => Show (TypedArg a)
+deriving instance Ord a => Ord (TypedArg a)
 
 data WithStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   = WithStatement
@@ -728,7 +728,3 @@ deriveShow1 ''Decorated
 
 deriveEq1 ''AsyncStatement
 deriveShow1 ''AsyncStatement
-
-instance HasName TypedArg where
-  named (TypedArg ident _ _) = named ident
-  namedIdentifier = lens _typedArg_value (\s a -> s { _typedArg_value = a })

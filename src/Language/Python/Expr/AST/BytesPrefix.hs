@@ -13,4 +13,4 @@ data BytesPrefix
   | BytesPrefix_rB
   | BytesPrefix_Rb
   | BytesPrefix_RB
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)

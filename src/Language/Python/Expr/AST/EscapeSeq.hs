@@ -20,7 +20,7 @@ data EscapeSeq
   | Slash_v
   | Slash_octal (NonEmpty OctDigit)
   | Slash_hex HexDigit (NonEmpty HexDigit)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 isEscapeChar :: Char -> Bool
 isEscapeChar c =

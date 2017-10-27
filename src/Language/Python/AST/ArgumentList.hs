@@ -388,3 +388,18 @@ instance (Show1 name, Show1 (expr as dctxt)) => Show1 (KeywordsArguments name ex
 
 instance (Show1 name, Show1 (expr as dctxt)) => Show1 (KeywordItem name expr as dctxt) where
   liftShowsPrec = $(makeLiftShowsPrec ''KeywordItem)
+
+instance (Ord1 name, Ord1 (expr as dctxt)) => Ord1 (ArgumentList name expr as dctxt) where
+  liftCompare = $(makeLiftCompare ''ArgumentList)
+
+instance Ord1 (expr as dctxt) => Ord1 (PositionalArguments expr as dctxt) where
+  liftCompare = $(makeLiftCompare ''PositionalArguments)
+
+instance (Ord1 name, Ord1 (expr as dctxt)) => Ord1 (StarredAndKeywords name expr as dctxt) where
+  liftCompare = $(makeLiftCompare ''StarredAndKeywords)
+
+instance (Ord1 name, Ord1 (expr as dctxt)) => Ord1 (KeywordsArguments name expr as dctxt) where
+  liftCompare = $(makeLiftCompare ''KeywordsArguments)
+
+instance (Ord1 name, Ord1 (expr as dctxt)) => Ord1 (KeywordItem name expr as dctxt) where
+  liftCompare = $(makeLiftCompare ''KeywordItem)

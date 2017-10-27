@@ -25,7 +25,7 @@ import Language.Python.Expr.AST.StringContent
 newtype LongStringChar
   = LongStringChar
   { _longStringChar_value :: Char
-  } deriving (Eq, Show)
+  } deriving (Eq, Ord, Show)
 
 instance AsChar LongStringChar where
   _Char = _LongStringChar
@@ -41,7 +41,7 @@ _LongStringChar =
 newtype LongStringCharFinal a
   = LongStringCharFinal
   { _longStringCharFinal_value :: Char
-  } deriving (Eq, Show)
+  } deriving (Eq, Ord, Show)
 
 _LongStringCharFinalSingle :: Prism' Char (LongStringCharFinal SingleQuote)
 _LongStringCharFinalSingle =

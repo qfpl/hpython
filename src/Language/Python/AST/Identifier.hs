@@ -15,5 +15,6 @@ data Identifier a
   } deriving (Eq, Show, Functor, Foldable, Traversable, Ord)
 
 deriveEq1 ''Identifier
+deriveOrd1 ''Identifier
 deriveShow1 ''Identifier
 makeLenses ''Identifier

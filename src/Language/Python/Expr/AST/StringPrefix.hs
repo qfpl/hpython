@@ -7,4 +7,4 @@ data StringPrefix
   | StringPrefix_u
   | StringPrefix_R
   | StringPrefix_U
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)

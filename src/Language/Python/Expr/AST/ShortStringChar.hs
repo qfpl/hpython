@@ -62,6 +62,7 @@ _ShortStringCharDouble =
   
 deriving instance Eq (ShortStringChar inside)
 deriving instance Show (ShortStringChar inside)
+deriving instance Ord (ShortStringChar inside)
 
 parseShortStringCharSingle
   :: ( HasCallStack

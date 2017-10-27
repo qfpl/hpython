@@ -96,3 +96,7 @@ instance (Eq1 (test as ctxt), Eq1 (starExpr as ctxt)) =>
 instance (Show1 (test as ctxt), Show1 (starExpr as ctxt)) =>
   Show1 (TestlistStarExpr test starExpr as ctxt) where
   liftShowsPrec = $(makeLiftShowsPrec ''TestlistStarExpr)
+
+instance (Ord1 (test as ctxt), Ord1 (starExpr as ctxt)) =>
+  Ord1 (TestlistStarExpr test starExpr as ctxt) where
+  liftCompare = $(makeLiftCompare ''TestlistStarExpr)

@@ -8,4 +8,4 @@ data TermOperator
   | TermFloorDiv
   | TermDiv
   | TermMod
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)

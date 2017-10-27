@@ -1,4 +1,3 @@
-{-# language RankNTypes #-}
 module Language.Python.Printer.TestlistStarExpr where
 
 import Papa
@@ -9,8 +8,8 @@ import Language.Python.Printer.Combinators
 import Language.Python.Printer.Symbols
 
 testlistStarExpr
-  :: (forall x. test as ectxt x -> Doc)
-  -> (forall x. starExpr as ectxt x -> Doc)
+  :: (test as ectxt a -> Doc)
+  -> (starExpr as ectxt a -> Doc)
   -> TestlistStarExpr test starExpr as ectxt a -> Doc
 testlistStarExpr test starExpr s =
   case s of

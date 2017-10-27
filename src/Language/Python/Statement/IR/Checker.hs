@@ -30,7 +30,8 @@ import Language.Python.IR.SyntaxChecker
 import Language.Python.IR.StatementConfig
 
 checkStatement
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> StatementConfig lctxt
   -> IR.Statement ann
   -> SyntaxChecker ann (Safe.Statement lctxt dctxt ann)
@@ -46,7 +47,8 @@ checkStatement ecfg scfg s =
       pure ann
 
 checkSimpleStatement
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> StatementConfig lctxt
   -> IR.SimpleStatement ann
   -> SyntaxChecker ann (Safe.SimpleStatement lctxt dctxt ann)
@@ -62,7 +64,8 @@ checkSimpleStatement ecfg scfg (IR.SimpleStatement h t s n ann) =
   pure ann
 
 checkCompoundStatement
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> StatementConfig lctxt
   -> IR.CompoundStatement ann
   -> SyntaxChecker ann (Safe.CompoundStatement lctxt dctxt ann)
@@ -109,7 +112,8 @@ checkCompoundStatement ecfg scfg s =
         _ -> syntaxError $ AsyncNotInAsyncFunction ann
 
 checkWhileStatement
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> StatementConfig lctxt
   -> IR.WhileStatement ann
   -> SyntaxChecker ann (Safe.WhileStatement lctxt dctxt ann)
@@ -130,7 +134,8 @@ checkWhileStatement ecfg scfg (IR.WhileStatement c b e ann) =
   pure ann
 
 checkForStatement
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> StatementConfig lctxt
   -> IR.ForStatement ann
   -> SyntaxChecker ann (Safe.ForStatement lctxt dctxt ann)
@@ -155,7 +160,8 @@ checkForStatement ecfg scfg (IR.ForStatement f i b e ann) =
   pure ann
 
 checkTryStatement
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> StatementConfig lctxt
   -> IR.TryStatement ann
   -> SyntaxChecker ann (Safe.TryStatement lctxt dctxt ann)
@@ -199,7 +205,8 @@ checkTryStatement ecfg scfg s =
       pure ann
 
 checkExceptClause
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> IR.ExceptClause ann
   -> SyntaxChecker ann (Safe.ExceptClause dctxt ann)
 checkExceptClause ecfg (IR.ExceptClause v ann) =
@@ -214,7 +221,8 @@ checkExceptClause ecfg (IR.ExceptClause v ann) =
   pure ann
 
 checkWithStatement
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> StatementConfig lctxt
   -> IR.WithStatement ann
   -> SyntaxChecker ann (Safe.WithStatement lctxt dctxt ann)
@@ -235,7 +243,8 @@ checkWithStatement ecfg scfg (IR.WithStatement h t s ann) =
   pure ann
 
 checkWithItem
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> IR.WithItem ann
   -> SyntaxChecker ann (Safe.WithItem dctxt ann)
 checkWithItem ecfg (IR.WithItem l r ann) =
@@ -248,7 +257,8 @@ checkWithItem ecfg (IR.WithItem l r ann) =
   pure ann
 
 checkFuncDef
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> SDefinitionContext inner
   -> IR.FuncDef ann
   -> SyntaxChecker ann (Safe.FuncDef dctxt inner ann)
@@ -266,7 +276,8 @@ checkFuncDef ecfg inner (IR.FuncDef n p t b ann) =
   pure ann
 
 checkParameters
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> IR.Parameters ann
   -> SyntaxChecker ann (Safe.Parameters dctxt ann)
 checkParameters ecfg (IR.Parameters v ann) =
@@ -281,7 +292,8 @@ checkParameters ecfg (IR.Parameters v ann) =
   pure ann
 
 checkTypedArg
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> IR.TypedArg ann
   -> SyntaxChecker ann (Safe.TypedArg ann)
 checkTypedArg ecfg (IR.TypedArg v t ann) =
@@ -295,7 +307,8 @@ checkTypedArg ecfg (IR.TypedArg v t ann) =
   pure ann
 
 checkClassDef
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> IR.ClassDef ann
   -> SyntaxChecker ann (Safe.ClassDef dctxt ann)
 checkClassDef ecfg (IR.ClassDef n a b ann) =
@@ -311,7 +324,8 @@ checkClassDef ecfg (IR.ClassDef n a b ann) =
   pure ann
 
 checkDecorated
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> IR.Decorated ann
   -> SyntaxChecker ann (Safe.Decorated dctxt ann)
 checkDecorated ecfg (IR.Decorated d b ann) =
@@ -325,7 +339,8 @@ checkDecorated ecfg (IR.Decorated d b ann) =
   pure ann
 
 checkAsyncFuncDef
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> IR.AsyncFuncDef ann
   -> SyntaxChecker ann (Safe.AsyncFuncDef dctxt ann)
 checkAsyncFuncDef ecfg (IR.AsyncFuncDef v ann) =
@@ -337,7 +352,8 @@ checkAsyncFuncDef ecfg (IR.AsyncFuncDef v ann) =
   pure ann
 
 checkDecorator
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> IR.Decorator ann
   -> SyntaxChecker ann (Safe.Decorator dctxt ann)
 checkDecorator ecfg (IR.Decorator n a nl ann) =
@@ -350,7 +366,8 @@ checkDecorator ecfg (IR.Decorator n a nl ann) =
   pure ann
 
 checkAsyncStatement
-  :: ExprConfig assignable ('FunDef 'Async)
+  :: Ord ann
+  => ExprConfig assignable ('FunDef 'Async)
   -> StatementConfig lctxt
   -> IR.AsyncStatement ann
   -> SyntaxChecker ann (Safe.AsyncStatement lctxt ('FunDef 'Async) ann)
@@ -366,7 +383,8 @@ checkAsyncStatement ecfg scfg (IR.AsyncStatement v ann) =
   pure ann
 
 checkIfStatement
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> StatementConfig lctxt
   -> IR.IfStatement ann
   -> SyntaxChecker ann (Safe.IfStatement lctxt dctxt ann)
@@ -400,7 +418,8 @@ checkIfStatement ecfg scfg (IR.IfStatement c t elif el ann) =
   pure ann
 
 checkSmallStatement
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> StatementConfig lctxt
   -> IR.SmallStatement ann
   -> SyntaxChecker ann (Safe.SmallStatement lctxt dctxt ann)
@@ -481,9 +500,15 @@ checkSmallStatement ecfg scfg s =
       pure ann
   where
     yieldOrTestList
-      :: ExprConfig as dctxt
+      :: Ord ann
+       => ExprConfig as dctxt
       -> Sum IR.YieldExpr IR.TestList ann
-      -> SyntaxChecker ann (Sum (Safe.YieldExpr dctxt) (Safe.TestList 'NotAssignable dctxt) ann)
+      -> SyntaxChecker
+           ann
+           (Sum
+             (Safe.YieldExpr dctxt)
+             (Safe.TestList 'NotAssignable dctxt)
+             ann)
     yieldOrTestList cfg (InL a) =
       case cfg ^. definitionContext of
         SFunDef SNormal -> InL <$> checkYieldExpr cfg a
@@ -491,9 +516,14 @@ checkSmallStatement ecfg scfg s =
     yieldOrTestList cfg (InR a) = InR <$> checkTestList (cfg & atomType .~ SNotAssignable) a
 
     yieldOrTestlistStarExpr
-      :: ExprConfig as dctxt
+      :: Ord ann
+      => ExprConfig as dctxt
       -> Sum IR.YieldExpr (IR.TestlistStarExpr IR.Test IR.StarExpr) ann
-      -> SyntaxChecker ann (Sum (Safe.YieldExpr dctxt) (Safe.TestlistStarExpr Safe.Test Safe.StarExpr 'NotAssignable dctxt) ann)
+      -> SyntaxChecker
+           ann
+           (Sum
+             (Safe.YieldExpr dctxt)
+             (Safe.TestlistStarExpr Safe.Test Safe.StarExpr 'NotAssignable dctxt) ann)
     yieldOrTestlistStarExpr cfg (InL a) =
       case cfg ^. definitionContext of
         SFunDef SNormal -> InL <$> checkYieldExpr cfg a
@@ -507,7 +537,8 @@ checkSmallStatement ecfg scfg s =
         a
 
 checkFlowStatement
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> StatementConfig lctxt
   -> IR.FlowStatement ann
   -> SyntaxChecker ann (Safe.FlowStatement lctxt dctxt ann)
@@ -548,7 +579,8 @@ checkFlowStatement ecfg scfg s =
         STopLevel -> syntaxError $ YieldNotInFunction ann
 
 checkRaiseStatement
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> IR.RaiseStatement ann
   -> SyntaxChecker ann (Safe.RaiseStatement dctxt ann)
 checkRaiseStatement ecfg (IR.RaiseStatement l r ann) =
@@ -561,7 +593,8 @@ checkRaiseStatement ecfg (IR.RaiseStatement l r ann) =
   pure ann
 
 checkSuite
-  :: ExprConfig assignable dctxt
+  :: Ord ann
+  => ExprConfig assignable dctxt
   -> StatementConfig lctxt
   -> IR.Suite ann
   -> SyntaxChecker ann (Safe.Suite lctxt dctxt ann)

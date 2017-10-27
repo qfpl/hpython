@@ -27,7 +27,6 @@ import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.AST.TestlistStarExpr
-import Language.Python.Expr.AST.ArgList
 import Language.Python.Expr.AST.BytesLiteral
 import Language.Python.Expr.AST.CompOperator
 import Language.Python.Expr.AST.FactorOperator
@@ -912,150 +911,187 @@ data PythonModule a
 
 deriveShow ''Comparison
 deriveEq1 ''Comparison
+deriveOrd1 ''Comparison
 deriveShow1 ''Comparison
 
 deriveShow ''NotTest
 deriveEq1 ''NotTest
+deriveOrd1 ''NotTest
 deriveShow1 ''NotTest
 
 deriveShow ''AndTest
 deriveEq1 ''AndTest
+deriveOrd1 ''AndTest
 deriveShow1 ''AndTest
 
 deriveShow ''OrTest
 deriveEq1 ''OrTest
+deriveOrd1 ''OrTest
 deriveShow1 ''OrTest
 
 deriveShow ''IfThenElse
 deriveEq1 ''IfThenElse
+deriveOrd1 ''IfThenElse
 deriveShow1 ''IfThenElse
 
 deriveShow ''Test
 deriveEq1 ''Test
+deriveOrd1 ''Test
 deriveShow1 ''Test
 
 deriveEq ''TestList
 deriveShow ''TestList
 deriveEq1 ''TestList
+deriveOrd1 ''TestList
 deriveShow1 ''TestList
 
 deriveEq ''LambdefNocond
 deriveShow ''LambdefNocond
 deriveEq1 ''LambdefNocond
+deriveOrd1 ''LambdefNocond
 deriveShow1 ''LambdefNocond
 
 deriveEq ''TestNocond
 deriveShow ''TestNocond
 deriveEq1 ''TestNocond
+deriveOrd1 ''TestNocond
 deriveShow1 ''TestNocond
 
 deriveShow ''CompIter
 deriveEq1 ''CompIter
+deriveOrd1 ''CompIter
 deriveShow1 ''CompIter
 
 deriveShow ''CompIf
 deriveEq1 ''CompIf
+deriveOrd1 ''CompIf
 deriveShow1 ''CompIf
 
 deriveEq ''StarExpr
 deriveShow ''StarExpr
 deriveEq1 ''StarExpr
+deriveOrd1 ''StarExpr
 deriveShow1 ''StarExpr
 
 deriveEq ''ExprList
 deriveShow ''ExprList
 deriveEq1 ''ExprList
+deriveOrd1 ''ExprList
 deriveShow1 ''ExprList
 
 deriveShow ''SliceOp
 deriveEq1 ''SliceOp
+deriveOrd1 ''SliceOp
 deriveShow1 ''SliceOp
 
 deriveShow ''Subscript
 deriveEq1 ''Subscript
+deriveOrd1 ''Subscript
 deriveShow1 ''Subscript
 
 deriveShow ''SubscriptList
 deriveEq1 ''SubscriptList
+deriveOrd1 ''SubscriptList
 deriveShow1 ''SubscriptList
 
 deriveShow ''CompFor
 deriveEq1 ''CompFor
+deriveOrd1 ''CompFor
 deriveShow1 ''CompFor
 
 deriveShow ''Trailer
 deriveEq1 ''Trailer
+deriveOrd1 ''Trailer
 deriveShow1 ''Trailer
 
 deriveShow ''AtomExpr
 deriveEq1 ''AtomExpr
+deriveOrd1 ''AtomExpr
 deriveShow1 ''AtomExpr
 
 deriveShow ''Power
 deriveEq1 ''Power
+deriveOrd1 ''Power
 deriveShow1 ''Power
 
 deriveShow ''Factor
 deriveEq1 ''Factor
+deriveOrd1 ''Factor
 deriveShow1 ''Factor
 
 deriveShow ''Term
 deriveEq1 ''Term
+deriveOrd1 ''Term
 deriveShow1 ''Term
 
 deriveShow ''ArithExpr
 deriveEq1 ''ArithExpr
+deriveOrd1 ''ArithExpr
 deriveShow1 ''ArithExpr
 
 deriveShow ''ShiftExpr
 deriveEq1 ''ShiftExpr
+deriveOrd1 ''ShiftExpr
 deriveShow1 ''ShiftExpr
 
 deriveShow ''AndExpr
 deriveEq1 ''AndExpr
+deriveOrd1 ''AndExpr
 deriveShow1 ''AndExpr
 
 deriveShow ''XorExpr
 deriveEq1 ''XorExpr
+deriveOrd1 ''XorExpr
 deriveShow1 ''XorExpr
   
 deriveShow ''Expr
 deriveEq1 ''Expr
+deriveOrd1 ''Expr
 deriveShow1 ''Expr
 
 deriveShow ''YieldArg
 deriveEq1 ''YieldArg
+deriveOrd1 ''YieldArg
 deriveShow1 ''YieldArg
 
 deriveEq1 ''YieldExpr
+deriveOrd1 ''YieldExpr
 deriveShow1 ''YieldExpr
 
 deriveShow ''TupleTestlistComp
 deriveEq1 ''TupleTestlistComp
+deriveOrd1 ''TupleTestlistComp
 deriveShow1 ''TupleTestlistComp
 
 deriveShow ''ListTestlistComp
 deriveEq1 ''ListTestlistComp
+deriveOrd1 ''ListTestlistComp
 deriveShow1 ''ListTestlistComp
 
 deriveEq1 ''DictOrSetMaker
+deriveOrd1 ''DictOrSetMaker
 deriveShow1 ''DictOrSetMaker
 
 deriveShow ''Atom
 deriveEq1 ''Atom
+deriveOrd1 ''Atom
 deriveShow1 ''Atom
 
 deriveEq ''PythonModule
 deriveShow ''PythonModule
 deriveEq1 ''PythonModule
+deriveOrd1 ''PythonModule
 deriveShow1 ''PythonModule
 
 deriveShow ''Lambdef
 deriveEq1 ''Lambdef
+deriveOrd1 ''Lambdef
 deriveShow1 ''Lambdef
 
 deriveEq1 ''DictUnpacking
+deriveOrd1 ''DictUnpacking
 deriveShow1 ''DictUnpacking
 
 deriveEq1 ''DictItem
+deriveOrd1 ''DictItem
 deriveShow1 ''DictItem

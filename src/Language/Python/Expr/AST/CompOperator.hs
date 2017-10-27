@@ -51,6 +51,6 @@ data CompOperator
   , _compNotIn_spaceBetween :: NonEmpty WhitespaceChar
   , _compNotIn_spaceAfter :: NonEmpty WhitespaceChar
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 makeLenses ''CompOperator

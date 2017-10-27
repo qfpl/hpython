@@ -18,19 +18,14 @@ import Papa hiding (cons, empty, snoc)
 import qualified Papa as P (snoc)
 
 import Control.Monad
-import Data.Maybe
-import Text.Parser.Char
-import Text.Parser.Combinators
-import Text.Parser.LookAhead
 
 import Language.Python.AST.Symbols
 import Language.Python.Expr.AST.EscapeSeq
-import Language.Python.Expr.Parser.EscapeSeq
 
 newtype StringContent b a
   = StringContent
   { _tripleString_value :: [Either EscapeSeq a] }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 stringContent :: Fold (StringContent a b) (Either EscapeSeq b)
 stringContent f (StringContent bs) =

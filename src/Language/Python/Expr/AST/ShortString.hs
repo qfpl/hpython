@@ -23,10 +23,9 @@ data ShortString a
   { _shortStringDouble_value
     :: StringContent DoubleQuote (ShortStringChar DoubleQuote)
   , _shortString_ann :: a
-  } deriving (Functor, Foldable, Traversable)
+  } deriving (Eq, Show, Ord, Functor, Foldable, Traversable)
 
-deriveEq ''ShortString
-deriveShow ''ShortString
 deriveEq1 ''ShortString
 deriveShow1 ''ShortString
+deriveOrd1 ''ShortString
 makeLenses ''ShortString

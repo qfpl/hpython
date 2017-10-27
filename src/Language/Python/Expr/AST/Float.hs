@@ -32,10 +32,9 @@ data Float' a
     :: Maybe (Before (Either Char_e Char_E) (NonEmpty Digit))
   , _float_ann :: a
   }
-  deriving (Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
-deriveEq ''Float'
-deriveShow ''Float'
 deriveEq1 ''Float'
+deriveOrd1 ''Float'
 deriveShow1 ''Float'
 makeLenses ''Float'

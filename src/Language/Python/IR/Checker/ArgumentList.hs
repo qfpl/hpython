@@ -125,7 +125,8 @@ checkStarredAndKeywords cfg _checkName _checkExpr (IR.StarredAndKeywords h t ann
   pure ann
 
 checkArgumentList
-  :: ExprConfig as dctxt
+  :: Ord (checkedName ann)
+  => ExprConfig as dctxt
   -> ( forall as' dctxt'
      . ExprConfig as' dctxt'
     -> name ann
@@ -172,5 +173,5 @@ checkArgumentList cfg _checkName _checkExpr a =
     liftArgumentError ann =
       liftError
       (\case
-          IR.KeywordBeforePositional _ -> KeywordBeforePositional ann
+          IR.KeywordBeforePositional -> KeywordBeforePositional ann
           IR.DuplicateArguments -> DuplicateArguments ann)

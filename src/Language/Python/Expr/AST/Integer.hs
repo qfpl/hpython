@@ -38,10 +38,9 @@ data Integer' a
          (NonEmpty BinDigit)
   , _integer_ann :: a
   }
-  deriving (Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
 makeLenses ''Integer'
-deriveEq ''Integer'
-deriveShow ''Integer'
 deriveEq1 ''Integer'
+deriveOrd1 ''Integer'
 deriveShow1 ''Integer'

@@ -17,10 +17,9 @@ data BytesLiteral a
   { _bytesLiteral_prefix :: BytesPrefix
   , _bytesLiteral_value :: Sum ShortBytes LongBytes a
   , _bytesLiteral_ann :: a
-  } deriving (Functor, Foldable, Traversable)
+  } deriving (Eq, Show, Ord, Functor, Foldable, Traversable)
 
-deriveEq ''BytesLiteral
-deriveShow ''BytesLiteral
 deriveEq1 ''BytesLiteral
 deriveShow1 ''BytesLiteral
+deriveOrd1 ''BytesLiteral
 makeLenses ''BytesLiteral

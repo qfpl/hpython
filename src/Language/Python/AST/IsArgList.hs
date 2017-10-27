@@ -1,9 +1,11 @@
 {-# language FlexibleContexts #-}
+{-# language KindSignatures #-}
 {-# language TypeFamilies #-}
 module Language.Python.AST.IsArgList where
 
 import Papa
 
+import Data.Functor.Classes
 import qualified Data.Set as S
 
 class IsArgList l where
@@ -21,22 +23,22 @@ data Argument l
   | PositionalArgument (PositionalArgument l)
 
 data ArgumentError l
-  = KeywordBeforePositional (Argument l)
+  = KeywordBeforePositional
   | DuplicateArguments
 
 keywordBeforePositional
   :: IsArgList l
   => [Argument l]
   -> Either (ArgumentError l) [Argument l]
-keywordBeforePositional l = go Nothing l
+keywordBeforePositional l = go False l
   where
     go _ [] = Right l
     go keyword (a:as) =
       case a of
-        KeywordArgument _ -> go (Just a) as
-        DoublestarArgument _ -> go (Just a) as
+        KeywordArgument _ -> go True as
+        DoublestarArgument _ -> go True as
         PositionalArgument _
-          | Just k <- keyword -> Left $ KeywordBeforePositional k
+          | keyword -> Left KeywordBeforePositional
           | otherwise -> go keyword as
 
 duplicateArguments

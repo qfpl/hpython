@@ -1,4 +1,3 @@
-{-# language RankNTypes #-}
 module Language.Python.Printer.ArgsList where
 
 import Prelude (error)
@@ -11,8 +10,8 @@ import Language.Python.Printer.Combinators
 import Language.Python.Printer.Symbols
 
 argsListArg
-  :: (forall x. name x -> Doc)
-  -> (forall x. f x -> Doc)
+  :: (name a -> Doc)
+  -> (f a -> Doc)
   -> ArgsListArg name f a
   -> Doc
 argsListArg renderName f (ArgsListArg l r _) =
@@ -20,8 +19,8 @@ argsListArg renderName f (ArgsListArg l r _) =
   foldMapF (beforeF (betweenWhitespace' . const $ char '=') f) r
 
 argsListStarPart
-  :: (forall x. name x -> Doc)
-  -> (forall x. f x -> Doc)
+  :: (name a -> Doc)
+  -> (f a -> Doc)
   -> ArgsListStarPart name f a
   -> Doc
 argsListStarPart renderName f e =
@@ -39,7 +38,7 @@ argsListStarPart renderName f e =
           (argsListDoublestarArg renderName)) r
 
 argsListDoublestarArg
-  :: (forall x. name x -> Doc)
+  :: (name a -> Doc)
   -> ArgsListDoublestarArg name test a
   -> Doc
 argsListDoublestarArg renderName (ArgsListDoublestarArg a _) =
@@ -47,9 +46,9 @@ argsListDoublestarArg renderName (ArgsListDoublestarArg a _) =
   betweenWhitespace'F renderName a
 
 argsList
-  :: HasName name
-  => (forall x. name x -> Doc)
-  -> (forall x. f x -> Doc)
+  :: Ord (name a)
+  => (name a -> Doc)
+  -> (f a -> Doc)
   -> ArgsList name f a
   -> Doc
 argsList renderName f e =
@@ -70,8 +69,8 @@ argsList renderName f e =
      error "incomplete pattern")
   where
     starOrDouble
-      :: (forall x. name x -> Doc)
-      -> (forall x. f x -> Doc)
+      :: (name a -> Doc)
+      -> (f a -> Doc)
       -> Sum (ArgsListStarPart name f) (ArgsListDoublestarArg name f) a
       -> Doc
     starOrDouble renderName' f' =

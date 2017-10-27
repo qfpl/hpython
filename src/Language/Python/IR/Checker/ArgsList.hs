@@ -89,7 +89,7 @@ checkArgsListStarPart cfg check checkName e =
       pure ann
 
 checkArgsList
-  :: Safe.HasName checkedName
+  :: Ord (checkedName ann)
   => ExprConfig atomType ctxt
   -> ( forall atomType' ctxt'
      . ExprConfig atomType' ctxt'
@@ -112,7 +112,7 @@ checkArgsList cfg check checkName e =
       liftError
         (\case
             Safe.DuplicateArguments -> DuplicateArguments ann
-            Safe.KeywordBeforePositional (Safe.KAKeywordArg e' _) ->
+            Safe.KeywordBeforePositional ->
               KeywordBeforePositional ann) $
         Safe.mkArgsListAll <$>
         checkArgsListArg cfg check checkName a <*>

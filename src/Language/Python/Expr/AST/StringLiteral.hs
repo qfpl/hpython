@@ -24,10 +24,9 @@ data StringLiteral a
          (Sum ShortString LongString)
          a
   , _stringLiteral_ann :: a
-  } deriving (Functor, Foldable, Traversable)
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
 
-deriveEq ''StringLiteral
-deriveShow ''StringLiteral
 deriveEq1 ''StringLiteral
+deriveOrd1 ''StringLiteral
 deriveShow1 ''StringLiteral
 makeLenses ''StringLiteral

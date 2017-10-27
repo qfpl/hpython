@@ -30,10 +30,9 @@ data LongBytes a
     :: StringContent DoubleQuote LongBytesChar
   , _longBytes_ann :: a
   }
-  deriving (Functor, Foldable, Traversable)
+  deriving (Eq, Show, Ord, Functor, Foldable, Traversable)
 
-deriveEq ''LongBytes
-deriveShow ''LongBytes
 deriveEq1 ''LongBytes
 deriveShow1 ''LongBytes
+deriveOrd1 ''LongBytes
 makeLenses ''LongBytes

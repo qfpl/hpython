@@ -6,4 +6,4 @@ data FactorOperator
   = FactorNeg
   | FactorPos
   | FactorInv
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)

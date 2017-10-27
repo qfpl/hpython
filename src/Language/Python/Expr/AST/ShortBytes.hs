@@ -23,10 +23,9 @@ data ShortBytes a
     :: StringContent DoubleQuote (ShortBytesChar DoubleQuote)
   , _shortBytes_ann :: a
   }
-  deriving (Functor, Foldable, Traversable)
+  deriving (Eq, Show, Ord, Functor, Foldable, Traversable)
 
-deriveEq ''ShortBytes
-deriveShow ''ShortBytes
 deriveEq1 ''ShortBytes
 deriveShow1 ''ShortBytes
+deriveOrd1 ''ShortBytes
 makeLenses ''ShortBytes

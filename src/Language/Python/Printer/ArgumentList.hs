@@ -13,8 +13,8 @@ import Language.Python.Printer.Combinators
 import Language.Python.Printer.Symbols
 
 keywordItem
-  :: (forall x. name x -> Doc)
-  -> (forall as' dctxt' x. expr as' dctxt' x -> Doc)
+  :: (name a -> Doc)
+  -> (forall as' dctxt'. expr as' dctxt' a -> Doc)
   -> KeywordItem name expr as dctxt a
   -> Doc
 keywordItem _name _expr (KeywordItem l r _) =
@@ -23,8 +23,8 @@ keywordItem _name _expr (KeywordItem l r _) =
   whitespaceBeforeF _expr r
 
 keywordsArguments
-  :: (forall x. name x -> Doc)
-  -> (forall as' dctxt' x. expr as' dctxt' x -> Doc)
+  :: (name a -> Doc)
+  -> (forall as' dctxt'. expr as' dctxt' a -> Doc)
   -> KeywordsArguments name expr as dctxt a
   -> Doc
 keywordsArguments _name _expr (KeywordsArguments h t _) =
@@ -42,7 +42,7 @@ keywordsArguments _name _expr (KeywordsArguments h t _) =
     t
 
 positionalArguments
-  :: (forall as' dctxt' x. expr as' dctxt' x -> Doc)
+  :: (forall as' dctxt'. expr as' dctxt' a -> Doc)
   -> PositionalArguments expr as dctxt a
   -> Doc
 positionalArguments _expr (PositionalArguments h t _) =
@@ -55,8 +55,8 @@ positionalArguments _expr (PositionalArguments h t _) =
     t
 
 starredAndKeywords
-  :: (forall x. name x -> Doc)
-  -> (forall as' dctxt' x. expr as' dctxt' x -> Doc)
+  :: (name a -> Doc)
+  -> (forall as' dctxt'. expr as' dctxt' a -> Doc)
   -> StarredAndKeywords name expr as dctxt a
   -> Doc
 starredAndKeywords _name _expr (StarredAndKeywords h t _) =
@@ -74,8 +74,9 @@ starredAndKeywords _name _expr (StarredAndKeywords h t _) =
     t
 
 argumentList
-  :: (forall x. name x -> Doc)
-  -> (forall as' dctxt' x. expr as' dctxt' x -> Doc)
+  :: Ord (name a)
+  => (name a -> Doc)
+  -> (forall as' dctxt'. expr as' dctxt' a -> Doc)
   -> ArgumentList name expr 'NotAssignable dctxt a
   -> Doc
 argumentList _name _expr e =

@@ -28,7 +28,7 @@ genArgumentList cfg _genName _genExpr =
   Gen.choice
     [ Gen.just $
       fmap (review _ArgumentListAll) $
-      (,,,) <$>
+      (,,,,) <$>
       genPositionalArguments cfg _genExpr <*>
       genMaybeF
         (genBeforeF (genBetweenWhitespace $ pure Comma)
@@ -37,20 +37,23 @@ genArgumentList cfg _genName _genExpr =
         (genBeforeF
            (genBetweenWhitespace $ pure Comma)
            (genKeywordsArguments cfg _genName _genExpr)) <*>
+      Gen.maybe (genBetweenWhitespace $ pure Comma) <*>
       pure ()
     , Gen.just $
       fmap (review _ArgumentListUnpacking) $
-      (,,) <$>
+      (,,,) <$>
       genStarredAndKeywords cfg _genName _genExpr <*>
       genMaybeF
         (genBeforeF
            (genBetweenWhitespace $ pure Comma)
            (genKeywordsArguments cfg _genName _genExpr)) <*>
+      Gen.maybe (genBetweenWhitespace $ pure Comma) <*>
       pure ()
     , Gen.just $
       fmap (review _ArgumentListKeywords) $
-      (,) <$>
+      (,,) <$>
       genKeywordsArguments cfg _genName _genExpr <*>
+      Gen.maybe (genBetweenWhitespace $ pure Comma) <*>
       pure ()
     ]
 

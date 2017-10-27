@@ -56,7 +56,7 @@ positionalArguments _expr =
   PositionalArguments <$>
   beforeF
     (optional . try $ betweenWhitespace asterisk)
-    _expr <*>
+    (_expr <* notFollowedBy (try $ many whitespaceChar *> char '=')) <*>
   manyF
     (try $
      beforeF
@@ -75,7 +75,7 @@ starredAndKeywords _name _expr =
   annotated $
   StarredAndKeywords <$>
   starOrKeyword <*>
-  manyF (try $ beforeF (betweenWhitespace comma) starOrKeyword)
+  manyF (beforeF (betweenWhitespace comma) starOrKeyword)
   where
     starOrKeyword =
       try (InL <$> beforeF (betweenWhitespace asterisk) _expr) <|>
@@ -107,7 +107,8 @@ argumentList _name _expr =
         (try $
          beforeF
            (betweenWhitespace comma)
-           (keywordsArguments _name _expr))
+           (keywordsArguments _name _expr)) <*>
+      optional (try $ betweenWhitespace comma)
 
     argumentListUnpacking =
       annotated $
@@ -115,9 +116,11 @@ argumentList _name _expr =
       starredAndKeywords _name _expr <*>
       optionalF
         (try $
-         beforeF (betweenWhitespace comma) (keywordsArguments _name _expr))
+         beforeF (betweenWhitespace comma) (keywordsArguments _name _expr)) <*>
+      optional (try $ betweenWhitespace comma)
 
     argumentListKeywords =
       annotated $
       ArgumentListKeywords <$>
-      keywordsArguments _name _expr
+      keywordsArguments _name _expr <*>
+      optional (try $ betweenWhitespace comma)

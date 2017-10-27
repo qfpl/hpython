@@ -14,7 +14,7 @@ import Language.Python.Printer.Symbols
 
 keywordItem
   :: (forall x. name x -> Doc)
-  -> (forall as dctxt x. expr as dctxt x -> Doc)
+  -> (forall as' dctxt' x. expr as' dctxt' x -> Doc)
   -> KeywordItem name expr as dctxt a
   -> Doc
 keywordItem _name _expr (KeywordItem l r _) =
@@ -24,7 +24,7 @@ keywordItem _name _expr (KeywordItem l r _) =
 
 keywordsArguments
   :: (forall x. name x -> Doc)
-  -> (forall as dctxt x. expr as dctxt x -> Doc)
+  -> (forall as' dctxt' x. expr as' dctxt' x -> Doc)
   -> KeywordsArguments name expr as dctxt a
   -> Doc
 keywordsArguments _name _expr (KeywordsArguments h t _) =
@@ -42,7 +42,7 @@ keywordsArguments _name _expr (KeywordsArguments h t _) =
     t
 
 positionalArguments
-  :: (forall as dctxt x. expr as dctxt x -> Doc)
+  :: (forall as' dctxt' x. expr as' dctxt' x -> Doc)
   -> PositionalArguments expr as dctxt a
   -> Doc
 positionalArguments _expr (PositionalArguments h t _) =
@@ -56,7 +56,7 @@ positionalArguments _expr (PositionalArguments h t _) =
 
 starredAndKeywords
   :: (forall x. name x -> Doc)
-  -> (forall as dctxt x. expr as dctxt x -> Doc)
+  -> (forall as' dctxt' x. expr as' dctxt' x -> Doc)
   -> StarredAndKeywords name expr as dctxt a
   -> Doc
 starredAndKeywords _name _expr (StarredAndKeywords h t _) =
@@ -75,13 +75,13 @@ starredAndKeywords _name _expr (StarredAndKeywords h t _) =
 
 argumentList
   :: (forall x. name x -> Doc)
-  -> (forall as dctxt x. expr as dctxt x -> Doc)
+  -> (forall as' dctxt' x. expr as' dctxt' x -> Doc)
   -> ArgumentList name expr 'NotAssignable dctxt a
   -> Doc
 argumentList _name _expr e =
   Just e &
     (outside _ArgumentListAll .~
-      (\(a, b, c, _) ->
+      (\(a, b, c, d, _) ->
          positionalArguments _expr a <>
          foldMapOf
            (_Wrapped.folded)
@@ -90,14 +90,18 @@ argumentList _name _expr e =
          foldMapOf
            (_Wrapped.folded)
            (beforeF (betweenWhitespace' comma) (keywordsArguments _name _expr))
-           c) $
+           c <>
+         foldMap (betweenWhitespace' comma) d) $
      outside _ArgumentListUnpacking .~
-      (\(a, b, _) ->
+      (\(a, b, c, _) ->
          starredAndKeywords _name _expr a <>
          foldMapOf
            (_Wrapped.folded)
            (beforeF (betweenWhitespace' comma) (keywordsArguments _name _expr))
-           b) $
+           b <>
+         foldMap (betweenWhitespace' comma) c) $
      outside _ArgumentListKeywords .~
-      (\(a, _) -> keywordsArguments _name _expr a) $
+      (\(a, b, _) ->
+         keywordsArguments _name _expr a <>
+         foldMap (betweenWhitespace' comma) b) $
      error "incomplete pattern")

@@ -29,7 +29,9 @@ import Data.Separated.After
 import Data.Separated.Before
 import Data.Separated.Between
 
-import Language.Python.AST.IsArgList
+import Language.Python.AST.Identifier
+import Language.Python.AST.IsArgList hiding (Argument)
+import qualified Language.Python.AST.IsArgList as AL
 import Language.Python.AST.Symbols
 import Language.Python.IR.ExprConfig
 
@@ -221,9 +223,13 @@ _ArgListMany =
         _ -> Nothing)
 
 instance IsArgList (ArgList test compFor as dctxt a) where
+  type Name (ArgList test compFor as dctxt a) = Identifier a
+
   data KeywordArgument (ArgList test compFor as dctxt a)
     = KAKeywordArg (test 'Assignable dctxt a) (test 'NotAssignable dctxt a)
-    | KADoubleUnpackArg DoubleAsterisk (test 'NotAssignable dctxt a)
+
+  data DoublestarArgument (ArgList test compFor as dctxt a)
+    = DADoublestarArg DoubleAsterisk (test 'NotAssignable dctxt a)
 
   data PositionalArgument (ArgList test compFor as dctxt a)
     = PASingleFor
@@ -242,6 +248,8 @@ instance IsArgList (ArgList test compFor as dctxt a) where
         (Before [WhitespaceChar])
         (test 'NotAssignable dctxt)
         a)
+
+  keywordName (KAKeywordArg )
 
   arguments a =
     case a of

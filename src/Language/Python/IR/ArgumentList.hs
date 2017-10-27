@@ -122,6 +122,7 @@ data ArgumentList name expr a
           (Before (Between' [WhitespaceChar] Comma))
           (KeywordsArguments name expr))
         a
+  , _argumentList_comma :: Maybe (Between' [WhitespaceChar] Comma)
   , _argumentList_ann :: a
   }
   | ArgumentListUnpacking
@@ -134,11 +135,13 @@ data ArgumentList name expr a
           (Before (Between' [WhitespaceChar] Comma))
           (KeywordsArguments name expr))
         a
+  , _argumentList_comma :: Maybe (Between' [WhitespaceChar] Comma)
   , _argumentList_ann :: a 
   }
   | ArgumentListKeywords
   { _argumentListKeywords_keywords
     :: KeywordsArguments name expr a
+  , _argumentList_comma :: Maybe (Between' [WhitespaceChar] Comma)
   , _argumentList_ann :: a 
   }
 deriving instance (Functor name, Functor expr) => Functor (ArgumentList name expr)

@@ -138,7 +138,7 @@ checkArgumentList
   -> SyntaxChecker ann (Safe.ArgumentList checkedName checkedExpr 'NotAssignable dctxt ann)
 checkArgumentList cfg _checkName _checkExpr a =
   case a of
-    IR.ArgumentListAll ps ss ks ann ->
+    IR.ArgumentListAll ps ss ks c ann ->
       liftArgumentError ann $
       Safe.mkArgumentListAll <$>
       checkPositionalArguments cfg _checkExpr ps <*>
@@ -150,8 +150,9 @@ checkArgumentList cfg _checkName _checkExpr a =
         (_Wrapped.traverse._Wrapped.traverse)
         (checkKeywordsArguments cfg _checkName _checkExpr)
         ks <*>
+      pure c <*>
       pure ann
-    IR.ArgumentListUnpacking ss ks ann ->
+    IR.ArgumentListUnpacking ss ks c ann ->
       liftArgumentError ann $
       Safe.mkArgumentListUnpacking <$>
       checkStarredAndKeywords cfg _checkName _checkExpr ss <*>
@@ -159,11 +160,13 @@ checkArgumentList cfg _checkName _checkExpr a =
         (_Wrapped.traverse._Wrapped.traverse)
         (checkKeywordsArguments cfg _checkName _checkExpr)
         ks <*>
+      pure c <*>
       pure ann
-    IR.ArgumentListKeywords ks ann ->
+    IR.ArgumentListKeywords ks c ann ->
       liftArgumentError ann $
       Safe.mkArgumentListKeywords <$>
       checkKeywordsArguments cfg _checkName _checkExpr ks <*>
+      pure c <*>
       pure ann
   where
     liftArgumentError ann =

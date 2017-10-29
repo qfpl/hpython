@@ -2,9 +2,9 @@
 module Language.Python.Expr.Printer where
 
 import Papa hiding (Plus, Product, Sum, Space, zero, o, argument)
-import Prelude (error)
 
 import Data.Functor.Product
+import Data.Functor.Sum
 import Text.PrettyPrint hiding ((<>), comma, colon)
 
 import qualified Data.Text as T
@@ -397,7 +397,10 @@ dictOrSetMaker e =
       foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t <>
       foldMap (betweenWhitespace' comma) c
   where
+    itemOrUnpacking :: Ord a => Sum (DictItem atomType ctxt) (DictUnpacking atomType ctxt) a -> Doc
     itemOrUnpacking = sumElim dictItem dictUnpacking
+
+    testOrStar :: Ord a => Sum (Test atomType ctxt) (StarExpr atomType ctxt) a -> Doc
     testOrStar = sumElim test starExpr
 
 starExpr :: Ord a => StarExpr atomType ctxt a -> Doc

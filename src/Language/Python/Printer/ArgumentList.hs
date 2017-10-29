@@ -8,6 +8,7 @@ import Papa
 import Text.PrettyPrint hiding ((<>), comma)
 
 import Language.Python.AST.ArgumentList
+import Language.Python.AST.IsArgList
 import Language.Python.IR.ExprConfig
 import Language.Python.Printer.Combinators
 import Language.Python.Printer.Symbols
@@ -74,7 +75,7 @@ starredAndKeywords _name _expr (StarredAndKeywords h t _) =
     t
 
 argumentList
-  :: Ord (name a)
+  :: HasName name
   => (name a -> Doc)
   -> (forall as' dctxt'. expr as' dctxt' a -> Doc)
   -> ArgumentList name expr 'NotAssignable dctxt a

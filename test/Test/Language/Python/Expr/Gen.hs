@@ -21,7 +21,6 @@ import qualified Hedgehog.Range as Range
 import qualified Language.Python.AST.Keywords as AST
 import qualified Language.Python.AST.Symbols as AST
 import qualified Language.Python.Expr.AST as AST
-import qualified Language.Python.Expr.AST.ArgList as AST
 import qualified Language.Python.Expr.AST.BytesLiteral as AST
 import qualified Language.Python.Expr.AST.BytesPrefix as AST
 import qualified Language.Python.Expr.AST.CompOperator as AST
@@ -758,64 +757,6 @@ genCompFor cfg =
      genCompIter $
      cfg & atomType .~ SNotAssignable) <*>
   pure ()
-
-genArgument
-  :: MonadGen m
-  => (forall as ctxt. ExprConfig as ctxt -> m (test as ctxt ()))
-  -> (forall as ctxt. ExprConfig as ctxt -> m (compFor 'NotAssignable ctxt ()))
-  -> ExprConfig 'NotAssignable ctxt
-  -> m (AST.Argument test compFor 'NotAssignable ctxt ())
-genArgument _genTest _genCompFor cfg =
-  Gen.choice
-    [ AST.ArgumentExpr <$>
-      _genTest (cfg & atomType .~ SNotAssignable) <*>
-      pure ()
-    , AST.ArgumentFor <$>
-      genWhitespaceAfter (pure AST.LeftParen) <*>
-      Gen.small (_genTest cfg) <*>
-      Gen.small (_genCompFor cfg) <*>
-      genWhitespaceBefore (pure AST.RightParen) <*>
-      pure ()
-    , AST.ArgumentDefault <$>
-      genWhitespaceAfterF
-        (Gen.small . _genTest $ cfg & atomType .~ SAssignable) <*>
-      genWhitespaceBeforeF (Gen.small $ _genTest cfg) <*>
-      pure ()
-    , AST.ArgumentUnpack <$>
-      Gen.element [Left AST.Asterisk, Right AST.DoubleAsterisk] <*>
-      genWhitespaceBeforeF (Gen.small $ _genTest cfg) <*>
-      pure ()
-    ]
-
-genArgList
-  :: MonadGen m
-  => (forall as ctxt. ExprConfig as ctxt -> m (test as ctxt ()))
-  -> (forall as ctxt. ExprConfig as ctxt -> m (compFor 'NotAssignable ctxt ()))
-  -> ExprConfig as ctxt
-  -> m (AST.ArgList test compFor as ctxt ())
-genArgList _genTest _genCompFor cfg = do
-  n <- Size <$> Gen.integral_ (Range.linear 0 20)
-  Gen.choice
-    [ Gen.just .
-      fmap (review AST._ArgListSingleFor) $
-      (,,,) <$>
-      Gen.resize n (_genTest (cfg & atomType .~ SNotAssignable)) <*>
-      Gen.resize n (_genCompFor (cfg & atomType .~ SNotAssignable)) <*>
-      Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
-      pure ()
-    , Gen.just .
-      fmap (review AST._ArgListMany) $
-      (,,,) <$>
-      Gen.resize n
-        (genArgument _genTest _genCompFor $ cfg & atomType .~ SNotAssignable) <*>
-      genListF
-        (genBeforeF
-          (genBetweenWhitespace $ pure AST.Comma)
-          (Gen.resize n .
-           genArgument _genTest _genCompFor$ cfg & atomType .~ SNotAssignable)) <*>
-      Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
-      pure ()
-    ]
 
 genSliceOp
   :: MonadGen m

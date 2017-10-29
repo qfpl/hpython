@@ -89,7 +89,7 @@ checkArgsListStarPart cfg check checkName e =
       pure ann
 
 checkArgsList
-  :: Ord (checkedName ann)
+  :: Safe.HasName checkedName
   => ExprConfig atomType ctxt
   -> ( forall atomType' ctxt'
      . ExprConfig atomType' ctxt'

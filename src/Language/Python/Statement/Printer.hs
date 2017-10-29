@@ -3,8 +3,7 @@ module Language.Python.Statement.Printer where
 
 import Papa
 import Data.Functor.Compose
-import Data.Functor.Sum
-import Text.PrettyPrint hiding ((<>), semicolon, equals, comma, colon)
+import Text.PrettyPrint hiding ((<>), equals, comma, colon)
 
 import Language.Python.Expr.Printer
 import Language.Python.Printer.ArgsList
@@ -20,13 +19,13 @@ import Language.Python.Statement.AST
 import Language.Python.Statement.Printer.AugAssign
 import Language.Python.Statement.Printer.Imports
 
-statement :: Statement lctxt ectxt a -> Doc
+statement :: Ord a => Statement lctxt ectxt a -> Doc
 statement s =
   case s of
     StatementSimple v _ -> simpleStatement v
     StatementCompound v _ -> compoundStatement v
 
-simpleStatement :: SimpleStatement lctxt ectxt a -> Doc
+simpleStatement :: Ord a => SimpleStatement lctxt ectxt a -> Doc
 simpleStatement (SimpleStatement h t s n _) =
   smallStatement h <>
   foldMapOf
@@ -36,7 +35,7 @@ simpleStatement (SimpleStatement h t s n _) =
   foldMap (whitespaceBefore semicolon) s <>
   whitespaceBefore newlineChar n
 
-smallStatement :: SmallStatement lctxt ectxt a -> Doc
+smallStatement :: Ord a => SmallStatement lctxt ectxt a -> Doc
 smallStatement s =
   case s of
     SmallStatementExpr v _ -> test v
@@ -83,7 +82,7 @@ smallStatement s =
         (beforeF (betweenWhitespace' comma) test)
         t
 
-flowStatement :: FlowStatement lctxt ectxt a -> Doc
+flowStatement :: Ord a => FlowStatement lctxt ectxt a -> Doc
 flowStatement s =
   case s of
     FlowStatementBreak _ -> text "break"
@@ -102,7 +101,7 @@ flowStatement s =
         v
     FlowStatementYield v _ -> yieldExpr v
 
-raiseStatement :: RaiseStatement ectxt a -> Doc
+raiseStatement :: Ord a => RaiseStatement ectxt a -> Doc
 raiseStatement (RaiseStatement l r _) =
   test l <>
   foldMapOf
@@ -110,7 +109,7 @@ raiseStatement (RaiseStatement l r _) =
     (beforeF kFrom $ whitespaceBeforeF test)
     r
 
-compoundStatement :: CompoundStatement lctxt ectxt a -> Doc
+compoundStatement :: Ord a => CompoundStatement lctxt ectxt a -> Doc
 compoundStatement s =
   case s of
     CompoundStatementIf v _ -> ifStatement v
@@ -123,7 +122,7 @@ compoundStatement s =
     CompoundStatementDecorated v _ -> decorated v
     CompoundStatementAsync v _ -> asyncStatement v
 
-ifStatement :: IfStatement lctxt ectxt a -> Doc
+ifStatement :: Ord a => IfStatement lctxt ectxt a -> Doc
 ifStatement (IfStatement c t elif el _) =
   text "if" <>
   whitespaceBeforeF test c <>
@@ -141,7 +140,7 @@ ifStatement (IfStatement c t elif el _) =
      beforeF (betweenWhitespace' colon) suite)
     el
 
-whileStatement :: WhileStatement lctxt ectxt a -> Doc
+whileStatement :: Ord a => WhileStatement lctxt ectxt a -> Doc
 whileStatement (WhileStatement c b e _) =
   text "while" <>
   whitespaceBeforeF test c <>
@@ -152,7 +151,7 @@ whileStatement (WhileStatement c b e _) =
      beforeF (betweenWhitespace' colon) suite)
     e
 
-forStatement :: ForStatement lctxt ectxt a -> Doc
+forStatement :: Ord a => ForStatement lctxt ectxt a -> Doc
 forStatement (ForStatement f i b e _) =
   text "for" <>
   betweenWhitespace'F (testlistStarExpr expr starExpr) f <>
@@ -164,7 +163,7 @@ forStatement (ForStatement f i b e _) =
     ((text "else" <>) . beforeF (betweenWhitespace' colon) suite)
     e
 
-tryStatement :: TryStatement lctxt ectxt a -> Doc
+tryStatement :: Ord a => TryStatement lctxt ectxt a -> Doc
 tryStatement s =
   case s of
     TryStatementExcepts t ex el f _ ->
@@ -190,7 +189,7 @@ tryStatement s =
       text "finally" <>
       beforeF (betweenWhitespace' colon) suite f
 
-exceptClause :: ExceptClause ctxt a -> Doc
+exceptClause :: Ord a => ExceptClause ctxt a -> Doc
 exceptClause (ExceptClause v _) =
   text "except" <>
   foldMapOf
@@ -200,7 +199,7 @@ exceptClause (ExceptClause v _) =
      beforeF (betweenWhitespace' kAs) identifier)
     v
 
-withStatement :: WithStatement lctxt ectxt a -> Doc
+withStatement :: Ord a => WithStatement lctxt ectxt a -> Doc
 withStatement (WithStatement h t s _) =
   text "with" <>
   whitespaceBeforeF withItem h <>
@@ -210,7 +209,7 @@ withStatement (WithStatement h t s _) =
     t <>
   beforeF (betweenWhitespace' colon) suite s
 
-withItem :: WithItem ctxt a -> Doc
+withItem :: Ord a => WithItem ctxt a -> Doc
 withItem (WithItem l r _) =
   test l <>
   foldMapOf
@@ -218,14 +217,14 @@ withItem (WithItem l r _) =
     (beforeF (betweenWhitespace' kAs) expr)
     r
 
-asyncStatement :: AsyncStatement lctxt ectxt a -> Doc
+asyncStatement :: Ord a => AsyncStatement lctxt ectxt a -> Doc
 asyncStatement (AsyncStatement v _) =
   text "async" <>
   whitespaceBeforeF
     (sumElim (sumElim funcDef withStatement) forStatement)
     v
 
-funcDef :: FuncDef outer inner a -> Doc
+funcDef :: Ord a => FuncDef outer inner a -> Doc
 funcDef (FuncDef n p t b _) =
   text "def" <>
   whitespaceBeforeF identifier n <>
@@ -236,12 +235,12 @@ funcDef (FuncDef n p t b _) =
     t <>
   beforeF (betweenWhitespace' colon) suite b
 
-parameters :: Parameters ctxt a -> Doc
+parameters :: Ord a => Parameters ctxt a -> Doc
 parameters (Parameters v _) =
   parens $
   betweenWhitespace'F (foldMapOf (_Wrapped.folded) (argsList typedArg test)) v
 
-typedArg :: TypedArg a -> Doc
+typedArg :: Ord a => TypedArg a -> Doc
 typedArg (TypedArg v t _) =
   identifier v <>
   foldMapOf
@@ -249,7 +248,7 @@ typedArg (TypedArg v t _) =
     (beforeF (betweenWhitespace' colon) test)
     t
 
-classDef :: ClassDef ctxt a -> Doc
+classDef :: Ord a => ClassDef ctxt a -> Doc
 classDef (ClassDef n a b _) =
   text "class" <>
   whitespaceBeforeF identifier n <>
@@ -262,12 +261,12 @@ classDef (ClassDef n a b _) =
     a <>
   beforeF (betweenWhitespace' colon) suite b
 
-decorated :: Decorated ctxt a -> Doc
+decorated :: Ord a => Decorated ctxt a -> Doc
 decorated (Decorated ds b _) =
   foldMapOf (_Wrapped.folded) decorator ds <>
   sumElim (sumElim classDef funcDef) asyncFuncDef b
 
-decorator :: Decorator ctxt a -> Doc
+decorator :: Ord a => Decorator ctxt a -> Doc
 decorator (Decorator name args n _) =
   text "@" <>
   whitespaceBeforeF dottedName name <>
@@ -279,12 +278,12 @@ decorator (Decorator name args n _) =
     args <>
   newlineChar n
 
-asyncFuncDef :: AsyncFuncDef ctxt a -> Doc
+asyncFuncDef :: Ord a => AsyncFuncDef ctxt a -> Doc
 asyncFuncDef (AsyncFuncDef v _) =
   text "async" <>
   whitespaceBeforeF funcDef v
 
-suite :: Suite lctxt ctxt a -> Doc
+suite :: Ord a => Suite lctxt ctxt a -> Doc
 suite s =
   case s of
     SuiteSingle v _ -> simpleStatement v

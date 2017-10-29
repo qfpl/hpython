@@ -68,7 +68,7 @@ data ArgsListArg name test a
   deriving (Eq, Functor, Foldable, Show, Traversable)
 
 mkArgsListAll
-  :: Ord (name a)
+  :: HasName name
   => ArgsListArg name test a
   -> Compose
        []
@@ -95,7 +95,7 @@ mkArgsListAll a bs c ann =
   in validateArgList res
 
 _ArgsListAll
-  :: Ord (name a)
+  :: HasName name
   => Prism'
        (Maybe (ArgsList name test a))
        ( ArgsListArg name test a
@@ -131,7 +131,7 @@ _ArgsListAll =
           _ -> Nothing)
 
 mkArgsListArgsKwargs
-  :: Ord (name a)
+  :: HasName name
   => Sum
        (ArgsListStarPart name test)
        (ArgsListDoublestarArg name test)
@@ -143,7 +143,7 @@ mkArgsListArgsKwargs a ann =
   in validateArgList res
 
 _ArgsListArgsKwargs
-  :: Ord (name a)
+  :: HasName name
   => Prism'
        (Maybe (ArgsList name test a))
        ( Sum
@@ -198,9 +198,7 @@ data ArgsList name test a
 deriving instance (Eq1 test, Eq1 name, Eq a, Eq (name a)) => Eq (ArgsList name test a)
 deriving instance (Show1 test, Show1 name, Show a, Show (name a)) => Show (ArgsList name test a)
 
-instance IsArgList (ArgsList name test a) where
-  type Name (ArgsList name test a) = name a
-
+instance HasName name => IsArgList (ArgsList name test a) where
   data KeywordArgument (ArgsList name test a)
     = KAKeywordArg (name a) (test a)
 
@@ -211,7 +209,12 @@ instance IsArgList (ArgsList name test a) where
     = PASinglestarArg (name a)
     | PAPositionalArg (name a)
 
-  keywordName (KAKeywordArg n _) = n
+  argumentName (KeywordArgument (KAKeywordArg n _)) = n ^? name
+  argumentName (DoublestarArgument (DADoublestarArg n)) = n ^? name
+  argumentName (PositionalArgument a) =
+    case a of
+      PASinglestarArg n -> n ^? name
+      PAPositionalArg n -> n ^? name
 
   arguments =
     \case

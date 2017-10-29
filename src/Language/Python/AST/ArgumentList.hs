@@ -169,7 +169,7 @@ deriving instance (Foldable name, Foldable (expr as dctxt)) => Foldable (Argumen
 deriving instance (Traversable name, Traversable (expr as dctxt)) => Traversable (ArgumentList name expr as dctxt)
 
 mkArgumentListAll
-  :: Ord (name a)
+  :: HasName name
   => PositionalArguments expr 'NotAssignable dctxt a
   -> Compose
        Maybe
@@ -193,7 +193,7 @@ mkArgumentListAll a b c d e =
   in validateArgList res
 
 _ArgumentListAll
-  :: Ord (name a)
+  :: HasName name
   => Prism'
        (Maybe (ArgumentList name expr 'NotAssignable dctxt a))
        ( PositionalArguments expr 'NotAssignable dctxt a
@@ -221,7 +221,7 @@ _ArgumentListAll =
         _ -> Nothing)
 
 mkArgumentListUnpacking
-  :: Ord (name a)
+  :: HasName name
   => StarredAndKeywords name expr 'NotAssignable dctxt a
   -> Compose
        Maybe
@@ -239,7 +239,7 @@ mkArgumentListUnpacking a b c d =
   in validateArgList res
 
 _ArgumentListUnpacking
-  :: Ord (name a)
+  :: HasName name
   => Prism'
        (Maybe (ArgumentList name expr 'NotAssignable dctxt a))
        ( StarredAndKeywords name expr 'NotAssignable dctxt a
@@ -261,7 +261,7 @@ _ArgumentListUnpacking =
         _ -> Nothing)
 
 mkArgumentListKeywords
-  :: Ord (name a)
+  :: HasName name
   => KeywordsArguments name expr 'NotAssignable dctxt a
   -> Maybe (Between' [WhitespaceChar] Comma)
   -> a
@@ -273,7 +273,7 @@ mkArgumentListKeywords a b c =
   in validateArgList res
 
 _ArgumentListKeywords
-  :: Ord (name a)
+  :: HasName name
   => Prism'
        (Maybe (ArgumentList name expr 'NotAssignable dctxt a))
        ( KeywordsArguments name expr 'NotAssignable dctxt a
@@ -287,9 +287,7 @@ _ArgumentListKeywords =
         Just (ArgumentListKeywords a b c) -> Just (a, b, c)
         _ -> Nothing)
 
-instance IsArgList (ArgumentList name expr as dctxt a) where
-  type Name (ArgumentList name expr as dctxt a) = name a
-
+instance HasName name => IsArgList (ArgumentList name expr as dctxt a) where
   data KeywordArgument (ArgumentList name expr as dctxt a)
     = KAKeywordArg (KeywordItem name expr as dctxt a)
 
@@ -307,8 +305,9 @@ instance IsArgList (ArgumentList name expr as dctxt a) where
           (expr 'NotAssignable dctxt)
           a)
 
-  keywordName (KAKeywordArg (KeywordItem ident _ _)) =
-    ident ^. _Wrapped.after._2
+  argumentName (KeywordArgument (KAKeywordArg (KeywordItem ident _ _))) =
+    ident ^? _Wrapped.after._2.name
+  argumentName _ = Nothing
 
   arguments l =
     case l of

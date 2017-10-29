@@ -25,6 +25,7 @@ import Language.Python.AST.ArgumentList
 import Language.Python.AST.DottedName
 import Language.Python.AST.Identifier
 import Language.Python.AST.IndentedLines
+import Language.Python.AST.IsArgList
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.AST.TestlistStarExpr
@@ -695,6 +696,7 @@ deriveShow1 ''Parameters
 
 deriveEq1 ''TypedArg
 deriveShow1 ''TypedArg
+makeLenses ''TypedArg
 
 deriveEq1 ''WithItem
 deriveShow1 ''WithItem
@@ -728,3 +730,6 @@ deriveShow1 ''Decorated
 
 deriveEq1 ''AsyncStatement
 deriveShow1 ''AsyncStatement
+
+instance HasName TypedArg where
+  name = typedArg_value.identifier_value

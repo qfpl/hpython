@@ -5,6 +5,7 @@ import Papa hiding (Sum)
 import Data.Functor.Sum
 import Text.PrettyPrint hiding ((<>), comma, colon)
 
+import Language.Python.AST.IsArgList
 import Language.Python.AST.ArgsList
 import Language.Python.Printer.Combinators
 import Language.Python.Printer.Symbols
@@ -46,7 +47,7 @@ argsListDoublestarArg renderName (ArgsListDoublestarArg a _) =
   betweenWhitespace'F renderName a
 
 argsList
-  :: Ord (name a)
+  :: HasName name
   => (name a -> Doc)
   -> (f a -> Doc)
   -> ArgsList name f a

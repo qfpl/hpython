@@ -1,20 +1,21 @@
 {-# language FlexibleContexts #-}
-{-# language KindSignatures #-}
 {-# language TypeFamilies #-}
 module Language.Python.AST.IsArgList where
 
 import Papa
+import Data.Text (Text)
 
-import Data.Functor.Classes
 import qualified Data.Set as S
 
+class HasName s where
+  name :: Lens' (s a) Text
+
 class IsArgList l where
-  type Name l
   data KeywordArgument l
   data DoublestarArgument l
   data PositionalArgument l
 
-  keywordName :: KeywordArgument l -> Name l
+  argumentName :: Argument l -> Maybe Text
   arguments :: l -> [Argument l]
 
 data Argument l
@@ -42,31 +43,22 @@ keywordBeforePositional l = go False l
           | otherwise -> go keyword as
 
 duplicateArguments
-  :: ( IsArgList l
-     , Ord (Name l)
-     )
-  => [Argument l]
-  -> Either (ArgumentError l) [Argument l]
-duplicateArguments l = go S.empty l
-  where
-    go _ [] = Right l
-    go seen (a:as) =
-      case a of
-        KeywordArgument k ->
-          let name = keywordName k
-          in
-            if name `S.member` seen
-            then Left DuplicateArguments
-            else go (S.insert name seen) as
-        _ -> go seen as
+  :: IsArgList l
+  => [Text]
+  -> Either (ArgumentError l) [Text]
+duplicateArguments l
+  | length l /= length (S.fromList l)
+  = Left DuplicateArguments
+  | otherwise = Right l
 
 validateArgList
-  :: ( IsArgList l
-     , Ord (Name l)
-     )
+  :: IsArgList l
   => l
   -> Either (ArgumentError l) l
 validateArgList l =
-  (keywordBeforePositional (arguments l) >>=
-   duplicateArguments)
-  $> l
+  let
+    l' = arguments l
+  in
+    keywordBeforePositional l' *>
+    duplicateArguments (catMaybes $ fmap argumentName l') $>
+    l

@@ -281,8 +281,7 @@ checkParameters
   -> IR.Parameters ann
   -> SyntaxChecker ann (Safe.Parameters dctxt ann)
 checkParameters ecfg (IR.Parameters v ann) =
-  Safe.Parameters <$>
-  traverseOf
+  Safe.Parameters <$> traverseOf
     (_Wrapped.traverse._Wrapped.traverse)
     (checkArgsList
       (ecfg & atomType .~ SNotAssignable)

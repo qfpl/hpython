@@ -7,6 +7,7 @@ import Papa hiding (Sum)
 import Data.Functor.Sum
 import Hedgehog
 import Language.Python.AST.ArgsList
+import Language.Python.AST.IsArgList
 import Language.Python.AST.Symbols
 import Language.Python.IR.ExprConfig
 
@@ -78,8 +79,8 @@ genArgsListDoublestarArg _ genName =
   pure ()
 
 genArgsList
-  :: ( HasName name
-     , MonadGen m
+  :: ( MonadGen m
+     , HasName name
      )
   => ExprConfig 'NotAssignable ctxt
   -> m (name ())

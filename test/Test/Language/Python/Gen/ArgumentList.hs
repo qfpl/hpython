@@ -12,12 +12,15 @@ import qualified Hedgehog.Range as Range
 
 import Language.Python.IR.ExprConfig
 import Language.Python.AST.ArgumentList
+import Language.Python.AST.IsArgList
 import Language.Python.AST.Symbols
 
 import Test.Language.Python.Gen.Combinators
 
 genArgumentList
-  :: MonadGen m
+  :: ( MonadGen m
+     , HasName name
+     )
   => ExprConfig as dctxt
   -> m (name ())
   -> ( forall as' dctxt'

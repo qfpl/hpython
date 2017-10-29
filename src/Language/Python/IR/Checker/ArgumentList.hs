@@ -6,6 +6,7 @@ module Language.Python.IR.Checker.ArgumentList where
 import Papa
 import Data.Functor.Sum
 
+import Language.Python.AST.IsArgList (HasName)
 import Language.Python.IR.ExprConfig
 import Language.Python.IR.SyntaxChecker
 
@@ -125,7 +126,7 @@ checkStarredAndKeywords cfg _checkName _checkExpr (IR.StarredAndKeywords h t ann
   pure ann
 
 checkArgumentList
-  :: Ord (checkedName ann)
+  :: HasName checkedName
   => ExprConfig as dctxt
   -> ( forall as' dctxt'
      . ExprConfig as' dctxt'

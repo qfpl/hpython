@@ -8,9 +8,9 @@ import Language.Python.AST.Symbols
 
 newlineChar :: CharParsing m => m NewlineChar
 newlineChar =
-  (char '\r' $> CR) <|>
+  ((char '\r' $> CR) <|>
   (char '\n' $> LF) <|>
-  (string "\r\n" $> CRLF)
+  (string "\r\n" $> CRLF)) <?> "newline"
 
 leftParen :: CharParsing m => m LeftParen
 leftParen = char '(' $> LeftParen
@@ -26,6 +26,9 @@ asterisk = char '*' $> Asterisk
 
 colon :: CharParsing m => m Colon
 colon = char ':' $> Colon
+
+semicolon :: CharParsing m => m Semicolon
+semicolon = char ';' $> Semicolon
 
 tripleDoublequote :: CharParsing m => m TripleDoubleQuote
 tripleDoublequote = string "\"\"\"" $> TripleDoubleQuote
@@ -76,11 +79,31 @@ jJ =
 comma :: CharParsing m => m Comma
 comma = char ',' $> Comma
 
+dot :: CharParsing m => m Dot
+dot = char '.' $> Dot
+
 whitespaceChar :: CharParsing m => m WhitespaceChar
 whitespaceChar =
   (char ' ' $> Space) <|>
   (char '\t' $> Tab) <|>
   fmap Continued (char '\\' *> newlineChar)
-  
+
 equals :: CharParsing m => m Equals
 equals = char '=' $> Equals
+
+ellipsis :: CharParsing m => m Ellipsis
+ellipsis = string "..." $> Ellipsis
+
+rightArrow :: CharParsing m => m RightArrow
+rightArrow = string "->" $> RightArrow
+
+formFeed :: CharParsing m => m FormFeed
+formFeed = char '\f' $> FormFeed
+
+indentationChar :: CharParsing m => m IndentationChar
+indentationChar =
+  ((char ' ' $> IndentSpace) <|>
+  (char '\t' $> IndentTab) <|>
+  (IndentContinued <$> (char '\\' *> try newlineChar) <*>
+   many indentationChar)) <?> "indentation character"
+  

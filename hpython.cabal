@@ -18,57 +18,97 @@ cabal-version:       >=1.10
 tested-with:         GHC == 8.0.2
 
 library
-  exposed-modules:     Language.Python.AST
-                       Language.Python.AST.BytesLiteral
-                       Language.Python.AST.BytesPrefix
+  exposed-modules:
+                       Language.Python.AST.ArgsList
+                       Language.Python.AST.ArgumentList
                        Language.Python.AST.Comment
-                       Language.Python.AST.CompOperator
-                       Language.Python.AST.EscapeSeq
-                       Language.Python.AST.Digits
-                       Language.Python.AST.FactorOperator
-                       Language.Python.AST.Float
+                       Language.Python.AST.DottedName
                        Language.Python.AST.Identifier
-                       Language.Python.AST.Imag
-                       Language.Python.AST.Integer
+                       Language.Python.AST.IndentedLines
+                       Language.Python.AST.IsArgList
                        Language.Python.AST.Keywords
-                       Language.Python.AST.LongBytes
-                       Language.Python.AST.LongBytesChar
-                       Language.Python.AST.LongString
-                       Language.Python.AST.LongStringChar
-                       Language.Python.AST.ShortBytes
-                       Language.Python.AST.ShortBytesChar
-                       Language.Python.AST.ShortStringChar
-                       Language.Python.AST.ShortString
-                       Language.Python.AST.StringLiteral
-                       Language.Python.AST.StringPrefix
                        Language.Python.AST.Symbols
-                       Language.Python.AST.StringContent
-                       Language.Python.AST.TermOperator
-                       Language.Python.AST.VarargsList
-                       Language.Python.Parser
+                       Language.Python.AST.TestlistStarExpr
+                       Language.Python.Expr.AST
+                       Language.Python.Expr.AST.BytesLiteral
+                       Language.Python.Expr.AST.BytesPrefix
+                       Language.Python.Expr.AST.CompOperator
+                       Language.Python.Expr.AST.EscapeSeq
+                       Language.Python.Expr.AST.Digits
+                       Language.Python.Expr.AST.FactorOperator
+                       Language.Python.Expr.AST.Float
+                       Language.Python.Expr.AST.Imag
+                       Language.Python.Expr.AST.Integer
+                       Language.Python.Expr.AST.LongBytes
+                       Language.Python.Expr.AST.LongBytesChar
+                       Language.Python.Expr.AST.LongString
+                       Language.Python.Expr.AST.LongStringChar
+                       Language.Python.Expr.AST.ShortBytes
+                       Language.Python.Expr.AST.ShortBytesChar
+                       Language.Python.Expr.AST.ShortStringChar
+                       Language.Python.Expr.AST.ShortString
+                       Language.Python.Expr.AST.StringLiteral
+                       Language.Python.Expr.AST.StringPrefix
+                       Language.Python.Expr.AST.StringContent
+                       Language.Python.Expr.AST.TermOperator
+                       Language.Python.Expr.IR
+                       Language.Python.Expr.IR.Checker
+                       Language.Python.Expr.Parser
+                       Language.Python.Expr.Parser.EscapeSeq
+                       Language.Python.Expr.Parser.StringContent
+                       Language.Python.Expr.Printer
+                       Language.Python.IR.ArgsList
+                       Language.Python.IR.ArgumentList
+                       Language.Python.IR.Indentation
+                       Language.Python.IR.Checker.ArgsList
+                       Language.Python.IR.Checker.ArgumentList
+                       Language.Python.IR.Checker.TestlistStarExpr
+                       Language.Python.IR.ExprConfig
+                       Language.Python.IR.StatementConfig
+                       Language.Python.IR.SyntaxChecker
+                       Language.Python.IR.TestlistStarExpr
+                       Language.Python.Parser.ArgsList
+                       Language.Python.Parser.ArgumentList
                        Language.Python.Parser.Combinators
-                       Language.Python.Parser.IR
-                       Language.Python.Parser.IR.SyntaxConfig
-                       Language.Python.Parser.IR.Checker
-                       Language.Python.Parser.IR.VarargsList
-                       Language.Python.Parser.EscapeSeq
+                       Language.Python.Parser.DottedName
                        Language.Python.Parser.Identifier
-                       Language.Python.Parser.StringContent
+                       Language.Python.Parser.Indentation
+                       Language.Python.Parser.Keywords
                        Language.Python.Parser.SrcInfo
                        Language.Python.Parser.Symbols
-                       Language.Python.Parser.VarargsList
-                       Language.Python.Printer
+                       Language.Python.Parser.TestlistStarExpr
+                       Language.Python.Printer.ArgsList
+                       Language.Python.Printer.ArgumentList
+                       Language.Python.Printer.Combinators
+                       Language.Python.Printer.DottedName
+                       Language.Python.Printer.Identifier
+                       Language.Python.Printer.IndentedLines
+                       Language.Python.Printer.Keywords
+                       Language.Python.Printer.Symbols
+                       Language.Python.Printer.TestlistStarExpr
+                       Language.Python.Statement.AST
+                       Language.Python.Statement.AST.AugAssign
+                       Language.Python.Statement.AST.Imports
+                       Language.Python.Statement.IR
+                       Language.Python.Statement.IR.Checker
+                       Language.Python.Statement.Parser
+                       Language.Python.Statement.Parser.AugAssign
+                       Language.Python.Statement.Parser.Imports
+                       Language.Python.Statement.Printer
+                       Language.Python.Statement.Printer.AugAssign
+                       Language.Python.Statement.Printer.Imports
                        Data.Functor.Sum.Lens
                        Data.Separated.After
                        Data.Separated.Before
                        Data.Separated.Between
+                       Data.Orphans.NonEmpty
                        Text.Parser.Unspaced
   build-depends:       base >=4.9 && <4.10
                      , text >= 1.2 && <1.3
                      , charset
                      , deriving-compat
                      , papa >=0.3 && <0.4
-                     , parsers
+                     , parsers >=0.12.7 && < 0.13
                      , pretty >=1.1 && <1.2
                      , transformers >=0.5 && <0.6
                      , trifecta >=1.6 && <1.7
@@ -78,16 +118,28 @@ library
                      , dlist >=0.8 && <0.9
                      , validation >=0.5 && <0.6
                      , unordered-containers >=0.2 && <0.3
+                     , indentation-trifecta ==0.0.2
+                     , singletons >=2.2 && <2.3
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions:  NoImplicitPrelude
-
 test-suite hpython-tests
     type:                exitcode-stdio-1.0
     hs-source-dirs:      test
     main-is:             Main.hs
-    other-modules:       Test.Language.Python.ParserPrinter
-                       , Test.Language.Python.AST.Gen
+    other-modules:
+                         Test.Language.Python.Expr.AST.EscapeSeq
+                         Test.Language.Python.Expr.AST.StringContent
+                         Test.Language.Python.Expr.Gen
+                         Test.Language.Python.Gen.ArgsList
+                         Test.Language.Python.Gen.Combinators
+                         Test.Language.Python.Gen.DottedName
+                         Test.Language.Python.Gen.Identifier
+                         Test.Language.Python.Gen.IndentedLines
+                         Test.Language.Python.Gen.TestlistStarExpr
+                         Test.Language.Python.ParserPrinter
+                         Test.Language.Python.Parser.Indentation
+                         Test.Language.Python.Statement.Gen
     build-depends:       base >=4.9 && <4.10
                        , ansi-wl-pprint >=0.6 && <0.7
                        , directory >=1.3 && <1.4
@@ -103,5 +155,6 @@ test-suite hpython-tests
                        , transformers >=0.5 && <0.6
                        , tasty-hedgehog >=0.1 && <0.2
                        , hpython
+    ghc-options:         -rtsopts -O2
     default-extensions:  NoImplicitPrelude
     default-language:    Haskell2010

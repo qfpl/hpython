@@ -1,7 +1,7 @@
-{ pkgs ? import <nixpkgs> { }, haskellPackages }:
+{ pkgs ? import <nixpkgs> { } }:
 pkgs.fetchFromGitHub {
   owner = "qfpl";
   repo = "papa";
-  rev = "f76316938c1d5398cc9ab01de12bfde6b68b8502";
-  sha256 = "14dlk0v2p6y65953bnmy6bm3m5a5fag209r53kq6ycwqw8m0m1ja";
+  rev = "5f8707ca723ec104c79f83a56dfd2fabcc885c06";
+  sha256 = "12cb5am618hzydcp372vgbqh2a5a9anx3cbv56dlpf1n51hhxv5f";
 }

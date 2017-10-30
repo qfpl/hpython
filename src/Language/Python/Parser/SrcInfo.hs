@@ -9,7 +9,7 @@ data SrcInfo
   { _srcCaret :: Caret
   , _srcSpan :: Span
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 annotated
   :: ( Monad m

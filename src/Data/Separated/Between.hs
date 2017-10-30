@@ -9,14 +9,15 @@ module Data.Separated.Between where
 
 import Papa
 
-import Data.Eq.Deriving
-import Text.Show.Deriving
+import Data.Deriving
 
 data Between s t a = Between s a t
-  deriving (Eq, Foldable, Functor, Traversable, Show)
+  deriving (Eq, Ord, Foldable, Functor, Traversable, Show)
 
 deriveEq1 ''Between
 deriveShow1 ''Between
+deriveOrd1 ''Between
+deriveRead1 ''Between
 
 between :: Lens (Between s s' a) (Between t t' b) (s, a, s') (t, b, t')
 between =
@@ -25,10 +26,12 @@ between =
   (\Between{} (t, b, t') -> Between t b t')
 
 newtype Between' s a = Between' { _getBetween :: Between s s a }
-  deriving (Eq, Foldable, Functor, Traversable, Show)
+  deriving (Eq, Ord, Foldable, Functor, Traversable, Show)
 
 deriveEq1 ''Between'
 deriveShow1 ''Between'
+deriveOrd1 ''Between'
+deriveRead1 ''Between'
 
 instance Bifunctor Between' where
   bimap f g (Between' b) =

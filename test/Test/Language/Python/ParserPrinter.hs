@@ -1,9 +1,12 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Test.Language.Python.ParserPrinter (makeParserPrinterTests) where
 
 import Papa
-import Prelude (error)
+import Prelude (error, undefined)
 import Control.Monad.IO.Class
+import Data.Functor.Compose
+import Data.Separated.Before
 import Hedgehog
 import System.Directory
 import System.FilePath
@@ -13,16 +16,24 @@ import Test.Tasty.Hspec
 import Test.Tasty.Hedgehog
 import Text.Trifecta hiding (render, runUnspaced)
 
+import qualified Hedgehog.Gen as Gen
 import qualified Text.PrettyPrint.ANSI.Leijen as WL
 import qualified Text.PrettyPrint as HPJ
 
-import Language.Python.Parser.IR.SyntaxConfig
+import Language.Python.IR.SyntaxChecker
+import Language.Python.IR.ExprConfig
+import Language.Python.IR.StatementConfig
 
-import qualified Language.Python.Parser as Parse
-import qualified Language.Python.Parser.IR.Checker as Check
-import qualified Language.Python.Printer as Print
-import qualified Language.Python.AST as AST
-import qualified Test.Language.Python.AST.Gen as GenAST
+import qualified Language.Python.Expr.AST as AST
+import qualified Language.Python.AST.Identifier as AST
+import qualified Language.Python.Expr.AST.Integer as AST
+import qualified Language.Python.Expr.AST.Digits as AST
+import qualified Language.Python.Expr.Parser as Parse
+import qualified Language.Python.Expr.Printer as Print
+import qualified Language.Python.Expr.IR.Checker as Check
+import qualified Language.Python.Statement.Printer as Print
+import qualified Test.Language.Python.Expr.Gen as GenAST
+import qualified Test.Language.Python.Statement.Gen as GenAST
 
 import Text.Parser.Unspaced
 
@@ -35,13 +46,9 @@ parse_print_expr_id input =
     Success unchecked ->
       let
         checkResult =
-          (fmap Print.test . Check.runChecker $
+          (fmap Print.test . runChecker $
             Check.checkTest
-              (SyntaxConfig AST.SNotAssignable AST.STopLevel)
-              unchecked) <!>
-          (fmap Print.test . Check.runChecker $
-            Check.checkTest
-              (SyntaxConfig AST.SAssignable AST.STopLevel)
+              (ExprConfig SNotAssignable STopLevel)
               unchecked)
       in
         case checkResult of
@@ -99,12 +106,17 @@ checkSyntax input = do
       pure $ case errString of
         Just "Syntax" -> SyntaxError errorMsg
         Just "Indentation" -> SyntaxError errorMsg
+        Just "Tab" -> SyntaxError errorMsg
         _ -> SyntaxCorrect
 
-prop_ast_is_valid_python :: AST.SAtomType atomType -> Property
-prop_ast_is_valid_python assignability =
+prop_expr_ast_is_valid_python :: SAtomType atomType -> Property
+prop_expr_ast_is_valid_python assignability =
   property $ do
-    expr <- forAll (GenAST.genTest $ SyntaxConfig assignability AST.STopLevel)
+    expr <-
+      forAll .
+      Gen.resize 100 .
+      GenAST.genTest $
+      ExprConfig assignability STopLevel
     let program = HPJ.render $ Print.test expr
     res <- liftIO $ checkSyntax program
     case res of
@@ -124,6 +136,56 @@ prop_ast_is_valid_python assignability =
         failure
       SyntaxCorrect -> success
 
+prop_statement_ast_is_valid_python
+  :: StatementConfig lctxt
+  -> ExprConfig assignability dctxt
+  -> Property
+prop_statement_ast_is_valid_python scfg ecfg =
+  property $ do
+    st <- forAll $ GenAST.genStatement scfg ecfg
+    let program = HPJ.render $ Print.statement st
+    res <- liftIO $ checkSyntax program
+    case res of
+      SyntaxError pythonError -> do
+        footnote $
+          unlines
+          [ "Input string caused a syntax error."
+          , ""
+          , "Input string:"
+          , program
+          , "( " ++ show program ++ " )"
+          , ""
+          , "Error message:"
+          , ""
+          , pythonError
+          ]
+        failure
+      SyntaxCorrect -> success
+
+regressions :: Spec
+regressions = do
+  describe "regressions" $ do
+    it "1.a should be disallowed" $ do
+      let
+        expr =
+          AST.AtomExprNoAwait
+            (AST.AtomInteger
+              (AST.IntegerDecimal (Left (AST.NonZeroDigit_1, [])) ())
+              ())
+            (Compose
+              [ Compose . Before [] $
+                AST.TrailerAccess
+                (Compose $ Before [] (AST.Identifier "a" ()))
+                ()
+              ])
+            ()
+        program = HPJ.render $ Print.atomExpr expr
+      res <- checkSyntax program
+      case res of
+        SyntaxCorrect -> () `shouldBe` ()
+        SyntaxError err ->
+          expectationFailure $ "Failure:\n\n" ++ err ++ "\n"
+
 makeParserPrinterTests :: IO [TestTree]
 makeParserPrinterTests = do
   files <-
@@ -137,10 +199,15 @@ makeParserPrinterTests = do
     spec = traverse_ (uncurry it) filesExpectations
     properties =
       [ testProperty
-          "AST is valid python - assignable" $
-          prop_ast_is_valid_python AST.SAssignable
+          "Expression AST is valid python - assignable" $
+          prop_expr_ast_is_valid_python SAssignable
       , testProperty
-          "AST is valid python - not assignable" $
-          prop_ast_is_valid_python AST.SNotAssignable
+          "Expression AST is valid python - not assignable" $
+          prop_expr_ast_is_valid_python SNotAssignable
+      , testProperty
+          "Statement AST is valid python" $
+          prop_statement_ast_is_valid_python
+            (StatementConfig SNotInLoop)
+            (ExprConfig undefined STopLevel)
       ]
-  (properties ++) <$> testSpecs spec
+  (properties ++ ) <$> liftA2 (++) (testSpecs regressions) (testSpecs spec)

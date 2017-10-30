@@ -214,8 +214,7 @@ _ArgumentListAll
        )
 _ArgumentListAll =
   prism'
-    (\(a, b, c, d, e) ->
-       either (const Nothing) Just $ mkArgumentListAll a b c d e)
+    (\(a, b, c, d, e) -> mkArgumentListAll a b c d e ^? _Right)
     (\case
         Just (ArgumentListAll a b c d e) -> Just (a, b, c, d, e)
         _ -> Nothing)
@@ -254,8 +253,7 @@ _ArgumentListUnpacking
        )
 _ArgumentListUnpacking =
   prism'
-    (\(a, b, c, d) ->
-       either (const Nothing) Just $ mkArgumentListUnpacking a b c d)
+    (\(a, b, c, d) -> mkArgumentListUnpacking a b c d ^? _Right)
     (\case
         Just (ArgumentListUnpacking a b c d) -> Just (a, b, c, d)
         _ -> Nothing)
@@ -282,7 +280,7 @@ _ArgumentListKeywords
        )
 _ArgumentListKeywords =
   prism'
-    (\(a, b, c) -> either (const Nothing) Just $ mkArgumentListKeywords a b c)
+    (\(a, b, c) -> mkArgumentListKeywords a b c ^? _Right)
     (\case
         Just (ArgumentListKeywords a b c) -> Just (a, b, c)
         _ -> Nothing)

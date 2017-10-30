@@ -121,9 +121,7 @@ _ArgsListAll
        )
 _ArgsListAll =
   prism'
-    (\(a, b, c, d) -> case mkArgsListAll a b c d of
-        Right a' -> Just a'
-        Left _ -> Nothing)
+    (\(a, b, c, d) -> mkArgsListAll a b c d ^? _Right)
     (\v -> do
         v' <- v
         case v' of
@@ -154,9 +152,7 @@ _ArgsListArgsKwargs
        )
 _ArgsListArgsKwargs =
   prism'
-    (\(a, b) -> case mkArgsListArgsKwargs a b of
-        Right a' -> Just a'
-        Left _ -> Nothing)
+    (\(a, b) -> mkArgsListArgsKwargs a b ^? _Right)
     (\v -> do
         v' <- v
         case v' of

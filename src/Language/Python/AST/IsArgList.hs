@@ -60,5 +60,5 @@ validateArgList l =
     l' = arguments l
   in
     keywordBeforePositional l' *>
-    duplicateArguments (catMaybes $ fmap argumentName l') $>
+    duplicateArguments (mapMaybe argumentName l') $>
     l

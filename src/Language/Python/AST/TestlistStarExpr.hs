@@ -27,6 +27,7 @@ import Data.Deriving
 import Data.Functor.Classes
 import Data.Functor.Compose
 import Data.Functor.Sum
+import Data.Functor.Sum.Lens
 import Data.Separated.Before
 import Data.Separated.Between
 
@@ -76,18 +77,15 @@ _TestlistStarExprMany
 _TestlistStarExprMany =
   prism'
     (\(a, b, c, d) ->
-       case toListOf (_Wrapped.folded._Wrapped.before._2.filtered isStar) b of
+       case toListOf (_Wrapped.folded._Wrapped.before._2.filtered (isn't _InL)) b of
          [] -> Just $ TestlistStarExprMany a b c d
          [_]
-           | isStar a -> Nothing
+           | InR _ <- a -> Nothing
            | otherwise -> Just $ TestlistStarExprMany a b c d
          _ -> Nothing)
     (\case
         Just (TestlistStarExprMany a b c d) -> Just (a, b, c, d)
         _ -> Nothing)
-  where
-    isStar (InL _) = False
-    isStar (InR _) = True
 
 instance (Eq1 (test as ctxt), Eq1 (starExpr as ctxt)) =>
   Eq1 (TestlistStarExpr test starExpr as ctxt) where

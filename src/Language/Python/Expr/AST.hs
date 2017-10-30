@@ -253,30 +253,50 @@ deriving instance Functor (Trailer a b)
 deriving instance Foldable (Trailer a b)
 deriving instance Traversable (Trailer a b)
 
+data AtomExprTrailers :: AtomType -> DefinitionContext -> * -> * where
+  AtomExprTrailersBase ::
+    { _atomExprTrailersBase_value :: AtomNoInt atomType ctxt a
+    , _atomExprTrailersBase_trailers
+      :: Compose
+           (Before [WhitespaceChar])
+           (Trailer atomType ctxt)
+           a
+    , _atomExprTrailersBase_ann :: a
+    } -> AtomExprTrailers atomType ctxt a
+  AtomExprTrailersMany ::
+    { _atomExprTrailersMany_value :: AtomExprTrailers atomType ctxt a
+    , _atomExprTrailersMany_trailers
+      :: Compose
+           (Before [WhitespaceChar])
+           (Trailer atomType ctxt)
+           a
+    , _atomExprTrailersMany_ann :: a
+    } -> AtomExprTrailers atomType ctxt a
+deriving instance Eq c => Eq (AtomExprTrailers a b c)
+deriving instance Functor (AtomExprTrailers a b)
+deriving instance Foldable (AtomExprTrailers a b)
+deriving instance Traversable (AtomExprTrailers a b)
+
 data AtomExpr :: AtomType -> DefinitionContext -> * -> * where
-  AtomExprNoAwait ::
-    { _atomExpr_atom :: Atom atomType ctxt a
-    , _atomExpr_trailers
-      :: Compose
-           []
-           (Compose
-             (Before [WhitespaceChar])
-             (Trailer atomType ctxt))
-           a
-    , _atomExpr_ann :: a
+  AtomExprSingle ::
+    { _atomExprSingle_value :: Atom atomType ctxt a
+    , _atomExprSingle_ann :: a
     } -> AtomExpr atomType ctxt a
-  AtomExprAwait ::
-    { _atomExprAwait_await :: After (NonEmpty WhitespaceChar) KAwait
-    , _atomExprAwait_atom :: Atom 'NotAssignable ('FunDef 'Async) a
-    , _atomExprAwait_trailers
-      :: Compose
-           []
-           (Compose
-             (Before [WhitespaceChar])
-             (Trailer atomType ('FunDef 'Async)))
-           a
-    , _atomExprAwait_ann :: a
-    } -> AtomExpr atomType ('FunDef 'Async) a
+  AtomExprTrailers ::
+    { _atomExprTrailers_value :: AtomExprTrailers atomType ctxt a
+    , _atomExprTrailers_ann :: a
+    } -> AtomExpr atomType ctxt a
+  AtomExprAwaitSingle ::
+    { _atomExprAwaitSingle_await :: After (NonEmpty WhitespaceChar) KAwait
+    , _atomExprAwaitSingle_atom :: Atom 'NotAssignable ('FunDef 'Async) a
+    , _atomExprAwaitSingle_ann :: a
+    } -> AtomExpr 'NotAssignable ('FunDef 'Async) a
+  AtomExprAwaitTrailers ::
+    { _atomExprAwaitTrailers_await :: After (NonEmpty WhitespaceChar) KAwait
+    , _atomExprAwaitTrailers_trailers
+      :: AtomExprTrailers 'NotAssignable ('FunDef 'Async) a
+    , _atomExprAwaitTrailers_ann :: a
+    } -> AtomExpr 'NotAssignable ('FunDef 'Async) a
 deriving instance Eq a => Eq (AtomExpr c b a)
 deriving instance Functor (AtomExpr b a)
 deriving instance Foldable (AtomExpr b a)
@@ -803,7 +823,7 @@ deriving instance Functor (DictOrSetMaker a b)
 deriving instance Foldable (DictOrSetMaker a b)
 deriving instance Traversable (DictOrSetMaker a b)
 
-data Atom :: AtomType -> DefinitionContext -> * -> * where
+data AtomNoInt :: AtomType -> DefinitionContext -> * -> * where
   AtomParenNoYield ::
     { _atomParenNoYield_val
       :: Compose
@@ -813,7 +833,7 @@ data Atom :: AtomType -> DefinitionContext -> * -> * where
             (TupleTestlistComp atomType ctxt))
           a
     , _atomParenNoYield_ann :: a
-    } -> Atom atomType ctxt a
+    } -> AtomNoInt atomType ctxt a
 
   -- A yield expression can only be used within a normal function definition
   AtomParenYield ::
@@ -823,7 +843,7 @@ data Atom :: AtomType -> DefinitionContext -> * -> * where
           (YieldExpr ctxt)
           a
     , _atomParenYield_ann :: a
-    } -> Atom 'NotAssignable ctxt a
+    } -> AtomNoInt 'NotAssignable ctxt a
 
   AtomBracket ::
     { _atomBracket_val
@@ -834,7 +854,7 @@ data Atom :: AtomType -> DefinitionContext -> * -> * where
             (ListTestlistComp atomType ctxt))
           a
     , _atomBracket_ann :: a
-    } -> Atom atomType ctxt a
+    } -> AtomNoInt atomType ctxt a
 
   AtomCurly ::
     { _atomCurly_val
@@ -845,22 +865,17 @@ data Atom :: AtomType -> DefinitionContext -> * -> * where
             (DictOrSetMaker 'NotAssignable ctxt))
           a
     , _atomCurly_ann :: a
-    } -> Atom 'NotAssignable ctxt a
+    } -> AtomNoInt 'NotAssignable ctxt a
 
   AtomIdentifier ::
     { _atomIdentifier_value :: Identifier a
     , _atomIdentifier_ann :: a
-    } -> Atom atomType ctxt a
-
-  AtomInteger ::
-    { _atomInteger :: Integer' a
-    , _atomInteger_ann :: a
-    } -> Atom 'NotAssignable ctxt a
+    } -> AtomNoInt atomType ctxt a
 
   AtomFloat ::
     { _atomFloat :: Float' a
     , _atomFloat_ann :: a
-    } -> Atom 'NotAssignable ctxt a
+    } -> AtomNoInt 'NotAssignable ctxt a
 
   AtomString ::
     { _atomString_head :: Sum StringLiteral BytesLiteral a
@@ -872,8 +887,8 @@ data Atom :: AtomType -> DefinitionContext -> * -> * where
             (Sum StringLiteral BytesLiteral))
           a
     , _atomString_ann :: a
-    } -> Atom 'NotAssignable ctxt a
-    
+    } -> AtomNoInt 'NotAssignable ctxt a
+
   AtomImag ::
     { _atomImag_value
       :: Compose
@@ -881,22 +896,37 @@ data Atom :: AtomType -> DefinitionContext -> * -> * where
            Imag
           a
     , _atomString_ann :: a
-    } -> Atom 'NotAssignable ctxt a
+    } -> AtomNoInt 'NotAssignable ctxt a
 
   AtomEllipsis ::
     { _atomEllipsis_ann :: a
-    } -> Atom 'NotAssignable ctxt a
+    } -> AtomNoInt 'NotAssignable ctxt a
 
   AtomNone ::
     { _atomNone_ann :: a
-    } -> Atom 'NotAssignable ctxt a
+    } -> AtomNoInt 'NotAssignable ctxt a
 
   AtomTrue ::
     { _atomTrue_ann :: a
-    } -> Atom 'NotAssignable ctxt a
+    } -> AtomNoInt 'NotAssignable ctxt a
 
   AtomFalse ::
     { _atomFalse_ann :: a
+    } -> AtomNoInt 'NotAssignable ctxt a
+deriving instance Eq a => Eq (AtomNoInt atomType ctxt a)
+deriving instance Functor (AtomNoInt atomType ctxt)
+deriving instance Foldable (AtomNoInt atomType ctxt)
+deriving instance Traversable (AtomNoInt atomType ctxt)
+
+data Atom :: AtomType -> DefinitionContext -> * -> * where
+  AtomNoInt ::
+    { _atomNoInt_value :: AtomNoInt atomType ctxt a
+    , _atomNoInt_ann :: a
+    } -> Atom atomType ctxt a
+
+  AtomInteger ::
+    { _atomInteger :: Integer' a
+    , _atomInteger_ann :: a
     } -> Atom 'NotAssignable ctxt a
 deriving instance Eq a => Eq (Atom atomType ctxt a)
 deriving instance Functor (Atom atomType ctxt)
@@ -1004,6 +1034,11 @@ deriveEq1 ''Trailer
 deriveOrd1 ''Trailer
 deriveShow1 ''Trailer
 
+deriveShow ''AtomExprTrailers
+deriveEq1 ''AtomExprTrailers
+deriveOrd1 ''AtomExprTrailers
+deriveShow1 ''AtomExprTrailers
+
 deriveShow ''AtomExpr
 deriveEq1 ''AtomExpr
 deriveOrd1 ''AtomExpr
@@ -1071,6 +1106,11 @@ deriveShow1 ''ListTestlistComp
 deriveEq1 ''DictOrSetMaker
 deriveOrd1 ''DictOrSetMaker
 deriveShow1 ''DictOrSetMaker
+
+deriveShow ''AtomNoInt
+deriveEq1 ''AtomNoInt
+deriveOrd1 ''AtomNoInt
+deriveShow1 ''AtomNoInt
 
 deriveShow ''Atom
 deriveEq1 ''Atom

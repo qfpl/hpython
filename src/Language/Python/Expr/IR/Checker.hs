@@ -381,7 +381,40 @@ checkAtomExpr
   :: ExprConfig atomType ctxt
   -> IR.AtomExpr ann
   -> SyntaxChecker ann (Safe.AtomExpr atomType ctxt ann)
-checkAtomExpr cfg (IR.AtomExpr kw a ts ann) =
+checkAtomExpr cfg e =
+  case e ^. IR.atomExpr_await of
+    Nothing ->
+      case e of
+        IR.AtomExprSingle _ a ann ->
+          Safe.AtomExprSingle <$>
+          checkAtom cfg a <*>
+          pure ann
+        IR.AtomExprTrailers _ a ts ann -> _
+    Just kw ->
+      case (cfg ^. atomType, cfg ^. definitionContext) of
+        (SNotAssignable, SFunDef SAsync) ->
+          case e of
+            IR.AtomExprSingle _ a ann -> _
+            IR.AtomExprTrailers _ a ts ann -> _
+        (SNotAssignable, _) ->
+          syntaxError . AwaitNotInAsyncFunction $ e ^. IR.atomExpr_ann
+        (SAssignable, SFunDef SAsync) ->
+          syntaxError . CannotAssignTo LHSAwaitExpr $ e ^. IR.atomExpr_ann
+        (SAssignable, SFunDef SNormal) ->
+          let
+            err = e ^. IR.atomExpr_ann
+          in
+            syntaxError (CannotAssignTo LHSAwaitExpr err) *>
+            syntaxError (AwaitNotInAsyncFunction err)
+        (SAssignable, STopLevel) ->
+          let
+            err = e ^. IR.atomExpr_ann
+          in
+            syntaxError (CannotAssignTo LHSAwaitExpr err) *>
+            syntaxError (AwaitNotInAsyncFunction err)
+{-
+  case e of
+    IR.AtomExprSingle (IR.AtomExpr kw a ts ann) =
   case kw of
     Nothing ->
       Safe.AtomExprNoAwait <$>
@@ -411,6 +444,7 @@ checkAtomExpr cfg (IR.AtomExpr kw a ts ann) =
         (SAssignable, STopLevel) ->
           syntaxError (CannotAssignTo LHSAwaitExpr ann) *>
           syntaxError (AwaitNotInAsyncFunction ann)
+-}
 
 checkTrailer
   :: ExprConfig atomType ctxt

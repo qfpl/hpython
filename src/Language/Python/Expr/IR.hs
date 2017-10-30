@@ -251,11 +251,17 @@ data Trailer a
   } deriving (Functor, Foldable, Traversable)
 
 data AtomExpr a
-  = AtomExpr
+  = AtomExprSingle
   { _atomExpr_await
     :: Maybe (After (NonEmpty WhitespaceChar) KAwait)
-  , _atomExpr_atom :: Atom a
-  , _atomExpr_trailers
+  , _atomExprSingle_atom :: Atom a
+  , _atomExpr_ann :: a
+  }
+  | AtomExprTrailers
+  { _atomExpr_await
+    :: Maybe (After (NonEmpty WhitespaceChar) KAwait)
+  , _atomExprTrailers_atom :: AtomNoInt a
+  , _atomExprTrailers_trailers
     :: Compose
           []
           (Compose
@@ -593,8 +599,7 @@ data DictOrSetMaker a
   }
   deriving (Functor, Foldable, Traversable)
 
-
-data Atom a
+data AtomNoInt a
   = AtomParen
   { _atomParen_value
     :: Compose
@@ -603,7 +608,7 @@ data Atom a
           Maybe
           (Sum YieldExpr TupleTestlistComp))
         a
-  , _atom_ann :: a
+  , _atomNoInt_ann :: a
   }
 
   | AtomBracket
@@ -614,7 +619,7 @@ data Atom a
           Maybe
           ListTestlistComp)
         a
-  , _atom_ann :: a
+  , _atomNoInt_ann :: a
   }
 
   | AtomCurly
@@ -625,34 +630,29 @@ data Atom a
           Maybe
           DictOrSetMaker)
         a
-  , _atom_ann :: a
+  , _atomNoInt_ann :: a
   }
 
   | AtomIdentifier
   { _atomIdentifier_value :: Identifier a
-  , _atom_ann :: a
-  }
-
-  | AtomInteger
-  { _atomInteger_value :: Integer' a
-  , _atom_ann :: a
+  , _atomNoInt_ann :: a
   }
 
   | AtomFloat
   { _atomFloat_value :: Float' a
-  , _atom_ann :: a
+  , _atomNoInt_ann :: a
   }
 
   | AtomString
   { _atomString_head :: Sum StringLiteral BytesLiteral a
-  , _atomString_tail
+  , _atomNoInt_tail
     :: Compose
         []
         (Compose
           (Before [WhitespaceChar])
           (Sum StringLiteral BytesLiteral))
         a
-  , _atom_ann :: a
+  , _atomNoInt_ann :: a
   }
 
   | AtomImag
@@ -661,23 +661,33 @@ data Atom a
           (Before [WhitespaceChar])
           Imag
         a
-  , _atom_ann :: a
+  , _atomNoInt_ann :: a
   }
 
   | AtomEllipsis
-  { _atom_ann :: a
+  { _atomNoInt_ann :: a
   }
 
   | AtomNone
-  { _atom_ann :: a
+  { _atomNoInt_ann :: a
   }
 
   | AtomTrue
-  { _atom_ann :: a
+  { _atomNoInt_ann :: a
   }
 
   | AtomFalse
-  { _atom_ann :: a
+  { _atomNoInt_ann :: a
+  } deriving (Functor, Foldable, Traversable)
+
+data Atom a
+  = AtomNoInt
+  { _atomNoInt_value :: AtomNoInt a
+  , _atom_ann :: a
+  } 
+  | AtomInteger
+  { _atomInteger_value :: Integer' a
+  , _atom_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
 deriveEq ''Comparison
@@ -799,6 +809,12 @@ deriveEq1 ''Trailer
 deriveShow ''Trailer
 deriveShow1 ''Trailer
 makeLenses ''Trailer
+
+deriveEq ''AtomNoInt
+deriveEq1 ''AtomNoInt
+deriveShow ''AtomNoInt
+deriveShow1 ''AtomNoInt
+makeLenses ''AtomNoInt
 
 deriveEq ''AtomExpr
 deriveEq1 ''AtomExpr

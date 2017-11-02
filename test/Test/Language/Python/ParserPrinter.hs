@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Test.Language.Python.ParserPrinter (makeParserPrinterTests, prop_statement_ast_is_valid_python) where
+module Test.Language.Python.ParserPrinter (makeParserPrinterTests) where
 
 import Papa
 import Prelude (error, undefined)
@@ -80,12 +80,10 @@ checkSyntax input = do
   (_, _, errString) <-
     readProcessWithExitCode
       "python3"
-      [ "-c"
-      , input
-      , "-m"
+      [ "-m"
       , "py_compile" 
       ]
-      ""
+      input
   case last (lines errString) of
     Nothing -> pure SyntaxCorrect
     Just l -> 

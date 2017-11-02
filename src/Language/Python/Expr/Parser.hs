@@ -685,8 +685,8 @@ trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
 
 atomExpr :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (AtomExpr SrcInfo)
 atomExpr =
-  try atomExprSingle <|>
-  atomExprTrailers
+  try atomExprTrailers <|>
+  atomExprSingle
   where
     atomExprSingle =
       annotated $

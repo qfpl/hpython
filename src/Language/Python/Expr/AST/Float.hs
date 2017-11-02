@@ -15,20 +15,20 @@ import Language.Python.Expr.AST.Digits
 data Float' a
   = FloatNoDecimal
   { _floatNoDecimal_base :: NonEmpty Digit
-  , _float_exponent
-    :: Maybe (Before (Either Char_e Char_E) (NonEmpty Digit))
+  , _floatNoDecimal_exponent
+    :: Before (Either Char_e Char_E) (NonEmpty Digit)
   , _float_ann :: a
   }
   | FloatDecimalNoBase
   { _floatDecimalNoBase_fraction :: NonEmpty Digit
-  , _float_exponent
+  , _floatDecimalNoBase_exponent
     :: Maybe (Before (Either Char_e Char_E) (NonEmpty Digit))
   , _float_ann :: a
   }
   | FloatDecimalBase
   { _floatDecimalBase_base :: NonEmpty Digit
   , _floatDecimalBase_fraction :: Compose Maybe NonEmpty Digit
-  , _float_exponent
+  , _floatDecimalBase_exponent
     :: Maybe (Before (Either Char_e Char_E) (NonEmpty Digit))
   , _float_ann :: a
   }

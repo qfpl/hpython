@@ -384,7 +384,7 @@ float = try floatDecimalBase <|> try floatDecimalNoBase <|> floatNoDecimal
       annotated $
       FloatNoDecimal <$>
       try (some1 digit') <*>
-      ex
+      (Before <$> eE <*> some1 digit')
 
     ex = optional (try $ Before <$> eE <*> some1 digit')
 
@@ -491,7 +491,7 @@ testList =
   annotated $
   TestList <$>
   test <*>
-  beforeF (betweenWhitespace comma) test <*>
+  manyF (beforeF (betweenWhitespace comma) test) <*>
   optional (try $ whitespaceBefore comma)
 
 yieldArg :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (YieldArg SrcInfo)
@@ -511,13 +511,11 @@ yieldExpr =
   YieldExpr <$>
   (string "yield" *> optionalF (try $ whitespaceBefore1F yieldArg))
 
-
-atom :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Atom SrcInfo)
-atom =
+atomNoInt :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (AtomNoInt SrcInfo)
+atomNoInt =
   try atomParen <|>
   try atomBracket <|>
   try atomCurly <|>
-  try atomInteger <|>
   try atomFloat <|>
   try atomString <|>
   try atomEllipsis <|>
@@ -557,10 +555,6 @@ atom =
         (betweenWhitespaceF $
           optionalF $ try dictOrSetMaker)
 
-    atomInteger =
-      annotated $
-      AtomInteger <$> integer
-
     atomFloat =
       annotated $
       AtomFloat <$> float
@@ -588,6 +582,15 @@ atom =
     atomFalse =
       annotated $
       (string "False" *> notFollowedBy idContinue) $> AtomFalse
+
+atom :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Atom SrcInfo)
+atom =
+  try atomInteger <|>
+  annotated (AtomNoInt <$> atomNoInt)
+  where
+    atomInteger =
+      annotated $
+      AtomInteger <$> integer
 
 sliceOp :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (SliceOp SrcInfo)
 sliceOp =
@@ -682,11 +685,21 @@ trailer = try trailerCall <|> try trailerSubscript <|> trailerAccess
 
 atomExpr :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (AtomExpr SrcInfo)
 atomExpr =
-  annotated $
-  AtomExpr <$>
-  (optional . try $ string "await" *> whitespaceAfter1 (pure KAwait)) <*>
-  atom <*>
-  manyF (try $ whitespaceBeforeF trailer)
+  try atomExprTrailers <|>
+  atomExprSingle
+  where
+    atomExprSingle =
+      annotated $
+      AtomExprSingle <$>
+      (optional . try $ string "await" *> whitespaceAfter1 (pure KAwait)) <*>
+      atom
+
+    atomExprTrailers =
+      annotated $
+      AtomExprTrailers <$>
+      (optional . try $ string "await" *> whitespaceAfter1 (pure KAwait)) <*>
+      atomNoInt <*>
+      some1F (try $ whitespaceBeforeF trailer)
 
 power :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Power SrcInfo)
 power =

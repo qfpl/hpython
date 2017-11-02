@@ -436,13 +436,15 @@ data ExceptClause a
   { _exceptClause_value
     :: Compose
          Maybe
-         (Product
-           Test
-           (Compose
-             Maybe
+         (Compose
+           (Before (NonEmpty WhitespaceChar))
+           (Product
+             Test
              (Compose
-               (Before (Between' (NonEmpty WhitespaceChar) KAs))
-               Identifier)))
+               Maybe
+               (Compose
+                 (Before (Between' (NonEmpty WhitespaceChar) KAs))
+                 Identifier))))
          a
   , _exceptClause_ann :: a
   }

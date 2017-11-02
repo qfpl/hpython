@@ -155,7 +155,8 @@ genBetweenWhitespace1F = fmap Compose . genBetweenWhitespace1
 genNewlineChar
   :: MonadGen m
   => m NewlineChar
-genNewlineChar = Gen.element [CR, LF, CRLF]
+genNewlineChar =
+  Gen.element [CR, LF, CRLF]
 
 genIndentationChar
   :: MonadGen m

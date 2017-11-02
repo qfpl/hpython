@@ -194,7 +194,7 @@ exceptClause (ExceptClause v _) =
   text "except" <>
   foldMapOf
     (_Wrapped.folded)
-    (prodElim test $
+    (whitespaceBeforeF . prodElim test $
      foldMapOf (_Wrapped.folded) $
      beforeF (betweenWhitespace' kAs) identifier)
     v

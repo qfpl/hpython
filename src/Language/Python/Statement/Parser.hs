@@ -297,7 +297,7 @@ exceptClause =
   annotated $
   ExceptClause <$>
   optionalF
-    (try $
+    (try . whitespaceBefore1F $
       Pair <$>
       test <*>
       optionalF

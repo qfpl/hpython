@@ -4,6 +4,7 @@ module Test.Language.Python.Statement.Gen where
 import Papa
 import Hedgehog
 
+import Data.Separated.Before
 import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
@@ -221,7 +222,7 @@ genExceptClause
 genExceptClause ecfg =
   ExceptClause <$>
   genMaybeF
-    (Pair <$>
+    (genWhitespaceBefore1F $ Pair <$>
      genTest (ecfg & atomType .~ SNotAssignable) <*>
      genMaybeF
        (genBeforeF (genBetweenWhitespace1 $ pure KAs) genIdentifier)) <*>

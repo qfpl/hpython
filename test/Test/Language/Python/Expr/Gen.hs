@@ -1,7 +1,6 @@
 {-# language DataKinds #-}
 {-# language FlexibleInstances #-}
 {-# language GADTs #-}
-{-# language OverloadedStrings #-}
 {-# language RankNTypes #-}
 module Test.Language.Python.Expr.Gen where
 
@@ -9,9 +8,6 @@ import Papa
 import Prelude (div)
 
 import Data.Functor.Compose
-import Data.Separated.Before
-import Data.Separated.Between
-import Language.Python.AST.Identifier
 
 import Data.Functor.Sum
 import Hedgehog
@@ -174,9 +170,10 @@ genTestList
 genTestList cfg =
   AST.TestList <$>
     Gen.small (genTest cfg) <*>
-    genBeforeF
-      (genBetweenWhitespace $ pure AST.Comma)
-      (Gen.small $ genTest cfg) <*>
+    genListF
+      (genBeforeF
+        (genBetweenWhitespace $ pure AST.Comma)
+        (Gen.small $ genTest cfg)) <*>
     Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
     pure ()
 
@@ -347,11 +344,11 @@ genInteger :: MonadGen m => m (AST.Integer' ())
 genInteger =
   Gen.choice
     [ AST.IntegerDecimal <$>
-      Gen.choice
-        [ Left <$>
-          liftA2 (,) genNonZeroDigit (Gen.list (Range.linear 0 10) genDigit)
-        , Right <$> Gen.nonEmpty (Range.linear 1 10) (pure AST.Zero)
-        ] <*>
+      (Right <$> Gen.nonEmpty (Range.linear 1 10) (pure AST.Zero)) <*>
+      pure ()
+    , AST.IntegerDecimal <$>
+      (Left <$>
+       liftA2 (,) genNonZeroDigit (Gen.list (Range.linear 0 10) genDigit)) <*>
       pure ()
     , AST.IntegerOct <$>
       genBefore
@@ -386,8 +383,7 @@ genFloat =
   Gen.choice
     [ AST.FloatNoDecimal <$>
       someDigits <*>
-      Gen.maybe
-        (genBefore genE someDigits) <*>
+      genBefore genE someDigits <*>
       pure ()
     , AST.FloatDecimalNoBase <$>
       someDigits <*>
@@ -571,6 +567,21 @@ genAtom
   => ExprConfig atomType ctxt
   -> m (AST.Atom atomType ctxt ())
 genAtom cfg =
+  case cfg ^. atomType of
+    SNotAssignable -> Gen.choice [genAtomInteger cfg, genAtomNoInt' cfg]
+    _ -> genAtomNoInt' cfg
+  where
+    genAtomNoInt' cfg' =
+      AST.AtomNoInt <$>
+      genAtomNoInt cfg' <*>
+      pure ()
+    genAtomInteger _ = AST.AtomInteger <$> genInteger <*> pure ()
+
+genAtomNoInt
+  :: MonadGen m
+  => ExprConfig atomType ctxt
+  -> m (AST.AtomNoInt atomType ctxt ())
+genAtomNoInt cfg =
   case (cfg ^. atomType, cfg ^. definitionContext) of
     (SNotAssignable, SFunDef SNormal) ->
       Gen.recursive Gen.choice
@@ -579,8 +590,7 @@ genAtom cfg =
     (SNotAssignable, _) -> 
       Gen.recursive Gen.choice
         (normalNonRec ++
-          [ genAtomInteger cfg
-          , genAtomFloat cfg
+          [ genAtomFloat cfg
           , genAtomString cfg
           , genAtomImag cfg
           , genAtomEllipsis cfg
@@ -615,7 +625,6 @@ genAtom cfg =
         (genMaybeF $ genTupleTestlistComp cfg') <*>
       pure ()
 
-    genAtomInteger _ = AST.AtomInteger <$> genInteger <*> pure ()
     genAtomImag _ =
       AST.AtomImag <$>
       genWhitespaceBeforeF genImag <*>
@@ -825,6 +834,22 @@ genTrailer cfg =
         pure ()
       ]
 
+genAtomExprTrailers
+  :: MonadGen m
+  => ExprConfig atomType ctxt
+  -> m (AST.AtomExprTrailers atomType ctxt ())
+genAtomExprTrailers cfg =
+  Gen.recursive Gen.choice
+    [ AST.AtomExprTrailersBase <$>
+      genAtomNoInt (cfg & atomType .~ SNotAssignable) <*>
+      genWhitespaceBeforeF (genTrailer cfg) <*>
+      pure ()
+    ]
+    [ AST.AtomExprTrailersMany <$>
+      genAtomExprTrailers (cfg & atomType .~ SNotAssignable) <*>
+      genWhitespaceBeforeF (genTrailer cfg) <*>
+      pure ()
+    ]
 genAtomExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
@@ -832,22 +857,27 @@ genAtomExpr
 genAtomExpr cfg =
   case (cfg ^. atomType, cfg ^. definitionContext) of
     (SNotAssignable, SFunDef SAsync) ->
-      Gen.choice
-        [ atomExprNoAwait cfg
-        , AST.AtomExprAwait <$>
+      Gen.choice $
+        atomExprNoAwait cfg ++
+        [ AST.AtomExprAwaitSingle <$>
           genWhitespaceAfter1 (pure AST.KAwait) <*>
-          Gen.small (genAtom cfg) <*>
-          genListF (Gen.small . genWhitespaceBeforeF $ genTrailer cfg) <*>
+          genAtom cfg <*>
+          pure ()
+        , AST.AtomExprAwaitTrailers<$>
+          genWhitespaceAfter1 (pure AST.KAwait) <*>
+          genAtomExprTrailers cfg <*>
           pure ()
         ]
-    _ -> atomExprNoAwait cfg
+    _ -> Gen.choice $ atomExprNoAwait cfg
   where
     atomExprNoAwait cfg' =
-      AST.AtomExprNoAwait <$>
-      Gen.small (genAtom cfg') <*>
-      genListF
-        (Gen.small . genWhitespaceBeforeF . genTrailer $ cfg') <*>
-      pure ()
+      [ AST.AtomExprSingle <$>
+        genAtom cfg' <*>
+        pure ()
+      , AST.AtomExprTrailers <$>
+        genAtomExprTrailers cfg' <*>
+        pure ()
+      ]
 
 genPower
   :: MonadGen m
@@ -857,9 +887,9 @@ genPower cfg =
   case cfg ^. atomType of
     SAssignable -> powerOne cfg
     SNotAssignable ->
-      Gen.choice
-        [ powerOne cfg
-        , AST.PowerMany <$>
+      Gen.recursive Gen.choice
+        [ powerOne cfg ]
+        [ AST.PowerMany <$>
           Gen.small (genAtomExpr cfg) <*>
           genBeforeF
             (Gen.small . genBetweenWhitespace $ pure AST.DoubleAsterisk)
@@ -888,8 +918,7 @@ genFactor cfg =
   case cfg ^. atomType of
     SAssignable -> factorNone cfg
     SNotAssignable ->
-      Gen.recursive
-        Gen.choice
+      Gen.recursive Gen.choice
         [ factorNone cfg ]
         [ AST.FactorOne <$>
           genWhitespaceAfter genFactorOp <*>
@@ -910,9 +939,9 @@ genTerm cfg =
   case cfg ^. atomType of
     SAssignable -> termOne cfg
     SNotAssignable ->
-      Gen.choice
-        [ termOne cfg
-        , AST.TermMany <$>
+      Gen.recursive Gen.choice
+        [ termOne cfg ]
+        [ AST.TermMany <$>
             Gen.small (genFactor cfg) <*>
             genNonEmptyF
               (genBeforeF
@@ -934,9 +963,9 @@ genArithExpr cfg =
   case cfg ^. atomType of
     SAssignable -> arithExprOne cfg
     SNotAssignable ->
-      Gen.choice
-        [ arithExprOne cfg
-        , AST.ArithExprMany <$>
+      Gen.recursive Gen.choice
+        [ arithExprOne cfg ]
+        [ AST.ArithExprMany <$>
           Gen.small (genTerm cfg) <*>
           genNonEmptyF
             (genBeforeF
@@ -959,9 +988,9 @@ genShiftExpr cfg =
   case cfg ^. atomType of
     SAssignable -> shiftExprOne cfg
     SNotAssignable ->
-      Gen.choice
-        [ shiftExprOne cfg
-        , AST.ShiftExprMany <$>
+      Gen.recursive Gen.choice
+        [ shiftExprOne cfg ]
+        [ AST.ShiftExprMany <$>
           Gen.small (genArithExpr cfg) <*>
           genNonEmptyF
             (genBeforeF
@@ -984,9 +1013,9 @@ genAndExpr cfg =
   case cfg ^. atomType of
     SAssignable -> andExprOne cfg
     SNotAssignable ->
-      Gen.choice
-        [ andExprOne cfg
-        , AST.AndExprMany <$>
+      Gen.recursive Gen.choice
+        [ andExprOne cfg ]
+        [ AST.AndExprMany <$>
           Gen.small (genShiftExpr cfg) <*>
           genNonEmptyF
             (genBeforeF
@@ -1008,9 +1037,9 @@ genXorExpr cfg =
   case cfg ^. atomType of
     SAssignable -> xorExprOne cfg
     SNotAssignable ->
-      Gen.choice
-        [ xorExprOne cfg
-        , AST.XorExprMany <$>
+      Gen.recursive Gen.choice
+        [ xorExprOne cfg ]
+        [ AST.XorExprMany <$>
           Gen.small (genAndExpr cfg) <*>
           genNonEmptyF
             (genBeforeF
@@ -1032,9 +1061,9 @@ genExpr cfg =
   case cfg ^. atomType of
     SAssignable -> exprOne cfg
     SNotAssignable ->
-      Gen.choice
-        [ exprOne cfg
-        , AST.ExprMany <$>
+      Gen.recursive Gen.choice
+        [ exprOne cfg ]
+        [ AST.ExprMany <$>
           Gen.small (genXorExpr cfg) <*>
           genNonEmptyF
             (genBeforeF
@@ -1071,9 +1100,9 @@ genComparison cfg =
   case cfg ^. atomType of
     SAssignable -> comparisonOne cfg
     SNotAssignable ->
-      Gen.choice
-        [ comparisonOne cfg
-        , AST.ComparisonMany <$>
+      Gen.recursive Gen.choice
+        [ comparisonOne cfg ]
+        [ AST.ComparisonMany <$>
           Gen.small (genExpr cfg) <*>
           genNonEmptyF
             (genBeforeF
@@ -1119,9 +1148,9 @@ genAndTest cfg = do
   case cfg ^. atomType of
     SAssignable -> andTestOne cfg
     SNotAssignable ->
-      Gen.choice
-        [ andTestOne cfg
-        , AST.AndTestMany <$>
+      Gen.recursive Gen.choice
+        [ andTestOne cfg ]
+        [ AST.AndTestMany <$>
           Gen.small (genNotTest cfg) <*>
           (Compose <$> Gen.nonEmpty (Range.singleton n)
             (genBeforeF
@@ -1143,9 +1172,9 @@ genOrTest cfg =
   case cfg ^. atomType of
     SAssignable -> orTestOne cfg
     SNotAssignable ->
-      Gen.choice
-        [ orTestOne cfg
-        , AST.OrTestMany <$>
+      Gen.recursive Gen.choice
+        [ orTestOne cfg ]
+        [ AST.OrTestMany <$>
           Gen.small (genAndTest cfg) <*>
           genNonEmptyF
             (genBeforeF
@@ -1198,7 +1227,7 @@ genLambdef cfg =
      genArgsList cfg genIdentifier $ genTest cfg) <*>
   genBeforeF
     (genBetweenWhitespace $ pure AST.Colon)
-    (genTest $ cfg & definitionContext .~ SFunDef SNormal) <*>
+    (Gen.small . genTest $ cfg & definitionContext .~ SFunDef SNormal) <*>
   pure ()
 
 genStringContent

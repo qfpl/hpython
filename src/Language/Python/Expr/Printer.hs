@@ -214,17 +214,14 @@ float' f =
   case f of
     FloatNoDecimal b e _ ->
       foldMap digit b <>
-      ex e
+      before eE (foldMap digit) e
     FloatDecimalNoBase f' e _ ->
       char '.' <> foldMap digit f' <> ex e
     FloatDecimalBase b f' e _ ->
       foldMap digit b <> char '.' <> foldMap digit f' <> ex e
   where
-    ex =
-      foldMap
-        (before
-          (either (const $ char 'e') (const $ char 'E')) $
-          foldMap digit)
+    eE = either (const $ char 'e') (const $ char 'E')
+    ex = foldMap (before eE $ foldMap digit)
 
 imag :: Imag a -> Doc
 imag (Imag val _) =
@@ -448,7 +445,7 @@ tupleTestlistComp t =
 testList :: Ord a => TestList atomType ctxt a -> Doc
 testList (TestList h t c _) =
   test h <>
-  beforeF (betweenWhitespace' comma) test t <>
+  foldMapOf (_Wrapped.folded) (beforeF (betweenWhitespace' comma) test) t <>
   foldMap (whitespaceBefore comma) c
 
 yieldArg :: Ord a => YieldArg atomType ctxt a -> Doc
@@ -465,6 +462,12 @@ yieldExpr (YieldExpr val _) =
 atom :: Ord a => Atom atomType ctxt a -> Doc
 atom a =
   case a of
+    AtomNoInt val _ -> atomNoInt val
+    AtomInteger val _ -> integer' val
+
+atomNoInt :: Ord a => AtomNoInt atomType ctxt a -> Doc
+atomNoInt a =
+  case a of
     AtomParenYield val _ ->
       parens $ betweenWhitespace'F yieldExpr val
     AtomParenNoYield val _ ->
@@ -476,7 +479,6 @@ atom a =
       braces $
       betweenWhitespace'F (foldMapF dictOrSetMaker) val
     AtomIdentifier val _ -> identifier val
-    AtomInteger val _ -> integer' val
     AtomFloat val _ -> float' val
     AtomString h t _ ->
       sumElim stringLiteral bytesLiteral h <>
@@ -516,14 +518,25 @@ trailer t =
       brackets $ betweenWhitespace'F subscriptList val
     TrailerAccess val _ -> char '.' <> whitespaceBeforeF identifier val
 
+atomExprTrailers :: Ord a => AtomExprTrailers atomType ctxt a -> Doc
+atomExprTrailers (AtomExprTrailersBase v t _) =
+  atomNoInt v <>
+  whitespaceBeforeF trailer t
+atomExprTrailers (AtomExprTrailersMany v t _) =
+  atomExprTrailers v <>
+  whitespaceBeforeF trailer t
+
 atomExpr :: Ord a => AtomExpr atomType ctxt a -> Doc
-atomExpr (AtomExprAwait await a trailers _) =
-  whitespaceAfter kAwait await <>
-  atom a <>
-  foldMapF (whitespaceBeforeF trailer) trailers
-atomExpr (AtomExprNoAwait a trailers _) =
-  atom a <>
-  foldMapF (whitespaceBeforeF trailer) trailers
+atomExpr (AtomExprSingle v _) =
+  atom v
+atomExpr (AtomExprTrailers v _) =
+  atomExprTrailers v
+atomExpr (AtomExprAwaitSingle a b _) =
+  whitespaceAfter kAwait a <>
+  atom b
+atomExpr (AtomExprAwaitTrailers a b _) =
+  whitespaceAfter kAwait a <>
+  atomExprTrailers b
 
 power :: Ord a => Power atomType ctxt a -> Doc
 power (PowerOne v _) = atomExpr v

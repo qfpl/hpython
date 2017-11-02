@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Test.Language.Python.ParserPrinter (makeParserPrinterTests) where
+module Test.Language.Python.ParserPrinter (makeParserPrinterTests, prop_statement_ast_is_valid_python) where
 
 import Papa
 import Prelude (error, undefined)
@@ -162,30 +162,6 @@ prop_statement_ast_is_valid_python scfg ecfg =
         failure
       SyntaxCorrect -> success
 
-regressions :: Spec
-regressions = do
-  describe "regressions" $ do
-    it "1.a should be disallowed" $ do
-      let
-        expr =
-          AST.AtomExprNoAwait
-            (AST.AtomInteger
-              (AST.IntegerDecimal (Left (AST.NonZeroDigit_1, [])) ())
-              ())
-            (Compose
-              [ Compose . Before [] $
-                AST.TrailerAccess
-                (Compose $ Before [] (AST.Identifier "a" ()))
-                ()
-              ])
-            ()
-        program = HPJ.render $ Print.atomExpr expr
-      res <- checkSyntax program
-      case res of
-        SyntaxCorrect -> () `shouldBe` ()
-        SyntaxError err ->
-          expectationFailure $ "Failure:\n\n" ++ err ++ "\n"
-
 makeParserPrinterTests :: IO [TestTree]
 makeParserPrinterTests = do
   files <-
@@ -210,4 +186,4 @@ makeParserPrinterTests = do
             (StatementConfig SNotInLoop)
             (ExprConfig undefined STopLevel)
       ]
-  (properties ++ ) <$> liftA2 (++) (testSpecs regressions) (testSpecs spec)
+  (properties ++) <$> testSpecs spec

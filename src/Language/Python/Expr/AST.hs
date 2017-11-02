@@ -255,7 +255,7 @@ deriving instance Traversable (Trailer a b)
 
 data AtomExprTrailers :: AtomType -> DefinitionContext -> * -> * where
   AtomExprTrailersBase ::
-    { _atomExprTrailersBase_value :: AtomNoInt atomType ctxt a
+    { _atomExprTrailersBase_value :: AtomNoInt 'NotAssignable ctxt a
     , _atomExprTrailersBase_trailers
       :: Compose
            (Before [WhitespaceChar])
@@ -264,7 +264,7 @@ data AtomExprTrailers :: AtomType -> DefinitionContext -> * -> * where
     , _atomExprTrailersBase_ann :: a
     } -> AtomExprTrailers atomType ctxt a
   AtomExprTrailersMany ::
-    { _atomExprTrailersMany_value :: AtomExprTrailers atomType ctxt a
+    { _atomExprTrailersMany_value :: AtomExprTrailers 'NotAssignable ctxt a
     , _atomExprTrailersMany_trailers
       :: Compose
            (Before [WhitespaceChar])
@@ -613,8 +613,10 @@ data TestList (atomType :: AtomType) (ctxt :: DefinitionContext) a
   { _testList_head :: Test atomType ctxt a
   , _testList_tail
     :: Compose
-         (Before (Between' [WhitespaceChar] Comma))
-         (Test atomType ctxt)
+         []
+         (Compose
+           (Before (Between' [WhitespaceChar] Comma))
+           (Test atomType ctxt))
          a
   , _testList_comma :: Maybe (Before [WhitespaceChar] Comma)
   , _testList_ann :: a

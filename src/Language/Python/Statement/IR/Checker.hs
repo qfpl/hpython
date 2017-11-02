@@ -212,7 +212,7 @@ checkExceptClause
 checkExceptClause ecfg (IR.ExceptClause v ann) =
   Safe.ExceptClause <$>
   traverseOf
-    (_Wrapped.traverse)
+    (_Wrapped.traverse._Wrapped.traverse)
     (\(Pair a b) ->
       Pair <$>
       (checkTest $ ecfg & atomType .~ SNotAssignable) a <*>

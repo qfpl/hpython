@@ -8,6 +8,7 @@ module Language.Python.Expr.IR.Checker where
 import Data.Functor.Compose
 import Data.Functor.Sum
 import Data.Separated.After
+import Data.Separated.Before
 import Data.Separated.Between
 import Papa
 
@@ -15,6 +16,7 @@ import qualified Data.Set as S
 
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
+import Language.Python.AST.Symbols
 import Language.Python.IR.ExprConfig
 import Language.Python.IR.SyntaxChecker
 import Language.Python.IR.Checker.ArgsList
@@ -377,6 +379,139 @@ checkPower cfg (IR.Power l r ann) =
             r' <*>
           pure ann
 
+checkAtomNoInt
+  :: ExprConfig atomType ctxt
+  -> IR.AtomNoInt ann
+  -> SyntaxChecker ann (Safe.AtomNoInt atomType ctxt ann)
+checkAtomNoInt cfg e =
+  case e of
+    IR.AtomParen v ann ->
+      case v ^. _Wrapping Compose . between'._2._Wrapping Compose of
+        Nothing ->
+          pure $
+          Safe.AtomParenNoYield
+            (v &
+               _Wrapping Compose . between'._2._Wrapping Compose .~ Nothing)
+            ann
+        Just (InL a) ->
+          case (cfg  ^. atomType, cfg ^. definitionContext) of
+            (SAssignable, _) ->
+              syntaxError $ CannotAssignTo LHSYieldExpr ann
+            (_, STopLevel) ->
+              syntaxError $ YieldNotInFunction ann
+            (_, SFunDef SAsync) ->
+              syntaxError $ YieldInAsyncFunction ann
+            (SNotAssignable, SFunDef SNormal) ->
+              Safe.AtomParenYield <$>
+              traverseCompose
+                (checkYieldExpr cfg)
+                (v &
+                  _Wrapping Compose . between'._2 .~ a) <*>
+              pure ann
+        Just (InR a) ->
+          Safe.AtomParenNoYield <$>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (checkTupleTestlistComp cfg)
+            (v &
+              _Wrapping Compose . between'._2._Wrapping Compose .~ Just a) <*>
+          pure ann
+    IR.AtomBracket v ann ->
+      Safe.AtomBracket <$>
+      traverseOf
+        (traverseCompose.traverseCompose)
+        (checkListTestlistComp cfg)
+        v <*>
+      pure ann
+    IR.AtomCurly v ann ->
+      case cfg ^. atomType of
+        SAssignable ->
+          syntaxError $ CannotAssignTo LHSDictOrSet ann
+        SNotAssignable ->
+          Safe.AtomCurly <$>
+          traverseOf
+            (traverseCompose.traverseCompose)
+            (checkDictOrSetMaker cfg)
+            v <*>
+          pure ann
+    IR.AtomIdentifier v ann ->
+      Safe.AtomIdentifier <$>
+      checkIdentifier cfg v <*>
+      pure ann
+    IR.AtomFloat v ann ->
+      case cfg ^. atomType of
+        SAssignable ->
+          syntaxError $ CannotAssignTo LHSLiteral ann
+        SNotAssignable ->
+          pure $ Safe.AtomFloat v ann
+    IR.AtomString h t ann ->
+      case cfg ^. atomType of
+        SAssignable ->
+          syntaxError $ CannotAssignTo LHSLiteral ann
+        SNotAssignable ->
+          pure $ Safe.AtomString h t ann
+    IR.AtomImag v ann ->
+      case cfg ^. atomType of
+        SAssignable ->
+          syntaxError $ CannotAssignTo LHSLiteral ann
+        SNotAssignable ->
+          pure $ Safe.AtomImag v ann
+    IR.AtomEllipsis ann ->
+      case cfg ^. atomType of
+        SAssignable ->
+          syntaxError $ CannotAssignTo LHSEllipsis ann
+        SNotAssignable ->
+          pure $ Safe.AtomEllipsis ann
+    IR.AtomNone ann -> 
+      case cfg ^. atomType of
+        SAssignable ->
+          syntaxError $ CannotAssignTo LHSNone ann
+        SNotAssignable ->
+          pure $ Safe.AtomNone ann
+    IR.AtomTrue ann ->
+      case cfg ^. atomType of
+        SAssignable ->
+          syntaxError $ CannotAssignTo LHSTrue ann
+        SNotAssignable ->
+          pure $ Safe.AtomTrue ann
+    IR.AtomFalse ann ->
+      case cfg ^. atomType of
+        SAssignable ->
+          syntaxError $ CannotAssignTo LHSFalse ann
+        SNotAssignable ->
+          pure $ Safe.AtomFalse ann
+
+checkAtomExprTrailers
+  :: ExprConfig atomType ctxt
+  -> IR.AtomNoInt ann
+  -> Compose
+       NonEmpty
+       (Compose
+         (Before [WhitespaceChar])
+         IR.Trailer)
+       ann
+  -> ann
+  -> SyntaxChecker ann (Safe.AtomExprTrailers atomType ctxt ann)
+checkAtomExprTrailers cfg e ts ann =
+  let
+    ts' = toList $ getCompose ts
+  in
+    case unsnoc ts' of
+      Just ([], a) ->
+        Safe.AtomExprTrailersBase <$>
+        checkAtomNoInt (cfg & atomType .~ SNotAssignable) e <*>
+        traverseOf (_Wrapped.traverse) (checkTrailer cfg) a <*>
+        pure ann
+      Just (x:xs, a) ->
+        Safe.AtomExprTrailersMany <$>
+        checkAtomExprTrailers
+          (cfg & atomType .~ SNotAssignable)
+          e
+          (Compose $ x :| xs)
+          ann <*>
+        traverseOf (_Wrapped.traverse) (checkTrailer cfg) a <*>
+        pure ann
+
 checkAtomExpr
   :: ExprConfig atomType ctxt
   -> IR.AtomExpr ann
@@ -389,13 +524,22 @@ checkAtomExpr cfg e =
           Safe.AtomExprSingle <$>
           checkAtom cfg a <*>
           pure ann
-        IR.AtomExprTrailers _ a ts ann -> _
+        IR.AtomExprTrailers _ a ts ann ->
+          Safe.AtomExprTrailers <$>
+          checkAtomExprTrailers cfg a ts ann <*>
+          pure ann
     Just kw ->
       case (cfg ^. atomType, cfg ^. definitionContext) of
         (SNotAssignable, SFunDef SAsync) ->
           case e of
-            IR.AtomExprSingle _ a ann -> _
-            IR.AtomExprTrailers _ a ts ann -> _
+            IR.AtomExprSingle _ a ann ->
+              Safe.AtomExprAwaitSingle kw <$>
+              checkAtom cfg a <*>
+              pure ann
+            IR.AtomExprTrailers _ a ts ann ->
+              Safe.AtomExprAwaitTrailers kw <$>
+              checkAtomExprTrailers cfg a ts ann <*>
+              pure ann
         (SNotAssignable, _) ->
           syntaxError . AwaitNotInAsyncFunction $ e ^. IR.atomExpr_ann
         (SAssignable, SFunDef SAsync) ->
@@ -673,58 +817,9 @@ checkAtom
   -> SyntaxChecker ann (Safe.Atom atomType ctxt ann)
 checkAtom cfg e =
   case e of
-    IR.AtomParen v ann ->
-      case v ^. _Wrapping Compose . between'._2._Wrapping Compose of
-        Nothing ->
-          pure $
-          Safe.AtomParenNoYield
-            (v &
-               _Wrapping Compose . between'._2._Wrapping Compose .~ Nothing)
-            ann
-        Just (InL a) ->
-          case (cfg  ^. atomType, cfg ^. definitionContext) of
-            (SAssignable, _) ->
-              syntaxError $ CannotAssignTo LHSYieldExpr ann
-            (_, STopLevel) ->
-              syntaxError $ YieldNotInFunction ann
-            (_, SFunDef SAsync) ->
-              syntaxError $ YieldInAsyncFunction ann
-            (SNotAssignable, SFunDef SNormal) ->
-              Safe.AtomParenYield <$>
-              traverseCompose
-                (checkYieldExpr cfg)
-                (v &
-                  _Wrapping Compose . between'._2 .~ a) <*>
-              pure ann
-        Just (InR a) ->
-          Safe.AtomParenNoYield <$>
-          traverseOf
-            (traverseCompose.traverseCompose)
-            (checkTupleTestlistComp cfg)
-            (v &
-              _Wrapping Compose . between'._2._Wrapping Compose .~ Just a) <*>
-          pure ann
-    IR.AtomBracket v ann ->
-      Safe.AtomBracket <$>
-      traverseOf
-        (traverseCompose.traverseCompose)
-        (checkListTestlistComp cfg)
-        v <*>
-      pure ann
-    IR.AtomCurly v ann ->
-      case cfg ^. atomType of
-        SAssignable ->
-          syntaxError $ CannotAssignTo LHSDictOrSet ann
-        SNotAssignable ->
-          Safe.AtomCurly <$>
-          traverseOf
-            (traverseCompose.traverseCompose)
-            (checkDictOrSetMaker cfg)
-            v <*>
-          pure ann
-    IR.AtomIdentifier v ann ->
-      Safe.AtomIdentifier <$>
-      checkIdentifier cfg v <*>
+    IR.AtomNoInt v ann ->
+      Safe.AtomNoInt <$>
+      checkAtomNoInt cfg v <*>
       pure ann
     IR.AtomInteger v ann ->
       case cfg ^. atomType of
@@ -732,48 +827,6 @@ checkAtom cfg e =
           syntaxError $ CannotAssignTo LHSLiteral ann
         SNotAssignable ->
           pure $ Safe.AtomInteger v ann
-    IR.AtomFloat v ann ->
-      case cfg ^. atomType of
-        SAssignable ->
-          syntaxError $ CannotAssignTo LHSLiteral ann
-        SNotAssignable ->
-          pure $ Safe.AtomFloat v ann
-    IR.AtomString h t ann ->
-      case cfg ^. atomType of
-        SAssignable ->
-          syntaxError $ CannotAssignTo LHSLiteral ann
-        SNotAssignable ->
-          pure $ Safe.AtomString h t ann
-    IR.AtomImag v ann ->
-      case cfg ^. atomType of
-        SAssignable ->
-          syntaxError $ CannotAssignTo LHSLiteral ann
-        SNotAssignable ->
-          pure $ Safe.AtomImag v ann
-    IR.AtomEllipsis ann ->
-      case cfg ^. atomType of
-        SAssignable ->
-          syntaxError $ CannotAssignTo LHSEllipsis ann
-        SNotAssignable ->
-          pure $ Safe.AtomEllipsis ann
-    IR.AtomNone ann -> 
-      case cfg ^. atomType of
-        SAssignable ->
-          syntaxError $ CannotAssignTo LHSNone ann
-        SNotAssignable ->
-          pure $ Safe.AtomNone ann
-    IR.AtomTrue ann ->
-      case cfg ^. atomType of
-        SAssignable ->
-          syntaxError $ CannotAssignTo LHSTrue ann
-        SNotAssignable ->
-          pure $ Safe.AtomTrue ann
-    IR.AtomFalse ann ->
-      case cfg ^. atomType of
-        SAssignable ->
-          syntaxError $ CannotAssignTo LHSFalse ann
-        SNotAssignable ->
-          pure $ Safe.AtomFalse ann
 
 checkDictItem
   :: ExprConfig 'NotAssignable ctxt
@@ -892,7 +945,7 @@ checkTestList
 checkTestList cfg (IR.TestList h t comma ann) =
   Safe.TestList <$>
   checkTest cfg h <*>
-  traverseCompose (checkTest cfg) t <*>
+  traverseOf (_Wrapped.traverse._Wrapped.traverse) (checkTest cfg) t <*>
   pure comma <*>
   pure ann
 

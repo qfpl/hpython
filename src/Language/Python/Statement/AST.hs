@@ -451,13 +451,15 @@ data ExceptClause (ctxt :: DefinitionContext) a
   { _exceptClause_value
     :: Compose
          Maybe
-         (Product
-           (Test 'NotAssignable ctxt)
-           (Compose
-             Maybe
+         (Compose
+           (Before (NonEmpty WhitespaceChar))
+           (Product
+             (Test 'NotAssignable ctxt)
              (Compose
-               (Before (Between' (NonEmpty WhitespaceChar) KAs))
-               Identifier)))
+               Maybe
+               (Compose
+                 (Before (Between' (NonEmpty WhitespaceChar) KAs))
+                 Identifier))))
          a
   , _exceptClause_ann :: a
   }

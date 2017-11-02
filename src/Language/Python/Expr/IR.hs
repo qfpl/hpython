@@ -263,7 +263,7 @@ data AtomExpr a
   , _atomExprTrailers_atom :: AtomNoInt a
   , _atomExprTrailers_trailers
     :: Compose
-          []
+          NonEmpty
           (Compose
             (Before [WhitespaceChar])
             Trailer)
@@ -475,7 +475,12 @@ data TestList a
   = TestList
   { _testList_head :: Test a
   , _testList_tail
-    :: Compose (Before (Between' [WhitespaceChar] Comma)) Test a
+    :: Compose
+       []
+       (Compose
+         (Before (Between' [WhitespaceChar] Comma))
+         Test)
+       a
   , _testList_comma :: Maybe (Before [WhitespaceChar] Comma)
   , _testList_ann :: a
   }

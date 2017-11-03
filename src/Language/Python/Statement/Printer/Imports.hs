@@ -41,17 +41,20 @@ importFrom :: ImportFrom a -> Doc
 importFrom (ImportFrom f i _) =
   text "from" <>
   sumElim
-    (beforeF (foldMap . betweenWhitespace' $ either dot ellipsis) dottedName)
+    (whitespaceAfterF $
+     sumElim
+      (whitespaceBeforeF dottedName)
+      (beforeF (foldMap . betweenWhitespace' $ either dot ellipsis) dottedName))
     (foldMapOf (_Wrapped.folded) $ either dot ellipsis)
     f <>
   text "import" <>
-  whitespaceBeforeF
-    (sumElim
-      (sumElim
-        (asterisk.getConst)
-        (betweenF leftParen rightParen (betweenWhitespace'F importAsNames)))
-      importAsNames)
-    i
+  sumElim
+    (whitespaceBeforeF $
+     sumElim
+      (asterisk.getConst)
+      (betweenF leftParen rightParen (betweenWhitespace'F importAsNames)))
+    (whitespaceBeforeF importAsNames)
+  i
 
 importAsNames :: ImportAsNames a -> Doc
 importAsNames (ImportAsNames h t c _) =

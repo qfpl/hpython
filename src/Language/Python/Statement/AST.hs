@@ -667,70 +667,92 @@ data RaiseStatement (ctxt :: DefinitionContext) a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 deriveEq1 ''SmallStatement
+deriveOrd1 ''SmallStatement
 deriveShow1 ''SmallStatement
 
 deriveEq1 ''RaiseStatement
+deriveOrd1 ''RaiseStatement
 deriveShow1 ''RaiseStatement
 
 deriveEq1 ''FlowStatement
+deriveOrd1 ''FlowStatement
 deriveShow1 ''FlowStatement
 
 deriveEq1 ''Decorator
+deriveOrd1 ''Decorator
 deriveShow1 ''Decorator
 
 deriveEq1 ''ClassDef
+deriveOrd1 ''ClassDef
 deriveShow1 ''ClassDef
 
 deriveEq1 ''FuncDef
+deriveOrd1 ''FuncDef
 deriveShow1 ''FuncDef
 
 deriveEq1 ''AsyncFuncDef
+deriveOrd1 ''AsyncFuncDef
 deriveShow1 ''AsyncFuncDef
 
 deriveEq1 ''Suite
+deriveOrd1 ''Suite
 deriveShow1 ''Suite
 
 deriveEq1 ''Statement
+deriveOrd1 ''Statement
 deriveShow1 ''Statement
 
 deriveEq1 ''Parameters
+deriveOrd1 ''Parameters
 deriveShow1 ''Parameters
 
 deriveEq1 ''TypedArg
+deriveOrd1 ''TypedArg
 deriveShow1 ''TypedArg
 makeLenses ''TypedArg
 
 deriveEq1 ''WithItem
+deriveOrd1 ''WithItem
 deriveShow1 ''WithItem
 
 deriveEq1 ''WithStatement
+deriveOrd1 ''WithStatement
 deriveShow1 ''WithStatement
 
 deriveEq1 ''WhileStatement
+deriveOrd1 ''WhileStatement
 deriveShow1 ''WhileStatement
 
 deriveEq1 ''ForStatement
+deriveOrd1 ''ForStatement
 deriveShow1 ''ForStatement
 
 deriveEq1 ''ExceptClause
+deriveOrd1 ''ExceptClause
 deriveShow1 ''ExceptClause
 
 deriveEq1 ''SimpleStatement
+deriveOrd1 ''SimpleStatement
 deriveShow1 ''SimpleStatement
 
 deriveEq1 ''CompoundStatement
+deriveOrd1 ''CompoundStatement
 deriveShow1 ''CompoundStatement
 
 deriveEq1 ''IfStatement
+deriveOrd1 ''IfStatement
 deriveShow1 ''IfStatement
 
 deriveEq1 ''TryStatement
+deriveOrd1 ''TryStatement
 deriveShow1 ''TryStatement
 
 deriveEq1 ''Decorated
+deriveOrd1 ''Decorated
 deriveShow1 ''Decorated
 
 deriveEq1 ''AsyncStatement
+deriveOrd1 ''AsyncStatement
 deriveShow1 ''AsyncStatement
 
 instance HasName TypedArg where

@@ -55,7 +55,9 @@ data ArgsList name test a
   deriving (Functor, Foldable, Traversable)
 deriving instance (Eq1 test, Eq a, Eq1 name, Eq (name a)) => Eq (ArgsList name test a)
 deriving instance (Show1 test, Show a, Show1 name, Show (name a)) => Show (ArgsList name test a)
+deriving instance (Ord1 test, Ord a, Ord1 name, Ord (name a)) => Ord (ArgsList name test a)
 
 deriveEq1 ''ArgsList
 deriveShow1 ''ArgsList
+deriveOrd1 ''ArgsList
 makeLenses ''ArgsList

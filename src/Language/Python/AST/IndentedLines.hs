@@ -125,7 +125,9 @@ mkIndentedLines ls@((i, _) :| _) =
     validateSubIndentation level minLevel maxLevel
 
 deriveEq1 ''IndentedLines
+deriveOrd1 ''IndentedLines
 deriveShow1 ''IndentedLines
 
 deriveEq1 ''IndentationError
+deriveOrd1 ''IndentationError
 deriveShow1 ''IndentationError

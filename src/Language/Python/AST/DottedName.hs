@@ -25,8 +25,9 @@ data DottedName a
          a
   , _dottedName_ann :: a
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Ord, Functor, Foldable, Traversable)
 
 makeLenses ''DottedName
 deriveEq1 ''DottedName
+deriveOrd1 ''DottedName
 deriveShow1 ''DottedName

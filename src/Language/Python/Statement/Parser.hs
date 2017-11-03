@@ -126,9 +126,13 @@ flowStatement =
   try (symbol "break" $> FlowStatementBreak) <|>
   try (symbol "continue" $> FlowStatementContinue) <|>
   try
-    (FlowStatementReturn <$> optionalF (try $ whitespaceBefore1F testList)) <|>
+    (FlowStatementReturn <$>
+     (symbol "return" *>
+      optionalF (try $ whitespaceBefore1F testList))) <|>
   try
-    (FlowStatementRaise <$> optionalF (try $ whitespaceBefore1F raiseStatement)) <|>
+    (FlowStatementRaise <$>
+     (symbol "raise" *>
+      optionalF (try $ whitespaceBefore1F raiseStatement))) <|>
   (FlowStatementYield <$> yieldExpr)
 
 raiseStatement

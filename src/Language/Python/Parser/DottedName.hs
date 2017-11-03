@@ -16,4 +16,5 @@ dottedName =
   annotated $
   DottedName <$>
   identifier <*>
-  manyF (beforeF (betweenWhitespace dot) identifier)
+  manyF
+    (try $ beforeF (betweenWhitespace dot) identifier)

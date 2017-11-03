@@ -72,6 +72,9 @@ data KeywordsArguments name expr as dctxt a where
            a
     , _keywordsArguments_ann :: a
     } -> KeywordsArguments name expr 'NotAssignable dctxt a
+deriving instance (Eq1 name, Eq1 (expr as dctxt), Eq a) => Eq (KeywordsArguments name expr as dctxt a)
+deriving instance (Show1 name, Show1 (expr as dctxt), Show a) => Show (KeywordsArguments name expr as dctxt a)
+deriving instance (Ord1 name, Ord1 (expr as dctxt), Ord a) => Ord (KeywordsArguments name expr as dctxt a)
 deriving instance (Functor name, Functor (expr as dctxt)) => Functor (KeywordsArguments name expr as dctxt)
 deriving instance (Foldable name, Foldable (expr as dctxt)) => Foldable (KeywordsArguments name expr as dctxt)
 deriving instance (Traversable name, Traversable (expr as dctxt)) => Traversable (KeywordsArguments name expr as dctxt)
@@ -94,6 +97,9 @@ data PositionalArguments expr (as :: AtomType) (dctxt :: DefinitionContext) a wh
           a
     , _positionalArguments_ann :: a
     } -> PositionalArguments expr 'NotAssignable dctxt a
+deriving instance (Eq1 (expr as dctxt), Eq a) => Eq (PositionalArguments expr as dctxt a)
+deriving instance (Show1 (expr as dctxt), Show a) => Show (PositionalArguments expr as dctxt a)
+deriving instance (Ord1 (expr as dctxt), Ord a) => Ord (PositionalArguments expr as dctxt a)
 deriving instance Functor (expr as dctxt) => Functor (PositionalArguments expr as dctxt)
 deriving instance Foldable (expr as dctxt) => Foldable (PositionalArguments expr as dctxt)
 deriving instance Traversable (expr as dctxt) => Traversable (PositionalArguments expr as dctxt)
@@ -120,6 +126,9 @@ data StarredAndKeywords name expr (as :: AtomType) (dctxt :: DefinitionContext) 
            a
     , _starredAndKeywords_ann :: a
     } -> StarredAndKeywords name expr 'NotAssignable dctxt a
+deriving instance (Eq1 name, Eq1 (expr as dctxt), Eq a) => Eq (StarredAndKeywords name expr as dctxt a)
+deriving instance (Show1 name, Show1 (expr as dctxt), Show a) => Show (StarredAndKeywords name expr as dctxt a)
+deriving instance (Ord1 name, Ord1 (expr as dctxt), Ord a) => Ord (StarredAndKeywords name expr as dctxt a)
 deriving instance (Functor name, Functor (expr as dctxt)) => Functor (StarredAndKeywords name expr as dctxt)
 deriving instance (Foldable name, Foldable (expr as dctxt)) => Foldable (StarredAndKeywords name expr as dctxt)
 deriving instance (Traversable name, Traversable (expr as dctxt)) => Traversable (StarredAndKeywords name expr as dctxt)
@@ -164,6 +173,9 @@ data ArgumentList name expr (as :: AtomType) (dctxt :: DefinitionContext) a wher
     , _argumentList_comma :: Maybe (Between' [WhitespaceChar] Comma)
     , _argumentList_ann :: a
     } -> ArgumentList name expr 'NotAssignable dctxt a
+deriving instance (Eq1 name, Eq1 (expr as dctxt), Eq a) => Eq (ArgumentList name expr as dctxt a)
+deriving instance (Show1 name, Show1 (expr as dctxt), Show a) => Show (ArgumentList name expr as dctxt a)
+deriving instance (Ord1 name, Ord1 (expr as dctxt), Ord a) => Ord (ArgumentList name expr as dctxt a)
 deriving instance (Functor name, Functor (expr as dctxt)) => Functor (ArgumentList name expr as dctxt)
 deriving instance (Foldable name, Foldable (expr as dctxt)) => Foldable (ArgumentList name expr as dctxt)
 deriving instance (Traversable name, Traversable (expr as dctxt)) => Traversable (ArgumentList name expr as dctxt)

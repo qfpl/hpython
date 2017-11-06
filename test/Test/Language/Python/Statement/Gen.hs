@@ -67,7 +67,7 @@ genFlowStatement
   -> m (FlowStatement lc dc ())
 genFlowStatement scfg ecfg =
   case (scfg ^. loopContext, ecfg ^. definitionContext) of
-    (SInLoop, SFunDef _) ->
+    (SInLoop, SFunDef SNormal) ->
       Gen.choice
         [ genFlowStatementBreak scfg ecfg
         , genFlowStatementContinue scfg ecfg
@@ -75,34 +75,75 @@ genFlowStatement scfg ecfg =
         , genFlowStatementRaise scfg ecfg
         , genFlowStatementYield scfg ecfg
         ]
+    (SInLoop, SFunDef SAsync) ->
+      Gen.choice
+        [ genFlowStatementBreak scfg ecfg
+        , genFlowStatementContinue scfg ecfg
+        , genFlowStatementReturn scfg ecfg
+        , genFlowStatementRaise scfg ecfg
+        ]
     (SInLoop, STopLevel) ->
       Gen.choice
         [ genFlowStatementBreak scfg ecfg
         , genFlowStatementContinue scfg ecfg
         , genFlowStatementRaise scfg ecfg
         ]
-    (SNotInLoop, SFunDef _) ->
+    (SNotInLoop, SFunDef SNormal) ->
       Gen.choice
         [ genFlowStatementReturn scfg ecfg
         , genFlowStatementRaise scfg ecfg
         , genFlowStatementYield scfg ecfg
         ]
+    (SNotInLoop, SFunDef SAsync) ->
+      Gen.choice
+        [ genFlowStatementReturn scfg ecfg
+        , genFlowStatementRaise scfg ecfg
+        ]
     (SNotInLoop, STopLevel) ->
       Gen.choice
         [ genFlowStatementRaise scfg ecfg ]
   where
+    genFlowStatementBreak
+      :: MonadGen m
+      => StatementConfig 'InLoop
+      -> ExprConfig as dc
+      -> m (FlowStatement 'InLoop dc ())
     genFlowStatementBreak _ _ = pure $ FlowStatementBreak ()
+
+    genFlowStatementContinue
+      :: MonadGen m
+      => StatementConfig 'InLoop
+      -> ExprConfig as dc
+      -> m (FlowStatement 'InLoop dc ())
     genFlowStatementContinue _ _ = pure $ FlowStatementContinue ()
+
+    genFlowStatementReturn
+      :: MonadGen m
+      => StatementConfig lc
+      -> ExprConfig as ('FunDef b)
+      -> m (FlowStatement lc ('FunDef b) ())
     genFlowStatementReturn _ e =
       FlowStatementReturn <$>
       genMaybeF
         (genWhitespaceBefore1F
           (genTestList $ e & atomType .~ SNotAssignable)) <*>
       pure ()
+
+    genFlowStatementRaise
+      :: MonadGen m
+      => StatementConfig lc
+      -> ExprConfig as dc
+      -> m (FlowStatement lc dc ())
     genFlowStatementRaise _ e =
       FlowStatementRaise <$>
       genMaybeF (genWhitespaceBefore1F $ genRaiseStatement e) <*>
       pure ()
+
+    genFlowStatementYield
+      :: MonadGen m
+      => StatementConfig lc
+      -> ExprConfig as ('FunDef 'Normal)
+      -> m (FlowStatement lc ('FunDef 'Normal) ())
     genFlowStatementYield _ e =
       FlowStatementYield <$>
       genYieldExpr
@@ -112,7 +153,15 @@ genFlowStatement scfg ecfg =
       pure ()
 
 genRaiseStatement :: MonadGen m => ExprConfig as dc -> m (RaiseStatement dc ())
-genRaiseStatement ecfg = _
+genRaiseStatement ecfg =
+  RaiseStatement <$>
+  genTest (ecfg & atomType .~ SNotAssignable) <*>
+  genMaybeF
+    (genBeforeF
+      (pure KFrom)
+      (genWhitespaceBefore1F
+       (genTest $ ecfg & atomType .~ SNotAssignable))) <*>
+  pure ()
 
 genSmallStatement
   :: MonadGen m

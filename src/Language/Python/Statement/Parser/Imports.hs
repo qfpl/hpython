@@ -17,7 +17,7 @@ import Text.Parser.Unspaced
 importStatement :: DeltaParsing m => Unspaced m (ImportStatement SrcInfo)
 importStatement =
   annotated $
-  try (ImportStatementName <$> importName) <|>
+  (ImportStatementName <$> importName) <|>
   (ImportStatementFrom <$> importFrom)
 
 dottedAsNames :: DeltaParsing m => Unspaced m (DottedAsNames SrcInfo)
@@ -55,7 +55,7 @@ importFrom =
         (try (InL <$> whitespaceBefore1F dottedName) <|>
          (InR <$>
           beforeF (some1 $ betweenWhitespace dotOrEllipsis) dottedName))) <|>
-      (InR . Const <$> some1 dotOrEllipsis)
+      (InR <$> betweenWhitespaceF (Const <$> some1 dotOrEllipsis))
 
     importPart =
       try (InL <$>

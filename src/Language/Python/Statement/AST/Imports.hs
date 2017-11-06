@@ -44,7 +44,9 @@ data ImportFrom a
                 (Before
                   (NonEmpty (Between' [WhitespaceChar] (Either Dot Ellipsis))))
                 DottedName)))
-         (Const (NonEmpty (Either Dot Ellipsis)))
+         (Compose
+           (Between' [WhitespaceChar])
+           (Const (NonEmpty (Either Dot Ellipsis))))
          a
   , _importFrom_import
     :: Sum

@@ -91,8 +91,12 @@ genImportFrom =
               (genBetweenWhitespace $ Gen.element [Left Dot, Right Ellipsis]))
             genDottedName
         ]
-    , InR . Const <$>
-      Gen.nonEmpty (Range.linear 1 10) (Gen.element [Left Dot, Right Ellipsis])
+    , InR <$>
+      genBetweenWhitespaceF
+      (Const <$>
+       Gen.nonEmpty
+         (Range.linear 1 10)
+         (Gen.element [Left Dot, Right Ellipsis]))
     ] <*>
   Gen.choice
     [ fmap InL .

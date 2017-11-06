@@ -45,7 +45,8 @@ importFrom (ImportFrom f i _) =
      sumElim
       (whitespaceBeforeF dottedName)
       (beforeF (foldMap . betweenWhitespace' $ either dot ellipsis) dottedName))
-    (foldMapOf (_Wrapped.folded) $ either dot ellipsis)
+    (betweenWhitespace'F $
+     foldMapOf (_Wrapped.folded) (either dot ellipsis))
     f <>
   text "import" <>
   sumElim

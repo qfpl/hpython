@@ -31,7 +31,7 @@ statement
   => Unspaced m (Statement SrcInfo)
 statement =
   annotated $
-  (StatementSimple <$> try simpleStatement) <|>
+  (StatementSimple <$> simpleStatement) <|>
   (StatementCompound <$> compoundStatement)
 
 simpleStatement
@@ -54,13 +54,13 @@ smallStatement
   => Unspaced m (SmallStatement SrcInfo)
 smallStatement =
   annotated $
-  try smallStatementExpr <|>
-  try smallStatementDel <|>
-  try smallStatementPass <|>
-  try smallStatementFlow <|>
-  try smallStatementImport <|>
-  try smallStatementGlobal <|>
-  try smallStatementNonlocal <|>
+  smallStatementExpr <|>
+  smallStatementDel <|>
+  smallStatementPass <|>
+  smallStatementFlow <|>
+  smallStatementImport <|>
+  smallStatementGlobal <|>
+  smallStatementNonlocal <|>
   smallStatementAssert
   where
     augAssignSequence =
@@ -123,16 +123,14 @@ flowStatement
   => Unspaced m (FlowStatement SrcInfo)
 flowStatement =
   annotated $
-  try (symbol "break" $> FlowStatementBreak) <|>
-  try (symbol "continue" $> FlowStatementContinue) <|>
-  try
-    (FlowStatementReturn <$>
-     (symbol "return" *>
-      optionalF (try $ whitespaceBefore1F testList))) <|>
-  try
-    (FlowStatementRaise <$>
-     (symbol "raise" *>
-      optionalF (try $ whitespaceBefore1F raiseStatement))) <|>
+  (symbol "break" $> FlowStatementBreak) <|>
+  (symbol "continue" $> FlowStatementContinue) <|>
+  (FlowStatementReturn <$>
+    (symbol "return" *>
+    optionalF (try $ whitespaceBefore1F testList))) <|>
+  (FlowStatementRaise <$>
+    (symbol "raise" *>
+    optionalF (try $ whitespaceBefore1F raiseStatement))) <|>
   (FlowStatementYield <$> yieldExpr)
 
 raiseStatement
@@ -153,16 +151,16 @@ compoundStatement
   => Unspaced m (CompoundStatement SrcInfo)
 compoundStatement =
   annotated $
-  try (CompoundStatementIf <$> ifStatement) <|>
-  try (CompoundStatementWhile <$> whileStatement) <|>
-  try (CompoundStatementFor <$> forStatement) <|>
-  try (CompoundStatementTry <$> tryStatement) <|>
-  try (CompoundStatementWith <$> withStatement) <|>
-  try (CompoundStatementFuncDef <$> funcDef) <|>
-  try (CompoundStatementClassDef <$> classDef) <|>
-  try (CompoundStatementDecorated <$> decorated) <|>
+  (CompoundStatementIf <$> ifStatement) <|>
+  (CompoundStatementWhile <$> whileStatement) <|>
+  (CompoundStatementFor <$> forStatement) <|>
+  (CompoundStatementTry <$> tryStatement) <|>
+  (CompoundStatementWith <$> withStatement) <|>
+  (CompoundStatementFuncDef <$> funcDef) <|>
+  (CompoundStatementClassDef <$> classDef) <|>
+  (CompoundStatementDecorated <$> decorated) <|>
   (CompoundStatementAsync <$> asyncStatement)
-  
+
 asyncStatement
   :: ( LookAheadParsing m
      , DeltaParsing m

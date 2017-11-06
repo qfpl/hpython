@@ -250,7 +250,8 @@ parameters
 parameters =
   annotated $
   Parameters <$>
-  betweenWhitespaceF (optionalF . try $ argsList test typedArg)
+  parens
+  (betweenWhitespaceF (optionalF . try $ argsList test typedArg))
 
 funcDef
   :: ( LookAheadParsing m

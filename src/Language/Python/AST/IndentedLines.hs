@@ -74,25 +74,6 @@ maxIndentLevel (h:|t) = go 0 (h:t)
 class Indentable (s :: a -> b -> * -> *) (s' :: a -> b -> * -> *) | s -> s' where
   indentation :: Traversal' (s lctxt ctxt a) (IndentedLines (s' lctxt ctxt a))
 
-validateSubIndentation
-  :: Natural
-  -> Natural
-  -> Natural
-  -> IndentedLines a
-  -> Either (b -> IndentationError b) (IndentedLines a)
-validateSubIndentation parentLevel parentMinLevel parentMaxLevel il =
-  let
-    minLevel = getMinIndentLevel il
-    maxLevel = getMaxIndentLevel il
-    level = getIndentLevel il
-  in
-    if (minLevel <= parentMinLevel) || (maxLevel <= parentMaxLevel)
-    then Left TabError
-    else
-      if level <= parentLevel
-      then Left $ ExpectedLevel Gt parentLevel
-      else Right il
-
 validateIndentation
   :: Natural
   -> Natural
@@ -120,9 +101,9 @@ mkIndentedLines ls@((i, _) :| _) =
     minLevel = minIndentLevel i
     maxLevel = maxIndentLevel i
     level = indentLevel i
-  in fmap IndentedLines
-    (for ls $ validateIndentation level minLevel maxLevel) >>=
-    validateSubIndentation level minLevel maxLevel
+  in
+    IndentedLines <$>
+    traverse (validateIndentation level minLevel maxLevel) ls
 
 deriveEq1 ''IndentedLines
 deriveOrd1 ''IndentedLines

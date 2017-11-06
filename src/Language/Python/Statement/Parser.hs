@@ -397,13 +397,7 @@ suite = annotated $ try suiteSingle <|> suiteMulti
       suiteStatements
 
     someIndentation =
-      (formFeed *> some1 indentationChar) <?> "some indentation"
+      (optional formFeed *> some1 indentationChar) <?> "some indentation"
 
-    sameIndent IndentSpace = char ' ' $> IndentSpace
-    sameIndent IndentTab = char '\t' $> IndentTab
-
-    suiteStatements = do
-      indent <- someIndentation
-      st <- statement
-      Compose . (Compose (Before indent st) :|) <$>
-        many (beforeF (traverse sameIndent indent) statement)
+    suiteStatements =
+      some1F (beforeF someIndentation statement)

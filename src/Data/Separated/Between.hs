@@ -19,11 +19,11 @@ deriveShow1 ''Between
 deriveOrd1 ''Between
 deriveRead1 ''Between
 
-between :: Lens (Between s s' a) (Between t t' b) (s, a, s') (t, b, t')
+between :: Iso (Between s s' a) (Between t t' b) (s, a, s') (t, b, t')
 between =
-  lens
+  iso
   (\(Between s a s') -> (s, a, s'))
-  (\Between{} (t, b, t') -> Between t b t')
+  (\(t, b, t') -> Between t b t')
 
 newtype Between' s a = Between' { _getBetween :: Between s s a }
   deriving (Eq, Ord, Foldable, Functor, Traversable, Show)
@@ -58,5 +58,5 @@ instance Wrapped (Between' s a) where
 
 instance Rewrapped (Between' s a) t where
 
-between' :: Lens (Between' s a) (Between' t b) (s, a, s) (t, b, t)
+between' :: Iso (Between' s a) (Between' t b) (s, a, s) (t, b, t)
 between' = _Wrapped.between

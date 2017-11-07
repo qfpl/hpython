@@ -4,10 +4,16 @@ import Papa
 import Text.PrettyPrint hiding ((<>))
 
 import Language.Python.AST.IndentedLines
+import Language.Python.Printer.Combinators
 import Language.Python.Printer.Symbols
 
-indentedLines :: (a -> Doc) -> IndentedLines a -> Doc
-indentedLines f i =
-  foldMap
-    (\(a, b) -> foldMap indentationChar a <> f b)
+indentedLines
+  :: (comment a -> Doc)
+  -> (f a -> Doc)
+  -> IndentedLines comment f a
+  -> Doc
+indentedLines c f i =
+  foldMapOf
+    (_Wrapped.folded)
+    (sumElim c (beforeF (foldMap indentationChar) f))
     (getIndentedLines i)

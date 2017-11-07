@@ -4,12 +4,12 @@
 {-# language MultiParamTypeClasses #-}
 {-# language FunctionalDependencies #-}
 {-# language PolyKinds #-}
+{-# language StandaloneDeriving #-}
 {-# language TemplateHaskell #-}
 module Language.Python.AST.IndentedLines
   ( IndentedLines
   , getIndentedLines
   , IndentationError(..)
-  , Indentable(..)
   , mkIndentedLines
   , getIndentLevel
   , getMinIndentLevel
@@ -17,27 +17,46 @@ module Language.Python.AST.IndentedLines
   )
   where
 
-import Papa
+import Papa hiding (Sum)
 import Data.Deriving
 import Data.Functor.Classes
+import Data.Functor.Compose
+import Data.Functor.Sum
+import Data.Functor.Sum.Lens
+import qualified Data.List.NonEmpty as NE
+import Data.Separated.Before
 import GHC.Natural
 
 import Language.Python.AST.Symbols
 
-newtype IndentedLines a
+newtype IndentedLines (comment :: * -> *) f a
   = IndentedLines
-  { getIndentedLines :: NonEmpty (NonEmpty IndentationChar, a)
+  { getIndentedLines
+    :: Compose
+         NonEmpty
+         (Sum
+            comment
+            (Compose
+              (Before (NonEmpty IndentationChar))
+              f))
+         a
   }
-  deriving (Eq, Show, Ord, Functor, Foldable, Traversable)
+  deriving (Functor, Foldable, Traversable)
+deriving instance (Eq1 comment, Eq1 f, Eq a) => Eq (IndentedLines comment f a)
+deriving instance (Show1 comment, Show1 f, Show a) => Show (IndentedLines comment f a)
+deriving instance (Ord1 comment, Ord1 f, Ord a) => Ord (IndentedLines comment f a)
 
-getIndentLevel :: IndentedLines a -> Natural
-getIndentLevel (IndentedLines ((i, _) :| _)) = indentLevel i
+getIndentLevel :: IndentedLines comment f a -> Maybe Natural
+getIndentLevel (IndentedLines as) =
+  as ^? _Wrapped.folded._InR._Wrapped.before._1.to indentLevel
 
-getMinIndentLevel :: IndentedLines a -> Natural
-getMinIndentLevel (IndentedLines ((i, _) :| _)) = minIndentLevel i
+getMinIndentLevel :: IndentedLines comment f a -> Maybe Natural
+getMinIndentLevel (IndentedLines as) =
+  as ^? _Wrapped.folded._InR._Wrapped.before._1.to minIndentLevel
 
-getMaxIndentLevel :: IndentedLines a -> Natural
-getMaxIndentLevel (IndentedLines ((i, _) :| _)) = maxIndentLevel i
+getMaxIndentLevel :: IndentedLines comment f a -> Maybe Natural
+getMaxIndentLevel (IndentedLines as) =
+  as ^? _Wrapped.folded._InR._Wrapped.before._1.to maxIndentLevel
 
 data IndentationError a
   = TabError a
@@ -71,9 +90,6 @@ maxIndentLevel (h:|t) = go 0 (h:t)
     go count (IndentTab : rest) = go (count + 8) rest
     go count (IndentSpace : rest) = go (count + 1) rest
 
-class Indentable (s :: a -> b -> * -> *) (s' :: a -> b -> * -> *) | s -> s' where
-  indentation :: Traversal' (s lctxt ctxt a) (IndentedLines (s' lctxt ctxt a))
-
 validateIndentation
   :: Natural
   -> Natural
@@ -94,16 +110,38 @@ validateIndentation desired desiredMinLevel desiredMaxLevel (i, a) =
       else Right (i, a)
 
 mkIndentedLines
-  :: NonEmpty (NonEmpty IndentationChar, s lctxt ctxt a)
-  -> Either (b -> IndentationError b) (IndentedLines (s lctxt ctxt a))
-mkIndentedLines ls@((i, _) :| _) =
-  let
-    minLevel = minIndentLevel i
-    maxLevel = maxIndentLevel i
-    level = indentLevel i
-  in
-    IndentedLines <$>
-    traverse (validateIndentation level minLevel maxLevel) ls
+  :: Compose
+       NonEmpty
+       (Sum
+         comment
+         (Compose
+           (Before (NonEmpty IndentationChar))
+           f))
+       a
+  -> Either
+       (b -> IndentationError b)
+       (IndentedLines comment f a)
+mkIndentedLines ls =
+  case ls ^? _Wrapped.folded._InR._Wrapped.before._1 of
+    Nothing ->
+      case NE.tail $ getCompose ls of
+        [] -> Right $ IndentedLines ls
+        a:as ->
+          IndentedLines .
+          over _Wrapped (NE.cons . NE.head $ getCompose ls) .
+          getIndentedLines <$>
+          mkIndentedLines (Compose $ a :| as)
+    Just i ->
+      let
+        minLevel = minIndentLevel i
+        maxLevel = maxIndentLevel i
+        level = indentLevel i
+      in
+        IndentedLines <$>
+        traverseOf
+          (_Wrapped.traverse._InR._Wrapped.before)
+          (validateIndentation level minLevel maxLevel)
+          ls
 
 deriveEq1 ''IndentedLines
 deriveOrd1 ''IndentedLines

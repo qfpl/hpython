@@ -5,8 +5,6 @@ import Prelude (error)
 import Papa
 import Hedgehog
 
-import Data.Separated.Before
-import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
 import qualified Hedgehog.Gen as Gen
@@ -565,7 +563,8 @@ genSuite scfg ecfg =
     [ SuiteSingle <$> genSimpleStatement scfg ecfg <*> pure ()
     , SuiteMulti <$>
       genNewlineChar <*>
-      (Compose <$>
-      genIndentedLines (Range.constant 1 10) (genStatement scfg ecfg)) <*>
+      genIndentedLines
+        (Range.constant 1 10)
+        (genStatement scfg ecfg) <*>
       pure ()
     ]

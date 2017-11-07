@@ -12,6 +12,7 @@ import Language.Python.Expr.Parser
 import Language.Python.Parser.ArgsList
 import Language.Python.Parser.ArgumentList
 import Language.Python.Parser.Combinators
+import Language.Python.Parser.Comment
 import Language.Python.Parser.DottedName
 import Language.Python.Parser.Identifier
 import Language.Python.Parser.Keywords
@@ -400,4 +401,6 @@ suite = annotated $ try suiteSingle <|> suiteMulti
       (optional formFeed *> some1 indentationChar) <?> "some indentation"
 
     suiteStatements =
-      some1F (beforeF someIndentation statement)
+      some1F
+        (try (InL <$> whitespaceBeforeF (afterF newlineChar comment)) <|>
+         (InR <$> beforeF someIndentation statement))

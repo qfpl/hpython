@@ -11,9 +11,11 @@ import Data.Deriving
 import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
+import Data.Separated.After
 import Data.Separated.Before
 import Data.Separated.Between
 
+import Language.Python.AST.Comment
 import Language.Python.AST.DottedName
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
@@ -170,9 +172,15 @@ data Suite a
   , _suiteMulti_statements
     :: Compose
          NonEmpty
-         (Compose
-           (Before (NonEmpty IndentationChar))
-           Statement)
+         (Sum
+           (Compose
+             (Before [WhitespaceChar])
+             (Compose
+               (After NewlineChar)
+               Comment))
+           (Compose
+             (Before (NonEmpty IndentationChar))
+             Statement))
          a
   , _suiteMulti_ann :: a
   }

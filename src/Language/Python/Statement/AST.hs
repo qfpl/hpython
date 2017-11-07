@@ -16,12 +16,14 @@ import Data.Deriving
 import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
+import Data.Separated.After
 import Data.Separated.Before
 import Data.Separated.Between
 import Data.Singletons.Prelude ((:==))
 
 import Language.Python.AST.ArgsList
 import Language.Python.AST.ArgumentList
+import Language.Python.AST.Comment
 import Language.Python.AST.DottedName
 import Language.Python.AST.Identifier
 import Language.Python.AST.IndentedLines
@@ -177,7 +179,14 @@ data Suite (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   | SuiteMulti
   { _suiteMulti_newline :: NewlineChar
   , _suiteMulti_statements
-    :: Compose IndentedLines (Statement lctxt ctxt) a
+    :: IndentedLines
+         (Compose
+           (Before [WhitespaceChar])
+           (Compose
+             (After NewlineChar)
+             Comment))
+         (Statement lctxt ctxt)
+         a
   , _suiteMulti_ann :: a
   }
   deriving (Functor, Foldable, Traversable)

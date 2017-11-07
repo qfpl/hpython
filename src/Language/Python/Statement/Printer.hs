@@ -2,7 +2,6 @@
 module Language.Python.Statement.Printer where
 
 import Papa
-import Data.Functor.Compose
 import Text.PrettyPrint hiding ((<>), equals, comma, colon)
 
 import Language.Python.Expr.Printer
@@ -289,4 +288,7 @@ suite s =
     SuiteSingle v _ -> simpleStatement v
     SuiteMulti n sts _ ->
       newlineChar n <>
-      indentedLines statement (getCompose sts)
+      indentedLines
+        (whitespaceBeforeF (afterF newlineChar comment))
+        statement
+        sts

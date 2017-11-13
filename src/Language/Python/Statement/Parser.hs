@@ -12,6 +12,7 @@ import Language.Python.Expr.Parser
 import Language.Python.Parser.ArgsList
 import Language.Python.Parser.ArgumentList
 import Language.Python.Parser.Combinators
+import Language.Python.Parser.Comment
 import Language.Python.Parser.DottedName
 import Language.Python.Parser.Identifier
 import Language.Python.Parser.Keywords
@@ -31,7 +32,7 @@ statement
   => Unspaced m (Statement SrcInfo)
 statement =
   annotated $
-  (StatementSimple <$> try simpleStatement) <|>
+  (StatementSimple <$> simpleStatement) <|>
   (StatementCompound <$> compoundStatement)
 
 simpleStatement
@@ -54,13 +55,13 @@ smallStatement
   => Unspaced m (SmallStatement SrcInfo)
 smallStatement =
   annotated $
-  try smallStatementExpr <|>
-  try smallStatementDel <|>
-  try smallStatementPass <|>
-  try smallStatementFlow <|>
-  try smallStatementImport <|>
-  try smallStatementGlobal <|>
-  try smallStatementNonlocal <|>
+  smallStatementExpr <|>
+  smallStatementDel <|>
+  smallStatementPass <|>
+  smallStatementFlow <|>
+  smallStatementImport <|>
+  smallStatementGlobal <|>
+  smallStatementNonlocal <|>
   smallStatementAssert
   where
     augAssignSequence =
@@ -123,12 +124,14 @@ flowStatement
   => Unspaced m (FlowStatement SrcInfo)
 flowStatement =
   annotated $
-  try (symbol "break" $> FlowStatementBreak) <|>
-  try (symbol "continue" $> FlowStatementContinue) <|>
-  try
-    (FlowStatementReturn <$> optionalF (try $ whitespaceBefore1F testList)) <|>
-  try
-    (FlowStatementRaise <$> optionalF (try $ whitespaceBefore1F raiseStatement)) <|>
+  (symbol "break" $> FlowStatementBreak) <|>
+  (symbol "continue" $> FlowStatementContinue) <|>
+  (FlowStatementReturn <$>
+    (symbol "return" *>
+    optionalF (try $ whitespaceBefore1F testList))) <|>
+  (FlowStatementRaise <$>
+    (symbol "raise" *>
+    optionalF (try $ whitespaceBefore1F raiseStatement))) <|>
   (FlowStatementYield <$> yieldExpr)
 
 raiseStatement
@@ -149,16 +152,16 @@ compoundStatement
   => Unspaced m (CompoundStatement SrcInfo)
 compoundStatement =
   annotated $
-  try (CompoundStatementIf <$> ifStatement) <|>
-  try (CompoundStatementWhile <$> whileStatement) <|>
-  try (CompoundStatementFor <$> forStatement) <|>
-  try (CompoundStatementTry <$> tryStatement) <|>
-  try (CompoundStatementWith <$> withStatement) <|>
-  try (CompoundStatementFuncDef <$> funcDef) <|>
-  try (CompoundStatementClassDef <$> classDef) <|>
-  try (CompoundStatementDecorated <$> decorated) <|>
+  (CompoundStatementIf <$> ifStatement) <|>
+  (CompoundStatementWhile <$> whileStatement) <|>
+  (CompoundStatementFor <$> forStatement) <|>
+  (CompoundStatementTry <$> tryStatement) <|>
+  (CompoundStatementWith <$> withStatement) <|>
+  (CompoundStatementFuncDef <$> funcDef) <|>
+  (CompoundStatementClassDef <$> classDef) <|>
+  (CompoundStatementDecorated <$> decorated) <|>
   (CompoundStatementAsync <$> asyncStatement)
-  
+
 asyncStatement
   :: ( LookAheadParsing m
      , DeltaParsing m
@@ -248,7 +251,8 @@ parameters
 parameters =
   annotated $
   Parameters <$>
-  betweenWhitespaceF (optionalF . try $ argsList test typedArg)
+  parens
+  (betweenWhitespaceF (optionalF . try $ argsList test typedArg))
 
 funcDef
   :: ( LookAheadParsing m
@@ -394,13 +398,9 @@ suite = annotated $ try suiteSingle <|> suiteMulti
       suiteStatements
 
     someIndentation =
-      (formFeed *> some1 indentationChar) <?> "some indentation"
+      (optional formFeed *> some1 indentationChar) <?> "some indentation"
 
-    sameIndent IndentSpace = char ' ' $> IndentSpace
-    sameIndent IndentTab = char '\t' $> IndentTab
-
-    suiteStatements = do
-      indent <- someIndentation
-      st <- statement
-      Compose . (Compose (Before indent st) :|) <$>
-        many (beforeF (traverse sameIndent indent) statement)
+    suiteStatements =
+      some1F
+        (try (InL <$> whitespaceBeforeF (afterF newlineChar comment)) <|>
+         (InR <$> beforeF someIndentation statement))

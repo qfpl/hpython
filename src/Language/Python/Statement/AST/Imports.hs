@@ -10,6 +10,7 @@ import Papa hiding (Sum)
 import Data.Deriving
 import Data.Functor.Compose
 import Data.Functor.Sum
+import Data.Separated.After
 import Data.Separated.Before
 import Data.Separated.Between
 
@@ -27,34 +28,46 @@ data ImportStatement a
   { _importStatementFrom_value :: ImportFrom a
   , _importStatement_ann :: a
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Ord, Functor, Foldable, Traversable)
 
 data ImportFrom a
   = ImportFrom
   { _importFrom_from
     :: Sum
          (Compose
-           (Before [Between' [WhitespaceChar] (Either Dot Ellipsis)])
-           DottedName)
-         (Const (NonEmpty (Either Dot Ellipsis)))
+           (After (NonEmpty WhitespaceChar))
+           (Sum
+             (Compose
+               (Before (NonEmpty WhitespaceChar))
+               DottedName)
+              (Compose
+                (Before
+                  (NonEmpty (Between' [WhitespaceChar] (Either Dot Ellipsis))))
+                DottedName)))
+         (Compose
+           (Between' [WhitespaceChar])
+           (Const (NonEmpty (Either Dot Ellipsis))))
          a
   , _importFrom_import
-    :: Compose
-         (Before (NonEmpty WhitespaceChar))
-         (Sum
+    :: Sum
+         (Compose
+           (Before [WhitespaceChar])
            (Sum
              (Const Asterisk)
              (Compose
                (Between LeftParen RightParen)
                (Compose
                  (Between' [WhitespaceChar])
-                 ImportAsNames)))
+                 ImportAsNames))))
+         (Compose
+           (Before (NonEmpty WhitespaceChar))
            ImportAsNames)
-         a
+       a
   , _importFrom_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (ImportFrom a)
+deriving instance Ord a => Ord (ImportFrom a)
 deriving instance Show a => Show (ImportFrom a)
 
 data ImportAsNames a
@@ -72,6 +85,7 @@ data ImportAsNames a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (ImportAsNames a)
+deriving instance Ord a => Ord (ImportAsNames a)
 deriving instance Show a => Show (ImportAsNames a)
 
 data ImportAsName a
@@ -86,7 +100,7 @@ data ImportAsName a
          a
   , _importAsName_ann :: a
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Ord, Functor, Foldable, Traversable)
 
 data ImportName a
   = ImportName
@@ -99,6 +113,7 @@ data ImportName a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (ImportName a)
+deriving instance Ord a => Ord (ImportName a)
 deriving instance Show a => Show (ImportName a)
 
 data DottedAsName a
@@ -113,7 +128,7 @@ data DottedAsName a
          a
   , _dottedAsName_ann :: a
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Ord, Functor, Foldable, Traversable)
 
 data DottedAsNames a
   = DottedAsNames
@@ -129,32 +144,40 @@ data DottedAsNames a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (DottedAsNames a)
+deriving instance Ord a => Ord (DottedAsNames a)
 deriving instance Show a => Show (DottedAsNames a)
 
 makeLenses ''DottedAsName
 deriveEq1 ''DottedAsName
+deriveOrd1 ''DottedAsName
 deriveShow1 ''DottedAsName
 
 makeLenses ''ImportAsName
 deriveEq1 ''ImportAsName
+deriveOrd1 ''ImportAsName
 deriveShow1 ''ImportAsName
 
 makeLenses ''DottedAsNames
 deriveEq1 ''DottedAsNames
+deriveOrd1 ''DottedAsNames
 deriveShow1 ''DottedAsNames
 
 makeLenses ''ImportAsNames
 deriveEq1 ''ImportAsNames
+deriveOrd1 ''ImportAsNames
 deriveShow1 ''ImportAsNames
 
 makeLenses ''ImportStatement
 deriveEq1 ''ImportStatement
+deriveOrd1 ''ImportStatement
 deriveShow1 ''ImportStatement
 
 makeLenses ''ImportName
 deriveEq1 ''ImportName
+deriveOrd1 ''ImportName
 deriveShow1 ''ImportName
 
 makeLenses ''ImportFrom
 deriveEq1 ''ImportFrom
+deriveOrd1 ''ImportFrom
 deriveShow1 ''ImportFrom

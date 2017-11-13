@@ -16,5 +16,5 @@ deriveRead1 ''Before
 instance Bifunctor Before where
   bimap f g (Before s a) = Before (f s) (g a)
 
-before :: Lens (Before s a) (Before t b) (s, a) (t, b)
-before = lens (\(Before s a) -> (s, a)) (\Before{} (t, b) -> Before t b)
+before :: Iso (Before s a) (Before t b) (s, a) (t, b)
+before = iso (\(Before s a) -> (s, a)) (uncurry Before)

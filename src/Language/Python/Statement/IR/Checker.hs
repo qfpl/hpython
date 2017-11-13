@@ -10,6 +10,7 @@ import Papa hiding (Sum, Product)
 import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
+import Data.Functor.Sum.Lens
 import Data.Separated.Before
 
 import qualified Language.Python.Expr.AST as Safe
@@ -605,11 +606,8 @@ checkSuite ecfg scfg s =
       pure ann
     IR.SuiteMulti n ls ann ->
       Safe.SuiteMulti n <$>
-      traverseOf
-        _Wrapped
         (liftError (IndentationError . ($ ann)) .
          fmap mkIndentedLines .
-         traverseOf (traverse._2) (checkStatement ecfg scfg) .
-         fmap (view before . getCompose))
+         traverseOf (_Wrapped.traverse._InR._Wrapped.before._2) (checkStatement ecfg scfg))
         ls <*>
       pure ann

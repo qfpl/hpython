@@ -1,11 +1,10 @@
 {-# language DataKinds #-}
 module Test.Language.Python.Statement.Gen where
 
+import Prelude (error)
 import Papa
 import Hedgehog
 
-import Data.Separated.Before
-import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
 import qualified Hedgehog.Gen as Gen
@@ -26,6 +25,7 @@ import Test.Language.Python.Gen.Identifier
 import Test.Language.Python.Gen.IndentedLines
 import Test.Language.Python.Gen.TestlistStarExpr
 import Test.Language.Python.Statement.AugAssign
+import Test.Language.Python.Statement.Gen.Imports
 
 genStatement
   :: MonadGen m
@@ -58,17 +58,149 @@ genSimpleStatement scfg ecfg =
   genWhitespaceBefore genNewlineChar <*>
   pure ()
 
+genFlowStatement
+  :: MonadGen m
+  => StatementConfig lc
+  -> ExprConfig as dc
+  -> m (FlowStatement lc dc ())
+genFlowStatement scfg ecfg =
+  case (scfg ^. loopContext, ecfg ^. definitionContext) of
+    (SInLoop, SFunDef SNormal) ->
+      Gen.choice
+        [ genFlowStatementBreak scfg ecfg
+        , genFlowStatementContinue scfg ecfg
+        , genFlowStatementReturn scfg ecfg
+        , genFlowStatementRaise scfg ecfg
+        , genFlowStatementYield scfg ecfg
+        ]
+    (SInLoop, SFunDef SAsync) ->
+      Gen.choice
+        [ genFlowStatementBreak scfg ecfg
+        , genFlowStatementContinue scfg ecfg
+        , genFlowStatementReturn scfg ecfg
+        , genFlowStatementRaise scfg ecfg
+        ]
+    (SInLoop, STopLevel) ->
+      Gen.choice
+        [ genFlowStatementBreak scfg ecfg
+        , genFlowStatementContinue scfg ecfg
+        , genFlowStatementRaise scfg ecfg
+        ]
+    (SNotInLoop, SFunDef SNormal) ->
+      Gen.choice
+        [ genFlowStatementReturn scfg ecfg
+        , genFlowStatementRaise scfg ecfg
+        , genFlowStatementYield scfg ecfg
+        ]
+    (SNotInLoop, SFunDef SAsync) ->
+      Gen.choice
+        [ genFlowStatementReturn scfg ecfg
+        , genFlowStatementRaise scfg ecfg
+        ]
+    (SNotInLoop, STopLevel) ->
+      Gen.choice
+        [ genFlowStatementRaise scfg ecfg ]
+  where
+    genFlowStatementBreak
+      :: MonadGen m
+      => StatementConfig 'InLoop
+      -> ExprConfig as dc
+      -> m (FlowStatement 'InLoop dc ())
+    genFlowStatementBreak _ _ = pure $ FlowStatementBreak ()
+
+    genFlowStatementContinue
+      :: MonadGen m
+      => StatementConfig 'InLoop
+      -> ExprConfig as dc
+      -> m (FlowStatement 'InLoop dc ())
+    genFlowStatementContinue _ _ = pure $ FlowStatementContinue ()
+
+    genFlowStatementReturn
+      :: MonadGen m
+      => StatementConfig lc
+      -> ExprConfig as ('FunDef b)
+      -> m (FlowStatement lc ('FunDef b) ())
+    genFlowStatementReturn _ e =
+      FlowStatementReturn <$>
+      genMaybeF
+        (genWhitespaceBefore1F
+          (genTestList $ e & atomType .~ SNotAssignable)) <*>
+      pure ()
+
+    genFlowStatementRaise
+      :: MonadGen m
+      => StatementConfig lc
+      -> ExprConfig as dc
+      -> m (FlowStatement lc dc ())
+    genFlowStatementRaise _ e =
+      FlowStatementRaise <$>
+      genMaybeF (genWhitespaceBefore1F $ genRaiseStatement e) <*>
+      pure ()
+
+    genFlowStatementYield
+      :: MonadGen m
+      => StatementConfig lc
+      -> ExprConfig as ('FunDef 'Normal)
+      -> m (FlowStatement lc ('FunDef 'Normal) ())
+    genFlowStatementYield _ e =
+      FlowStatementYield <$>
+      genYieldExpr
+        (e
+           & atomType .~ SNotAssignable
+           & definitionContext .~ SFunDef SNormal) <*>
+      pure ()
+
+genRaiseStatement :: MonadGen m => ExprConfig as dc -> m (RaiseStatement dc ())
+genRaiseStatement ecfg =
+  RaiseStatement <$>
+  genTest (ecfg & atomType .~ SNotAssignable) <*>
+  genMaybeF
+    (genBeforeF
+      (pure KFrom)
+      (genWhitespaceBefore1F
+       (genTest $ ecfg & atomType .~ SNotAssignable))) <*>
+  pure ()
+
 genSmallStatement
   :: MonadGen m
   => StatementConfig lc
   -> ExprConfig as dc
   -> m (SmallStatement lc dc ())
 genSmallStatement scfg ecfg =
-  Gen.choice
-    [ SmallStatementExpr <$>
+  case ecfg ^. definitionContext of
+    STopLevel ->
+      Gen.choice
+        [ genSmallStatementExpr
+        , genSmallStatementAssign
+        , genSmallStatementAugAssign
+        , genSmallStatementDel
+        , genSmallStatementPass
+        , genSmallStatementFlow
+        , genSmallStatementImport
+        , genSmallStatementGlobal
+        , genSmallStatementAssert
+        ]
+    _ ->
+      Gen.choice
+        [ genSmallStatementExpr
+        , genSmallStatementAssign
+        , genSmallStatementAugAssign
+        , genSmallStatementDel
+        , genSmallStatementPass
+        , genSmallStatementFlow
+        , genSmallStatementImport
+        , genSmallStatementGlobal
+        , genSmallStatementNonlocal $ ecfg ^. definitionContext
+        , genSmallStatementAssert
+        ]
+  where
+    genSmallStatementExpr =
+      SmallStatementExpr <$>
       genTest (ecfg & atomType .~ SNotAssignable) <*>
       pure ()
-    , SmallStatementAssign <$>
+
+    genSmallStatementAssign =
+      SmallStatementAssign <$>
       genTestlistStarExpr genTest genStarExpr (ecfg & atomType .~ SAssignable) <*>
       genListF
         (genBeforeF
@@ -83,7 +215,9 @@ genSmallStatement scfg ecfg =
              _ -> []) <>
           [ InR <$> genTestlistStarExpr genTest genStarExpr (ecfg & atomType .~ SNotAssignable) ]) <*>
       pure ()
-    , SmallStatementAugAssign <$>
+
+    genSmallStatementAugAssign =
+      SmallStatementAugAssign <$>
       genTest (ecfg & atomType .~ SAssignable) <*>
       genBeforeF
         (genBetweenWhitespace genAugAssign)
@@ -94,7 +228,51 @@ genSmallStatement scfg ecfg =
              _ -> []) <>
           [ InR <$> genTestList (ecfg & atomType .~ SNotAssignable) ]) <*>
       pure ()
-    ]
+
+    genSmallStatementDel =
+      SmallStatementDel <$>
+      genWhitespaceBefore1F (genExprList $ ecfg & atomType .~ SAssignable) <*>
+      pure ()
+
+    genSmallStatementPass =
+      pure $ SmallStatementPass ()
+
+    genSmallStatementFlow =
+      SmallStatementFlow <$>
+      genFlowStatement scfg ecfg <*>
+      pure ()
+
+    genSmallStatementImport =
+      SmallStatementImport <$>
+      genImportStatement <*>
+      pure ()
+
+    genSmallStatementGlobal =
+      SmallStatementGlobal <$>
+      genWhitespaceBefore1F genIdentifier <*>
+      genListF
+        (genBeforeF (genBetweenWhitespace $ pure Comma) genIdentifier) <*>
+      pure ()
+
+    genSmallStatementNonlocal :: MonadGen m => SDefinitionContext a -> m (SmallStatement b a ())
+    genSmallStatementNonlocal dc =
+      case dc of
+        STopLevel -> error "impossible"
+        SFunDef _ ->
+          SmallStatementNonlocal <$>
+          genWhitespaceBefore1F genIdentifier <*>
+          genListF
+            (genBeforeF (genBetweenWhitespace $ pure Comma) genIdentifier) <*>
+          pure ()
+
+    genSmallStatementAssert =
+      SmallStatementAssert <$>
+      genWhitespaceBefore1F (genTest $ ecfg & atomType .~ SNotAssignable) <*>
+      genMaybeF
+        (genBeforeF
+          (genBetweenWhitespace $ pure Comma)
+          (genTest $ ecfg & atomType .~ SNotAssignable)) <*>
+      pure ()
 
 genCompoundStatement
   :: MonadGen m
@@ -385,7 +563,8 @@ genSuite scfg ecfg =
     [ SuiteSingle <$> genSimpleStatement scfg ecfg <*> pure ()
     , SuiteMulti <$>
       genNewlineChar <*>
-      (Compose <$>
-      genIndentedLines (Range.constant 1 10) (genStatement scfg ecfg)) <*>
+      genIndentedLines
+        (Range.constant 1 10)
+        (genStatement scfg ecfg) <*>
       pure ()
     ]

@@ -3,6 +3,7 @@
 {-# language DeriveTraversable #-}
 {-# language FlexibleContexts #-}
 {-# language KindSignatures #-}
+{-# language StandaloneDeriving #-}
 {-# language TemplateHaskell #-}
 module Language.Python.Expr.IR where
 
@@ -69,6 +70,9 @@ data Argument a
   , _argument_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Argument a)
+deriving instance Show a => Show (Argument a)
+deriving instance Ord a => Ord (Argument a)
 
 data ArgList a
   = ArgList
@@ -174,6 +178,9 @@ data CompFor a
         a
   , _compFor_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (CompFor a)
+deriving instance Show a => Show (CompFor a)
+deriving instance Ord a => Ord (CompFor a)
 
 data SliceOp a
   = SliceOp
@@ -184,6 +191,9 @@ data SliceOp a
         a
   , _sliceOp_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (SliceOp a)
+deriving instance Show a => Show (SliceOp a)
+deriving instance Ord a => Ord (SliceOp a)
 
 data Subscript a
   = SubscriptTest
@@ -211,6 +221,9 @@ data Subscript a
         a
   , _subscript_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Subscript a)
+deriving instance Show a => Show (Subscript a)
+deriving instance Ord a => Ord (Subscript a)
 
 data SubscriptList a
   = SubscriptList
@@ -225,6 +238,9 @@ data SubscriptList a
   , _subscriptList_comma :: Maybe (Before [WhitespaceChar] Comma)
   , _subscriptList_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (SubscriptList a)
+deriving instance Show a => Show (SubscriptList a)
+deriving instance Ord a => Ord (SubscriptList a)
 
 data Trailer a
   = TrailerCall
@@ -249,6 +265,9 @@ data Trailer a
   { _trailerAccess_value :: Compose (Before [WhitespaceChar]) Identifier a
   , _trailer_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Trailer a)
+deriving instance Show a => Show (Trailer a)
+deriving instance Ord a => Ord (Trailer a)
 
 data AtomExpr a
   = AtomExprSingle
@@ -270,6 +289,9 @@ data AtomExpr a
           a
   , _atomExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (AtomExpr a)
+deriving instance Show a => Show (AtomExpr a)
+deriving instance Ord a => Ord (AtomExpr a)
 
 data Power a
   = Power
@@ -283,6 +305,9 @@ data Power a
          a
   , _power_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Power a)
+deriving instance Show a => Show (Power a)
+deriving instance Ord a => Ord (Power a)
 
 data Factor a
   = FactorNone
@@ -294,6 +319,9 @@ data Factor a
   , _factorOne_value :: Factor a
   , _factorSome_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Factor a)
+deriving instance Show a => Show (Factor a)
+deriving instance Ord a => Ord (Factor a)
 
 data Term a
   = Term
@@ -307,6 +335,9 @@ data Term a
          a
   , _termMany_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Term a)
+deriving instance Show a => Show (Term a)
+deriving instance Ord a => Ord (Term a)
 
 data ArithExpr a
   = ArithExpr
@@ -320,6 +351,9 @@ data ArithExpr a
         a
   , _arithExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (ArithExpr a)
+deriving instance Show a => Show (ArithExpr a)
+deriving instance Ord a => Ord (ArithExpr a)
 
 data ShiftExpr a
   = ShiftExpr
@@ -333,6 +367,9 @@ data ShiftExpr a
          a
   , _shiftExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (ShiftExpr a)
+deriving instance Show a => Show (ShiftExpr a)
+deriving instance Ord a => Ord (ShiftExpr a)
 
 data AndExpr a
   = AndExpr
@@ -346,6 +383,9 @@ data AndExpr a
          a
   , _andExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (AndExpr a)
+deriving instance Show a => Show (AndExpr a)
+deriving instance Ord a => Ord (AndExpr a)
 
 data XorExpr a
   = XorExpr
@@ -359,6 +399,9 @@ data XorExpr a
          a
   , _xorExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (XorExpr a)
+deriving instance Show a => Show (XorExpr a)
+deriving instance Ord a => Ord (XorExpr a)
 
 data Expr a
   = Expr
@@ -372,6 +415,9 @@ data Expr a
         a
   , _expr_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Expr a)
+deriving instance Show a => Show (Expr a)
+deriving instance Ord a => Ord (Expr a)
 
 data Comparison a
   = Comparison
@@ -385,6 +431,9 @@ data Comparison a
          a
   , _comparison_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Comparison a)
+deriving instance Show a => Show (Comparison a)
+deriving instance Ord a => Ord (Comparison a)
 
 data NotTest a
   = NotTestMany
@@ -399,6 +448,9 @@ data NotTest a
   { _notTestNone_value :: Comparison a
   , _notTestNone_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (NotTest a)
+deriving instance Show a => Show (NotTest a)
+deriving instance Ord a => Ord (NotTest a)
 
 data AndTest a
   = AndTest
@@ -412,6 +464,9 @@ data AndTest a
          a
   , _andTest_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (AndTest a)
+deriving instance Show a => Show (AndTest a)
+deriving instance Ord a => Ord (AndTest a)
 
 data OrTest a
   = OrTest
@@ -425,6 +480,9 @@ data OrTest a
          a
   , _orTest_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (OrTest a)
+deriving instance Show a => Show (OrTest a)
+deriving instance Ord a => Ord (OrTest a)
 
 data IfThenElse a
   = IfThenElse
@@ -452,6 +510,9 @@ data Test a
   , _test_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Test a)
+deriving instance Show a => Show (Test a)
+deriving instance Ord a => Ord (Test a)
 
 data Lambdef a
   = Lambdef
@@ -470,6 +531,9 @@ data Lambdef a
   , _lambdef_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Lambdef a)
+deriving instance Show a => Show (Lambdef a)
+deriving instance Ord a => Ord (Lambdef a)
 
 data TestList a
   = TestList
@@ -485,6 +549,9 @@ data TestList a
   , _testList_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (TestList a)
+deriving instance Show a => Show (TestList a)
+deriving instance Ord a => Ord (TestList a)
 
 data YieldArg a
   = YieldArgFrom
@@ -496,6 +563,9 @@ data YieldArg a
   { _yieldArgList_value :: TestList a
   , _yieldArgList_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (YieldArg a)
+deriving instance Show a => Show (YieldArg a)
+deriving instance Ord a => Ord (YieldArg a)
 
 data YieldExpr a
   = YieldExpr
@@ -508,6 +578,9 @@ data YieldExpr a
         a
   , _yieldExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (YieldExpr a)
+deriving instance Show a => Show (YieldExpr a)
+deriving instance Ord a => Ord (YieldExpr a)
 
 data TupleTestlistComp a
   = TupleTestlistCompFor
@@ -528,6 +601,9 @@ data TupleTestlistComp a
   , _tupleTestlistCompList_comma :: Maybe (Before [WhitespaceChar] Comma)
   , _tupleTestlistCompList_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (TupleTestlistComp a)
+deriving instance Show a => Show (TupleTestlistComp a)
+deriving instance Ord a => Ord (TupleTestlistComp a)
 
 data ListTestlistComp a
   = ListTestlistCompFor
@@ -548,6 +624,9 @@ data ListTestlistComp a
   , _listTestlistCompList_comma :: Maybe (Before [WhitespaceChar] Comma)
   , _listTestlistCompList_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (ListTestlistComp a)
+deriving instance Show a => Show (ListTestlistComp a)
+deriving instance Ord a => Ord (ListTestlistComp a)
 
 data DictItem a
   = DictItem
@@ -556,6 +635,9 @@ data DictItem a
   , _dictItem_value :: Test a
   , _dictItem_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (DictItem a)
+deriving instance Show a => Show (DictItem a)
+deriving instance Ord a => Ord (DictItem a)
 
 data DictUnpacking a
   = DictUnpacking
@@ -566,6 +648,9 @@ data DictUnpacking a
           a
   , _dictUnpacking_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (DictUnpacking a)
+deriving instance Show a => Show (DictUnpacking a)
+deriving instance Ord a => Ord (DictUnpacking a)
 
 data DictOrSetMaker a
   = DictOrSetMakerDict
@@ -603,6 +688,9 @@ data DictOrSetMaker a
   , _dictOrSetMaker_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (DictOrSetMaker a)
+deriving instance Show a => Show (DictOrSetMaker a)
+deriving instance Ord a => Ord (DictOrSetMaker a)
 
 data AtomNoInt a
   = AtomParen
@@ -684,6 +772,9 @@ data AtomNoInt a
   | AtomFalse
   { _atomNoInt_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (AtomNoInt a)
+deriving instance Show a => Show (AtomNoInt a)
+deriving instance Ord a => Ord (AtomNoInt a)
 
 data Atom a
   = AtomNoInt
@@ -694,237 +785,201 @@ data Atom a
   { _atomInteger_value :: Integer' a
   , _atom_ann :: a
   } deriving (Functor, Foldable, Traversable)
+deriving instance Eq a => Eq (Atom a)
+deriving instance Show a => Show (Atom a)
+deriving instance Ord a => Ord (Atom a)
 
-deriveEq ''Comparison
 deriveEq1 ''Comparison
-deriveShow ''Comparison
+deriveOrd1 ''Comparison
 deriveShow1 ''Comparison
 makeLenses ''Comparison
 
-deriveEq ''NotTest
 deriveEq1 ''NotTest
-deriveShow ''NotTest
+deriveOrd1 ''NotTest
 deriveShow1 ''NotTest
 makeLenses ''NotTest
 
-deriveEq ''AndTest
 deriveEq1 ''AndTest
-deriveShow ''AndTest
+deriveOrd1 ''AndTest
 deriveShow1 ''AndTest
 makeLenses ''AndTest
 
-deriveEq ''OrTest
 deriveEq1 ''OrTest
-deriveShow ''OrTest
+deriveOrd1 ''OrTest
 deriveShow1 ''OrTest
 makeLenses ''OrTest
 
-deriveEq ''IfThenElse
 deriveEq1 ''IfThenElse
-deriveShow ''IfThenElse
+deriveOrd1 ''IfThenElse
 deriveShow1 ''IfThenElse
 makeLenses ''IfThenElse
 
-deriveEq ''Test
 deriveEq1 ''Test
-deriveShow ''Test
+deriveOrd1 ''Test
 deriveShow1 ''Test
 makeLenses ''Test
 
-deriveEq ''TestList
 deriveEq1 ''TestList
-deriveShow ''TestList
+deriveOrd1 ''TestList
 deriveShow1 ''TestList
 makeLenses ''TestList
 
-deriveEq ''Argument
 deriveEq1 ''Argument
-deriveShow ''Argument
+deriveOrd1 ''Argument
 deriveShow1 ''Argument
 makeLenses ''Argument
 
-deriveEq ''ArgList
 deriveEq1 ''ArgList
-deriveShow ''ArgList
+deriveOrd1 ''ArgList
 deriveShow1 ''ArgList
 makeLenses ''ArgList
 
-deriveEq ''LambdefNocond
 deriveEq1 ''LambdefNocond
-deriveShow ''LambdefNocond
+deriveOrd1 ''LambdefNocond
 deriveShow1 ''LambdefNocond
 makeLenses ''LambdefNocond
 
-deriveEq ''TestNocond
 deriveEq1 ''TestNocond
-deriveShow ''TestNocond
+deriveOrd1 ''TestNocond
 deriveShow1 ''TestNocond
 makeLenses ''TestNocond
 
-deriveEq ''CompIter
 deriveEq1 ''CompIter
-deriveShow ''CompIter
+deriveOrd1 ''CompIter
 deriveShow1 ''CompIter
 makeLenses ''CompIter
 
-deriveEq ''CompIf
 deriveEq1 ''CompIf
-deriveShow ''CompIf
+deriveOrd1 ''CompIf
 deriveShow1 ''CompIf
 makeLenses ''CompIf
 
-deriveEq ''StarExpr
 deriveEq1 ''StarExpr
-deriveShow ''StarExpr
+deriveOrd1 ''StarExpr
 deriveShow1 ''StarExpr
 makeLenses ''StarExpr
 
-deriveEq ''ExprList
 deriveEq1 ''ExprList
-deriveShow ''ExprList
+deriveOrd1 ''ExprList
 deriveShow1 ''ExprList
 makeLenses ''ExprList
 
-deriveEq ''SliceOp
 deriveEq1 ''SliceOp
-deriveShow ''SliceOp
+deriveOrd1 ''SliceOp
 deriveShow1 ''SliceOp
 makeLenses ''SliceOp
 
-deriveEq ''Subscript
 deriveEq1 ''Subscript
-deriveShow ''Subscript
+deriveOrd1 ''Subscript
 deriveShow1 ''Subscript
 makeLenses ''Subscript
 
-deriveEq ''SubscriptList
 deriveEq1 ''SubscriptList
-deriveShow ''SubscriptList
+deriveOrd1 ''SubscriptList
 deriveShow1 ''SubscriptList
 makeLenses ''SubscriptList
 
-deriveEq ''CompFor
 deriveEq1 ''CompFor
-deriveShow ''CompFor
+deriveOrd1 ''CompFor
 deriveShow1 ''CompFor
 makeLenses ''CompFor
 
-deriveEq ''Trailer
 deriveEq1 ''Trailer
-deriveShow ''Trailer
+deriveOrd1 ''Trailer
 deriveShow1 ''Trailer
 makeLenses ''Trailer
 
-deriveEq ''AtomNoInt
 deriveEq1 ''AtomNoInt
-deriveShow ''AtomNoInt
+deriveOrd1 ''AtomNoInt
 deriveShow1 ''AtomNoInt
 makeLenses ''AtomNoInt
 
-deriveEq ''AtomExpr
 deriveEq1 ''AtomExpr
-deriveShow ''AtomExpr
+deriveOrd1 ''AtomExpr
 deriveShow1 ''AtomExpr
 makeLenses ''AtomExpr
 
-deriveEq ''Power
 deriveEq1 ''Power
-deriveShow ''Power
+deriveOrd1 ''Power
 deriveShow1 ''Power
 makeLenses ''Power
 
-deriveEq ''Factor
 deriveEq1 ''Factor
-deriveShow ''Factor
+deriveOrd1 ''Factor
 deriveShow1 ''Factor
 makeLenses ''Factor
 
-deriveEq ''Term
 deriveEq1 ''Term
-deriveShow ''Term
+deriveOrd1 ''Term
 deriveShow1 ''Term
 makeLenses ''Term
 
-deriveEq ''ArithExpr
 deriveEq1 ''ArithExpr
-deriveShow ''ArithExpr
+deriveOrd1 ''ArithExpr
 deriveShow1 ''ArithExpr
 makeLenses ''ArithExpr
 
-deriveEq ''ShiftExpr
 deriveEq1 ''ShiftExpr
-deriveShow ''ShiftExpr
+deriveOrd1 ''ShiftExpr
 deriveShow1 ''ShiftExpr
 makeLenses ''ShiftExpr
 
-deriveEq ''AndExpr
 deriveEq1 ''AndExpr
-deriveShow ''AndExpr
+deriveOrd1 ''AndExpr
 deriveShow1 ''AndExpr
 makeLenses ''AndExpr
 
-deriveEq ''XorExpr
 deriveEq1 ''XorExpr
-deriveShow ''XorExpr
+deriveOrd1 ''XorExpr
 deriveShow1 ''XorExpr
 makeLenses ''XorExpr
   
-deriveEq ''Expr
 deriveEq1 ''Expr
-deriveShow ''Expr
+deriveOrd1 ''Expr
 deriveShow1 ''Expr
 makeLenses ''Expr
 
-deriveEq ''YieldArg
 deriveEq1 ''YieldArg
-deriveShow ''YieldArg
+deriveOrd1 ''YieldArg
 deriveShow1 ''YieldArg
 makeLenses ''YieldArg
 
-deriveEq ''YieldExpr
 deriveEq1 ''YieldExpr
-deriveShow ''YieldExpr
+deriveOrd1 ''YieldExpr
 deriveShow1 ''YieldExpr
 makeLenses ''YieldExpr
 
-deriveEq ''ListTestlistComp
 deriveEq1 ''ListTestlistComp
-deriveShow ''ListTestlistComp
+deriveOrd1 ''ListTestlistComp
 deriveShow1 ''ListTestlistComp
 makeLenses ''ListTestlistComp
 
-deriveEq ''TupleTestlistComp
 deriveEq1 ''TupleTestlistComp
-deriveShow ''TupleTestlistComp
+deriveOrd1 ''TupleTestlistComp
 deriveShow1 ''TupleTestlistComp
 makeLenses ''TupleTestlistComp
 
-deriveEq ''Atom
 deriveEq1 ''Atom
-deriveShow ''Atom
+deriveOrd1 ''Atom
 deriveShow1 ''Atom
 makeLenses ''Atom
 
-deriveEq ''Lambdef
 deriveEq1 ''Lambdef
-deriveShow ''Lambdef
+deriveOrd1 ''Lambdef
 deriveShow1 ''Lambdef
 makeLenses ''Lambdef
 
-deriveEq ''DictItem
 deriveEq1 ''DictItem
-deriveShow ''DictItem
+deriveOrd1 ''DictItem
 deriveShow1 ''DictItem
 makeLenses ''DictItem
 
-deriveEq ''DictUnpacking
 deriveEq1 ''DictUnpacking
-deriveShow ''DictUnpacking
+deriveOrd1 ''DictUnpacking
 deriveShow1 ''DictUnpacking
 makeLenses ''DictUnpacking
 
-deriveEq ''DictOrSetMaker
 deriveEq1 ''DictOrSetMaker
-deriveShow ''DictOrSetMaker
+deriveOrd1 ''DictOrSetMaker
 deriveShow1 ''DictOrSetMaker
 makeLenses ''DictOrSetMaker

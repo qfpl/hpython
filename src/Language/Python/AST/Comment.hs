@@ -12,8 +12,9 @@ data Comment a
   = Comment
   { _comment_text :: Text
   , _comment_ann :: a
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
+  } deriving (Eq, Show, Ord, Functor, Foldable, Traversable)
 
 makeLenses ''Comment
 deriveEq1 ''Comment
 deriveShow1 ''Comment
+deriveOrd1 ''Comment

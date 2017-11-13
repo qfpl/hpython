@@ -16,4 +16,4 @@ data AugAssign
   | ShiftRightEquals
   | DoubleStarEquals
   | DoubleSlashEquals
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)

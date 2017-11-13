@@ -65,7 +65,7 @@ data ArgsListArg name test a
          a
   , _argsListArg_ann :: a
   }
-  deriving (Eq, Functor, Foldable, Show, Traversable)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 mkArgsListAll
   :: HasName name
@@ -148,8 +148,7 @@ _ArgsListArgsKwargs
            (ArgsListStarPart name test)
            (ArgsListDoublestarArg name test)
            a
-       , a
-       )
+       , a)
 _ArgsListArgsKwargs =
   prism'
     (\(a, b) -> mkArgsListArgsKwargs a b ^? _Right)
@@ -289,7 +288,7 @@ data ArgsListDoublestarArg name (test :: * -> *) a
          a
   , _argsListDoublestarArg_ann :: a
   }
-  deriving (Eq, Functor, Foldable, Show, Traversable)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 deriveEq1 ''ArgsListStarPart
 deriveOrd1 ''ArgsListStarPart

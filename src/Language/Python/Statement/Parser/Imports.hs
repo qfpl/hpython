@@ -17,7 +17,7 @@ import Text.Parser.Unspaced
 importStatement :: DeltaParsing m => Unspaced m (ImportStatement SrcInfo)
 importStatement =
   annotated $
-  try (ImportStatementName <$> importName) <|>
+  (ImportStatementName <$> importName) <|>
   (ImportStatementFrom <$> importFrom)
 
 dottedAsNames :: DeltaParsing m => Unspaced m (DottedAsNames SrcInfo)
@@ -38,7 +38,8 @@ importName :: DeltaParsing m => Unspaced m (ImportName SrcInfo)
 importName =
   annotated $
   ImportName <$>
-  whitespaceBefore1F dottedAsNames
+  (string "import" *>
+   whitespaceBefore1F dottedAsNames)
 
 importFrom :: DeltaParsing m => Unspaced m (ImportFrom SrcInfo)
 importFrom =
@@ -49,18 +50,20 @@ importFrom =
   where
     dotOrEllipsis = (Left <$> try dot) <|> (Right <$> ellipsis)
     fromPart =
-      (InL <$>
-        try (beforeF (many $ betweenWhitespace dotOrEllipsis) dottedName)) <|>
-      (InR . Const <$>
-        some1 dotOrEllipsis)
+      try (InL <$>
+        whitespaceAfter1F
+        (try (InL <$> whitespaceBefore1F dottedName) <|>
+         (InR <$>
+          beforeF (some1 $ betweenWhitespace dotOrEllipsis) dottedName))) <|>
+      (InR <$> betweenWhitespaceF (Const <$> some1 dotOrEllipsis))
 
     importPart =
-      whitespaceBefore1F $
-      try (InL . InL . Const <$> asterisk) <|>
-      try
-        (InL . InR <$>
-          betweenF leftParen rightParen (betweenWhitespaceF importAsNames)) <|>
-       (InR <$> importAsNames)
+      try (InL <$>
+        whitespaceBeforeF
+          (try (InL . Const <$> asterisk) <|>
+           (InR <$>
+            betweenF leftParen rightParen (betweenWhitespaceF importAsNames)))) <|>
+       (InR <$> whitespaceBefore1F importAsNames)
 
 importAsNames :: DeltaParsing m => Unspaced m (ImportAsNames SrcInfo)
 importAsNames =

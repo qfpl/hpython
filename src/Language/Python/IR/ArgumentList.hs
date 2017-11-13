@@ -26,6 +26,9 @@ data KeywordItem name expr a
          a
   , _keywordItem_ann :: a
   }
+deriving instance (Eq1 name, Eq1 expr, Eq a) => Eq (KeywordItem name expr a)
+deriving instance (Show1 name, Show1 expr, Show a) => Show (KeywordItem name expr a)
+deriving instance (Ord1 name, Ord1 expr, Ord a) => Ord (KeywordItem name expr a)
 deriving instance (Functor name, Functor expr) => Functor (KeywordItem name expr)
 deriving instance (Foldable name, Foldable expr) => Foldable (KeywordItem name expr)
 deriving instance (Traversable name, Traversable expr) => Traversable (KeywordItem name expr)
@@ -52,6 +55,9 @@ data KeywordsArguments name expr a
          a
   , _keywordsArguments_ann :: a
   }
+deriving instance (Eq1 name, Eq1 expr, Eq a) => Eq (KeywordsArguments name expr a)
+deriving instance (Show1 name, Show1 expr, Show a) => Show (KeywordsArguments name expr a)
+deriving instance (Ord1 name, Ord1 expr, Ord a) => Ord (KeywordsArguments name expr a)
 deriving instance (Functor name, Functor expr) => Functor (KeywordsArguments name expr)
 deriving instance (Foldable name, Foldable expr) => Foldable (KeywordsArguments name expr)
 deriving instance (Traversable name, Traversable expr) => Traversable (KeywordsArguments name expr)
@@ -74,6 +80,9 @@ data PositionalArguments expr a
         a
   , _positionalArguments_ann :: a
   }
+deriving instance (Eq1 expr, Eq a) => Eq (PositionalArguments expr a)
+deriving instance (Show1 expr, Show a) => Show (PositionalArguments expr a)
+deriving instance (Ord1 expr, Ord a) => Ord (PositionalArguments expr a)
 deriving instance Functor expr => Functor (PositionalArguments expr)
 deriving instance Foldable expr => Foldable (PositionalArguments expr)
 deriving instance Traversable expr => Traversable (PositionalArguments expr)
@@ -100,6 +109,9 @@ data StarredAndKeywords name expr a
          a
   , _starredAndKeywords_ann :: a
   }
+deriving instance (Eq1 name, Eq1 expr, Eq a) => Eq (StarredAndKeywords name expr a)
+deriving instance (Ord1 name, Ord1 expr, Ord a) => Ord (StarredAndKeywords name expr a)
+deriving instance (Show1 name, Show1 expr, Show a) => Show (StarredAndKeywords name expr a)
 deriving instance (Functor name, Functor expr) => Functor (StarredAndKeywords name expr)
 deriving instance (Foldable name, Foldable expr) => Foldable (StarredAndKeywords name expr)
 deriving instance (Traversable name, Traversable expr) => Traversable (StarredAndKeywords name expr)
@@ -144,6 +156,9 @@ data ArgumentList name expr a
   , _argumentList_comma :: Maybe (Between' [WhitespaceChar] Comma)
   , _argumentList_ann :: a 
   }
+deriving instance (Eq1 name, Eq1 expr, Eq a) => Eq (ArgumentList name expr a)
+deriving instance (Show1 name, Show1 expr, Show a) => Show (ArgumentList name expr a)
+deriving instance (Ord1 name, Ord1 expr, Ord a) => Ord (ArgumentList name expr a)
 deriving instance (Functor name, Functor expr) => Functor (ArgumentList name expr)
 deriving instance (Foldable name, Foldable expr) => Foldable (ArgumentList name expr)
 deriving instance (Traversable name, Traversable expr) => Traversable (ArgumentList name expr)
@@ -179,3 +194,18 @@ instance (Show1 name, Show1 expr) => Show1 (KeywordsArguments name expr) where
 
 instance (Show1 name, Show1 expr) => Show1 (KeywordItem name expr) where
   liftShowsPrec = $(makeLiftShowsPrec ''KeywordItem)
+
+instance (Ord1 name, Ord1 expr) => Ord1 (ArgumentList name expr) where
+  liftCompare = $(makeLiftCompare ''ArgumentList)
+
+instance Ord1 expr => Ord1 (PositionalArguments expr) where
+  liftCompare = $(makeLiftCompare ''PositionalArguments)
+
+instance (Ord1 name, Ord1 expr) => Ord1 (StarredAndKeywords name expr) where
+  liftCompare = $(makeLiftCompare ''StarredAndKeywords)
+
+instance (Ord1 name, Ord1 expr) => Ord1 (KeywordsArguments name expr) where
+  liftCompare = $(makeLiftCompare ''KeywordsArguments)
+
+instance (Ord1 name, Ord1 expr) => Ord1 (KeywordItem name expr) where
+  liftCompare = $(makeLiftCompare ''KeywordItem)

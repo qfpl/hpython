@@ -29,8 +29,9 @@ data TestlistStarExpr test starExpr a
   , _testlistStarExpr_comma :: Maybe (Between' [WhitespaceChar] Comma)
   , _testlistStarExpr_ann :: a
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Ord, Functor, Foldable, Traversable)
 
 makeLenses ''TestlistStarExpr
 deriveEq1 ''TestlistStarExpr
 deriveShow1 ''TestlistStarExpr
+deriveOrd1 ''TestlistStarExpr

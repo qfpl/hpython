@@ -28,17 +28,32 @@ import qualified Language.Python.Expr.AST as AST
 import qualified Language.Python.AST.Identifier as AST
 import qualified Language.Python.Expr.AST.Integer as AST
 import qualified Language.Python.Expr.AST.Digits as AST
-import qualified Language.Python.Expr.Parser as Parse
-import qualified Language.Python.Expr.Printer as Print
+
 import qualified Language.Python.Expr.IR.Checker as Check
+import qualified Language.Python.Module.IR.Checker as Check
+import qualified Language.Python.Statement.IR.Checker as Check
+
+import qualified Language.Python.Expr.Parser as Parse
+import qualified Language.Python.Module.Parser as Parse
+import qualified Language.Python.Statement.Parser as Parse
+
+import qualified Language.Python.Expr.Printer as Print
+import qualified Language.Python.Module.Printer as Print
 import qualified Language.Python.Statement.Printer as Print
+
 import qualified Test.Language.Python.Expr.Gen as GenAST
 import qualified Test.Language.Python.Statement.Gen as GenAST
 
 import Text.Parser.Unspaced
 
-examplesDir :: FilePath
-examplesDir = "test" </> "examples" </> "expressions" </> "valid"
+exprExamplesDir :: FilePath
+exprExamplesDir = "test" </> "examples" </> "expressions" </> "valid"
+
+statementExamplesDir :: FilePath
+statementExamplesDir = "test" </> "examples" </> "statements" </> "valid"
+
+filesExamplesDir :: FilePath
+filesExamplesDir = "test" </> "examples" </> "files" </> "valid"
 
 parse_print_expr_id :: String -> Expectation
 parse_print_expr_id input =
@@ -50,6 +65,44 @@ parse_print_expr_id input =
             Check.checkTest
               (ExprConfig SNotAssignable STopLevel)
               unchecked)
+      in
+        case checkResult of
+          Left es ->
+            expectationFailure $
+            WL.displayS (WL.renderPretty 1.0 80 . WL.text $ show es) ""
+          Right ast ->
+            HPJ.render ast `shouldBe` input
+    Failure (ErrInfo info _) ->
+      expectationFailure $ WL.displayS (WL.renderPretty 1.0 80 info) ""
+
+parse_print_statement_id :: String -> Expectation
+parse_print_statement_id input =
+  case parseString (runUnspaced $ Parse.statement <* eof) mempty input of
+    Success unchecked ->
+      let
+        checkResult =
+          (fmap Print.statement . runChecker $
+            Check.checkStatement
+              (ExprConfig SNotAssignable STopLevel)
+              (StatementConfig SNotInLoop)
+              unchecked)
+      in
+        case checkResult of
+          Left es ->
+            expectationFailure $
+            WL.displayS (WL.renderPretty 1.0 80 . WL.text $ show es) ""
+          Right ast ->
+            HPJ.render ast `shouldBe` input
+    Failure (ErrInfo info _) ->
+      expectationFailure $ WL.displayS (WL.renderPretty 1.0 80 info) ""
+
+parse_print_file_id :: String -> Expectation
+parse_print_file_id input =
+  case parseString (runUnspaced $ Parse.module' <* eof) mempty input of
+    Success unchecked ->
+      let
+        checkResult =
+          fmap Print.module' . runChecker $ Check.checkModule unchecked
       in
         case checkResult of
           Left es ->
@@ -162,15 +215,40 @@ prop_statement_ast_is_valid_python scfg ecfg =
 
 makeParserPrinterTests :: IO [TestTree]
 makeParserPrinterTests = do
-  files <-
+  exprFiles <-
     fmap sort .
-    over (mapped.mapped) (examplesDir </>) $ listDirectory examplesDir
-  contents <- traverse readFile files
+    over (mapped.mapped) (exprExamplesDir </>) $
+    listDirectory exprExamplesDir
+  exprFilesContents <- traverse readFile exprFiles
   let
-    filesExpectations =
-      zip files (parse_print_expr_id <$> contents)
+    exprFilesExpectations =
+      zip exprFiles (parse_print_expr_id <$> exprFilesContents)
 
-    spec = traverse_ (uncurry it) filesExpectations
+  statementFiles <-
+    fmap sort .
+    over (mapped.mapped) (statementExamplesDir </>) $
+    listDirectory statementExamplesDir
+  statementFilesContents <- traverse readFile statementFiles
+  let
+    statementFilesExpectations =
+      zip statementFiles (parse_print_statement_id <$> statementFilesContents)
+
+  filesFiles <-
+    fmap sort .
+    over (mapped.mapped) (filesExamplesDir </>) $
+    listDirectory filesExamplesDir
+  filesFilesContents <- traverse readFile filesFiles
+  let
+    filesFilesExpectations =
+      zip filesFiles (parse_print_file_id <$> filesFilesContents)
+
+  let
+    spec =
+      traverse_ (uncurry it) $
+      exprFilesExpectations <>
+      statementFilesExpectations <>
+      filesFilesExpectations
+
     properties =
       [ testProperty
           "Expression AST is valid python - assignable" $

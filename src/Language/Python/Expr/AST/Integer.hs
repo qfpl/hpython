@@ -38,7 +38,7 @@ data Integer' a
          (NonEmpty BinDigit)
   , _integer_ann :: a
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Ord, Functor, Foldable, Traversable)
 
 makeLenses ''Integer'
 deriveEq1 ''Integer'

@@ -67,9 +67,15 @@ library
                        Language.Python.IR.StatementConfig
                        Language.Python.IR.SyntaxChecker
                        Language.Python.IR.TestlistStarExpr
+                       Language.Python.Module.AST
+                       Language.Python.Module.IR
+                       Language.Python.Module.IR.Checker
+                       Language.Python.Module.Parser
+                       Language.Python.Module.Printer
                        Language.Python.Parser.ArgsList
                        Language.Python.Parser.ArgumentList
                        Language.Python.Parser.Combinators
+                       Language.Python.Parser.Comment
                        Language.Python.Parser.DottedName
                        Language.Python.Parser.Identifier
                        Language.Python.Parser.Indentation

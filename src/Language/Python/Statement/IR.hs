@@ -11,9 +11,11 @@ import Data.Deriving
 import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
+import Data.Separated.After
 import Data.Separated.Before
 import Data.Separated.Between
 
+import Language.Python.AST.Comment
 import Language.Python.AST.DottedName
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
@@ -36,6 +38,7 @@ data Statement a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (Statement a)
+deriving instance Ord a => Ord (Statement a)
 deriving instance Show a => Show (Statement a)
 
 data CompoundStatement a
@@ -77,6 +80,7 @@ data CompoundStatement a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (CompoundStatement a)
+deriving instance Ord a => Ord (CompoundStatement a)
 deriving instance Show a => Show (CompoundStatement a)
 
 data Decorated a
@@ -87,6 +91,7 @@ data Decorated a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (Decorated a)
+deriving instance Ord a => Ord (Decorated a)
 deriving instance Show a => Show (Decorated a)
 
 data AsyncFuncDef a
@@ -100,6 +105,7 @@ data AsyncFuncDef a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (AsyncFuncDef a)
+deriving instance Ord a => Ord (AsyncFuncDef a)
 deriving instance Show a => Show (AsyncFuncDef a)
 
 data Decorator a
@@ -123,6 +129,7 @@ data Decorator a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (Decorator a)
+deriving instance Ord a => Ord (Decorator a)
 deriving instance Show a => Show (Decorator a)
 
 data ClassDef a
@@ -152,6 +159,7 @@ data ClassDef a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (ClassDef a)
+deriving instance Ord a => Ord (ClassDef a)
 deriving instance Show a => Show (ClassDef a)
 
 data Suite a
@@ -164,14 +172,21 @@ data Suite a
   , _suiteMulti_statements
     :: Compose
          NonEmpty
-         (Compose
-           (Before (NonEmpty IndentationChar))
-           Statement)
+         (Sum
+           (Compose
+             (Before [WhitespaceChar])
+             (Compose
+               (After NewlineChar)
+               Comment))
+           (Compose
+             (Before (NonEmpty IndentationChar))
+             Statement))
          a
   , _suiteMulti_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (Suite a)
+deriving instance Ord a => Ord (Suite a)
 deriving instance Show a => Show (Suite a)
 
 data FuncDef a
@@ -202,6 +217,7 @@ data FuncDef a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (FuncDef a)
+deriving instance Ord a => Ord (FuncDef a)
 deriving instance Show a => Show (FuncDef a)
 
 data Parameters a
@@ -217,6 +233,7 @@ data Parameters a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (Parameters a)
+deriving instance Ord a => Ord (Parameters a)
 deriving instance Show a => Show (Parameters a)
 
 data TypedArg a
@@ -233,6 +250,7 @@ data TypedArg a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (TypedArg a)
+deriving instance Ord a => Ord (TypedArg a)
 deriving instance Show a => Show (TypedArg a)
 
 data WithStatement a
@@ -258,6 +276,7 @@ data WithStatement a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (WithStatement a)
+deriving instance Ord a => Ord (WithStatement a)
 deriving instance Show a => Show (WithStatement a)
 
 data WithItem a
@@ -274,6 +293,7 @@ data WithItem a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (WithItem a)
+deriving instance Ord a => Ord (WithItem a)
 deriving instance Show a => Show (WithItem a)
 
 data AsyncStatement a
@@ -289,6 +309,7 @@ data AsyncStatement a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (AsyncStatement a)
+deriving instance Ord a => Ord (AsyncStatement a)
 deriving instance Show a => Show (AsyncStatement a)
 
 data IfStatement a
@@ -325,6 +346,7 @@ data IfStatement a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (IfStatement a)
+deriving instance Ord a => Ord (IfStatement a)
 deriving instance Show a => Show (IfStatement a)
 
 data WhileStatement a
@@ -350,6 +372,7 @@ data WhileStatement a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (WhileStatement a)
+deriving instance Ord a => Ord (WhileStatement a)
 deriving instance Show a => Show (WhileStatement a)
 
 data ForStatement a
@@ -380,6 +403,7 @@ data ForStatement a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (ForStatement a)
+deriving instance Ord a => Ord (ForStatement a)
 deriving instance Show a => Show (ForStatement a)
 
 data TryStatement a
@@ -429,6 +453,7 @@ data TryStatement a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (TryStatement a)
+deriving instance Ord a => Ord (TryStatement a)
 deriving instance Show a => Show (TryStatement a)
 
 data ExceptClause a
@@ -450,6 +475,7 @@ data ExceptClause a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (ExceptClause a)
+deriving instance Ord a => Ord (ExceptClause a)
 deriving instance Show a => Show (ExceptClause a)
 
 data SimpleStatement a
@@ -468,6 +494,7 @@ data SimpleStatement a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (SimpleStatement a)
+deriving instance Ord a => Ord (SimpleStatement a)
 deriving instance Show a => Show (SimpleStatement a)
 
 data SmallStatement a
@@ -552,6 +579,7 @@ data SmallStatement a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (SmallStatement a)
+deriving instance Ord a => Ord (SmallStatement a)
 deriving instance Show a => Show (SmallStatement a)
 
 data FlowStatement a
@@ -587,6 +615,7 @@ data FlowStatement a
   }
   deriving (Functor, Foldable, Traversable)
 deriving instance Eq a => Eq (FlowStatement a)
+deriving instance Ord a => Ord (FlowStatement a)
 deriving instance Show a => Show (FlowStatement a)
 
 data RaiseStatement a
@@ -607,88 +636,110 @@ data RaiseStatement a
 
 makeLenses ''SmallStatement
 deriveEq1 ''SmallStatement
+deriveOrd1 ''SmallStatement
 deriveShow1 ''SmallStatement
 
 makeLenses ''RaiseStatement
 deriveEq1 ''RaiseStatement
+deriveOrd1 ''RaiseStatement
 deriveShow1 ''RaiseStatement
 
 makeLenses ''FlowStatement
 deriveEq1 ''FlowStatement
+deriveOrd1 ''FlowStatement
 deriveShow1 ''FlowStatement
 
 makeLenses ''Decorator
 deriveEq1 ''Decorator
+deriveOrd1 ''Decorator
 deriveShow1 ''Decorator
 
 makeLenses ''ClassDef
 deriveEq1 ''ClassDef
+deriveOrd1 ''ClassDef
 deriveShow1 ''ClassDef
 
 makeLenses ''FuncDef
 deriveEq1 ''FuncDef
+deriveOrd1 ''FuncDef
 deriveShow1 ''FuncDef
 
 makeLenses ''AsyncFuncDef
 deriveEq1 ''AsyncFuncDef
+deriveOrd1 ''AsyncFuncDef
 deriveShow1 ''AsyncFuncDef
 
 makeLenses ''Suite
 deriveEq1 ''Suite
+deriveOrd1 ''Suite
 deriveShow1 ''Suite
 
 makeLenses ''Statement
 deriveEq1 ''Statement
+deriveOrd1 ''Statement
 deriveShow1 ''Statement
 
 makeLenses ''Parameters
 deriveEq1 ''Parameters
+deriveOrd1 ''Parameters
 deriveShow1 ''Parameters
 
 makeLenses ''TypedArg
 deriveEq1 ''TypedArg
+deriveOrd1 ''TypedArg
 deriveShow1 ''TypedArg
 
 makeLenses ''WithItem
 deriveEq1 ''WithItem
+deriveOrd1 ''WithItem
 deriveShow1 ''WithItem
 
 makeLenses ''WithStatement
 deriveEq1 ''WithStatement
+deriveOrd1 ''WithStatement
 deriveShow1 ''WithStatement
 
 makeLenses ''WhileStatement
 deriveEq1 ''WhileStatement
+deriveOrd1 ''WhileStatement
 deriveShow1 ''WhileStatement
 
 makeLenses ''ForStatement
 deriveEq1 ''ForStatement
+deriveOrd1 ''ForStatement
 deriveShow1 ''ForStatement
 
 makeLenses ''ExceptClause
 deriveEq1 ''ExceptClause
+deriveOrd1 ''ExceptClause
 deriveShow1 ''ExceptClause
 
 makeLenses ''SimpleStatement
 deriveEq1 ''SimpleStatement
+deriveOrd1 ''SimpleStatement
 deriveShow1 ''SimpleStatement
 
 makeLenses ''CompoundStatement
 deriveEq1 ''CompoundStatement
+deriveOrd1 ''CompoundStatement
 deriveShow1 ''CompoundStatement
 
 makeLenses ''IfStatement
 deriveEq1 ''IfStatement
+deriveOrd1 ''IfStatement
 deriveShow1 ''IfStatement
 
 makeLenses ''TryStatement
 deriveEq1 ''TryStatement
+deriveOrd1 ''TryStatement
 deriveShow1 ''TryStatement
 
 makeLenses ''Decorated
 deriveEq1 ''Decorated
+deriveOrd1 ''Decorated
 deriveShow1 ''Decorated
 
 makeLenses ''AsyncStatement
 deriveEq1 ''AsyncStatement
+deriveOrd1 ''AsyncStatement
 deriveShow1 ''AsyncStatement

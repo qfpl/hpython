@@ -14,8 +14,8 @@ mkDerivation {
     transformers trifecta unordered-containers validation
   ];
   testHaskellDepends = [
-    ansi-wl-pprint base directory filepath hedgehog papa pretty process
-    tasty tasty-hedgehog tasty-hspec text transformers trifecta
+    ansi-wl-pprint base directory filepath hedgehog mtl papa pretty
+    process tasty tasty-hedgehog tasty-hspec text transformers trifecta
   ];
   homepage = "https://github.com/qfpl/hpython";
   description = "Write Python using Haskell";

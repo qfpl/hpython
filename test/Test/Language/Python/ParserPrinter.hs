@@ -5,6 +5,7 @@ module Test.Language.Python.ParserPrinter (makeParserPrinterTests) where
 import Papa
 import Prelude (error, undefined)
 import Control.Monad.IO.Class
+import Control.Monad.State
 import Data.Functor.Compose
 import Data.Separated.Before
 import Hedgehog
@@ -77,7 +78,7 @@ parse_print_expr_id input =
 
 parse_print_statement_id :: String -> Expectation
 parse_print_statement_id input =
-  case parseString (runUnspaced $ Parse.statement <* eof) mempty input of
+  case parseString (flip evalStateT [] . runUnspaced $ Parse.statement <* eof) mempty input of
     Success unchecked ->
       let
         checkResult =
@@ -98,7 +99,7 @@ parse_print_statement_id input =
 
 parse_print_file_id :: String -> Expectation
 parse_print_file_id input =
-  case parseString (runUnspaced $ Parse.module' <* eof) mempty input of
+  case parseString (flip evalStateT [] . runUnspaced $ Parse.module' <* eof) mempty input of
     Success unchecked ->
       let
         checkResult =

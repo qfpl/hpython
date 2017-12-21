@@ -184,7 +184,9 @@ data Suite (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
            (Before [WhitespaceChar])
            (Compose
              (After NewlineChar)
-             Comment))
+             (Compose
+               Maybe
+               Comment)))
          (Statement lctxt ctxt)
          a
   , _suiteMulti_ann :: a

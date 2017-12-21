@@ -319,6 +319,6 @@ suite preceding s =
     SuiteMulti n sts _ ->
       (preceding <> newlineChar n) :
       indentedLines
-        (pure . whitespaceBeforeF (afterF newlineChar comment))
+        (pure . whitespaceBeforeF (afterF newlineChar (foldMapOf (_Wrapped.folded) comment)))
         statement
         sts

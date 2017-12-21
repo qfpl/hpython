@@ -177,7 +177,9 @@ data Suite a
              (Before [WhitespaceChar])
              (Compose
                (After NewlineChar)
-               Comment))
+               (Compose
+                 Maybe
+                 Comment)))
            (Compose
              (Before (NonEmpty IndentationChar))
              Statement))

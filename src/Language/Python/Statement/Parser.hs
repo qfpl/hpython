@@ -439,7 +439,7 @@ suite
      , DeltaParsing m
      )
   => Unspaced (StateT [NonEmpty IndentationChar] m) (Suite SrcInfo)
-suite = annotated $ try suiteSingle <|> suiteMulti
+suite = annotated $ suiteSingle <|> suiteMulti
   where
     suiteSingle =
       SuiteSingle <$>
@@ -451,6 +451,6 @@ suite = annotated $ try suiteSingle <|> suiteMulti
       (suiteStatements <* dedent)
 
     suiteStatements =
-      some1F
-        (try (InL <$> whitespaceBeforeF (afterF newlineChar comment)) <|>
-         (InR <$> beforeF (try level1) statement))
+      some1F $
+        try (InL <$> whitespaceBeforeF (afterF newlineChar (optionalF comment))) <|>
+        try (InR <$> beforeF level1 statement)

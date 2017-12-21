@@ -411,10 +411,10 @@ indentations is = traverseOf_ (traverse.traverse) indentParser is
 level
   :: DeltaParsing m
   => Unspaced (StateT [NonEmpty IndentationChar] m) [IndentationChar]
-level = do
+level = (do
   is <- lift get
   indentations is
-  pure (foldMap NonEmpty.toList is) <?> "level indentation (possibly none)"
+  pure . maybe [] NonEmpty.toList $ last is) <?> "level indentation (possibly none)"
 
 level1
   :: DeltaParsing m
@@ -422,9 +422,7 @@ level1
 level1 = (do
   is <- lift get
   indentations is
-  case is of
-    [] -> empty
-    (x:xs) -> pure $ fold1 (x:|xs)) <?> "level indentation"
+  maybe empty pure $ last is) <?> "level indentation"
 
 indent
   :: (DeltaParsing m, LookAheadParsing m)

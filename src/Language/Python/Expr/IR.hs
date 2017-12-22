@@ -30,676 +30,676 @@ import Language.Python.Expr.AST.Integer
 import Language.Python.Expr.AST.StringLiteral
 import Language.Python.Expr.AST.TermOperator
 
-data Argument a
+data Argument ws a
   = ArgumentFor
-  { _argumentFor_expr :: Test a
+  { _argumentFor_expr :: Test ws a
   , _argumentFor_for
     :: Compose
         Maybe
-        CompFor
+        (CompFor ws)
         a
   , _argument_ann :: a
   }
   | ArgumentForParens
-  { _argumentForParens_lparen :: After [WhitespaceChar] LeftParen
-  , _argumentForParens_expr :: Test a
-  , _argumentForParens_for :: CompFor a
-  , _argumentForParens_rparen :: Before [WhitespaceChar] RightParen
+  { _argumentForParens_lparen :: After [ws] LeftParen
+  , _argumentForParens_expr :: Test ws a
+  , _argumentForParens_for :: CompFor ws a
+  , _argumentForParens_rparen :: Before [ws] RightParen
   , _argument_ann :: a
   }
   | ArgumentDefault
   { _argumentDefault_left
     :: Compose
-          (After [WhitespaceChar])
-          Test
-          a
+         (After [ws])
+         (Test ws)
+         a
   , _argumentDefault_right
     :: Compose
-          (Before [WhitespaceChar])
-          Test
-          a
+         (Before [ws])
+         (Test ws)
+         a
   , _argument_ann :: a
   }
   | ArgumentUnpack
   { _argumentUnpack_symbol :: Either Asterisk DoubleAsterisk
   , _argumentUnpack_val
     :: Compose
-          (Before [WhitespaceChar])
-          Test
+          (Before [ws])
+          (Test ws)
           a
   , _argument_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (Argument a)
-deriving instance Show a => Show (Argument a)
-deriving instance Ord a => Ord (Argument a)
+deriving instance (Eq a, Eq ws) => Eq (Argument ws a)
+deriving instance (Show a, Show ws) => Show (Argument ws a)
+deriving instance (Ord a, Ord ws) => Ord (Argument ws a)
 
-data ArgList a
+data ArgList ws a
   = ArgList
-  { _argList_head :: Argument a
+  { _argList_head :: Argument ws a
   , _argList_tail
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           Argument)
+           (Before (Between' [ws] Comma))
+           (Argument ws))
          a
-  , _argList_comma :: Maybe (Before [WhitespaceChar] Comma)
+  , _argList_comma :: Maybe (Before [ws] Comma)
   , _argList_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
-data LambdefNocond a
+data LambdefNocond ws a
   = LambdefNocond
   { _lambdefNocond_args
     :: Compose
          Maybe
          (Compose
-           (Between (NonEmpty WhitespaceChar) [WhitespaceChar])
-           (ArgsList Identifier Test))
+           (Between (NonEmpty ws) [WhitespaceChar])
+           (ArgsList Identifier (Test ws)))
          a
   , _lambdefNocond_expr
     :: Compose
-         (Before [WhitespaceChar])
-         TestNocond
+         (Before [ws])
+         (TestNocond ws)
          a
   , _lambdefNocond_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
 
-data TestNocond a
+data TestNocond ws a
   = TestNocond
   { _expressionNocond_value
     :: Sum
-         OrTest
-         LambdefNocond
+         (OrTest ws)
+         (LambdefNocond ws)
          a
   , _expressionNocond_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
-data CompIter a
+data CompIter ws a
   = CompIter
-  { _compIter_value :: Sum CompFor CompIf a
+  { _compIter_value :: Sum (CompFor ws) (CompIf ws) a
   , _compIter_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
-data CompIf a
+data CompIf ws a
   = CompIf
-  { _compIf_if :: Between' (NonEmpty WhitespaceChar) KIf
-  , _compIf_expr :: TestNocond a
+  { _compIf_if :: Between' (NonEmpty ws) KIf
+  , _compIf_expr :: TestNocond ws a
   , _compIf_iter
     :: Compose
         Maybe
         (Compose
-          (Before [WhitespaceChar])
-          CompIter)
+          (Before [ws])
+          (CompIter ws))
         a
   , _compIf_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
-data StarExpr a
+data StarExpr ws a
   = StarExpr
   { _starExpr_value
     :: Compose
-         (Before [WhitespaceChar])
-         Expr
+         (Before [ws])
+         (Expr ws)
          a
   , _starExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
-data ExprList a
+data ExprList ws a
   = ExprList
-  { _exprList_head :: Sum Expr StarExpr a
+  { _exprList_head :: Sum (Expr ws) (StarExpr ws) a
   , _exprList_tail
     :: Compose
         []
         (Compose
-          (Before (Between' [WhitespaceChar] Comma))
-          (Sum Expr StarExpr))
+          (Before (Between' [ws] Comma))
+          (Sum (Expr ws) (StarExpr ws)))
         a
-  , _exprList_comma :: Maybe (Before [WhitespaceChar] Comma)
+  , _exprList_comma :: Maybe (Before [ws] Comma)
   , _exprList_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
-data CompFor a
+data CompFor ws a
   = CompFor
   { _compFor_targets
     :: Compose
-        (Before (Between' (NonEmpty WhitespaceChar) KFor))
+        (Before (Between' (NonEmpty ws) KFor))
         (Compose
-          (After (NonEmpty WhitespaceChar))
-          (TestlistStarExpr Expr StarExpr))
+          (After (NonEmpty ws))
+          (TestlistStarExpr (Expr ws) (StarExpr ws)))
         a
-  , _compFor_expr :: Compose (Before (NonEmpty WhitespaceChar)) OrTest a
+  , _compFor_expr :: Compose (Before (NonEmpty ws)) (OrTest ws) a
   , _compFor_iter
     :: Compose
         Maybe
-        (Compose (Before [WhitespaceChar]) CompIter)
+        (Compose (Before [ws]) (CompIter ws))
         a
   , _compFor_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (CompFor a)
-deriving instance Show a => Show (CompFor a)
-deriving instance Ord a => Ord (CompFor a)
+deriving instance (Eq a, Eq ws) => Eq (CompFor ws a)
+deriving instance (Show a, Show ws) => Show (CompFor ws a)
+deriving instance (Ord a, Ord ws) => Ord (CompFor ws a)
 
-data SliceOp a
+data SliceOp ws a
   = SliceOp
   { _sliceOp_val
     :: Compose
         Maybe
-        (Compose (Before [WhitespaceChar]) Test)
+        (Compose (Before [ws]) (Test ws))
         a
   , _sliceOp_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (SliceOp a)
-deriving instance Show a => Show (SliceOp a)
-deriving instance Ord a => Ord (SliceOp a)
+deriving instance (Eq a, Eq ws) => Eq (SliceOp ws a)
+deriving instance (Show a, Show ws) => Show (SliceOp ws a)
+deriving instance (Ord a, Ord ws) => Ord (SliceOp ws a)
 
-data Subscript a
+data Subscript ws a
   = SubscriptTest
-  { _subscriptTest_val :: Test a
+  { _subscriptTest_val :: Test ws a
   , _subscript_ann :: a
   }
   | SubscriptSlice
   { _subscriptSlice_left
     :: Compose
-         (After [WhitespaceChar])
+         (After [ws])
          (Compose
            Maybe
-           Test)
+           (Test ws))
          a
-  , _subscriptSlice_colon :: After [WhitespaceChar] Colon
+  , _subscriptSlice_colon :: After [ws] Colon
   , _subscriptSlice_right
     :: Compose
         Maybe
-        (Compose (After [WhitespaceChar]) Test)
+        (Compose (After [ws]) (Test ws))
         a
   , _subscriptSlice_sliceOp
     :: Compose
         Maybe
-        (Compose (After [WhitespaceChar]) SliceOp)
+        (Compose (After [ws]) (SliceOp ws))
         a
   , _subscript_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (Subscript a)
-deriving instance Show a => Show (Subscript a)
-deriving instance Ord a => Ord (Subscript a)
+deriving instance (Eq a, Eq ws) => Eq (Subscript ws a)
+deriving instance (Show a, Show ws) => Show (Subscript ws a)
+deriving instance (Ord a, Ord ws) => Ord (Subscript ws a)
 
-data SubscriptList a
+data SubscriptList ws a
   = SubscriptList
-  { _subscriptList_head :: Subscript a
+  { _subscriptList_head :: Subscript ws a
   , _subscriptList_tail
     :: Compose
         []
         (Compose
-          (Before (Between' [WhitespaceChar] Comma))
-          Subscript)
+          (Before (Between' [ws] Comma))
+          (Subscript ws))
         a
-  , _subscriptList_comma :: Maybe (Before [WhitespaceChar] Comma)
+  , _subscriptList_comma :: Maybe (Before [ws] Comma)
   , _subscriptList_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (SubscriptList a)
-deriving instance Show a => Show (SubscriptList a)
-deriving instance Ord a => Ord (SubscriptList a)
+deriving instance (Eq a, Eq ws) => Eq (SubscriptList ws a)
+deriving instance (Show a, Show ws) => Show (SubscriptList ws a)
+deriving instance (Ord a, Ord ws) => Ord (SubscriptList ws a)
 
-data Trailer a
+data Trailer ws a
   = TrailerCall
   { _trailerCall_value
     :: Compose
-        (Between' [WhitespaceChar])
+        (Between' [AnyWhitespaceChar])
         (Compose
           Maybe
-          (ArgumentList Identifier Test))
+          (ArgumentList Identifier (Test AnyWhitespaceChar)))
         a
   , _trailer_ann :: a
   }
   | TrailerSubscript
   { _trailerSubscript_value
     :: Compose
-        (Between' [WhitespaceChar])
-        SubscriptList
+        (Between' [AnyWhitespaceChar])
+        (SubscriptList AnyWhitespaceChar)
         a
   , _trailer_ann :: a
   }
   | TrailerAccess
-  { _trailerAccess_value :: Compose (Before [WhitespaceChar]) Identifier a
+  { _trailerAccess_value :: Compose (Before [ws]) Identifier a
   , _trailer_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (Trailer a)
-deriving instance Show a => Show (Trailer a)
-deriving instance Ord a => Ord (Trailer a)
+deriving instance (Eq a, Eq ws) => Eq (Trailer ws a)
+deriving instance (Show a, Show ws) => Show (Trailer ws a)
+deriving instance (Ord a, Ord ws) => Ord (Trailer ws a)
 
-data AtomExpr a
+data AtomExpr ws a
   = AtomExprSingle
   { _atomExpr_await
-    :: Maybe (After (NonEmpty WhitespaceChar) KAwait)
-  , _atomExprSingle_atom :: Atom a
+    :: Maybe (After (NonEmpty ws) KAwait)
+  , _atomExprSingle_atom :: Atom ws a
   , _atomExpr_ann :: a
   }
   | AtomExprTrailers
   { _atomExpr_await
-    :: Maybe (After (NonEmpty WhitespaceChar) KAwait)
-  , _atomExprTrailers_atom :: AtomNoInt a
+    :: Maybe (After (NonEmpty ws) KAwait)
+  , _atomExprTrailers_atom :: AtomNoInt ws a
   , _atomExprTrailers_trailers
     :: Compose
           NonEmpty
           (Compose
-            (Before [WhitespaceChar])
-            Trailer)
+            (Before [ws])
+            (Trailer ws))
           a
   , _atomExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (AtomExpr a)
-deriving instance Show a => Show (AtomExpr a)
-deriving instance Ord a => Ord (AtomExpr a)
+deriving instance (Eq a, Eq ws) => Eq (AtomExpr ws a)
+deriving instance (Show a, Show ws) => Show (AtomExpr ws a)
+deriving instance (Ord a, Ord ws) => Ord (AtomExpr ws a)
 
-data Power a
+data Power ws a
   = Power
-  { _power_left :: AtomExpr a
+  { _power_left :: AtomExpr ws a
   , _power_right
     :: Compose
          Maybe
          (Compose
-           (Before (Between' [WhitespaceChar] DoubleAsterisk))
-           Factor)
+           (Before (Between' [ws] DoubleAsterisk))
+           (Factor ws))
          a
   , _power_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (Power a)
-deriving instance Show a => Show (Power a)
-deriving instance Ord a => Ord (Power a)
+deriving instance (Eq a, Eq ws) => Eq (Power ws a)
+deriving instance (Show a, Show ws) => Show (Power ws a)
+deriving instance (Ord a, Ord ws) => Ord (Power ws a)
 
-data Factor a
+data Factor ws a
   = FactorNone
-  { _factorNone_value :: Power a
+  { _factorNone_value :: Power ws a
   , _factor_ann :: a
   }
   | FactorOne
-  { _factorOne_op :: After [WhitespaceChar] FactorOperator
-  , _factorOne_value :: Factor a
+  { _factorOne_op :: After [ws] FactorOperator
+  , _factorOne_value :: Factor ws a
   , _factorSome_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (Factor a)
-deriving instance Show a => Show (Factor a)
-deriving instance Ord a => Ord (Factor a)
+deriving instance (Eq a, Eq ws) => Eq (Factor ws a)
+deriving instance (Show a, Show ws) => Show (Factor ws a)
+deriving instance (Ord a, Ord ws) => Ord (Factor ws a)
 
-data Term a
+data Term ws a
   = Term
-  { _term_left :: Factor a
+  { _term_left :: Factor ws a
   , _term_right
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] TermOperator))
-           Factor)
+           (Before (Between' [ws] TermOperator))
+           (Factor ws))
          a
   , _termMany_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (Term a)
-deriving instance Show a => Show (Term a)
-deriving instance Ord a => Ord (Term a)
+deriving instance (Eq a, Eq ws) => Eq (Term ws a)
+deriving instance (Show a, Show ws) => Show (Term ws a)
+deriving instance (Ord a, Ord ws) => Ord (Term ws a)
 
-data ArithExpr a
+data ArithExpr ws a
   = ArithExpr
-  { _arithExpr_left :: Term a
+  { _arithExpr_left :: Term ws a
   , _arithExpr_right
     :: Compose
         []
         (Compose
-          (Before (Between' [WhitespaceChar] (Either Plus Minus)))
-          Term)
+          (Before (Between' [ws] (Either Plus Minus)))
+          (Term ws))
         a
   , _arithExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (ArithExpr a)
-deriving instance Show a => Show (ArithExpr a)
-deriving instance Ord a => Ord (ArithExpr a)
+deriving instance (Eq a, Eq ws) => Eq (ArithExpr ws a)
+deriving instance (Show a, Show ws) => Show (ArithExpr ws a)
+deriving instance (Ord a, Ord ws) => Ord (ArithExpr ws a)
 
-data ShiftExpr a
+data ShiftExpr ws a
   = ShiftExpr
-  { _shiftExpr_left :: ArithExpr a
+  { _shiftExpr_left :: ArithExpr ws a
   , _shiftExpr_right
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] (Either DoubleLT DoubleGT)))
-           ArithExpr)
+           (Before (Between' [ws] (Either DoubleLT DoubleGT)))
+           (ArithExpr ws))
          a
   , _shiftExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (ShiftExpr a)
-deriving instance Show a => Show (ShiftExpr a)
-deriving instance Ord a => Ord (ShiftExpr a)
+deriving instance (Eq a, Eq ws) => Eq (ShiftExpr ws a)
+deriving instance (Show a, Show ws) => Show (ShiftExpr ws a)
+deriving instance (Ord a, Ord ws) => Ord (ShiftExpr ws a)
 
-data AndExpr a
+data AndExpr ws a
   = AndExpr
-  { _andExpr_left :: ShiftExpr a
+  { _andExpr_left :: ShiftExpr ws a
   , _andExpr_right
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] Ampersand))
-           ShiftExpr)
+           (Before (Between' [ws] Ampersand))
+           (ShiftExpr ws))
          a
   , _andExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (AndExpr a)
-deriving instance Show a => Show (AndExpr a)
-deriving instance Ord a => Ord (AndExpr a)
+deriving instance (Eq a, Eq ws) => Eq (AndExpr ws a)
+deriving instance (Show a, Show ws) => Show (AndExpr ws a)
+deriving instance (Ord a, Ord ws) => Ord (AndExpr ws a)
 
-data XorExpr a
+data XorExpr ws a
   = XorExpr
-  { _xorExpr_left :: AndExpr a
+  { _xorExpr_left :: AndExpr ws a
   , _xorExpr_right
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] Caret))
-           AndExpr)
+           (Before (Between' [ws] Caret))
+           (AndExpr ws))
          a
   , _xorExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (XorExpr a)
-deriving instance Show a => Show (XorExpr a)
-deriving instance Ord a => Ord (XorExpr a)
+deriving instance (Eq a, Eq ws) => Eq (XorExpr ws a)
+deriving instance (Show a, Show ws) => Show (XorExpr ws a)
+deriving instance (Ord a, Ord ws) => Ord (XorExpr ws a)
 
-data Expr a
+data Expr ws a
   = Expr
-  { _expr_value :: XorExpr a
+  { _expr_value :: XorExpr ws a
   , _expr_right
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] Pipe))
-           XorExpr)
+           (Before (Between' [ws] Pipe))
+           (XorExpr ws))
         a
   , _expr_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (Expr a)
-deriving instance Show a => Show (Expr a)
-deriving instance Ord a => Ord (Expr a)
+deriving instance (Eq a, Eq ws) => Eq (Expr ws a)
+deriving instance (Show a, Show ws) => Show (Expr ws a)
+deriving instance (Ord a, Ord ws) => Ord (Expr ws a)
 
-data Comparison a
+data Comparison ws a
   = Comparison
-  { _comparison_left :: Expr a
+  { _comparison_left :: Expr ws a
   , _comparison_right
     :: Compose
          []
          (Compose
-           (Before CompOperator)
-           Expr)
+           (Before (Between' [ws] CompOperator))
+           (Expr ws))
          a
   , _comparison_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (Comparison a)
-deriving instance Show a => Show (Comparison a)
-deriving instance Ord a => Ord (Comparison a)
+deriving instance (Eq a, Eq ws) => Eq (Comparison ws a)
+deriving instance (Show a, Show ws) => Show (Comparison ws a)
+deriving instance (Ord a, Ord ws) => Ord (Comparison ws a)
 
-data NotTest a
+data NotTest ws a
   = NotTestMany
   { _notTestMany_value
     :: Compose
-        (Before (After (NonEmpty WhitespaceChar) KNot))
-        NotTest
+        (Before (After (NonEmpty ws) KNot))
+        (NotTest ws)
         a
   , _notTestMany_ann :: a
   }
   | NotTestOne
-  { _notTestNone_value :: Comparison a
+  { _notTestNone_value :: Comparison ws a
   , _notTestNone_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (NotTest a)
-deriving instance Show a => Show (NotTest a)
-deriving instance Ord a => Ord (NotTest a)
+deriving instance (Eq a, Eq ws) => Eq (NotTest ws a)
+deriving instance (Show a, Show ws) => Show (NotTest ws a)
+deriving instance (Ord a, Ord ws) => Ord (NotTest ws a)
 
-data AndTest a
+data AndTest ws a
   = AndTest
-  { _andTest_left :: NotTest a
+  { _andTest_left :: NotTest ws a
   , _andTest_right
     :: Compose
          []
          (Compose
-           (Before (Between' (NonEmpty WhitespaceChar) KAnd))
-           NotTest)
+           (Before (Between' (NonEmpty ws) KAnd))
+           (NotTest ws))
          a
   , _andTest_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (AndTest a)
-deriving instance Show a => Show (AndTest a)
-deriving instance Ord a => Ord (AndTest a)
+deriving instance (Eq a, Eq ws) => Eq (AndTest ws a)
+deriving instance (Show a, Show ws) => Show (AndTest ws a)
+deriving instance (Ord a, Ord ws) => Ord (AndTest ws a)
 
-data OrTest a
+data OrTest ws a
   = OrTest
-  { _orTest_left :: AndTest a
+  { _orTest_left :: AndTest ws a
   , _orTest_right
     :: Compose
          []
          (Compose
-           (Before (Between' (NonEmpty WhitespaceChar) KOr))
-           AndTest)
+           (Before (Between' (NonEmpty ws) KOr))
+           (AndTest ws))
          a
   , _orTest_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (OrTest a)
-deriving instance Show a => Show (OrTest a)
-deriving instance Ord a => Ord (OrTest a)
+deriving instance (Eq a, Eq ws) => Eq (OrTest ws a)
+deriving instance (Show a, Show ws) => Show (OrTest ws a)
+deriving instance (Ord a, Ord ws) => Ord (OrTest ws a)
 
-data IfThenElse a
+data IfThenElse ws a
   = IfThenElse
-  { _ifThenElse_if :: Between' (NonEmpty WhitespaceChar) KIf
-  , _ifThenElse_value1 :: OrTest a
-  , _ifThenElse_else :: Between' (NonEmpty WhitespaceChar) KElse
-  , _ifThenElse_value2 :: Test a
+  { _ifThenElse_if :: Between' (NonEmpty ws) KIf
+  , _ifThenElse_value1 :: OrTest ws a
+  , _ifThenElse_else :: Between' (NonEmpty ws) KElse
+  , _ifThenElse_value2 :: Test ws a
   }
   deriving (Functor, Foldable, Traversable)
 
-data Test a
+data Test ws a
   = TestCond
-  { _testCond_head :: OrTest a
+  { _testCond_head :: OrTest ws a
   , _testCond_tail
     :: Compose
          Maybe
          (Compose
-           (Before (NonEmpty WhitespaceChar))
-           IfThenElse)
+           (Before (NonEmpty ws))
+           (IfThenElse ws))
         a
   , _test_ann :: a
   }
   | TestLambdef
-  { _testLambdef_value :: Lambdef a
+  { _testLambdef_value :: Lambdef ws a
   , _test_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (Test a)
-deriving instance Show a => Show (Test a)
-deriving instance Ord a => Ord (Test a)
+deriving instance (Eq a, Eq ws) => Eq (Test ws a)
+deriving instance (Show a, Show ws) => Show (Test ws a)
+deriving instance (Ord a, Ord ws) => Ord (Test ws a)
 
-data Lambdef a
+data Lambdef ws a
   = Lambdef
   { _lambdef_args
     :: Compose
          Maybe
          (Compose
-           (Before (NonEmpty WhitespaceChar))
-           (ArgsList Identifier Test))
+           (Before (NonEmpty ws))
+           (ArgsList Identifier (Test ws)))
          a
   , _lambdef_body
     :: Compose
-         (Before (Between' [WhitespaceChar] Colon))
-         Test
+         (Before (Between' [ws] Colon))
+         (Test ws)
          a
   , _lambdef_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (Lambdef a)
-deriving instance Show a => Show (Lambdef a)
-deriving instance Ord a => Ord (Lambdef a)
+deriving instance (Eq a, Eq ws) => Eq (Lambdef ws a)
+deriving instance (Show a, Show ws) => Show (Lambdef ws a)
+deriving instance (Ord a, Ord ws) => Ord (Lambdef ws a)
 
-data TestList a
+data TestList ws a
   = TestList
-  { _testList_head :: Test a
+  { _testList_head :: Test ws a
   , _testList_tail
     :: Compose
        []
        (Compose
-         (Before (Between' [WhitespaceChar] Comma))
-         Test)
+         (Before (Between' [ws] Comma))
+         (Test ws))
        a
-  , _testList_comma :: Maybe (Before [WhitespaceChar] Comma)
+  , _testList_comma :: Maybe (Before [ws] Comma)
   , _testList_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (TestList a)
-deriving instance Show a => Show (TestList a)
-deriving instance Ord a => Ord (TestList a)
+deriving instance (Eq a, Eq ws) => Eq (TestList ws a)
+deriving instance (Show a, Show ws) => Show (TestList ws a)
+deriving instance (Ord a, Ord ws) => Ord (TestList ws a)
 
-data YieldArg a
+data YieldArg ws a
   = YieldArgFrom
   { _yieldArgFrom_value
-    :: Compose (Before (NonEmpty WhitespaceChar)) Test a
+    :: Compose (Before (NonEmpty ws)) (Test ws) a
   , _yieldArgFrom_ann :: a
   }
   | YieldArgList
-  { _yieldArgList_value :: TestList a
+  { _yieldArgList_value :: TestList ws a
   , _yieldArgList_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (YieldArg a)
-deriving instance Show a => Show (YieldArg a)
-deriving instance Ord a => Ord (YieldArg a)
+deriving instance (Eq a, Eq ws) => Eq (YieldArg ws a)
+deriving instance (Show a, Show ws) => Show (YieldArg ws a)
+deriving instance (Ord a, Ord ws) => Ord (YieldArg ws a)
 
-data YieldExpr a
+data YieldExpr ws a
   = YieldExpr
   { _yieldExpr_value
     :: Compose
         Maybe
         (Compose
-          (Before (NonEmpty WhitespaceChar))
-          YieldArg)
+          (Before (NonEmpty ws))
+          (YieldArg ws))
         a
   , _yieldExpr_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (YieldExpr a)
-deriving instance Show a => Show (YieldExpr a)
-deriving instance Ord a => Ord (YieldExpr a)
+deriving instance (Eq a, Eq ws) => Eq (YieldExpr ws a)
+deriving instance (Show a, Show ws) => Show (YieldExpr ws a)
+deriving instance (Ord a, Ord ws) => Ord (YieldExpr ws a)
 
-data TupleTestlistComp a
+data TupleTestlistComp ws a
   = TupleTestlistCompFor
-  { _tupleTestlistCompFor_head :: Sum Test StarExpr a
-  , _tupleTestlistCompFor_tail :: CompFor a
+  { _tupleTestlistCompFor_head :: Sum (Test ws) (StarExpr ws) a
+  , _tupleTestlistCompFor_tail :: CompFor ws a
   , _tupleTestlistCompFor_ann :: a
   }
 
   | TupleTestlistCompList
-  { _tupleTestlistCompList_head :: Sum Test StarExpr a
+  { _tupleTestlistCompList_head :: Sum (Test ws) (StarExpr ws) a
   , _tupleTestlistCompList_tail
     :: Compose
         []
         (Compose
-          (Before (Between' [WhitespaceChar] Comma))
-          (Sum Test StarExpr))
+          (Before (Between' [ws] Comma))
+          (Sum (Test ws) (StarExpr ws)))
         a
-  , _tupleTestlistCompList_comma :: Maybe (Before [WhitespaceChar] Comma)
+  , _tupleTestlistCompList_comma :: Maybe (Before [ws] Comma)
   , _tupleTestlistCompList_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (TupleTestlistComp a)
-deriving instance Show a => Show (TupleTestlistComp a)
-deriving instance Ord a => Ord (TupleTestlistComp a)
+deriving instance (Eq a, Eq ws) => Eq (TupleTestlistComp ws a)
+deriving instance (Show a, Show ws) => Show (TupleTestlistComp ws a)
+deriving instance (Ord a, Ord ws) => Ord (TupleTestlistComp ws a)
 
-data ListTestlistComp a
+data ListTestlistComp ws a
   = ListTestlistCompFor
-  { _listTestlistCompFor_head :: Sum Test StarExpr a
-  , _listTestlistCompFor_tail :: CompFor a
+  { _listTestlistCompFor_head :: Sum (Test ws) (StarExpr ws) a
+  , _listTestlistCompFor_tail :: CompFor ws a
   , _listTestlistCompFor_ann :: a
   }
 
   | ListTestlistCompList
-  { _listTestlistCompList_head :: Sum Test StarExpr a
+  { _listTestlistCompList_head :: Sum (Test ws) (StarExpr ws) a
   , _listTestlistCompList_tail
     :: Compose
         []
         (Compose
-          (Before (Between' [WhitespaceChar] Comma))
-          (Sum Test StarExpr))
+          (Before (Between' [ws] Comma))
+          (Sum (Test ws) (StarExpr ws)))
         a
-  , _listTestlistCompList_comma :: Maybe (Before [WhitespaceChar] Comma)
+  , _listTestlistCompList_comma :: Maybe (Before [ws] Comma)
   , _listTestlistCompList_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (ListTestlistComp a)
-deriving instance Show a => Show (ListTestlistComp a)
-deriving instance Ord a => Ord (ListTestlistComp a)
+deriving instance (Eq a, Eq ws) => Eq (ListTestlistComp ws a)
+deriving instance (Show a, Show ws) => Show (ListTestlistComp ws a)
+deriving instance (Ord a, Ord ws) => Ord (ListTestlistComp ws a)
 
-data DictItem a
+data DictItem ws a
   = DictItem
-  { _dictItem_key :: Test a
-  , _dictItem_colon :: Between' [WhitespaceChar] Colon
-  , _dictItem_value :: Test a
+  { _dictItem_key :: Test ws a
+  , _dictItem_colon :: Between' [ws] Colon
+  , _dictItem_value :: Test ws a
   , _dictItem_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (DictItem a)
-deriving instance Show a => Show (DictItem a)
-deriving instance Ord a => Ord (DictItem a)
+deriving instance (Eq a, Eq ws) => Eq (DictItem ws a)
+deriving instance (Show a, Show ws) => Show (DictItem ws a)
+deriving instance (Ord a, Ord ws) => Ord (DictItem ws a)
 
-data DictUnpacking a
+data DictUnpacking ws a
   = DictUnpacking
   { _dictUnpacking_value
      :: Compose
-          (Before (Between' [WhitespaceChar] DoubleAsterisk))
-          Expr
+          (Before (Between' [ws] DoubleAsterisk))
+          (Expr ws)
           a
   , _dictUnpacking_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (DictUnpacking a)
-deriving instance Show a => Show (DictUnpacking a)
-deriving instance Ord a => Ord (DictUnpacking a)
+deriving instance (Eq a, Eq ws) => Eq (DictUnpacking ws a)
+deriving instance (Show a, Show ws) => Show (DictUnpacking ws a)
+deriving instance (Ord a, Ord ws) => Ord (DictUnpacking ws a)
 
-data DictOrSetMaker a
+data DictOrSetMaker ws a
   = DictOrSetMakerDict
   { _dictOrSetMakerDict_head
     :: Sum
-         DictItem
-         DictUnpacking
+         (DictItem ws)
+         (DictUnpacking ws)
          a
   , _dictOrSetMakerDict_tail
     :: Sum
-         CompFor
+         (CompFor ws)
          (Compose
-           (After (Maybe (Between' [WhitespaceChar] Comma)))
+           (After (Maybe (Between' [ws] Comma)))
            (Compose
              []
              (Compose
-               (Before (Between' [WhitespaceChar] Comma))
-               (Sum DictItem DictUnpacking))))
+               (Before (Between' [ws] Comma))
+               (Sum (DictItem ws) (DictUnpacking ws)))))
          a
   , _dictOrSetMaker_ann :: a
   }
   | DictOrSetMakerSet
-  { _dictOrSetMakerSet_head :: Sum Test StarExpr a
+  { _dictOrSetMakerSet_head :: Sum (Test ws) (StarExpr ws) a
   , _dictOrSetMakerSet_tail
     :: Sum
-         CompFor
+         (CompFor ws)
          (Compose
-           (After (Maybe (Between' [WhitespaceChar] Comma)))
+           (After (Maybe (Between' [ws] Comma)))
            (Compose
              []
              (Compose
-               (Before (Between' [WhitespaceChar] Comma))
-               (Sum Test StarExpr))))
+               (Before (Between' [ws] Comma))
+               (Sum (Test ws) (StarExpr ws)))))
          a
   , _dictOrSetMaker_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (DictOrSetMaker a)
-deriving instance Show a => Show (DictOrSetMaker a)
-deriving instance Ord a => Ord (DictOrSetMaker a)
+deriving instance (Eq a, Eq ws) => Eq (DictOrSetMaker ws a)
+deriving instance (Show a, Show ws) => Show (DictOrSetMaker ws a)
+deriving instance (Ord a, Ord ws) => Ord (DictOrSetMaker ws a)
 
-data AtomNoInt a
+data AtomNoInt ws a
   = AtomParen
   { _atomParen_value
     :: Compose
-        (Between' [WhitespaceChar])
+        (Between' [AnyWhitespaceChar])
         (Compose
           Maybe
-          (Sum YieldExpr TupleTestlistComp))
+          (Sum (YieldExpr AnyWhitespaceChar) (TupleTestlistComp AnyWhitespaceChar)))
         a
   , _atomNoInt_ann :: a
   }
@@ -707,10 +707,10 @@ data AtomNoInt a
   | AtomBracket
   { _atomBracket_value
     :: Compose
-        (Between' [WhitespaceChar])
+        (Between' [AnyWhitespaceChar])
         (Compose
           Maybe
-          ListTestlistComp)
+          (ListTestlistComp AnyWhitespaceChar))
         a
   , _atomNoInt_ann :: a
   }
@@ -718,10 +718,10 @@ data AtomNoInt a
   | AtomCurly
   { _atomCurly_value
     :: Compose
-        (Between' [WhitespaceChar])
+        (Between' [AnyWhitespaceChar])
         (Compose
           Maybe
-          DictOrSetMaker)
+          (DictOrSetMaker AnyWhitespaceChar))
         a
   , _atomNoInt_ann :: a
   }
@@ -742,7 +742,7 @@ data AtomNoInt a
     :: Compose
         []
         (Compose
-          (Before [WhitespaceChar])
+          (Before [ws])
           (Sum StringLiteral BytesLiteral))
         a
   , _atomNoInt_ann :: a
@@ -751,7 +751,7 @@ data AtomNoInt a
   | AtomImag
   { _atomImag_value
     :: Compose
-          (Before [WhitespaceChar])
+          (Before [ws])
           Imag
         a
   , _atomNoInt_ann :: a
@@ -772,22 +772,22 @@ data AtomNoInt a
   | AtomFalse
   { _atomNoInt_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (AtomNoInt a)
-deriving instance Show a => Show (AtomNoInt a)
-deriving instance Ord a => Ord (AtomNoInt a)
+deriving instance (Eq a, Eq ws) => Eq (AtomNoInt ws a)
+deriving instance (Show a, Show ws) => Show (AtomNoInt ws a)
+deriving instance (Ord a, Ord ws) => Ord (AtomNoInt ws a)
 
-data Atom a
+data Atom ws a
   = AtomNoInt
-  { _atomNoInt_value :: AtomNoInt a
+  { _atomNoInt_value :: AtomNoInt ws a
   , _atom_ann :: a
   } 
   | AtomInteger
   { _atomInteger_value :: Integer' a
   , _atom_ann :: a
   } deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (Atom a)
-deriving instance Show a => Show (Atom a)
-deriving instance Ord a => Ord (Atom a)
+deriving instance (Eq a, Eq ws) => Eq (Atom ws a)
+deriving instance (Show a, Show ws) => Show (Atom ws a)
+deriving instance (Ord a, Ord ws) => Ord (Atom ws a)
 
 deriveEq1 ''Comparison
 deriveOrd1 ''Comparison

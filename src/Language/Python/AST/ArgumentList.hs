@@ -38,10 +38,10 @@ import Language.Python.AST.Symbols
 
 data KeywordItem name expr (as :: AtomType) (dctxt :: DefinitionContext) a where
   KeywordItem ::
-    { _keywordItem_left :: Compose (After [WhitespaceChar]) name a
+    { _keywordItem_left :: Compose (After [AnyWhitespaceChar]) name a
     , _keywordItem_right
       :: Compose
-           (Before [WhitespaceChar])
+           (Before [AnyWhitespaceChar])
            (expr 'NotAssignable dctxt)
            a
     , _keywordItem_ann :: a
@@ -56,18 +56,18 @@ data KeywordsArguments name expr as dctxt a where
       :: Sum
            (KeywordItem name expr 'NotAssignable dctxt)
            (Compose
-             (Before (Between' [WhitespaceChar] DoubleAsterisk))
+             (Before (Between' [AnyWhitespaceChar] DoubleAsterisk))
              (expr 'NotAssignable dctxt))
            a
     , _keywordsArguments_tail
       :: Compose
            []
            (Compose
-             (Before (Between' [WhitespaceChar] Comma))
+             (Before (Between' [AnyWhitespaceChar] Comma))
              (Sum
                (KeywordItem name expr 'NotAssignable dctxt)
                (Compose
-                 (Before (Between' [WhitespaceChar] DoubleAsterisk))
+                 (Before (Between' [AnyWhitespaceChar] DoubleAsterisk))
                  (expr 'NotAssignable dctxt))))
            a
     , _keywordsArguments_ann :: a
@@ -83,16 +83,16 @@ data PositionalArguments expr (as :: AtomType) (dctxt :: DefinitionContext) a wh
   PositionalArguments ::
     { _positionalArguments_head
       :: Compose
-          (Before (Maybe (Between' [WhitespaceChar] Asterisk)))
+          (Before (Maybe (Between' [AnyWhitespaceChar] Asterisk)))
           (expr 'NotAssignable dctxt)
           a
     , _positionalArguments_tail
       :: Compose
           []
           (Compose
-            (Before (Between' [WhitespaceChar] Comma))
+            (Before (Between' [AnyWhitespaceChar] Comma))
             (Compose
-              (Before (Maybe (Between' [WhitespaceChar] Asterisk)))
+              (Before (Maybe (Between' [AnyWhitespaceChar] Asterisk)))
               (expr 'NotAssignable dctxt)))
           a
     , _positionalArguments_ann :: a
@@ -109,7 +109,7 @@ data StarredAndKeywords name expr (as :: AtomType) (dctxt :: DefinitionContext) 
     { _starredAndKeywords_head
       :: Sum
            (Compose
-             (Before (Between' [WhitespaceChar] Asterisk))
+             (Before (Between' [AnyWhitespaceChar] Asterisk))
              (expr 'NotAssignable dctxt))
            (KeywordItem name expr 'NotAssignable dctxt)
            a 
@@ -117,10 +117,10 @@ data StarredAndKeywords name expr (as :: AtomType) (dctxt :: DefinitionContext) 
       :: Compose
            []
            (Compose
-             (Before (Between' [WhitespaceChar] Comma))
+             (Before (Between' [AnyWhitespaceChar] Comma))
              (Sum
                (Compose
-                 (Before (Between' [WhitespaceChar] Asterisk))
+                 (Before (Between' [AnyWhitespaceChar] Asterisk))
                    (expr 'NotAssignable dctxt))
                (KeywordItem name expr 'NotAssignable dctxt)))
            a
@@ -141,17 +141,17 @@ data ArgumentList name expr (as :: AtomType) (dctxt :: DefinitionContext) a wher
       :: Compose
           Maybe
           (Compose
-            (Before (Between' [WhitespaceChar] Comma))
+            (Before (Between' [AnyWhitespaceChar] Comma))
             (StarredAndKeywords name expr 'NotAssignable dctxt))
           a
     , _argumentListAll_keywords
       :: Compose
           Maybe
           (Compose
-            (Before (Between' [WhitespaceChar] Comma))
+            (Before (Between' [AnyWhitespaceChar] Comma))
             (KeywordsArguments name expr 'NotAssignable dctxt))
           a
-    , _argumentList_comma :: Maybe (Between' [WhitespaceChar] Comma)
+    , _argumentList_comma :: Maybe (Between' [AnyWhitespaceChar] Comma)
     , _argumentList_ann :: a
     } -> ArgumentList name expr 'NotAssignable dctxt a
   ArgumentListUnpacking ::
@@ -161,16 +161,16 @@ data ArgumentList name expr (as :: AtomType) (dctxt :: DefinitionContext) a wher
       :: Compose
           Maybe
           (Compose
-            (Before (Between' [WhitespaceChar] Comma))
+            (Before (Between' [AnyWhitespaceChar] Comma))
             (KeywordsArguments name expr 'NotAssignable dctxt))
           a
-    , _argumentList_comma :: Maybe (Between' [WhitespaceChar] Comma)
+    , _argumentList_comma :: Maybe (Between' [AnyWhitespaceChar] Comma)
     , _argumentList_ann :: a
     } -> ArgumentList name expr 'NotAssignable dctxt a
   ArgumentListKeywords ::
     { _argumentListKeywords_keywords
       :: KeywordsArguments name expr 'NotAssignable dctxt a
-    , _argumentList_comma :: Maybe (Between' [WhitespaceChar] Comma)
+    , _argumentList_comma :: Maybe (Between' [AnyWhitespaceChar] Comma)
     , _argumentList_ann :: a
     } -> ArgumentList name expr 'NotAssignable dctxt a
 deriving instance (Eq1 name, Eq1 (expr as dctxt), Eq a) => Eq (ArgumentList name expr as dctxt a)
@@ -186,16 +186,16 @@ mkArgumentListAll
   -> Compose
        Maybe
        (Compose
-         (Before (Between' [WhitespaceChar] Comma))
+         (Before (Between' [AnyWhitespaceChar] Comma))
          (StarredAndKeywords name expr 'NotAssignable dctxt))
        a
   -> Compose
        Maybe
        (Compose
-         (Before (Between' [WhitespaceChar] Comma))
+         (Before (Between' [AnyWhitespaceChar] Comma))
          (KeywordsArguments name expr 'NotAssignable dctxt))
        a
-  -> Maybe (Between' [WhitespaceChar] Comma)
+  -> Maybe (Between' [AnyWhitespaceChar] Comma)
   -> a
   -> Either
        (ArgumentError (ArgumentList name expr 'NotAssignable dctxt a))
@@ -212,16 +212,16 @@ _ArgumentListAll
        , Compose
            Maybe
            (Compose
-             (Before (Between' [WhitespaceChar] Comma))
+             (Before (Between' [AnyWhitespaceChar] Comma))
              (StarredAndKeywords name expr 'NotAssignable dctxt))
            a
        , Compose
            Maybe
            (Compose
-             (Before (Between' [WhitespaceChar] Comma))
+             (Before (Between' [AnyWhitespaceChar] Comma))
              (KeywordsArguments name expr 'NotAssignable dctxt))
            a
-       , Maybe (Between' [WhitespaceChar] Comma)
+       , Maybe (Between' [AnyWhitespaceChar] Comma)
        , a
        )
 _ArgumentListAll =
@@ -237,10 +237,10 @@ mkArgumentListUnpacking
   -> Compose
        Maybe
        (Compose
-         (Before (Between' [WhitespaceChar] Comma))
+         (Before (Between' [AnyWhitespaceChar] Comma))
          (KeywordsArguments name expr 'NotAssignable dctxt))
        a
-  -> Maybe (Between' [WhitespaceChar] Comma)
+  -> Maybe (Between' [AnyWhitespaceChar] Comma)
   -> a
   -> Either
        (ArgumentError (ArgumentList name expr 'NotAssignable dctxt a))
@@ -257,10 +257,10 @@ _ArgumentListUnpacking
        , Compose
            Maybe
            (Compose
-             (Before (Between' [WhitespaceChar] Comma))
+             (Before (Between' [AnyWhitespaceChar] Comma))
              (KeywordsArguments name expr 'NotAssignable dctxt))
            a
-       , Maybe (Between' [WhitespaceChar] Comma)
+       , Maybe (Between' [AnyWhitespaceChar] Comma)
        , a
        )
 _ArgumentListUnpacking =
@@ -273,7 +273,7 @@ _ArgumentListUnpacking =
 mkArgumentListKeywords
   :: HasName name
   => KeywordsArguments name expr 'NotAssignable dctxt a
-  -> Maybe (Between' [WhitespaceChar] Comma)
+  -> Maybe (Between' [AnyWhitespaceChar] Comma)
   -> a
   -> Either
        (ArgumentError (ArgumentList name expr 'NotAssignable dctxt a))
@@ -287,7 +287,7 @@ _ArgumentListKeywords
   => Prism'
        (Maybe (ArgumentList name expr 'NotAssignable dctxt a))
        ( KeywordsArguments name expr 'NotAssignable dctxt a
-       , Maybe (Between' [WhitespaceChar] Comma)
+       , Maybe (Between' [AnyWhitespaceChar] Comma)
        , a
        )
 _ArgumentListKeywords =
@@ -304,14 +304,14 @@ instance HasName name => IsArgList (ArgumentList name expr as dctxt a) where
   data DoublestarArgument (ArgumentList name expr as dctxt a)
     = DADoublestarArg
         (Compose
-          (Before (Between' [WhitespaceChar] DoubleAsterisk))
+          (Before (Between' [AnyWhitespaceChar] DoubleAsterisk))
           (expr 'NotAssignable dctxt)
           a)
 
   data PositionalArgument (ArgumentList name expr as dctxt a)
     = PAPositionalArg
         (Compose
-          (Before (Maybe (Between' [WhitespaceChar] Asterisk)))
+          (Before (Maybe (Between' [AnyWhitespaceChar] Asterisk)))
           (expr 'NotAssignable dctxt)
           a)
 

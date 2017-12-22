@@ -23,9 +23,9 @@ keywordItem
 keywordItem _name _expr =
   annotated $
   KeywordItem <$>
-  whitespaceAfterF _name <*
+  anyWhitespaceAfterF _name <*
   equals <*>
-  whitespaceBeforeF _expr
+  anyWhitespaceBeforeF _expr
 
 keywordsArguments
   :: ( Functor name
@@ -39,11 +39,11 @@ keywordsArguments _name _expr =
   annotated $
   KeywordsArguments <$>
   keywordOrDoublestar <*>
-  manyF (try $ beforeF (betweenWhitespace comma) keywordOrDoublestar)
+  manyF (try $ beforeF (betweenAnyWhitespace comma) keywordOrDoublestar)
   where
     keywordOrDoublestar = 
       try (InL <$> keywordItem _name _expr) <|>
-      (InR <$> beforeF (betweenWhitespace doubleAsterisk) _expr)
+      (InR <$> beforeF (betweenAnyWhitespace doubleAsterisk) _expr)
 
 positionalArguments
   :: ( Functor expr
@@ -55,13 +55,13 @@ positionalArguments _expr =
   annotated $
   PositionalArguments <$>
   beforeF
-    (optional . try $ betweenWhitespace asterisk)
+    (optional . try $ betweenAnyWhitespace asterisk)
     (_expr <* notFollowedBy (try $ many whitespaceChar *> char '=')) <*>
   manyF
     (try $
      beforeF
-       (betweenWhitespace comma)
-       (beforeF (optional . try $ betweenWhitespace asterisk) _expr))
+       (betweenAnyWhitespace comma)
+       (beforeF (optional . try $ betweenAnyWhitespace asterisk) _expr))
 
 starredAndKeywords
   :: ( Functor name
@@ -75,10 +75,10 @@ starredAndKeywords _name _expr =
   annotated $
   StarredAndKeywords <$>
   starOrKeyword <*>
-  manyF (beforeF (betweenWhitespace comma) starOrKeyword)
+  manyF (beforeF (betweenAnyWhitespace comma) starOrKeyword)
   where
     starOrKeyword =
-      try (InL <$> beforeF (betweenWhitespace asterisk) _expr) <|>
+      try (InL <$> beforeF (betweenAnyWhitespace asterisk) _expr) <|>
       (InR <$> keywordItem _name _expr)
 
 argumentList
@@ -101,14 +101,14 @@ argumentList _name _expr =
       optionalF
         (try $
          beforeF
-           (betweenWhitespace comma)
+           (betweenAnyWhitespace comma)
            (starredAndKeywords _name _expr)) <*>
       optionalF
         (try $
          beforeF
-           (betweenWhitespace comma)
+           (betweenAnyWhitespace comma)
            (keywordsArguments _name _expr)) <*>
-      optional (try $ betweenWhitespace comma)
+      optional (try $ betweenAnyWhitespace comma)
 
     argumentListUnpacking =
       annotated $
@@ -116,11 +116,11 @@ argumentList _name _expr =
       starredAndKeywords _name _expr <*>
       optionalF
         (try $
-         beforeF (betweenWhitespace comma) (keywordsArguments _name _expr)) <*>
-      optional (try $ betweenWhitespace comma)
+         beforeF (betweenAnyWhitespace comma) (keywordsArguments _name _expr)) <*>
+      optional (try $ betweenAnyWhitespace comma)
 
     argumentListKeywords =
       annotated $
       ArgumentListKeywords <$>
       keywordsArguments _name _expr <*>
-      optional (try $ betweenWhitespace comma)
+      optional (try $ betweenAnyWhitespace comma)

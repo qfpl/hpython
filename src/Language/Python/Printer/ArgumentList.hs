@@ -19,9 +19,9 @@ keywordItem
   -> KeywordItem name expr as dctxt a
   -> Doc
 keywordItem _name _expr (KeywordItem l r _) =
-  whitespaceAfterF _name l <>
+  anyWhitespaceAfterF _name l <>
   text "=" <>
-  whitespaceBeforeF _expr r
+  anyWhitespaceBeforeF _expr r
 
 keywordsArguments
   :: (name a -> Doc)
@@ -31,15 +31,15 @@ keywordsArguments
 keywordsArguments _name _expr (KeywordsArguments h t _) =
   sumElim
     (keywordItem _name _expr)
-    (beforeF (betweenWhitespace' doubleAsterisk) _expr)
+    (beforeF (betweenAnyWhitespace' doubleAsterisk) _expr)
     h <>
   foldMapOf
     (_Wrapped.folded)
     (beforeF
-      (betweenWhitespace' comma)
+      (betweenAnyWhitespace' comma)
       (sumElim
         (keywordItem _name _expr)
-        (beforeF (betweenWhitespace' doubleAsterisk) _expr)))
+        (beforeF (betweenAnyWhitespace' doubleAsterisk) _expr)))
     t
 
 positionalArguments
@@ -47,12 +47,12 @@ positionalArguments
   -> PositionalArguments expr as dctxt a
   -> Doc
 positionalArguments _expr (PositionalArguments h t _) =
-  beforeF (foldMap $ betweenWhitespace' asterisk) _expr h <>
+  beforeF (foldMap $ betweenAnyWhitespace' asterisk) _expr h <>
   foldMapOf
     (_Wrapped.folded)
     (beforeF
-      (betweenWhitespace' comma)
-      (beforeF (foldMap $ betweenWhitespace' asterisk) _expr))
+      (betweenAnyWhitespace' comma)
+      (beforeF (foldMap $ betweenAnyWhitespace' asterisk) _expr))
     t
 
 starredAndKeywords
@@ -62,15 +62,15 @@ starredAndKeywords
   -> Doc
 starredAndKeywords _name _expr (StarredAndKeywords h t _) =
   sumElim
-    (beforeF (betweenWhitespace' asterisk) _expr)
+    (beforeF (betweenAnyWhitespace' asterisk) _expr)
     (keywordItem _name _expr)
     h <>
   foldMapOf
     (_Wrapped.folded)
     (beforeF
-      (betweenWhitespace' comma)
+      (betweenAnyWhitespace' comma)
       (sumElim
-        (beforeF (betweenWhitespace' asterisk) _expr)
+        (beforeF (betweenAnyWhitespace' asterisk) _expr)
         (keywordItem _name _expr)))
     t
 
@@ -87,23 +87,23 @@ argumentList _name _expr e =
          positionalArguments _expr a <>
          foldMapOf
            (_Wrapped.folded)
-           (beforeF (betweenWhitespace' comma) (starredAndKeywords _name _expr))
+           (beforeF (betweenAnyWhitespace' comma) (starredAndKeywords _name _expr))
            b <>
          foldMapOf
            (_Wrapped.folded)
-           (beforeF (betweenWhitespace' comma) (keywordsArguments _name _expr))
+           (beforeF (betweenAnyWhitespace' comma) (keywordsArguments _name _expr))
            c <>
-         foldMap (betweenWhitespace' comma) d) $
+         foldMap (betweenAnyWhitespace' comma) d) $
      outside _ArgumentListUnpacking .~
       (\(a, b, c, _) ->
          starredAndKeywords _name _expr a <>
          foldMapOf
            (_Wrapped.folded)
-           (beforeF (betweenWhitespace' comma) (keywordsArguments _name _expr))
+           (beforeF (betweenAnyWhitespace' comma) (keywordsArguments _name _expr))
            b <>
-         foldMap (betweenWhitespace' comma) c) $
+         foldMap (betweenAnyWhitespace' comma) c) $
      outside _ArgumentListKeywords .~
       (\(a, b, _) ->
          keywordsArguments _name _expr a <>
-         foldMap (betweenWhitespace' comma) b) $
+         foldMap (betweenAnyWhitespace' comma) b) $
      error "incomplete pattern")

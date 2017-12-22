@@ -119,10 +119,10 @@ data Decorator a
     :: Compose
          Maybe
          (Compose
-           (Between' [WhitespaceChar])
+           (Between' [AnyWhitespaceChar])
            (Compose
              Maybe
-             (ArgumentList Identifier Test)))
+             (ArgumentList Identifier (Test AnyWhitespaceChar))))
          a
   , _decorator_newline :: NewlineChar
   , _decorator_ann :: a
@@ -145,10 +145,10 @@ data ClassDef a
          (Compose
            (Before [WhitespaceChar])
            (Compose
-             (Between' [WhitespaceChar])
+             (Between' [AnyWhitespaceChar])
              (Compose
                Maybe
-               (ArgumentList Identifier Test))))
+               (ArgumentList Identifier (Test AnyWhitespaceChar)))))
          a
   , _classDef_body
     :: Compose
@@ -208,7 +208,7 @@ data FuncDef a
          Maybe
          (Compose
            (Before (Between' [WhitespaceChar] RightArrow))
-           Test)
+           (Test WhitespaceChar))
          a
   , _funcDef_body
     :: Compose
@@ -226,10 +226,10 @@ data Parameters a
   = Parameters
   { _parameters_value
     :: Compose
-         (Between' [WhitespaceChar])
+         (Between' [AnyWhitespaceChar])
          (Compose
            Maybe
-           (ArgsList TypedArg Test))
+           (ArgsList (TypedArg AnyWhitespaceChar) (Test AnyWhitespaceChar)))
          a
   , _parameters_ann :: a
   }
@@ -238,7 +238,7 @@ deriving instance Eq a => Eq (Parameters a)
 deriving instance Ord a => Ord (Parameters a)
 deriving instance Show a => Show (Parameters a)
 
-data TypedArg a
+data TypedArg ws a
   = TypedArg
   { _typedArg_value :: Identifier a
   , _typedArg_type
@@ -246,14 +246,14 @@ data TypedArg a
          Maybe
          (Compose
            (Before (Between' [WhitespaceChar] Colon))
-           Test)
+           (Test ws))
          a
   , _typedArg_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (TypedArg a)
-deriving instance Ord a => Ord (TypedArg a)
-deriving instance Show a => Show (TypedArg a)
+deriving instance (Eq a, Eq ws) => Eq (TypedArg ws a)
+deriving instance (Ord a, Ord ws) => Ord (TypedArg ws a)
+deriving instance (Show a, Show ws) => Show (TypedArg ws a)
 
 data WithStatement a
   = WithStatement
@@ -283,13 +283,13 @@ deriving instance Show a => Show (WithStatement a)
 
 data WithItem a
   = WithItem
-  { _withItem_left :: Test a
+  { _withItem_left :: Test WhitespaceChar a
   , _withItem_right
     :: Compose
          Maybe
          (Compose
            (Before (Between' (NonEmpty WhitespaceChar) KAs))
-           Expr)
+           (Expr WhitespaceChar))
          a
   , _withItem_ann :: a
   }
@@ -319,7 +319,7 @@ data IfStatement a
   { _ifStatement_cond
     :: Compose
          (Before (NonEmpty WhitespaceChar))
-         Test
+         (Test WhitespaceChar)
          a
   , _ifStatement_then
     :: Compose
@@ -332,7 +332,7 @@ data IfStatement a
          (Product
            (Compose
              (Before (NonEmpty WhitespaceChar))
-             Test)
+             (Test WhitespaceChar))
            (Compose
              (Before (Between' [WhitespaceChar] Colon))
              Suite))
@@ -356,7 +356,7 @@ data WhileStatement a
   { _whileStatement_cond
     :: Compose
          (Before (NonEmpty WhitespaceChar))
-         Test
+         (Test WhitespaceChar)
          a
   , _whileStatement_body
     :: Compose
@@ -382,12 +382,12 @@ data ForStatement a
   { _forStatement_for
     :: Compose
          (Between' (NonEmpty WhitespaceChar))
-         (TestlistStarExpr Expr StarExpr)
+         (TestlistStarExpr (Expr WhitespaceChar) (StarExpr WhitespaceChar))
          a
   , _forStatement_in
     :: Compose
          (Before (NonEmpty WhitespaceChar))
-         TestList
+         (TestList WhitespaceChar)
          a
   , _forStatement_body
     :: Compose
@@ -466,7 +466,7 @@ data ExceptClause a
          (Compose
            (Before (NonEmpty WhitespaceChar))
            (Product
-             Test
+             (Test WhitespaceChar)
              (Compose
                Maybe
                (Compose
@@ -501,17 +501,20 @@ deriving instance Show a => Show (SimpleStatement a)
 
 data SmallStatement a
   = SmallStatementExpr
-  { _smallStatementExpr_left :: TestlistStarExpr Test StarExpr a
+  { _smallStatementExpr_left
+    :: TestlistStarExpr (Test WhitespaceChar) (StarExpr WhitespaceChar) a
   , _smallStatementExpr_right
     :: Sum
          (Compose
            (Before (Between' [WhitespaceChar] AugAssign))
-           (Sum YieldExpr TestList))
+           (Sum (YieldExpr WhitespaceChar) (TestList WhitespaceChar)))
          (Compose
            []
            (Compose
              (Before (Between' [WhitespaceChar] Equals))
-             (Sum YieldExpr (TestlistStarExpr Test StarExpr))))
+             (Sum
+               (YieldExpr WhitespaceChar)
+               (TestlistStarExpr (Test WhitespaceChar) (StarExpr WhitespaceChar)))))
          a
   , _smallStatement_ann :: a
   }
@@ -519,7 +522,7 @@ data SmallStatement a
   { _smallStatementDel_value
     :: Compose
          (Before (NonEmpty WhitespaceChar))
-         ExprList
+         (ExprList WhitespaceChar)
          a
   , _smallStatement_ann :: a
   }
@@ -568,14 +571,14 @@ data SmallStatement a
   { _smallStatementAssert_head
     :: Compose
          (Before (NonEmpty WhitespaceChar))
-         Test
+         (Test WhitespaceChar)
          a
   , _smallStatementAssert_tail
     :: Compose
          Maybe
          (Compose
            (Before (Between' [WhitespaceChar] Comma))
-           Test)
+           (Test WhitespaceChar))
          a
   , _smallStatement_ann :: a
   }
@@ -597,7 +600,7 @@ data FlowStatement a
          Maybe
          (Compose
            (Before (NonEmpty WhitespaceChar))
-           TestList)
+           (TestList WhitespaceChar))
          a
   , _flowStatement_ann :: a
   }
@@ -612,7 +615,7 @@ data FlowStatement a
   , _flowStatement_ann :: a
   }
   | FlowStatementYield
-  { _flowStatementYield_value :: YieldExpr a
+  { _flowStatementYield_value :: YieldExpr WhitespaceChar a
   , _flowStatement_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
@@ -622,7 +625,7 @@ deriving instance Show a => Show (FlowStatement a)
 
 data RaiseStatement a
   = RaiseStatement
-  { _raiseStatement_left :: Test a
+  { _raiseStatement_left :: Test WhitespaceChar a
   , _raiseStatement_right
     :: Compose
          Maybe
@@ -630,7 +633,7 @@ data RaiseStatement a
            (Before KFrom)
            (Compose
              (Before (NonEmpty WhitespaceChar))
-             Test))
+             (Test WhitespaceChar)))
          a
   , _raiseStatement_ann :: a
   }

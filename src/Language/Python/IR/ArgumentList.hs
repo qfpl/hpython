@@ -18,10 +18,10 @@ import Language.Python.AST.Symbols
 
 data KeywordItem name expr a
   = KeywordItem
-  { _keywordItem_left :: Compose (After [WhitespaceChar]) name a
+  { _keywordItem_left :: Compose (After [AnyWhitespaceChar]) name a
   , _keywordItem_right
     :: Compose
-         (Before [WhitespaceChar])
+         (Before [AnyWhitespaceChar])
          expr
          a
   , _keywordItem_ann :: a
@@ -39,18 +39,18 @@ data KeywordsArguments name expr a
     :: Sum
          (KeywordItem name expr)
          (Compose
-           (Before (Between' [WhitespaceChar] DoubleAsterisk))
+           (Before (Between' [AnyWhitespaceChar] DoubleAsterisk))
            expr)
          a
   , _keywordsArguments_tail
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] Comma))
+           (Before (Between' [AnyWhitespaceChar] Comma))
            (Sum
              (KeywordItem name expr)
              (Compose
-               (Before (Between' [WhitespaceChar] DoubleAsterisk))
+               (Before (Between' [AnyWhitespaceChar] DoubleAsterisk))
                expr)))
          a
   , _keywordsArguments_ann :: a
@@ -66,16 +66,16 @@ data PositionalArguments expr a
   = PositionalArguments
   { _positionalArguments_head
     :: Compose
-        (Before (Maybe (Between' [WhitespaceChar] Asterisk)))
+        (Before (Maybe (Between' [AnyWhitespaceChar] Asterisk)))
         expr
         a
   , _positionalArguments_tail
     :: Compose
         []
         (Compose
-          (Before (Between' [WhitespaceChar] Comma))
+          (Before (Between' [AnyWhitespaceChar] Comma))
           (Compose
-            (Before (Maybe (Between' [WhitespaceChar] Asterisk)))
+            (Before (Maybe (Between' [AnyWhitespaceChar] Asterisk)))
             expr))
         a
   , _positionalArguments_ann :: a
@@ -92,7 +92,7 @@ data StarredAndKeywords name expr a
   { _starredAndKeywords_head
     :: Sum
          (Compose
-           (Before (Between' [WhitespaceChar] Asterisk))
+           (Before (Between' [AnyWhitespaceChar] Asterisk))
            expr)
          (KeywordItem name expr)
          a 
@@ -100,10 +100,10 @@ data StarredAndKeywords name expr a
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] Comma))
+           (Before (Between' [AnyWhitespaceChar] Comma))
            (Sum
              (Compose
-               (Before (Between' [WhitespaceChar] Asterisk))
+               (Before (Between' [AnyWhitespaceChar] Asterisk))
                  expr)
              (KeywordItem name expr)))
          a
@@ -124,17 +124,17 @@ data ArgumentList name expr a
     :: Compose
         Maybe
         (Compose
-          (Before (Between' [WhitespaceChar] Comma))
+          (Before (Between' [AnyWhitespaceChar] Comma))
           (StarredAndKeywords name expr))
         a
   , _argumentListAll_keywords
     :: Compose
         Maybe
         (Compose
-          (Before (Between' [WhitespaceChar] Comma))
+          (Before (Between' [AnyWhitespaceChar] Comma))
           (KeywordsArguments name expr))
         a
-  , _argumentList_comma :: Maybe (Between' [WhitespaceChar] Comma)
+  , _argumentList_comma :: Maybe (Between' [AnyWhitespaceChar] Comma)
   , _argumentList_ann :: a
   }
   | ArgumentListUnpacking
@@ -144,16 +144,16 @@ data ArgumentList name expr a
     :: Compose
         Maybe
         (Compose
-          (Before (Between' [WhitespaceChar] Comma))
+          (Before (Between' [AnyWhitespaceChar] Comma))
           (KeywordsArguments name expr))
         a
-  , _argumentList_comma :: Maybe (Between' [WhitespaceChar] Comma)
+  , _argumentList_comma :: Maybe (Between' [AnyWhitespaceChar] Comma)
   , _argumentList_ann :: a 
   }
   | ArgumentListKeywords
   { _argumentListKeywords_keywords
     :: KeywordsArguments name expr a
-  , _argumentList_comma :: Maybe (Between' [WhitespaceChar] Comma)
+  , _argumentList_comma :: Maybe (Between' [AnyWhitespaceChar] Comma)
   , _argumentList_ann :: a 
   }
 deriving instance (Eq1 name, Eq1 expr, Eq a) => Eq (ArgumentList name expr a)

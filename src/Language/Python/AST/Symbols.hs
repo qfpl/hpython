@@ -32,6 +32,7 @@ data IndentationChar
   | IndentTab
   | IndentContinued NewlineChar [IndentationChar]
   deriving (Eq, Show, Ord)
+type AnyWhitespaceChar = Either WhitespaceChar NewlineChar
 data Comma = Comma deriving (Eq, Ord, Show)
 data Hash = Hash deriving (Eq, Ord, Show)
 data Colon = Colon deriving (Eq, Ord, Show)

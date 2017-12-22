@@ -130,10 +130,10 @@ data Decorator (ctxt :: DefinitionContext) a
     :: Compose
          Maybe
          (Compose
-           (Between' [WhitespaceChar])
+           (Between' [AnyWhitespaceChar])
            (Compose
              Maybe
-             (ArgumentList Identifier Test 'NotAssignable ctxt)))
+             (ArgumentList Identifier (Test AnyWhitespaceChar) 'NotAssignable ctxt)))
          a
   , _decorator_newline :: NewlineChar
   , _decorator_ann :: a
@@ -155,10 +155,10 @@ data ClassDef (ctxt :: DefinitionContext) a
          (Compose
            (Before [WhitespaceChar])
            (Compose
-             (Between' [WhitespaceChar])
+             (Between' [AnyWhitespaceChar])
              (Compose
                Maybe
-               (ArgumentList Identifier Test 'NotAssignable ctxt))))
+               (ArgumentList Identifier (Test AnyWhitespaceChar) 'NotAssignable ctxt))))
          a
   , _classDef_body
     :: Compose
@@ -212,7 +212,7 @@ data FuncDef (outer :: DefinitionContext) (inner :: DefinitionContext) (a :: *)
          Maybe
          (Compose
            (Before (Between' [WhitespaceChar] RightArrow))
-           (Test 'NotAssignable outer))
+           (Test WhitespaceChar 'NotAssignable outer))
          a
   , _funcDef_body
     :: Compose
@@ -232,7 +232,9 @@ data Parameters (ctxt :: DefinitionContext) a
          (Between' [WhitespaceChar])
          (Compose
            Maybe
-           (ArgsList TypedArg (Test 'NotAssignable ctxt)))
+           (ArgsList
+             (TypedArg AnyWhitespaceChar)
+             (Test AnyWhitespaceChar 'NotAssignable ctxt)))
          a
   , _parameters_ann :: a
   }
@@ -240,7 +242,7 @@ data Parameters (ctxt :: DefinitionContext) a
 deriving instance Eq a => Eq (Parameters ctxt a)
 deriving instance Show a => Show (Parameters ctxt a)
 
-data TypedArg a
+data TypedArg ws a
   = TypedArg
   { _typedArg_value :: Identifier a
   , _typedArg_type
@@ -248,14 +250,14 @@ data TypedArg a
          Maybe
          (Compose
            (Before (Between' [WhitespaceChar] Colon))
-           (Test 'NotAssignable ('FunDef 'Normal)))
+           (Test ws 'NotAssignable ('FunDef 'Normal)))
          a
   , _typedArg_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (TypedArg a)
-deriving instance Show a => Show (TypedArg a)
-deriving instance Ord a => Ord (TypedArg a)
+deriving instance (Eq a, Eq ws) => Eq (TypedArg ws a)
+deriving instance (Show a, Show ws) => Show (TypedArg ws a)
+deriving instance (Ord a, Ord ws) => Ord (TypedArg ws a)
 
 data WithStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   = WithStatement
@@ -284,13 +286,13 @@ deriving instance Show a => Show (WithStatement lctxt ctxt a)
 
 data WithItem (ctxt :: DefinitionContext) a
   = WithItem
-  { _withItem_left :: Test 'NotAssignable ctxt a
+  { _withItem_left :: Test WhitespaceChar 'NotAssignable ctxt a
   , _withItem_right
     :: Compose
          Maybe
          (Compose
            (Before (Between' (NonEmpty WhitespaceChar) KAs))
-           (Expr 'Assignable ctxt))
+           (Expr WhitespaceChar 'Assignable ctxt))
          a
   , _withItem_ann :: a
   }
@@ -322,7 +324,7 @@ data IfStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   { _ifStatement_cond
     :: Compose
          (Before (NonEmpty WhitespaceChar))
-         (Test 'NotAssignable ctxt)
+         (Test WhitespaceChar 'NotAssignable ctxt)
          a
   , _ifStatement_then
     :: Compose
@@ -335,7 +337,7 @@ data IfStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
          (Product
            (Compose
              (Before (NonEmpty WhitespaceChar))
-             (Test 'NotAssignable ctxt))
+             (Test WhitespaceChar 'NotAssignable ctxt))
            (Compose
              (Before (Between' [WhitespaceChar] Colon))
              (Suite lctxt ctxt)))
@@ -358,7 +360,7 @@ data WhileStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   { _whileStatement_cond
     :: Compose
          (Before (NonEmpty WhitespaceChar))
-         (Test 'NotAssignable ctxt)
+         (Test WhitespaceChar 'NotAssignable ctxt)
          a
   , _whileStatement_body
     :: Compose
@@ -383,12 +385,12 @@ data ForStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   { _forStatement_for
     :: Compose
          (Between' (NonEmpty WhitespaceChar))
-         (TestlistStarExpr Expr StarExpr 'Assignable ctxt)
+         (TestlistStarExpr (Expr WhitespaceChar) (StarExpr WhitespaceChar) 'Assignable ctxt)
          a
   , _forStatement_in
     :: Compose
          (Before (NonEmpty WhitespaceChar))
-         (TestList 'NotAssignable ctxt)
+         (TestList WhitespaceChar 'NotAssignable ctxt)
          a
   , _forStatement_body
     :: Compose
@@ -465,7 +467,7 @@ data ExceptClause (ctxt :: DefinitionContext) a
          (Compose
            (Before (NonEmpty WhitespaceChar))
            (Product
-             (Test 'NotAssignable ctxt)
+             (Test WhitespaceChar 'NotAssignable ctxt)
              (Compose
                Maybe
                (Compose
@@ -498,33 +500,38 @@ deriving instance Show a => Show (SimpleStatement lctxt ctxt a)
 
 data SmallStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
   SmallStatementExpr ::
-    { _smallStatementExpr_value :: Test 'NotAssignable ctxt a
+    { _smallStatementExpr_value :: Test WhitespaceChar 'NotAssignable ctxt a
     , _smallStatementExpr_ann :: a
     } -> SmallStatement lctxt ctxt a
 
   SmallStatementAssign ::
-    { _smallStatementAssign_left :: TestlistStarExpr Test StarExpr 'Assignable ctxt a
+    { _smallStatementAssign_left
+      :: TestlistStarExpr (Test WhitespaceChar) (StarExpr WhitespaceChar) 'Assignable ctxt a
     , _smallStatementAssign_middle
       :: Compose
            []
            (Compose
              (Before (Between' [WhitespaceChar] Equals))
-             (TestlistStarExpr Test StarExpr 'Assignable ctxt))
+             (TestlistStarExpr (Test WhitespaceChar) (StarExpr WhitespaceChar) 'Assignable ctxt))
          a
     , _smallStatementAssign_right
         :: Compose
              (Before (Between' [WhitespaceChar] Equals))
-             (Sum (YieldExpr ctxt) (TestlistStarExpr Test StarExpr 'NotAssignable ctxt))
+             (Sum
+               (YieldExpr WhitespaceChar ctxt)
+               (TestlistStarExpr (Test WhitespaceChar) (StarExpr WhitespaceChar) 'NotAssignable ctxt))
            a
     , _smallStatementAssign_ann :: a
     } -> SmallStatement lctxt ctxt a
 
   SmallStatementAugAssign ::
-    { _smallStatementAugAssign_left :: Test 'Assignable ctxt a
+    { _smallStatementAugAssign_left :: Test WhitespaceChar 'Assignable ctxt a
     , _smallStatementAugAssign_right
       :: Compose
             (Before (Between' [WhitespaceChar] AugAssign))
-            (Sum (YieldExpr ctxt) (TestList 'NotAssignable ctxt))
+            (Sum
+              (YieldExpr WhitespaceChar ctxt)
+              (TestList WhitespaceChar 'NotAssignable ctxt))
           a
     , _smallStatementAugAssign_ann :: a
     } -> SmallStatement lctxt ctxt a
@@ -533,7 +540,7 @@ data SmallStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
     { _smallStatementDel_value
       :: Compose
           (Before (NonEmpty WhitespaceChar))
-          (ExprList 'Assignable ctxt)
+          (ExprList WhitespaceChar 'Assignable ctxt)
           a
     , _smallStatement_ann :: a
     } -> SmallStatement lctxt ctxt a
@@ -587,14 +594,14 @@ data SmallStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
     { _smallStatementAssert_head
       :: Compose
            (Before (NonEmpty WhitespaceChar))
-           (Test 'NotAssignable ctxt)
+           (Test WhitespaceChar 'NotAssignable ctxt)
            a
     , _smallStatementAssert_tail
       :: Compose
           Maybe
           (Compose
             (Before (Between' [WhitespaceChar] Comma))
-            (Test 'NotAssignable ctxt))
+            (Test WhitespaceChar 'NotAssignable ctxt))
           a
     , _smallStatement_ann :: a
     } -> SmallStatement lctxt ctxt a
@@ -636,7 +643,7 @@ data FlowStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
           Maybe
           (Compose
             (Before (NonEmpty WhitespaceChar))
-            (TestList 'NotAssignable ('FunDef b)))
+            (TestList WhitespaceChar 'NotAssignable ('FunDef b)))
           a
     , _flowStatementReturn_ann :: a
     } -> FlowStatement lctxt ('FunDef b) a
@@ -651,7 +658,7 @@ data FlowStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
     , _flowStatementRaise_ann :: a
     } -> FlowStatement lctxt ctxt a
   FlowStatementYield ::
-    { _flowStatementYield_value :: YieldExpr ctxt a
+    { _flowStatementYield_value :: YieldExpr WhitespaceChar ctxt a
     , _flowStatementYield_ann :: a
     } -> FlowStatement lctxt ctxt a
 
@@ -663,7 +670,7 @@ deriving instance Show a => Show (FlowStatement lctxt ctxt a)
 
 data RaiseStatement (ctxt :: DefinitionContext) a
   = RaiseStatement
-  { _raiseStatement_left :: Test 'NotAssignable ctxt a
+  { _raiseStatement_left :: Test WhitespaceChar 'NotAssignable ctxt a
   , _raiseStatement_right
     :: Compose
          Maybe
@@ -671,7 +678,7 @@ data RaiseStatement (ctxt :: DefinitionContext) a
            (Before KFrom)
            (Compose
              (Before (NonEmpty WhitespaceChar))
-             (Test 'NotAssignable ctxt)))
+             (Test WhitespaceChar 'NotAssignable ctxt)))
          a
   , _raiseStatement_ann :: a
   }
@@ -766,5 +773,5 @@ deriveEq1 ''AsyncStatement
 deriveOrd1 ''AsyncStatement
 deriveShow1 ''AsyncStatement
 
-instance HasName TypedArg where
+instance HasName (TypedArg ws) where
   name = typedArg_value.identifier_value

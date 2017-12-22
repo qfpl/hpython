@@ -14,11 +14,23 @@ import Language.Python.Parser.Symbols
 whitespaceBefore :: CharParsing m => m a -> m (Before [WhitespaceChar] a)
 whitespaceBefore m = Before <$> many whitespaceChar <*> m
 
+anyWhitespaceBefore :: CharParsing m => m a -> m (Before [AnyWhitespaceChar] a)
+anyWhitespaceBefore m =
+  Before <$>
+  many anyWhitespaceChar <*>
+  m
+
 whitespaceBeforeF
   :: CharParsing m
   => m (f a)
   -> m (Compose (Before [WhitespaceChar]) f a)
 whitespaceBeforeF = fmap Compose . whitespaceBefore
+
+anyWhitespaceBeforeF
+  :: CharParsing m
+  => m (f a)
+  -> m (Compose (Before [AnyWhitespaceChar]) f a)
+anyWhitespaceBeforeF = fmap Compose . anyWhitespaceBefore
 
 whitespaceBefore1
   :: CharParsing m
@@ -35,11 +47,23 @@ whitespaceBefore1F = fmap Compose . whitespaceBefore1
 whitespaceAfter :: CharParsing m => m a -> m (After [WhitespaceChar] a)
 whitespaceAfter m = flip After <$> m <*> many whitespaceChar
 
+anyWhitespaceAfter :: CharParsing m => m a -> m (After [AnyWhitespaceChar] a)
+anyWhitespaceAfter m =
+  flip After <$>
+  m <*>
+  many anyWhitespaceChar
+
 whitespaceAfterF
   :: CharParsing m
   => m (f a)
   -> m (Compose (After [WhitespaceChar]) f a)
 whitespaceAfterF = fmap Compose . whitespaceAfter
+
+anyWhitespaceAfterF
+  :: CharParsing m
+  => m (f a)
+  -> m (Compose (After [AnyWhitespaceChar]) f a)
+anyWhitespaceAfterF = fmap Compose . anyWhitespaceAfter
 
 whitespaceAfter1
   :: CharParsing m
@@ -63,6 +87,17 @@ betweenWhitespace m =
   many whitespaceChar <*>
   m <*>
   many whitespaceChar
+
+betweenAnyWhitespace
+  :: CharParsing m
+  => m a
+  -> m (Between' [AnyWhitespaceChar] a)
+betweenAnyWhitespace m =
+  fmap Between' $
+  Between <$>
+  many anyWhitespaceChar <*>
+  m <*>
+  many anyWhitespaceChar
 
 betweenWhitespaceF
   :: CharParsing m

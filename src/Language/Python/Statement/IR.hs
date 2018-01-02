@@ -245,7 +245,7 @@ data TypedArg ws a
     :: Compose
          Maybe
          (Compose
-           (Before (Between' [WhitespaceChar] Colon))
+           (Before (Between' [ws] Colon))
            (Test ws))
          a
   , _typedArg_ann :: a

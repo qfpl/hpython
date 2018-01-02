@@ -14,6 +14,12 @@ import qualified Hedgehog.Range as Range
 genBefore :: MonadGen m => m s -> m a -> m (Before s a)
 genBefore = liftA2 Before
 
+genBefore1 :: MonadGen m => m s -> m a -> m (Before (NonEmpty s) a)
+genBefore1 a b = liftA2 Before (Gen.nonEmpty (Range.linear 1 10) a) b
+
+genBefore1F :: MonadGen m => m s -> m (f a) -> m (Compose (Before (NonEmpty s)) f a)
+genBefore1F a b = Compose <$> genBefore1 a b
+
 genBeforeF
   :: MonadGen m
   => m s
@@ -81,11 +87,23 @@ genWhitespaceBefore
   -> m (Before [WhitespaceChar] a)
 genWhitespaceBefore ma = Before <$> genWhitespace <*> ma
 
+genAnyWhitespaceBefore
+  :: MonadGen m
+  => m a
+  -> m (Before [AnyWhitespaceChar] a)
+genAnyWhitespaceBefore ma = Before <$> genAnyWhitespace <*> ma
+
 genWhitespaceBeforeF
   :: MonadGen m
   => m (f a)
   -> m (Compose (Before [WhitespaceChar]) f a)
 genWhitespaceBeforeF = fmap Compose . genWhitespaceBefore
+
+genAnyWhitespaceBeforeF
+  :: MonadGen m
+  => m (f a)
+  -> m (Compose (Before [AnyWhitespaceChar]) f a)
+genAnyWhitespaceBeforeF = fmap Compose . genAnyWhitespaceBefore
 
 genWhitespaceBefore1
   :: MonadGen m
@@ -105,11 +123,23 @@ genWhitespaceAfter
   -> m (After [WhitespaceChar] a)
 genWhitespaceAfter ma = After <$> genWhitespace <*> ma
 
+genAnyWhitespaceAfter
+  :: MonadGen m
+  => m a
+  -> m (After [AnyWhitespaceChar] a)
+genAnyWhitespaceAfter ma = After <$> genAnyWhitespace <*> ma
+
 genWhitespaceAfterF
   :: MonadGen m
   => m (f a)
   -> m (Compose (After [WhitespaceChar]) f a)
 genWhitespaceAfterF = fmap Compose . genWhitespaceAfter
+
+genAnyWhitespaceAfterF
+  :: MonadGen m
+  => m (f a)
+  -> m (Compose (After [AnyWhitespaceChar]) f a)
+genAnyWhitespaceAfterF = fmap Compose . genAnyWhitespaceAfter
 
 genWhitespaceAfter1
   :: MonadGen m
@@ -128,11 +158,22 @@ genWhitespace
   => m [WhitespaceChar]
 genWhitespace = Gen.list (Range.linear 0 10) genWhitespaceChar
 
+genAnyWhitespace
+  :: MonadGen m
+  => m [AnyWhitespaceChar]
+genAnyWhitespace = Gen.list (Range.linear 0 10) genAnyWhitespaceChar
+
 genBetweenWhitespace
   :: MonadGen m
   => m a
   -> m (Between' [WhitespaceChar] a)
 genBetweenWhitespace = genBetween' genWhitespace
+
+genBetweenAnyWhitespace
+  :: MonadGen m
+  => m a
+  -> m (Between' [AnyWhitespaceChar] a)
+genBetweenAnyWhitespace = genBetween' genAnyWhitespace
 
 genBetweenWhitespaceF
   :: MonadGen m
@@ -140,11 +181,18 @@ genBetweenWhitespaceF
   -> m (Compose (Between' [WhitespaceChar]) f a)
 genBetweenWhitespaceF = fmap Compose . genBetweenWhitespace
 
+genBetween'1
+  :: MonadGen m
+  => m ws
+  -> m a
+  -> m (Between' (NonEmpty ws) a)
+genBetween'1 ws = genBetween' (Gen.nonEmpty (Range.linear 1 10) ws)
+
 genBetweenWhitespace1
   :: MonadGen m
   => m a
   -> m (Between' (NonEmpty WhitespaceChar) a)
-genBetweenWhitespace1 = genBetween' genWhitespace1
+genBetweenWhitespace1 = genBetween'1 genWhitespaceChar
 
 genBetweenWhitespace1F
   :: MonadGen m
@@ -178,4 +226,13 @@ genWhitespaceChar =
     [ pure Space
     , pure Tab
     , Continued <$> genNewlineChar
+    ]
+
+genAnyWhitespaceChar
+  :: MonadGen m
+  => m AnyWhitespaceChar
+genAnyWhitespaceChar =
+  Gen.choice
+    [ Left <$> genWhitespaceChar
+    , Right <$> genNewlineChar
     ]

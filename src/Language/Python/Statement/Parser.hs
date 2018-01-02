@@ -3,11 +3,8 @@ module Language.Python.Statement.Parser where
 
 import Papa hiding (Sum, Product)
 import Control.Monad.State
-import Data.DList (DList)
-import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
-import Data.Separated.Before (Before(..))
 import Text.Parser.LookAhead
 import Text.Trifecta hiding (Unspaced(..), comma, dot, colon)
 import Language.Python.AST.Symbols
@@ -26,7 +23,6 @@ import Language.Python.Statement.IR
 import Language.Python.Statement.Parser.AugAssign
 import Language.Python.Statement.Parser.Imports
 
-import qualified Data.DList as DList
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Text.Parser.Unspaced
@@ -73,25 +69,26 @@ smallStatement =
     augAssignSequence =
       beforeF
         (betweenWhitespace augAssign)
-        ((InL <$> try yieldExpr) <|>
-         (InR <$> testList))
+        ((InL <$> try (yieldExpr whitespaceChar)) <|>
+         (InR <$> testList whitespaceChar))
 
     regularAssignSequence =
       manyF
         (beforeF
           (betweenWhitespace equals)
-          ((InL <$> try yieldExpr) <|> (InR <$> testlistStarExpr test starExpr)))
+          ((InL <$> try (yieldExpr whitespaceChar)) <|>
+           (InR <$> testlistStarExpr (test whitespaceChar) (starExpr whitespaceChar))))
 
     smallStatementExpr =
       SmallStatementExpr <$>
-      testlistStarExpr test starExpr <*>
+      testlistStarExpr (test whitespaceChar) (starExpr whitespaceChar) <*>
       ((InL <$> try augAssignSequence) <|>
        (InR <$> regularAssignSequence))
 
     smallStatementDel =
       SmallStatementDel <$>
       (string "del" *>
-       whitespaceBefore1F exprList)
+       whitespaceBefore1F (exprList whitespaceChar))
 
     smallStatementPass =
       string "pass" $>
@@ -120,8 +117,8 @@ smallStatement =
     smallStatementAssert =
       SmallStatementAssert <$>
       (string "assert" *>
-       whitespaceBefore1F test) <*>
-      optionalF (beforeF (betweenWhitespace comma) test)
+       whitespaceBefore1F (test whitespaceChar)) <*>
+      optionalF (beforeF (betweenWhitespace comma) (test whitespaceChar))
 
 flowStatement
   :: ( LookAheadParsing m
@@ -134,11 +131,11 @@ flowStatement =
   (symbol "continue" $> FlowStatementContinue) <|>
   (FlowStatementReturn <$>
     (symbol "return" *>
-    optionalF (try $ whitespaceBefore1F testList))) <|>
+    optionalF (try $ whitespaceBefore1F (testList whitespaceChar)))) <|>
   (FlowStatementRaise <$>
     (symbol "raise" *>
     optionalF (try $ whitespaceBefore1F raiseStatement))) <|>
-  (FlowStatementYield <$> yieldExpr)
+  (FlowStatementYield <$> yieldExpr whitespaceChar)
 
 raiseStatement
   :: ( LookAheadParsing m
@@ -148,8 +145,8 @@ raiseStatement
 raiseStatement =
   annotated $
   RaiseStatement <$>
-  test <*>
-  optionalF (try . beforeF kFrom $ whitespaceBefore1F test)
+  test whitespaceChar <*>
+  optionalF (try . beforeF kFrom $ whitespaceBefore1F (test whitespaceChar))
 
 compoundStatement
   :: ( LookAheadParsing m
@@ -203,7 +200,11 @@ decorator =
   Decorator <$>
   (char '@' *>
    whitespaceBeforeF dottedName) <*>
-  optionalF (try . betweenWhitespaceF . optionalF $ try (argumentList identifier test)) <*>
+  optionalF
+    (try .
+     parens .
+     between'F (many anyWhitespaceChar) .
+     optionalF $ try (argumentList identifier $ test anyWhitespaceChar)) <*>
   newlineChar
 
 decorated
@@ -233,21 +234,22 @@ classDef =
     (try .
      whitespaceBeforeF .
      parens .
-     betweenWhitespaceF .
+     between'F (many anyWhitespaceChar) .
      optionalF $
-     try (argumentList identifier test)) <*>
+     try (argumentList identifier (test anyWhitespaceChar))) <*>
   beforeF (betweenWhitespace colon) suite
 
 typedArg
   :: ( LookAheadParsing m
      , DeltaParsing m
      )
-  => Unspaced (StateT [NonEmpty IndentationChar] m) (TypedArg SrcInfo)
-typedArg =
+  => Unspaced (StateT [NonEmpty IndentationChar] m) ws
+  -> Unspaced (StateT [NonEmpty IndentationChar] m) (TypedArg ws SrcInfo)
+typedArg ws =
   annotated $
   TypedArg <$>
   identifier <*>
-  optionalF (try $ beforeF (betweenWhitespace colon) test)
+  optionalF (try $ beforeF (between' (many ws) colon) (test ws))
 
 parameters
   :: ( LookAheadParsing m
@@ -258,7 +260,8 @@ parameters =
   annotated $
   Parameters <$>
   parens
-  (betweenWhitespaceF (optionalF . try $ argsList test typedArg))
+  (between'F (many anyWhitespaceChar)
+    (optionalF . try $ argsList (test anyWhitespaceChar) (typedArg anyWhitespaceChar)))
 
 funcDef
   :: ( LookAheadParsing m
@@ -271,7 +274,7 @@ funcDef =
   (string "def" *>
    whitespaceBefore1F identifier) <*>
   whitespaceBeforeF parameters <*>
-  optionalF (try $ beforeF (betweenWhitespace rightArrow) test) <*>
+  optionalF (try $ beforeF (betweenWhitespace rightArrow) (test whitespaceChar)) <*>
   beforeF (betweenWhitespace colon) suite
 
 withItem
@@ -282,8 +285,8 @@ withItem
 withItem =
   annotated $
   WithItem <$>
-  test <*>
-  optionalF (try $ beforeF (betweenWhitespace1 kAs) expr)
+  test whitespaceChar <*>
+  optionalF (try $ beforeF (betweenWhitespace1 kAs) (expr whitespaceChar))
 
 withStatement
   :: ( LookAheadParsing m
@@ -310,7 +313,7 @@ exceptClause =
    optionalF
      (try . whitespaceBefore1F $
        Pair <$>
-       test <*>
+       test whitespaceChar <*>
        optionalF
          (try $ beforeF (betweenWhitespace1 kAs) identifier)))
 
@@ -352,7 +355,7 @@ whileStatement =
   annotated $
   WhileStatement <$>
   (string "while" *>
-   whitespaceBefore1F test) <*>
+   whitespaceBefore1F (test whitespaceChar)) <*>
   beforeF (betweenWhitespace colon) suite <*>
   optionalF
     (try (level *> string "else") *>
@@ -367,9 +370,9 @@ forStatement =
   annotated $
   ForStatement <$>
   (string "for" *>
-   betweenWhitespace1F (testlistStarExpr expr starExpr)) <*>
+   betweenWhitespace1F (testlistStarExpr (expr whitespaceChar) (starExpr whitespaceChar))) <*>
   (string "in" *>
-   whitespaceBefore1F testList) <*>
+   whitespaceBefore1F (testList whitespaceChar)) <*>
   beforeF (betweenWhitespace colon) suite <*>
   optionalF
     (try (level *> string "else") *>
@@ -384,12 +387,12 @@ ifStatement =
   annotated $
   IfStatement <$>
   (string "if" *>
-   whitespaceBefore1F test) <*>
+   whitespaceBefore1F (test whitespaceChar)) <*>
   beforeF (betweenWhitespace colon) suite <*>
   manyF
     (try (level *> string "elif") *>
      (Pair <$>
-      whitespaceBefore1F test <*>
+      whitespaceBefore1F (test whitespaceChar) <*>
       beforeF (betweenWhitespace colon) suite)) <*>
   optionalF
     (try (level *> string "else") *>

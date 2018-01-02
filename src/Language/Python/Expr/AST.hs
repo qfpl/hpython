@@ -481,7 +481,7 @@ data Comparison :: * -> AtomType -> DefinitionContext -> * -> * where
       :: Compose
           NonEmpty
           (Compose
-            (Before CompOperator)
+            (Before (Between' [ws] CompOperator))
             (Expr ws 'NotAssignable ctxt))
           a
     , _comparisonMany_ann :: a

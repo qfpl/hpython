@@ -41,10 +41,10 @@ data Argument ws a
   , _argument_ann :: a
   }
   | ArgumentForParens
-  { _argumentForParens_lparen :: After [ws] LeftParen
-  , _argumentForParens_expr :: Test ws a
-  , _argumentForParens_for :: CompFor ws a
-  , _argumentForParens_rparen :: Before [ws] RightParen
+  { _argumentForParens_lparen :: After [AnyWhitespaceChar] LeftParen
+  , _argumentForParens_expr :: Test AnyWhitespaceChar a
+  , _argumentForParens_for :: CompFor AnyWhitespaceChar a
+  , _argumentForParens_rparen :: Before [AnyWhitespaceChar] RightParen
   , _argument_ann :: a
   }
   | ArgumentDefault
@@ -95,7 +95,7 @@ data LambdefNocond ws a
     :: Compose
          Maybe
          (Compose
-           (Between (NonEmpty ws) [WhitespaceChar])
+           (Between (NonEmpty ws) [ws])
            (ArgsList Identifier (Test ws)))
          a
   , _lambdefNocond_expr

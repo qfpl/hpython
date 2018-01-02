@@ -32,17 +32,31 @@ anyWhitespaceBeforeF
   -> m (Compose (Before [AnyWhitespaceChar]) f a)
 anyWhitespaceBeforeF = fmap Compose . anyWhitespaceBefore
 
+before1
+  :: CharParsing m
+  => m ws
+  -> m a
+  -> m (Before (NonEmpty ws) a)
+before1 ws m = Before <$> some1 (try ws) <*> m
+
 whitespaceBefore1
   :: CharParsing m
   => m a
   -> m (Before (NonEmpty WhitespaceChar) a)
-whitespaceBefore1 m = Before <$> some1 (try whitespaceChar) <*> m
+whitespaceBefore1 = before1 whitespaceChar
+
+before1F
+  :: CharParsing m
+  => m ws
+  -> m (f a)
+  -> m (Compose (Before (NonEmpty ws)) f a)
+before1F ws = fmap Compose . before1 ws
 
 whitespaceBefore1F
   :: CharParsing m
   => m (f a)
   -> m (Compose (Before (NonEmpty WhitespaceChar)) f a)
-whitespaceBefore1F = fmap Compose . whitespaceBefore1
+whitespaceBefore1F = before1F whitespaceChar
 
 whitespaceAfter :: CharParsing m => m a -> m (After [WhitespaceChar] a)
 whitespaceAfter m = flip After <$> m <*> many whitespaceChar
@@ -65,17 +79,31 @@ anyWhitespaceAfterF
   -> m (Compose (After [AnyWhitespaceChar]) f a)
 anyWhitespaceAfterF = fmap Compose . anyWhitespaceAfter
 
+after1
+  :: CharParsing m
+  => m ws
+  -> m a
+  -> m (After (NonEmpty ws) a)
+after1 ws m = flip After <$> m <*> some1 (try ws)
+
 whitespaceAfter1
   :: CharParsing m
   => m a
   -> m (After (NonEmpty WhitespaceChar) a)
-whitespaceAfter1 m = flip After <$> m <*> some1 (try whitespaceChar)
+whitespaceAfter1 = after1 whitespaceChar
+
+after1F
+  :: CharParsing m
+  => m ws
+  -> m (f a)
+  -> m (Compose (After (NonEmpty ws)) f a)
+after1F ws = fmap Compose . after1 ws
 
 whitespaceAfter1F
   :: CharParsing m
   => m (f a)
   -> m (Compose (After (NonEmpty WhitespaceChar)) f a)
-whitespaceAfter1F = fmap Compose . whitespaceAfter1
+whitespaceAfter1F = after1F whitespaceChar
 
 betweenWhitespace
   :: CharParsing m
@@ -105,6 +133,18 @@ betweenWhitespaceF
   -> m (Compose (Between' [WhitespaceChar]) f a)
 betweenWhitespaceF = fmap Compose . betweenWhitespace
 
+between'1
+  :: CharParsing m
+  => m ws
+  -> m a
+  -> m (Between' (NonEmpty ws) a)
+between'1 ws m =
+  fmap Between' $
+  Between <$>
+  some1 (try ws) <*>
+  m <*>
+  some1 (try ws)
+
 betweenWhitespace1
   :: CharParsing m
   => m a
@@ -131,8 +171,14 @@ some1F m = Compose <$> some1 m
 manyF :: Alternative m => m (f a) -> m (Compose [] f a)
 manyF m = Compose <$> many m
 
+after :: Applicative m => m s -> m a -> m (After s a)
+after ms ma = flip After <$> ma <*> ms
+
 afterF :: Applicative m => m s -> m (f a) -> m (Compose (After s) f a)
 afterF ms ma = fmap Compose $ flip After <$> ma <*> ms
+
+before :: Applicative m => m s -> m a -> m (Before s a)
+before ms ma = Before <$> ms <*> ma
 
 beforeF :: Applicative m => m s -> m (f a) -> m (Compose (Before s) f a)
 beforeF ms ma = fmap Compose $ Before <$> ms <*> ma

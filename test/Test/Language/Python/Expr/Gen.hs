@@ -49,12 +49,13 @@ import Test.Language.Python.Gen.TestlistStarExpr
 genIfThenElse
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.IfThenElse 'NotAssignable ctxt ())
-genIfThenElse cfg =
+  -> m ws
+  -> m (AST.IfThenElse ws 'NotAssignable ctxt ())
+genIfThenElse cfg ws =
   AST.IfThenElse <$>
-  genBetweenWhitespace1 (pure AST.KIf) <*>
+  genBetween1 ws (pure AST.KIf) <*>
   Gen.small (genOrTest cfg) <*>
-  genBetweenWhitespace1 (pure AST.KElse) <*>
+  genBetween1 ws (pure AST.KElse) <*>
   Gen.small (genTest cfg)
 
 genTermOp :: MonadGen m => m AST.TermOperator
@@ -70,17 +71,18 @@ genTermOp =
 genStarExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.StarExpr atomType ctxt ())
-genStarExpr cfg =
+  -> m ws
+  -> m (AST.StarExpr ws atomType ctxt ())
+genStarExpr cfg ws =
   AST.StarExpr <$>
-  genWhitespaceBeforeF
+  genBeforeF (Gen.list (Range.linear 0 10) ws)
     (Gen.small . genExpr $ cfg & atomType .~ SAssignable) <*>
   pure ()
 
 genListTestlistComp
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.ListTestlistComp atomType ctxt ())
+  -> m (AST.ListTestlistComp ws atomType ctxt ())
 genListTestlistComp cfg =
   case cfg ^. atomType of
     SAssignable ->
@@ -121,7 +123,7 @@ genListTestlistComp cfg =
 genTupleTestlistComp
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.TupleTestlistComp atomType ctxt ())
+  -> m (AST.TupleTestlistComp ws atomType ctxt ())
 genTupleTestlistComp cfg =
   case cfg ^. atomType of
     SAssignable ->
@@ -166,7 +168,7 @@ genTupleTestlistComp cfg =
 genTestList
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.TestList atomType ctxt ())
+  -> m (AST.TestList ws atomType ctxt ())
 genTestList cfg =
   AST.TestList <$>
     Gen.small (genTest cfg) <*>
@@ -180,7 +182,7 @@ genTestList cfg =
 genYieldArg
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.YieldArg atomType ctxt ())
+  -> m (AST.YieldArg ws atomType ctxt ())
 genYieldArg cfg =
   case cfg ^. atomType of
     SAssignable -> Gen.small $ Gen.choice [ yieldArgList cfg ]
@@ -197,7 +199,7 @@ genYieldArg cfg =
 genYieldExpr
   :: MonadGen m
   => ExprConfig 'NotAssignable ('FunDef 'Normal)
-  -> m (AST.YieldExpr ('FunDef 'Normal) ())
+  -> m (AST.YieldExpr ws ('FunDef 'Normal) ())
 genYieldExpr cfg =
   Gen.small $
   AST.YieldExpr <$>
@@ -211,7 +213,7 @@ genYieldExpr cfg =
 genDictItem
   :: MonadGen m
   => ExprConfig 'NotAssignable cfg
-  -> m (AST.DictItem 'NotAssignable cfg ())
+  -> m (AST.DictItem ws 'NotAssignable cfg ())
 genDictItem cfg =
   AST.DictItem <$>
   Gen.small (genTest cfg) <*>
@@ -222,7 +224,7 @@ genDictItem cfg =
 genDictUnpacking
   :: MonadGen m
   => ExprConfig 'NotAssignable cfg
-  -> m (AST.DictUnpacking 'NotAssignable cfg ())
+  -> m (AST.DictUnpacking ws 'NotAssignable cfg ())
 genDictUnpacking cfg =
   AST.DictUnpacking <$>
   genBeforeF
@@ -233,7 +235,7 @@ genDictUnpacking cfg =
 genDictOrSetMaker
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.DictOrSetMaker 'NotAssignable ctxt ())
+  -> m (AST.DictOrSetMaker ws 'NotAssignable ctxt ())
 genDictOrSetMaker cfg =
   Gen.choice
     [ AST.DictOrSetMakerDictComp <$>
@@ -565,7 +567,7 @@ genBytesLiteral =
 genAtom
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Atom atomType ctxt ())
+  -> m (AST.Atom ws atomType ctxt ())
 genAtom cfg =
   case cfg ^. atomType of
     SNotAssignable -> Gen.choice [genAtomInteger cfg, genAtomNoInt' cfg]
@@ -580,7 +582,7 @@ genAtom cfg =
 genAtomNoInt
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.AtomNoInt atomType ctxt ())
+  -> m (AST.AtomNoInt ws atomType ctxt ())
 genAtomNoInt cfg =
   case (cfg ^. atomType, cfg ^. definitionContext) of
     (SNotAssignable, SFunDef SNormal) ->
@@ -652,7 +654,7 @@ genAtomNoInt cfg =
 genLambdefNocond
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.LambdefNocond 'NotAssignable ctxt ())
+  -> m (AST.LambdefNocond ws 'NotAssignable ctxt ())
 genLambdefNocond cfg =
   AST.LambdefNocond <$>
   genMaybeF
@@ -667,7 +669,7 @@ genLambdefNocond cfg =
 genTestNocond
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.TestNocond atomType ctxt ())
+  -> m (AST.TestNocond ws atomType ctxt ())
 genTestNocond cfg =
   Gen.small $
   AST.TestNocond <$>
@@ -681,7 +683,7 @@ genTestNocond cfg =
 genCompIf
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.CompIf 'NotAssignable ctxt ())
+  -> m (AST.CompIf ws 'NotAssignable ctxt ())
 genCompIf cfg =
   AST.CompIf <$>
   genBetweenWhitespace1 (pure AST.KIf) <*>
@@ -693,7 +695,7 @@ genCompIf cfg =
 genCompIter
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.CompIter 'NotAssignable ctxt ())
+  -> m (AST.CompIter ws 'NotAssignable ctxt ())
 genCompIter cfg =
   Gen.small $
   AST.CompIter <$>
@@ -703,7 +705,7 @@ genCompIter cfg =
 genExprList
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.ExprList atomType ctxt ())
+  -> m (AST.ExprList ws atomType ctxt ())
 genExprList cfg =
   case cfg ^. atomType of
     SAssignable -> 
@@ -749,7 +751,7 @@ genExprList cfg =
 genCompFor
   :: MonadGen m
   => ExprConfig as ctxt
-  -> m (AST.CompFor 'NotAssignable ctxt ())
+  -> m (AST.CompFor ws 'NotAssignable ctxt ())
 genCompFor cfg =
   AST.CompFor <$>
   genBeforeF
@@ -770,7 +772,7 @@ genCompFor cfg =
 genSliceOp
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.SliceOp 'NotAssignable ctxt ())
+  -> m (AST.SliceOp ws 'NotAssignable ctxt ())
 genSliceOp cfg =
   AST.SliceOp <$>
   genMaybeF (Gen.small . genWhitespaceBeforeF $ genTest cfg) <*>
@@ -779,7 +781,7 @@ genSliceOp cfg =
 genSubscript
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.Subscript 'NotAssignable ctxt ())
+  -> m (AST.Subscript ws 'NotAssignable ctxt ())
 genSubscript cfg =
   Gen.choice
     [ AST.SubscriptTest <$> Gen.small (genTest cfg) <*> pure ()
@@ -794,7 +796,7 @@ genSubscript cfg =
 genSubscriptList
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.SubscriptList 'NotAssignable ctxt ())
+  -> m (AST.SubscriptList ws 'NotAssignable ctxt ())
 genSubscriptList cfg =
   AST.SubscriptList <$>
   Gen.small (genSubscript cfg) <*>
@@ -808,7 +810,7 @@ genSubscriptList cfg =
 genTrailer
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Trailer atomType ctxt ())
+  -> m (AST.Trailer ws atomType ctxt ())
 genTrailer cfg =
   case cfg ^. atomType of
     SNotAssignable ->
@@ -837,7 +839,7 @@ genTrailer cfg =
 genAtomExprTrailers
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.AtomExprTrailers atomType ctxt ())
+  -> m (AST.AtomExprTrailers ws atomType ctxt ())
 genAtomExprTrailers cfg =
   Gen.recursive Gen.choice
     [ AST.AtomExprTrailersBase <$>
@@ -853,7 +855,7 @@ genAtomExprTrailers cfg =
 genAtomExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.AtomExpr atomType ctxt ())
+  -> m (AST.AtomExpr ws atomType ctxt ())
 genAtomExpr cfg =
   case (cfg ^. atomType, cfg ^. definitionContext) of
     (SNotAssignable, SFunDef SAsync) ->
@@ -882,7 +884,7 @@ genAtomExpr cfg =
 genPower
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Power atomType ctxt ())
+  -> m (AST.Power ws atomType ctxt ())
 genPower cfg =
   case cfg ^. atomType of
     SAssignable -> powerOne cfg
@@ -913,7 +915,7 @@ genFactorOp =
 genFactor
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Factor atomType ctxt ())
+  -> m (AST.Factor ws atomType ctxt ())
 genFactor cfg =
   case cfg ^. atomType of
     SAssignable -> factorNone cfg
@@ -934,7 +936,7 @@ genFactor cfg =
 genTerm
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Term atomType ctxt ())
+  -> m (AST.Term ws atomType ctxt ())
 genTerm cfg =
   case cfg ^. atomType of
     SAssignable -> termOne cfg
@@ -958,7 +960,7 @@ genTerm cfg =
 genArithExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.ArithExpr atomType ctxt ())
+  -> m (AST.ArithExpr ws atomType ctxt ())
 genArithExpr cfg =
   case cfg ^. atomType of
     SAssignable -> arithExprOne cfg
@@ -983,7 +985,7 @@ genArithExpr cfg =
 genShiftExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.ShiftExpr atomType ctxt ())
+  -> m (AST.ShiftExpr ws atomType ctxt ())
 genShiftExpr cfg =
   case cfg ^. atomType of
     SAssignable -> shiftExprOne cfg
@@ -1008,7 +1010,7 @@ genShiftExpr cfg =
 genAndExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.AndExpr atomType ctxt ())
+  -> m (AST.AndExpr ws atomType ctxt ())
 genAndExpr cfg =
   case cfg ^. atomType of
     SAssignable -> andExprOne cfg
@@ -1032,7 +1034,7 @@ genAndExpr cfg =
 genXorExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.XorExpr atomType ctxt ())
+  -> m (AST.XorExpr ws atomType ctxt ())
 genXorExpr cfg =
   case cfg ^. atomType of
     SAssignable -> xorExprOne cfg
@@ -1056,7 +1058,7 @@ genXorExpr cfg =
 genExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Expr atomType ctxt ())
+  -> m (AST.Expr ws atomType ctxt ())
 genExpr cfg =
   case cfg ^. atomType of
     SAssignable -> exprOne cfg
@@ -1095,7 +1097,7 @@ genCompOperator =
 genComparison
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Comparison atomType ctxt ())
+  -> m (AST.Comparison ws atomType ctxt ())
 genComparison cfg =
   case cfg ^. atomType of
     SAssignable -> comparisonOne cfg
@@ -1119,7 +1121,7 @@ genComparison cfg =
 genNotTest
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.NotTest atomType ctxt ())
+  -> m (AST.NotTest ws atomType ctxt ())
 genNotTest cfg =
   case cfg ^. atomType of
     SAssignable -> notTestOne cfg
@@ -1142,7 +1144,7 @@ genNotTest cfg =
 genAndTest
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.AndTest atomType ctxt ())
+  -> m (AST.AndTest ws atomType ctxt ())
 genAndTest cfg = do
   n <- Gen.int (Range.linear 1 10)
   case cfg ^. atomType of
@@ -1167,7 +1169,7 @@ genAndTest cfg = do
 genOrTest
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.OrTest atomType ctxt ())
+  -> m (AST.OrTest ws atomType ctxt ())
 genOrTest cfg =
   case cfg ^. atomType of
     SAssignable -> orTestOne cfg
@@ -1191,8 +1193,9 @@ genOrTest cfg =
 genTest
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Test atomType ctxt ())
-genTest cfg =
+  -> m ws
+  -> m (AST.Test ws atomType ctxt ())
+genTest cfg ws =
   case cfg ^. atomType of
     SAssignable -> testCondNoIf cfg
     SNotAssignable ->
@@ -1202,12 +1205,12 @@ genTest cfg =
         [ AST.TestCondIf <$>
           Gen.small (genOrTest cfg) <*>
           genBeforeF
-            genWhitespace1
+            (Gen.nonEmpty (Range.linear 1 10) ws)
             (Gen.small $ genIfThenElse cfg) <*>
           pure ()
         , Gen.small $
           AST.TestLambdef <$>
-          genLambdef cfg <*>
+          genLambdef cfg ws <*>
           pure ()
         ]
   where
@@ -1219,15 +1222,16 @@ genTest cfg =
 genLambdef
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.Lambdef 'NotAssignable ctxt ())
-genLambdef cfg =
+  -> m ws
+  -> m (AST.Lambdef ws 'NotAssignable ctxt ())
+genLambdef cfg ws =
   AST.Lambdef <$>
   genMaybeF
-    (genWhitespaceBefore1F .
-     genArgsList cfg genIdentifier $ genTest cfg) <*>
+    (genBefore1F ws .
+     genArgsList cfg genIdentifier $ genTest cfg ws) <*>
   genBeforeF
-    (genBetweenWhitespace $ pure AST.Colon)
-    (Gen.small . genTest $ cfg & definitionContext .~ SFunDef SNormal) <*>
+    (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure AST.Colon)
+    (Gen.small $ genTest (cfg & definitionContext .~ SFunDef SNormal) ws) <*>
   pure ()
 
 genStringContent

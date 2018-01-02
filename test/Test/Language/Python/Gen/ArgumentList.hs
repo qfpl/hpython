@@ -34,13 +34,13 @@ genArgumentList cfg _genName _genExpr =
       (,,,,) <$>
       genPositionalArguments cfg _genExpr <*>
       genMaybeF
-        (genBeforeF (genBetweenWhitespace $ pure Comma)
+        (genBeforeF (genBetweenAnyWhitespace $ pure Comma)
          (genStarredAndKeywords cfg _genName _genExpr)) <*>
       genMaybeF
         (genBeforeF
-           (genBetweenWhitespace $ pure Comma)
+           (genBetweenAnyWhitespace $ pure Comma)
            (genKeywordsArguments cfg _genName _genExpr)) <*>
-      Gen.maybe (genBetweenWhitespace $ pure Comma) <*>
+      Gen.maybe (genBetweenAnyWhitespace $ pure Comma) <*>
       pure ()
     , Gen.just $
       fmap (review _ArgumentListUnpacking) $
@@ -48,15 +48,15 @@ genArgumentList cfg _genName _genExpr =
       genStarredAndKeywords cfg _genName _genExpr <*>
       genMaybeF
         (genBeforeF
-           (genBetweenWhitespace $ pure Comma)
+           (genBetweenAnyWhitespace $ pure Comma)
            (genKeywordsArguments cfg _genName _genExpr)) <*>
-      Gen.maybe (genBetweenWhitespace $ pure Comma) <*>
+      Gen.maybe (genBetweenAnyWhitespace $ pure Comma) <*>
       pure ()
     , Gen.just $
       fmap (review _ArgumentListKeywords) $
       (,,) <$>
       genKeywordsArguments cfg _genName _genExpr <*>
-      Gen.maybe (genBetweenWhitespace $ pure Comma) <*>
+      Gen.maybe (genBetweenAnyWhitespace $ pure Comma) <*>
       pure ()
     ]
 
@@ -72,14 +72,14 @@ genPositionalArguments cfg _genExpr = do
   PositionalArguments <$>
     Gen.resize n
       (genBeforeF
-        (Gen.maybe . genBetweenWhitespace $ pure Asterisk)
+        (Gen.maybe . genBetweenAnyWhitespace $ pure Asterisk)
         (_genExpr $ cfg & atomType .~ SNotAssignable)) <*>
     genListF
       (Gen.resize n $
        genBeforeF
-         (genBetweenWhitespace $ pure Comma)
+         (genBetweenAnyWhitespace $ pure Comma)
          (genBeforeF
-           (Gen.maybe . genBetweenWhitespace $ pure Asterisk)
+           (Gen.maybe . genBetweenAnyWhitespace $ pure Asterisk)
            (_genExpr $ cfg & atomType .~ SNotAssignable))) <*>
     pure ()
 
@@ -96,7 +96,7 @@ genStarredAndKeywords cfg _genName _genExpr = do
   StarredAndKeywords <$>
     starOrKeyword n <*>
     genListF
-      (genBeforeF (genBetweenWhitespace $ pure Comma) (starOrKeyword n)) <*>
+      (genBeforeF (genBetweenAnyWhitespace $ pure Comma) (starOrKeyword n)) <*>
     pure ()
   where
     starOrKeyword n =
@@ -104,7 +104,7 @@ genStarredAndKeywords cfg _genName _genExpr = do
         [ InL <$>
           Gen.resize n
             (genBeforeF
-              (genBetweenWhitespace $ pure Asterisk)
+              (genBetweenAnyWhitespace $ pure Asterisk)
               (_genExpr $ cfg & atomType .~ SNotAssignable))
         , InR <$> Gen.resize n (genKeywordItem cfg _genName _genExpr)
         ]
@@ -123,7 +123,7 @@ genKeywordsArguments cfg _genName _genExpr = do
     keywordOrDoublestar n <*>
     genListF
       (genBeforeF
-        (genBetweenWhitespace $ pure Comma)
+        (genBetweenAnyWhitespace $ pure Comma)
         (keywordOrDoublestar n)) <*>
     pure ()
   where
@@ -133,7 +133,7 @@ genKeywordsArguments cfg _genName _genExpr = do
         , Gen.resize n $
           InR <$>
           genBeforeF
-            (genBetweenWhitespace $ pure DoubleAsterisk)
+            (genBetweenAnyWhitespace $ pure DoubleAsterisk)
             (_genExpr $ cfg & atomType .~ SNotAssignable)
         ]
 
@@ -147,6 +147,6 @@ genKeywordItem
   -> m (KeywordItem name expr 'NotAssignable dctxt ())
 genKeywordItem cfg _genName _genExpr =
   KeywordItem <$>
-  genWhitespaceAfterF _genName <*>
-  genWhitespaceBeforeF (_genExpr $ cfg & atomType .~ SNotAssignable) <*>
+  genAnyWhitespaceAfterF _genName <*>
+  genAnyWhitespaceBeforeF (_genExpr $ cfg & atomType .~ SNotAssignable) <*>
   pure ()

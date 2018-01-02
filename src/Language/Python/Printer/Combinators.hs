@@ -69,6 +69,14 @@ between'
   -> r
 between' f g (Between' (Between s a t)) = f s <> g a <> f t
 
+between'F
+  :: Semigroup r
+  => (s -> r)
+  -> (f a -> r)
+  -> Compose (Between' s) f a
+  -> r
+between'F f g (Compose (Between' (Between s a t))) = f s <> g a <> f t
+
 whitespaceAfterF
   :: Foldable g
   => (f a -> Doc)

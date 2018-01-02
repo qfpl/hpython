@@ -40,25 +40,29 @@ simpleStatement (SimpleStatement h t s n _) =
 smallStatement :: Ord a => SmallStatement lctxt ectxt a -> Doc
 smallStatement s =
   case s of
-    SmallStatementExpr v _ -> test v
+    SmallStatementExpr v _ -> test whitespaceChar v
     SmallStatementAssign l m r _ ->
-      testlistStarExpr test starExpr l <>
+      testlistStarExpr (test whitespaceChar) (starExpr whitespaceChar) l <>
       foldMapOf
         (_Wrapped.folded)
         (beforeF
           (betweenWhitespace' equals)
-          (testlistStarExpr test starExpr))
+          (testlistStarExpr (test whitespaceChar) (starExpr whitespaceChar)))
         m <>
       beforeF
         (betweenWhitespace' equals)
-        (sumElim yieldExpr $ testlistStarExpr test starExpr)
+        (sumElim
+          (yieldExpr whitespaceChar)
+          (testlistStarExpr (test whitespaceChar) (starExpr whitespaceChar)))
         r
     SmallStatementAugAssign l r _ ->
-      test l <>
-      beforeF (betweenWhitespace' augAssign) (sumElim yieldExpr testList) r
+      test whitespaceChar l <>
+      beforeF
+        (betweenWhitespace' augAssign)
+        (sumElim (yieldExpr whitespaceChar) (testList whitespaceChar)) r
     SmallStatementDel v _ ->
       text "del" <>
-      whitespaceBeforeF exprList v
+      whitespaceBeforeF (exprList whitespaceChar) v
     SmallStatementPass _ -> text "pass"
     SmallStatementFlow v _ -> flowStatement v
     SmallStatementImport v _ -> importStatement v
@@ -78,10 +82,10 @@ smallStatement s =
         t
     SmallStatementAssert h t _ ->
       text "assert" <>
-      whitespaceBeforeF test h <>
+      whitespaceBeforeF (test whitespaceChar) h <>
       foldMapOf
         (_Wrapped.folded)
-        (beforeF (betweenWhitespace' comma) test)
+        (beforeF (betweenWhitespace' comma) (test whitespaceChar))
         t
 
 flowStatement :: Ord a => FlowStatement lctxt ectxt a -> Doc
@@ -93,7 +97,7 @@ flowStatement s =
       text "return" <>
       foldMapOf
         (_Wrapped.folded)
-        (whitespaceBeforeF testList)
+        (whitespaceBeforeF $ testList whitespaceChar)
         v
     FlowStatementRaise v _ ->
       text "raise" <>
@@ -101,14 +105,14 @@ flowStatement s =
         (_Wrapped.folded)
         (whitespaceBeforeF raiseStatement)
         v
-    FlowStatementYield v _ -> yieldExpr v
+    FlowStatementYield v _ -> yieldExpr whitespaceChar v
 
 raiseStatement :: Ord a => RaiseStatement ectxt a -> Doc
 raiseStatement (RaiseStatement l r _) =
-  test l <>
+  test whitespaceChar l <>
   foldMapOf
     (_Wrapped.folded)
-    (beforeF kFrom $ whitespaceBeforeF test)
+    (beforeF kFrom $ whitespaceBeforeF (test whitespaceChar))
     r
 
 compoundStatement :: Ord a => CompoundStatement lctxt ectxt a -> [Doc]
@@ -128,14 +132,14 @@ ifStatement :: Ord a => IfStatement lctxt ectxt a -> [Doc]
 ifStatement (IfStatement a b elif el _) =
   suite
     (text "if" <>
-     whitespaceBeforeF test a <>
+     whitespaceBeforeF (test whitespaceChar) a <>
      betweenWhitespace' colon (b ^. _Wrapped.before._1))
     (b ^. _Wrapped.before._2) <>
   foldMap
     (\a ->
        suite
          (text "elif" <>
-          whitespaceBeforeF test (a ^. _1) <>
+          whitespaceBeforeF (test whitespaceChar) (a ^. _1) <>
           betweenWhitespace' colon (a ^. _2._Wrapped.before._1))
          (a ^. _2._Wrapped.before._2))
     (getCompose elif) <>
@@ -150,7 +154,7 @@ whileStatement :: Ord a => WhileStatement lctxt ectxt a -> [Doc]
 whileStatement (WhileStatement c b e _) =
   suite
     (text "while" <>
-     whitespaceBeforeF test c <>
+     whitespaceBeforeF (test whitespaceChar) c <>
      betweenWhitespace' colon (b ^. _Wrapped.before._1))
     (b ^. _Wrapped.before._2) <>
   foldMapOf
@@ -165,9 +169,11 @@ forStatement :: Ord a => ForStatement lctxt ectxt a -> [Doc]
 forStatement (ForStatement f i b e _) =
   suite
     (text "for" <>
-     betweenWhitespace'F (testlistStarExpr expr starExpr) f <>
+     betweenWhitespace'F
+       (testlistStarExpr (expr whitespaceChar) (starExpr whitespaceChar))
+       f <>
      text "in" <>
-     whitespaceBeforeF testList i <>
+     whitespaceBeforeF (testList whitespaceChar) i <>
      betweenWhitespace' colon (b ^. _Wrapped.before._1))
     (b ^. _Wrapped.before._2) <>
   foldMapOf
@@ -219,7 +225,7 @@ exceptClause (ExceptClause v _) =
   text "except" <>
   foldMapOf
     (_Wrapped.folded)
-    (whitespaceBeforeF . prodElim test $
+    (whitespaceBeforeF . prodElim (test whitespaceChar) $
      foldMapOf (_Wrapped.folded) $
      beforeF (betweenWhitespace' kAs) identifier)
     v
@@ -238,10 +244,10 @@ withStatement (WithStatement h t s _) =
 
 withItem :: Ord a => WithItem ctxt a -> Doc
 withItem (WithItem l r _) =
-  test l <>
+  test whitespaceChar l <>
   foldMapOf
     (_Wrapped.folded)
-    (beforeF (betweenWhitespace' kAs) expr)
+    (beforeF (betweenWhitespace' kAs) (expr whitespaceChar))
     r
 
 asyncStatement :: Ord a => AsyncStatement lctxt ectxt a -> [Doc]
@@ -257,7 +263,7 @@ funcDef (FuncDef n p t b _) =
      whitespaceBeforeF parameters p <>
      foldMapOf
        (_Wrapped.folded)
-       (beforeF (betweenWhitespace' rightArrow) test)
+       (beforeF (betweenWhitespace' rightArrow) (test whitespaceChar))
        t <>
      betweenWhitespace' colon (b ^. _Wrapped.before._1))
     (b ^. _Wrapped.before._2)
@@ -265,14 +271,19 @@ funcDef (FuncDef n p t b _) =
 parameters :: Ord a => Parameters ctxt a -> Doc
 parameters (Parameters v _) =
   parens $
-  betweenWhitespace'F (foldMapOf (_Wrapped.folded) (argsList typedArg test)) v
+  between'F
+    (foldMap anyWhitespaceChar)
+    (foldMapOf
+      (_Wrapped.folded)
+      (argsList (typedArg anyWhitespaceChar) (test anyWhitespaceChar)))
+    v
 
-typedArg :: Ord a => TypedArg a -> Doc
-typedArg (TypedArg v t _) =
+typedArg :: Ord a => (ws -> Doc) -> TypedArg ws a -> Doc
+typedArg ws (TypedArg v t _) =
   identifier v <>
   foldMapOf
     (_Wrapped.folded)
-    (beforeF (betweenWhitespace' colon) test)
+    (beforeF (between' (foldMap ws) colon) (test ws))
     t
 
 classDef :: Ord a => ClassDef ctxt a -> [Doc]
@@ -284,8 +295,8 @@ classDef (ClassDef n a b _) =
        (_Wrapped.folded)
        (parens .
        whitespaceBeforeF
-         (betweenWhitespace'F $
-          foldMapOf (_Wrapped.folded) (argumentList identifier test)))
+         (between'F (foldMap anyWhitespaceChar) $
+          foldMapOf (_Wrapped.folded) (argumentList identifier (test anyWhitespaceChar))))
        a <>
      betweenWhitespace' colon (b ^. _Wrapped.before._1))
   (b ^. _Wrapped.before._2)
@@ -302,8 +313,8 @@ decorator (Decorator name args n _) =
   foldMapOf
     (_Wrapped.folded)
     (parens .
-     betweenWhitespace'F
-       (foldMapOf (_Wrapped.folded) (argumentList identifier test)))
+     between'F (foldMap anyWhitespaceChar)
+       (foldMapOf (_Wrapped.folded) (argumentList identifier (test anyWhitespaceChar))))
     args <>
   newlineChar n
 

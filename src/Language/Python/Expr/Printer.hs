@@ -1,4 +1,5 @@
 {-# language GADTs #-}
+{-# language ScopedTypeVariables #-}
 module Language.Python.Expr.Printer where
 
 import Papa hiding (Plus, Product, Sum, Space, zero, o, argument)
@@ -242,12 +243,12 @@ bytesLiteral (BytesLiteral prefix val _) =
   bytesPrefix prefix <>
   sumElim shortBytes longBytes val
 
-ifThenElse :: Ord a => IfThenElse atomType ctxt a -> Doc
-ifThenElse (IfThenElse i v1 e v2) =
-  betweenWhitespace' (const $ text "if") i <>
-  orTest v1 <>
-  betweenWhitespace' (const $ text "else") e <>
-  test v2
+ifThenElse :: Ord a => (ws -> Doc) -> IfThenElse ws atomType ctxt a -> Doc
+ifThenElse ws (IfThenElse i v1 e v2) =
+  between' (foldMap ws) (const $ text "if") i <>
+  orTest ws v1 <>
+  between' (foldMap ws) (const $ text "else") e <>
+  test ws v2
 
 compOperator :: CompOperator -> Doc
 compOperator o =
@@ -300,52 +301,52 @@ compOperator o =
 tupleElim :: Semigroup r => (a -> r) -> (b -> r) -> (a, b) -> r
 tupleElim f g (a, b) = f a <> g b
 
-compIter :: Ord a => CompIter atomType ctxt a -> Doc
-compIter (CompIter val _) = sumElim compFor compIf val
+compIter :: Ord a => (ws -> Doc) -> CompIter ws atomType ctxt a -> Doc
+compIter ws (CompIter val _) = sumElim (compFor ws) (compIf ws) val
 
-lambdefNocond :: Ord a => LambdefNocond atomType ctxt a -> Doc
-lambdefNocond  (LambdefNocond a e _) =
+lambdefNocond :: Ord a => (ws -> Doc) -> LambdefNocond ws atomType ctxt a -> Doc
+lambdefNocond ws (LambdefNocond a e _) =
   text "lambda" <>
   foldMapF
     (betweenF
-      (foldMap whitespaceChar)
-      (foldMap whitespaceChar)
-      (argsList identifier test))
+      (foldMap ws)
+      (foldMap ws)
+      (argsList identifier $ test ws))
     a <>
   char ':' <>
-  whitespaceBeforeF testNocond e
+  beforeF (foldMap ws) (testNocond ws) e
 
-testNocond :: Ord a => TestNocond atomType ctxt a -> Doc
-testNocond (TestNocond val _) = sumElim orTest lambdefNocond val
+testNocond :: Ord a => (ws -> Doc) -> TestNocond ws atomType ctxt a -> Doc
+testNocond ws (TestNocond val _) = sumElim (orTest ws) (lambdefNocond ws) val
 
-compIf :: Ord a => CompIf atomType ctxt a -> Doc
-compIf (CompIf kw e i _) =
-  betweenWhitespace' (const $ text "if") kw <>
-  testNocond e <>
-  foldMapF (whitespaceBeforeF compIter) i
+compIf :: Ord a => (ws -> Doc) -> CompIf ws atomType ctxt a -> Doc
+compIf ws (CompIf kw e i _) =
+  between' (foldMap ws) (const $ text "if") kw <>
+  testNocond ws e <>
+  foldMapF (beforeF (foldMap ws) (compIter ws)) i
 
-exprList :: Ord a => ExprList atomType ctxt a -> Doc
-exprList e =
+exprList :: Ord a => (ws -> Doc) -> ExprList ws atomType ctxt a -> Doc
+exprList ws e =
   case e of
-    ExprListSingleStarredNoComma s _ -> starExpr s
-    ExprListSingleStarredComma s c _ -> starExpr s <> whitespaceBefore comma c
-    ExprListSingle v c _ -> expr v <> foldMap (whitespaceBefore comma) c
+    ExprListSingleStarredNoComma s _ -> starExpr ws s
+    ExprListSingleStarredComma s c _ -> starExpr ws s <> before (foldMap ws) comma c
+    ExprListSingle v c _ -> expr ws v <> foldMap (before (foldMap ws) comma) c
     ExprListMany h t c _ ->
       exprOrStar h <>
-      foldMapF (beforeF (betweenWhitespace' comma) exprOrStar) t <>
-      foldMap (whitespaceBefore comma) c
+      foldMapF (beforeF (between' (foldMap ws) comma) exprOrStar) t <>
+      foldMap (before (foldMap ws) comma) c
   where
-    exprOrStar = sumElim expr starExpr
+    exprOrStar = sumElim (expr ws) (starExpr ws)
 
-compFor :: Ord a => CompFor atomType ctxt a -> Doc
-compFor (CompFor t e i _) =
+compFor :: Ord a => (ws -> Doc) -> CompFor ws atomType ctxt a -> Doc
+compFor ws (CompFor t e i _) =
   beforeF
-    (betweenWhitespace' . const $ text "for")
-    (whitespaceAfterF $ testlistStarExpr expr starExpr)
+    (between' (foldMap ws) . const $ text "for")
+    (afterF (foldMap ws) $ testlistStarExpr (expr ws) (starExpr ws))
     t <>
   text "in" <>
-  whitespaceBeforeF orTest e <>
-  foldMapF (whitespaceBeforeF compIter) i
+  beforeF (foldMap ws) (orTest ws) e <>
+  foldMapF (beforeF (foldMap ws) (compIter ws)) i
 
 prodElim
   :: Semigroup r
@@ -354,195 +355,198 @@ prodElim
   -> Product f g a -> r
 prodElim f g (Pair a b) = f a <> g b
 
-expr :: Ord a => Expr atomType ctxt a -> Doc
-expr (ExprOne v _) = xorExpr v
-expr (ExprMany l r _) =
-  xorExpr l <>
-  foldMapF (beforeF (betweenWhitespace' pipe) xorExpr) r
+expr :: Ord a => (ws -> Doc) -> Expr ws atomType ctxt a -> Doc
+expr ws (ExprOne v _) = xorExpr ws v
+expr ws (ExprMany l r _) =
+  xorExpr ws l <>
+  foldMapF (beforeF (between' (foldMap ws) pipe) (xorExpr ws)) r
 
-comparison :: Ord a => Comparison atomType ctxt a -> Doc
-comparison (ComparisonOne v _) = expr v
-comparison (ComparisonMany l r _) =
-  expr l <>
-  foldMapF (beforeF compOperator expr) r
+comparison :: Ord a => (ws -> Doc) -> Comparison ws atomType ctxt a -> Doc
+comparison ws (ComparisonOne v _) = expr ws v
+comparison ws (ComparisonMany l r _) =
+  expr ws l <>
+  foldMapF (beforeF (between' (foldMap ws) compOperator) (expr ws)) r
 
-dictItem :: Ord a => DictItem atomType ctxt a -> Doc
-dictItem (DictItem k c v _) =
-  test k <>
-  betweenWhitespace' colon c <>
-  test v
+dictItem :: Ord a => (ws -> Doc) -> DictItem ws atomType ctxt a -> Doc
+dictItem ws (DictItem k c v _) =
+  test ws k <>
+  between' (foldMap ws) colon c <>
+  test ws v
 
-dictUnpacking :: Ord a => DictUnpacking atomType ctxt a -> Doc
-dictUnpacking (DictUnpacking v _) =
-  beforeF (betweenWhitespace' doubleAsterisk) expr v
+dictUnpacking :: Ord a => (ws -> Doc) -> DictUnpacking ws atomType ctxt a -> Doc
+dictUnpacking ws (DictUnpacking v _) =
+  beforeF (between' (foldMap ws) doubleAsterisk) (expr ws) v
 
-dictOrSetMaker :: Ord a => DictOrSetMaker atomType ctxt a -> Doc
-dictOrSetMaker e =
+dictOrSetMaker :: forall a ws atomType ctxt. Ord a => (ws -> Doc) -> DictOrSetMaker ws atomType ctxt a -> Doc
+dictOrSetMaker ws e =
   case e of
     DictOrSetMakerDictComp h t _ ->
-      dictItem h <>
-      compFor t
+      dictItem ws h <>
+      compFor ws t
     DictOrSetMakerDictUnpack h t c _ ->
       itemOrUnpacking h <>
-      foldMapF (beforeF (betweenWhitespace' comma) itemOrUnpacking) t <>
-      foldMap (betweenWhitespace' comma) c
+      foldMapF (beforeF (between' (foldMap ws) comma) itemOrUnpacking) t <>
+      foldMap (between' (foldMap ws) comma) c
     DictOrSetMakerSetComp h t _ ->
-      test h <>
-      compFor t
+      test ws h <>
+      compFor ws t
     DictOrSetMakerSetUnpack h t c _ ->
       testOrStar h <>
-      foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t <>
-      foldMap (betweenWhitespace' comma) c
+      foldMapF (beforeF (between' (foldMap ws) comma) testOrStar) t <>
+      foldMap (between' (foldMap ws) comma) c
   where
-    itemOrUnpacking :: Ord a => Sum (DictItem atomType ctxt) (DictUnpacking atomType ctxt) a -> Doc
-    itemOrUnpacking = sumElim dictItem dictUnpacking
+    itemOrUnpacking :: Ord a => Sum (DictItem ws atomType ctxt) (DictUnpacking ws atomType ctxt) a -> Doc
+    itemOrUnpacking = sumElim (dictItem ws) (dictUnpacking ws)
 
-    testOrStar :: Ord a => Sum (Test atomType ctxt) (StarExpr atomType ctxt) a -> Doc
-    testOrStar = sumElim test starExpr
+    testOrStar :: Ord a => Sum (Test ws atomType ctxt) (StarExpr ws atomType ctxt) a -> Doc
+    testOrStar = sumElim (test ws) (starExpr ws)
 
-starExpr :: Ord a => StarExpr atomType ctxt a -> Doc
-starExpr (StarExpr val _) =
+starExpr :: Ord a => (ws -> Doc) -> StarExpr ws atomType ctxt a -> Doc
+starExpr ws (StarExpr val _) =
   char '*' <>
-  whitespaceBeforeF expr val
+  beforeF (foldMap ws) (expr ws) val
 
-listTestlistComp :: Ord a => ListTestlistComp atomType ctxt a -> Doc
-listTestlistComp t =
+listTestlistComp :: Ord a => (ws -> Doc) -> ListTestlistComp ws atomType ctxt a -> Doc
+listTestlistComp ws t =
   case t of
     ListTestlistCompFor h t' _ ->
-      test h <>
-      compFor t'
+      test ws h <>
+      compFor ws t'
     ListTestlistCompList h t' c _ ->
-      test h <>
-      foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t' <>
-      foldMap (whitespaceBefore comma) c
+      test ws h <>
+      foldMapF (beforeF (between' (foldMap ws) comma) testOrStar) t' <>
+      foldMap (before (foldMap ws) comma) c
     ListTestlistCompStarred h t' c _ ->
-      starExpr h <>
-      foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t' <>
-      foldMap (whitespaceBefore comma) c
+      starExpr ws h <>
+      foldMapF (beforeF (between' (foldMap ws) comma) testOrStar) t' <>
+      foldMap (before (foldMap ws) comma) c
   where
-    testOrStar = sumElim test starExpr
+    testOrStar = sumElim (test ws) (starExpr ws)
 
-tupleTestlistComp :: Ord a => TupleTestlistComp atomType ctxt a -> Doc
-tupleTestlistComp t =
+tupleTestlistComp :: Ord a => (ws -> Doc) -> TupleTestlistComp ws atomType ctxt a -> Doc
+tupleTestlistComp ws t =
   case t of
     TupleTestlistCompFor h t' _ ->
-      test h <>
-      compFor t'
+      test ws h <>
+      compFor ws t'
     TupleTestlistCompList h t' c _ ->
-      test h <>
-      foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t' <>
-      foldMap (whitespaceBefore comma) c
+      test ws h <>
+      foldMapF (beforeF (between' (foldMap ws) comma) testOrStar) t' <>
+      foldMap (before (foldMap ws) comma) c
     TupleTestlistCompStarredOne h c _ ->
-      starExpr h <>
-      whitespaceBefore comma c
+      starExpr ws h <>
+      before (foldMap ws) comma c
     TupleTestlistCompStarredMany h t' c _ ->
-      starExpr h <>
-      foldMapF (beforeF (betweenWhitespace' comma) testOrStar) t' <>
-      foldMap (whitespaceBefore comma) c
+      starExpr ws h <>
+      foldMapF (beforeF (between' (foldMap ws) comma) testOrStar) t' <>
+      foldMap (before (foldMap ws) comma) c
   where
-    testOrStar = sumElim test starExpr
+    testOrStar = sumElim (test ws) (starExpr ws)
 
-testList :: Ord a => TestList atomType ctxt a -> Doc
-testList (TestList h t c _) =
-  test h <>
-  foldMapOf (_Wrapped.folded) (beforeF (betweenWhitespace' comma) test) t <>
-  foldMap (whitespaceBefore comma) c
+testList :: Ord a => (ws -> Doc) -> TestList ws atomType ctxt a -> Doc
+testList ws (TestList h t c _) =
+  test ws h <>
+  foldMapOf
+    (_Wrapped.folded)
+    (beforeF (between' (foldMap ws) comma) (test ws))
+    t <>
+  foldMap (before (foldMap ws) comma) c
 
-yieldArg :: Ord a => YieldArg atomType ctxt a -> Doc
-yieldArg y =
+yieldArg :: Ord a => (ws -> Doc) -> YieldArg ws atomType ctxt a -> Doc
+yieldArg ws y =
   case y of
-    YieldArgFrom val _ -> text "from" <> whitespaceBeforeF test val
-    YieldArgList val _ -> testList val
+    YieldArgFrom val _ -> text "from" <> beforeF (foldMap ws) (test ws) val
+    YieldArgList val _ -> testList ws val
 
-yieldExpr :: Ord a => YieldExpr ctxt a -> Doc
-yieldExpr (YieldExpr val _) =
+yieldExpr :: Ord a => (ws -> Doc) -> YieldExpr ws ctxt a -> Doc
+yieldExpr ws (YieldExpr val _) =
   text "yield" <>
-  foldMapF (whitespaceBeforeF yieldArg) val
+  foldMapF (beforeF (foldMap ws) (yieldArg ws)) val
 
-atom :: Ord a => Atom atomType ctxt a -> Doc
-atom a =
+atom :: Ord a => (ws -> Doc) -> Atom ws atomType ctxt a -> Doc
+atom ws a =
   case a of
-    AtomNoInt val _ -> atomNoInt val
+    AtomNoInt val _ -> atomNoInt ws val
     AtomInteger val _ -> integer' val
 
-atomNoInt :: Ord a => AtomNoInt atomType ctxt a -> Doc
-atomNoInt a =
+atomNoInt :: Ord a => (ws -> Doc) -> AtomNoInt ws atomType ctxt a -> Doc
+atomNoInt ws a =
   case a of
     AtomParenYield val _ ->
-      parens $ betweenWhitespace'F yieldExpr val
+      parens $ between'F (foldMap anyWhitespaceChar) (yieldExpr anyWhitespaceChar) val
     AtomParenNoYield val _ ->
-      parens $ betweenWhitespace'F (foldMapF tupleTestlistComp) val
+      parens $ between'F (foldMap anyWhitespaceChar) (foldMapF (tupleTestlistComp anyWhitespaceChar)) val
     AtomBracket val _ ->
       brackets $
-      betweenWhitespace'F (foldMapF listTestlistComp) val
+      between'F (foldMap anyWhitespaceChar) (foldMapF (listTestlistComp anyWhitespaceChar)) val
     AtomCurly val _ ->
       braces $
-      betweenWhitespace'F (foldMapF dictOrSetMaker) val
+      between'F (foldMap anyWhitespaceChar) (foldMapF (dictOrSetMaker anyWhitespaceChar)) val
     AtomIdentifier val _ -> identifier val
     AtomFloat val _ -> float' val
     AtomString h t _ ->
       sumElim stringLiteral bytesLiteral h <>
-      foldMapF (whitespaceBeforeF $ sumElim stringLiteral bytesLiteral) t
+      foldMapF (beforeF (foldMap ws) $ sumElim stringLiteral bytesLiteral) t
     AtomEllipsis _ -> text "..."
     AtomNone _ -> text "None"
     AtomTrue _ -> text "True"
     AtomFalse _ -> text "False"
-    AtomImag v _ -> whitespaceBeforeF imag v
+    AtomImag v _ -> beforeF (foldMap ws) imag v
 
-sliceOp :: Ord a => SliceOp atomType ctxt a -> Doc
-sliceOp (SliceOp val _) = char ':' <> foldMapF (whitespaceBeforeF test) val
+sliceOp :: Ord a => (ws -> Doc) -> SliceOp ws atomType ctxt a -> Doc
+sliceOp ws (SliceOp val _) = char ':' <> foldMapF (beforeF (foldMap ws) (test ws)) val
 
-subscript :: Ord a => Subscript atomType ctxt a -> Doc
-subscript s =
+subscript :: Ord a => (ws -> Doc) -> Subscript ws atomType ctxt a -> Doc
+subscript ws s =
   case s of
-    SubscriptTest val _ -> test val
+    SubscriptTest val _ -> test ws val
     SubscriptSlice l c r o _ ->
-      whitespaceAfterF (foldMapF test) l <>
-      whitespaceAfter (const $ text ":") c <>
-      foldMapF (whitespaceAfterF test) r <>
-      foldMapF (whitespaceAfterF sliceOp) o
+      afterF (foldMap ws) (foldMapF $ test ws) l <>
+      after (foldMap ws) (const $ text ":") c <>
+      foldMapF (afterF (foldMap ws) (test ws)) r <>
+      foldMapF (afterF (foldMap ws) (sliceOp ws)) o
 
-subscriptList :: Ord a => SubscriptList atomType ctxt a -> Doc
-subscriptList (SubscriptList h t c _) =
-  subscript h <>
-  foldMapF (beforeF (betweenWhitespace' comma) subscript) t <>
-  foldMap (whitespaceBefore comma) c
+subscriptList :: Ord a => (ws -> Doc) -> SubscriptList ws atomType ctxt a -> Doc
+subscriptList ws (SubscriptList h t c _) =
+  subscript ws h <>
+  foldMapF (beforeF (between' (foldMap ws) comma) (subscript ws)) t <>
+  foldMap (before (foldMap ws) comma) c
 
-trailer :: Ord a => Trailer atomType ctxt a -> Doc
-trailer t =
+trailer :: Ord a => (ws -> Doc) -> Trailer ws atomType ctxt a -> Doc
+trailer ws t =
   case t of
     TrailerCall val _ ->
       parens $
-      betweenWhitespace'F (foldMapF $ argumentList identifier test) val
+      between'F (foldMap anyWhitespaceChar) (foldMapF $ argumentList identifier (test anyWhitespaceChar)) val
     TrailerSubscript val _ ->
-      brackets $ betweenWhitespace'F subscriptList val
-    TrailerAccess val _ -> char '.' <> whitespaceBeforeF identifier val
+      brackets $ between'F (foldMap anyWhitespaceChar) (subscriptList anyWhitespaceChar) val
+    TrailerAccess val _ -> char '.' <> beforeF (foldMap ws) identifier val
 
-atomExprTrailers :: Ord a => AtomExprTrailers atomType ctxt a -> Doc
-atomExprTrailers (AtomExprTrailersBase v t _) =
-  atomNoInt v <>
-  whitespaceBeforeF trailer t
-atomExprTrailers (AtomExprTrailersMany v t _) =
-  atomExprTrailers v <>
-  whitespaceBeforeF trailer t
+atomExprTrailers :: Ord a => (ws -> Doc) -> AtomExprTrailers ws atomType ctxt a -> Doc
+atomExprTrailers ws (AtomExprTrailersBase v t _) =
+  atomNoInt ws v <>
+  beforeF (foldMap ws) (trailer ws) t
+atomExprTrailers ws (AtomExprTrailersMany v t _) =
+  atomExprTrailers ws v <>
+  beforeF (foldMap ws) (trailer ws) t
 
-atomExpr :: Ord a => AtomExpr atomType ctxt a -> Doc
-atomExpr (AtomExprSingle v _) =
-  atom v
-atomExpr (AtomExprTrailers v _) =
-  atomExprTrailers v
-atomExpr (AtomExprAwaitSingle a b _) =
-  whitespaceAfter kAwait a <>
-  atom b
-atomExpr (AtomExprAwaitTrailers a b _) =
-  whitespaceAfter kAwait a <>
-  atomExprTrailers b
+atomExpr :: Ord a => (ws -> Doc) -> AtomExpr ws atomType ctxt a -> Doc
+atomExpr ws (AtomExprSingle v _) =
+  atom ws v
+atomExpr ws (AtomExprTrailers v _) =
+  atomExprTrailers ws v
+atomExpr ws (AtomExprAwaitSingle a b _) =
+  after (foldMap ws) kAwait a <>
+  atom ws b
+atomExpr ws (AtomExprAwaitTrailers a b _) =
+  after (foldMap ws) kAwait a <>
+  atomExprTrailers ws b
 
-power :: Ord a => Power atomType ctxt a -> Doc
-power (PowerOne v _) = atomExpr v
-power (PowerMany l r _) =
-  atomExpr l <>
-  beforeF (betweenWhitespace' doubleAsterisk) factor r
+power :: Ord a => (ws -> Doc) -> Power ws atomType ctxt a -> Doc
+power ws (PowerOne v _) = atomExpr ws v
+power ws (PowerMany l r _) =
+  atomExpr ws l <>
+  beforeF (between' (foldMap ws) doubleAsterisk) (factor ws) r
 
 factorOp :: FactorOperator -> Doc
 factorOp f =
@@ -551,11 +555,11 @@ factorOp f =
     FactorPos -> char '+'
     FactorInv -> char '~'
 
-factor :: Ord a => Factor atomType ctxt a -> Doc
-factor f =
+factor :: Ord a => (ws -> Doc) -> Factor ws atomType ctxt a -> Doc
+factor ws f =
   case f of
-    FactorNone val _ -> power val
-    FactorOne compOp val _ -> whitespaceAfter factorOp compOp <> factor val
+    FactorNone val _ -> power ws val
+    FactorOne compOp val _ -> after (foldMap ws) factorOp compOp <> factor ws val
 
 termOp :: TermOperator -> Doc
 termOp t =
@@ -566,76 +570,76 @@ termOp t =
     TermDiv -> char '/'
     TermMod -> char '%'
 
-term :: Ord a => Term atomType ctxt a -> Doc
-term (TermOne v _) = factor v
-term (TermMany l r _) =
-  factor l <>
-  foldMapF (beforeF (betweenWhitespace' termOp) factor) r
+term :: Ord a => (ws -> Doc) -> Term ws atomType ctxt a -> Doc
+term ws (TermOne v _) = factor ws v
+term ws (TermMany l r _) =
+  factor ws l <>
+  foldMapF (beforeF (between' (foldMap ws) termOp) (factor ws)) r
 
-arithExpr :: Ord a => ArithExpr atomType ctxt a -> Doc
-arithExpr (ArithExprOne v _) = term v
-arithExpr (ArithExprMany l r _) =
-  term l <>
-  foldMapF (beforeF (betweenWhitespace' (either plus minus)) term) r
+arithExpr :: Ord a => (ws -> Doc) -> ArithExpr ws atomType ctxt a -> Doc
+arithExpr ws (ArithExprOne v _) = term ws v
+arithExpr ws (ArithExprMany l r _) =
+  term ws l <>
+  foldMapF (beforeF (between' (foldMap ws) (either plus minus)) (term ws)) r
 
-shiftExpr :: Ord a => ShiftExpr atomType ctxt a -> Doc
-shiftExpr (ShiftExprOne v _) = arithExpr v
-shiftExpr (ShiftExprMany l r _) =
-  arithExpr l <>
+shiftExpr :: Ord a => (ws -> Doc) -> ShiftExpr ws atomType ctxt a -> Doc
+shiftExpr ws (ShiftExprOne v _) = arithExpr ws v
+shiftExpr ws (ShiftExprMany l r _) =
+  arithExpr ws l <>
   foldMapF
     (beforeF
-      (betweenWhitespace' (either doubleLT doubleGT))
-      arithExpr)
+      (between' (foldMap ws) (either doubleLT doubleGT))
+      (arithExpr ws))
     r
 
-andExpr :: Ord a => AndExpr atomType ctxt a -> Doc
-andExpr (AndExprOne v _) = shiftExpr v
-andExpr (AndExprMany l r _) =
-  shiftExpr l <>
-  foldMapF (beforeF (betweenWhitespace' ampersand) shiftExpr) r
+andExpr :: Ord a => (ws -> Doc) -> AndExpr ws atomType ctxt a -> Doc
+andExpr ws (AndExprOne v _) = shiftExpr ws v
+andExpr ws (AndExprMany l r _) =
+  shiftExpr ws l <>
+  foldMapF (beforeF (between' (foldMap ws) ampersand) (shiftExpr ws)) r
 
-xorExpr :: Ord a => XorExpr atomType ctxt a -> Doc
-xorExpr (XorExprOne v _) = andExpr v
-xorExpr (XorExprMany l r _) =
-  andExpr l <>
-  foldMapF (beforeF (betweenWhitespace' caret) andExpr) r
+xorExpr :: Ord a => (ws -> Doc) -> XorExpr ws atomType ctxt a -> Doc
+xorExpr ws (XorExprOne v _) = andExpr ws v
+xorExpr ws (XorExprMany l r _) =
+  andExpr ws l <>
+  foldMapF (beforeF (between' (foldMap ws) caret) (andExpr ws)) r
 
-notTest :: Ord a => NotTest atomType ctxt a -> Doc
-notTest n =
+notTest :: Ord a => (ws -> Doc) -> NotTest ws atomType ctxt a -> Doc
+notTest ws n =
   case n of
-    NotTestMany val _ -> beforeF (whitespaceAfter kNot) notTest val
-    NotTestOne val _ -> comparison val
+    NotTestMany val _ -> beforeF (after (foldMap ws) kNot) (notTest ws) val
+    NotTestOne val _ -> comparison ws val
 
-andTest :: Ord a => AndTest atomType ctxt a -> Doc
-andTest (AndTestOne v _) = notTest v
-andTest (AndTestMany l r _) =
-  notTest l <>
+andTest :: Ord a => (ws -> Doc) -> AndTest ws atomType ctxt a -> Doc
+andTest ws (AndTestOne v _) = notTest ws v
+andTest ws (AndTestMany l r _) =
+  notTest ws l <>
   foldMapF
     (beforeF
-      (betweenWhitespace' kAnd)
-      notTest)
+      (between' (foldMap ws) kAnd)
+      (notTest ws))
     r
 
-orTest :: Ord a => OrTest atomType ctxt a -> Doc
-orTest (OrTestOne v _) = andTest v
-orTest (OrTestMany l r _) =
-  andTest l <>
-  foldMapF (beforeF (betweenWhitespace' kOr) andTest) r
+orTest :: Ord a => (ws -> Doc) -> OrTest ws atomType ctxt a -> Doc
+orTest ws (OrTestOne v _) = andTest ws v
+orTest ws (OrTestMany l r _) =
+  andTest ws l <>
+  foldMapF (beforeF (between' (foldMap ws) kOr) (andTest ws)) r
 
-test :: Ord a => Test atomType ctxt a -> Doc
-test t =
+test :: Ord a => (ws -> Doc) -> Test ws atomType ctxt a -> Doc
+test ws t =
   case t of
-    TestCondNoIf v _ -> orTest v
+    TestCondNoIf v _ -> orTest ws v
     TestCondIf h t' _ ->
-      orTest h <>
-      whitespaceBeforeF ifThenElse t'
-    TestLambdef a _ -> lambdef a
+      orTest ws h <>
+      beforeF (foldMap ws) (ifThenElse ws) t'
+    TestLambdef a _ -> lambdef ws a
 
-lambdef :: Ord a => Lambdef atomType ctxt a -> Doc
-lambdef (Lambdef a b _) =
+lambdef :: Ord a => (ws -> Doc) -> Lambdef ws atomType ctxt a -> Doc
+lambdef ws (Lambdef a b _) =
   text "lambda" <>
-  foldMapF (whitespaceBeforeF $ argsList identifier test) a <>
-  beforeF (betweenWhitespace' colon) test b
+  foldMapF (beforeF (foldMap ws) $ argsList identifier (test ws)) a <>
+  beforeF (between' (foldMap ws) colon) (test ws) b
 
 comment :: Comment a -> Doc
 comment (Comment val _) = char '#' <> text (T.unpack val)

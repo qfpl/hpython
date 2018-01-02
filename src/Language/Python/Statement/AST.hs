@@ -229,7 +229,7 @@ data Parameters (ctxt :: DefinitionContext) a
   = Parameters
   { _parameters_value
     :: Compose
-         (Between' [WhitespaceChar])
+         (Between' [AnyWhitespaceChar])
          (Compose
            Maybe
            (ArgsList
@@ -249,7 +249,7 @@ data TypedArg ws a
     :: Compose
          Maybe
          (Compose
-           (Before (Between' [WhitespaceChar] Colon))
+           (Before (Between' [ws] Colon))
            (Test ws 'NotAssignable ('FunDef 'Normal)))
          a
   , _typedArg_ann :: a

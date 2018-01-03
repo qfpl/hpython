@@ -12,5 +12,5 @@ module' :: Ord a => Module a -> Doc
 module' (Module s _ ) =
   foldMapOf
     (_Wrapped.folded)
-    (sumElim (newlineChar . getConst) (fold . statement))
+    (sumElim (newlineChar . getConst) (foldMap ($ mempty) . statement))
     s

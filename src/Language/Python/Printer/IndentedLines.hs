@@ -10,10 +10,10 @@ import Language.Python.Printer.Combinators
 import Language.Python.Printer.Symbols
 
 indentedLines
-  :: (comment a -> [Doc])
-  -> (f a -> [Doc])
+  :: (comment a -> [Doc -> Doc])
+  -> (f a -> [Doc -> Doc])
   -> IndentedLines comment f a
-  -> [Doc]
+  -> [Doc -> Doc]
 indentedLines c f i =
   foldMapOf
     (_Wrapped.folded)
@@ -21,5 +21,5 @@ indentedLines c f i =
       c
       (\(Compose (Before a b)) ->
          let a' = foldMap indentationChar a
-         in (a' <>) <$> f b))
+         in (. (<> a')) <$> f b))
     (getIndentedLines i)

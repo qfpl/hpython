@@ -21,10 +21,13 @@ import Language.Python.Statement.AST
 import Language.Python.Statement.Printer.AugAssign
 import Language.Python.Statement.Printer.Imports
 
-statement :: Ord a => Statement lctxt ectxt a -> [Doc]
+-- Doc -> Doc is used because comments need to ignore the
+-- surrounding indentation. The argument to Doc -> Doc is
+-- preceding text for that line
+statement :: Ord a => Statement lctxt ectxt a -> [Doc -> Doc]
 statement s =
   case s of
-    StatementSimple v _ -> [ simpleStatement v ]
+    StatementSimple v _ -> [ (<> simpleStatement v) ]
     StatementCompound v _ -> compoundStatement v
 
 simpleStatement :: Ord a => SimpleStatement lctxt ectxt a -> Doc
@@ -115,7 +118,7 @@ raiseStatement (RaiseStatement l r _) =
     (beforeF kFrom $ whitespaceBeforeF (test whitespaceChar))
     r
 
-compoundStatement :: Ord a => CompoundStatement lctxt ectxt a -> [Doc]
+compoundStatement :: Ord a => CompoundStatement lctxt ectxt a -> [Doc -> Doc]
 compoundStatement s =
   case s of
     CompoundStatementIf v _ -> ifStatement v
@@ -128,7 +131,7 @@ compoundStatement s =
     CompoundStatementDecorated v _ -> decorated v
     CompoundStatementAsync v _ -> asyncStatement v
 
-ifStatement :: Ord a => IfStatement lctxt ectxt a -> [Doc]
+ifStatement :: Ord a => IfStatement lctxt ectxt a -> [Doc -> Doc]
 ifStatement (IfStatement a b elif el _) =
   suite
     (text "if" <>
@@ -150,7 +153,7 @@ ifStatement (IfStatement a b elif el _) =
          (a ^. _Wrapped.before._2))
     (getCompose el)
 
-whileStatement :: Ord a => WhileStatement lctxt ectxt a -> [Doc]
+whileStatement :: Ord a => WhileStatement lctxt ectxt a -> [Doc -> Doc]
 whileStatement (WhileStatement c b e _) =
   suite
     (text "while" <>
@@ -165,7 +168,7 @@ whileStatement (WhileStatement c b e _) =
          (a ^. _Wrapped.before._2))
     e
 
-forStatement :: Ord a => ForStatement lctxt ectxt a -> [Doc]
+forStatement :: Ord a => ForStatement lctxt ectxt a -> [Doc -> Doc]
 forStatement (ForStatement f i b e _) =
   suite
     (text "for" <>
@@ -184,7 +187,7 @@ forStatement (ForStatement f i b e _) =
          (a ^. _Wrapped.before._2))
     e
 
-tryStatement :: Ord a => TryStatement lctxt ectxt a -> [Doc]
+tryStatement :: Ord a => TryStatement lctxt ectxt a -> [Doc -> Doc]
 tryStatement s =
   case s of
     TryStatementExcepts t ex el f _ ->
@@ -230,7 +233,7 @@ exceptClause (ExceptClause v _) =
      beforeF (betweenWhitespace' kAs) identifier)
     v
 
-withStatement :: Ord a => WithStatement lctxt ectxt a -> [Doc]
+withStatement :: Ord a => WithStatement lctxt ectxt a -> [Doc -> Doc]
 withStatement (WithStatement h t s _) =
   suite
     (text "with" <>
@@ -250,12 +253,12 @@ withItem (WithItem l r _) =
     (beforeF (betweenWhitespace' kAs) (expr whitespaceChar))
     r
 
-asyncStatement :: Ord a => AsyncStatement lctxt ectxt a -> [Doc]
+asyncStatement :: Ord a => AsyncStatement lctxt ectxt a -> [Doc -> Doc]
 asyncStatement (AsyncStatement v _) =
   case sumElim (sumElim funcDef withStatement) forStatement (v ^. _Wrapped.before._2) of
-    (x:xs) -> (text "async" <> foldMap whitespaceChar (v ^. _Wrapped.before._1) <> x) : xs
+    (x:xs) -> (<> x (text "async" <> foldMap whitespaceChar (v ^. _Wrapped.before._1))) : xs
 
-funcDef :: Ord a => FuncDef outer inner a -> [Doc]
+funcDef :: Ord a => FuncDef outer inner a -> [Doc -> Doc]
 funcDef (FuncDef n p t b _) =
   suite
     (text "def" <>
@@ -286,7 +289,7 @@ typedArg ws (TypedArg v t _) =
     (beforeF (between' (foldMap ws) colon) (test ws))
     t
 
-classDef :: Ord a => ClassDef ctxt a -> [Doc]
+classDef :: Ord a => ClassDef ctxt a -> [Doc -> Doc]
 classDef (ClassDef n a b _) =
   suite
     (text "class" <>
@@ -301,9 +304,9 @@ classDef (ClassDef n a b _) =
      betweenWhitespace' colon (b ^. _Wrapped.before._1))
   (b ^. _Wrapped.before._2)
 
-decorated :: Ord a => Decorated ctxt a -> [Doc]
+decorated :: Ord a => Decorated ctxt a -> [Doc -> Doc]
 decorated (Decorated ds b _) =
-  fmap decorator (NonEmpty.toList $ getCompose ds) <>
+  fmap (flip (<>) . decorator) (NonEmpty.toList $ getCompose ds) <>
   sumElim (sumElim classDef funcDef) asyncFuncDef b
 
 decorator :: Ord a => Decorator ctxt a -> Doc
@@ -318,18 +321,25 @@ decorator (Decorator name args n _) =
     args <>
   newlineChar n
 
-asyncFuncDef :: Ord a => AsyncFuncDef ctxt a -> [Doc]
+asyncFuncDef :: Ord a => AsyncFuncDef ctxt a -> [Doc -> Doc]
 asyncFuncDef (AsyncFuncDef v _) =
   case funcDef (v ^. _Wrapped.before._2) of
-    (x:xs) -> (text "async" <> foldMap whitespaceChar (v ^. _Wrapped.before._1) <> x) : xs
+    (x:xs) -> (<> x (text "async" <> foldMap whitespaceChar (v ^. _Wrapped.before._1))) : xs
 
-suite :: Ord a => Doc -> Suite lctxt ctxt a -> [Doc]
+suite :: Ord a => Doc -> Suite lctxt ctxt a -> [Doc -> Doc]
 suite preceding s =
   case s of
-    SuiteSingle v _ -> [preceding <> simpleStatement v]
+    SuiteSingle v _ -> [(<> preceding <> simpleStatement v)]
     SuiteMulti n sts _ ->
-      (preceding <> newlineChar n) :
+      (<> preceding <> newlineChar n) :
       indentedLines
-        (pure . whitespaceBeforeF (afterF newlineChar (foldMapOf (_Wrapped.folded) comment)))
+        (\a ->
+           [ const $
+             whitespaceBeforeF
+               (afterF
+                 newlineChar
+                 (foldMapOf (_Wrapped.folded) comment))
+             a
+           ])
         statement
         sts

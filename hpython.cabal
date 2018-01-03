@@ -151,6 +151,7 @@ test-suite hpython-tests
                        , directory >=1.3 && <1.4
                        , filepath >=1.4 && <1.5
                        , hedgehog >=0.5 && <0.6
+                       , hspec-expectations-pretty-diff >=0.7.2.4 && <0.8
                        , tasty >=0.11 && <0.12
                        , tasty-hspec >=1.1 && <1.2
                        , trifecta >=1.6 && <1.7

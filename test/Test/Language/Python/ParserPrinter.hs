@@ -12,8 +12,9 @@ import Hedgehog
 import System.Directory
 import System.FilePath
 import System.Process
+import Test.Hspec.Expectations.Pretty
 import Test.Tasty
-import Test.Tasty.Hspec
+import Test.Tasty.Hspec (HasCallStack, it, testSpecs)
 import Test.Tasty.Hedgehog
 import Text.Trifecta hiding (render, runUnspaced)
 
@@ -96,7 +97,7 @@ parse_print_statement_id input =
             expectationFailure $
             WL.displayS (WL.renderPretty 1.0 80 . WL.text $ show es) ""
           Right ast ->
-            HPJ.render (fold ast) `shouldBe` input
+            HPJ.render (foldMap ($ mempty) ast) `shouldBe` input
     Failure (ErrInfo info _) ->
       expectationFailure $ WL.displayS (WL.renderPretty 1.0 80 info) ""
 
@@ -197,7 +198,7 @@ prop_statement_ast_is_valid_python
 prop_statement_ast_is_valid_python scfg ecfg =
   property $ do
     st <- forAll $ GenAST.genStatement scfg ecfg
-    let program = HPJ.render . fold $ Print.statement st
+    let program = HPJ.render . foldMap ($ mempty) $ Print.statement st
     res <- liftIO $ checkSyntax program
     case res of
       SyntaxError pythonError -> do

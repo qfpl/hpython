@@ -44,7 +44,7 @@ data LambdefNocond (ws :: *) (atomType :: AtomType) (ctxt :: DefinitionContext) 
          Maybe
          (Compose
            (Between (NonEmpty ws) [ws])
-           (ArgsList Identifier (Test ws atomType ctxt)))
+           (ArgsList ws Identifier (Test ws atomType ctxt)))
          a
   , _lambdefNocond_expr
     :: Compose
@@ -596,7 +596,7 @@ data Lambdef :: * -> AtomType -> DefinitionContext -> * -> * where
           Maybe
           (Compose
             (Before (NonEmpty ws))
-            (ArgsList Identifier (Test ws 'NotAssignable ctxt)))
+            (ArgsList ws Identifier (Test ws 'NotAssignable ctxt)))
           a
     , _lambdef_body
       :: Compose

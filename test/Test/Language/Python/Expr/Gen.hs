@@ -681,7 +681,7 @@ genLambdefNocond cfg ws =
      genBetweenF
        (Gen.nonEmpty (Range.linear 1 10) ws)
        (Gen.list (Range.linear 0 10) ws) $
-      genArgsList cfg genIdentifier (genTest cfg ws)) <*>
+      genArgsList cfg ws genIdentifier (genTest cfg ws)) <*>
   genBeforeF (Gen.list (Range.linear 0 10) ws)
     (Gen.small $
      genTestNocond (cfg & definitionContext .~ SFunDef SNormal) ws) <*>
@@ -1284,7 +1284,7 @@ genLambdef cfg ws =
   AST.Lambdef <$>
   genMaybeF
     (genBefore1F ws .
-     genArgsList cfg genIdentifier $ genTest cfg ws) <*>
+     genArgsList cfg ws genIdentifier $ genTest cfg ws) <*>
   genBeforeF
     (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure AST.Colon)
     (Gen.small $ genTest (cfg & definitionContext .~ SFunDef SNormal) ws) <*>

@@ -86,7 +86,7 @@ lambdef ws =
   annotated $
   Lambdef <$>
   (string "lambda" *>
-   optionalF (before1F ws $ argsList (test ws) identifier)) <*>
+   optionalF (before1F ws $ argsList ws (test ws) identifier)) <*>
   beforeF (between' (many ws) colon) (test ws)
 
 orTest
@@ -110,7 +110,7 @@ lambdefNocond ws =
     (try $ betweenF
       (some1 ws)
       (many ws)
-      (argsList (test ws) identifier)) <*>
+      (argsList ws (test ws) identifier)) <*>
   beforeF (many ws) (testNocond ws)
 
 testNocond

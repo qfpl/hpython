@@ -311,7 +311,7 @@ lambdefNocond ws (LambdefNocond a e _) =
     (betweenF
       (foldMap ws)
       (foldMap ws)
-      (argsList identifier $ test ws))
+      (argsList ws identifier $ test ws))
     a <>
   char ':' <>
   beforeF (foldMap ws) (testNocond ws) e
@@ -640,7 +640,9 @@ test ws t =
 lambdef :: Ord a => (ws -> Doc) -> Lambdef ws atomType ctxt a -> Doc
 lambdef ws (Lambdef a b _) =
   text "lambda" <>
-  foldMapF (beforeF (foldMap ws) $ argsList identifier (test ws)) a <>
+  foldMapF
+    (beforeF (foldMap ws) $ argsList ws identifier (test ws))
+    a <>
   beforeF (between' (foldMap ws) colon) (test ws) b
 
 comment :: Comment a -> Doc

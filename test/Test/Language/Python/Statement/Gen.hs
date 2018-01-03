@@ -486,6 +486,7 @@ genParameters ecfg =
     (genMaybeF
       (genArgsList
         (ecfg & atomType .~ SNotAssignable)
+        genAnyWhitespaceChar
         (genTypedArg ecfg genAnyWhitespaceChar)
         (genTest (ecfg & atomType .~ SNotAssignable) genAnyWhitespaceChar))) <*>
   pure ()

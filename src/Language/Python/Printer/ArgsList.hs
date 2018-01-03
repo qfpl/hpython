@@ -11,70 +11,80 @@ import Language.Python.Printer.Combinators
 import Language.Python.Printer.Symbols
 
 argsListArg
-  :: (name a -> Doc)
+  :: (ws -> Doc)
+  -> (name a -> Doc)
   -> (f a -> Doc)
-  -> ArgsListArg name f a
+  -> ArgsListArg ws name f a
   -> Doc
-argsListArg renderName f (ArgsListArg l r _) =
+argsListArg ws renderName f (ArgsListArg l r _) =
   renderName l <>
-  foldMapF (beforeF (betweenWhitespace' . const $ char '=') f) r
+  foldMapF
+    (beforeF (between' (foldMap ws) . const $ char '=') f)
+    r
 
 argsListStarPart
-  :: (name a -> Doc)
+  :: (ws -> Doc)
+  -> (name a -> Doc)
   -> (f a -> Doc)
-  -> ArgsListStarPart name f a
+  -> ArgsListStarPart ws name f a
   -> Doc
-argsListStarPart renderName f e =
+argsListStarPart ws renderName f e =
   case e of
     ArgsListStarPartEmpty _ -> mempty
     ArgsListStarPart h t r _ ->
-      beforeF (betweenWhitespace' . const $ text "*") renderName h <>
+      beforeF
+        (between' (foldMap ws) . const $ text "*")
+        renderName
+        h <>
       foldMapF
         (beforeF
-          (betweenWhitespace' comma)
-          (argsListArg renderName f)) t <>
+          (between' (foldMap ws) comma)
+          (argsListArg ws renderName f)) t <>
       foldMapF
         (beforeF
-          (betweenWhitespace' comma)
-          (argsListDoublestarArg renderName)) r
+          (between' (foldMap ws) comma)
+          (argsListDoublestarArg ws renderName)) r
 
 argsListDoublestarArg
-  :: (name a -> Doc)
-  -> ArgsListDoublestarArg name test a
+  :: (ws -> Doc)
+  -> (name a -> Doc)
+  -> ArgsListDoublestarArg ws name test a
   -> Doc
-argsListDoublestarArg renderName (ArgsListDoublestarArg a _) =
+argsListDoublestarArg ws renderName (ArgsListDoublestarArg a _) =
   text "**" <>
-  betweenWhitespace'F renderName a
+  between'F (foldMap ws) renderName a
 
 argsList
   :: HasName name
-  => (name a -> Doc)
+  => (ws -> Doc)
+  -> (name a -> Doc)
   -> (f a -> Doc)
-  -> ArgsList name f a
+  -> ArgsList ws name f a
   -> Doc
-argsList renderName f e =
+argsList ws renderName f e =
   Just e &
     (outside _ArgsListAll .~
        (\(h, t, r, _) ->
-         argsListArg renderName f h <>
+         argsListArg ws renderName f h <>
          foldMapF
            (beforeF
-             (betweenWhitespace' comma)
-             (argsListArg renderName f)) t <>
+             (between' (foldMap ws) comma)
+             (argsListArg ws renderName f)) t <>
          foldMapF
            (beforeF
-             (betweenWhitespace' comma)
-             (foldMapF $ starOrDouble renderName f)) r) $
+             (between' (foldMap ws) comma)
+             (foldMapF $ starOrDouble ws renderName f)) r) $
      outside _ArgsListArgsKwargs .~
-       (\(a, _) -> starOrDouble renderName f a) $
+       (\(a, _) -> starOrDouble ws renderName f a) $
      error "incomplete pattern")
   where
     starOrDouble
-      :: (name a -> Doc)
+      :: (ws -> Doc)
+      -> (name a -> Doc)
       -> (f a -> Doc)
-      -> Sum (ArgsListStarPart name f) (ArgsListDoublestarArg name f) a
+      -> Sum (ArgsListStarPart ws name f) (ArgsListDoublestarArg ws name f) a
       -> Doc
-    starOrDouble renderName' f' =
+    starOrDouble ws' renderName' f' =
       sumElim
-        (argsListStarPart renderName' f')
-        (argsListDoublestarArg renderName')
+        (argsListStarPart ws' renderName' f')
+        (argsListDoublestarArg ws' renderName')

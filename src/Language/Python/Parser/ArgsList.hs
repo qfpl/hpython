@@ -19,14 +19,15 @@ argsListArg
      , Functor f
      , Functor name
      )
-  => Unspaced m (f SrcInfo)
+  => Unspaced m ws
+  -> Unspaced m (f SrcInfo)
   -> Unspaced m (name SrcInfo)
-  -> Unspaced m (ArgsListArg name f SrcInfo)
-argsListArg p pname =
+  -> Unspaced m (ArgsListArg ws name f SrcInfo)
+argsListArg ws p pname =
   annotated $
   ArgsListArg <$>
   pname <*>
-  optionalF (beforeF (betweenWhitespace equals) p)
+  optionalF (beforeF (between' (many ws) equals) p)
 
 argsListStarPart
   :: ( DeltaParsing m
@@ -34,35 +35,37 @@ argsListStarPart
      , Functor f
      , Functor name
      )
-  => Unspaced m (f SrcInfo)
+  => Unspaced m ws
+  -> Unspaced m (f SrcInfo)
   -> Unspaced m (name SrcInfo)
-  -> Unspaced m (ArgsListStarPart name f SrcInfo)
-argsListStarPart p pname =
+  -> Unspaced m (ArgsListStarPart ws name f SrcInfo)
+argsListStarPart ws p pname =
   annotated $
   try argsListStarPartSome <|>
   pure ArgsListStarPartEmpty
   where
     argsListStarPartSome =
       ArgsListStarPart <$>
-      beforeF (betweenWhitespace asterisk) pname <*>
-      manyF (beforeF (betweenWhitespace comma) (argsListArg p pname)) <*>
+      beforeF (between' (many ws) asterisk) pname <*>
+      manyF (beforeF (between' (many ws) comma) (argsListArg ws p pname)) <*>
       optionalF
         (beforeF
-          (betweenWhitespace comma)
-          (argsListDoublestarArg pname))
+          (between' (many ws) comma)
+          (argsListDoublestarArg ws pname))
 
 argsListDoublestarArg
   :: ( DeltaParsing m
      , LookAheadParsing m
      , Functor name
      )
-  => Unspaced m (name SrcInfo)
-  -> Unspaced m (ArgsListDoublestarArg name test SrcInfo)
-argsListDoublestarArg pname =
+  => Unspaced m ws
+  -> Unspaced m (name SrcInfo)
+  -> Unspaced m (ArgsListDoublestarArg ws name test SrcInfo)
+argsListDoublestarArg ws pname =
   annotated $
   ArgsListDoublestarArg <$>
   (doubleAsterisk *>
-   betweenWhitespaceF pname)
+   between'F (many ws) pname)
 
 argsList
   :: ( DeltaParsing m
@@ -70,17 +73,18 @@ argsList
      , Functor f
      , Functor name
      )
-  => Unspaced m (f SrcInfo)
+  => Unspaced m ws
+  -> Unspaced m (f SrcInfo)
   -> Unspaced m (name SrcInfo)
-  -> Unspaced m (ArgsList name f SrcInfo)
-argsList p pname = try argsListAll <|> argsListArgsKwargs
+  -> Unspaced m (ArgsList ws name f SrcInfo)
+argsList ws p pname = try argsListAll <|> argsListArgsKwargs
   where
     argsListAll =
       annotated $
       ArgsListAll <$>
-      argsListArg p pname <*>
-      manyF (beforeF (betweenWhitespace comma) (argsListArg p pname)) <*>
-      optionalF (beforeF (betweenWhitespace comma) $ optionalF starOrDouble)
+      argsListArg ws p pname <*>
+      manyF (beforeF (between' (many ws) comma) (argsListArg ws p pname)) <*>
+      optionalF (beforeF (between' (many ws) comma) $ optionalF starOrDouble)
 
     argsListArgsKwargs =
       annotated $
@@ -88,5 +92,5 @@ argsList p pname = try argsListAll <|> argsListArgsKwargs
       starOrDouble
 
     starOrDouble = 
-      (InL <$> try (argsListStarPart p pname)) <|>
-      (InR <$> argsListDoublestarArg pname)
+      (InL <$> try (argsListStarPart ws p pname)) <|>
+      (InR <$> argsListDoublestarArg ws pname)

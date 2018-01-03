@@ -233,6 +233,7 @@ data Parameters (ctxt :: DefinitionContext) a
          (Compose
            Maybe
            (ArgsList
+             AnyWhitespaceChar
              (TypedArg AnyWhitespaceChar)
              (Test AnyWhitespaceChar 'NotAssignable ctxt)))
          a

@@ -53,14 +53,14 @@ import Data.Functor.Sum
 import Language.Python.AST.IsArgList
 import Language.Python.AST.Symbols
 
-data ArgsListArg name test a
+data ArgsListArg ws name test a
   = ArgsListArg
   { _argsListArg_left :: name a
   , _argsListArg_right
     :: Compose
          Maybe
          (Compose
-           (Before (Between' [WhitespaceChar] Equals))
+           (Before (Between' [ws] Equals))
            test)
          a
   , _argsListArg_ann :: a
@@ -69,27 +69,27 @@ data ArgsListArg name test a
 
 mkArgsListAll
   :: HasName name
-  => ArgsListArg name test a
+  => ArgsListArg ws name test a
   -> Compose
        []
        (Compose
          (Before
-           (Between' [WhitespaceChar] Comma))
-           (ArgsListArg name test))
+           (Between' [ws] Comma))
+           (ArgsListArg ws name test))
        a
   -> Compose
        Maybe
        (Compose
          (Before
-           (Between' [WhitespaceChar] Comma))
+           (Between' [ws] Comma))
            (Compose
              Maybe
              (Sum
-               (ArgsListStarPart name test)
-               (ArgsListDoublestarArg name test))))
+               (ArgsListStarPart ws name test)
+               (ArgsListDoublestarArg ws name test))))
        a
   -> a
-  -> Either (ArgumentError (ArgsList name test a)) (ArgsList name test a)
+  -> Either (ArgumentError (ArgsList ws name test a)) (ArgsList ws name test a)
 mkArgsListAll a bs c ann =
   let res = ArgsListAll a bs c ann
   in validateArgList res
@@ -97,25 +97,25 @@ mkArgsListAll a bs c ann =
 _ArgsListAll
   :: HasName name
   => Prism'
-       (Maybe (ArgsList name test a))
-       ( ArgsListArg name test a
+       (Maybe (ArgsList ws name test a))
+       ( ArgsListArg ws name test a
        , Compose
            []
            (Compose
              (Before
-               (Between' [WhitespaceChar] Comma))
-               (ArgsListArg name test))
+               (Between' [ws] Comma))
+               (ArgsListArg ws name test))
            a
        , Compose
            Maybe
            (Compose
              (Before
-               (Between' [WhitespaceChar] Comma))
+               (Between' [ws] Comma))
                (Compose
                   Maybe
                   (Sum
-                    (ArgsListStarPart name test)
-                    (ArgsListDoublestarArg name test))))
+                    (ArgsListStarPart ws name test)
+                    (ArgsListDoublestarArg ws name test))))
            a
        , a
        )
@@ -131,11 +131,11 @@ _ArgsListAll =
 mkArgsListArgsKwargs
   :: HasName name
   => Sum
-       (ArgsListStarPart name test)
-       (ArgsListDoublestarArg name test)
+       (ArgsListStarPart ws name test)
+       (ArgsListDoublestarArg ws name test)
        a
   -> a
-  -> Either (ArgumentError (ArgsList name test a)) (ArgsList name test a)
+  -> Either (ArgumentError (ArgsList ws name test a)) (ArgsList ws name test a)
 mkArgsListArgsKwargs a ann =
   let res = ArgsListArgsKwargs a ann
   in validateArgList res
@@ -143,10 +143,10 @@ mkArgsListArgsKwargs a ann =
 _ArgsListArgsKwargs
   :: HasName name
   => Prism'
-       (Maybe (ArgsList name test a))
+       (Maybe (ArgsList ws name test a))
        ( Sum
-           (ArgsListStarPart name test)
-           (ArgsListDoublestarArg name test)
+           (ArgsListStarPart ws name test)
+           (ArgsListDoublestarArg ws name test)
            a
        , a)
 _ArgsListArgsKwargs =
@@ -158,49 +158,49 @@ _ArgsListArgsKwargs =
           ArgsListArgsKwargs a b -> pure (a, b)
           _ -> Nothing)
 
-data ArgsList name test a
+data ArgsList ws name test a
   = ArgsListAll
-  { _argsListAll_head :: ArgsListArg name test a
+  { _argsListAll_head :: ArgsListArg ws name test a
   , _argsListAll_tail
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (ArgsListArg name test))
+           (Before (Between' [ws] Comma))
+           (ArgsListArg ws name test))
          a
   , _argsListAll_rest
     :: Compose
          Maybe
          (Compose
-           (Before (Between' [WhitespaceChar] Comma))
+           (Before (Between' [ws] Comma))
            (Compose
              Maybe
              (Sum
-               (ArgsListStarPart name test)
-               (ArgsListDoublestarArg name test))))
+               (ArgsListStarPart ws name test)
+               (ArgsListDoublestarArg ws name test))))
          a
   , _argsList_ann :: a
   }
   | ArgsListArgsKwargs
   { _argsListArgsKwargs_value
       :: Sum
-           (ArgsListStarPart name test)
-           (ArgsListDoublestarArg name test)
+           (ArgsListStarPart ws name test)
+           (ArgsListDoublestarArg ws name test)
            a
   , _argsList_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance (Eq1 test, Eq1 name, Eq a, Eq (name a)) => Eq (ArgsList name test a)
-deriving instance (Show1 test, Show1 name, Show a, Show (name a)) => Show (ArgsList name test a)
+deriving instance (Eq ws, Eq1 test, Eq1 name, Eq a, Eq (name a)) => Eq (ArgsList ws name test a)
+deriving instance (Show ws, Show1 test, Show1 name, Show a, Show (name a)) => Show (ArgsList ws name test a)
 
-instance HasName name => IsArgList (ArgsList name test a) where
-  data KeywordArgument (ArgsList name test a)
+instance HasName name => IsArgList (ArgsList ws name test a) where
+  data KeywordArgument (ArgsList ws name test a)
     = KAKeywordArg (name a) (test a)
 
-  data DoublestarArgument (ArgsList name test a)
+  data DoublestarArgument (ArgsList ws name test a)
     = DADoublestarArg (name a)
 
-  data PositionalArgument (ArgsList name test a)
+  data PositionalArgument (ArgsList ws name test a)
     = PASinglestarArg (name a)
     | PAPositionalArg (name a)
 
@@ -249,41 +249,41 @@ instance HasName name => IsArgList (ArgsList name test a) where
                _Wrapped.between'._2.
                to (DoublestarArgument . DADoublestarArg))
 
-data ArgsListStarPart name test a
+data ArgsListStarPart ws name test a
   = ArgsListStarPartEmpty
   { _argsListStarPart_ann :: a
   }
   | ArgsListStarPart
   { _argsListStarPart_starred
     :: Compose
-         (Before (Between' [WhitespaceChar] Asterisk))
+         (Before (Between' [ws] Asterisk))
          name
          a
   , _argsListStarPart_defaults
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (ArgsListArg name test))
+           (Before (Between' [ws] Comma))
+           (ArgsListArg ws name test))
          a
   , _argsListStarPart_kwargs
     :: Compose
          Maybe
          (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (ArgsListDoublestarArg name test))
+           (Before (Between' [ws] Comma))
+           (ArgsListDoublestarArg ws name test))
          a
   , _argsListStarPart_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance (Eq1 test, Eq1 name, Eq a, Eq (name a)) => Eq (ArgsListStarPart name test a)
-deriving instance (Show1 test, Show1 name, Show a, Show (name a)) => Show (ArgsListStarPart name test a)
+deriving instance (Eq ws, Eq1 test, Eq1 name, Eq a, Eq (name a)) => Eq (ArgsListStarPart ws name test a)
+deriving instance (Show ws, Show1 test, Show1 name, Show a, Show (name a)) => Show (ArgsListStarPart ws name test a)
 
-data ArgsListDoublestarArg name (test :: * -> *) a
+data ArgsListDoublestarArg ws name (test :: * -> *) a
   = ArgsListDoublestarArg
   { _argsListDoublestarArg_value
     :: Compose
-         (Between' [WhitespaceChar])
+         (Between' [ws])
          name
          a
   , _argsListDoublestarArg_ann :: a

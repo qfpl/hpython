@@ -21,41 +21,41 @@ import Language.Python.AST.ArgsList
   , ArgsListDoublestarArg
   )
 
-data ArgsList name test a
+data ArgsList ws name test a
   = ArgsListAll
-  { _argsListAll_head :: ArgsListArg name test a
+  { _argsListAll_head :: ArgsListArg ws name test a
   , _argsListAll_tail
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (ArgsListArg name test))
+           (Before (Between' [ws] Comma))
+           (ArgsListArg ws name test))
          a
   , _argsListAll_rest
     :: Compose
          Maybe
          (Compose
-           (Before (Between' [WhitespaceChar] Comma))
+           (Before (Between' [ws] Comma))
            (Compose
              Maybe
              (Sum
-               (ArgsListStarPart name test)
-               (ArgsListDoublestarArg name test))))
+               (ArgsListStarPart ws name test)
+               (ArgsListDoublestarArg ws name test))))
          a
   , _argsList_ann :: a
   }
   | ArgsListArgsKwargs
   { _argsListArgsKwargs_value
       :: Sum
-           (ArgsListStarPart name test)
-           (ArgsListDoublestarArg name test)
+           (ArgsListStarPart ws name test)
+           (ArgsListDoublestarArg ws name test)
            a
   , _argsList_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance (Eq1 test, Eq a, Eq1 name, Eq (name a)) => Eq (ArgsList name test a)
-deriving instance (Show1 test, Show a, Show1 name, Show (name a)) => Show (ArgsList name test a)
-deriving instance (Ord1 test, Ord a, Ord1 name, Ord (name a)) => Ord (ArgsList name test a)
+deriving instance (Eq ws, Eq1 test, Eq a, Eq1 name, Eq (name a)) => Eq (ArgsList ws name test a)
+deriving instance (Show ws, Show1 test, Show a, Show1 name, Show (name a)) => Show (ArgsList ws name test a)
+deriving instance (Ord ws, Ord1 test, Ord a, Ord1 name, Ord (name a)) => Ord (ArgsList ws name test a)
 
 deriveEq1 ''ArgsList
 deriveShow1 ''ArgsList

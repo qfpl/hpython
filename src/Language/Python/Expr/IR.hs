@@ -96,7 +96,7 @@ data LambdefNocond ws a
          Maybe
          (Compose
            (Between (NonEmpty ws) [ws])
-           (ArgsList Identifier (Test ws)))
+           (ArgsList ws Identifier (Test ws)))
          a
   , _lambdefNocond_expr
     :: Compose
@@ -521,7 +521,7 @@ data Lambdef ws a
          Maybe
          (Compose
            (Before (NonEmpty ws))
-           (ArgsList Identifier (Test ws)))
+           (ArgsList ws Identifier (Test ws)))
          a
   , _lambdef_body
     :: Compose

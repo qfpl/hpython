@@ -34,28 +34,28 @@ import Data.Separated.Between
 import Language.Python.AST.Symbols
 import Language.Python.IR.ExprConfig
 
-data TestlistStarExpr test starExpr (as :: AtomType) (ctxt :: DefinitionContext) a
+data TestlistStarExpr ws test starExpr (as :: AtomType) (ctxt :: DefinitionContext) a
   = TestlistStarExprSingle
-  { _testlistStarExprSingle_value :: test as ctxt a
+  { _testlistStarExprSingle_value :: test ws as ctxt a
   , _testlistStarExprSingle_ann :: a
   }
   | TestlistStarExprSingleComma
   { _testlistStarExprSingleComma_value
-    :: Sum (test as ctxt) (starExpr as ctxt) a
-  , _testlistStarExprSingleComma_comma :: Between' [WhitespaceChar] Comma
+    :: Sum (test ws as ctxt) (starExpr ws as ctxt) a
+  , _testlistStarExprSingleComma_comma :: Between' [ws] Comma
   , _testlistStarExprSingleComma_ann :: a
   }
   | TestlistStarExprMany
   { _testlistStarExpr_head
-    :: Sum (test as ctxt) (starExpr as ctxt) a
+    :: Sum (test ws as ctxt) (starExpr ws as ctxt) a
   , _testlistStarExpr_tail
     :: Compose
          NonEmpty
          (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           (Sum (test as ctxt) (starExpr as ctxt)))
+           (Before (Between' [ws] Comma))
+           (Sum (test ws as ctxt) (starExpr ws as ctxt)))
          a
-  , _testlistStarExpr_comma :: Maybe (Between' [WhitespaceChar] Comma)
+  , _testlistStarExpr_comma :: Maybe (Between' [ws] Comma)
   , _testlistStarExpr_ann :: a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
@@ -63,15 +63,15 @@ $(return [])
 
 _TestlistStarExprMany
   :: Prism'
-       (Maybe (TestlistStarExpr test starExpr as ctxt a))
-       ( Sum (test as ctxt) (starExpr as ctxt) a
+       (Maybe (TestlistStarExpr ws test starExpr as ctxt a))
+       ( Sum (test ws as ctxt) (starExpr ws as ctxt) a
        , Compose
            NonEmpty
            (Compose
-             (Before (Between' [WhitespaceChar] Comma))
-             (Sum (test as ctxt) (starExpr as ctxt)))
+             (Before (Between' [ws] Comma))
+             (Sum (test ws as ctxt) (starExpr ws as ctxt)))
            a
-       , Maybe (Between' [WhitespaceChar] Comma)
+       , Maybe (Between' [ws] Comma)
        , a
        )
 _TestlistStarExprMany =
@@ -87,14 +87,14 @@ _TestlistStarExprMany =
         Just (TestlistStarExprMany a b c d) -> Just (a, b, c, d)
         _ -> Nothing)
 
-instance (Eq1 (test as ctxt), Eq1 (starExpr as ctxt)) =>
-  Eq1 (TestlistStarExpr test starExpr as ctxt) where
+instance (Eq1 (test ws as ctxt), Eq1 (starExpr ws as ctxt), Eq ws) =>
+  Eq1 (TestlistStarExpr ws test starExpr as ctxt) where
   liftEq = $(makeLiftEq ''TestlistStarExpr)
 
-instance (Show1 (test as ctxt), Show1 (starExpr as ctxt)) =>
-  Show1 (TestlistStarExpr test starExpr as ctxt) where
+instance (Show1 (test ws as ctxt), Show1 (starExpr ws as ctxt), Show ws) =>
+  Show1 (TestlistStarExpr ws test starExpr as ctxt) where
   liftShowsPrec = $(makeLiftShowsPrec ''TestlistStarExpr)
 
-instance (Ord1 (test as ctxt), Ord1 (starExpr as ctxt)) =>
-  Ord1 (TestlistStarExpr test starExpr as ctxt) where
+instance (Ord1 (test ws as ctxt), Ord1 (starExpr ws as ctxt), Ord ws) =>
+  Ord1 (TestlistStarExpr ws test starExpr as ctxt) where
   liftCompare = $(makeLiftCompare ''TestlistStarExpr)

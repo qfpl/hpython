@@ -77,11 +77,11 @@ smallStatement =
         (beforeF
           (betweenWhitespace equals)
           ((InL <$> try (yieldExpr whitespaceChar)) <|>
-           (InR <$> testlistStarExpr (test whitespaceChar) (starExpr whitespaceChar))))
+           (InR <$> testlistStarExpr whitespaceChar test starExpr)))
 
     smallStatementExpr =
       SmallStatementExpr <$>
-      testlistStarExpr (test whitespaceChar) (starExpr whitespaceChar) <*>
+      testlistStarExpr whitespaceChar test starExpr <*>
       ((InL <$> try augAssignSequence) <|>
        (InR <$> regularAssignSequence))
 
@@ -204,7 +204,7 @@ decorator =
     (try .
      parens .
      between'F (many anyWhitespaceChar) .
-     optionalF $ try (argumentList identifier $ test anyWhitespaceChar)) <*>
+     optionalF $ try (argumentList identifier test)) <*>
   newlineChar
 
 decorated
@@ -236,7 +236,7 @@ classDef =
      parens .
      between'F (many anyWhitespaceChar) .
      optionalF $
-     try (argumentList identifier (test anyWhitespaceChar))) <*>
+     try (argumentList identifier test)) <*>
   beforeF (betweenWhitespace colon) suite
 
 typedArg
@@ -370,7 +370,7 @@ forStatement =
   annotated $
   ForStatement <$>
   (string "for" *>
-   betweenWhitespace1F (testlistStarExpr (expr whitespaceChar) (starExpr whitespaceChar))) <*>
+   betweenWhitespace1F (testlistStarExpr whitespaceChar expr starExpr)) <*>
   (string "in" *>
    whitespaceBefore1F (testList whitespaceChar)) <*>
   beforeF (betweenWhitespace colon) suite <*>

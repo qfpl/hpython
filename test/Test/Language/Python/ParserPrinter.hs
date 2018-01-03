@@ -37,11 +37,14 @@ import qualified Language.Python.Statement.IR.Checker as Check
 import qualified Language.Python.Expr.Parser as Parse
 import qualified Language.Python.Module.Parser as Parse
 import qualified Language.Python.Statement.Parser as Parse
+import qualified Language.Python.Parser.Symbols as Parse
 
 import qualified Language.Python.Expr.Printer as Print
 import qualified Language.Python.Module.Printer as Print
 import qualified Language.Python.Statement.Printer as Print
+import qualified Language.Python.Printer.Symbols as Print
 
+import Test.Language.Python.Gen.Combinators
 import qualified Test.Language.Python.Expr.Gen as GenAST
 import qualified Test.Language.Python.Statement.Gen as GenAST
 
@@ -58,11 +61,11 @@ filesExamplesDir = "test" </> "examples" </> "files" </> "valid"
 
 parse_print_expr_id :: String -> Expectation
 parse_print_expr_id input =
-  case parseString (runUnspaced $ Parse.test <* eof) mempty input of
+  case parseString (runUnspaced $ Parse.test Parse.whitespaceChar <* eof) mempty input of
     Success unchecked ->
       let
         checkResult =
-          (fmap Print.test . runChecker $
+          (fmap (Print.test Print.whitespaceChar) . runChecker $
             Check.checkTest
               (ExprConfig SNotAssignable STopLevel)
               unchecked)
@@ -166,10 +169,9 @@ prop_expr_ast_is_valid_python assignability =
   property $ do
     expr <-
       forAll .
-      Gen.resize 100 .
-      GenAST.genTest $
-      ExprConfig assignability STopLevel
-    let program = HPJ.render $ Print.test expr
+      Gen.resize 100 $
+      GenAST.genTest (ExprConfig assignability STopLevel) genWhitespaceChar
+    let program = HPJ.render $ Print.test Print.whitespaceChar expr
     res <- liftIO $ checkSyntax program
     case res of
       SyntaxError pythonError -> do

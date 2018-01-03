@@ -147,7 +147,7 @@ data CompFor :: * -> AtomType -> DefinitionContext -> * -> * where
           (Before (Between' (NonEmpty ws) KFor))
           (Compose
             (After (NonEmpty ws))
-            (TestlistStarExpr (Expr ws) (StarExpr ws) 'Assignable ctxt))
+            (TestlistStarExpr ws Expr StarExpr 'Assignable ctxt))
           a
     , _compFor_expr :: Compose (Before (NonEmpty ws)) (OrTest ws 'NotAssignable ctxt) a
     , _compFor_iter
@@ -234,7 +234,7 @@ data Trailer :: * -> AtomType -> DefinitionContext -> * -> * where
           (Between' [AnyWhitespaceChar])
           (Compose
             Maybe
-            (ArgumentList Identifier (Test AnyWhitespaceChar) 'NotAssignable ctxt))
+            (ArgumentList Identifier Test 'NotAssignable ctxt))
           a
     , _trailerCall_ann :: a
     } -> Trailer ws 'NotAssignable ctxt a

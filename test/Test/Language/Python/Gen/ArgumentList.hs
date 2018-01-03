@@ -23,9 +23,11 @@ genArgumentList
      )
   => ExprConfig as dctxt
   -> m (name ())
-  -> ( forall as' dctxt'
+  -> ( forall as' ws' dctxt'
      . ExprConfig as' dctxt'
-    -> m (expr as' dctxt' ()))
+    -> m ws'
+    -> m (expr ws' as' dctxt' ())
+     )
   -> m (ArgumentList name expr 'NotAssignable dctxt ())
 genArgumentList cfg _genName _genExpr =
   Gen.choice
@@ -63,9 +65,10 @@ genArgumentList cfg _genName _genExpr =
 genPositionalArguments
   :: MonadGen m
   => ExprConfig as dctxt
-  -> ( forall as' dctxt'
+  -> ( forall as' ws' dctxt'
      . ExprConfig as' dctxt'
-    -> m (expr as' dctxt' ()))
+    -> m ws'
+    -> m (expr ws' as' dctxt' ()))
   -> m (PositionalArguments expr 'NotAssignable dctxt ())
 genPositionalArguments cfg _genExpr = do
   n <- Size <$> Gen.int (Range.linear 1 20)
@@ -73,23 +76,25 @@ genPositionalArguments cfg _genExpr = do
     Gen.resize n
       (genBeforeF
         (Gen.maybe . genBetweenAnyWhitespace $ pure Asterisk)
-        (_genExpr $ cfg & atomType .~ SNotAssignable)) <*>
+        (_genExpr (cfg & atomType .~ SNotAssignable) genAnyWhitespaceChar)) <*>
     genListF
       (Gen.resize n $
        genBeforeF
          (genBetweenAnyWhitespace $ pure Comma)
          (genBeforeF
            (Gen.maybe . genBetweenAnyWhitespace $ pure Asterisk)
-           (_genExpr $ cfg & atomType .~ SNotAssignable))) <*>
+           (_genExpr (cfg & atomType .~ SNotAssignable) genAnyWhitespaceChar))) <*>
     pure ()
 
 genStarredAndKeywords
   :: MonadGen m
   => ExprConfig as dctxt
   -> m (name ())
-  -> ( forall as' dctxt'
+  -> ( forall as' ws' dctxt'
      . ExprConfig as' dctxt'
-    -> m (expr as' dctxt' ()))
+    -> m ws'
+    -> m (expr ws' as' dctxt' ())
+     )
   -> m (StarredAndKeywords name expr 'NotAssignable dctxt ())
 genStarredAndKeywords cfg _genName _genExpr = do
   n <- Size <$> Gen.int (Range.linear 1 20)
@@ -105,7 +110,7 @@ genStarredAndKeywords cfg _genName _genExpr = do
           Gen.resize n
             (genBeforeF
               (genBetweenAnyWhitespace $ pure Asterisk)
-              (_genExpr $ cfg & atomType .~ SNotAssignable))
+              (_genExpr (cfg & atomType .~ SNotAssignable) genAnyWhitespaceChar))
         , InR <$> Gen.resize n (genKeywordItem cfg _genName _genExpr)
         ]
 
@@ -113,9 +118,11 @@ genKeywordsArguments
   :: MonadGen m
   => ExprConfig as dctxt
   -> m (name ())
-  -> ( forall as' dctxt'
+  -> ( forall as' ws' dctxt'
      . ExprConfig as' dctxt'
-    -> m (expr as' dctxt' ()))
+    -> m ws'
+    -> m (expr ws' as' dctxt' ())
+     )
   -> m (KeywordsArguments name expr 'NotAssignable dctxt ())
 genKeywordsArguments cfg _genName _genExpr = do
   n <- Size <$> Gen.int (Range.linear 1 20)
@@ -134,19 +141,22 @@ genKeywordsArguments cfg _genName _genExpr = do
           InR <$>
           genBeforeF
             (genBetweenAnyWhitespace $ pure DoubleAsterisk)
-            (_genExpr $ cfg & atomType .~ SNotAssignable)
+            (_genExpr (cfg & atomType .~ SNotAssignable) genAnyWhitespaceChar)
         ]
 
 genKeywordItem
   :: MonadGen m
   => ExprConfig as dctxt
   -> m (name ())
-  -> ( forall as' dctxt'
+  -> ( forall as' ws' dctxt'
      . ExprConfig as' dctxt'
-    -> m (expr as' dctxt' ()))
+    -> m ws'
+    -> m (expr ws' as' dctxt' ())
+     )
   -> m (KeywordItem name expr 'NotAssignable dctxt ())
 genKeywordItem cfg _genName _genExpr =
   KeywordItem <$>
   genAnyWhitespaceAfterF _genName <*>
-  genAnyWhitespaceBeforeF (_genExpr $ cfg & atomType .~ SNotAssignable) <*>
+  genAnyWhitespaceBeforeF
+    (_genExpr (cfg & atomType .~ SNotAssignable) genAnyWhitespaceChar) <*>
   pure ()

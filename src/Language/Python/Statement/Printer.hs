@@ -42,18 +42,18 @@ smallStatement s =
   case s of
     SmallStatementExpr v _ -> test whitespaceChar v
     SmallStatementAssign l m r _ ->
-      testlistStarExpr (test whitespaceChar) (starExpr whitespaceChar) l <>
+      testlistStarExpr whitespaceChar test starExpr l <>
       foldMapOf
         (_Wrapped.folded)
         (beforeF
           (betweenWhitespace' equals)
-          (testlistStarExpr (test whitespaceChar) (starExpr whitespaceChar)))
+          (testlistStarExpr whitespaceChar test starExpr))
         m <>
       beforeF
         (betweenWhitespace' equals)
         (sumElim
           (yieldExpr whitespaceChar)
-          (testlistStarExpr (test whitespaceChar) (starExpr whitespaceChar)))
+          (testlistStarExpr whitespaceChar test starExpr))
         r
     SmallStatementAugAssign l r _ ->
       test whitespaceChar l <>
@@ -170,7 +170,7 @@ forStatement (ForStatement f i b e _) =
   suite
     (text "for" <>
      betweenWhitespace'F
-       (testlistStarExpr (expr whitespaceChar) (starExpr whitespaceChar))
+       (testlistStarExpr whitespaceChar expr starExpr)
        f <>
      text "in" <>
      whitespaceBeforeF (testList whitespaceChar) i <>
@@ -296,7 +296,7 @@ classDef (ClassDef n a b _) =
        (parens .
        whitespaceBeforeF
          (between'F (foldMap anyWhitespaceChar) $
-          foldMapOf (_Wrapped.folded) (argumentList identifier (test anyWhitespaceChar))))
+          foldMapOf (_Wrapped.folded) (argumentList identifier test)))
        a <>
      betweenWhitespace' colon (b ^. _Wrapped.before._1))
   (b ^. _Wrapped.before._2)
@@ -314,7 +314,7 @@ decorator (Decorator name args n _) =
     (_Wrapped.folded)
     (parens .
      between'F (foldMap anyWhitespaceChar)
-       (foldMapOf (_Wrapped.folded) (argumentList identifier (test anyWhitespaceChar))))
+       (foldMapOf (_Wrapped.folded) (argumentList identifier test)))
     args <>
   newlineChar n
 

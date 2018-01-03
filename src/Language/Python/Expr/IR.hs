@@ -168,7 +168,7 @@ data CompFor ws a
         (Before (Between' (NonEmpty ws) KFor))
         (Compose
           (After (NonEmpty ws))
-          (TestlistStarExpr (Expr ws) (StarExpr ws)))
+          (TestlistStarExpr ws Expr StarExpr))
         a
   , _compFor_expr :: Compose (Before (NonEmpty ws)) (OrTest ws) a
   , _compFor_iter
@@ -249,7 +249,7 @@ data Trailer ws a
         (Between' [AnyWhitespaceChar])
         (Compose
           Maybe
-          (ArgumentList Identifier (Test AnyWhitespaceChar)))
+          (ArgumentList Identifier Test))
         a
   , _trailer_ann :: a
   }

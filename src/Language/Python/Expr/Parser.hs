@@ -171,7 +171,7 @@ compFor ws =
   CompFor <$>
   beforeF
     (between'1 ws $ string "for" $> KFor)
-    (after1F ws $ testlistStarExpr (expr ws) (starExpr ws)) <*>
+    (after1F ws $ testlistStarExpr ws expr starExpr) <*>
   (string "in" *> (before1F <*> orTest) ws) <*>
   optionalF (try $ beforeF (many ws) (compIter ws))
 
@@ -746,7 +746,7 @@ trailer ws = try trailerCall <|> try trailerSubscript <|> trailerAccess
         (char ')')
         (between'F
           (many anyWhitespaceChar) .
-          optionalF $ try (argumentList identifier $ test anyWhitespaceChar))
+          optionalF $ try (argumentList identifier test))
 
     trailerSubscript =
       annotated $

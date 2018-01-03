@@ -342,7 +342,7 @@ compFor :: Ord a => (ws -> Doc) -> CompFor ws atomType ctxt a -> Doc
 compFor ws (CompFor t e i _) =
   beforeF
     (between' (foldMap ws) . const $ text "for")
-    (afterF (foldMap ws) $ testlistStarExpr (expr ws) (starExpr ws))
+    (afterF (foldMap ws) $ testlistStarExpr ws expr starExpr)
     t <>
   text "in" <>
   beforeF (foldMap ws) (orTest ws) e <>
@@ -517,7 +517,9 @@ trailer ws t =
   case t of
     TrailerCall val _ ->
       parens $
-      between'F (foldMap anyWhitespaceChar) (foldMapF $ argumentList identifier (test anyWhitespaceChar)) val
+      between'F
+        (foldMap anyWhitespaceChar)
+        (foldMapF $ argumentList identifier test) val
     TrailerSubscript val _ ->
       brackets $ between'F (foldMap anyWhitespaceChar) (subscriptList anyWhitespaceChar) val
     TrailerAccess val _ -> char '.' <> beforeF (foldMap ws) identifier val

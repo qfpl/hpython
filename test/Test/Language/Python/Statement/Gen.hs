@@ -124,7 +124,7 @@ genFlowStatement scfg ecfg =
       FlowStatementReturn <$>
       genMaybeF
         (genWhitespaceBefore1F
-          (genTestList $ e & atomType .~ SNotAssignable)) <*>
+          (genTestList (e & atomType .~ SNotAssignable) genWhitespaceChar)) <*>
       pure ()
 
     genFlowStatementRaise
@@ -147,18 +147,19 @@ genFlowStatement scfg ecfg =
       genYieldExpr
         (e
            & atomType .~ SNotAssignable
-           & definitionContext .~ SFunDef SNormal) <*>
+           & definitionContext .~ SFunDef SNormal)
+        genWhitespaceChar <*>
       pure ()
 
 genRaiseStatement :: MonadGen m => ExprConfig as dc -> m (RaiseStatement dc ())
 genRaiseStatement ecfg =
   RaiseStatement <$>
-  genTest (ecfg & atomType .~ SNotAssignable) <*>
+  genTest (ecfg & atomType .~ SNotAssignable) genWhitespaceChar <*>
   genMaybeF
     (genBeforeF
       (pure KFrom)
       (genWhitespaceBefore1F
-       (genTest $ ecfg & atomType .~ SNotAssignable))) <*>
+       (genTest (ecfg & atomType .~ SNotAssignable) genWhitespaceChar))) <*>
   pure ()
 
 genSmallStatement
@@ -196,42 +197,57 @@ genSmallStatement scfg ecfg =
   where
     genSmallStatementExpr =
       SmallStatementExpr <$>
-      genTest (ecfg & atomType .~ SNotAssignable) <*>
+      genTest (ecfg & atomType .~ SNotAssignable) genWhitespaceChar <*>
       pure ()
 
     genSmallStatementAssign =
       SmallStatementAssign <$>
-      genTestlistStarExpr genTest genStarExpr (ecfg & atomType .~ SAssignable) <*>
+      genTestlistStarExpr
+        genTest
+        genStarExpr
+        (ecfg & atomType .~ SAssignable)
+        genWhitespaceChar <*>
       genListF
         (genBeforeF
           (genBetweenWhitespace $ pure Equals)
-          (genTestlistStarExpr genTest genStarExpr (ecfg & atomType .~ SAssignable))) <*>
+          (genTestlistStarExpr
+            genTest
+            genStarExpr
+            (ecfg & atomType .~ SAssignable)
+            genWhitespaceChar)) <*>
       genBeforeF
         (genBetweenWhitespace $ pure Equals)
         (Gen.choice $
           (case ecfg ^. definitionContext of
              SFunDef SNormal ->
-               [ InL <$> genYieldExpr (ecfg & atomType .~ SNotAssignable) ]
+               [ InL <$> genYieldExpr (ecfg & atomType .~ SNotAssignable) genWhitespaceChar ]
              _ -> []) <>
-          [ InR <$> genTestlistStarExpr genTest genStarExpr (ecfg & atomType .~ SNotAssignable) ]) <*>
+          [ InR <$>
+            genTestlistStarExpr
+              genTest
+              genStarExpr
+              (ecfg & atomType .~ SNotAssignable)
+              genWhitespaceChar
+          ]) <*>
       pure ()
 
     genSmallStatementAugAssign =
       SmallStatementAugAssign <$>
-      genTest (ecfg & atomType .~ SAssignable) <*>
+      genTest (ecfg & atomType .~ SAssignable) genWhitespaceChar <*>
       genBeforeF
         (genBetweenWhitespace genAugAssign)
         (Gen.choice $
           (case ecfg ^. definitionContext of
              SFunDef SNormal ->
-               [ InL <$> genYieldExpr (ecfg & atomType .~ SNotAssignable) ]
+               [ InL <$> genYieldExpr (ecfg & atomType .~ SNotAssignable) genWhitespaceChar ]
              _ -> []) <>
-          [ InR <$> genTestList (ecfg & atomType .~ SNotAssignable) ]) <*>
+          [ InR <$> genTestList (ecfg & atomType .~ SNotAssignable) genWhitespaceChar ]) <*>
       pure ()
 
     genSmallStatementDel =
       SmallStatementDel <$>
-      genWhitespaceBefore1F (genExprList $ ecfg & atomType .~ SAssignable) <*>
+      genWhitespaceBefore1F
+        (genExprList (ecfg & atomType .~ SAssignable) genWhitespaceChar) <*>
       pure ()
 
     genSmallStatementPass =
@@ -267,11 +283,12 @@ genSmallStatement scfg ecfg =
 
     genSmallStatementAssert =
       SmallStatementAssert <$>
-      genWhitespaceBefore1F (genTest $ ecfg & atomType .~ SNotAssignable) <*>
+      genWhitespaceBefore1F
+        (genTest (ecfg & atomType .~ SNotAssignable) genWhitespaceChar) <*>
       genMaybeF
         (genBeforeF
           (genBetweenWhitespace $ pure Comma)
-          (genTest $ ecfg & atomType .~ SNotAssignable)) <*>
+          (genTest (ecfg & atomType .~ SNotAssignable) genWhitespaceChar)) <*>
       pure ()
 
 genCompoundStatement
@@ -306,13 +323,15 @@ genIfStatement
   -> m (IfStatement lc dc ())
 genIfStatement scfg ecfg =
   IfStatement <$>
-  genWhitespaceBefore1F (genTest $ ecfg & atomType .~ SNotAssignable) <*>
+  genWhitespaceBefore1F
+    (genTest (ecfg & atomType .~ SNotAssignable) genWhitespaceChar) <*>
   genBeforeF
     (genBetweenWhitespace $ pure Colon)
     (Gen.small $ genSuite scfg ecfg) <*>
   genListF
     (Pair <$>
-     genWhitespaceBefore1F (genTest $ ecfg & atomType .~ SNotAssignable) <*>
+     genWhitespaceBefore1F
+       (genTest (ecfg & atomType .~ SNotAssignable) genWhitespaceChar) <*>
      genBeforeF
        (genBetweenWhitespace $ pure Colon)
        (Gen.small $ genSuite scfg ecfg)) <*>
@@ -329,7 +348,7 @@ genWhileStatement
   -> m (WhileStatement lc dc ())
 genWhileStatement scfg ecfg =
   WhileStatement <$>
-  genWhitespaceBefore1F (genTest $ ecfg & atomType .~ SNotAssignable) <*>
+  genWhitespaceBefore1F (genTest (ecfg & atomType .~ SNotAssignable) genWhitespaceChar) <*>
   genBeforeF
     (genBetweenWhitespace $ pure Colon)
     (Gen.small $ genSuite (scfg & loopContext .~ SInLoop) ecfg) <*>
@@ -346,8 +365,13 @@ genForStatement
   -> m (ForStatement lc dc ())
 genForStatement scfg ecfg =
   ForStatement <$>
-  genBetweenWhitespace1F (genTestlistStarExpr genExpr genStarExpr $ ecfg & atomType .~ SAssignable) <*>
-  genWhitespaceBefore1F (genTestList $ ecfg & atomType .~ SNotAssignable) <*>
+  genBetweenWhitespace1F
+    (genTestlistStarExpr
+      genExpr
+      genStarExpr
+      (ecfg & atomType .~ SAssignable)
+      genWhitespaceChar) <*>
+  genWhitespaceBefore1F (genTestList (ecfg & atomType .~ SNotAssignable) genWhitespaceChar) <*>
   genBeforeF
     (genBetweenWhitespace $ pure Colon)
     (Gen.small $ genSuite (scfg & loopContext .~ SInLoop) ecfg) <*>
@@ -401,7 +425,7 @@ genExceptClause ecfg =
   ExceptClause <$>
   genMaybeF
     (genWhitespaceBefore1F $ Pair <$>
-     genTest (ecfg & atomType .~ SNotAssignable) <*>
+     genTest (ecfg & atomType .~ SNotAssignable) genWhitespaceChar <*>
      genMaybeF
        (genBeforeF (genBetweenWhitespace1 $ pure KAs) genIdentifier)) <*>
   pure ()
@@ -427,11 +451,11 @@ genWithItem
   -> m (WithItem dc ())
 genWithItem ecfg =
   WithItem <$>
-  genTest (ecfg & atomType .~ SNotAssignable) <*>
+  genTest (ecfg & atomType .~ SNotAssignable) genWhitespaceChar <*>
   genMaybeF
     (genBeforeF
       (genBetweenWhitespace1 $ pure KAs)
-      (genExpr $ ecfg & atomType .~ SAssignable)) <*>
+      (genExpr (ecfg & atomType .~ SAssignable) genWhitespaceChar)) <*>
   pure ()
 
 genFuncDef
@@ -446,8 +470,7 @@ genFuncDef ecfg inner =
   genMaybeF
     (genBeforeF
        (genBetweenWhitespace $ pure RightArrow)
-       (genTest $ ecfg
-         & atomType .~ SNotAssignable)) <*>
+       (genTest (ecfg & atomType .~ SNotAssignable) genWhitespaceChar)) <*>
   genBeforeF
     (genBetweenWhitespace $ pure Colon)
     (Gen.small $ genSuite (StatementConfig SNotInLoop) (ecfg & definitionContext .~ inner)) <*>
@@ -459,27 +482,30 @@ genParameters
   -> m (Parameters dc ())
 genParameters ecfg =
   Parameters <$>
-  genBetweenWhitespaceF
+  genBetween'F (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
     (genMaybeF
       (genArgsList
         (ecfg & atomType .~ SNotAssignable)
-        (genTypedArg ecfg)
-        (genTest $ ecfg & atomType .~ SNotAssignable))) <*>
+        (genTypedArg ecfg genAnyWhitespaceChar)
+        (genTest (ecfg & atomType .~ SNotAssignable) genAnyWhitespaceChar))) <*>
   pure ()
 
 genTypedArg
   :: MonadGen m
   => ExprConfig as dc
-  -> m (TypedArg ())
-genTypedArg ecfg =
+  -> m ws
+  -> m (TypedArg ws ())
+genTypedArg ecfg ws =
   TypedArg <$>
   genIdentifier <*>
   genMaybeF
     (genBeforeF
-      (genBetweenWhitespace $ pure Colon)
-      (genTest $ ecfg
-        & atomType .~ SNotAssignable
-        & definitionContext .~ SFunDef SNormal)) <*>
+      (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure Colon)
+      (genTest
+        (ecfg
+          & atomType .~ SNotAssignable
+          & definitionContext .~ SFunDef SNormal)
+        ws)) <*>
   pure ()
 
 genClassDef
@@ -491,7 +517,7 @@ genClassDef ecfg =
   genWhitespaceBefore1F genIdentifier <*>
   genMaybeF
     (genWhitespaceBeforeF .
-     genBetweenWhitespaceF .
+     genBetween'F (Gen.list (Range.linear 0 10) genAnyWhitespaceChar) .
      genMaybeF $
      genArgumentList (ecfg & atomType .~ SNotAssignable) genIdentifier genTest) <*>
   genBeforeF
@@ -532,7 +558,7 @@ genDecorator ecfg =
   Decorator <$>
   genWhitespaceBeforeF genDottedName <*>
   genMaybeF
-    (genBetweenWhitespaceF
+    (genBetween'F (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
        (genMaybeF $
         genArgumentList (ecfg & atomType .~ SNotAssignable) genIdentifier genTest)) <*>
   genNewlineChar <*>

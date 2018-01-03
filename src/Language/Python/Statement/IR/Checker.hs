@@ -518,12 +518,12 @@ checkSmallStatement ecfg scfg s =
     yieldOrTestlistStarExpr
       :: Ord ann
       => ExprConfig as dctxt
-      -> Sum (IR.YieldExpr ws) (IR.TestlistStarExpr (IR.Test ws) (IR.StarExpr ws)) ann
+      -> Sum (IR.YieldExpr ws) (IR.TestlistStarExpr ws IR.Test IR.StarExpr) ann
       -> SyntaxChecker
            ann
            (Sum
              (Safe.YieldExpr ws dctxt)
-             (Safe.TestlistStarExpr (Safe.Test ws) (Safe.StarExpr ws) 'NotAssignable dctxt) ann)
+             (Safe.TestlistStarExpr ws Safe.Test Safe.StarExpr 'NotAssignable dctxt) ann)
     yieldOrTestlistStarExpr cfg (InL a) =
       case cfg ^. definitionContext of
         SFunDef SNormal -> InL <$> checkYieldExpr cfg a

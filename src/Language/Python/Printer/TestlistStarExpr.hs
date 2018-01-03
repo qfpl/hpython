@@ -8,20 +8,21 @@ import Language.Python.Printer.Combinators
 import Language.Python.Printer.Symbols
 
 testlistStarExpr
-  :: (test as ectxt a -> Doc)
-  -> (starExpr as ectxt a -> Doc)
-  -> TestlistStarExpr test starExpr as ectxt a -> Doc
-testlistStarExpr test starExpr s =
+  :: (ws -> Doc)
+  -> ((ws -> Doc) -> test ws as ectxt a -> Doc)
+  -> ((ws -> Doc) -> starExpr ws as ectxt a -> Doc)
+  -> TestlistStarExpr ws test starExpr as ectxt a -> Doc
+testlistStarExpr ws test starExpr s =
   case s of
-    TestlistStarExprSingle v _ -> test v
+    TestlistStarExprSingle v _ -> test ws v
     TestlistStarExprSingleComma v c _ ->
-      sumElim test starExpr v <>
-      betweenWhitespace' comma c
+      sumElim (test ws) (starExpr ws) v <>
+      between' (foldMap ws) comma c
     _
       | Just (h, t, c, _) <- Just s ^? _TestlistStarExprMany ->
-          sumElim test starExpr h <>
+          sumElim (test ws) (starExpr ws) h <>
           foldMapOf
             (_Wrapped.folded)
-            (beforeF (betweenWhitespace' comma) (sumElim test starExpr))
+            (beforeF (between' (foldMap ws) comma) (sumElim (test ws) (starExpr ws)))
             t <>
-          foldMap (betweenWhitespace' comma) c
+          foldMap (between' (foldMap ws) comma) c

@@ -20,10 +20,10 @@ checkKeywordItem
      . ExprConfig as' dctxt'
     -> name ann
     -> SyntaxChecker ann (checkedName ann))
-  -> ( forall as' dctxt'
+  -> ( forall as' ws' dctxt'
      . ExprConfig as' dctxt'
-    -> expr ann
-    -> SyntaxChecker ann (checkedExpr as' dctxt' ann))
+    -> expr ws' ann
+    -> SyntaxChecker ann (checkedExpr ws' as' dctxt' ann))
   -> IR.KeywordItem name expr ann
   -> SyntaxChecker ann (Safe.KeywordItem checkedName checkedExpr 'NotAssignable dctxt ann)
 checkKeywordItem cfg _checkName _checkExpr (IR.KeywordItem l r ann) =
@@ -41,10 +41,10 @@ checkKeywordsArguments
      . ExprConfig as' dctxt'
     -> name ann
     -> SyntaxChecker ann (checkedName ann))
-  -> ( forall as' dctxt'
+  -> ( forall as' ws' dctxt'
      . ExprConfig as' dctxt'
-    -> expr ann
-    -> SyntaxChecker ann (checkedExpr as' dctxt' ann))
+    -> expr ws' ann
+    -> SyntaxChecker ann (checkedExpr ws' as' dctxt' ann))
   -> IR.KeywordsArguments name expr ann
   -> SyntaxChecker ann (Safe.KeywordsArguments checkedName checkedExpr 'NotAssignable dctxt ann)
 checkKeywordsArguments cfg _checkName _checkExpr (IR.KeywordsArguments h t ann) =
@@ -72,10 +72,10 @@ checkKeywordsArguments cfg _checkName _checkExpr (IR.KeywordsArguments h t ann) 
 
 checkPositionalArguments
   :: ExprConfig as dctxt
-  -> ( forall as' dctxt'
+  -> ( forall as' ws' dctxt'
      . ExprConfig as' dctxt'
-    -> expr ann
-    -> SyntaxChecker ann (checkedExpr as' dctxt' ann))
+    -> expr ws' ann
+    -> SyntaxChecker ann (checkedExpr ws' as' dctxt' ann))
   -> IR.PositionalArguments expr ann
   -> SyntaxChecker ann (Safe.PositionalArguments checkedExpr 'NotAssignable dctxt ann)
 checkPositionalArguments cfg _checkExpr (IR.PositionalArguments h t ann) =
@@ -96,10 +96,10 @@ checkStarredAndKeywords
      . ExprConfig as' dctxt'
     -> name ann
     -> SyntaxChecker ann (checkedName ann))
-  -> ( forall as' dctxt'
+  -> ( forall as' ws' dctxt'
      . ExprConfig as' dctxt'
-    -> expr ann
-    -> SyntaxChecker ann (checkedExpr as' dctxt' ann))
+    -> expr ws' ann
+    -> SyntaxChecker ann (checkedExpr ws' as' dctxt' ann))
   -> IR.StarredAndKeywords name expr ann
   -> SyntaxChecker ann (Safe.StarredAndKeywords checkedName checkedExpr 'NotAssignable dctxt ann)
 checkStarredAndKeywords cfg _checkName _checkExpr (IR.StarredAndKeywords h t ann) =
@@ -132,10 +132,10 @@ checkArgumentList
      . ExprConfig as' dctxt'
     -> name ann
     -> SyntaxChecker ann (checkedName ann))
-  -> ( forall as' dctxt'
+  -> ( forall as' ws' dctxt'
      . ExprConfig as' dctxt'
-    -> expr ann
-    -> SyntaxChecker ann (checkedExpr as' dctxt' ann))
+    -> expr ws' ann
+    -> SyntaxChecker ann (checkedExpr ws' as' dctxt' ann))
   -> IR.ArgumentList name expr ann
   -> SyntaxChecker ann (Safe.ArgumentList checkedName checkedExpr 'NotAssignable dctxt ann)
 checkArgumentList cfg _checkName _checkExpr a =

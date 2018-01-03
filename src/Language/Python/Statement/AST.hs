@@ -133,7 +133,7 @@ data Decorator (ctxt :: DefinitionContext) a
            (Between' [AnyWhitespaceChar])
            (Compose
              Maybe
-             (ArgumentList Identifier (Test AnyWhitespaceChar) 'NotAssignable ctxt)))
+             (ArgumentList Identifier Test 'NotAssignable ctxt)))
          a
   , _decorator_newline :: NewlineChar
   , _decorator_ann :: a
@@ -158,7 +158,7 @@ data ClassDef (ctxt :: DefinitionContext) a
              (Between' [AnyWhitespaceChar])
              (Compose
                Maybe
-               (ArgumentList Identifier (Test AnyWhitespaceChar) 'NotAssignable ctxt))))
+               (ArgumentList Identifier Test 'NotAssignable ctxt))))
          a
   , _classDef_body
     :: Compose
@@ -385,7 +385,7 @@ data ForStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   { _forStatement_for
     :: Compose
          (Between' (NonEmpty WhitespaceChar))
-         (TestlistStarExpr (Expr WhitespaceChar) (StarExpr WhitespaceChar) 'Assignable ctxt)
+         (TestlistStarExpr WhitespaceChar Expr StarExpr 'Assignable ctxt)
          a
   , _forStatement_in
     :: Compose
@@ -506,20 +506,20 @@ data SmallStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
 
   SmallStatementAssign ::
     { _smallStatementAssign_left
-      :: TestlistStarExpr (Test WhitespaceChar) (StarExpr WhitespaceChar) 'Assignable ctxt a
+      :: TestlistStarExpr WhitespaceChar Test StarExpr 'Assignable ctxt a
     , _smallStatementAssign_middle
       :: Compose
            []
            (Compose
              (Before (Between' [WhitespaceChar] Equals))
-             (TestlistStarExpr (Test WhitespaceChar) (StarExpr WhitespaceChar) 'Assignable ctxt))
+             (TestlistStarExpr WhitespaceChar Test StarExpr 'Assignable ctxt))
          a
     , _smallStatementAssign_right
         :: Compose
              (Before (Between' [WhitespaceChar] Equals))
              (Sum
                (YieldExpr WhitespaceChar ctxt)
-               (TestlistStarExpr (Test WhitespaceChar) (StarExpr WhitespaceChar) 'NotAssignable ctxt))
+               (TestlistStarExpr WhitespaceChar Test StarExpr 'NotAssignable ctxt))
            a
     , _smallStatementAssign_ann :: a
     } -> SmallStatement lctxt ctxt a

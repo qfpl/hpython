@@ -122,7 +122,7 @@ data Decorator a
            (Between' [AnyWhitespaceChar])
            (Compose
              Maybe
-             (ArgumentList Identifier (Test AnyWhitespaceChar))))
+             (ArgumentList Identifier Test)))
          a
   , _decorator_newline :: NewlineChar
   , _decorator_ann :: a
@@ -148,7 +148,7 @@ data ClassDef a
              (Between' [AnyWhitespaceChar])
              (Compose
                Maybe
-               (ArgumentList Identifier (Test AnyWhitespaceChar)))))
+               (ArgumentList Identifier Test))))
          a
   , _classDef_body
     :: Compose
@@ -382,7 +382,7 @@ data ForStatement a
   { _forStatement_for
     :: Compose
          (Between' (NonEmpty WhitespaceChar))
-         (TestlistStarExpr (Expr WhitespaceChar) (StarExpr WhitespaceChar))
+         (TestlistStarExpr WhitespaceChar Expr StarExpr)
          a
   , _forStatement_in
     :: Compose
@@ -502,7 +502,7 @@ deriving instance Show a => Show (SimpleStatement a)
 data SmallStatement a
   = SmallStatementExpr
   { _smallStatementExpr_left
-    :: TestlistStarExpr (Test WhitespaceChar) (StarExpr WhitespaceChar) a
+    :: TestlistStarExpr WhitespaceChar Test StarExpr a
   , _smallStatementExpr_right
     :: Sum
          (Compose
@@ -514,7 +514,7 @@ data SmallStatement a
              (Before (Between' [WhitespaceChar] Equals))
              (Sum
                (YieldExpr WhitespaceChar)
-               (TestlistStarExpr (Test WhitespaceChar) (StarExpr WhitespaceChar)))))
+               (TestlistStarExpr WhitespaceChar Test StarExpr))))
          a
   , _smallStatement_ann :: a
   }

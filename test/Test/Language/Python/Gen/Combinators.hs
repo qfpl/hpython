@@ -17,6 +17,12 @@ genBefore = liftA2 Before
 genBefore1 :: MonadGen m => m s -> m a -> m (Before (NonEmpty s) a)
 genBefore1 a b = liftA2 Before (Gen.nonEmpty (Range.linear 1 10) a) b
 
+genAfter1 :: MonadGen m => m s -> m a -> m (After (NonEmpty s) a)
+genAfter1 a b = liftA2 After (Gen.nonEmpty (Range.linear 1 10) a) b
+
+genAfter1F :: MonadGen m => m s -> m (f a) -> m (Compose (After (NonEmpty s)) f a)
+genAfter1F a b = Compose <$> genAfter1 a b
+
 genBefore1F :: MonadGen m => m s -> m (f a) -> m (Compose (Before (NonEmpty s)) f a)
 genBefore1F a b = Compose <$> genBefore1 a b
 
@@ -56,6 +62,11 @@ genBetween'
   :: MonadGen m
   => m s -> m a -> m (Between' s a)
 genBetween' ms ma = Between' <$> genBetween ms ms ma
+
+genBetween'F
+  :: MonadGen m
+  => m s -> m (f a) -> m (Compose (Between' s) f a)
+genBetween'F ms ma = Compose <$> genBetween' ms ma
 
 genListF
   :: MonadGen m

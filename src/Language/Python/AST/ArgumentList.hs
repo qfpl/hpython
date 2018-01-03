@@ -8,6 +8,7 @@
 {-# language StandaloneDeriving #-}
 {-# language TemplateHaskell #-}
 {-# language TypeFamilies #-}
+{-# language UndecidableInstances #-}
 module Language.Python.AST.ArgumentList
   ( KeywordItem(..)
   , KeywordsArguments(..)
@@ -42,13 +43,13 @@ data KeywordItem name expr (as :: AtomType) (dctxt :: DefinitionContext) a where
     , _keywordItem_right
       :: Compose
            (Before [AnyWhitespaceChar])
-           (expr 'NotAssignable dctxt)
+           (expr AnyWhitespaceChar 'NotAssignable dctxt)
            a
     , _keywordItem_ann :: a
     } -> KeywordItem name expr 'NotAssignable dctxt a
-deriving instance (Functor name, Functor (expr as dctxt)) => Functor (KeywordItem name expr as dctxt)
-deriving instance (Foldable name, Foldable (expr as dctxt)) => Foldable (KeywordItem name expr as dctxt)
-deriving instance (Traversable name, Traversable (expr as dctxt)) => Traversable (KeywordItem name expr as dctxt)
+deriving instance (Functor name, Functor (expr AnyWhitespaceChar as dctxt)) => Functor (KeywordItem name expr as dctxt)
+deriving instance (Foldable name, Foldable (expr AnyWhitespaceChar as dctxt)) => Foldable (KeywordItem name expr as dctxt)
+deriving instance (Traversable name, Traversable (expr AnyWhitespaceChar as dctxt)) => Traversable (KeywordItem name expr as dctxt)
 
 data KeywordsArguments name expr as dctxt a where
   KeywordsArguments ::
@@ -57,7 +58,7 @@ data KeywordsArguments name expr as dctxt a where
            (KeywordItem name expr 'NotAssignable dctxt)
            (Compose
              (Before (Between' [AnyWhitespaceChar] DoubleAsterisk))
-             (expr 'NotAssignable dctxt))
+             (expr AnyWhitespaceChar 'NotAssignable dctxt))
            a
     , _keywordsArguments_tail
       :: Compose
@@ -68,23 +69,23 @@ data KeywordsArguments name expr as dctxt a where
                (KeywordItem name expr 'NotAssignable dctxt)
                (Compose
                  (Before (Between' [AnyWhitespaceChar] DoubleAsterisk))
-                 (expr 'NotAssignable dctxt))))
+                 (expr AnyWhitespaceChar 'NotAssignable dctxt))))
            a
     , _keywordsArguments_ann :: a
     } -> KeywordsArguments name expr 'NotAssignable dctxt a
-deriving instance (Eq1 name, Eq1 (expr as dctxt), Eq a) => Eq (KeywordsArguments name expr as dctxt a)
-deriving instance (Show1 name, Show1 (expr as dctxt), Show a) => Show (KeywordsArguments name expr as dctxt a)
-deriving instance (Ord1 name, Ord1 (expr as dctxt), Ord a) => Ord (KeywordsArguments name expr as dctxt a)
-deriving instance (Functor name, Functor (expr as dctxt)) => Functor (KeywordsArguments name expr as dctxt)
-deriving instance (Foldable name, Foldable (expr as dctxt)) => Foldable (KeywordsArguments name expr as dctxt)
-deriving instance (Traversable name, Traversable (expr as dctxt)) => Traversable (KeywordsArguments name expr as dctxt)
+deriving instance (Eq1 name, Eq1 (expr AnyWhitespaceChar as dctxt), Eq a) => Eq (KeywordsArguments name expr as dctxt a)
+deriving instance (Show1 name, Show1 (expr AnyWhitespaceChar as dctxt), Show a) => Show (KeywordsArguments name expr as dctxt a)
+deriving instance (Ord1 name, Ord1 (expr AnyWhitespaceChar as dctxt), Ord a) => Ord (KeywordsArguments name expr as dctxt a)
+deriving instance (Functor name, Functor (expr AnyWhitespaceChar as dctxt)) => Functor (KeywordsArguments name expr as dctxt)
+deriving instance (Foldable name, Foldable (expr AnyWhitespaceChar as dctxt)) => Foldable (KeywordsArguments name expr as dctxt)
+deriving instance (Traversable name, Traversable (expr AnyWhitespaceChar as dctxt)) => Traversable (KeywordsArguments name expr as dctxt)
 
 data PositionalArguments expr (as :: AtomType) (dctxt :: DefinitionContext) a where
   PositionalArguments ::
     { _positionalArguments_head
       :: Compose
           (Before (Maybe (Between' [AnyWhitespaceChar] Asterisk)))
-          (expr 'NotAssignable dctxt)
+          (expr AnyWhitespaceChar 'NotAssignable dctxt)
           a
     , _positionalArguments_tail
       :: Compose
@@ -93,16 +94,16 @@ data PositionalArguments expr (as :: AtomType) (dctxt :: DefinitionContext) a wh
             (Before (Between' [AnyWhitespaceChar] Comma))
             (Compose
               (Before (Maybe (Between' [AnyWhitespaceChar] Asterisk)))
-              (expr 'NotAssignable dctxt)))
+              (expr AnyWhitespaceChar 'NotAssignable dctxt)))
           a
     , _positionalArguments_ann :: a
     } -> PositionalArguments expr 'NotAssignable dctxt a
-deriving instance (Eq1 (expr as dctxt), Eq a) => Eq (PositionalArguments expr as dctxt a)
-deriving instance (Show1 (expr as dctxt), Show a) => Show (PositionalArguments expr as dctxt a)
-deriving instance (Ord1 (expr as dctxt), Ord a) => Ord (PositionalArguments expr as dctxt a)
-deriving instance Functor (expr as dctxt) => Functor (PositionalArguments expr as dctxt)
-deriving instance Foldable (expr as dctxt) => Foldable (PositionalArguments expr as dctxt)
-deriving instance Traversable (expr as dctxt) => Traversable (PositionalArguments expr as dctxt)
+deriving instance (Eq1 (expr AnyWhitespaceChar as dctxt), Eq a) => Eq (PositionalArguments expr as dctxt a)
+deriving instance (Show1 (expr AnyWhitespaceChar as dctxt), Show a) => Show (PositionalArguments expr as dctxt a)
+deriving instance (Ord1 (expr AnyWhitespaceChar as dctxt), Ord a) => Ord (PositionalArguments expr as dctxt a)
+deriving instance Functor (expr AnyWhitespaceChar as dctxt) => Functor (PositionalArguments expr as dctxt)
+deriving instance Foldable (expr AnyWhitespaceChar as dctxt) => Foldable (PositionalArguments expr as dctxt)
+deriving instance Traversable (expr AnyWhitespaceChar as dctxt) => Traversable (PositionalArguments expr as dctxt)
 
 data StarredAndKeywords name expr (as :: AtomType) (dctxt :: DefinitionContext) a where
   StarredAndKeywords ::
@@ -110,7 +111,7 @@ data StarredAndKeywords name expr (as :: AtomType) (dctxt :: DefinitionContext) 
       :: Sum
            (Compose
              (Before (Between' [AnyWhitespaceChar] Asterisk))
-             (expr 'NotAssignable dctxt))
+             (expr AnyWhitespaceChar 'NotAssignable dctxt))
            (KeywordItem name expr 'NotAssignable dctxt)
            a 
     , _starredAndKeywords_tail
@@ -121,17 +122,17 @@ data StarredAndKeywords name expr (as :: AtomType) (dctxt :: DefinitionContext) 
              (Sum
                (Compose
                  (Before (Between' [AnyWhitespaceChar] Asterisk))
-                   (expr 'NotAssignable dctxt))
+                   (expr AnyWhitespaceChar 'NotAssignable dctxt))
                (KeywordItem name expr 'NotAssignable dctxt)))
            a
     , _starredAndKeywords_ann :: a
     } -> StarredAndKeywords name expr 'NotAssignable dctxt a
-deriving instance (Eq1 name, Eq1 (expr as dctxt), Eq a) => Eq (StarredAndKeywords name expr as dctxt a)
-deriving instance (Show1 name, Show1 (expr as dctxt), Show a) => Show (StarredAndKeywords name expr as dctxt a)
-deriving instance (Ord1 name, Ord1 (expr as dctxt), Ord a) => Ord (StarredAndKeywords name expr as dctxt a)
-deriving instance (Functor name, Functor (expr as dctxt)) => Functor (StarredAndKeywords name expr as dctxt)
-deriving instance (Foldable name, Foldable (expr as dctxt)) => Foldable (StarredAndKeywords name expr as dctxt)
-deriving instance (Traversable name, Traversable (expr as dctxt)) => Traversable (StarredAndKeywords name expr as dctxt)
+deriving instance (Eq1 name, Eq1 (expr AnyWhitespaceChar as dctxt), Eq a) => Eq (StarredAndKeywords name expr as dctxt a)
+deriving instance (Show1 name, Show1 (expr AnyWhitespaceChar as dctxt), Show a) => Show (StarredAndKeywords name expr as dctxt a)
+deriving instance (Ord1 name, Ord1 (expr AnyWhitespaceChar as dctxt), Ord a) => Ord (StarredAndKeywords name expr as dctxt a)
+deriving instance (Functor name, Functor (expr AnyWhitespaceChar as dctxt)) => Functor (StarredAndKeywords name expr as dctxt)
+deriving instance (Foldable name, Foldable (expr AnyWhitespaceChar as dctxt)) => Foldable (StarredAndKeywords name expr as dctxt)
+deriving instance (Traversable name, Traversable (expr AnyWhitespaceChar as dctxt)) => Traversable (StarredAndKeywords name expr as dctxt)
 
 data ArgumentList name expr (as :: AtomType) (dctxt :: DefinitionContext) a where
   ArgumentListAll ::
@@ -173,12 +174,12 @@ data ArgumentList name expr (as :: AtomType) (dctxt :: DefinitionContext) a wher
     , _argumentList_comma :: Maybe (Between' [AnyWhitespaceChar] Comma)
     , _argumentList_ann :: a
     } -> ArgumentList name expr 'NotAssignable dctxt a
-deriving instance (Eq1 name, Eq1 (expr as dctxt), Eq a) => Eq (ArgumentList name expr as dctxt a)
-deriving instance (Show1 name, Show1 (expr as dctxt), Show a) => Show (ArgumentList name expr as dctxt a)
-deriving instance (Ord1 name, Ord1 (expr as dctxt), Ord a) => Ord (ArgumentList name expr as dctxt a)
-deriving instance (Functor name, Functor (expr as dctxt)) => Functor (ArgumentList name expr as dctxt)
-deriving instance (Foldable name, Foldable (expr as dctxt)) => Foldable (ArgumentList name expr as dctxt)
-deriving instance (Traversable name, Traversable (expr as dctxt)) => Traversable (ArgumentList name expr as dctxt)
+deriving instance (Eq1 name, Eq1 (expr AnyWhitespaceChar as dctxt), Eq a) => Eq (ArgumentList name expr as dctxt a)
+deriving instance (Show1 name, Show1 (expr AnyWhitespaceChar as dctxt), Show a) => Show (ArgumentList name expr as dctxt a)
+deriving instance (Ord1 name, Ord1 (expr AnyWhitespaceChar as dctxt), Ord a) => Ord (ArgumentList name expr as dctxt a)
+deriving instance (Functor name, Functor (expr AnyWhitespaceChar as dctxt)) => Functor (ArgumentList name expr as dctxt)
+deriving instance (Foldable name, Foldable (expr AnyWhitespaceChar as dctxt)) => Foldable (ArgumentList name expr as dctxt)
+deriving instance (Traversable name, Traversable (expr AnyWhitespaceChar as dctxt)) => Traversable (ArgumentList name expr as dctxt)
 
 mkArgumentListAll
   :: HasName name
@@ -305,14 +306,14 @@ instance HasName name => IsArgList (ArgumentList name expr as dctxt a) where
     = DADoublestarArg
         (Compose
           (Before (Between' [AnyWhitespaceChar] DoubleAsterisk))
-          (expr 'NotAssignable dctxt)
+          (expr AnyWhitespaceChar 'NotAssignable dctxt)
           a)
 
   data PositionalArgument (ArgumentList name expr as dctxt a)
     = PAPositionalArg
         (Compose
           (Before (Maybe (Between' [AnyWhitespaceChar] Asterisk)))
-          (expr 'NotAssignable dctxt)
+          (expr AnyWhitespaceChar 'NotAssignable dctxt)
           a)
 
   argumentName (KeywordArgument (KAKeywordArg (KeywordItem ident _ _))) =
@@ -368,47 +369,47 @@ instance HasName name => IsArgList (ArgumentList name expr as dctxt a) where
 
 $(return [])
 
-instance (Eq1 name, Eq1 (expr as dctxt)) => Eq1 (ArgumentList name expr as dctxt) where
+instance (Eq1 name, Eq1 (expr AnyWhitespaceChar as dctxt)) => Eq1 (ArgumentList name expr as dctxt) where
   liftEq = $(makeLiftEq ''ArgumentList)
 
-instance Eq1 (expr as dctxt) => Eq1 (PositionalArguments expr as dctxt) where
+instance Eq1 (expr AnyWhitespaceChar as dctxt) => Eq1 (PositionalArguments expr as dctxt) where
   liftEq = $(makeLiftEq ''PositionalArguments)
 
-instance (Eq1 name, Eq1 (expr as dctxt)) => Eq1 (StarredAndKeywords name expr as dctxt) where
+instance (Eq1 name, Eq1 (expr AnyWhitespaceChar as dctxt)) => Eq1 (StarredAndKeywords name expr as dctxt) where
   liftEq = $(makeLiftEq ''StarredAndKeywords)
 
-instance (Eq1 name, Eq1 (expr as dctxt)) => Eq1 (KeywordsArguments name expr as dctxt) where
+instance (Eq1 name, Eq1 (expr AnyWhitespaceChar as dctxt)) => Eq1 (KeywordsArguments name expr as dctxt) where
   liftEq = $(makeLiftEq ''KeywordsArguments)
 
-instance (Eq1 name, Eq1 (expr as dctxt)) => Eq1 (KeywordItem name expr as dctxt) where
+instance (Eq1 name, Eq1 (expr AnyWhitespaceChar as dctxt)) => Eq1 (KeywordItem name expr as dctxt) where
   liftEq = $(makeLiftEq ''KeywordItem)
 
-instance (Show1 name, Show1 (expr as dctxt)) => Show1 (ArgumentList name expr as dctxt) where
+instance (Show1 name, Show1 (expr AnyWhitespaceChar as dctxt)) => Show1 (ArgumentList name expr as dctxt) where
   liftShowsPrec = $(makeLiftShowsPrec ''ArgumentList)
 
-instance Show1 (expr as dctxt) => Show1 (PositionalArguments expr as dctxt) where
+instance Show1 (expr AnyWhitespaceChar as dctxt) => Show1 (PositionalArguments expr as dctxt) where
   liftShowsPrec = $(makeLiftShowsPrec ''PositionalArguments)
 
-instance (Show1 name, Show1 (expr as dctxt)) => Show1 (StarredAndKeywords name expr as dctxt) where
+instance (Show1 name, Show1 (expr AnyWhitespaceChar as dctxt)) => Show1 (StarredAndKeywords name expr as dctxt) where
   liftShowsPrec = $(makeLiftShowsPrec ''StarredAndKeywords)
 
-instance (Show1 name, Show1 (expr as dctxt)) => Show1 (KeywordsArguments name expr as dctxt) where
+instance (Show1 name, Show1 (expr AnyWhitespaceChar as dctxt)) => Show1 (KeywordsArguments name expr as dctxt) where
   liftShowsPrec = $(makeLiftShowsPrec ''KeywordsArguments)
 
-instance (Show1 name, Show1 (expr as dctxt)) => Show1 (KeywordItem name expr as dctxt) where
+instance (Show1 name, Show1 (expr AnyWhitespaceChar as dctxt)) => Show1 (KeywordItem name expr as dctxt) where
   liftShowsPrec = $(makeLiftShowsPrec ''KeywordItem)
 
-instance (Ord1 name, Ord1 (expr as dctxt)) => Ord1 (ArgumentList name expr as dctxt) where
+instance (Ord1 name, Ord1 (expr AnyWhitespaceChar as dctxt)) => Ord1 (ArgumentList name expr as dctxt) where
   liftCompare = $(makeLiftCompare ''ArgumentList)
 
-instance Ord1 (expr as dctxt) => Ord1 (PositionalArguments expr as dctxt) where
+instance Ord1 (expr AnyWhitespaceChar as dctxt) => Ord1 (PositionalArguments expr as dctxt) where
   liftCompare = $(makeLiftCompare ''PositionalArguments)
 
-instance (Ord1 name, Ord1 (expr as dctxt)) => Ord1 (StarredAndKeywords name expr as dctxt) where
+instance (Ord1 name, Ord1 (expr AnyWhitespaceChar as dctxt)) => Ord1 (StarredAndKeywords name expr as dctxt) where
   liftCompare = $(makeLiftCompare ''StarredAndKeywords)
 
-instance (Ord1 name, Ord1 (expr as dctxt)) => Ord1 (KeywordsArguments name expr as dctxt) where
+instance (Ord1 name, Ord1 (expr AnyWhitespaceChar as dctxt)) => Ord1 (KeywordsArguments name expr as dctxt) where
   liftCompare = $(makeLiftCompare ''KeywordsArguments)
 
-instance (Ord1 name, Ord1 (expr as dctxt)) => Ord1 (KeywordItem name expr as dctxt) where
+instance (Ord1 name, Ord1 (expr AnyWhitespaceChar as dctxt)) => Ord1 (KeywordItem name expr as dctxt) where
   liftCompare = $(makeLiftCompare ''KeywordItem)

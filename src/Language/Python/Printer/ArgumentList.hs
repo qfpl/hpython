@@ -15,23 +15,23 @@ import Language.Python.Printer.Symbols
 
 keywordItem
   :: (name a -> Doc)
-  -> (forall as' dctxt'. expr as' dctxt' a -> Doc)
+  -> (forall as' ws' dctxt'. (ws' -> Doc) -> expr ws' as' dctxt' a -> Doc)
   -> KeywordItem name expr as dctxt a
   -> Doc
 keywordItem _name _expr (KeywordItem l r _) =
   anyWhitespaceAfterF _name l <>
   text "=" <>
-  anyWhitespaceBeforeF _expr r
+  anyWhitespaceBeforeF (_expr anyWhitespaceChar) r
 
 keywordsArguments
   :: (name a -> Doc)
-  -> (forall as' dctxt'. expr as' dctxt' a -> Doc)
+  -> (forall as' ws' dctxt'. (ws' -> Doc) -> expr ws' as' dctxt' a -> Doc)
   -> KeywordsArguments name expr as dctxt a
   -> Doc
 keywordsArguments _name _expr (KeywordsArguments h t _) =
   sumElim
     (keywordItem _name _expr)
-    (beforeF (betweenAnyWhitespace' doubleAsterisk) _expr)
+    (beforeF (betweenAnyWhitespace' doubleAsterisk) (_expr anyWhitespaceChar))
     h <>
   foldMapOf
     (_Wrapped.folded)
@@ -39,30 +39,30 @@ keywordsArguments _name _expr (KeywordsArguments h t _) =
       (betweenAnyWhitespace' comma)
       (sumElim
         (keywordItem _name _expr)
-        (beforeF (betweenAnyWhitespace' doubleAsterisk) _expr)))
+        (beforeF (betweenAnyWhitespace' doubleAsterisk) (_expr anyWhitespaceChar))))
     t
 
 positionalArguments
-  :: (forall as' dctxt'. expr as' dctxt' a -> Doc)
+  :: (forall as' ws' dctxt'. (ws' -> Doc) -> expr ws' as' dctxt' a -> Doc)
   -> PositionalArguments expr as dctxt a
   -> Doc
 positionalArguments _expr (PositionalArguments h t _) =
-  beforeF (foldMap $ betweenAnyWhitespace' asterisk) _expr h <>
+  beforeF (foldMap $ betweenAnyWhitespace' asterisk) (_expr anyWhitespaceChar) h <>
   foldMapOf
     (_Wrapped.folded)
     (beforeF
       (betweenAnyWhitespace' comma)
-      (beforeF (foldMap $ betweenAnyWhitespace' asterisk) _expr))
+      (beforeF (foldMap $ betweenAnyWhitespace' asterisk) (_expr anyWhitespaceChar)))
     t
 
 starredAndKeywords
   :: (name a -> Doc)
-  -> (forall as' dctxt'. expr as' dctxt' a -> Doc)
+  -> (forall as' ws' dctxt'. (ws' -> Doc) -> expr ws' as' dctxt' a -> Doc)
   -> StarredAndKeywords name expr as dctxt a
   -> Doc
 starredAndKeywords _name _expr (StarredAndKeywords h t _) =
   sumElim
-    (beforeF (betweenAnyWhitespace' asterisk) _expr)
+    (beforeF (betweenAnyWhitespace' asterisk) (_expr anyWhitespaceChar))
     (keywordItem _name _expr)
     h <>
   foldMapOf
@@ -70,14 +70,14 @@ starredAndKeywords _name _expr (StarredAndKeywords h t _) =
     (beforeF
       (betweenAnyWhitespace' comma)
       (sumElim
-        (beforeF (betweenAnyWhitespace' asterisk) _expr)
+        (beforeF (betweenAnyWhitespace' asterisk) (_expr anyWhitespaceChar))
         (keywordItem _name _expr)))
     t
 
 argumentList
   :: HasName name
   => (name a -> Doc)
-  -> (forall as' dctxt'. expr as' dctxt' a -> Doc)
+  -> (forall as' ws' dctxt'. (ws' -> Doc) -> expr ws' as' dctxt' a -> Doc)
   -> ArgumentList name expr 'NotAssignable dctxt a
   -> Doc
 argumentList _name _expr e =

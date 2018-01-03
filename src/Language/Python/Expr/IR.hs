@@ -426,7 +426,7 @@ data Comparison ws a
     :: Compose
          []
          (Compose
-           (Before (Between' [ws] CompOperator))
+           (Before (CompOperator ws))
            (Expr ws))
          a
   , _comparison_ann :: a
@@ -486,7 +486,7 @@ deriving instance (Ord a, Ord ws) => Ord (OrTest ws a)
 
 data IfThenElse ws a
   = IfThenElse
-  { _ifThenElse_if :: Between' (NonEmpty ws) KIf
+  { _ifThenElse_if :: After (NonEmpty ws) KIf
   , _ifThenElse_value1 :: OrTest ws a
   , _ifThenElse_else :: Between' (NonEmpty ws) KElse
   , _ifThenElse_value2 :: Test ws a

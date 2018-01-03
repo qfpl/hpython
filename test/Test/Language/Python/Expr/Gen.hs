@@ -53,7 +53,7 @@ genIfThenElse
   -> m (AST.IfThenElse ws 'NotAssignable ctxt ())
 genIfThenElse cfg ws =
   AST.IfThenElse <$>
-  genBetween'1 ws (pure AST.KIf) <*>
+  genAfter1 ws (pure AST.KIf) <*>
   Gen.small (genOrTest cfg ws) <*>
   genBetween'1 ws (pure AST.KElse) <*>
   Gen.small (genTest cfg ws)
@@ -1127,20 +1127,24 @@ genExpr cfg ws =
       Gen.small (genXorExpr cfg' ws') <*>
       pure ()
 
-genCompOperator :: MonadGen m => m AST.CompOperator
-genCompOperator =
-  Gen.choice
-    [ AST.CompLT <$> genWhitespace <*> genWhitespace
-    , AST.CompGT <$> genWhitespace <*> genWhitespace
-    , AST.CompEq <$> genWhitespace <*> genWhitespace
-    , AST.CompGEq <$> genWhitespace <*> genWhitespace
-    , AST.CompLEq <$> genWhitespace <*> genWhitespace
-    , AST.CompNEq <$> genWhitespace <*> genWhitespace
-    , AST.CompIs <$> genWhitespace1 <*> genWhitespace1
-    , AST.CompIn <$> genWhitespace1 <*> genWhitespace1
-    , AST.CompIsNot <$> genWhitespace1 <*> genWhitespace1 <*> genWhitespace1
-    , AST.CompNotIn <$> genWhitespace1 <*> genWhitespace1 <*> genWhitespace1
-    ]
+genCompOperator :: MonadGen m => m ws -> m (AST.CompOperator ws)
+genCompOperator ws =
+  let
+    wss = Gen.list (Range.linear 0 10) ws
+    wss1 = Gen.nonEmpty (Range.linear 1 10) ws
+  in
+    Gen.choice
+      [ AST.CompLT <$> wss <*> wss
+      , AST.CompGT <$> wss <*> wss
+      , AST.CompEq <$> wss <*> wss
+      , AST.CompGEq <$> wss <*> wss
+      , AST.CompLEq <$> wss <*> wss
+      , AST.CompNEq <$> wss <*> wss
+      , AST.CompIs <$> wss1 <*> wss1
+      , AST.CompIn <$> wss1 <*> wss1
+      , AST.CompIsNot <$> wss1 <*> wss1 <*> wss1
+      , AST.CompNotIn <$> wss1 <*> wss1 <*> wss1
+      ]
 
 genComparison
   :: MonadGen m
@@ -1157,7 +1161,7 @@ genComparison cfg ws =
           Gen.small (genExpr cfg ws) <*>
           genNonEmptyF
             (genBeforeF
-              (genBetween' (Gen.list (Range.linear 0 10) ws) genCompOperator)
+              (genCompOperator ws)
               (Gen.small $ genExpr cfg ws)) <*>
           pure ()
         ]

@@ -60,7 +60,7 @@ ifThenElse
   -> Unspaced m (IfThenElse ws SrcInfo)
 ifThenElse ws =
   IfThenElse <$>
-  between'1 ws (string "if" $> KIf) <*>
+  after1 ws (string "if" $> KIf) <*>
   orTest ws <*>
   between'1 ws (string "else" $> KElse) <*>
   test ws
@@ -736,7 +736,7 @@ trailer
   :: (DeltaParsing m, LookAheadParsing m)
   => Unspaced m ws
   -> Unspaced m (Trailer ws SrcInfo)
-trailer ws = try trailerCall <|> try trailerSubscript <|> trailerAccess
+trailer ws = trailerCall <|> trailerSubscript <|> trailerAccess
   where
     trailerCall =
       annotated $
@@ -745,7 +745,7 @@ trailer ws = try trailerCall <|> try trailerSubscript <|> trailerAccess
         (char '(')
         (char ')')
         (between'F
-          (many anyWhitespaceChar) .
+          (many $ anyWhitespaceChar) .
           optionalF $ try (argumentList identifier test))
 
     trailerSubscript =
@@ -883,8 +883,8 @@ expr ws =
   xorExpr ws <*>
   manyF (try $ beforeF (between' (many ws) $ char '|' $> Pipe) (xorExpr ws))
 
-compOperator :: (DeltaParsing m, LookAheadParsing m) => m CompOperator
-compOperator =
+compOperator :: (DeltaParsing m, LookAheadParsing m) => m ws -> m (CompOperator ws)
+compOperator ws =
   try compEq <|>
   try compGEq <|>
   try compLEq <|>
@@ -898,55 +898,55 @@ compOperator =
   where
     compEq =
       CompEq <$>
-      (many (try whitespaceChar) <* string "==") <*>
-      many whitespaceChar
+      (many (try ws) <* string "==") <*>
+      many ws
 
     compGEq =
       CompGEq <$>
-      (many (try whitespaceChar) <* string ">=") <*>
-      many whitespaceChar
+      (many (try ws) <* string ">=") <*>
+      many ws
 
     compNEq =
       CompNEq <$>
-      (many (try whitespaceChar) <* string "!=") <*>
-      many whitespaceChar
+      (many (try ws) <* string "!=") <*>
+      many ws
 
     compLEq =
       CompLEq <$>
-      (many (try whitespaceChar) <* string "<=") <*>
-      many whitespaceChar
+      (many (try ws) <* string "<=") <*>
+      many ws
 
     compLT =
       CompLT <$>
-      (many (try whitespaceChar) <* string "<") <*>
-      many whitespaceChar
+      (many (try ws) <* string "<") <*>
+      many ws
 
     compGT =
       CompGT <$>
-      (many (try whitespaceChar) <* string ">") <*>
-      many whitespaceChar
+      (many (try ws) <* string ">") <*>
+      many ws
 
     compIsNot =
       CompIsNot <$>
-      (some1 whitespaceChar <* string "is") <*>
-      (some1 whitespaceChar <* string "not") <*>
-      some1 whitespaceChar
+      (some1 ws <* string "is") <*>
+      (some1 ws <* string "not") <*>
+      some1 ws
 
     compIs =
       CompIs <$>
-      (some1 whitespaceChar <* string "is") <*>
-      some1 whitespaceChar
+      (some1 ws <* string "is") <*>
+      some1 ws
 
     compIn =
       CompIn <$>
-      (some1 whitespaceChar <* string "in") <*>
-      some1 whitespaceChar
+      (some1 ws <* string "in") <*>
+      some1 ws
 
     compNotIn =
       CompNotIn <$>
-      (some1 whitespaceChar <* string "not") <*>
-      (some1 whitespaceChar <* string "in") <*>
-      some1 whitespaceChar
+      (some1 ws <* string "not") <*>
+      (some1 ws <* string "in") <*>
+      some1 ws
 
 comparison
   :: (DeltaParsing m, LookAheadParsing m)
@@ -956,7 +956,7 @@ comparison ws =
   annotated $
   Comparison <$>
   expr ws <*>
-  manyF (try $ beforeF (between' (many ws) compOperator) (expr ws))
+  manyF (try $ beforeF (compOperator ws) (expr ws))
 
 notTest
   :: (DeltaParsing m, LookAheadParsing m)

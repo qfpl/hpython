@@ -245,58 +245,58 @@ bytesLiteral (BytesLiteral prefix val _) =
 
 ifThenElse :: Ord a => (ws -> Doc) -> IfThenElse ws atomType ctxt a -> Doc
 ifThenElse ws (IfThenElse i v1 e v2) =
-  between' (foldMap ws) (const $ text "if") i <>
+  after (foldMap ws) (const $ text "if") i <>
   orTest ws v1 <>
   between' (foldMap ws) (const $ text "else") e <>
   test ws v2
 
-compOperator :: CompOperator -> Doc
-compOperator o =
+compOperator :: (ws -> Doc) -> CompOperator ws -> Doc
+compOperator ws o =
   case o of
     CompLT b a ->
-      foldMap whitespaceChar b <>
+      foldMap ws b <>
       char '<' <>
-      foldMap whitespaceChar a
+      foldMap ws a
     CompGT b a ->
-      foldMap whitespaceChar b <>
+      foldMap ws b <>
       char '>' <>
-      foldMap whitespaceChar a
+      foldMap ws a
     CompEq b a ->
-      foldMap whitespaceChar b <>
+      foldMap ws b <>
       text "==" <>
-      foldMap whitespaceChar a
+      foldMap ws a
     CompNEq b a ->
-      foldMap whitespaceChar b <>
+      foldMap ws b <>
       text "!=" <>
-      foldMap whitespaceChar a
+      foldMap ws a
     CompLEq b a ->
-      foldMap whitespaceChar b <>
+      foldMap ws b <>
       text "<=" <>
-      foldMap whitespaceChar a
+      foldMap ws a
     CompGEq b a ->
-      foldMap whitespaceChar b <>
+      foldMap ws b <>
       text ">=" <>
-      foldMap whitespaceChar a
+      foldMap ws a
     CompIs b a ->
-      foldMap whitespaceChar b <>
+      foldMap ws b <>
       text "is" <>
-      foldMap whitespaceChar a
+      foldMap ws a
     CompIsNot b m a ->
-      foldMap whitespaceChar b <>
+      foldMap ws b <>
       text "is" <>
-      foldMap whitespaceChar m <>
+      foldMap ws m <>
       text "not" <>
-      foldMap whitespaceChar a
+      foldMap ws a
     CompIn b a ->
-      foldMap whitespaceChar b <>
+      foldMap ws b <>
       text "in" <>
-      foldMap whitespaceChar a
+      foldMap ws a
     CompNotIn b m a ->
-      foldMap whitespaceChar b <>
+      foldMap ws b <>
       text "not" <>
-      foldMap whitespaceChar m <>
+      foldMap ws m <>
       text "in" <>
-      foldMap whitespaceChar a
+      foldMap ws a
 
 tupleElim :: Semigroup r => (a -> r) -> (b -> r) -> (a, b) -> r
 tupleElim f g (a, b) = f a <> g b
@@ -365,7 +365,7 @@ comparison :: Ord a => (ws -> Doc) -> Comparison ws atomType ctxt a -> Doc
 comparison ws (ComparisonOne v _) = expr ws v
 comparison ws (ComparisonMany l r _) =
   expr ws l <>
-  foldMapF (beforeF (between' (foldMap ws) compOperator) (expr ws)) r
+  foldMapF (beforeF (compOperator ws) (expr ws)) r
 
 dictItem :: Ord a => (ws -> Doc) -> DictItem ws atomType ctxt a -> Doc
 dictItem ws (DictItem k c v _) =

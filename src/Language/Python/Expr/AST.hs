@@ -481,7 +481,7 @@ data Comparison :: * -> AtomType -> DefinitionContext -> * -> * where
       :: Compose
           NonEmpty
           (Compose
-            (Before (Between' [ws] CompOperator))
+            (Before (CompOperator ws))
             (Expr ws 'NotAssignable ctxt))
           a
     , _comparisonMany_ann :: a
@@ -555,7 +555,7 @@ deriving instance Traversable (OrTest ws a b)
 
 data IfThenElse :: * -> AtomType -> DefinitionContext -> * -> * where
   IfThenElse ::
-    { _ifThenElse_if :: Between' (NonEmpty ws) KIf
+    { _ifThenElse_if :: After (NonEmpty ws) KIf
     , _ifThenElse_value1 :: OrTest ws 'NotAssignable ctxt a
     , _ifThenElse_else :: Between' (NonEmpty ws) KElse
     , _ifThenElse_value2 :: Test ws 'NotAssignable ctxt a

@@ -228,7 +228,7 @@ instance HasName name => IsArgList (ArgsList ws name test a) where
             pure .
             DoublestarArgument .
             DADoublestarArg $
-            a' ^. to _argsListDoublestarArg_value._Wrapped.between'._2
+            a' ^. to _argsListDoublestarArg_value._Wrapped.before._2
 
       fromArgslistarg a =
         case getCompose $ _argsListArg_right a of
@@ -247,7 +247,7 @@ instance HasName name => IsArgList (ArgsList ws name test a) where
                _Wrapped.folded.
                _Wrapped.folded.
                to _argsListDoublestarArg_value.
-               _Wrapped.between'._2.
+               _Wrapped.before._2.
                to (DoublestarArgument . DADoublestarArg))
 
 data ArgsListStarPart ws name test a
@@ -284,7 +284,7 @@ data ArgsListDoublestarArg ws name (test :: * -> *) a
   = ArgsListDoublestarArg
   { _argsListDoublestarArg_value
     :: Compose
-         (Between' [ws])
+         (Before (After [ws] DoubleAsterisk))
          name
          a
   , _argsListDoublestarArg_ann :: a

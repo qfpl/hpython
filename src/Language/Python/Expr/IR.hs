@@ -30,65 +30,6 @@ import Language.Python.Expr.AST.Integer
 import Language.Python.Expr.AST.StringLiteral
 import Language.Python.Expr.AST.TermOperator
 
-data Argument ws a
-  = ArgumentFor
-  { _argumentFor_expr :: Test ws a
-  , _argumentFor_for
-    :: Compose
-        Maybe
-        (CompFor ws)
-        a
-  , _argument_ann :: a
-  }
-  | ArgumentForParens
-  { _argumentForParens_lparen :: After [AnyWhitespaceChar] LeftParen
-  , _argumentForParens_expr :: Test AnyWhitespaceChar a
-  , _argumentForParens_for :: CompFor AnyWhitespaceChar a
-  , _argumentForParens_rparen :: Before [AnyWhitespaceChar] RightParen
-  , _argument_ann :: a
-  }
-  | ArgumentDefault
-  { _argumentDefault_left
-    :: Compose
-         (After [ws])
-         (Test ws)
-         a
-  , _argumentDefault_right
-    :: Compose
-         (Before [ws])
-         (Test ws)
-         a
-  , _argument_ann :: a
-  }
-  | ArgumentUnpack
-  { _argumentUnpack_symbol :: Either Asterisk DoubleAsterisk
-  , _argumentUnpack_val
-    :: Compose
-          (Before [ws])
-          (Test ws)
-          a
-  , _argument_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-deriving instance (Eq a, Eq ws) => Eq (Argument ws a)
-deriving instance (Show a, Show ws) => Show (Argument ws a)
-deriving instance (Ord a, Ord ws) => Ord (Argument ws a)
-
-data ArgList ws a
-  = ArgList
-  { _argList_head :: Argument ws a
-  , _argList_tail
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [ws] Comma))
-           (Argument ws))
-         a
-  , _argList_comma :: Maybe (Before [ws] Comma)
-  , _argList_ann :: a
-  }
-  deriving (Functor, Foldable, Traversable)
-
 data LambdefNocond ws a
   = LambdefNocond
   { _lambdefNocond_args
@@ -264,7 +205,8 @@ data Trailer ws a
   | TrailerAccess
   { _trailerAccess_value :: Compose (Before [ws]) Identifier a
   , _trailer_ann :: a
-  } deriving (Functor, Foldable, Traversable)
+  }
+  deriving (Functor, Foldable, Traversable)
 deriving instance (Eq a, Eq ws) => Eq (Trailer ws a)
 deriving instance (Show a, Show ws) => Show (Trailer ws a)
 deriving instance (Ord a, Ord ws) => Ord (Trailer ws a)
@@ -823,16 +765,6 @@ deriveEq1 ''TestList
 deriveOrd1 ''TestList
 deriveShow1 ''TestList
 makeLenses ''TestList
-
-deriveEq1 ''Argument
-deriveOrd1 ''Argument
-deriveShow1 ''Argument
-makeLenses ''Argument
-
-deriveEq1 ''ArgList
-deriveOrd1 ''ArgList
-deriveShow1 ''ArgList
-makeLenses ''ArgList
 
 deriveEq1 ''LambdefNocond
 deriveOrd1 ''LambdefNocond

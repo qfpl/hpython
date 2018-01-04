@@ -78,7 +78,7 @@ genArgsListDoublestarArg
   -> m (ArgsListDoublestarArg ws name test ())
 genArgsListDoublestarArg _ ws genName =
   ArgsListDoublestarArg <$>
-  genBetween'F (Gen.list (Range.linear 0 10) ws) genName <*>
+  genBeforeF (genAfter (Gen.list (Range.linear 0 10) ws) (pure DoubleAsterisk)) genName <*>
   pure ()
 
 genArgsList

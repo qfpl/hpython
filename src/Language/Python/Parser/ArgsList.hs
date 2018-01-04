@@ -64,8 +64,7 @@ argsListDoublestarArg
 argsListDoublestarArg ws pname =
   annotated $
   ArgsListDoublestarArg <$>
-  (doubleAsterisk *>
-   between'F (many ws) pname)
+  beforeF (after (many ws) doubleAsterisk) pname
 
 argsList
   :: ( DeltaParsing m

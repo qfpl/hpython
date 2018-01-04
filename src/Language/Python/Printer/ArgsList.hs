@@ -51,8 +51,7 @@ argsListDoublestarArg
   -> ArgsListDoublestarArg ws name test a
   -> Doc
 argsListDoublestarArg ws renderName (ArgsListDoublestarArg a _) =
-  text "**" <>
-  between'F (foldMap ws) renderName a
+  beforeF (after (foldMap ws) doubleAsterisk) renderName a
 
 argsList
   :: HasName name

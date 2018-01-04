@@ -1,8 +1,10 @@
 {-# language DeriveFunctor #-}
 {-# language DeriveFoldable #-}
 {-# language DeriveTraversable #-}
+{-# language FlexibleContexts #-}
 {-# language StandaloneDeriving #-}
 {-# language TemplateHaskell #-}
+{-# language TypeFamilies #-}
 {-# language UndecidableInstances #-}
 module Language.Python.IR.ArgumentList where
 
@@ -10,203 +12,108 @@ import Papa hiding (Sum)
 import Data.Deriving
 import Data.Functor.Classes
 import Data.Functor.Compose
-import Data.Functor.Sum
 import Data.Separated.After
 import Data.Separated.Before
 import Data.Separated.Between
 
+import Language.Python.AST.IsArgList hiding (Argument)
 import Language.Python.AST.Symbols
 
-data KeywordItem name expr a
-  = KeywordItem
-  { _keywordItem_left :: Compose (After [AnyWhitespaceChar]) name a
-  , _keywordItem_right
-    :: Compose
-         (Before [AnyWhitespaceChar])
-         (expr AnyWhitespaceChar)
-         a
-  , _keywordItem_ann :: a
+data Argument name expr a
+  = ArgumentPositional
+  { _argumentPositional_value :: expr AnyWhitespaceChar a
+  , _argumentPositional_ann :: a
   }
-deriving instance (Eq1 name, Eq1 (expr AnyWhitespaceChar), Eq a) => Eq (KeywordItem name expr a)
-deriving instance (Show1 name, Show1 (expr AnyWhitespaceChar), Show a) => Show (KeywordItem name expr a)
-deriving instance (Ord1 name, Ord1 (expr AnyWhitespaceChar), Ord a) => Ord (KeywordItem name expr a)
-deriving instance (Functor name, Functor (expr AnyWhitespaceChar)) => Functor (KeywordItem name expr)
-deriving instance (Foldable name, Foldable (expr AnyWhitespaceChar)) => Foldable (KeywordItem name expr)
-deriving instance (Traversable name, Traversable (expr AnyWhitespaceChar)) => Traversable (KeywordItem name expr)
-
-data KeywordsArguments name expr a
-  = KeywordsArguments
-  { _keywordsArguments_head
-    :: Sum
-         (KeywordItem name expr)
-         (Compose
-           (Before (After [AnyWhitespaceChar] DoubleAsterisk))
-           (expr AnyWhitespaceChar))
-         a
-  , _keywordsArguments_tail
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [AnyWhitespaceChar] Comma))
-           (Sum
-             (KeywordItem name expr)
-             (Compose
-               (Before (After [AnyWhitespaceChar] DoubleAsterisk))
-               (expr AnyWhitespaceChar))))
-         a
-  , _keywordsArguments_ann :: a
+  | ArgumentKeyword
+  { _argumentKeyword_left :: name a
+  , _argumentKeyword_equals :: Between' [AnyWhitespaceChar] Equals
+  , _argumentKeyword_right :: expr AnyWhitespaceChar a
+  , _argumentKeyword_ann :: a
   }
-deriving instance (Eq1 name, Eq1 (expr AnyWhitespaceChar), Eq a) => Eq (KeywordsArguments name expr a)
-deriving instance (Show1 name, Show1 (expr AnyWhitespaceChar), Show a) => Show (KeywordsArguments name expr a)
-deriving instance (Ord1 name, Ord1 (expr AnyWhitespaceChar), Ord a) => Ord (KeywordsArguments name expr a)
-deriving instance (Functor name, Functor (expr AnyWhitespaceChar)) => Functor (KeywordsArguments name expr)
-deriving instance (Foldable name, Foldable (expr AnyWhitespaceChar)) => Foldable (KeywordsArguments name expr)
-deriving instance (Traversable name, Traversable (expr AnyWhitespaceChar)) => Traversable (KeywordsArguments name expr)
-
-data PositionalArguments expr a
-  = PositionalArguments
-  { _positionalArguments_head
-    :: Compose
-        (Before (Maybe (After [AnyWhitespaceChar] Asterisk)))
-        (expr AnyWhitespaceChar)
-        a
-  , _positionalArguments_tail
-    :: Compose
-        []
-        (Compose
-          (Before (Between' [AnyWhitespaceChar] Comma))
-          (Compose
-            (Before (Maybe (After [AnyWhitespaceChar] Asterisk)))
-            (expr AnyWhitespaceChar)))
-        a
-  , _positionalArguments_ann :: a
+  | ArgumentStar
+  { _argumentStar_asterisk :: After [AnyWhitespaceChar] Asterisk
+  , _argumentStar_value :: expr AnyWhitespaceChar a
+  , _argumentStar_ann :: a
   }
-deriving instance (Eq1 (expr AnyWhitespaceChar), Eq a) => Eq (PositionalArguments expr a)
-deriving instance (Show1 (expr AnyWhitespaceChar), Show a) => Show (PositionalArguments expr a)
-deriving instance (Ord1 (expr AnyWhitespaceChar), Ord a) => Ord (PositionalArguments expr a)
-deriving instance Functor (expr AnyWhitespaceChar) => Functor (PositionalArguments expr)
-deriving instance Foldable (expr AnyWhitespaceChar) => Foldable (PositionalArguments expr)
-deriving instance Traversable (expr AnyWhitespaceChar) => Traversable (PositionalArguments expr)
-
-data StarredAndKeywords name expr a
-  = StarredAndKeywords
-  { _starredAndKeywords_head
-    :: Sum
-         (Compose
-           (Before (After [AnyWhitespaceChar] Asterisk))
-           (expr AnyWhitespaceChar))
-         (KeywordItem name expr)
-         a 
-  , _starredAndKeywords_tail
-    :: Compose
-         []
-         (Compose
-           (Before (Between' [AnyWhitespaceChar] Comma))
-           (Sum
-             (Compose
-               (Before (After [AnyWhitespaceChar] Asterisk))
-                 (expr AnyWhitespaceChar))
-             (KeywordItem name expr)))
-         a
-  , _starredAndKeywords_ann :: a
+  | ArgumentDoublestar
+  { _argumentDoublestar_asterisk :: After [AnyWhitespaceChar] DoubleAsterisk
+  , _argumentDoublestar_value :: expr AnyWhitespaceChar a
+  , _argumentDoublestar_ann :: a
   }
-deriving instance (Eq1 name, Eq1 (expr AnyWhitespaceChar), Eq a) => Eq (StarredAndKeywords name expr a)
-deriving instance (Ord1 name, Ord1 (expr AnyWhitespaceChar), Ord a) => Ord (StarredAndKeywords name expr a)
-deriving instance (Show1 name, Show1 (expr AnyWhitespaceChar), Show a) => Show (StarredAndKeywords name expr a)
-deriving instance (Functor name, Functor (expr AnyWhitespaceChar)) => Functor (StarredAndKeywords name expr)
-deriving instance (Foldable name, Foldable (expr AnyWhitespaceChar)) => Foldable (StarredAndKeywords name expr)
-deriving instance (Traversable name, Traversable (expr AnyWhitespaceChar)) => Traversable (StarredAndKeywords name expr)
+deriving instance (Eq (expr AnyWhitespaceChar a), Eq (name a), Eq a) => Eq (Argument name expr a)
+deriving instance (Show (expr AnyWhitespaceChar a), Show (name a), Show a) => Show (Argument name expr a)
+deriving instance (Ord (expr AnyWhitespaceChar a), Ord (name a), Ord a) => Ord (Argument name expr a)
+deriving instance (Functor name, Functor (expr AnyWhitespaceChar)) => Functor (Argument name expr)
+deriving instance (Foldable name, Foldable (expr AnyWhitespaceChar)) => Foldable (Argument name expr)
+deriving instance (Traversable name, Traversable (expr AnyWhitespaceChar)) => Traversable (Argument name expr)
 
 data ArgumentList name expr a
-  = ArgumentListAll
-  { _argumentListAll_positionalArguments
-    :: PositionalArguments expr a
-  , _argumentListAll_starredAndKeywords
+  = ArgumentList
+  { _argumentList_head :: Argument name expr a
+  , _argumentList_tail
     :: Compose
-        Maybe
-        (Compose
-          (Before (Between' [AnyWhitespaceChar] Comma))
-          (StarredAndKeywords name expr))
-        a
-  , _argumentListAll_keywords
-    :: Compose
-        Maybe
-        (Compose
-          (Before (Between' [AnyWhitespaceChar] Comma))
-          (KeywordsArguments name expr))
-        a
-  , _argumentList_comma :: Maybe (Between' [AnyWhitespaceChar] Comma)
+         NonEmpty
+         (Compose
+           (Before (Between' [AnyWhitespaceChar] Comma))
+           (Argument name expr))
+         a
+  , _argumentList_comma :: Maybe (Before [AnyWhitespaceChar] Comma)
   , _argumentList_ann :: a
   }
-  | ArgumentListUnpacking
-  { _argumentListUnpacking_starredAndKeywords
-    :: StarredAndKeywords name expr a
-  , _argumentListUnpacking_keywords
-    :: Compose
-        Maybe
-        (Compose
-          (Before (Between' [AnyWhitespaceChar] Comma))
-          (KeywordsArguments name expr))
-        a
-  , _argumentList_comma :: Maybe (Between' [AnyWhitespaceChar] Comma)
-  , _argumentList_ann :: a 
-  }
-  | ArgumentListKeywords
-  { _argumentListKeywords_keywords
-    :: KeywordsArguments name expr a
-  , _argumentList_comma :: Maybe (Between' [AnyWhitespaceChar] Comma)
-  , _argumentList_ann :: a 
-  }
-deriving instance (Eq1 name, Eq1 (expr AnyWhitespaceChar), Eq a) => Eq (ArgumentList name expr a)
-deriving instance (Show1 name, Show1 (expr AnyWhitespaceChar), Show a) => Show (ArgumentList name expr a)
-deriving instance (Ord1 name, Ord1 (expr AnyWhitespaceChar), Ord a) => Ord (ArgumentList name expr a)
+deriving instance (Eq1 (Argument name expr), Eq (expr AnyWhitespaceChar a), Eq (name a), Eq a) => Eq (ArgumentList name expr a)
+deriving instance (Show1 (Argument name expr), Show (expr AnyWhitespaceChar a), Show (name a), Show a) => Show (ArgumentList name expr a)
+deriving instance (Ord1 (Argument name expr), Ord (expr AnyWhitespaceChar a), Ord (name a), Ord a) => Ord (ArgumentList name expr a)
 deriving instance (Functor name, Functor (expr AnyWhitespaceChar)) => Functor (ArgumentList name expr)
 deriving instance (Foldable name, Foldable (expr AnyWhitespaceChar)) => Foldable (ArgumentList name expr)
 deriving instance (Traversable name, Traversable (expr AnyWhitespaceChar)) => Traversable (ArgumentList name expr)
 
+instance HasName name => IsArgList (ArgumentList name expr a) where
+  data KeywordArgument (ArgumentList name expr a)
+    = AKeywordArgument
+        (name a)
+        (Between' [AnyWhitespaceChar] Equals)
+        (expr AnyWhitespaceChar a)
+        a
+
+  data DoublestarArgument (ArgumentList name expr a)
+    = ADoublestarArgument
+        (After [AnyWhitespaceChar] DoubleAsterisk)
+        (expr AnyWhitespaceChar a)
+        a
+
+  data PositionalArgument (ArgumentList name expr a)
+    = APositionalArgument
+        (Maybe (After [AnyWhitespaceChar] Asterisk))
+        (expr AnyWhitespaceChar a)
+        a
+
+  argumentName (KeywordArgument (AKeywordArgument n _ _ _)) = Just $ n ^. name
+  argumentName _ = Nothing
+
+  arguments (ArgumentList h (Compose as) _ _) =
+    toArg h : toList (toArg . (^. _Wrapped.before._2) <$> as)
+    where
+      toArg (ArgumentPositional a b) = PositionalArgument $ APositionalArgument Nothing a b
+      toArg (ArgumentKeyword a b c d) = KeywordArgument $ AKeywordArgument a b c d
+      toArg (ArgumentStar a b c) = PositionalArgument $ APositionalArgument (Just a) b c
+      toArg (ArgumentDoublestar a b c) = DoublestarArgument $ ADoublestarArgument a b c
+
 $(return [])
 
-instance (Eq1 name, Eq1 (expr AnyWhitespaceChar)) => Eq1 (ArgumentList name expr) where
+instance (Eq1 (Argument name expr), Eq1 (expr AnyWhitespaceChar)) => Eq1 (ArgumentList name expr) where
   liftEq = $(makeLiftEq ''ArgumentList)
 
-instance Eq1 (expr AnyWhitespaceChar) => Eq1 (PositionalArguments expr) where
-  liftEq = $(makeLiftEq ''PositionalArguments)
-
-instance (Eq1 name, Eq1 (expr AnyWhitespaceChar)) => Eq1 (StarredAndKeywords name expr) where
-  liftEq = $(makeLiftEq ''StarredAndKeywords)
-
-instance (Eq1 name, Eq1 (expr AnyWhitespaceChar)) => Eq1 (KeywordsArguments name expr) where
-  liftEq = $(makeLiftEq ''KeywordsArguments)
-
-instance (Eq1 name, Eq1 (expr AnyWhitespaceChar)) => Eq1 (KeywordItem name expr) where
-  liftEq = $(makeLiftEq ''KeywordItem)
-
-instance (Show1 name, Show1 (expr AnyWhitespaceChar)) => Show1 (ArgumentList name expr) where
+instance (Show1 (Argument name expr), Show1 (expr AnyWhitespaceChar)) => Show1 (ArgumentList name expr) where
   liftShowsPrec = $(makeLiftShowsPrec ''ArgumentList)
 
-instance Show1 (expr AnyWhitespaceChar) => Show1 (PositionalArguments expr) where
-  liftShowsPrec = $(makeLiftShowsPrec ''PositionalArguments)
-
-instance (Show1 name, Show1 (expr AnyWhitespaceChar)) => Show1 (StarredAndKeywords name expr) where
-  liftShowsPrec = $(makeLiftShowsPrec ''StarredAndKeywords)
-
-instance (Show1 name, Show1 (expr AnyWhitespaceChar)) => Show1 (KeywordsArguments name expr) where
-  liftShowsPrec = $(makeLiftShowsPrec ''KeywordsArguments)
-
-instance (Show1 name, Show1 (expr AnyWhitespaceChar)) => Show1 (KeywordItem name expr) where
-  liftShowsPrec = $(makeLiftShowsPrec ''KeywordItem)
-
-instance (Ord1 name, Ord1 (expr AnyWhitespaceChar)) => Ord1 (ArgumentList name expr) where
+instance (Ord1 (Argument name expr), Ord1 (expr AnyWhitespaceChar)) => Ord1 (ArgumentList name expr) where
   liftCompare = $(makeLiftCompare ''ArgumentList)
 
-instance Ord1 (expr AnyWhitespaceChar) => Ord1 (PositionalArguments expr) where
-  liftCompare = $(makeLiftCompare ''PositionalArguments)
+instance (Eq1 name, Eq1 (expr AnyWhitespaceChar)) => Eq1 (Argument name expr) where
+  liftEq = $(makeLiftEq ''Argument)
 
-instance (Ord1 name, Ord1 (expr AnyWhitespaceChar)) => Ord1 (StarredAndKeywords name expr) where
-  liftCompare = $(makeLiftCompare ''StarredAndKeywords)
+instance (Show1 name, Show1 (expr AnyWhitespaceChar)) => Show1 (Argument name expr) where
+  liftShowsPrec = $(makeLiftShowsPrec ''Argument)
 
-instance (Ord1 name, Ord1 (expr AnyWhitespaceChar)) => Ord1 (KeywordsArguments name expr) where
-  liftCompare = $(makeLiftCompare ''KeywordsArguments)
-
-instance (Ord1 name, Ord1 (expr AnyWhitespaceChar)) => Ord1 (KeywordItem name expr) where
-  liftCompare = $(makeLiftCompare ''KeywordItem)
+instance (Ord1 name, Ord1 (expr AnyWhitespaceChar)) => Ord1 (Argument name expr) where
+  liftCompare = $(makeLiftCompare ''Argument)

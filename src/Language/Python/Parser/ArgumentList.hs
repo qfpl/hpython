@@ -41,10 +41,10 @@ keywordsArguments _name _expr =
   annotated $
   KeywordsArguments <$>
   keywordOrDoublestar <*>
-  manyF (try $ beforeF (betweenAnyWhitespace comma) keywordOrDoublestar)
+  manyF (beforeF (betweenAnyWhitespace comma) keywordOrDoublestar)
   where
-    keywordOrDoublestar = 
-      try (InL <$> keywordItem _name _expr) <|>
+    keywordOrDoublestar =
+      (InL <$> keywordItem _name _expr) <|>
       (InR <$> beforeF (after (many anyWhitespaceChar) doubleAsterisk) (_expr anyWhitespaceChar))
 
 positionalArguments
@@ -81,10 +81,10 @@ starredAndKeywords _name _expr =
   annotated $
   StarredAndKeywords <$>
   starOrKeyword <*>
-  manyF (beforeF (betweenAnyWhitespace comma) starOrKeyword)
+  manyF (beforeF (try $ betweenAnyWhitespace comma <* notFollowedBy doubleAsterisk) starOrKeyword)
   where
     starOrKeyword =
-      (InL <$> beforeF (after (many anyWhitespaceChar) asterisk) (_expr anyWhitespaceChar)) <|>
+      (try $ InL <$> beforeF (after (many anyWhitespaceChar) asterisk) (_expr anyWhitespaceChar)) <|>
       (InR <$> keywordItem _name _expr)
 
 argumentList
@@ -107,7 +107,7 @@ argumentList _name _expr =
       optionalF
         (try $
          beforeF
-           (betweenAnyWhitespace comma)
+           (betweenAnyWhitespace comma <* notFollowedBy doubleAsterisk)
            (starredAndKeywords _name _expr)) <*>
       optionalF
         (try $

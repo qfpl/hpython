@@ -40,7 +40,7 @@ data KeywordsArguments name expr a
     :: Sum
          (KeywordItem name expr)
          (Compose
-           (Before (Between' [AnyWhitespaceChar] DoubleAsterisk))
+           (Before (After [AnyWhitespaceChar] DoubleAsterisk))
            (expr AnyWhitespaceChar))
          a
   , _keywordsArguments_tail
@@ -51,7 +51,7 @@ data KeywordsArguments name expr a
            (Sum
              (KeywordItem name expr)
              (Compose
-               (Before (Between' [AnyWhitespaceChar] DoubleAsterisk))
+               (Before (After [AnyWhitespaceChar] DoubleAsterisk))
                (expr AnyWhitespaceChar))))
          a
   , _keywordsArguments_ann :: a
@@ -67,7 +67,7 @@ data PositionalArguments expr a
   = PositionalArguments
   { _positionalArguments_head
     :: Compose
-        (Before (Maybe (Between' [AnyWhitespaceChar] Asterisk)))
+        (Before (Maybe (After [AnyWhitespaceChar] Asterisk)))
         (expr AnyWhitespaceChar)
         a
   , _positionalArguments_tail
@@ -76,7 +76,7 @@ data PositionalArguments expr a
         (Compose
           (Before (Between' [AnyWhitespaceChar] Comma))
           (Compose
-            (Before (Maybe (Between' [AnyWhitespaceChar] Asterisk)))
+            (Before (Maybe (After [AnyWhitespaceChar] Asterisk)))
             (expr AnyWhitespaceChar)))
         a
   , _positionalArguments_ann :: a
@@ -93,7 +93,7 @@ data StarredAndKeywords name expr a
   { _starredAndKeywords_head
     :: Sum
          (Compose
-           (Before (Between' [AnyWhitespaceChar] Asterisk))
+           (Before (After [AnyWhitespaceChar] Asterisk))
            (expr AnyWhitespaceChar))
          (KeywordItem name expr)
          a 
@@ -104,7 +104,7 @@ data StarredAndKeywords name expr a
            (Before (Between' [AnyWhitespaceChar] Comma))
            (Sum
              (Compose
-               (Before (Between' [AnyWhitespaceChar] Asterisk))
+               (Before (After [AnyWhitespaceChar] Asterisk))
                  (expr AnyWhitespaceChar))
              (KeywordItem name expr)))
          a

@@ -57,7 +57,7 @@ data KeywordsArguments name expr as dctxt a where
       :: Sum
            (KeywordItem name expr 'NotAssignable dctxt)
            (Compose
-             (Before (Between' [AnyWhitespaceChar] DoubleAsterisk))
+             (Before (After [AnyWhitespaceChar] DoubleAsterisk))
              (expr AnyWhitespaceChar 'NotAssignable dctxt))
            a
     , _keywordsArguments_tail
@@ -68,7 +68,7 @@ data KeywordsArguments name expr as dctxt a where
              (Sum
                (KeywordItem name expr 'NotAssignable dctxt)
                (Compose
-                 (Before (Between' [AnyWhitespaceChar] DoubleAsterisk))
+                 (Before (After [AnyWhitespaceChar] DoubleAsterisk))
                  (expr AnyWhitespaceChar 'NotAssignable dctxt))))
            a
     , _keywordsArguments_ann :: a
@@ -84,16 +84,16 @@ data PositionalArguments expr (as :: AtomType) (dctxt :: DefinitionContext) a wh
   PositionalArguments ::
     { _positionalArguments_head
       :: Compose
-          (Before (Maybe (Between' [AnyWhitespaceChar] Asterisk)))
-          (expr AnyWhitespaceChar 'NotAssignable dctxt)
-          a
+           (Before (Maybe (After [AnyWhitespaceChar] Asterisk)))
+           (expr AnyWhitespaceChar 'NotAssignable dctxt)
+           a
     , _positionalArguments_tail
       :: Compose
           []
           (Compose
             (Before (Between' [AnyWhitespaceChar] Comma))
             (Compose
-              (Before (Maybe (Between' [AnyWhitespaceChar] Asterisk)))
+              (Before (Maybe (After [AnyWhitespaceChar] Asterisk)))
               (expr AnyWhitespaceChar 'NotAssignable dctxt)))
           a
     , _positionalArguments_ann :: a
@@ -110,7 +110,7 @@ data StarredAndKeywords name expr (as :: AtomType) (dctxt :: DefinitionContext) 
     { _starredAndKeywords_head
       :: Sum
            (Compose
-             (Before (Between' [AnyWhitespaceChar] Asterisk))
+             (Before (After [AnyWhitespaceChar] Asterisk))
              (expr AnyWhitespaceChar 'NotAssignable dctxt))
            (KeywordItem name expr 'NotAssignable dctxt)
            a 
@@ -121,7 +121,7 @@ data StarredAndKeywords name expr (as :: AtomType) (dctxt :: DefinitionContext) 
              (Before (Between' [AnyWhitespaceChar] Comma))
              (Sum
                (Compose
-                 (Before (Between' [AnyWhitespaceChar] Asterisk))
+                 (Before (After [AnyWhitespaceChar] Asterisk))
                    (expr AnyWhitespaceChar 'NotAssignable dctxt))
                (KeywordItem name expr 'NotAssignable dctxt)))
            a
@@ -305,14 +305,14 @@ instance HasName name => IsArgList (ArgumentList name expr as dctxt a) where
   data DoublestarArgument (ArgumentList name expr as dctxt a)
     = DADoublestarArg
         (Compose
-          (Before (Between' [AnyWhitespaceChar] DoubleAsterisk))
+          (Before (After [AnyWhitespaceChar] DoubleAsterisk))
           (expr AnyWhitespaceChar 'NotAssignable dctxt)
           a)
 
   data PositionalArgument (ArgumentList name expr as dctxt a)
     = PAPositionalArg
         (Compose
-          (Before (Maybe (Between' [AnyWhitespaceChar] Asterisk)))
+          (Before (Maybe (After [AnyWhitespaceChar] Asterisk)))
           (expr AnyWhitespaceChar 'NotAssignable dctxt)
           a)
 

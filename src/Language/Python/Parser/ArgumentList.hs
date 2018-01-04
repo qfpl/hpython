@@ -45,7 +45,7 @@ keywordsArguments _name _expr =
   where
     keywordOrDoublestar = 
       try (InL <$> keywordItem _name _expr) <|>
-      (InR <$> beforeF (betweenAnyWhitespace doubleAsterisk) (_expr anyWhitespaceChar))
+      (InR <$> beforeF (after (many anyWhitespaceChar) doubleAsterisk) (_expr anyWhitespaceChar))
 
 positionalArguments
   :: ( Functor (expr AnyWhitespaceChar)
@@ -56,14 +56,18 @@ positionalArguments
 positionalArguments _expr =
   annotated $
   PositionalArguments <$>
-  beforeF
-    (optional . try $ betweenAnyWhitespace asterisk)
-    (_expr anyWhitespaceChar <* notFollowedBy (try $ many whitespaceChar *> char '=')) <*>
+  posArg <*>
   manyF
     (try $
      beforeF
        (betweenAnyWhitespace comma)
-       (beforeF (optional . try $ betweenAnyWhitespace asterisk) (_expr anyWhitespaceChar)))
+       posArg)
+  where
+    posArg =
+      try $
+      beforeF
+        (optional $ after (many anyWhitespaceChar) asterisk)
+        (_expr anyWhitespaceChar <* notFollowedBy (many whitespaceChar *> char '='))
 
 starredAndKeywords
   :: ( Functor name
@@ -80,7 +84,7 @@ starredAndKeywords _name _expr =
   manyF (beforeF (betweenAnyWhitespace comma) starOrKeyword)
   where
     starOrKeyword =
-      try (InL <$> beforeF (betweenAnyWhitespace asterisk) (_expr anyWhitespaceChar)) <|>
+      (InL <$> beforeF (after (many anyWhitespaceChar) asterisk) (_expr anyWhitespaceChar)) <|>
       (InR <$> keywordItem _name _expr)
 
 argumentList

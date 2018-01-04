@@ -31,7 +31,7 @@ keywordsArguments
 keywordsArguments _name _expr (KeywordsArguments h t _) =
   sumElim
     (keywordItem _name _expr)
-    (beforeF (betweenAnyWhitespace' doubleAsterisk) (_expr anyWhitespaceChar))
+    (beforeF (after (foldMap anyWhitespaceChar) doubleAsterisk) (_expr anyWhitespaceChar))
     h <>
   foldMapOf
     (_Wrapped.folded)
@@ -39,7 +39,7 @@ keywordsArguments _name _expr (KeywordsArguments h t _) =
       (betweenAnyWhitespace' comma)
       (sumElim
         (keywordItem _name _expr)
-        (beforeF (betweenAnyWhitespace' doubleAsterisk) (_expr anyWhitespaceChar))))
+        (beforeF (after (foldMap anyWhitespaceChar) doubleAsterisk) (_expr anyWhitespaceChar))))
     t
 
 positionalArguments
@@ -47,12 +47,12 @@ positionalArguments
   -> PositionalArguments expr as dctxt a
   -> Doc
 positionalArguments _expr (PositionalArguments h t _) =
-  beforeF (foldMap $ betweenAnyWhitespace' asterisk) (_expr anyWhitespaceChar) h <>
+  beforeF (foldMap $ after (foldMap anyWhitespaceChar) asterisk) (_expr anyWhitespaceChar) h <>
   foldMapOf
     (_Wrapped.folded)
     (beforeF
       (betweenAnyWhitespace' comma)
-      (beforeF (foldMap $ betweenAnyWhitespace' asterisk) (_expr anyWhitespaceChar)))
+      (beforeF (foldMap $ after (foldMap anyWhitespaceChar) asterisk) (_expr anyWhitespaceChar)))
     t
 
 starredAndKeywords
@@ -62,7 +62,7 @@ starredAndKeywords
   -> Doc
 starredAndKeywords _name _expr (StarredAndKeywords h t _) =
   sumElim
-    (beforeF (betweenAnyWhitespace' asterisk) (_expr anyWhitespaceChar))
+    (beforeF (after (foldMap anyWhitespaceChar) asterisk) (_expr anyWhitespaceChar))
     (keywordItem _name _expr)
     h <>
   foldMapOf
@@ -70,7 +70,7 @@ starredAndKeywords _name _expr (StarredAndKeywords h t _) =
     (beforeF
       (betweenAnyWhitespace' comma)
       (sumElim
-        (beforeF (betweenAnyWhitespace' asterisk) (_expr anyWhitespaceChar))
+        (beforeF (after (foldMap anyWhitespaceChar) asterisk) (_expr anyWhitespaceChar))
         (keywordItem _name _expr)))
     t
 

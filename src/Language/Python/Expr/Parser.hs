@@ -746,7 +746,7 @@ trailer ws = trailerCall <|> trailerSubscript <|> trailerAccess
         (char ')')
         (between'F
           (many $ anyWhitespaceChar) .
-          optionalF $ try (argumentList identifier test))
+          optionalF $ argumentList identifier test)
 
     trailerSubscript =
       annotated $

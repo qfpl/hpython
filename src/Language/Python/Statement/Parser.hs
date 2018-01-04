@@ -261,8 +261,8 @@ parameters =
   Parameters <$>
   parens
   (between'F (many anyWhitespaceChar)
-    (optionalF .
-     try $ argsList anyWhitespaceChar (test anyWhitespaceChar) (typedArg anyWhitespaceChar)))
+    (optionalF $
+     argsList anyWhitespaceChar (test anyWhitespaceChar) (typedArg anyWhitespaceChar)))
 
 funcDef
   :: ( LookAheadParsing m

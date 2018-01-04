@@ -46,7 +46,7 @@ argsListStarPart ws p pname =
   where
     argsListStarPartSome =
       ArgsListStarPart <$>
-      beforeF (between' (many ws) asterisk) pname <*>
+      beforeF (after (many ws) asterisk) pname <*>
       manyF (beforeF (between' (many ws) comma) (argsListArg ws p pname)) <*>
       optionalF
         (beforeF
@@ -77,13 +77,16 @@ argsList
   -> Unspaced m (f SrcInfo)
   -> Unspaced m (name SrcInfo)
   -> Unspaced m (ArgsList ws name f SrcInfo)
-argsList ws p pname = try argsListAll <|> argsListArgsKwargs
+argsList ws p pname = argsListAll <|> argsListArgsKwargs
   where
     argsListAll =
       annotated $
       ArgsListAll <$>
       argsListArg ws p pname <*>
-      manyF (beforeF (between' (many ws) comma) (argsListArg ws p pname)) <*>
+      manyF
+        (beforeF
+          (try $ between' (many ws) comma <* notFollowedBy asterisk)
+          (argsListArg ws p pname)) <*>
       optionalF (beforeF (between' (many ws) comma) $ optionalF starOrDouble)
 
     argsListArgsKwargs =

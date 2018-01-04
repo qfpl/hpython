@@ -46,7 +46,7 @@ genArgsListStarPart cfg ws genName gen = do
     [ pure $ ArgsListStarPartEmpty ()
     , ArgsListStarPart <$>
       genBeforeF
-        (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure Asterisk)
+        (genAfter (Gen.list (Range.linear 0 10) ws) $ pure Asterisk)
         genName <*>
       pure (Compose []) <*>
       genMaybeF
@@ -57,7 +57,7 @@ genArgsListStarPart cfg ws genName gen = do
     ]
     [ ArgsListStarPart <$>
       genBeforeF
-        (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure Asterisk)
+        (genAfter (Gen.list (Range.linear 0 10) ws) $ pure Asterisk)
         genName <*>
       genListF
         (genBeforeF

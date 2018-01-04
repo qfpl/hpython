@@ -33,7 +33,7 @@ argsListStarPart ws renderName f e =
     ArgsListStarPartEmpty _ -> mempty
     ArgsListStarPart h t r _ ->
       beforeF
-        (between' (foldMap ws) . const $ text "*")
+        (after (foldMap ws) . const $ text "*")
         renderName
         h <>
       foldMapF

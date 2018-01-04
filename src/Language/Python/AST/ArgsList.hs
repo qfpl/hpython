@@ -44,6 +44,7 @@ module Language.Python.AST.ArgsList
 
 import Papa hiding (Sum)
 import Data.Deriving
+import Data.Separated.After
 import Data.Separated.Before
 import Data.Separated.Between
 import Data.Functor.Classes
@@ -256,7 +257,7 @@ data ArgsListStarPart ws name test a
   | ArgsListStarPart
   { _argsListStarPart_starred
     :: Compose
-         (Before (Between' [ws] Asterisk))
+         (Before (After [ws] Asterisk))
          name
          a
   , _argsListStarPart_defaults

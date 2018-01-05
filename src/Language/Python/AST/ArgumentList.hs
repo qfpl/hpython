@@ -64,7 +64,7 @@ data ArgumentList name expr (as :: AtomType) (dctxt :: DefinitionContext) a wher
     { _argumentList_head :: Argument name expr dctxt a
     , _argumentList_tail
       :: Compose
-          NonEmpty
+          []
           (Compose
             (Before (Between' [AnyWhitespaceChar] Comma))
             (Argument name expr dctxt))
@@ -83,7 +83,7 @@ mkArgumentList
   :: HasName name
   => Argument name expr dctxt a
   -> Compose
-       NonEmpty
+       []
         (Compose
           (Before (Between' [AnyWhitespaceChar] Comma))
           (Argument name expr dctxt))
@@ -103,7 +103,7 @@ _ArgumentList
        (Maybe (ArgumentList name expr 'NotAssignable dctxt a))
        ( Argument name expr dctxt a
        , Compose
-           NonEmpty
+           []
            (Compose
              (Before (Between' [AnyWhitespaceChar] Comma))
              (Argument name expr dctxt))
@@ -161,3 +161,12 @@ instance (Show1 name, Show1 (expr AnyWhitespaceChar as dctxt), Show1 (Argument n
 
 instance (Ord1 name, Ord1 (expr AnyWhitespaceChar as dctxt), Ord1 (Argument name expr dctxt)) => Ord1 (ArgumentList name expr as dctxt) where
   liftCompare = $(makeLiftCompare ''ArgumentList)
+
+instance (Eq1 name, Eq1 (expr AnyWhitespaceChar 'NotAssignable dctxt), Eq1 (Argument name expr dctxt)) => Eq1 (Argument name expr dctxt) where
+  liftEq = $(makeLiftEq ''Argument)
+
+instance (Show1 name, Show1 (expr AnyWhitespaceChar 'NotAssignable dctxt), Show1 (Argument name expr dctxt)) => Show1 (Argument name expr dctxt) where
+  liftShowsPrec = $(makeLiftShowsPrec ''Argument)
+
+instance (Ord1 name, Ord1 (expr AnyWhitespaceChar 'NotAssignable dctxt), Ord1 (Argument name expr dctxt)) => Ord1 (Argument name expr dctxt) where
+  liftCompare = $(makeLiftCompare ''Argument)

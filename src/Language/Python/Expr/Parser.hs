@@ -659,39 +659,6 @@ sliceOp ws =
   SliceOp <$>
   (char ':' *> optionalF (try $ beforeF (many ws) (test ws)))
 
-argument
-  :: (DeltaParsing m, LookAheadParsing m)
-  => Unspaced m ws
-  -> Unspaced m (Argument ws SrcInfo)
-argument ws =
-  try argumentUnpack <|>
-  try argumentDefault <|>
-  try argumentForParens <|>
-  argumentFor
-  where
-    argumentForParens =
-      annotated $
-      ArgumentForParens <$>
-      after (many anyWhitespaceChar) leftParen <*>
-      test anyWhitespaceChar <*>
-      compFor anyWhitespaceChar <*>
-      before (many anyWhitespaceChar) rightParen
-    argumentFor =
-      annotated $
-      ArgumentFor <$>
-      test ws <*>
-      optionalF (try $ compFor ws)
-    argumentDefault =
-      annotated $
-      ArgumentDefault <$>
-      (afterF (many ws) (test ws) <* char '=') <*>
-      beforeF (many ws) (test ws)
-    argumentUnpack =
-      annotated $
-      ArgumentUnpack <$>
-      (try (Right <$> doubleAsterisk) <|> (Left <$> asterisk)) <*>
-      beforeF (many ws) (test ws)
-
 subscript
   :: (DeltaParsing m, LookAheadParsing m)
   => Unspaced m ws
@@ -709,17 +676,6 @@ subscript ws = try subscriptTest <|> subscriptSlice
       after (many ws) (char ':' $> Colon) <*>
       optionalF (try $ afterF (many ws) (test ws)) <*>
       optionalF (try $ afterF (many ws) (sliceOp ws))
-
-argList
-  :: (DeltaParsing m, LookAheadParsing m)
-  => Unspaced m ws
-  -> Unspaced m (ArgList ws SrcInfo)
-argList ws =
-  annotated $
-  ArgList <$>
-  argument ws <*>
-  manyF (try $ beforeF (between' (many ws) comma) (argument ws)) <*>
-  optional (try $ before (many ws) comma)
 
 subscriptList
   :: (DeltaParsing m, LookAheadParsing m)
@@ -745,7 +701,7 @@ trailer ws = trailerCall <|> trailerSubscript <|> trailerAccess
         (char '(')
         (char ')')
         (between'F
-          (many $ anyWhitespaceChar) .
+          (many anyWhitespaceChar) .
           optionalF $ argumentList identifier test)
 
     trailerSubscript =

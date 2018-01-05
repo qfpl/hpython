@@ -52,7 +52,7 @@ data ArgumentList name expr a
   { _argumentList_head :: Argument name expr a
   , _argumentList_tail
     :: Compose
-         NonEmpty
+         []
          (Compose
            (Before (Between' [AnyWhitespaceChar] Comma))
            (Argument name expr))

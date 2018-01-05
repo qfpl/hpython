@@ -1,7 +1,7 @@
 {-# language RankNTypes #-}
 module Language.Python.Parser.ArgumentList where
 
-import Papa
+import Papa hiding (argument)
 
 import Data.Functor.Sum
 import Text.Trifecta hiding (Unspaced(..), comma)
@@ -14,78 +14,40 @@ import Language.Python.Parser.Symbols
 
 import Text.Parser.Unspaced
 
-keywordItem
+argument
   :: ( Functor name
      , Functor (expr AnyWhitespaceChar)
      , DeltaParsing m
      )
   => Unspaced m (name SrcInfo)
   -> (forall ws. Unspaced m ws -> Unspaced m (expr ws SrcInfo))
-  -> Unspaced m (KeywordItem name expr SrcInfo)
-keywordItem _name _expr =
+  -> Unspaced m (Argument name expr SrcInfo)
+argument _name _expr =
   annotated $
-  KeywordItem <$>
-  anyWhitespaceAfterF _name <*
-  equals <*>
-  anyWhitespaceBeforeF (_expr anyWhitespaceChar)
-
-keywordsArguments
-  :: ( Functor name
-     , Functor (expr AnyWhitespaceChar)
-     , DeltaParsing m
-     )
-  => Unspaced m (name SrcInfo)
-  -> (forall ws. Unspaced m ws -> Unspaced m (expr ws SrcInfo))
-  -> Unspaced m (KeywordsArguments name expr SrcInfo)
-keywordsArguments _name _expr =
-  annotated $
-  KeywordsArguments <$>
-  keywordOrDoublestar <*>
-  manyF (beforeF (betweenAnyWhitespace comma) keywordOrDoublestar)
+  argPos <|>
+  argKey <|>
+  argStar <|>
+  argDoublestar
   where
-    keywordOrDoublestar =
-      (InL <$> keywordItem _name _expr) <|>
-      (InR <$> beforeF (after (many anyWhitespaceChar) doubleAsterisk) (_expr anyWhitespaceChar))
-
-positionalArguments
-  :: ( Functor (expr AnyWhitespaceChar)
-     , DeltaParsing m
-     )
-  => (forall ws. Unspaced m ws -> Unspaced m (expr ws SrcInfo))
-  -> Unspaced m (PositionalArguments expr SrcInfo)
-positionalArguments _expr =
-  annotated $
-  PositionalArguments <$>
-  posArg <*>
-  manyF
-    (try $
-     beforeF
-       (betweenAnyWhitespace comma)
-       posArg)
-  where
-    posArg =
+    argPos =
       try $
-      beforeF
-        (optional $ after (many anyWhitespaceChar) asterisk)
-        (_expr anyWhitespaceChar <* notFollowedBy (many whitespaceChar *> char '='))
-
-starredAndKeywords
-  :: ( Functor name
-     , Functor (expr AnyWhitespaceChar)
-     , DeltaParsing m
-     )
-  => Unspaced m (name SrcInfo)
-  -> (forall ws. Unspaced m ws -> Unspaced m (expr ws SrcInfo))
-  -> Unspaced m (StarredAndKeywords name expr SrcInfo)
-starredAndKeywords _name _expr =
-  annotated $
-  StarredAndKeywords <$>
-  starOrKeyword <*>
-  manyF (beforeF (try $ betweenAnyWhitespace comma <* notFollowedBy doubleAsterisk) starOrKeyword)
-  where
-    starOrKeyword =
-      (try $ InL <$> beforeF (after (many anyWhitespaceChar) asterisk) (_expr anyWhitespaceChar)) <|>
-      (InR <$> keywordItem _name _expr)
+      ArgumentPositional <$>
+        (_expr anyWhitespaceChar <* notFollowedBy (many anyWhitespaceChar *> equals))
+    argKey =
+      ArgumentKeyword <$>
+      _name <*>
+      between' (many anyWhitespaceChar) equals <*>
+      _expr anyWhitespaceChar
+    argStar =
+      try $
+      ArgumentStar <$>
+      after (many anyWhitespaceChar) (asterisk <* notFollowedBy asterisk) <*>
+      _expr anyWhitespaceChar
+    argDoublestar =
+      try $
+      ArgumentDoublestar <$>
+      after (many anyWhitespaceChar) doubleAsterisk <*>
+      _expr anyWhitespaceChar
 
 argumentList
   :: ( Functor name
@@ -96,37 +58,12 @@ argumentList
   -> (forall ws. Unspaced m ws -> Unspaced m (expr ws SrcInfo))
   -> Unspaced m (ArgumentList name expr SrcInfo)
 argumentList _name _expr =
-  try argumentListAll <|>
-  try argumentListUnpacking <|>
-  argumentListKeywords
-  where
-    argumentListAll =
-      annotated $
-      ArgumentListAll <$>
-      positionalArguments _expr <*>
-      optionalF
-        (try $
-         beforeF
-           (betweenAnyWhitespace comma <* notFollowedBy doubleAsterisk)
-           (starredAndKeywords _name _expr)) <*>
-      optionalF
-        (try $
-         beforeF
-           (betweenAnyWhitespace comma)
-           (keywordsArguments _name _expr)) <*>
-      optional (try $ betweenAnyWhitespace comma)
-
-    argumentListUnpacking =
-      annotated $
-      ArgumentListUnpacking <$>
-      starredAndKeywords _name _expr <*>
-      optionalF
-        (try $
-         beforeF (betweenAnyWhitespace comma) (keywordsArguments _name _expr)) <*>
-      optional (try $ betweenAnyWhitespace comma)
-
-    argumentListKeywords =
-      annotated $
-      ArgumentListKeywords <$>
-      keywordsArguments _name _expr <*>
-      optional (try $ betweenAnyWhitespace comma)
+  annotated $
+  ArgumentList <$>
+  argument _name _expr <*>
+  manyF
+    (try $
+     beforeF
+       (betweenAnyWhitespace comma)
+       (argument _name _expr)) <*>
+  optional (anyWhitespaceBefore comma)

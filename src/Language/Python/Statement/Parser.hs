@@ -450,6 +450,7 @@ suite = annotated $ suiteSingle <|> suiteMulti
 
     suiteMulti =
       SuiteMulti <$>
+      whitespaceBeforeF (optionalF comment) <*>
       (newlineChar <* indent) <*>
       (suiteStatements <* dedent)
 

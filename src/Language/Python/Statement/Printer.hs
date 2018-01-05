@@ -330,8 +330,8 @@ suite :: Ord a => Doc -> Suite lctxt ctxt a -> [Doc -> Doc]
 suite preceding s =
   case s of
     SuiteSingle v _ -> [(<> preceding <> simpleStatement v)]
-    SuiteMulti n sts _ ->
-      (<> preceding <> newlineChar n) :
+    SuiteMulti c n sts _ ->
+      (<> preceding <> whitespaceBeforeF (foldMapOf (_Wrapped.folded) comment) c <> newlineChar n) :
       indentedLines
         (\a ->
            [ const $

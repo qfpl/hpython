@@ -177,7 +177,12 @@ data Suite (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   , _suite_ann :: a
   }
   | SuiteMulti
-  { _suiteMulti_newline :: NewlineChar
+  { _suiteMulti_comment
+    :: Compose
+         (Before [WhitespaceChar])
+         (Compose Maybe Comment)
+         a
+  , _suiteMulti_newline :: NewlineChar
   , _suiteMulti_statements
     :: IndentedLines
          (Compose

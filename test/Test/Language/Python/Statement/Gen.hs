@@ -20,6 +20,7 @@ import Test.Language.Python.Expr.Gen
 import Test.Language.Python.Gen.ArgsList
 import Test.Language.Python.Gen.ArgumentList
 import Test.Language.Python.Gen.Combinators
+import Test.Language.Python.Gen.Comment
 import Test.Language.Python.Gen.DottedName
 import Test.Language.Python.Gen.Identifier
 import Test.Language.Python.Gen.IndentedLines
@@ -588,6 +589,7 @@ genSuite scfg ecfg =
   Gen.choice
     [ SuiteSingle <$> genSimpleStatement scfg ecfg <*> pure ()
     , SuiteMulti <$>
+      genWhitespaceBeforeF (genMaybeF genComment) <*>
       genNewlineChar <*>
       genIndentedLines
         (Range.constant 1 10)

@@ -139,6 +139,7 @@ test-suite hpython-tests
                          Test.Language.Python.Expr.Gen
                          Test.Language.Python.Gen.ArgsList
                          Test.Language.Python.Gen.Combinators
+                         Test.Language.Python.Gen.Comment
                          Test.Language.Python.Gen.DottedName
                          Test.Language.Python.Gen.Identifier
                          Test.Language.Python.Gen.IndentedLines

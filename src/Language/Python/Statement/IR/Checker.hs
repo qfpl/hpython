@@ -604,8 +604,8 @@ checkSuite ecfg scfg s =
       Safe.SuiteSingle <$>
       checkSimpleStatement ecfg scfg v <*>
       pure ann
-    IR.SuiteMulti n ls ann ->
-      Safe.SuiteMulti n <$>
+    IR.SuiteMulti c n ls ann ->
+      Safe.SuiteMulti c n <$>
         (liftError (IndentationError . ($ ann)) .
          fmap mkIndentedLines .
          traverseOf (_Wrapped.traverse._InR._Wrapped.before._2) (checkStatement ecfg scfg))

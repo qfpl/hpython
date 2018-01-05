@@ -484,11 +484,10 @@ genParameters ecfg =
   Parameters <$>
   genBetween'F (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
     (genMaybeF
-      (genArgsList
+      (genArgumentList
         (ecfg & atomType .~ SNotAssignable)
-        genAnyWhitespaceChar
         (genTypedArg ecfg genAnyWhitespaceChar)
-        (genTest (ecfg & atomType .~ SNotAssignable) genAnyWhitespaceChar))) <*>
+        genTest)) <*>
   pure ()
 
 genTypedArg

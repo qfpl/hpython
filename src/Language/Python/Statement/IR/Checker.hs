@@ -284,10 +284,10 @@ checkParameters
 checkParameters ecfg (IR.Parameters v ann) =
   Safe.Parameters <$> traverseOf
     (_Wrapped.traverse._Wrapped.traverse)
-    (checkArgsList
+    (checkArgumentList
       (ecfg & atomType .~ SNotAssignable)
-      checkTest
-      checkTypedArg)
+      checkTypedArg
+      checkTest)
     v <*>
   pure ann
 

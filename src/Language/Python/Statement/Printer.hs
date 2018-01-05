@@ -278,7 +278,7 @@ parameters (Parameters v _) =
     (foldMap anyWhitespaceChar)
     (foldMapOf
       (_Wrapped.folded)
-      (argsList anyWhitespaceChar (typedArg anyWhitespaceChar) (test anyWhitespaceChar)))
+      (argumentList (typedArg anyWhitespaceChar) test))
     v
 
 typedArg :: Ord a => (ws -> Doc) -> TypedArg ws a -> Doc

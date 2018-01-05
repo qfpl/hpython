@@ -229,7 +229,7 @@ data Parameters a
          (Between' [AnyWhitespaceChar])
          (Compose
            Maybe
-           (ArgsList AnyWhitespaceChar (TypedArg AnyWhitespaceChar) (Test AnyWhitespaceChar)))
+           (ArgumentList (TypedArg AnyWhitespaceChar) Test))
          a
   , _parameters_ann :: a
   }

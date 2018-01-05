@@ -232,10 +232,11 @@ data Parameters (ctxt :: DefinitionContext) a
          (Between' [AnyWhitespaceChar])
          (Compose
            Maybe
-           (ArgsList
-             AnyWhitespaceChar
+           (ArgumentList
              (TypedArg AnyWhitespaceChar)
-             (Test AnyWhitespaceChar 'NotAssignable ctxt)))
+             Test
+             'NotAssignable
+             ctxt))
          a
   , _parameters_ann :: a
   }

@@ -496,7 +496,10 @@ data SimpleStatement a
            SmallStatement)
          a
   , _simpleStatement_semicolon :: Maybe (Before [WhitespaceChar] Semicolon)
-  , _simpleStatement_newline :: Before [WhitespaceChar] NewlineChar
+  , _simpleStatement_newline
+    :: Compose
+         (Between [WhitespaceChar] NewlineChar)
+         (Compose Maybe Comment) a
   , _simpleStatement_ann :: a
   }
   deriving (Functor, Foldable, Traversable)

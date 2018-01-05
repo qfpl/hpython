@@ -56,7 +56,7 @@ genSimpleStatement scfg ecfg =
       (genBetweenWhitespace $ pure Semicolon)
       (Gen.small $ genSmallStatement scfg ecfg)) <*>
   Gen.maybe (genWhitespaceBefore $ pure Semicolon) <*>
-  genWhitespaceBefore genNewlineChar <*>
+  genBetweenF genWhitespace genNewlineChar (genMaybeF genComment) <*>
   pure ()
 
 genFlowStatement

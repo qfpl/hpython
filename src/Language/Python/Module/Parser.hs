@@ -11,6 +11,7 @@ import Text.Parser.Unspaced
 import Language.Python.AST.Symbols
 import Language.Python.Module.IR
 import Language.Python.Parser.Combinators
+import Language.Python.Parser.Comment
 import Language.Python.Parser.SrcInfo
 import Language.Python.Parser.Symbols
 import Language.Python.Statement.Parser
@@ -21,4 +22,6 @@ module'
 module' =
   annotated $
   Module <$>
-  manyF ((InL . Const <$> newlineChar) <|> (InR <$> statement))
+  manyF
+    ((InL <$> betweenF (many whitespaceChar) newlineChar (optionalF comment)) <|>
+     (InR <$> statement))

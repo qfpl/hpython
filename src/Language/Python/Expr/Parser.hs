@@ -18,7 +18,7 @@ import Data.Separated.After (After(..))
 import Data.Separated.Before (Before(..))
 import Text.Parser.LookAhead
 import Text.Trifecta as P hiding
-  (Unspaced(..), stringLiteral, integer, octDigit, hexDigit, comma, colon)
+  (Unspaced(..), stringLiteral, integer, octDigit, hexDigit, comma, colon, between)
 
 import Language.Python.AST.Symbols as S
 import Language.Python.AST.Keywords
@@ -188,18 +188,16 @@ shortString = try shortStringSingle <|> shortStringDouble
     shortStringSingle =
       annotated $
       ShortStringSingle <$>
-      between
-        singleQuote
-        singleQuote
-        (parseStringContentSingle parseShortStringCharSingle singleQuote)
+      (singleQuote *>
+       parseStringContentSingle parseShortStringCharSingle singleQuote <*
+       singleQuote)
 
     shortStringDouble =
       annotated $
       ShortStringDouble <$>
-      between
-        doubleQuote
-        doubleQuote
-        (parseStringContentDouble parseShortStringCharDouble doubleQuote)
+      (doubleQuote *>
+       parseStringContentDouble parseShortStringCharDouble doubleQuote <*
+       doubleQuote)
 
 longString :: (HasCallStack, DeltaParsing m, LookAheadParsing m) => Unspaced m (LongString SrcInfo)
 longString =
@@ -208,18 +206,16 @@ longString =
     longStringSingle =
       annotated $
       LongStringSingle <$>
-      between
-        tripleSinglequote
-        tripleSinglequote
-        (parseStringContentSingle parseLongStringChar tripleSinglequote)
+      (tripleSinglequote *>
+       parseStringContentSingle parseLongStringChar tripleSinglequote <*
+       tripleSinglequote)
 
     longStringDouble =
       annotated $
       LongStringDouble <$>
-      between
-        tripleDoublequote
-        tripleDoublequote
-        (parseStringContentDouble parseLongStringChar tripleDoublequote)
+      (tripleDoublequote *>
+       parseStringContentDouble parseLongStringChar tripleDoublequote <*
+       tripleDoublequote)
 
 stringLiteral :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (StringLiteral SrcInfo)
 stringLiteral =
@@ -248,18 +244,16 @@ shortBytes = try shortBytesSingle <|> shortBytesDouble
     shortBytesSingle =
       annotated $
       ShortBytesSingle <$>
-      between
-        singleQuote
-        singleQuote
-        (parseStringContentSingle parseShortBytesCharSingle singleQuote)
+      (singleQuote *>
+       parseStringContentSingle parseShortBytesCharSingle singleQuote <*
+       singleQuote)
 
     shortBytesDouble =
       annotated $
       ShortBytesDouble <$>
-      between
-        doubleQuote
-        doubleQuote
-        (parseStringContentDouble parseShortBytesCharDouble doubleQuote)
+      (doubleQuote *>
+       parseStringContentDouble parseShortBytesCharDouble doubleQuote <*
+       doubleQuote)
 
 longBytes :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (LongBytes SrcInfo)
 longBytes =
@@ -281,18 +275,16 @@ longBytes =
     longBytesSingle =
       annotated $
       LongBytesSingle <$>
-      between
-        tripleSinglequote
-        tripleSinglequote
-        (parseStringContentSingle parseLongBytesChar tripleSinglequote)
+      (tripleSinglequote *>
+       parseStringContentSingle parseLongBytesChar tripleSinglequote <*
+       tripleSinglequote)
 
     longBytesDouble =
       annotated $
       LongBytesDouble <$>
-      between
-        tripleDoublequote
-        tripleDoublequote
-        (parseStringContentDouble parseLongBytesChar tripleDoublequote)
+      (tripleDoublequote *>
+       parseStringContentDouble parseLongBytesChar tripleDoublequote <*
+       tripleDoublequote)
 
 bytesLiteral :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (BytesLiteral SrcInfo)
 bytesLiteral =
@@ -586,29 +578,29 @@ atomNoInt ws =
     atomParen =
       annotated $
       AtomParen <$>
-      between (char '(') (char ')')
-      (between'F (many anyWhitespaceChar)
-        (optionalF
-          (try $ (InL <$> try (yieldExpr anyWhitespaceChar)) <|>
-           (InR <$> tupleTestlistComp anyWhitespaceChar))))
+      (char '(' *>
+       between'F
+         (many anyWhitespaceChar)
+         (optionalF
+           (try $ (InL <$> try (yieldExpr anyWhitespaceChar)) <|>
+            (InR <$> tupleTestlistComp anyWhitespaceChar))) <*
+       char ')')
 
     atomBracket =
       annotated $
       AtomBracket <$>
-      between
-        (char '[')
-        (char ']')
-        (between'F (many anyWhitespaceChar) $
-          optionalF $ try (listTestlistComp anyWhitespaceChar))
+        (char '[' *>
+         between'F (many anyWhitespaceChar)
+           (optionalF $ try (listTestlistComp anyWhitespaceChar)) <*
+         char ']')
 
     atomCurly =
       annotated $
       AtomCurly <$>
-      between
-        (char '{')
-        (char '}')
-        (between'F (many anyWhitespaceChar) $
-          optionalF $ try (dictOrSetMaker anyWhitespaceChar))
+        (char '{' *>
+         between'F (many anyWhitespaceChar)
+           (optionalF $ try (dictOrSetMaker anyWhitespaceChar)) <*
+         char '}')
 
     atomFloat =
       annotated $
@@ -697,20 +689,18 @@ trailer ws = trailerCall <|> trailerSubscript <|> trailerAccess
     trailerCall =
       annotated $
       TrailerCall <$>
-      between
-        (char '(')
-        (char ')')
-        (between'F
-          (many anyWhitespaceChar) .
-          optionalF $ argumentList identifier test)
+        (char '(' *>
+         between'F
+           (many anyWhitespaceChar)
+           (optionalF $ argumentList identifier test) <*
+         char ')')
 
     trailerSubscript =
       annotated $
       TrailerSubscript <$>
-      between
-        (char '[')
-        (char ']')
-        (between'F (many anyWhitespaceChar) (subscriptList anyWhitespaceChar))
+      (char '[' *>
+       between'F (many anyWhitespaceChar) (subscriptList anyWhitespaceChar) <*
+       char ']')
 
     trailerAccess =
       annotated $

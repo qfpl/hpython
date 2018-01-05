@@ -183,6 +183,14 @@ before ms ma = Before <$> ms <*> ma
 beforeF :: Applicative m => m s -> m (f a) -> m (Compose (Before s) f a)
 beforeF ms ma = fmap Compose $ Before <$> ms <*> ma
 
+between
+  :: Applicative m
+  => m s
+  -> m t
+  -> m a
+  -> m (Between s t a)
+between ms mt ma = Between <$> ms <*> ma <*> mt
+
 betweenF
   :: Applicative m
   => m s

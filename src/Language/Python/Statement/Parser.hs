@@ -5,8 +5,9 @@ import Papa hiding (Sum, Product)
 import Control.Monad.State
 import Data.Functor.Product
 import Data.Functor.Sum
+import Data.Separated.Between (Between'(..))
 import Text.Parser.LookAhead
-import Text.Trifecta hiding (Unspaced(..), comma, dot, colon)
+import Text.Trifecta hiding (Unspaced(..), comma, dot, colon, between)
 import Language.Python.AST.Symbols
 import Language.Python.Expr.Parser
 import Language.Python.Parser.ArgsList
@@ -46,9 +47,13 @@ simpleStatement =
   annotated $
   SimpleStatement <$>
   smallStatement <*>
-  manyF (try $ beforeF (betweenWhitespace semicolon) smallStatement) <*>
+  manyF
+    (try $
+     beforeF
+       (betweenWhitespace semicolon)
+       smallStatement) <*>
   optional (try $ whitespaceBefore semicolon) <*>
-  whitespaceBefore newlineChar
+  betweenF (many whitespaceChar) newlineChar (optionalF comment)
 
 smallStatement
   :: ( LookAheadParsing m
@@ -67,22 +72,32 @@ smallStatement =
   smallStatementAssert
   where
     augAssignSequence =
+      try $
       beforeF
-        (betweenWhitespace augAssign)
+        (Between' <$>
+         between
+           (many whitespaceChar <* notFollowedBy (char '#'))
+           (many whitespaceChar)
+           augAssign)
         ((InL <$> try (yieldExpr whitespaceChar)) <|>
          (InR <$> testList whitespaceChar))
 
     regularAssignSequence =
       manyF
-        (beforeF
-          (betweenWhitespace equals)
-          ((InL <$> try (yieldExpr whitespaceChar)) <|>
-           (InR <$> testlistStarExpr whitespaceChar test starExpr)))
+        (try $
+         beforeF
+           (Between' <$>
+            between
+              (many whitespaceChar <* notFollowedBy (char '#'))
+              (many whitespaceChar)
+              equals)
+           ((InL <$> try (yieldExpr whitespaceChar)) <|>
+            (InR <$> testlistStarExpr whitespaceChar test starExpr)))
 
     smallStatementExpr =
       SmallStatementExpr <$>
       testlistStarExpr whitespaceChar test starExpr <*>
-      ((InL <$> try augAssignSequence) <|>
+      ((InL <$> augAssignSequence) <|>
        (InR <$> regularAssignSequence))
 
     smallStatementDel =

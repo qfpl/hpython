@@ -38,7 +38,11 @@ simpleStatement (SimpleStatement h t s n _) =
     (beforeF (betweenWhitespace' semicolon) smallStatement)
     t <>
   foldMap (whitespaceBefore semicolon) s <>
-  whitespaceBefore newlineChar n
+  betweenF
+    (foldMap whitespaceChar)
+    newlineChar
+    (foldMapOf (_Wrapped.folded) comment)
+    n
 
 smallStatement :: Ord a => SmallStatement lctxt ectxt a -> Doc
 smallStatement s =

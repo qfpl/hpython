@@ -86,6 +86,7 @@ library
                        Language.Python.Printer.ArgsList
                        Language.Python.Printer.ArgumentList
                        Language.Python.Printer.Combinators
+                       Language.Python.Printer.Comment
                        Language.Python.Printer.DottedName
                        Language.Python.Printer.Identifier
                        Language.Python.Printer.IndentedLines

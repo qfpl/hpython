@@ -5,14 +5,16 @@ module Test.Language.Python.ParserPrinter (makeParserPrinterTests) where
 import Papa
 import Prelude (error, undefined)
 import Control.Monad.IO.Class
+import Control.Monad.State
 import Data.Functor.Compose
 import Data.Separated.Before
 import Hedgehog
 import System.Directory
 import System.FilePath
 import System.Process
+import Test.Hspec.Expectations.Pretty
 import Test.Tasty
-import Test.Tasty.Hspec
+import Test.Tasty.Hspec (HasCallStack, it, testSpecs)
 import Test.Tasty.Hedgehog
 import Text.Trifecta hiding (render, runUnspaced)
 
@@ -36,11 +38,14 @@ import qualified Language.Python.Statement.IR.Checker as Check
 import qualified Language.Python.Expr.Parser as Parse
 import qualified Language.Python.Module.Parser as Parse
 import qualified Language.Python.Statement.Parser as Parse
+import qualified Language.Python.Parser.Symbols as Parse
 
 import qualified Language.Python.Expr.Printer as Print
 import qualified Language.Python.Module.Printer as Print
 import qualified Language.Python.Statement.Printer as Print
+import qualified Language.Python.Printer.Symbols as Print
 
+import Test.Language.Python.Gen.Combinators
 import qualified Test.Language.Python.Expr.Gen as GenAST
 import qualified Test.Language.Python.Statement.Gen as GenAST
 
@@ -57,11 +62,11 @@ filesExamplesDir = "test" </> "examples" </> "files" </> "valid"
 
 parse_print_expr_id :: String -> Expectation
 parse_print_expr_id input =
-  case parseString (runUnspaced $ Parse.test <* eof) mempty input of
+  case parseString (runUnspaced $ Parse.test Parse.whitespaceChar <* eof) mempty input of
     Success unchecked ->
       let
         checkResult =
-          (fmap Print.test . runChecker $
+          (fmap (Print.test Print.whitespaceChar) . runChecker $
             Check.checkTest
               (ExprConfig SNotAssignable STopLevel)
               unchecked)
@@ -77,7 +82,7 @@ parse_print_expr_id input =
 
 parse_print_statement_id :: String -> Expectation
 parse_print_statement_id input =
-  case parseString (runUnspaced $ Parse.statement <* eof) mempty input of
+  case parseString (flip evalStateT [] . runUnspaced $ Parse.statement <* eof) mempty input of
     Success unchecked ->
       let
         checkResult =
@@ -92,13 +97,13 @@ parse_print_statement_id input =
             expectationFailure $
             WL.displayS (WL.renderPretty 1.0 80 . WL.text $ show es) ""
           Right ast ->
-            HPJ.render ast `shouldBe` input
+            HPJ.render (foldMap ($ mempty) ast) `shouldBe` input
     Failure (ErrInfo info _) ->
       expectationFailure $ WL.displayS (WL.renderPretty 1.0 80 info) ""
 
 parse_print_file_id :: String -> Expectation
 parse_print_file_id input =
-  case parseString (runUnspaced $ Parse.module' <* eof) mempty input of
+  case parseString (flip evalStateT [] . runUnspaced $ Parse.module' <* eof) mempty input of
     Success unchecked ->
       let
         checkResult =
@@ -165,10 +170,9 @@ prop_expr_ast_is_valid_python assignability =
   property $ do
     expr <-
       forAll .
-      Gen.resize 100 .
-      GenAST.genTest $
-      ExprConfig assignability STopLevel
-    let program = HPJ.render $ Print.test expr
+      Gen.resize 100 $
+      GenAST.genTest (ExprConfig assignability STopLevel) genWhitespaceChar
+    let program = HPJ.render $ Print.test Print.whitespaceChar expr
     res <- liftIO $ checkSyntax program
     case res of
       SyntaxError pythonError -> do
@@ -194,7 +198,7 @@ prop_statement_ast_is_valid_python
 prop_statement_ast_is_valid_python scfg ecfg =
   property $ do
     st <- forAll $ GenAST.genStatement scfg ecfg
-    let program = HPJ.render $ Print.statement st
+    let program = HPJ.render . foldMap ($ mempty) $ Print.statement st
     res <- liftIO $ checkSyntax program
     case res of
       SyntaxError pythonError -> do

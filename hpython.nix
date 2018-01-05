@@ -1,8 +1,9 @@
 { mkDerivation, ansi-wl-pprint, base, charset, containers
 , deriving-compat, digit, directory, dlist, filepath, hedgehog
-, indentation-trifecta, mtl, papa, parsers, pretty, process
-, singletons, stdenv, tasty, tasty-hedgehog, tasty-hspec, text
-, transformers, trifecta, unordered-containers, validation
+, hspec-expectations-pretty-diff, indentation-trifecta, mtl, papa
+, parsers, pretty, process, singletons, stdenv, tasty
+, tasty-hedgehog, tasty-hspec, text, transformers, trifecta
+, unordered-containers, validation
 }:
 mkDerivation {
   pname = "hpython";
@@ -14,8 +15,9 @@ mkDerivation {
     transformers trifecta unordered-containers validation
   ];
   testHaskellDepends = [
-    ansi-wl-pprint base directory filepath hedgehog papa pretty process
-    tasty tasty-hedgehog tasty-hspec text transformers trifecta
+    ansi-wl-pprint base directory filepath hedgehog
+    hspec-expectations-pretty-diff mtl papa pretty process tasty
+    tasty-hedgehog tasty-hspec text transformers trifecta
   ];
   homepage = "https://github.com/qfpl/hpython";
   description = "Write Python using Haskell";

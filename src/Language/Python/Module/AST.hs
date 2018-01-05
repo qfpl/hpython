@@ -10,8 +10,10 @@ import Papa hiding (Sum)
 import Data.Deriving
 import Data.Functor.Compose
 import Data.Functor.Sum
+import Data.Separated.Between
 
 import Language.Python.Statement.AST
+import Language.Python.AST.Comment
 import Language.Python.AST.Symbols
 import Language.Python.IR.ExprConfig
 import Language.Python.IR.StatementConfig
@@ -22,7 +24,9 @@ data Module a
     :: Compose
          []
          (Sum
-           (Const NewlineChar)
+           (Compose
+             (Between [WhitespaceChar] NewlineChar)
+             (Compose Maybe Comment))
            (Statement 'NotInLoop 'TopLevel))
          a
   , _module_ann :: a

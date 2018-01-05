@@ -52,6 +52,9 @@ whitespaceChar w =
     Tab -> char '\t'
     Continued nl -> char '\\' <> newlineChar nl
 
+anyWhitespaceChar :: AnyWhitespaceChar -> Doc
+anyWhitespaceChar = either whitespaceChar newlineChar
+
 asterisk :: Asterisk -> Doc
 asterisk _ = char '*'
 

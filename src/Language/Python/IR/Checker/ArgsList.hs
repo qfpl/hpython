@@ -21,10 +21,11 @@ checkArgsListArg
      . ExprConfig atomType' ctxt'
     -> uncheckedName ann
     -> SyntaxChecker ann (checkedName ann)) -- ^ Name-checking function
-  -> Safe.ArgsListArg uncheckedName unchecked ann -- ^ Item to check
+  -> Safe.ArgsListArg ws uncheckedName unchecked ann -- ^ Item to check
   -> SyntaxChecker
        ann
        (Safe.ArgsListArg
+         ws
          checkedName
          (checked atomType ctxt)
          ann)
@@ -43,10 +44,11 @@ checkArgsListDoublestarArg
      . ExprConfig atomType' ctxt'
     -> uncheckedName ann
     -> SyntaxChecker ann (checkedName ann))
-  -> Safe.ArgsListDoublestarArg uncheckedName unchecked ann
+  -> Safe.ArgsListDoublestarArg ws uncheckedName unchecked ann
   -> SyntaxChecker
        ann
        (Safe.ArgsListDoublestarArg
+         ws
          checkedName
          (checked atomType ctxt)
          ann)
@@ -65,10 +67,11 @@ checkArgsListStarPart
      . ExprConfig atomType' ctxt'
     -> uncheckedName ann
     -> SyntaxChecker ann (checkedName ann))
-  -> Safe.ArgsListStarPart uncheckedName unchecked ann
+  -> Safe.ArgsListStarPart ws uncheckedName unchecked ann
   -> SyntaxChecker
        ann
        (Safe.ArgsListStarPart
+         ws
          checkedName
          (checked atomType ctxt)
          ann)
@@ -99,10 +102,11 @@ checkArgsList
      . ExprConfig atomType' ctxt'
     -> uncheckedName ann
     -> SyntaxChecker ann (checkedName ann))
-  -> IR.ArgsList uncheckedName unchecked ann
+  -> IR.ArgsList ws uncheckedName unchecked ann
   -> SyntaxChecker
        ann
        (Safe.ArgsList
+         ws
          checkedName
          (checked atomType ctxt)
          ann)

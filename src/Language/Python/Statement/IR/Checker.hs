@@ -284,18 +284,18 @@ checkParameters
 checkParameters ecfg (IR.Parameters v ann) =
   Safe.Parameters <$> traverseOf
     (_Wrapped.traverse._Wrapped.traverse)
-    (checkArgsList
+    (checkArgumentList
       (ecfg & atomType .~ SNotAssignable)
-      checkTest
-      checkTypedArg)
+      checkTypedArg
+      checkTest)
     v <*>
   pure ann
 
 checkTypedArg
   :: Ord ann
   => ExprConfig assignable dctxt
-  -> IR.TypedArg ann
-  -> SyntaxChecker ann (Safe.TypedArg ann)
+  -> IR.TypedArg ws ann
+  -> SyntaxChecker ann (Safe.TypedArg ws ann)
 checkTypedArg ecfg (IR.TypedArg v t ann) =
   Safe.TypedArg v <$>
   traverseOf
@@ -502,12 +502,12 @@ checkSmallStatement ecfg scfg s =
     yieldOrTestList
       :: Ord ann
        => ExprConfig as dctxt
-      -> Sum IR.YieldExpr IR.TestList ann
+      -> Sum (IR.YieldExpr ws) (IR.TestList ws) ann
       -> SyntaxChecker
            ann
            (Sum
-             (Safe.YieldExpr dctxt)
-             (Safe.TestList 'NotAssignable dctxt)
+             (Safe.YieldExpr ws dctxt)
+             (Safe.TestList ws 'NotAssignable dctxt)
              ann)
     yieldOrTestList cfg (InL a) =
       case cfg ^. definitionContext of
@@ -518,12 +518,12 @@ checkSmallStatement ecfg scfg s =
     yieldOrTestlistStarExpr
       :: Ord ann
       => ExprConfig as dctxt
-      -> Sum IR.YieldExpr (IR.TestlistStarExpr IR.Test IR.StarExpr) ann
+      -> Sum (IR.YieldExpr ws) (IR.TestlistStarExpr ws IR.Test IR.StarExpr) ann
       -> SyntaxChecker
            ann
            (Sum
-             (Safe.YieldExpr dctxt)
-             (Safe.TestlistStarExpr Safe.Test Safe.StarExpr 'NotAssignable dctxt) ann)
+             (Safe.YieldExpr ws dctxt)
+             (Safe.TestlistStarExpr ws Safe.Test Safe.StarExpr 'NotAssignable dctxt) ann)
     yieldOrTestlistStarExpr cfg (InL a) =
       case cfg ^. definitionContext of
         SFunDef SNormal -> InL <$> checkYieldExpr cfg a
@@ -604,8 +604,8 @@ checkSuite ecfg scfg s =
       Safe.SuiteSingle <$>
       checkSimpleStatement ecfg scfg v <*>
       pure ann
-    IR.SuiteMulti n ls ann ->
-      Safe.SuiteMulti n <$>
+    IR.SuiteMulti c n ls ann ->
+      Safe.SuiteMulti c n <$>
         (liftError (IndentationError . ($ ann)) .
          fmap mkIndentedLines .
          traverseOf (_Wrapped.traverse._InR._Wrapped.before._2) (checkStatement ecfg scfg))

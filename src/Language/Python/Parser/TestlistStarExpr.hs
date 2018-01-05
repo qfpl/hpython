@@ -1,3 +1,4 @@
+{-# language RankNTypes #-}
 module Language.Python.Parser.TestlistStarExpr where
 
 import Papa
@@ -15,17 +16,18 @@ import Text.Parser.Unspaced
 testlistStarExpr
   :: ( LookAheadParsing m
      , DeltaParsing m
-     , Functor test
-     , Functor starExpr
+     , Functor (test ws)
+     , Functor (starExpr ws)
      )
-  => Unspaced m (test SrcInfo)
-  -> Unspaced m (starExpr SrcInfo)
-  -> Unspaced m (TestlistStarExpr test starExpr SrcInfo)
-testlistStarExpr test starExpr=
+  => Unspaced m ws
+  -> (forall ws'. Unspaced m ws' -> Unspaced m (test ws' SrcInfo))
+  -> (forall ws'. Unspaced m ws' -> Unspaced m (starExpr ws' SrcInfo))
+  -> Unspaced m (TestlistStarExpr ws test starExpr SrcInfo)
+testlistStarExpr ws test starExpr =
   annotated $
   TestlistStarExpr <$>
   testOrStar <*>
-  manyF (try $ beforeF (betweenWhitespace comma) testOrStar) <*>
-  optional (try $ betweenWhitespace comma)
+  manyF (try $ beforeF (between' (many ws) comma) testOrStar) <*>
+  optional (try $ between' (many ws) comma)
   where
-    testOrStar = (InL <$> try test) <|> (InR <$> starExpr)
+    testOrStar = (InL <$> try (test ws)) <|> (InR <$> (starExpr ws))

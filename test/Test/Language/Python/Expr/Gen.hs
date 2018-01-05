@@ -49,13 +49,14 @@ import Test.Language.Python.Gen.TestlistStarExpr
 genIfThenElse
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.IfThenElse 'NotAssignable ctxt ())
-genIfThenElse cfg =
+  -> m ws
+  -> m (AST.IfThenElse ws 'NotAssignable ctxt ())
+genIfThenElse cfg ws =
   AST.IfThenElse <$>
-  genBetweenWhitespace1 (pure AST.KIf) <*>
-  Gen.small (genOrTest cfg) <*>
-  genBetweenWhitespace1 (pure AST.KElse) <*>
-  Gen.small (genTest cfg)
+  genAfter1 ws (pure AST.KIf) <*>
+  Gen.small (genOrTest cfg ws) <*>
+  genBetween'1 ws (pure AST.KElse) <*>
+  Gen.small (genTest cfg ws)
 
 genTermOp :: MonadGen m => m AST.TermOperator
 genTermOp =
@@ -70,203 +71,214 @@ genTermOp =
 genStarExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.StarExpr atomType ctxt ())
-genStarExpr cfg =
+  -> m ws
+  -> m (AST.StarExpr ws atomType ctxt ())
+genStarExpr cfg ws =
   AST.StarExpr <$>
-  genWhitespaceBeforeF
-    (Gen.small . genExpr $ cfg & atomType .~ SAssignable) <*>
+  genBeforeF (Gen.list (Range.linear 0 10) ws)
+    (Gen.small $ genExpr (cfg & atomType .~ SAssignable) ws) <*>
   pure ()
 
 genListTestlistComp
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.ListTestlistComp atomType ctxt ())
-genListTestlistComp cfg =
+  -> m ws
+  -> m (AST.ListTestlistComp ws atomType ctxt ())
+genListTestlistComp cfg ws =
   case cfg ^. atomType of
     SAssignable ->
-      Gen.choice [ Gen.small $ listTestlistCompList cfg ]
+      Gen.choice [ Gen.small $ listTestlistCompList cfg ws ]
     SNotAssignable ->
       Gen.choice
-        [ Gen.small $ listTestlistCompList cfg
+        [ Gen.small $ listTestlistCompList cfg ws
         , AST.ListTestlistCompFor <$>
-          Gen.small (genTest cfg) <*>
-          Gen.small (genCompFor cfg) <*>
+          Gen.small (genTest cfg ws) <*>
+          Gen.small (genCompFor cfg ws) <*>
           pure ()
         ]
   where
-    listTestlistCompList cfg' =
+    listTestlistCompList cfg' ws' =
       Gen.choice
         [ AST.ListTestlistCompStarred <$>
-          Gen.small (genStarExpr cfg') <*>
+          Gen.small (genStarExpr cfg' ws') <*>
           genListF
             (genBeforeF
-              (genBetweenWhitespace $ pure AST.Comma) .
-              Gen.small $ genTestOrStar cfg') <*>
-          Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+              (genBetween' (Gen.list (Range.linear 0 10) ws') $ pure AST.Comma) .
+              Gen.small $ genTestOrStar cfg' ws') <*>
+          Gen.maybe (genBefore (Gen.list (Range.linear 0 10) ws') $ pure AST.Comma) <*>
           pure ()
         , AST.ListTestlistCompList <$>
-          Gen.small (genTest cfg') <*>
+          Gen.small (genTest cfg' ws') <*>
           genListF
             (genBeforeF
-              (genBetweenWhitespace $ pure AST.Comma) .
-              Gen.small $ genTestOrStar cfg') <*>
-          Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+              (genBetween' (Gen.list (Range.linear 0 10) ws') $ pure AST.Comma) .
+              Gen.small $ genTestOrStar cfg' ws') <*>
+          Gen.maybe (genBefore (Gen.list (Range.linear 0 10) ws')$ pure AST.Comma) <*>
           pure ()
         ]
 
-    genTestOrStar cfg' =
+    genTestOrStar cfg' ws' =
       Gen.small $
-      Gen.choice [ InL <$> genTest cfg', InR <$> genStarExpr cfg' ]
+      Gen.choice [ InL <$> genTest cfg' ws', InR <$> genStarExpr cfg' ws' ]
 
 genTupleTestlistComp
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.TupleTestlistComp atomType ctxt ())
-genTupleTestlistComp cfg =
+  -> m ws
+  -> m (AST.TupleTestlistComp ws atomType ctxt ())
+genTupleTestlistComp cfg ws =
   case cfg ^. atomType of
     SAssignable ->
-      Gen.choice [ Gen.small $ tupleTestlistCompList cfg ]
+      Gen.choice [ Gen.small $ tupleTestlistCompList cfg ws ]
     SNotAssignable ->
       Gen.choice
-        [ Gen.small $ tupleTestlistCompList cfg
+        [ Gen.small $ tupleTestlistCompList cfg ws
         , AST.TupleTestlistCompFor <$>
-          Gen.small (genTest cfg) <*>
-          Gen.small (genCompFor cfg) <*>
+          Gen.small (genTest cfg ws) <*>
+          Gen.small (genCompFor cfg ws) <*>
           pure ()
         ]
   where
-    tupleTestlistCompList cfg' =
+    tupleTestlistCompList cfg' ws' =
       Gen.choice
         [ AST.TupleTestlistCompStarredOne <$>
-          Gen.small (genStarExpr cfg') <*>
-          genWhitespaceBefore (pure AST.Comma) <*>
+          Gen.small (genStarExpr cfg' ws') <*>
+          genBefore (Gen.list (Range.linear 0 10) ws') (pure AST.Comma) <*>
           pure ()
         , AST.TupleTestlistCompStarredMany <$>
-          Gen.small (genStarExpr cfg') <*>
+          Gen.small (genStarExpr cfg' ws') <*>
           genNonEmptyF
             (genBeforeF
-              (genBetweenWhitespace $ pure AST.Comma) .
-              Gen.small $ genTestOrStar cfg') <*>
-          Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+              (genBetween' (Gen.list (Range.linear 0 10) ws') $ pure AST.Comma) .
+              Gen.small $ genTestOrStar cfg' ws') <*>
+          Gen.maybe (genBefore (Gen.list (Range.linear 0 10) ws') $ pure AST.Comma) <*>
           pure ()
         , AST.TupleTestlistCompList <$>
-          Gen.small (genTest cfg') <*>
+          Gen.small (genTest cfg' ws') <*>
           genListF
             (genBeforeF
-              (genBetweenWhitespace $ pure AST.Comma) .
-              Gen.small $ genTestOrStar cfg') <*>
-          Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+              (genBetween' (Gen.list (Range.linear 0 10) ws') $ pure AST.Comma) .
+              Gen.small $ genTestOrStar cfg' ws') <*>
+          Gen.maybe (genBefore (Gen.list (Range.linear 0 10) ws') $ pure AST.Comma) <*>
           pure ()
         ]
 
-    genTestOrStar cfg' =
+    genTestOrStar cfg' ws' =
       Gen.small $
-      Gen.choice [ InL <$> genTest cfg', InR <$> genStarExpr cfg' ]
+      Gen.choice [ InL <$> genTest cfg' ws', InR <$> genStarExpr cfg' ws' ]
 
 genTestList
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.TestList atomType ctxt ())
-genTestList cfg =
+  -> m ws
+  -> m (AST.TestList ws atomType ctxt ())
+genTestList cfg ws =
   AST.TestList <$>
-    Gen.small (genTest cfg) <*>
+    Gen.small (genTest cfg ws) <*>
     genListF
       (genBeforeF
-        (genBetweenWhitespace $ pure AST.Comma)
-        (Gen.small $ genTest cfg)) <*>
-    Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+        (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure AST.Comma)
+        (Gen.small $ genTest cfg ws)) <*>
+    Gen.maybe (genBefore (Gen.list (Range.linear 0 10) ws) $ pure AST.Comma) <*>
     pure ()
 
 genYieldArg
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.YieldArg atomType ctxt ())
-genYieldArg cfg =
+  -> m ws
+  -> m (AST.YieldArg ws atomType ctxt ())
+genYieldArg cfg ws =
   case cfg ^. atomType of
-    SAssignable -> Gen.small $ Gen.choice [ yieldArgList cfg ]
+    SAssignable -> Gen.small $ Gen.choice [ yieldArgList cfg ws ]
     SNotAssignable ->
       Gen.small $
       Gen.choice
-        [ yieldArgList cfg
-        , AST.YieldArgFrom <$> genWhitespaceBefore1F (genTest cfg) <*> pure ()
+        [ yieldArgList cfg ws
+        , AST.YieldArgFrom <$> genBefore1F ws (genTest cfg ws) <*> pure ()
         ]
   where
-    yieldArgList cfg' =
-      AST.YieldArgList <$> genTestList cfg' <*> pure ()
+    yieldArgList cfg' ws' =
+      AST.YieldArgList <$> genTestList cfg' ws' <*> pure ()
 
 genYieldExpr
   :: MonadGen m
   => ExprConfig 'NotAssignable ('FunDef 'Normal)
-  -> m (AST.YieldExpr ('FunDef 'Normal) ())
-genYieldExpr cfg =
+  -> m ws
+  -> m (AST.YieldExpr ws ('FunDef 'Normal) ())
+genYieldExpr cfg ws =
   Gen.small $
   AST.YieldExpr <$>
   genMaybeF
-    (genWhitespaceBefore1F . genYieldArg $
-     cfg
-       & atomType .~ SNotAssignable
-       & definitionContext .~ SFunDef SNormal) <*>
+    (genBefore1F ws $
+     genYieldArg 
+       (cfg
+         & atomType .~ SNotAssignable
+         & definitionContext .~ SFunDef SNormal)
+       ws) <*>
   pure ()
 
 genDictItem
   :: MonadGen m
   => ExprConfig 'NotAssignable cfg
-  -> m (AST.DictItem 'NotAssignable cfg ())
-genDictItem cfg =
+  -> m ws
+  -> m (AST.DictItem ws 'NotAssignable cfg ())
+genDictItem cfg ws =
   AST.DictItem <$>
-  Gen.small (genTest cfg) <*>
-  genBetweenWhitespace (pure AST.Colon) <*>
-  Gen.small (genTest cfg) <*>
+  Gen.small (genTest cfg ws) <*>
+  genBetween' (Gen.list (Range.linear 0 10) ws) (pure AST.Colon) <*>
+  Gen.small (genTest cfg ws) <*>
   pure ()
 
 genDictUnpacking
   :: MonadGen m
   => ExprConfig 'NotAssignable cfg
-  -> m (AST.DictUnpacking 'NotAssignable cfg ())
-genDictUnpacking cfg =
+  -> m ws
+  -> m (AST.DictUnpacking ws 'NotAssignable cfg ())
+genDictUnpacking cfg ws =
   AST.DictUnpacking <$>
   genBeforeF
-    (genBetweenWhitespace $ pure AST.DoubleAsterisk)
-    (Gen.small $ genExpr cfg) <*>
+    (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure AST.DoubleAsterisk)
+    (Gen.small $ genExpr cfg ws) <*>
   pure ()
 
 genDictOrSetMaker
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.DictOrSetMaker 'NotAssignable ctxt ())
-genDictOrSetMaker cfg =
+  -> m ws
+  -> m (AST.DictOrSetMaker ws 'NotAssignable ctxt ())
+genDictOrSetMaker cfg ws =
   Gen.choice
     [ AST.DictOrSetMakerDictComp <$>
-      Gen.small (genDictItem cfg) <*>
-      Gen.small (genCompFor cfg) <*>
+      Gen.small (genDictItem cfg ws) <*>
+      Gen.small (genCompFor cfg ws) <*>
       pure ()
     , AST.DictOrSetMakerDictUnpack <$>
       Gen.small genItemOrUnpacking <*>
       genListF
         (genBeforeF
-          (genBetweenWhitespace $ pure AST.Comma)
+          (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure AST.Comma)
           (Gen.small genItemOrUnpacking)) <*>
-      Gen.maybe (genBetweenWhitespace $ pure AST.Comma) <*>
+      Gen.maybe (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure AST.Comma) <*>
       pure ()
     , AST.DictOrSetMakerSetComp <$>
-      Gen.small (genTest cfg) <*>
-      Gen.small (genCompFor cfg) <*>
+      Gen.small (genTest cfg ws) <*>
+      Gen.small (genCompFor cfg ws) <*>
       pure ()
     , AST.DictOrSetMakerSetUnpack <$>
       Gen.small genTestOrStar <*>
       genListF
         (genBeforeF
-          (genBetweenWhitespace $ pure AST.Comma)
+          (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure AST.Comma)
           (Gen.small genTestOrStar)) <*>
-      Gen.maybe (genBetweenWhitespace $ pure AST.Comma) <*>
+      Gen.maybe (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure AST.Comma) <*>
       pure ()
     ]
   where
     genItemOrUnpacking =
-      Gen.choice [ InL <$> genDictItem cfg, InR <$> genDictUnpacking cfg ]
+      Gen.choice [ InL <$> genDictItem cfg ws, InR <$> genDictUnpacking cfg ws ]
 
     genTestOrStar =
-      Gen.choice [ InL <$> genTest cfg, InR <$> genStarExpr cfg ]
+      Gen.choice [ InL <$> genTest cfg ws, InR <$> genStarExpr cfg ws ]
 
 genDigit :: MonadGen m => m AST.Digit
 genDigit =
@@ -565,23 +577,25 @@ genBytesLiteral =
 genAtom
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Atom atomType ctxt ())
-genAtom cfg =
+  -> m ws
+  -> m (AST.Atom ws atomType ctxt ())
+genAtom cfg ws =
   case cfg ^. atomType of
     SNotAssignable -> Gen.choice [genAtomInteger cfg, genAtomNoInt' cfg]
     _ -> genAtomNoInt' cfg
   where
     genAtomNoInt' cfg' =
       AST.AtomNoInt <$>
-      genAtomNoInt cfg' <*>
+      genAtomNoInt cfg' ws <*>
       pure ()
     genAtomInteger _ = AST.AtomInteger <$> genInteger <*> pure ()
 
 genAtomNoInt
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.AtomNoInt atomType ctxt ())
-genAtomNoInt cfg =
+  -> m ws
+  -> m (AST.AtomNoInt ws atomType ctxt ())
+genAtomNoInt cfg ws =
   case (cfg ^. atomType, cfg ^. definitionContext) of
     (SNotAssignable, SFunDef SNormal) ->
       Gen.recursive Gen.choice
@@ -591,8 +605,8 @@ genAtomNoInt cfg =
       Gen.recursive Gen.choice
         (normalNonRec ++
           [ genAtomFloat cfg
-          , genAtomString cfg
-          , genAtomImag cfg
+          , genAtomString cfg ws
+          , genAtomImag cfg ws
           , genAtomEllipsis cfg
           , genAtomNone cfg
           , genAtomTrue cfg
@@ -611,30 +625,34 @@ genAtomNoInt cfg =
 
     genAtomCurly cfg' =
       AST.AtomCurly <$>
-      genBetweenWhitespaceF (genMaybeF $ genDictOrSetMaker cfg') <*>
+      genBetween'F
+        (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
+        (genMaybeF $ genDictOrSetMaker cfg' genAnyWhitespaceChar) <*>
       pure ()  
 
     genAtomBracket cfg' =
       AST.AtomBracket <$>
-      genBetweenWhitespaceF (genMaybeF $ genListTestlistComp cfg') <*>
+      genBetween'F
+        (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
+        (genMaybeF $ genListTestlistComp cfg' genAnyWhitespaceChar) <*>
       pure ()
 
     genAtomParenNoYield cfg' =
       AST.AtomParenNoYield <$>
-      genBetweenWhitespaceF
-        (genMaybeF $ genTupleTestlistComp cfg') <*>
+      genBetween'F (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
+        (genMaybeF $ genTupleTestlistComp cfg' genAnyWhitespaceChar) <*>
       pure ()
 
-    genAtomImag _ =
+    genAtomImag _ ws' =
       AST.AtomImag <$>
-      genWhitespaceBeforeF genImag <*>
+      genBeforeF (Gen.list (Range.linear 0 10) ws') genImag <*>
       pure ()
     genAtomFloat _ = AST.AtomFloat <$> genFloat <*> pure ()
 
-    genAtomString cfg' =
+    genAtomString cfg' ws' =
       AST.AtomString <$>
       genStringOrBytes cfg' <*>
-      genListF (genWhitespaceBeforeF $ genStringOrBytes cfg') <*>
+      genListF (genBeforeF (Gen.list (Range.linear 0 10) ws') $ genStringOrBytes cfg') <*>
       pure ()  
     genAtomEllipsis _ = pure $ AST.AtomEllipsis ()
     genAtomNone _ = pure $ AST.AtomNone ()
@@ -643,7 +661,9 @@ genAtomNoInt cfg =
 
     genAtomParenYield cfg' = 
       AST.AtomParenYield <$>
-      genBetweenWhitespaceF (genYieldExpr cfg') <*>
+      genBetween'F
+        (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
+        (genYieldExpr cfg' genAnyWhitespaceChar) <*>
       pure ()
 
     genStringOrBytes _ =
@@ -652,254 +672,277 @@ genAtomNoInt cfg =
 genLambdefNocond
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.LambdefNocond 'NotAssignable ctxt ())
-genLambdefNocond cfg =
+  -> m ws
+  -> m (AST.LambdefNocond ws 'NotAssignable ctxt ())
+genLambdefNocond cfg ws =
   AST.LambdefNocond <$>
   genMaybeF
-    (Gen.small . genBetweenF genWhitespace1 genWhitespace $
-      genArgsList cfg genIdentifier (genTest cfg)) <*>
-  genWhitespaceBeforeF
     (Gen.small .
-     genTestNocond $
-     cfg & definitionContext .~ SFunDef SNormal) <*>
+     genBetweenF
+       (Gen.nonEmpty (Range.linear 1 10) ws)
+       (Gen.list (Range.linear 0 10) ws) $
+      genArgsList cfg ws genIdentifier (genTest cfg ws)) <*>
+  genBeforeF (Gen.list (Range.linear 0 10) ws)
+    (Gen.small $
+     genTestNocond (cfg & definitionContext .~ SFunDef SNormal) ws) <*>
   pure ()
 
 genTestNocond
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.TestNocond atomType ctxt ())
-genTestNocond cfg =
+  -> m ws
+  -> m (AST.TestNocond ws atomType ctxt ())
+genTestNocond cfg ws =
   Gen.small $
   AST.TestNocond <$>
   (case cfg ^. atomType of
     SNotAssignable ->
-      Gen.choice [ InL <$> genOrTest cfg, InR <$> genLambdefNocond cfg ]
+      Gen.choice [ InL <$> genOrTest cfg ws, InR <$> genLambdefNocond cfg ws ]
     SAssignable ->
-      Gen.choice [ InL <$> genOrTest cfg ]) <*>
+      Gen.choice [ InL <$> genOrTest cfg ws ]) <*>
   pure ()
 
 genCompIf
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.CompIf 'NotAssignable ctxt ())
-genCompIf cfg =
+  -> m ws
+  -> m (AST.CompIf ws 'NotAssignable ctxt ())
+genCompIf cfg ws =
   AST.CompIf <$>
-  genBetweenWhitespace1 (pure AST.KIf) <*>
-  Gen.small (genTestNocond cfg) <*>
+  genBetween'1 ws (pure AST.KIf) <*>
+  Gen.small (genTestNocond cfg ws) <*>
   genMaybeF
-    (Gen.small . genWhitespaceBeforeF $ genCompIter cfg) <*>
+    (Gen.small . genBeforeF (Gen.list (Range.linear 0 10) ws) $ genCompIter cfg ws) <*>
   pure ()
 
 genCompIter
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.CompIter 'NotAssignable ctxt ())
-genCompIter cfg =
+  -> m ws
+  -> m (AST.CompIter ws 'NotAssignable ctxt ())
+genCompIter cfg ws =
   Gen.small $
   AST.CompIter <$>
-  Gen.choice [ InL <$> genCompFor cfg, InR <$> genCompIf cfg ] <*>
+  Gen.choice [ InL <$> genCompFor cfg ws, InR <$> genCompIf cfg ws ] <*>
   pure ()
 
 genExprList
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.ExprList atomType ctxt ())
-genExprList cfg =
+  -> m ws
+  -> m (AST.ExprList ws atomType ctxt ())
+genExprList cfg ws =
   case cfg ^. atomType of
     SAssignable -> 
       Gen.choice
-        [ exprListSingleStarredComma cfg
-        , exprListSingle cfg
-        , exprListMany cfg
+        [ exprListSingleStarredComma cfg ws
+        , exprListSingle cfg ws
+        , exprListMany cfg ws
         ]
     SNotAssignable ->
       Gen.choice
-        [ exprListSingleStarredComma cfg
-        , exprListSingleStarredNoComma cfg
-        , exprListSingle cfg
-        , exprListMany cfg
+        [ exprListSingleStarredComma cfg ws
+        , exprListSingleStarredNoComma cfg ws
+        , exprListSingle cfg ws
+        , exprListMany cfg ws
         ]
   where
-    exprListSingleStarredComma cfg' =
+    exprListSingleStarredComma cfg' ws' =
      AST.ExprListSingleStarredComma <$>
-      Gen.small (genStarExpr cfg') <*>
-      genWhitespaceBefore (pure AST.Comma) <*>
+      Gen.small (genStarExpr cfg' ws') <*>
+      genBefore (Gen.list (Range.linear 0 10) ws') (pure AST.Comma) <*>
       pure ()
-    exprListSingleStarredNoComma cfg' =
+    exprListSingleStarredNoComma cfg' ws' =
       AST.ExprListSingleStarredNoComma <$>
-      Gen.small (genStarExpr cfg') <*>
+      Gen.small (genStarExpr cfg' ws') <*>
       pure ()
-    exprListSingle cfg' =
+    exprListSingle cfg' ws' =
       AST.ExprListSingle <$>
-      Gen.small (genExpr cfg') <*>
-      Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+      Gen.small (genExpr cfg' ws') <*>
+      Gen.maybe (genBefore (Gen.list (Range.linear 0 10) ws') $ pure AST.Comma) <*>
       pure ()
-    exprListMany cfg' =
+    exprListMany cfg' ws' =
       AST.ExprListMany <$>
-      Gen.small (genSumOrStar cfg') <*>
+      Gen.small (genSumOrStar cfg' ws') <*>
       genNonEmptyF
         (genBeforeF
-          (genBetweenWhitespace $ pure AST.Comma) . Gen.small $
-            genSumOrStar cfg') <*>
-      Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+          (genBetween' (Gen.list (Range.linear 0 10) ws') $ pure AST.Comma) . Gen.small $
+            genSumOrStar cfg' ws') <*>
+      Gen.maybe (genBefore (Gen.list (Range.linear 0 10) ws') $ pure AST.Comma) <*>
       pure ()
-    genSumOrStar cfg' =
-      Gen.choice [InL <$> genExpr cfg', InR <$> genStarExpr cfg']
+    genSumOrStar cfg' ws' =
+      Gen.choice [InL <$> genExpr cfg' ws', InR <$> genStarExpr cfg' ws']
 
 genCompFor
   :: MonadGen m
   => ExprConfig as ctxt
-  -> m (AST.CompFor 'NotAssignable ctxt ())
-genCompFor cfg =
+  -> m ws
+  -> m (AST.CompFor ws 'NotAssignable ctxt ())
+genCompFor cfg ws =
   AST.CompFor <$>
   genBeforeF
-    (genBetweenWhitespace1 $ pure AST.KFor)
-    (genWhitespaceAfter1F .
-     Gen.small .
-     genTestlistStarExpr genExpr genStarExpr $
-      cfg & atomType .~ SAssignable) <*>
-  genWhitespaceBefore1F
-    (Gen.small . genOrTest $ cfg & atomType .~ SNotAssignable) <*>
+    (genBetween'1 ws $ pure AST.KFor)
+    (genAfter1F ws .
+     Gen.small $
+     genTestlistStarExpr genExpr genStarExpr (cfg & atomType .~ SAssignable) ws) <*>
+  genBefore1F ws
+    (Gen.small $ genOrTest (cfg & atomType .~ SNotAssignable) ws) <*>
   genMaybeF
-    (genWhitespaceBeforeF .
-     Gen.small .
-     genCompIter $
-     cfg & atomType .~ SNotAssignable) <*>
+    (genBeforeF (Gen.list (Range.linear 0 10) ws) .
+     Gen.small $
+     genCompIter (cfg & atomType .~ SNotAssignable) ws) <*>
   pure ()
 
 genSliceOp
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.SliceOp 'NotAssignable ctxt ())
-genSliceOp cfg =
+  -> m ws
+  -> m (AST.SliceOp ws 'NotAssignable ctxt ())
+genSliceOp cfg ws =
   AST.SliceOp <$>
-  genMaybeF (Gen.small . genWhitespaceBeforeF $ genTest cfg) <*>
+  genMaybeF (Gen.small . genBeforeF (Gen.list (Range.linear 0 10) ws) $ genTest cfg ws) <*>
   pure ()
 
 genSubscript
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.Subscript 'NotAssignable ctxt ())
-genSubscript cfg =
+  -> m ws
+  -> m (AST.Subscript ws 'NotAssignable ctxt ())
+genSubscript cfg ws =
   Gen.choice
-    [ AST.SubscriptTest <$> Gen.small (genTest cfg) <*> pure ()
+    [ AST.SubscriptTest <$> Gen.small (genTest cfg ws) <*> pure ()
     , AST.SubscriptSlice <$>
-      genWhitespaceAfterF (genMaybeF . Gen.small $ genTest cfg) <*>
-      genWhitespaceAfter (pure AST.Colon) <*>
-      genMaybeF (Gen.small . genWhitespaceAfterF $ genTest cfg) <*>
-      genMaybeF (Gen.small . genWhitespaceAfterF $ genSliceOp cfg) <*>
+      genAfterF (Gen.list (Range.linear 0 10) ws) (genMaybeF . Gen.small $ genTest cfg ws) <*>
+      genAfter (Gen.list (Range.linear 0 10) ws) (pure AST.Colon) <*>
+      genMaybeF
+        (Gen.small .
+         genAfterF (Gen.list (Range.linear 0 10) ws) $ genTest cfg ws) <*>
+      genMaybeF
+        (Gen.small .
+         genAfterF (Gen.list (Range.linear 0 10) ws) $ genSliceOp cfg ws) <*>
       pure ()
     ]
 
 genSubscriptList
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.SubscriptList 'NotAssignable ctxt ())
-genSubscriptList cfg =
+  -> m ws
+  -> m (AST.SubscriptList ws 'NotAssignable ctxt ())
+genSubscriptList cfg ws =
   AST.SubscriptList <$>
-  Gen.small (genSubscript cfg) <*>
+  Gen.small (genSubscript cfg ws) <*>
   genListF
     (genBeforeF
-      (genBetweenWhitespace $ pure AST.Comma)
-      (Gen.small $ genSubscript cfg)) <*>
-  Gen.maybe (genWhitespaceBefore $ pure AST.Comma) <*>
+      (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure AST.Comma)
+      (Gen.small $ genSubscript cfg ws)) <*>
+  Gen.maybe (genBefore (Gen.list (Range.linear 0 10) ws) $ pure AST.Comma) <*>
   pure ()
 
 genTrailer
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Trailer atomType ctxt ())
-genTrailer cfg =
+  -> m ws
+  -> m (AST.Trailer ws atomType ctxt ())
+genTrailer cfg ws =
   case cfg ^. atomType of
     SNotAssignable ->
       Gen.recursive
         Gen.choice
-        (commonNonRec cfg) $
+        (commonNonRec cfg ws) $
         commonRec cfg ++
         [ AST.TrailerCall <$>
-          genBetweenWhitespaceF
+          genBetween'F (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
             (genMaybeF $ genArgumentList cfg genIdentifier genTest) <*>
           pure ()
         ]
-    SAssignable -> Gen.recursive Gen.choice (commonNonRec cfg) (commonRec cfg)
+    SAssignable ->
+      Gen.recursive Gen.choice
+        (commonNonRec cfg ws)
+        (commonRec cfg)
   where
-    commonNonRec _ =
+    commonNonRec _ ws' =
       [ AST.TrailerAccess <$>
-        genWhitespaceBeforeF genIdentifier <*>
+        genBeforeF (Gen.list (Range.linear 0 10) ws') genIdentifier <*>
         pure ()
       ]
     commonRec cfg' =
       [ AST.TrailerSubscript <$>
-        genBetweenWhitespaceF (genSubscriptList $ cfg' & atomType .~ SNotAssignable) <*>
+        genBetween'F
+          (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
+          (genSubscriptList (cfg' & atomType .~ SNotAssignable) genAnyWhitespaceChar) <*>
         pure ()
       ]
 
 genAtomExprTrailers
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.AtomExprTrailers atomType ctxt ())
-genAtomExprTrailers cfg =
+  -> m ws
+  -> m (AST.AtomExprTrailers ws atomType ctxt ())
+genAtomExprTrailers cfg ws =
   Gen.recursive Gen.choice
     [ AST.AtomExprTrailersBase <$>
-      genAtomNoInt (cfg & atomType .~ SNotAssignable) <*>
-      genWhitespaceBeforeF (genTrailer cfg) <*>
+      genAtomNoInt (cfg & atomType .~ SNotAssignable) ws <*>
+      genBeforeF (Gen.list (Range.linear 0 10) ws) (genTrailer cfg ws) <*>
       pure ()
     ]
     [ AST.AtomExprTrailersMany <$>
-      genAtomExprTrailers (cfg & atomType .~ SNotAssignable) <*>
-      genWhitespaceBeforeF (genTrailer cfg) <*>
+      genAtomExprTrailers (cfg & atomType .~ SNotAssignable) ws <*>
+      genBeforeF (Gen.list (Range.linear 0 10) ws) (genTrailer cfg ws) <*>
       pure ()
     ]
+
 genAtomExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.AtomExpr atomType ctxt ())
-genAtomExpr cfg =
+  -> m ws
+  -> m (AST.AtomExpr ws atomType ctxt ())
+genAtomExpr cfg ws =
   case (cfg ^. atomType, cfg ^. definitionContext) of
     (SNotAssignable, SFunDef SAsync) ->
       Gen.choice $
-        atomExprNoAwait cfg ++
+        atomExprNoAwait cfg ws ++
         [ AST.AtomExprAwaitSingle <$>
-          genWhitespaceAfter1 (pure AST.KAwait) <*>
-          genAtom cfg <*>
+          genAfter1 ws (pure AST.KAwait) <*>
+          genAtom cfg ws <*>
           pure ()
         , AST.AtomExprAwaitTrailers<$>
-          genWhitespaceAfter1 (pure AST.KAwait) <*>
-          genAtomExprTrailers cfg <*>
+          genAfter1 ws (pure AST.KAwait) <*>
+          genAtomExprTrailers cfg ws <*>
           pure ()
         ]
-    _ -> Gen.choice $ atomExprNoAwait cfg
+    _ -> Gen.choice $ atomExprNoAwait cfg ws
   where
-    atomExprNoAwait cfg' =
+    atomExprNoAwait cfg' ws' =
       [ AST.AtomExprSingle <$>
-        genAtom cfg' <*>
+        genAtom cfg' ws' <*>
         pure ()
       , AST.AtomExprTrailers <$>
-        genAtomExprTrailers cfg' <*>
+        genAtomExprTrailers cfg' ws' <*>
         pure ()
       ]
 
 genPower
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Power atomType ctxt ())
-genPower cfg =
+  -> m ws
+  -> m (AST.Power ws atomType ctxt ())
+genPower cfg ws =
   case cfg ^. atomType of
-    SAssignable -> powerOne cfg
+    SAssignable -> powerOne cfg ws
     SNotAssignable ->
       Gen.recursive Gen.choice
-        [ powerOne cfg ]
+        [ powerOne cfg ws ]
         [ AST.PowerMany <$>
-          Gen.small (genAtomExpr cfg) <*>
+          Gen.small (genAtomExpr cfg ws) <*>
           genBeforeF
-            (Gen.small . genBetweenWhitespace $ pure AST.DoubleAsterisk)
-            (Gen.small $ genFactor cfg) <*>
+            (Gen.small . genBetween' (Gen.list (Range.linear 0 10) ws) $ pure AST.DoubleAsterisk)
+            (Gen.small $ genFactor cfg ws) <*>
           pure ()
         ]
   where
-    powerOne cfg' =
+    powerOne cfg' ws' =
       AST.PowerOne <$>
-      Gen.small (genAtomExpr cfg') <*>
+      Gen.small (genAtomExpr cfg' ws') <*>
       pure ()
 
 genFactorOp :: MonadGen m => m AST.FactorOperator
@@ -913,321 +956,338 @@ genFactorOp =
 genFactor
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Factor atomType ctxt ())
-genFactor cfg =
+  -> m ws
+  -> m (AST.Factor ws atomType ctxt ())
+genFactor cfg ws =
   case cfg ^. atomType of
-    SAssignable -> factorNone cfg
+    SAssignable -> factorNone cfg ws
     SNotAssignable ->
       Gen.recursive Gen.choice
-        [ factorNone cfg ]
+        [ factorNone cfg ws ]
         [ AST.FactorOne <$>
-          genWhitespaceAfter genFactorOp <*>
-          Gen.small (genFactor cfg) <*>
+          genAfter (Gen.list (Range.linear 0 10) ws) genFactorOp <*>
+          Gen.small (genFactor cfg ws) <*>
           pure ()
         ]
   where
-    factorNone cfg' =
+    factorNone cfg' ws' =
       AST.FactorNone <$>
-      Gen.small (genPower cfg') <*>
+      Gen.small (genPower cfg' ws') <*>
       pure ()
 
 genTerm
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Term atomType ctxt ())
-genTerm cfg =
+  -> m ws
+  -> m (AST.Term ws atomType ctxt ())
+genTerm cfg ws =
   case cfg ^. atomType of
-    SAssignable -> termOne cfg
+    SAssignable -> termOne cfg ws
     SNotAssignable ->
       Gen.recursive Gen.choice
-        [ termOne cfg ]
+        [ termOne cfg ws ]
         [ AST.TermMany <$>
-            Gen.small (genFactor cfg) <*>
+            Gen.small (genFactor cfg ws) <*>
             genNonEmptyF
               (genBeforeF
-                (Gen.small $ genBetweenWhitespace genTermOp)
-                (Gen.small $ genFactor cfg)) <*>
+                (Gen.small $ genBetween' (Gen.list (Range.linear 0 10) ws) genTermOp)
+                (Gen.small $ genFactor cfg ws)) <*>
             pure ()
         ]
   where
-    termOne cfg' =
+    termOne cfg' ws' =
       AST.TermOne <$>
-      Gen.small (genFactor cfg') <*>
+      Gen.small (genFactor cfg' ws') <*>
       pure ()
 
 genArithExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.ArithExpr atomType ctxt ())
-genArithExpr cfg =
+  -> m ws
+  -> m (AST.ArithExpr ws atomType ctxt ())
+genArithExpr cfg ws =
   case cfg ^. atomType of
-    SAssignable -> arithExprOne cfg
+    SAssignable -> arithExprOne cfg ws
     SNotAssignable ->
       Gen.recursive Gen.choice
-        [ arithExprOne cfg ]
+        [ arithExprOne cfg ws ]
         [ AST.ArithExprMany <$>
-          Gen.small (genTerm cfg) <*>
+          Gen.small (genTerm cfg ws) <*>
           genNonEmptyF
             (genBeforeF
-              (genBetweenWhitespace $
+              (genBetween' (Gen.list (Range.linear 0 10) ws) $
                 Gen.element [Left AST.Plus, Right AST.Minus])
-              (Gen.small $ genTerm cfg)) <*>
+              (Gen.small $ genTerm cfg ws)) <*>
           pure ()
         ]
   where
-    arithExprOne cfg' =
+    arithExprOne cfg' ws' =
       AST.ArithExprOne <$>
-      Gen.small (genTerm cfg') <*>
+      Gen.small (genTerm cfg' ws') <*>
       pure ()
 
 genShiftExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.ShiftExpr atomType ctxt ())
-genShiftExpr cfg =
+  -> m ws
+  -> m (AST.ShiftExpr ws atomType ctxt ())
+genShiftExpr cfg ws =
   case cfg ^. atomType of
-    SAssignable -> shiftExprOne cfg
+    SAssignable -> shiftExprOne cfg ws
     SNotAssignable ->
       Gen.recursive Gen.choice
-        [ shiftExprOne cfg ]
+        [ shiftExprOne cfg ws ]
         [ AST.ShiftExprMany <$>
-          Gen.small (genArithExpr cfg) <*>
+          Gen.small (genArithExpr cfg ws) <*>
           genNonEmptyF
             (genBeforeF
-              (genBetweenWhitespace $
+              (genBetween' (Gen.list (Range.linear 0 10) ws) $
                   Gen.element [Left AST.DoubleLT, Right AST.DoubleGT])
-              (Gen.small $ genArithExpr cfg)) <*>
+              (Gen.small $ genArithExpr cfg ws)) <*>
           pure ()
         ]
   where
-    shiftExprOne cfg' =
+    shiftExprOne cfg' ws' =
       AST.ShiftExprOne <$>
-      Gen.small (genArithExpr cfg') <*>
+      Gen.small (genArithExpr cfg' ws') <*>
       pure ()
 
 genAndExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.AndExpr atomType ctxt ())
-genAndExpr cfg =
+  -> m ws
+  -> m (AST.AndExpr ws atomType ctxt ())
+genAndExpr cfg ws =
   case cfg ^. atomType of
-    SAssignable -> andExprOne cfg
+    SAssignable -> andExprOne cfg ws
     SNotAssignable ->
       Gen.recursive Gen.choice
-        [ andExprOne cfg ]
+        [ andExprOne cfg ws ]
         [ AST.AndExprMany <$>
-          Gen.small (genShiftExpr cfg) <*>
+          Gen.small (genShiftExpr cfg ws) <*>
           genNonEmptyF
             (genBeforeF
-              (genBetweenWhitespace $ pure AST.Ampersand)
-              (Gen.small $ genShiftExpr cfg)) <*>
+              (genBetween' (Gen.list (Range.linear 1 10) ws) $ pure AST.Ampersand)
+              (Gen.small $ genShiftExpr cfg ws)) <*>
           pure ()
         ]
   where
-    andExprOne cfg' =
+    andExprOne cfg' ws' =
       AST.AndExprOne <$>
-      Gen.small (genShiftExpr cfg') <*>
+      Gen.small (genShiftExpr cfg' ws') <*>
       pure ()
 
 genXorExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.XorExpr atomType ctxt ())
-genXorExpr cfg =
+  -> m ws
+  -> m (AST.XorExpr ws atomType ctxt ())
+genXorExpr cfg ws =
   case cfg ^. atomType of
-    SAssignable -> xorExprOne cfg
+    SAssignable -> xorExprOne cfg ws
     SNotAssignable ->
       Gen.recursive Gen.choice
-        [ xorExprOne cfg ]
+        [ xorExprOne cfg ws ]
         [ AST.XorExprMany <$>
-          Gen.small (genAndExpr cfg) <*>
+          Gen.small (genAndExpr cfg ws) <*>
           genNonEmptyF
             (genBeforeF
-              (genBetweenWhitespace $ pure AST.Caret)
-              (Gen.small $ genAndExpr cfg)) <*>
+              (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure AST.Caret)
+              (Gen.small $ genAndExpr cfg ws)) <*>
           pure ()
         ]
   where
-    xorExprOne cfg' =
+    xorExprOne cfg' ws' =
       AST.XorExprOne <$>
-      Gen.small (genAndExpr cfg') <*>
+      Gen.small (genAndExpr cfg' ws') <*>
       pure ()
 
 genExpr
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Expr atomType ctxt ())
-genExpr cfg =
+  -> m ws
+  -> m (AST.Expr ws atomType ctxt ())
+genExpr cfg ws =
   case cfg ^. atomType of
-    SAssignable -> exprOne cfg
+    SAssignable -> exprOne cfg ws
     SNotAssignable ->
       Gen.recursive Gen.choice
-        [ exprOne cfg ]
+        [ exprOne cfg ws ]
         [ AST.ExprMany <$>
-          Gen.small (genXorExpr cfg) <*>
+          Gen.small (genXorExpr cfg ws) <*>
           genNonEmptyF
             (genBeforeF
-              (genBetweenWhitespace $ pure AST.Pipe)
-              (Gen.small $ genXorExpr cfg)) <*>
+              (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure AST.Pipe)
+              (Gen.small $ genXorExpr cfg ws)) <*>
           pure ()
         ]
   where
-    exprOne cfg' =
+    exprOne cfg' ws' =
       AST.ExprOne <$>
-      Gen.small (genXorExpr cfg') <*>
+      Gen.small (genXorExpr cfg' ws') <*>
       pure ()
 
-genCompOperator :: MonadGen m => m AST.CompOperator
-genCompOperator =
-  Gen.choice
-    [ AST.CompLT <$> genWhitespace <*> genWhitespace
-    , AST.CompGT <$> genWhitespace <*> genWhitespace
-    , AST.CompEq <$> genWhitespace <*> genWhitespace
-    , AST.CompGEq <$> genWhitespace <*> genWhitespace
-    , AST.CompLEq <$> genWhitespace <*> genWhitespace
-    , AST.CompNEq <$> genWhitespace <*> genWhitespace
-    , AST.CompIs <$> genWhitespace1 <*> genWhitespace1
-    , AST.CompIn <$> genWhitespace1 <*> genWhitespace1
-    , AST.CompIsNot <$> genWhitespace1 <*> genWhitespace1 <*> genWhitespace1
-    , AST.CompNotIn <$> genWhitespace1 <*> genWhitespace1 <*> genWhitespace1
-    ]
+genCompOperator :: MonadGen m => m ws -> m (AST.CompOperator ws)
+genCompOperator ws =
+  let
+    wss = Gen.list (Range.linear 0 10) ws
+    wss1 = Gen.nonEmpty (Range.linear 1 10) ws
+  in
+    Gen.choice
+      [ AST.CompLT <$> wss <*> wss
+      , AST.CompGT <$> wss <*> wss
+      , AST.CompEq <$> wss <*> wss
+      , AST.CompGEq <$> wss <*> wss
+      , AST.CompLEq <$> wss <*> wss
+      , AST.CompNEq <$> wss <*> wss
+      , AST.CompIs <$> wss1 <*> wss1
+      , AST.CompIn <$> wss1 <*> wss1
+      , AST.CompIsNot <$> wss1 <*> wss1 <*> wss1
+      , AST.CompNotIn <$> wss1 <*> wss1 <*> wss1
+      ]
 
 genComparison
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Comparison atomType ctxt ())
-genComparison cfg =
+  -> m ws
+  -> m (AST.Comparison ws atomType ctxt ())
+genComparison cfg ws =
   case cfg ^. atomType of
-    SAssignable -> comparisonOne cfg
+    SAssignable -> comparisonOne cfg ws
     SNotAssignable ->
       Gen.recursive Gen.choice
-        [ comparisonOne cfg ]
+        [ comparisonOne cfg ws ]
         [ AST.ComparisonMany <$>
-          Gen.small (genExpr cfg) <*>
+          Gen.small (genExpr cfg ws) <*>
           genNonEmptyF
             (genBeforeF
-              genCompOperator
-              (Gen.small $ genExpr cfg)) <*>
+              (genCompOperator ws)
+              (Gen.small $ genExpr cfg ws)) <*>
           pure ()
         ]
   where
-    comparisonOne cfg' =
+    comparisonOne cfg' ws' =
       AST.ComparisonOne <$>
-      Gen.small (genExpr cfg') <*>
+      Gen.small (genExpr cfg' ws') <*>
       pure ()
 
 genNotTest
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.NotTest atomType ctxt ())
-genNotTest cfg =
+  -> m ws
+  -> m (AST.NotTest ws atomType ctxt ())
+genNotTest cfg ws =
   case cfg ^. atomType of
-    SAssignable -> notTestOne cfg
+    SAssignable -> notTestOne cfg ws
     SNotAssignable ->
       Gen.recursive
         Gen.choice
-        [ notTestOne cfg ]
+        [ notTestOne cfg ws ]
         [ AST.NotTestMany <$>
           genBeforeF
-            (genWhitespaceAfter1 $ pure AST.KNot)
-            (genNotTest cfg) <*>
+            (genAfter1 ws $ pure AST.KNot)
+            (genNotTest cfg ws) <*>
           pure ()
         ]
   where
-    notTestOne cfg' =
+    notTestOne cfg' ws' =
       AST.NotTestOne <$>
-      Gen.small (genComparison cfg') <*>
+      Gen.small (genComparison cfg' ws') <*>
       pure ()
 
 genAndTest
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.AndTest atomType ctxt ())
-genAndTest cfg = do
+  -> m ws
+  -> m (AST.AndTest ws atomType ctxt ())
+genAndTest cfg ws = do
   n <- Gen.int (Range.linear 1 10)
   case cfg ^. atomType of
-    SAssignable -> andTestOne cfg
+    SAssignable -> andTestOne cfg ws
     SNotAssignable ->
       Gen.recursive Gen.choice
-        [ andTestOne cfg ]
+        [ andTestOne cfg ws ]
         [ AST.AndTestMany <$>
-          Gen.small (genNotTest cfg) <*>
+          Gen.small (genNotTest cfg ws) <*>
           (Compose <$> Gen.nonEmpty (Range.singleton n)
             (genBeforeF
-              (genBetween' genWhitespace1 $ pure AST.KAnd)
-              (Gen.scale (`div` Size n) $ genNotTest cfg))) <*>
+              (genBetween' (Gen.nonEmpty (Range.linear 1 10) ws) $ pure AST.KAnd)
+              (Gen.scale (`div` Size n) $ genNotTest cfg ws))) <*>
           pure ()
         ]
   where
-    andTestOne cfg' =
+    andTestOne cfg' ws' =
       AST.AndTestOne <$>
-      Gen.small (genNotTest cfg') <*>
+      Gen.small (genNotTest cfg' ws') <*>
       pure ()
 
 genOrTest
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.OrTest atomType ctxt ())
-genOrTest cfg =
+  -> m ws
+  -> m (AST.OrTest ws atomType ctxt ())
+genOrTest cfg ws =
   case cfg ^. atomType of
-    SAssignable -> orTestOne cfg
+    SAssignable -> orTestOne cfg ws
     SNotAssignable ->
       Gen.recursive Gen.choice
-        [ orTestOne cfg ]
+        [ orTestOne cfg ws ]
         [ AST.OrTestMany <$>
-          Gen.small (genAndTest cfg) <*>
+          Gen.small (genAndTest cfg ws) <*>
           genNonEmptyF
             (genBeforeF
-              (genBetween' genWhitespace1 $ pure AST.KOr)
-              (Gen.small $ genAndTest cfg)) <*>
+              (genBetween' (Gen.nonEmpty (Range.linear 1 10) ws) $ pure AST.KOr)
+              (Gen.small $ genAndTest cfg ws)) <*>
           pure ()
         ]
   where
-    orTestOne cfg' =
+    orTestOne cfg' ws' =
       AST.OrTestOne <$>
-      Gen.small (genAndTest cfg') <*>
+      Gen.small (genAndTest cfg' ws') <*>
       pure ()
 
 genTest
   :: MonadGen m
   => ExprConfig atomType ctxt
-  -> m (AST.Test atomType ctxt ())
-genTest cfg =
+  -> m ws
+  -> m (AST.Test ws atomType ctxt ())
+genTest cfg ws =
   case cfg ^. atomType of
-    SAssignable -> testCondNoIf cfg
+    SAssignable -> testCondNoIf cfg ws
     SNotAssignable ->
       Gen.recursive
         Gen.choice
-        [ testCondNoIf cfg ]
+        [ testCondNoIf cfg ws ]
         [ AST.TestCondIf <$>
-          Gen.small (genOrTest cfg) <*>
+          Gen.small (genOrTest cfg ws) <*>
           genBeforeF
-            genWhitespace1
-            (Gen.small $ genIfThenElse cfg) <*>
+            (Gen.nonEmpty (Range.linear 1 10) ws)
+            (Gen.small $ genIfThenElse cfg ws) <*>
           pure ()
         , Gen.small $
           AST.TestLambdef <$>
-          genLambdef cfg <*>
+          genLambdef cfg ws <*>
           pure ()
         ]
   where
-    testCondNoIf cfg' =
+    testCondNoIf cfg' ws =
       AST.TestCondNoIf <$>
-      Gen.small (genOrTest cfg') <*>
+      Gen.small (genOrTest cfg' ws) <*>
       pure ()
 
 genLambdef
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
-  -> m (AST.Lambdef 'NotAssignable ctxt ())
-genLambdef cfg =
+  -> m ws
+  -> m (AST.Lambdef ws 'NotAssignable ctxt ())
+genLambdef cfg ws =
   AST.Lambdef <$>
   genMaybeF
-    (genWhitespaceBefore1F .
-     genArgsList cfg genIdentifier $ genTest cfg) <*>
+    (genBefore1F ws .
+     genArgsList cfg ws genIdentifier $ genTest cfg ws) <*>
   genBeforeF
-    (genBetweenWhitespace $ pure AST.Colon)
-    (Gen.small . genTest $ cfg & definitionContext .~ SFunDef SNormal) <*>
+    (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure AST.Colon)
+    (Gen.small $ genTest (cfg & definitionContext .~ SFunDef SNormal) ws) <*>
   pure ()
 
 genStringContent

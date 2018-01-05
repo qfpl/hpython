@@ -1,0 +1,5 @@
+def __init__(self, connection=None, hostname=None, enabled=True,
+             channel=None, buffer_while_offline=True, app=None,
+             serializer=None, groups=None, delivery_mode=1,
+             buffer_group=None, buffer_limit=24, on_send_buffered=None):
+  test

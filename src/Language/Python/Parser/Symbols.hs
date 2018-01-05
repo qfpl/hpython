@@ -88,6 +88,9 @@ whitespaceChar =
   (char '\t' $> Tab) <|>
   fmap Continued (char '\\' *> newlineChar)
 
+anyWhitespaceChar :: CharParsing m => m AnyWhitespaceChar
+anyWhitespaceChar = (Left <$> whitespaceChar) <|> (Right <$> newlineChar)
+
 equals :: CharParsing m => m Equals
 equals = char '=' $> Equals
 

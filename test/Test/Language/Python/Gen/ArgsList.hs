@@ -19,63 +19,66 @@ import qualified Hedgehog.Range as Range
 genArgsListArg
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
+  -> m ws
   -> m (name ())
   -> m (f ())
-  -> m (ArgsListArg name f ())
-genArgsListArg _ genName gen =
+  -> m (ArgsListArg ws name f ())
+genArgsListArg _ ws genName gen =
   ArgsListArg <$>
   genName <*>
   genMaybeF
     (genBeforeF
-       (genBetweenWhitespace $ pure Equals)
-       gen) <*>
+      (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure Equals)
+      gen) <*>
   pure ()
 
 genArgsListStarPart
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
+  -> m ws
   -> m (name ())
   -> m (f ())
-  -> m (ArgsListStarPart name f ())
-genArgsListStarPart cfg genName gen = do
+  -> m (ArgsListStarPart ws name f ())
+genArgsListStarPart cfg ws genName gen = do
   n <- Size <$> Gen.integral_ (Range.linear 0 20)
   Gen.recursive
     Gen.choice
     [ pure $ ArgsListStarPartEmpty ()
     , ArgsListStarPart <$>
       genBeforeF
-        (genBetweenWhitespace $ pure Asterisk)
+        (genAfter (Gen.list (Range.linear 0 10) ws) $ pure Asterisk)
         genName <*>
       pure (Compose []) <*>
       genMaybeF
         (genBeforeF
-          (genBetweenWhitespace $ pure Comma)
-          (genArgsListDoublestarArg cfg genName)) <*>
+          (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure Comma)
+          (genArgsListDoublestarArg cfg ws genName)) <*>
       pure ()
     ]
     [ ArgsListStarPart <$>
       genBeforeF
-        (genBetweenWhitespace $ pure Asterisk)
+        (genAfter (Gen.list (Range.linear 0 10) ws) $ pure Asterisk)
         genName <*>
       genListF
         (genBeforeF
-          (genBetweenWhitespace $ pure Comma)
-          (Gen.resize n $ genArgsListArg cfg genName gen)) <*>
+          (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure Comma)
+          (Gen.resize n $ genArgsListArg cfg ws genName gen)) <*>
       genMaybeF
         (genBeforeF
-          (genBetweenWhitespace $ pure Comma)
-          (genArgsListDoublestarArg cfg genName)) <*>
+          (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure Comma)
+          (genArgsListDoublestarArg cfg ws genName)) <*>
       pure ()
     ]
 
 genArgsListDoublestarArg
   :: MonadGen m
   => ExprConfig 'NotAssignable ctxt
+  -> m ws
   -> m (name ())
-  -> m (ArgsListDoublestarArg name test ())
-genArgsListDoublestarArg _ genName =
+  -> m (ArgsListDoublestarArg ws name test ())
+genArgsListDoublestarArg _ ws genName =
   ArgsListDoublestarArg <$>
-  genBetweenWhitespaceF genName <*>
+  genBeforeF (genAfter (Gen.list (Range.linear 0 10) ws) (pure DoubleAsterisk)) genName <*>
   pure ()
 
 genArgsList
@@ -83,30 +86,31 @@ genArgsList
      , HasName name
      )
   => ExprConfig 'NotAssignable ctxt
+  -> m ws
   -> m (name ())
   -> m (f ())
-  -> m (ArgsList name f ())
-genArgsList cfg genName gen = do
+  -> m (ArgsList ws name f ())
+genArgsList cfg ws genName gen = do
   n <- Size <$> Gen.integral_ (Range.linear 0 20)
   Gen.recursive
     Gen.choice
     [ Gen.just $
       fmap (review _ArgsListArgsKwargs) $
       (,) <$>
-      (InR <$> genArgsListDoublestarArg cfg genName) <*>
+      (InR <$> genArgsListDoublestarArg cfg ws genName) <*>
       pure ()
     ]
     [ Gen.just $
       fmap (review _ArgsListAll) $
       (,,,) <$>
-      Gen.resize n (genArgsListArg cfg genName gen) <*>
+      Gen.resize n (genArgsListArg cfg ws genName gen) <*>
       genListF
         (genBeforeF
-          (genBetweenWhitespace $ pure Comma)
-          (Gen.resize n $ genArgsListArg cfg genName gen)) <*>
+          (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure Comma)
+          (Gen.resize n $ genArgsListArg cfg ws genName gen)) <*>
       genMaybeF
         (genBeforeF
-          (genBetweenWhitespace $ pure Comma)
+          (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure Comma)
           (genMaybeF genStarOrDouble)) <*>
       pure ()
     , Gen.just $
@@ -118,6 +122,6 @@ genArgsList cfg genName gen = do
   where
     genStarOrDouble =
       Gen.choice
-        [ Gen.small $ InL <$> genArgsListStarPart cfg genName gen
-        , InR <$> genArgsListDoublestarArg cfg genName
+        [ Gen.small $ InL <$> genArgsListStarPart cfg ws genName gen
+        , InR <$> genArgsListDoublestarArg cfg ws genName
         ]

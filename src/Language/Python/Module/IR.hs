@@ -11,8 +11,10 @@ import Data.Deriving
 import Data.Functor.Compose
 import Data.Functor.Sum
 import Data.Separated.After
+import Data.Separated.Between
 
 import Language.Python.Statement.IR
+import Language.Python.AST.Comment
 import Language.Python.AST.Symbols
 
 data Module a
@@ -21,7 +23,9 @@ data Module a
     :: Compose
          []
          (Sum
-           (Const NewlineChar)
+           (Compose
+             (Between [WhitespaceChar] NewlineChar)
+             (Compose Maybe Comment))
            Statement)
          a
   , _module_ann :: a

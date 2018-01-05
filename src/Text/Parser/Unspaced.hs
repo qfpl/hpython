@@ -6,6 +6,7 @@ module Text.Parser.Unspaced
 
 import Papa
 
+import Control.Monad.Trans.Class
 import Text.Parser.Char (CharParsing(..))
 import Text.Parser.Combinators (Parsing(..))
 import Text.Parser.LookAhead (LookAheadParsing(..))
@@ -25,6 +26,7 @@ newtype Unspaced m a
   , Parsing
   , CharParsing
   , TokenParsing
+  , MonadTrans
   )
 
 runUnspaced :: Unspaced m a -> m a

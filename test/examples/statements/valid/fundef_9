@@ -1,0 +1,3 @@
+def __init__(self, a=None,
+             b=True):
+  a

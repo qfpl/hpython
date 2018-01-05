@@ -1,0 +1,2 @@
+os.open(new_file_name, (os.O_WRONLY | os.O_CREAT | getattr(os, 'O_BINARY', 0) |
+                        (os.O_EXCL if not allow_overwrite else 0)))

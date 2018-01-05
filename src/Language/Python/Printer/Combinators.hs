@@ -69,6 +69,13 @@ between'
   -> r
 between' f g (Between' (Between s a t)) = f s <> g a <> f t
 
+between'F
+  :: Semigroup r
+  => (s -> r)
+  -> (f a -> r)
+  -> Compose (Between' s) f a
+  -> r
+between'F f g (Compose (Between' (Between s a t))) = f s <> g a <> f t
 
 whitespaceAfterF
   :: Foldable g
@@ -76,6 +83,13 @@ whitespaceAfterF
   -> Compose (After (g WhitespaceChar)) f a
   -> Doc
 whitespaceAfterF f = after (foldMap whitespaceChar) f . getCompose
+
+anyWhitespaceAfterF
+  :: Foldable g
+  => (f a -> Doc)
+  -> Compose (After (g AnyWhitespaceChar)) f a
+  -> Doc
+anyWhitespaceAfterF f = after (foldMap anyWhitespaceChar) f . getCompose
 
 whitespaceAfter
   :: Foldable g
@@ -95,6 +109,13 @@ whitespaceBeforeF
   -> Doc
 whitespaceBeforeF f = before (foldMap whitespaceChar) f . getCompose
 
+anyWhitespaceBeforeF
+  :: Foldable g
+  => (f a -> Doc)
+  -> Compose (Before (g AnyWhitespaceChar)) f a
+  -> Doc
+anyWhitespaceBeforeF f = before (foldMap anyWhitespaceChar) f . getCompose
+
 betweenWhitespace'F
   :: Foldable g
   => (f a -> Doc)
@@ -106,3 +127,7 @@ betweenWhitespace'
   :: Foldable f
   => (a -> Doc) -> Between' (f WhitespaceChar) a -> Doc
 betweenWhitespace' = between' (foldMap whitespaceChar)
+
+betweenAnyWhitespace'
+  :: Foldable f => (a -> Doc) -> Between' (f AnyWhitespaceChar) a -> Doc
+betweenAnyWhitespace' = between' (foldMap anyWhitespaceChar)

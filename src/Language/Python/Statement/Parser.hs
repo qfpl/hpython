@@ -471,5 +471,5 @@ suite = annotated $ suiteSingle <|> suiteMulti
 
     suiteStatements =
       some1F $
-        try (InL <$> whitespaceBeforeF (afterF newlineChar (optionalF comment))) <|>
+        try (InL <$> betweenF (many whitespaceChar) newlineChar (optionalF comment)) <|>
         try (InR <$> beforeF level1 statement)

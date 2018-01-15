@@ -339,10 +339,10 @@ suite preceding s =
       indentedLines
         (\a ->
            [ const $
-             whitespaceBeforeF
-               (afterF
-                 newlineChar
-                 (foldMapOf (_Wrapped.folded) comment))
+             betweenF
+               (foldMap whitespaceChar)
+               newlineChar
+               (foldMapOf (_Wrapped.folded) comment)
              a
            ])
         statement

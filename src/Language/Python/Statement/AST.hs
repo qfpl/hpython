@@ -186,12 +186,10 @@ data Suite (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
   , _suiteMulti_statements
     :: IndentedLines
          (Compose
-           (Before [WhitespaceChar])
+           (Between [WhitespaceChar] NewlineChar)
            (Compose
-             (After NewlineChar)
-             (Compose
-               Maybe
-               Comment)))
+             Maybe
+             Comment))
          (Statement lctxt ctxt)
          a
   , _suiteMulti_ann :: a

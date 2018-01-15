@@ -179,12 +179,10 @@ data Suite a
          NonEmpty
          (Sum
            (Compose
-             (Before [WhitespaceChar])
+             (Between [WhitespaceChar] NewlineChar)
              (Compose
-               (After NewlineChar)
-               (Compose
-                 Maybe
-                 Comment)))
+               Maybe
+               Comment))
            (Compose
              (Before (NonEmpty IndentationChar))
              Statement))

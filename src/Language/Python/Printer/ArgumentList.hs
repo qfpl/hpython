@@ -42,11 +42,12 @@ argumentList
 argumentList _name _expr e =
   Just e &
     (outside _ArgumentList .~
-      (\(a, b, c, _) ->
+      (\(a, b, c, d, _) ->
          argument _name _expr a <>
          foldMapOf
            (_Wrapped.folded._Wrapped)
            (before (between' (foldMap anyWhitespaceChar) comma) (argument _name _expr))
            b <>
-         foldMap (before (foldMap anyWhitespaceChar) comma) c) $
+         foldMap anyWhitespaceChar c <>
+         foldMap (after (foldMap anyWhitespaceChar) comma) d) $
      error "incomplete pattern")

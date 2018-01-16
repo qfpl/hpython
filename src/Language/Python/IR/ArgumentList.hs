@@ -57,7 +57,8 @@ data ArgumentList name expr a
            (Before (Between' [AnyWhitespaceChar] Comma))
            (Argument name expr))
          a
-  , _argumentList_comma :: Maybe (Before [AnyWhitespaceChar] Comma)
+  , _argumentList_whitespace :: [AnyWhitespaceChar]
+  , _argumentList_comma :: Maybe (After [AnyWhitespaceChar] Comma)
   , _argumentList_ann :: a
   }
 deriving instance (Eq1 (Argument name expr), Eq (expr AnyWhitespaceChar a), Eq (name a), Eq a) => Eq (ArgumentList name expr a)
@@ -90,7 +91,7 @@ instance HasName name => IsArgList (ArgumentList name expr a) where
   argumentName (KeywordArgument (AKeywordArgument n _ _ _)) = Just $ n ^. name
   argumentName _ = Nothing
 
-  arguments (ArgumentList h (Compose as) _ _) =
+  arguments (ArgumentList h (Compose as) _ _ _) =
     toArg h : toList (toArg . (^. _Wrapped.before._2) <$> as)
     where
       toArg (ArgumentPositional a b) = PositionalArgument $ APositionalArgument Nothing a b

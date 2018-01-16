@@ -851,7 +851,7 @@ genTrailer cfg ws =
         (commonNonRec cfg ws) $
         commonRec cfg ++
         [ AST.TrailerCall <$>
-          genBetween'F (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
+          genBeforeF (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
             (genMaybeF $ genArgumentList cfg genIdentifier genTest) <*>
           pure ()
         ]

@@ -44,7 +44,6 @@ argument _name _expr =
       after (many anyWhitespaceChar) (asterisk <* notFollowedBy asterisk) <*>
       _expr anyWhitespaceChar
     argDoublestar =
-      try $
       ArgumentDoublestar <$>
       after (many anyWhitespaceChar) doubleAsterisk <*>
       _expr anyWhitespaceChar
@@ -62,8 +61,8 @@ argumentList _name _expr =
   ArgumentList <$>
   argument _name _expr <*>
   manyF
-    (try $
-     beforeF
-       (betweenAnyWhitespace comma)
+    (beforeF
+       (try $ betweenAnyWhitespace comma <* notFollowedBy (char ')'))
        (argument _name _expr)) <*>
-  optional (anyWhitespaceBefore comma)
+  many anyWhitespaceChar <*>
+  optional (anyWhitespaceAfter comma)

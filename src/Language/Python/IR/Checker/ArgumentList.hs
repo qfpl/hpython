@@ -63,11 +63,12 @@ checkArgumentList
   -> SyntaxChecker ann (Safe.ArgumentList checkedName checkedExpr 'NotAssignable dctxt ann)
 checkArgumentList cfg _checkName _checkExpr a =
   case a of
-    IR.ArgumentList h t c ann ->
+    IR.ArgumentList h t ws c ann ->
       liftArgumentError ann $
       Safe.mkArgumentList <$>
       checkArgument cfg _checkName _checkExpr h <*>
       traverseOf (_Wrapped.traverse._Wrapped.before._2) (checkArgument cfg _checkName _checkExpr) t <*>
+      pure ws <*>
       pure c <*>
       pure ann
   where

@@ -517,7 +517,7 @@ trailer ws t =
   case t of
     TrailerCall val _ ->
       parens $
-      between'F
+      beforeF
         (foldMap anyWhitespaceChar)
         (foldMapF $ argumentList identifier test) val
     TrailerSubscript val _ ->

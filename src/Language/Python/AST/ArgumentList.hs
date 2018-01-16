@@ -69,7 +69,8 @@ data ArgumentList name expr (as :: AtomType) (dctxt :: DefinitionContext) a wher
             (Before (Between' [AnyWhitespaceChar] Comma))
             (Argument name expr dctxt))
           a
-    , _argumentList_comma :: Maybe (Before [AnyWhitespaceChar] Comma)
+    , _argumentList_whitespace :: [AnyWhitespaceChar]
+    , _argumentList_comma :: Maybe (After [AnyWhitespaceChar] Comma)
     , _argumentList_ann :: a
     } -> ArgumentList name expr 'NotAssignable dctxt a
 deriving instance (Eq (name a), Eq (expr AnyWhitespaceChar as dctxt a), Eq a, Eq1 (Argument name expr dctxt)) => Eq (ArgumentList name expr as dctxt a)
@@ -88,13 +89,14 @@ mkArgumentList
           (Before (Between' [AnyWhitespaceChar] Comma))
           (Argument name expr dctxt))
         a
-  -> Maybe (Before [AnyWhitespaceChar] Comma)
+  -> [AnyWhitespaceChar]
+  -> Maybe (After [AnyWhitespaceChar] Comma)
   -> a
   -> Either
        (ArgumentError (ArgumentList name expr 'NotAssignable dctxt a))
        (ArgumentList name expr 'NotAssignable dctxt a)
-mkArgumentList a b c d =
-  let res = ArgumentList a b c d
+mkArgumentList a b c d e =
+  let res = ArgumentList a b c d e
   in validateArgList res
 
 _ArgumentList
@@ -108,14 +110,15 @@ _ArgumentList
              (Before (Between' [AnyWhitespaceChar] Comma))
              (Argument name expr dctxt))
            a
-       , Maybe (Before [AnyWhitespaceChar] Comma)
+       , [AnyWhitespaceChar]
+       , Maybe (After [AnyWhitespaceChar] Comma)
        , a
        )
 _ArgumentList =
   prism'
-    (\(a, b, c, d) -> mkArgumentList a b c d ^? _Right)
+    (\(a, b, c, d, e) -> mkArgumentList a b c d e ^? _Right)
     (\case
-        Just (ArgumentList a b c d) -> Just (a, b, c, d)
+        Just (ArgumentList a b c d e) -> Just (a, b, c, d, e)
         _ -> Nothing)
 
 instance HasName name => IsArgList (ArgumentList name expr as dctxt a) where
@@ -143,7 +146,7 @@ instance HasName name => IsArgList (ArgumentList name expr as dctxt a) where
 
   arguments l =
     case l of
-      ArgumentList h (Compose t) _ _ ->
+      ArgumentList h (Compose t) _ _ _ ->
         toArg h : toList (toArg . (^. _Wrapped.before._2) <$> t)
     where
       toArg (ArgumentPositional a b) = PositionalArgument $ PAPositionalArg Nothing a b

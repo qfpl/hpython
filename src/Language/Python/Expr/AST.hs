@@ -231,7 +231,7 @@ data Trailer :: * -> AtomType -> DefinitionContext -> * -> * where
   TrailerCall ::
     { _trailerCall_value
       :: Compose
-          (Between' [AnyWhitespaceChar])
+          (Before [AnyWhitespaceChar])
           (Compose
             Maybe
             (ArgumentList Identifier Test 'NotAssignable ctxt))

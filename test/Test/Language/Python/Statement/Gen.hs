@@ -591,6 +591,11 @@ genSuite scfg ecfg =
     , SuiteMulti <$>
       genWhitespaceBeforeF (genMaybeF genComment) <*>
       genNewlineChar <*>
+      genListF
+        (genBetweenF
+          genWhitespace
+          genNewlineChar
+          (genMaybeF genComment)) <*>
       genIndentedLines
         (Range.constant 1 10)
         (genStatement scfg ecfg) <*>

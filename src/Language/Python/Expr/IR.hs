@@ -187,7 +187,7 @@ data Trailer ws a
   = TrailerCall
   { _trailerCall_value
     :: Compose
-        (Between' [AnyWhitespaceChar])
+        (Before [AnyWhitespaceChar])
         (Compose
           Maybe
           (ArgumentList Identifier Test))

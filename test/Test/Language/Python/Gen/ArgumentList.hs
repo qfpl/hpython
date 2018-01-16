@@ -69,5 +69,6 @@ genArgumentList cfg _genName _genExpr =
     (genBeforeF
       (genBetweenAnyWhitespace $ pure Comma)
       (genArgument (cfg & atomType .~ SNotAssignable) _genName _genExpr)) <*>
-  Gen.maybe (genAnyWhitespaceBefore $ pure Comma) <*>
+  Gen.list (Range.linear 0 10) genAnyWhitespaceChar <*>
+  Gen.maybe (genAnyWhitespaceAfter $ pure Comma) <*>
   pure ()

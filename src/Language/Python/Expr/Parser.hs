@@ -69,7 +69,7 @@ test
   :: (DeltaParsing m, LookAheadParsing m)
   => Unspaced m ws
   -> Unspaced m (Test ws SrcInfo)
-test ws = try testCond <|> testLambdef
+test ws = testCond <|> testLambdef
   where
     testLambdef = annotated $ TestLambdef <$> lambdef ws
     testCond =
@@ -559,15 +559,15 @@ atomNoInt
   => Unspaced m ws
   -> Unspaced m (AtomNoInt ws SrcInfo)
 atomNoInt ws =
-  try atomParen <|>
-  try atomBracket <|>
-  try atomCurly <|>
+  atomParen <|>
+  atomBracket <|>
+  atomCurly <|>
   try atomFloat <|>
-  try atomString <|>
-  try atomEllipsis <|>
-  try atomNone <|>
-  try atomTrue <|>
-  try atomFalse <|>
+  (try atomString <?> "string literal") <|>
+  atomEllipsis <|>
+  (try atomNone <?> "None") <|>
+  (try atomTrue <?> "True") <|>
+  (try atomFalse <?> "False") <|>
   atomIdentifier
   where
     atomIdentifier =
@@ -582,7 +582,7 @@ atomNoInt ws =
        between'F
          (many anyWhitespaceChar)
          (optionalF
-           (try $ (InL <$> try (yieldExpr anyWhitespaceChar)) <|>
+           ((InL <$> yieldExpr anyWhitespaceChar) <|>
             (InR <$> tupleTestlistComp anyWhitespaceChar))) <*
        char ')')
 
@@ -690,9 +690,7 @@ trailer ws = trailerCall <|> trailerSubscript <|> trailerAccess
       annotated $
       TrailerCall <$>
         (char '(' *>
-         between'F
-           (many anyWhitespaceChar)
-           (optionalF $ argumentList identifier test) <*
+         anyWhitespaceBeforeF (optionalF $ argumentList identifier test) <*
          char ')')
 
     trailerSubscript =
@@ -711,20 +709,18 @@ atomExpr
   :: (DeltaParsing m, LookAheadParsing m)
   => Unspaced m ws
   -> Unspaced m (AtomExpr ws SrcInfo)
-atomExpr ws =
-  try atomExprTrailers <|>
-  atomExprSingle
+atomExpr ws = do
+  aw <- optional $ string "await" *> after1 ws (pure KAwait)
+  try (atomExprTrailers aw) <|> atomExprSingle aw
   where
-    atomExprSingle =
+    atomExprSingle aw =
       annotated $
-      AtomExprSingle <$>
-      (optional . try $ string "await" *> after1 ws (pure KAwait)) <*>
+      AtomExprSingle aw <$>
       atom ws
 
-    atomExprTrailers =
+    atomExprTrailers aw =
       annotated $
-      AtomExprTrailers <$>
-      (optional . try $ string "await" *> after1 ws (pure KAwait)) <*>
+      AtomExprTrailers aw <$>
       atomNoInt ws <*>
       some1F (try $ beforeF (many ws) (trailer ws))
 

@@ -183,6 +183,15 @@ data Suite (lctxt :: LoopContext) (ctxt :: DefinitionContext) a
          (Compose Maybe Comment)
          a
   , _suiteMulti_newline :: NewlineChar
+  , _suiteMulti_lineComments
+    :: Compose
+         []
+         (Compose
+           (Between [WhitespaceChar] NewlineChar)
+           (Compose
+             Maybe
+             Comment))
+         a
   , _suiteMulti_statements
     :: IndentedLines
          (Compose

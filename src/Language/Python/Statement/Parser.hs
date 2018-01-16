@@ -466,8 +466,9 @@ suite = annotated $ suiteSingle <|> suiteMulti
     suiteMulti =
       SuiteMulti <$>
       whitespaceBeforeF (optionalF comment) <*>
-      (newlineChar <* indent) <*>
-      (suiteStatements <* dedent)
+      newlineChar <*>
+      manyF (try $ betweenF (many whitespaceChar) newlineChar (optionalF comment)) <*>
+      (indent *> suiteStatements <* dedent)
 
     suiteStatements =
       some1F $

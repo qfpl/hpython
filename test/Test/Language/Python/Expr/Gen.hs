@@ -712,7 +712,7 @@ genCompIf cfg ws =
   genBetween'1 ws (pure AST.KIf) <*>
   Gen.small (genTestNocond cfg ws) <*>
   genMaybeF
-    (Gen.small . genBeforeF (Gen.list (Range.linear 0 10) ws) $ genCompIter cfg ws) <*>
+    (Gen.small $ genCompIter cfg ws) <*>
   pure ()
 
 genCompIter
@@ -784,12 +784,11 @@ genCompFor cfg ws =
     (genBetween'1 ws $ pure AST.KFor)
     (genAfter1F ws .
      Gen.small $
-     genTestlistStarExpr genExpr genStarExpr (cfg & atomType .~ SAssignable) ws) <*>
+     genExprList (cfg & atomType .~ SAssignable) ws) <*>
   genBefore1F ws
     (Gen.small $ genOrTest (cfg & atomType .~ SNotAssignable) ws) <*>
   genMaybeF
-    (genBeforeF (Gen.list (Range.linear 0 10) ws) .
-     Gen.small $
+    (Gen.small $
      genCompIter (cfg & atomType .~ SNotAssignable) ws) <*>
   pure ()
 

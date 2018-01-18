@@ -68,13 +68,7 @@ data CompIf ws a
   = CompIf
   { _compIf_if :: Between' (NonEmpty ws) KIf
   , _compIf_expr :: TestNocond ws a
-  , _compIf_iter
-    :: Compose
-        Maybe
-        (Compose
-          (Before [ws])
-          (CompIter ws))
-        a
+  , _compIf_iter :: Compose Maybe (CompIter ws) a
   , _compIf_ann :: a
   } deriving (Functor, Foldable, Traversable)
 
@@ -109,14 +103,10 @@ data CompFor ws a
         (Before (Between' (NonEmpty ws) KFor))
         (Compose
           (After (NonEmpty ws))
-          (TestlistStarExpr ws Expr StarExpr))
+          (ExprList ws))
         a
   , _compFor_expr :: Compose (Before (NonEmpty ws)) (OrTest ws) a
-  , _compFor_iter
-    :: Compose
-        Maybe
-        (Compose (Before [ws]) (CompIter ws))
-        a
+  , _compFor_iter :: Compose Maybe (CompIter ws) a
   , _compFor_ann :: a
   } deriving (Functor, Foldable, Traversable)
 deriving instance (Eq a, Eq ws) => Eq (CompFor ws a)

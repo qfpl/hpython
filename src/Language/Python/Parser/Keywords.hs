@@ -16,3 +16,12 @@ kAs = string "as" $> KAs
 
 kFrom :: CharParsing m => m KFrom
 kFrom = string "from" $> KFrom
+
+kIf :: CharParsing m => m KIf
+kIf = string "if" $> KIf
+
+kIn :: CharParsing m => m KIn
+kIn = string "in" $> KIn
+
+kFor :: CharParsing m => m KFor
+kFor = string "for" $> KFor

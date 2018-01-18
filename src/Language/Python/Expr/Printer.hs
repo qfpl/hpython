@@ -323,7 +323,7 @@ compIf :: Ord a => (ws -> Doc) -> CompIf ws atomType ctxt a -> Doc
 compIf ws (CompIf kw e i _) =
   between' (foldMap ws) (const $ text "if") kw <>
   testNocond ws e <>
-  foldMapF (beforeF (foldMap ws) (compIter ws)) i
+  foldMapF (compIter ws) i
 
 exprList :: Ord a => (ws -> Doc) -> ExprList ws atomType ctxt a -> Doc
 exprList ws e =
@@ -342,11 +342,11 @@ compFor :: Ord a => (ws -> Doc) -> CompFor ws atomType ctxt a -> Doc
 compFor ws (CompFor t e i _) =
   beforeF
     (between' (foldMap ws) . const $ text "for")
-    (afterF (foldMap ws) $ testlistStarExpr ws expr starExpr)
+    (afterF (foldMap ws) $ exprList ws)
     t <>
   text "in" <>
   beforeF (foldMap ws) (orTest ws) e <>
-  foldMapF (beforeF (foldMap ws) (compIter ws)) i
+  foldMapF (compIter ws) i
 
 prodElim
   :: Semigroup r

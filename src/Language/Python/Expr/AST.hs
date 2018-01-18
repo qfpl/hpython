@@ -79,13 +79,8 @@ deriving instance Traversable (CompIter ws a b)
 data CompIf :: * -> AtomType -> DefinitionContext -> * -> * where
   CompIf ::
     { _compIf_if :: Between' (NonEmpty ws) KIf
-    , _compIf_expr
-      :: TestNocond ws 'NotAssignable ctxt a
-    , _compIf_iter
-      :: Compose
-          Maybe
-          (Compose (Before [ws]) (CompIter ws 'NotAssignable ctxt))
-          a
+    , _compIf_expr :: TestNocond ws 'NotAssignable ctxt a
+    , _compIf_iter :: Compose Maybe (CompIter ws 'NotAssignable ctxt) a
     , _compIf_ann :: a
     } -> CompIf ws 'NotAssignable ctxt a
 deriving instance (Eq c, Eq ws) => Eq (CompIf ws a b c)
@@ -147,15 +142,13 @@ data CompFor :: * -> AtomType -> DefinitionContext -> * -> * where
           (Before (Between' (NonEmpty ws) KFor))
           (Compose
             (After (NonEmpty ws))
-            (TestlistStarExpr ws Expr StarExpr 'Assignable ctxt))
+            (ExprList ws 'Assignable ctxt))
           a
     , _compFor_expr :: Compose (Before (NonEmpty ws)) (OrTest ws 'NotAssignable ctxt) a
     , _compFor_iter
       :: Compose
           Maybe
-          (Compose
-            (Before [ws])
-            (CompIter ws 'NotAssignable ctxt))
+          (CompIter ws 'NotAssignable ctxt)
           a
     , _compFor_ann :: a
     } -> CompFor ws 'NotAssignable ctxt a

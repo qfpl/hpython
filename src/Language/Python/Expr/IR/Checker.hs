@@ -628,14 +628,14 @@ checkCompFor cfg e =
           Safe.CompFor <$>
           traverseOf
             (traverseCompose.traverseCompose)
-            (checkTestlistStarExpr checkExpr checkStarExpr $ cfg & atomType .~ SAssignable)
+            (checkExprList $ cfg & atomType .~ SAssignable)
             ts <*>
           traverseOf
             traverseCompose
             (checkOrTest cfg)
             ex <*>
           traverseOf
-            (traverseCompose.traverseCompose)
+            (_Wrapped.traverse)
             (checkCompIter cfg)
             i <*>
           pure ann
@@ -722,7 +722,7 @@ checkCompIf cfg (IR.CompIf kw ex it ann) =
     SNotAssignable ->
       Safe.CompIf kw <$>
       checkTestNocond cfg ex <*>
-      traverseOf (traverseCompose.traverseCompose) (checkCompIter cfg) it <*>
+      traverseOf (_Wrapped.traverse) (checkCompIter cfg) it <*>
       pure ann
 
 checkTestNocond

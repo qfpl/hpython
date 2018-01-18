@@ -1,0 +1,4 @@
+@test
+@test
+async def a():
+  pass

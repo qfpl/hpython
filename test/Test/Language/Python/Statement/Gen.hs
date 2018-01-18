@@ -488,6 +488,7 @@ genParameters ecfg =
       (genArgumentList
         (ecfg & atomType .~ SNotAssignable)
         (genTypedArg ecfg genAnyWhitespaceChar)
+        (genTypedArg ecfg genAnyWhitespaceChar)
         genTest)) <*>
   pure ()
 
@@ -520,7 +521,11 @@ genClassDef ecfg =
     (genWhitespaceBeforeF .
      genBetween'F (Gen.list (Range.linear 0 10) genAnyWhitespaceChar) .
      genMaybeF $
-     genArgumentList (ecfg & atomType .~ SNotAssignable) genIdentifier genTest) <*>
+     genArgumentList
+       (ecfg & atomType .~ SNotAssignable)
+       (genTest (ecfg & atomType .~ SNotAssignable) genAnyWhitespaceChar)
+       genIdentifier
+       genTest) <*>
   genBeforeF
     (genBetweenWhitespace $ pure Colon)
     (Gen.small $ genSuite (StatementConfig SNotInLoop) ecfg) <*>
@@ -561,7 +566,11 @@ genDecorator ecfg =
   genMaybeF
     (genBetween'F (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
        (genMaybeF $
-        genArgumentList (ecfg & atomType .~ SNotAssignable) genIdentifier genTest)) <*>
+        genArgumentList
+          (ecfg & atomType .~ SNotAssignable)
+          (genTest (ecfg & atomType .~ SNotAssignable) genAnyWhitespaceChar)
+          genIdentifier
+          genTest)) <*>
   genNewlineChar <*>
   pure ()
 
@@ -571,14 +580,20 @@ genAsyncStatement
   -> ExprConfig as ('FunDef 'Async)
   -> m (AsyncStatement lc ('FunDef 'Async) ())
 genAsyncStatement scfg ecfg =
-  AsyncStatement <$>
-  genWhitespaceBefore1F
-    (Gen.choice
-      [ Gen.small $ InL . InL <$> genFuncDef ecfg (SFunDef SAsync)
-      , Gen.small $ InL . InR <$> genWithStatement scfg ecfg
-      , Gen.small $ InR <$> genForStatement scfg ecfg
-      ]) <*>
-  pure ()
+  Gen.choice
+    [ Gen.small $
+      AsyncStatementFuncDef <$>
+      genWhitespaceBefore1F (genFuncDef ecfg (SFunDef SAsync)) <*>
+      pure ()
+    , Gen.small $
+      AsyncStatementWith <$>
+      genWhitespaceBefore1F (genWithStatement scfg ecfg) <*>
+      pure ()
+    , Gen.small $
+      AsyncStatementFor <$>
+      genWhitespaceBefore1F (genForStatement scfg ecfg) <*>
+      pure ()
+    ]
 
 genSuite
   :: MonadGen m

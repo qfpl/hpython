@@ -122,7 +122,7 @@ data Decorator a
            (Between' [AnyWhitespaceChar])
            (Compose
              Maybe
-             (ArgumentList Identifier Test)))
+             (ArgumentList (Test AnyWhitespaceChar) Identifier Test)))
          a
   , _decorator_newline :: NewlineChar
   , _decorator_ann :: a
@@ -148,7 +148,7 @@ data ClassDef a
              (Between' [AnyWhitespaceChar])
              (Compose
                Maybe
-               (ArgumentList Identifier Test))))
+               (ArgumentList (Test AnyWhitespaceChar) Identifier Test))))
          a
   , _classDef_body
     :: Compose
@@ -241,7 +241,10 @@ data Parameters a
          (Between' [AnyWhitespaceChar])
          (Compose
            Maybe
-           (ArgumentList (TypedArg AnyWhitespaceChar) Test))
+           (ArgumentList
+             (TypedArg AnyWhitespaceChar)
+             (TypedArg AnyWhitespaceChar)
+             Test))
          a
   , _parameters_ann :: a
   }
@@ -311,13 +314,27 @@ deriving instance Ord a => Ord (WithItem a)
 deriving instance Show a => Show (WithItem a)
 
 data AsyncStatement a
-  = AsyncStatement
-  { _asyncStatement_value
+  = AsyncStatementFuncDef
+  { _asyncStatementFuncDef_value
     :: Compose
          (Before (NonEmpty WhitespaceChar))
-         (Sum
-           (Sum FuncDef WithStatement)
-           ForStatement)
+         FuncDef
+         a
+  , _asyncStatement_ann :: a
+  }
+  | AsyncStatementFor
+  { _asyncStatementFor_value
+    :: Compose
+         (Before (NonEmpty WhitespaceChar))
+         ForStatement
+         a
+  , _asyncStatement_ann :: a
+  }
+  | AsyncStatementWith
+  { _asyncStatementWith_value
+    :: Compose
+         (Before (NonEmpty WhitespaceChar))
+         WithStatement
          a
   , _asyncStatement_ann :: a
   }

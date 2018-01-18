@@ -227,7 +227,12 @@ data Trailer :: * -> AtomType -> DefinitionContext -> * -> * where
           (Before [AnyWhitespaceChar])
           (Compose
             Maybe
-            (ArgumentList Identifier Test 'NotAssignable ctxt))
+            (ArgumentList
+              (Test AnyWhitespaceChar 'NotAssignable ctxt)
+              Identifier
+              Test
+              'NotAssignable
+              ctxt))
           a
     , _trailerCall_ann :: a
     } -> Trailer ws 'NotAssignable ctxt a

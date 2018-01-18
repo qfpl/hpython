@@ -180,7 +180,7 @@ data Trailer ws a
         (Before [AnyWhitespaceChar])
         (Compose
           Maybe
-          (ArgumentList Identifier Test))
+          (ArgumentList (Test AnyWhitespaceChar) Identifier Test))
         a
   , _trailer_ann :: a
   }

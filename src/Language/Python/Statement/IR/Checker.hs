@@ -105,12 +105,9 @@ checkCompoundStatement ecfg scfg s =
       checkDecorated ecfg v <*>
       pure ann
     IR.CompoundStatementAsync v ann ->
-      case ecfg ^. definitionContext of
-        SFunDef SAsync ->
-          Safe.CompoundStatementAsync <$>
-          checkAsyncStatement ecfg scfg v <*>
-          pure ann
-        _ -> syntaxError $ AsyncNotInAsyncFunction ann
+      Safe.CompoundStatementAsync <$>
+      checkAsyncStatement ecfg scfg v <*>
+      pure ann
 
 checkWhileStatement
   :: Ord ann
@@ -286,6 +283,7 @@ checkParameters ecfg (IR.Parameters v ann) =
     (_Wrapped.traverse._Wrapped.traverse)
     (checkArgumentList
       (ecfg & atomType .~ SNotAssignable)
+      (checkTypedArg $ ecfg & atomType .~ SNotAssignable)
       checkTypedArg
       checkTest)
     v <*>
@@ -315,7 +313,11 @@ checkClassDef ecfg (IR.ClassDef n a b ann) =
   Safe.ClassDef n <$>
   traverseOf
     (_Wrapped.traverse._Wrapped.traverse._Wrapped.traverse._Wrapped.traverse)
-    (checkArgumentList (ecfg & atomType .~ SNotAssignable) checkIdentifier checkTest)
+    (checkArgumentList
+      (ecfg & atomType .~ SNotAssignable)
+      (checkTest (ecfg & atomType .~ SNotAssignable))
+      checkIdentifier
+      checkTest)
     a <*>
   traverseOf
     (_Wrapped.traverse)
@@ -360,27 +362,48 @@ checkDecorator ecfg (IR.Decorator n a nl ann) =
   Safe.Decorator n <$>
   traverseOf
     (_Wrapped.traverse._Wrapped.traverse._Wrapped.traverse)
-    (checkArgumentList (ecfg & atomType .~ SNotAssignable) checkIdentifier checkTest)
+    (checkArgumentList
+       (ecfg & atomType .~ SNotAssignable)
+       (checkTest (ecfg & atomType .~ SNotAssignable))
+       checkIdentifier
+       checkTest)
     a <*>
   pure nl <*>
   pure ann
 
 checkAsyncStatement
   :: Ord ann
-  => ExprConfig assignable ('FunDef 'Async)
+  => ExprConfig assignable ctxt
   -> StatementConfig lctxt
   -> IR.AsyncStatement ann
-  -> SyntaxChecker ann (Safe.AsyncStatement lctxt ('FunDef 'Async) ann)
-checkAsyncStatement ecfg scfg (IR.AsyncStatement v ann) =
-  Safe.AsyncStatement <$>
+  -> SyntaxChecker ann (Safe.AsyncStatement lctxt ctxt ann)
+checkAsyncStatement ecfg scfg (IR.AsyncStatementFuncDef v ann) =
+  Safe.AsyncStatementFuncDef <$>
   traverseOf
     (_Wrapped.traverse)
-    (\a -> case a of
-        InL (InL a') -> InL . InL <$> checkFuncDef ecfg (SFunDef SAsync) a'
-        InL (InR a') -> InL . InR <$> checkWithStatement ecfg scfg a'
-        InR a' -> InR <$> checkForStatement ecfg scfg a')
+    (checkFuncDef (ecfg & definitionContext .~ SFunDef SAsync) $ SFunDef SAsync)
     v <*>
   pure ann
+checkAsyncStatement ecfg scfg (IR.AsyncStatementWith v ann) =
+  case ecfg ^. definitionContext of
+    SFunDef SAsync ->
+      Safe.AsyncStatementWith <$>
+      traverseOf
+        (_Wrapped.traverse)
+        (checkWithStatement ecfg scfg)
+        v <*>
+      pure ann
+    _ -> syntaxError $ AsyncNotInAsyncFunction ann
+checkAsyncStatement ecfg scfg (IR.AsyncStatementFor v ann) =
+  case ecfg ^. definitionContext of
+    SFunDef SAsync ->
+      Safe.AsyncStatementFor <$>
+      traverseOf
+        (_Wrapped.traverse)
+        (checkForStatement ecfg scfg)
+        v <*>
+      pure ann
+    _ -> syntaxError $ AsyncNotInAsyncFunction ann
 
 checkIfStatement
   :: Ord ann

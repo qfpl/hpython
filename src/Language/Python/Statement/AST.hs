@@ -16,7 +16,6 @@ import Data.Deriving
 import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
-import Data.Separated.After
 import Data.Separated.Before
 import Data.Separated.Between
 import Data.Singletons.Prelude ((:==))
@@ -133,7 +132,12 @@ data Decorator (ctxt :: DefinitionContext) a
            (Between' [AnyWhitespaceChar])
            (Compose
              Maybe
-             (ArgumentList Identifier Test 'NotAssignable ctxt)))
+             (ArgumentList
+               (Test AnyWhitespaceChar 'NotAssignable ctxt)
+               Identifier
+               Test
+               'NotAssignable
+               ctxt)))
          a
   , _decorator_newline :: NewlineChar
   , _decorator_ann :: a
@@ -158,7 +162,12 @@ data ClassDef (ctxt :: DefinitionContext) a
              (Between' [AnyWhitespaceChar])
              (Compose
                Maybe
-               (ArgumentList Identifier Test 'NotAssignable ctxt))))
+               (ArgumentList
+                  (Test AnyWhitespaceChar 'NotAssignable ctxt)
+                  Identifier
+                  Test
+                  'NotAssignable
+                  ctxt))))
          a
   , _classDef_body
     :: Compose
@@ -246,6 +255,7 @@ data Parameters (ctxt :: DefinitionContext) a
            Maybe
            (ArgumentList
              (TypedArg AnyWhitespaceChar)
+             (TypedArg AnyWhitespaceChar)
              Test
              'NotAssignable
              ctxt))
@@ -315,17 +325,29 @@ deriving instance Eq a => Eq (WithItem ctxt a)
 deriving instance Show a => Show (WithItem ctxt a)
 
 data AsyncStatement (lctxt :: LoopContext) (ctxt :: DefinitionContext) a where
-  AsyncStatement ::
-    { _asyncStatement_value
+  AsyncStatementFuncDef ::
+    { _asyncStatementFuncDef_value
       :: Compose
           (Before (NonEmpty WhitespaceChar))
-          (Sum
-            (Sum
-              (FuncDef ('FunDef 'Async) ('FunDef 'Async))
-              (WithStatement lctxt ('FunDef 'Async)))
-            (ForStatement lctxt ('FunDef 'Async)))
+          (FuncDef ('FunDef 'Async) ('FunDef 'Async))
           a
-    , _asyncStatement_ann :: a
+    , _asyncStatementFuncDef_ann :: a
+    } -> AsyncStatement lctxt ctxt a
+  AsyncStatementFor ::
+    { _asyncStatementFor_value
+      :: Compose
+          (Before (NonEmpty WhitespaceChar))
+          (ForStatement lctxt ('FunDef 'Async))
+          a
+    , _asyncStatementFor_ann :: a
+    } -> AsyncStatement lctxt ('FunDef 'Async) a
+  AsyncStatementWith ::
+    { _asyncStatementWith_value
+      :: Compose
+          (Before (NonEmpty WhitespaceChar))
+          (WithStatement lctxt ('FunDef 'Async))
+          a
+    , _asyncStatementWith_ann :: a
     } -> AsyncStatement lctxt ('FunDef 'Async) a
 deriving instance Functor (AsyncStatement lctxt ctxt)
 deriving instance Foldable (AsyncStatement lctxt ctxt)

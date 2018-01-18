@@ -40,7 +40,6 @@ import Language.Python.Printer.Combinators
 import Language.Python.Printer.Identifier
 import Language.Python.Printer.Keywords
 import Language.Python.Printer.Symbols
-import Language.Python.Printer.TestlistStarExpr
 
 stringPrefix :: StringPrefix -> Doc
 stringPrefix sp =
@@ -519,7 +518,7 @@ trailer ws t =
       parens $
       beforeF
         (foldMap anyWhitespaceChar)
-        (foldMapF $ argumentList identifier test) val
+        (foldMapF $ argumentList (test anyWhitespaceChar) identifier test) val
     TrailerSubscript val _ ->
       brackets $ between'F (foldMap anyWhitespaceChar) (subscriptList anyWhitespaceChar) val
     TrailerAccess val _ -> char '.' <> beforeF (foldMap ws) identifier val

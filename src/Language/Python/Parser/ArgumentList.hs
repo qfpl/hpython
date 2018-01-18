@@ -3,7 +3,6 @@ module Language.Python.Parser.ArgumentList where
 
 import Papa hiding (argument)
 
-import Data.Functor.Sum
 import Text.Trifecta hiding (Unspaced(..), comma)
 
 import Language.Python.AST.Symbols
@@ -16,53 +15,55 @@ import Text.Parser.Unspaced
 
 argument
   :: ( Functor name
+     , Functor val
      , Functor (expr AnyWhitespaceChar)
      , DeltaParsing m
      )
-  => Unspaced m (name SrcInfo)
+  => Unspaced m (val SrcInfo)
+  -> Unspaced m (name SrcInfo)
   -> (forall ws. Unspaced m ws -> Unspaced m (expr ws SrcInfo))
-  -> Unspaced m (Argument name expr SrcInfo)
-argument _name _expr =
+  -> Unspaced m (Argument val name expr SrcInfo)
+argument _val _name _expr =
   annotated $
-  argPos <|>
   argKey <|>
-  argStar <|>
-  argDoublestar
+  argPos <|>
+  argDoublestar <|>
+  argStar
   where
     argPos =
-      try $
-      ArgumentPositional <$>
-        (_expr anyWhitespaceChar <* notFollowedBy (many anyWhitespaceChar *> equals))
+      ArgumentPositional <$> _val
     argKey =
-      ArgumentKeyword <$>
-      _name <*>
-      between' (many anyWhitespaceChar) equals <*>
+      try
+        (ArgumentKeyword <$>
+         _name <*>
+         between' (many anyWhitespaceChar) equals) <*>
       _expr anyWhitespaceChar
     argStar =
-      try $
       ArgumentStar <$>
-      after (many anyWhitespaceChar) (asterisk <* notFollowedBy asterisk) <*>
-      _expr anyWhitespaceChar
+      after (many anyWhitespaceChar) asterisk <*>
+      _val
     argDoublestar =
       ArgumentDoublestar <$>
-      after (many anyWhitespaceChar) doubleAsterisk <*>
-      _expr anyWhitespaceChar
+      try (after (many anyWhitespaceChar) doubleAsterisk) <*>
+      _val
 
 argumentList
   :: ( Functor name
+     , Functor val
      , Functor (expr AnyWhitespaceChar)
      , DeltaParsing m
      )
-  => Unspaced m (name SrcInfo)
+  => Unspaced m (val SrcInfo)
+  -> Unspaced m (name SrcInfo)
   -> (forall ws. Unspaced m ws -> Unspaced m (expr ws SrcInfo))
-  -> Unspaced m (ArgumentList name expr SrcInfo)
-argumentList _name _expr =
+  -> Unspaced m (ArgumentList val name expr SrcInfo)
+argumentList _val _name _expr =
   annotated $
   ArgumentList <$>
-  argument _name _expr <*>
+  argument _val _name _expr <*>
   manyF
     (beforeF
        (try $ betweenAnyWhitespace comma <* notFollowedBy (char ')'))
-       (argument _name _expr)) <*>
+       (argument _val _name _expr)) <*>
   many anyWhitespaceChar <*>
   optional (anyWhitespaceAfter comma)

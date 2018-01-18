@@ -1,0 +1,3 @@
+@test()
+def a():
+  pass

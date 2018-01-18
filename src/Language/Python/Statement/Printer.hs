@@ -258,9 +258,15 @@ withItem (WithItem l r _) =
     r
 
 asyncStatement :: Ord a => AsyncStatement lctxt ectxt a -> [Doc -> Doc]
-asyncStatement (AsyncStatement v _) =
-  case sumElim (sumElim funcDef withStatement) forStatement (v ^. _Wrapped.before._2) of
-    (x:xs) -> (<> x (text "async" <> foldMap whitespaceChar (v ^. _Wrapped.before._1))) : xs
+asyncStatement a =
+  case a of
+    AsyncStatementFuncDef v _ -> write funcDef v
+    AsyncStatementFor v _ -> write forStatement v
+    AsyncStatementWith v _ -> write withStatement v
+  where
+    write g v =
+      case g (v ^. _Wrapped.before._2) of
+        (x:xs) -> (<> x (text "async" <> foldMap whitespaceChar (v ^. _Wrapped.before._1))) : xs
 
 funcDef :: Ord a => FuncDef outer inner a -> [Doc -> Doc]
 funcDef (FuncDef n p t b _) =
@@ -282,7 +288,10 @@ parameters (Parameters v _) =
     (foldMap anyWhitespaceChar)
     (foldMapOf
       (_Wrapped.folded)
-      (argumentList (typedArg anyWhitespaceChar) test))
+      (argumentList
+        (typedArg anyWhitespaceChar)
+        (typedArg anyWhitespaceChar)
+        test))
     v
 
 typedArg :: Ord a => (ws -> Doc) -> TypedArg ws a -> Doc
@@ -303,7 +312,9 @@ classDef (ClassDef n a b _) =
        (parens .
        whitespaceBeforeF
          (between'F (foldMap anyWhitespaceChar) $
-          foldMapOf (_Wrapped.folded) (argumentList identifier test)))
+          foldMapOf
+            (_Wrapped.folded)
+            (argumentList (test anyWhitespaceChar) identifier test)))
        a <>
      betweenWhitespace' colon (b ^. _Wrapped.before._1))
   (b ^. _Wrapped.before._2)
@@ -321,7 +332,9 @@ decorator (Decorator name args n _) =
     (_Wrapped.folded)
     (parens .
      between'F (foldMap anyWhitespaceChar)
-       (foldMapOf (_Wrapped.folded) (argumentList identifier test)))
+       (foldMapOf
+         (_Wrapped.folded)
+         (argumentList (test anyWhitespaceChar) identifier test)))
     args <>
   newlineChar n
 

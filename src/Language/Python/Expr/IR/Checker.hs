@@ -603,7 +603,11 @@ checkTrailer cfg e =
           Safe.TrailerCall <$>
           traverseOf
             (traverseCompose.traverseCompose)
-            (checkArgumentList cfg checkIdentifier checkTest)
+            (checkArgumentList
+               cfg
+               (checkTest cfg)
+               checkIdentifier
+               checkTest)
             v <*>
           pure ann
     IR.TrailerSubscript v ann ->

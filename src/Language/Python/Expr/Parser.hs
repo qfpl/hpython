@@ -711,7 +711,9 @@ trailer ws = trailerCall <|> trailerSubscript <|> trailerAccess
       annotated $
       TrailerCall <$>
         (char '(' *>
-         anyWhitespaceBeforeF (optionalF $ argumentList identifier test) <*
+         anyWhitespaceBeforeF
+           (optionalF $
+            argumentList (test anyWhitespaceChar) identifier test) <*
          char ')')
 
     trailerSubscript =
@@ -730,20 +732,18 @@ atomExpr
   :: (DeltaParsing m, LookAheadParsing m)
   => Unspaced m ws
   -> Unspaced m (AtomExpr ws SrcInfo)
-atomExpr ws = do
-  aw <- optional $ string "await" *> after1 ws (pure KAwait)
-  try (atomExprTrailers aw) <|> atomExprSingle aw
-  where
-    atomExprSingle aw =
-      annotated $
-      AtomExprSingle aw <$>
-      atom ws
-
-    atomExprTrailers aw =
-      annotated $
-      AtomExprTrailers aw <$>
-      atomNoInt ws <*>
-      some1F (try $ beforeF (many ws) (trailer ws))
+atomExpr ws =
+  annotated $ do
+    aw <- optional $ string "await" *> after1 ws (pure KAwait)
+    (do
+        a@(AtomNoInt anoi _) <- annotated $ AtomNoInt <$> atomNoInt ws
+        (AtomExprTrailers aw anoi <$>
+         some1F
+           (beforeF
+             (try $ many ws <* lookAhead (char '.' <|> char '[' <|> char '('))
+             (trailer ws))) <|>
+          pure (AtomExprSingle aw a)) <|>
+      (AtomExprSingle aw <$> annotated (AtomInteger <$> integer))
 
 power
   :: (DeltaParsing m, LookAheadParsing m)
@@ -765,7 +765,7 @@ factor
   :: (DeltaParsing m, LookAheadParsing m)
   => Unspaced m ws
   -> Unspaced m (Factor ws SrcInfo)
-factor ws = try factorOne <|> factorNone
+factor ws = factorOne <|> factorNone
   where
     factorNone = annotated $ FactorNone <$> power ws
     factorOne =
@@ -778,8 +778,7 @@ termOp :: (DeltaParsing m, LookAheadParsing m) => m TermOperator
 termOp =
   (char '*' $> TermMult) <|>
   (char '@' $> TermAt) <|>
-  (string "//" $> TermFloorDiv) <|>
-  (char '/' $> TermDiv) <|>
+  (char '/' *> ((char '/' $> TermFloorDiv) <|> pure TermDiv)) <|>
   (char '%' $> TermMod)
 
 term

@@ -13,6 +13,7 @@ import GHC.Stack
 
 import Papa hiding (Space, zero, o, Plus, (\\), Product, argument)
 import Data.Functor.Compose
+import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Separated.After (After(..))
 import Data.Separated.Before (Before(..))
@@ -713,7 +714,17 @@ trailer ws = trailerCall <|> trailerSubscript <|> trailerAccess
         (char '(' *>
          anyWhitespaceBeforeF
            (optionalF $
-            argumentList (test anyWhitespaceChar) identifier test) <*
+            argumentList
+              (liftA2
+                 Pair
+                 (test anyWhitespaceChar)
+                 (optionalF
+                   (beforeF
+                     (try $ some1 anyWhitespaceChar <* lookAhead kFor)
+                     (compFor anyWhitespaceChar))))
+              (test anyWhitespaceChar)
+              identifier
+              test) <*
          char ')')
 
     trailerSubscript =

@@ -134,6 +134,7 @@ data Decorator (ctxt :: DefinitionContext) a
              Maybe
              (ArgumentList
                (Test AnyWhitespaceChar 'NotAssignable ctxt)
+               (Test AnyWhitespaceChar 'NotAssignable ctxt)
                Identifier
                Test
                'NotAssignable
@@ -163,6 +164,7 @@ data ClassDef (ctxt :: DefinitionContext) a
              (Compose
                Maybe
                (ArgumentList
+                  (Test AnyWhitespaceChar 'NotAssignable ctxt)
                   (Test AnyWhitespaceChar 'NotAssignable ctxt)
                   Identifier
                   Test
@@ -254,6 +256,7 @@ data Parameters (ctxt :: DefinitionContext) a
          (Compose
            Maybe
            (ArgumentList
+             (TypedArg AnyWhitespaceChar)
              (TypedArg AnyWhitespaceChar)
              (TypedArg AnyWhitespaceChar)
              Test

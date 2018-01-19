@@ -284,6 +284,7 @@ checkParameters ecfg (IR.Parameters v ann) =
     (checkArgumentList
       (ecfg & atomType .~ SNotAssignable)
       (checkTypedArg $ ecfg & atomType .~ SNotAssignable)
+      (checkTypedArg $ ecfg & atomType .~ SNotAssignable)
       checkTypedArg
       checkTest)
     v <*>
@@ -315,6 +316,7 @@ checkClassDef ecfg (IR.ClassDef n a b ann) =
     (_Wrapped.traverse._Wrapped.traverse._Wrapped.traverse._Wrapped.traverse)
     (checkArgumentList
       (ecfg & atomType .~ SNotAssignable)
+      (checkTest (ecfg & atomType .~ SNotAssignable))
       (checkTest (ecfg & atomType .~ SNotAssignable))
       checkIdentifier
       checkTest)
@@ -364,6 +366,7 @@ checkDecorator ecfg (IR.Decorator n a nl ann) =
     (_Wrapped.traverse._Wrapped.traverse._Wrapped.traverse)
     (checkArgumentList
        (ecfg & atomType .~ SNotAssignable)
+       (checkTest (ecfg & atomType .~ SNotAssignable))
        (checkTest (ecfg & atomType .~ SNotAssignable))
        checkIdentifier
        checkTest)

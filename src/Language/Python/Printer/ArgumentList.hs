@@ -15,14 +15,15 @@ import Language.Python.Printer.Symbols
 
 argument
   :: HasName name
-  => (val a -> Doc)
+  => (arg a -> Doc)
+  -> (val a -> Doc)
   -> (name a -> Doc)
   -> (forall as' ws' dctxt'. (ws' -> Doc) -> expr ws' as' dctxt' a -> Doc)
-  -> Argument val name expr dctxt a
+  -> Argument arg val name expr dctxt a
   -> Doc
-argument _val _name _expr a =
+argument _arg _val _name _expr a =
   case a of
-    ArgumentPositional a _ -> _val a
+    ArgumentPositional a _ -> _arg a
     ArgumentKeyword a b c _ ->
       _name a <>
       between' (foldMap anyWhitespaceChar) equals b <>
@@ -36,19 +37,22 @@ argument _val _name _expr a =
 
 argumentList
   :: HasName name
-  => (val a -> Doc)
+  => (arg a -> Doc)
+  -> (val a -> Doc)
   -> (name a -> Doc)
   -> (forall as' ws' dctxt'. (ws' -> Doc) -> expr ws' as' dctxt' a -> Doc)
-  -> ArgumentList val name expr 'NotAssignable dctxt a
+  -> ArgumentList arg val name expr 'NotAssignable dctxt a
   -> Doc
-argumentList _val _name _expr e =
+argumentList _arg _val _name _expr e =
   Just e &
     (outside _ArgumentList .~
       (\(a, b, c, d, _) ->
-         argument _val _name _expr a <>
+         argument _arg _val _name _expr a <>
          foldMapOf
            (_Wrapped.folded._Wrapped)
-           (before (between' (foldMap anyWhitespaceChar) comma) (argument _val _name _expr))
+           (before
+             (between' (foldMap anyWhitespaceChar) comma)
+             (argument _arg _val _name _expr))
            b <>
          foldMap anyWhitespaceChar c <>
          foldMap (after (foldMap anyWhitespaceChar) comma) d) $

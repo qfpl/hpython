@@ -220,7 +220,11 @@ decorator =
     (parens .
      between'F (many anyWhitespaceChar) .
      optionalF $
-     argumentList (test anyWhitespaceChar) identifier test) <*>
+     argumentList
+       (test anyWhitespaceChar)
+       (test anyWhitespaceChar)
+       identifier
+       test) <*>
   newlineChar
 
 decorated
@@ -252,7 +256,11 @@ classDef =
      parens .
      between'F (many anyWhitespaceChar) .
      optionalF $
-     argumentList (test anyWhitespaceChar) identifier test) <*>
+     argumentList
+       (test anyWhitespaceChar)
+       (test anyWhitespaceChar)
+       identifier
+       test) <*>
   beforeF (betweenWhitespace colon) suite
 
 typedArg
@@ -280,6 +288,7 @@ parameters =
       (many anyWhitespaceChar)
       (optionalF $
        argumentList
+         (typedArg anyWhitespaceChar)
          (typedArg anyWhitespaceChar)
          (typedArg anyWhitespaceChar)
          test))

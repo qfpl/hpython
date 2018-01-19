@@ -10,6 +10,7 @@ module Language.Python.Expr.IR where
 import Papa hiding (Plus, Sum, Product)
 import Data.Deriving
 import Data.Functor.Compose
+import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Separated.After
 import Data.Separated.Before
@@ -180,7 +181,16 @@ data Trailer ws a
         (Before [AnyWhitespaceChar])
         (Compose
           Maybe
-          (ArgumentList (Test AnyWhitespaceChar) Identifier Test))
+          (ArgumentList
+            (Product
+              (Test AnyWhitespaceChar)
+              (Compose
+                Maybe
+                (Compose
+                  (Before (NonEmpty AnyWhitespaceChar))
+                  (CompFor AnyWhitespaceChar))))
+            (Test AnyWhitespaceChar)
+            Identifier Test))
         a
   , _trailer_ann :: a
   }

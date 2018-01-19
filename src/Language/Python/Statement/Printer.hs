@@ -291,6 +291,7 @@ parameters (Parameters v _) =
       (argumentList
         (typedArg anyWhitespaceChar)
         (typedArg anyWhitespaceChar)
+        (typedArg anyWhitespaceChar)
         test))
     v
 
@@ -314,7 +315,11 @@ classDef (ClassDef n a b _) =
          (between'F (foldMap anyWhitespaceChar) $
           foldMapOf
             (_Wrapped.folded)
-            (argumentList (test anyWhitespaceChar) identifier test)))
+            (argumentList
+              (test anyWhitespaceChar)
+              (test anyWhitespaceChar)
+              identifier
+              test)))
        a <>
      betweenWhitespace' colon (b ^. _Wrapped.before._1))
   (b ^. _Wrapped.before._2)
@@ -334,7 +339,11 @@ decorator (Decorator name args n _) =
      between'F (foldMap anyWhitespaceChar)
        (foldMapOf
          (_Wrapped.folded)
-         (argumentList (test anyWhitespaceChar) identifier test)))
+         (argumentList
+           (test anyWhitespaceChar)
+           (test anyWhitespaceChar)
+           identifier
+           test)))
     args <>
   newlineChar n
 

@@ -22,6 +22,7 @@ genArgument
      , HasName name
      )
   => ExprConfig 'NotAssignable dctxt
+  -> m (arg ())
   -> m (val ())
   -> m (name ())
   -> ( forall as' ws' dctxt'
@@ -29,11 +30,11 @@ genArgument
     -> m ws'
     -> m (expr ws' as' dctxt' ())
      )
-  -> m (Argument val name expr dctxt ())
-genArgument cfg _genVal _genName _genExpr =
+  -> m (Argument arg val name expr dctxt ())
+genArgument cfg _genArg _genVal _genName _genExpr =
   Gen.choice
     [ ArgumentPositional <$>
-      _genVal <*>
+      _genArg <*>
       pure ()
     , ArgumentKeyword <$>
       _genName <*>
@@ -55,6 +56,7 @@ genArgumentList
      , HasName name
      )
   => ExprConfig as dctxt
+  -> m (arg ())
   -> m (val ())
   -> m (name ())
   -> ( forall as' ws' dctxt'
@@ -62,15 +64,15 @@ genArgumentList
     -> m ws'
     -> m (expr ws' as' dctxt' ())
      )
-  -> m (ArgumentList val name expr 'NotAssignable dctxt ())
-genArgumentList cfg _genVal _genName _genExpr =
+  -> m (ArgumentList arg val name expr 'NotAssignable dctxt ())
+genArgumentList cfg _genArg _genVal _genName _genExpr =
   Gen.just . fmap (^? _Right) $
   mkArgumentList <$>
-  genArgument (cfg & atomType .~ SNotAssignable) _genVal _genName _genExpr <*>
+  genArgument (cfg & atomType .~ SNotAssignable) _genArg _genVal _genName _genExpr <*>
   genListF
     (genBeforeF
       (genBetweenAnyWhitespace $ pure Comma)
-      (genArgument (cfg & atomType .~ SNotAssignable) _genVal _genName _genExpr)) <*>
+      (genArgument (cfg & atomType .~ SNotAssignable) _genArg _genVal _genName _genExpr)) <*>
   Gen.list (Range.linear 0 10) genAnyWhitespaceChar <*>
   Gen.maybe (genAnyWhitespaceAfter $ pure Comma) <*>
   pure ()

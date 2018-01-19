@@ -9,6 +9,7 @@ import Prelude (div)
 
 import Data.Functor.Compose
 
+import Data.Functor.Product
 import Data.Functor.Sum
 import Hedgehog
 
@@ -854,6 +855,13 @@ genTrailer cfg ws =
             (genMaybeF $
              genArgumentList
                cfg
+               (liftA2
+                 Pair
+                 (genTest cfg genAnyWhitespaceChar)
+                 (genMaybeF
+                   (genBeforeF
+                     (Gen.nonEmpty (Range.linear 1 10) genAnyWhitespaceChar)
+                     (genCompFor cfg genAnyWhitespaceChar))))
                (genTest cfg genAnyWhitespaceChar)
                genIdentifier
                genTest) <*>

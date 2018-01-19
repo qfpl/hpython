@@ -6,6 +6,7 @@
 module Language.Python.Expr.IR.Checker where
 
 import Data.Functor.Compose
+import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Separated.After
 import Data.Separated.Before
@@ -556,39 +557,6 @@ checkAtomExpr cfg e =
           in
             syntaxError (CannotAssignTo LHSAwaitExpr err) *>
             syntaxError (AwaitNotInAsyncFunction err)
-{-
-  case e of
-    IR.AtomExprSingle (IR.AtomExpr kw a ts ann) =
-  case kw of
-    Nothing ->
-      Safe.AtomExprNoAwait <$>
-      checkAtom cfg a <*>
-      traverseOf
-        (traverseCompose.traverseCompose)
-        (checkTrailer cfg)
-        ts <*>
-      pure ann
-    Just kw' ->
-      case (cfg ^. atomType, cfg ^. definitionContext) of
-        (SNotAssignable, SFunDef SAsync) ->
-          Safe.AtomExprAwait kw' <$>
-          checkAtom cfg a <*>
-          traverseOf
-            (traverseCompose.traverseCompose)
-            (checkTrailer cfg)
-            ts <*>
-          pure ann
-        (SNotAssignable, _) ->
-          syntaxError $ AwaitNotInAsyncFunction ann
-        (SAssignable, SFunDef SAsync) ->
-          syntaxError $ CannotAssignTo LHSAwaitExpr ann
-        (SAssignable, SFunDef SNormal) ->
-          syntaxError (CannotAssignTo LHSAwaitExpr ann) *>
-          syntaxError (AwaitNotInAsyncFunction ann)
-        (SAssignable, STopLevel) ->
-          syntaxError (CannotAssignTo LHSAwaitExpr ann) *>
-          syntaxError (AwaitNotInAsyncFunction ann)
--}
 
 checkTrailer
   :: ExprConfig atomType ctxt
@@ -605,6 +573,11 @@ checkTrailer cfg e =
             (traverseCompose.traverseCompose)
             (checkArgumentList
                cfg
+               (\(Pair a b) ->
+                  liftA2
+                    Pair
+                    (checkTest cfg a)
+                    (traverseOf (_Wrapped.traverse._Wrapped.traverse) (checkCompFor cfg) b))
                (checkTest cfg)
                checkIdentifier
                checkTest)

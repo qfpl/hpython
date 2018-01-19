@@ -16,6 +16,8 @@ import qualified Language.Python.AST.ArgumentList as Safe
 
 checkArgument
   :: ExprConfig as dctxt
+  -> ( arg ann
+    -> SyntaxChecker ann (checkedArg ann))
   -> ( val ann
     -> SyntaxChecker ann (checkedVal ann))
   -> ( forall as' dctxt'
@@ -26,14 +28,14 @@ checkArgument
      . ExprConfig as' dctxt'
     -> expr ws' ann
     -> SyntaxChecker ann (checkedExpr ws' as' dctxt' ann))
-  -> IR.Argument val name expr ann
-  -> SyntaxChecker ann (Safe.Argument checkedVal checkedName checkedExpr dctxt ann)
-checkArgument ecfg _checkVal _checkName _checkExpr a =
+  -> IR.Argument arg val name expr ann
+  -> SyntaxChecker ann (Safe.Argument checkedArg checkedVal checkedName checkedExpr dctxt ann)
+checkArgument ecfg _checkArg _checkVal _checkName _checkExpr a =
   let ecfg' = ecfg & atomType .~ SNotAssignable in
   case a of
     IR.ArgumentPositional a b ->
       Safe.ArgumentPositional <$>
-      _checkVal a <*>
+      _checkArg a <*>
       pure b
     IR.ArgumentKeyword a b c d ->
       Safe.ArgumentKeyword <$>
@@ -53,6 +55,8 @@ checkArgument ecfg _checkVal _checkName _checkExpr a =
 checkArgumentList
   :: HasName checkedName
   => ExprConfig as dctxt
+  -> ( arg ann
+    -> SyntaxChecker ann (checkedArg ann))
   -> ( val ann
     -> SyntaxChecker ann (checkedVal ann))
   -> ( forall as' dctxt'
@@ -63,17 +67,17 @@ checkArgumentList
      . ExprConfig as' dctxt'
     -> expr ws' ann
     -> SyntaxChecker ann (checkedExpr ws' as' dctxt' ann))
-  -> IR.ArgumentList val name expr ann
-  -> SyntaxChecker ann (Safe.ArgumentList checkedVal checkedName checkedExpr 'NotAssignable dctxt ann)
-checkArgumentList cfg _checkVal _checkName _checkExpr a =
+  -> IR.ArgumentList arg val name expr ann
+  -> SyntaxChecker ann (Safe.ArgumentList checkedArg checkedVal checkedName checkedExpr 'NotAssignable dctxt ann)
+checkArgumentList cfg _checkArg _checkVal _checkName _checkExpr a =
   case a of
     IR.ArgumentList h t ws c ann ->
       liftArgumentError ann $
       Safe.mkArgumentList <$>
-      checkArgument cfg _checkVal _checkName _checkExpr h <*>
+      checkArgument cfg _checkArg _checkVal _checkName _checkExpr h <*>
       traverseOf
         (_Wrapped.traverse._Wrapped.before._2)
-        (checkArgument cfg _checkVal _checkName _checkExpr)
+        (checkArgument cfg _checkArg _checkVal _checkName _checkExpr)
         t <*>
       pure ws <*>
       pure c <*>

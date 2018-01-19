@@ -518,7 +518,16 @@ trailer ws t =
       parens $
       beforeF
         (foldMap anyWhitespaceChar)
-        (foldMapF $ argumentList (test anyWhitespaceChar) identifier test) val
+        (foldMapF $
+         argumentList
+           (\(Pair a b) ->
+              test anyWhitespaceChar a <>
+              foldMapOf
+                (_Wrapped.folded)
+                (beforeF (foldMap anyWhitespaceChar) (compFor anyWhitespaceChar))
+                b)
+           (test anyWhitespaceChar)
+           identifier test) val
     TrailerSubscript val _ ->
       brackets $ between'F (foldMap anyWhitespaceChar) (subscriptList anyWhitespaceChar) val
     TrailerAccess val _ -> char '.' <> beforeF (foldMap ws) identifier val

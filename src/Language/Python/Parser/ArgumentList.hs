@@ -14,16 +14,18 @@ import Language.Python.Parser.Symbols
 import Text.Parser.Unspaced
 
 argument
-  :: ( Functor name
+  :: ( Functor arg
+     , Functor name
      , Functor val
      , Functor (expr AnyWhitespaceChar)
      , DeltaParsing m
      )
-  => Unspaced m (val SrcInfo)
+  => Unspaced m (arg SrcInfo)
+  -> Unspaced m (val SrcInfo)
   -> Unspaced m (name SrcInfo)
   -> (forall ws. Unspaced m ws -> Unspaced m (expr ws SrcInfo))
-  -> Unspaced m (Argument val name expr SrcInfo)
-argument _val _name _expr =
+  -> Unspaced m (Argument arg val name expr SrcInfo)
+argument _arg _val _name _expr =
   annotated $
   argKey <|>
   argPos <|>
@@ -31,7 +33,7 @@ argument _val _name _expr =
   argStar
   where
     argPos =
-      ArgumentPositional <$> _val
+      ArgumentPositional <$> _arg
     argKey =
       try
         (ArgumentKeyword <$>
@@ -48,22 +50,24 @@ argument _val _name _expr =
       _val
 
 argumentList
-  :: ( Functor name
+  :: ( Functor arg
+     , Functor name
      , Functor val
      , Functor (expr AnyWhitespaceChar)
      , DeltaParsing m
      )
-  => Unspaced m (val SrcInfo)
+  => Unspaced m (arg SrcInfo)
+  -> Unspaced m (val SrcInfo)
   -> Unspaced m (name SrcInfo)
   -> (forall ws. Unspaced m ws -> Unspaced m (expr ws SrcInfo))
-  -> Unspaced m (ArgumentList val name expr SrcInfo)
-argumentList _val _name _expr =
+  -> Unspaced m (ArgumentList arg val name expr SrcInfo)
+argumentList _arg _val _name _expr =
   annotated $
   ArgumentList <$>
-  argument _val _name _expr <*>
+  argument _arg _val _name _expr <*>
   manyF
     (beforeF
        (try $ betweenAnyWhitespace comma <* notFollowedBy (char ')'))
-       (argument _val _name _expr)) <*>
+       (argument _arg _val _name _expr)) <*>
   many anyWhitespaceChar <*>
   optional (anyWhitespaceAfter comma)

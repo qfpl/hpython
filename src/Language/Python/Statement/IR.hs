@@ -122,7 +122,11 @@ data Decorator a
            (Between' [AnyWhitespaceChar])
            (Compose
              Maybe
-             (ArgumentList (Test AnyWhitespaceChar) Identifier Test)))
+             (ArgumentList
+               (Test AnyWhitespaceChar)
+               (Test AnyWhitespaceChar)
+               Identifier
+               Test)))
          a
   , _decorator_newline :: NewlineChar
   , _decorator_ann :: a
@@ -148,7 +152,11 @@ data ClassDef a
              (Between' [AnyWhitespaceChar])
              (Compose
                Maybe
-               (ArgumentList (Test AnyWhitespaceChar) Identifier Test))))
+               (ArgumentList
+                 (Test AnyWhitespaceChar)
+                 (Test AnyWhitespaceChar)
+                 Identifier
+                 Test))))
          a
   , _classDef_body
     :: Compose
@@ -242,6 +250,7 @@ data Parameters a
          (Compose
            Maybe
            (ArgumentList
+             (TypedArg AnyWhitespaceChar)
              (TypedArg AnyWhitespaceChar)
              (TypedArg AnyWhitespaceChar)
              Test))

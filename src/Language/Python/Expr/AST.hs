@@ -16,6 +16,7 @@ import Papa hiding (Plus, Sum, Product)
 
 import Data.Deriving
 import Data.Functor.Compose
+import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Separated.After
 import Data.Separated.Before
@@ -228,6 +229,13 @@ data Trailer :: * -> AtomType -> DefinitionContext -> * -> * where
           (Compose
             Maybe
             (ArgumentList
+              (Product
+                (Test AnyWhitespaceChar 'NotAssignable ctxt)
+                (Compose
+                  Maybe
+                  (Compose
+                    (Before (NonEmpty AnyWhitespaceChar))
+                    (CompFor AnyWhitespaceChar 'NotAssignable ctxt))))
               (Test AnyWhitespaceChar 'NotAssignable ctxt)
               Identifier
               Test

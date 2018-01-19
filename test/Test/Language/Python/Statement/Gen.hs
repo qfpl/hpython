@@ -489,6 +489,7 @@ genParameters ecfg =
         (ecfg & atomType .~ SNotAssignable)
         (genTypedArg ecfg genAnyWhitespaceChar)
         (genTypedArg ecfg genAnyWhitespaceChar)
+        (genTypedArg ecfg genAnyWhitespaceChar)
         genTest)) <*>
   pure ()
 
@@ -523,6 +524,7 @@ genClassDef ecfg =
      genMaybeF $
      genArgumentList
        (ecfg & atomType .~ SNotAssignable)
+       (genTest (ecfg & atomType .~ SNotAssignable) genAnyWhitespaceChar)
        (genTest (ecfg & atomType .~ SNotAssignable) genAnyWhitespaceChar)
        genIdentifier
        genTest) <*>
@@ -568,6 +570,7 @@ genDecorator ecfg =
        (genMaybeF $
         genArgumentList
           (ecfg & atomType .~ SNotAssignable)
+          (genTest (ecfg & atomType .~ SNotAssignable) genAnyWhitespaceChar)
           (genTest (ecfg & atomType .~ SNotAssignable) genAnyWhitespaceChar)
           genIdentifier
           genTest)) <*>

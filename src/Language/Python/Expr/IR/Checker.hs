@@ -5,6 +5,8 @@
 {-# language RankNTypes #-}
 module Language.Python.Expr.IR.Checker where
 
+import Prelude (error)
+
 import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
@@ -17,12 +19,10 @@ import qualified Data.Set as S
 
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
-import Language.Python.AST.Symbols
 import Language.Python.IR.ExprConfig
 import Language.Python.IR.SyntaxChecker
 import Language.Python.IR.Checker.ArgsList
 import Language.Python.IR.Checker.ArgumentList
-import Language.Python.IR.Checker.TestlistStarExpr
 
 import qualified Language.Python.Expr.AST as Safe
 import qualified Language.Python.Expr.IR as IR
@@ -512,6 +512,7 @@ checkAtomExprTrailers cfg e ts ann =
           ann <*>
         traverseOf (_Wrapped.traverse) (checkTrailer cfg) a <*>
         pure ann
+      Nothing -> error "impossible" -- unsnoc from a NonEmpty always succeeds
 
 checkAtomExpr
   :: ExprConfig atomType ctxt

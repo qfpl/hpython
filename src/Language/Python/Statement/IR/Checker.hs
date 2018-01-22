@@ -6,6 +6,8 @@
 {-# language RankNTypes #-}
 module Language.Python.Statement.IR.Checker where
 
+import Prelude (error)
+
 import Papa hiding (Sum, Product)
 import Data.Functor.Compose
 import Data.Functor.Product
@@ -23,7 +25,6 @@ import qualified Language.Python.Statement.IR as IR
 
 import Language.Python.AST.IndentedLines
 import Language.Python.Expr.IR.Checker
-import Language.Python.IR.Checker.ArgsList
 import Language.Python.IR.Checker.ArgumentList
 import Language.Python.IR.Checker.TestlistStarExpr
 import Language.Python.IR.ExprConfig
@@ -380,7 +381,7 @@ checkAsyncStatement
   -> StatementConfig lctxt
   -> IR.AsyncStatement ann
   -> SyntaxChecker ann (Safe.AsyncStatement lctxt ctxt ann)
-checkAsyncStatement ecfg scfg (IR.AsyncStatementFuncDef v ann) =
+checkAsyncStatement ecfg _ (IR.AsyncStatementFuncDef v ann) =
   Safe.AsyncStatementFuncDef <$>
   traverseOf
     (_Wrapped.traverse)
@@ -474,6 +475,7 @@ checkSmallStatement ecfg scfg s =
             InR _ -> syntaxError $ TopLevelUnpacking ann
         (_, InR (Compose as)) ->
           case unsnoc as of
+            Nothing -> error "impossible" -- we matched the empty case above
             Just (as', a') ->
               Safe.SmallStatementAssign <$>
               checkTestlistStarExpr

@@ -3,7 +3,6 @@ module Language.Python.IR.Checker.TestlistStarExpr where
 import Papa hiding (Sum)
 import Data.Functor.Compose
 import Data.Functor.Sum
-import Language.Python.IR.ExprConfig
 import Language.Python.IR.SyntaxChecker
 
 import qualified Language.Python.AST.TestlistStarExpr as Safe

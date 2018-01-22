@@ -1,7 +1,7 @@
 module Language.Python.Printer.DottedName where
 
 import Papa
-import Text.PrettyPrint hiding ((<>), dot)
+import Text.PrettyPrint hiding ((<>))
 
 import Language.Python.AST.DottedName
 import Language.Python.Printer.Combinators

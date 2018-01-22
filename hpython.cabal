@@ -59,7 +59,6 @@ library
                        Language.Python.Expr.Printer
                        Language.Python.IR.ArgsList
                        Language.Python.IR.ArgumentList
-                       Language.Python.IR.Indentation
                        Language.Python.IR.Checker.ArgsList
                        Language.Python.IR.Checker.ArgumentList
                        Language.Python.IR.Checker.TestlistStarExpr
@@ -108,7 +107,6 @@ library
                        Data.Separated.After
                        Data.Separated.Before
                        Data.Separated.Between
-                       Data.Orphans.NonEmpty
                        Text.Parser.Unspaced
   build-depends:       base >=4.9 && <4.10
                      , text >= 1.2 && <1.3

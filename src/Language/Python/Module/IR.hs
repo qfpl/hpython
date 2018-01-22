@@ -10,7 +10,6 @@ import Papa hiding (Sum)
 import Data.Deriving
 import Data.Functor.Compose
 import Data.Functor.Sum
-import Data.Separated.After
 import Data.Separated.Between
 
 import Language.Python.Statement.IR

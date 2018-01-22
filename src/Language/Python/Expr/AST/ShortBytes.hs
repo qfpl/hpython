@@ -8,7 +8,6 @@ import Papa
 import Data.Deriving
 
 import Language.Python.AST.Symbols
-import Language.Python.Expr.AST.EscapeSeq
 import Language.Python.Expr.AST.ShortBytesChar
 import Language.Python.Expr.AST.StringContent
 

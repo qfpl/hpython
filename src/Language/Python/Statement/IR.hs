@@ -11,7 +11,6 @@ import Data.Deriving
 import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
-import Data.Separated.After
 import Data.Separated.Before
 import Data.Separated.Between
 
@@ -21,7 +20,6 @@ import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
 import Language.Python.Expr.IR
-import Language.Python.IR.ArgsList
 import Language.Python.IR.ArgumentList
 import Language.Python.IR.TestlistStarExpr
 import Language.Python.Statement.AST.AugAssign

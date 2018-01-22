@@ -20,7 +20,6 @@ import Data.Separated.Before
 import Data.Separated.Between
 import Data.Singletons.Prelude ((:==))
 
-import Language.Python.AST.ArgsList
 import Language.Python.AST.ArgumentList
 import Language.Python.AST.Comment
 import Language.Python.AST.DottedName

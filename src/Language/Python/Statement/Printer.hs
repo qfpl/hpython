@@ -8,7 +8,6 @@ import Text.PrettyPrint hiding ((<>), equals, comma, colon)
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Expr.Printer
-import Language.Python.Printer.ArgsList
 import Language.Python.Printer.ArgumentList
 import Language.Python.Printer.Combinators hiding (before)
 import Language.Python.Printer.DottedName
@@ -266,6 +265,7 @@ asyncStatement a =
   where
     write g v =
       case g (v ^. _Wrapped.before._2) of
+        [] -> []
         (x:xs) -> (<> x (text "async" <> foldMap whitespaceChar (v ^. _Wrapped.before._1))) : xs
 
 funcDef :: Ord a => FuncDef outer inner a -> [Doc -> Doc]
@@ -350,6 +350,7 @@ decorator (Decorator name args n _) =
 asyncFuncDef :: Ord a => AsyncFuncDef ctxt a -> [Doc -> Doc]
 asyncFuncDef (AsyncFuncDef v _) =
   case funcDef (v ^. _Wrapped.before._2) of
+    [] -> []
     (x:xs) -> (<> x (text "async" <> foldMap whitespaceChar (v ^. _Wrapped.before._1))) : xs
 
 suite :: Ord a => Doc -> Suite lctxt ctxt a -> [Doc -> Doc]

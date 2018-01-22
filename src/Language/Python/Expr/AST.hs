@@ -27,7 +27,6 @@ import Language.Python.AST.ArgumentList
 import Language.Python.AST.Identifier
 import Language.Python.AST.Keywords
 import Language.Python.AST.Symbols
-import Language.Python.AST.TestlistStarExpr
 import Language.Python.Expr.AST.BytesLiteral
 import Language.Python.Expr.AST.CompOperator
 import Language.Python.Expr.AST.FactorOperator

@@ -9,7 +9,6 @@ import Data.Deriving
 
 import Language.Python.AST.Symbols
 import Language.Python.Expr.AST.LongBytesChar
-import Language.Python.Expr.AST.EscapeSeq
 import Language.Python.Expr.AST.StringContent
 
 -- | Between triple quotes

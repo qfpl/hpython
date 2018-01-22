@@ -51,7 +51,6 @@ import Language.Python.Parser.Identifier
 import Language.Python.Parser.Keywords
 import Language.Python.Parser.SrcInfo
 import Language.Python.Parser.Symbols
-import Language.Python.Parser.TestlistStarExpr
 
 import Text.Parser.Unspaced
 

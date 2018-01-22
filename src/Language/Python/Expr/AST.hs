@@ -233,9 +233,7 @@ data Trailer :: * -> AtomType -> DefinitionContext -> * -> * where
                 (Test AnyWhitespaceChar 'NotAssignable ctxt)
                 (Compose
                   Maybe
-                  (Compose
-                    (Before (NonEmpty AnyWhitespaceChar))
-                    (CompFor AnyWhitespaceChar 'NotAssignable ctxt))))
+                  (CompFor AnyWhitespaceChar 'NotAssignable ctxt)))
               (Test AnyWhitespaceChar 'NotAssignable ctxt)
               Identifier
               Test

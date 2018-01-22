@@ -859,9 +859,7 @@ genTrailer cfg ws =
                  Pair
                  (genTest cfg genAnyWhitespaceChar)
                  (genMaybeF
-                   (genBeforeF
-                     (Gen.nonEmpty (Range.linear 1 10) genAnyWhitespaceChar)
-                     (genCompFor cfg genAnyWhitespaceChar))))
+                   (genCompFor cfg genAnyWhitespaceChar)))
                (genTest cfg genAnyWhitespaceChar)
                genIdentifier
                genTest) <*>

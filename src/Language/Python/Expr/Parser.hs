@@ -718,10 +718,7 @@ trailer ws = trailerCall <|> trailerSubscript <|> trailerAccess
               (liftA2
                  Pair
                  (test anyWhitespaceChar)
-                 (optionalF
-                   (beforeF
-                     (try $ some1 anyWhitespaceChar <* lookAhead kFor)
-                     (compFor anyWhitespaceChar))))
+                 (optionalF (compFor anyWhitespaceChar)))
               (test anyWhitespaceChar)
               identifier
               test) <*

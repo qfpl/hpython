@@ -577,7 +577,7 @@ checkTrailer cfg e =
                   liftA2
                     Pair
                     (checkTest cfg a)
-                    (traverseOf (_Wrapped.traverse._Wrapped.traverse) (checkCompFor cfg) b))
+                    (traverseOf (_Wrapped.traverse) (checkCompFor cfg) b))
                (checkTest cfg)
                checkIdentifier
                checkTest)

@@ -524,7 +524,7 @@ trailer ws t =
               test anyWhitespaceChar a <>
               foldMapOf
                 (_Wrapped.folded)
-                (beforeF (foldMap anyWhitespaceChar) (compFor anyWhitespaceChar))
+                (compFor anyWhitespaceChar)
                 b)
            (test anyWhitespaceChar)
            identifier test) val

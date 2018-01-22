@@ -186,9 +186,7 @@ data Trailer ws a
               (Test AnyWhitespaceChar)
               (Compose
                 Maybe
-                (Compose
-                  (Before (NonEmpty AnyWhitespaceChar))
-                  (CompFor AnyWhitespaceChar))))
+                (CompFor AnyWhitespaceChar)))
             (Test AnyWhitespaceChar)
             Identifier Test))
         a

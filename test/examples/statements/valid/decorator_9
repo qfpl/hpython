@@ -1,0 +1,8 @@
+def test():
+
+  @property
+  @property
+  def thing():
+    pass
+
+  return 2

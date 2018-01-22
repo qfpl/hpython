@@ -3,6 +3,7 @@ module Language.Python.Statement.Parser.Imports where
 import Papa
 import Data.Functor.Sum
 import Text.Trifecta hiding (Unspaced(..), comma, dot, colon)
+import Text.Parser.LookAhead
 
 import Language.Python.Parser.Combinators
 import Language.Python.Parser.DottedName
@@ -14,7 +15,7 @@ import Language.Python.Statement.AST.Imports
 
 import Text.Parser.Unspaced
 
-importStatement :: DeltaParsing m => Unspaced m (ImportStatement SrcInfo)
+importStatement :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (ImportStatement SrcInfo)
 importStatement =
   annotated $
   (ImportStatementName <$> importName) <|>
@@ -25,14 +26,16 @@ dottedAsNames =
   annotated $
   DottedAsNames <$>
   dottedAsName <*>
-  manyF (beforeF (betweenWhitespace comma) dottedAsName)
+  manyF
+    (beforeF (try $ betweenWhitespace comma) dottedAsName)
 
 dottedAsName :: DeltaParsing m => Unspaced m (DottedAsName SrcInfo)
 dottedAsName =
   annotated $
   DottedAsName <$>
   dottedName <*>
-  optionalF (try $ beforeF (betweenWhitespace1 kAs) identifier)
+  optionalF
+    (beforeF (try $ betweenWhitespace1 kAs) identifier)
 
 importName :: DeltaParsing m => Unspaced m (ImportName SrcInfo)
 importName =
@@ -41,7 +44,7 @@ importName =
   (string "import" *>
    whitespaceBefore1F dottedAsNames)
 
-importFrom :: DeltaParsing m => Unspaced m (ImportFrom SrcInfo)
+importFrom :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (ImportFrom SrcInfo)
 importFrom =
   annotated $
   ImportFrom <$>
@@ -58,24 +61,38 @@ importFrom =
       (InR <$> betweenWhitespaceF (Const <$> some1 dotOrEllipsis))
 
     importPart =
-      try (InL <$>
-        whitespaceBeforeF
-          (try (InL . Const <$> asterisk) <|>
+      (InL <$>
+        beforeF (try $ many whitespaceChar <* lookAhead (char '*' <|> char '('))
+          ((InL . Const <$> asterisk) <|>
            (InR <$>
-            betweenF leftParen rightParen (betweenWhitespaceF importAsNames)))) <|>
-       (InR <$> whitespaceBefore1F importAsNames)
+            betweenF
+              leftParen
+              rightParen
+              (between'F (many anyWhitespaceChar) $ importAsNames anyWhitespaceChar)))) <|>
+      (InR <$> whitespaceBefore1F (importAsNames whitespaceChar))
 
-importAsNames :: DeltaParsing m => Unspaced m (ImportAsNames SrcInfo)
-importAsNames =
+importAsNames
+  :: DeltaParsing m
+  => Unspaced m ws
+  -> Unspaced m (ImportAsNames ws SrcInfo)
+importAsNames ws =
   annotated $
   ImportAsNames <$>
-  importAsName <*>
-  manyF (beforeF (betweenWhitespace comma) importAsName) <*>
-  optional (try $ betweenWhitespace comma)
+  importAsName ws <*>
+  manyF
+    (beforeF
+      (try $
+       between' (many ws) comma <*
+       notFollowedBy (void newlineChar <|> void (char '#') <|> void (char ';')))
+      (importAsName ws)) <*>
+  optional (try $ between' (many ws) comma)
 
-importAsName :: DeltaParsing m => Unspaced m (ImportAsName SrcInfo)
-importAsName =
+importAsName
+  :: DeltaParsing m
+  => Unspaced m ws
+  -> Unspaced m (ImportAsName ws SrcInfo)
+importAsName ws =
   annotated $
   ImportAsName <$>
   identifier <*>
-  optionalF (try $ beforeF (betweenWhitespace1 kAs) identifier)
+  optionalF (beforeF (try $ between'1 ws kAs) identifier)

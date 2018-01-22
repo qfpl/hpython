@@ -53,23 +53,26 @@ importFrom (ImportFrom f i _) =
     (whitespaceBeforeF $
      sumElim
       (asterisk.getConst)
-      (betweenF leftParen rightParen (betweenWhitespace'F importAsNames)))
-    (whitespaceBeforeF importAsNames)
+      (betweenF
+        leftParen
+        rightParen
+        (between'F (foldMap anyWhitespaceChar) $ importAsNames anyWhitespaceChar)))
+    (whitespaceBeforeF $ importAsNames whitespaceChar)
   i
 
-importAsNames :: ImportAsNames a -> Doc
-importAsNames (ImportAsNames h t c _) =
-  importAsName h <>
+importAsNames :: (ws -> Doc) -> ImportAsNames ws a -> Doc
+importAsNames ws (ImportAsNames h t c _) =
+  importAsName ws h <>
   foldMapOf
     (_Wrapped.folded)
-    (beforeF (betweenWhitespace' comma) importAsName)
+    (beforeF (between' (foldMap ws) comma) $ importAsName ws)
     t <>
-  foldMap (betweenWhitespace' comma) c
+  foldMap (between' (foldMap ws) comma) c
 
-importAsName :: ImportAsName a -> Doc
-importAsName (ImportAsName l r _) =
+importAsName :: (ws -> Doc) -> ImportAsName ws a -> Doc
+importAsName ws (ImportAsName l r _) =
   identifier l <>
   foldMapOf
     (_Wrapped.folded)
-    (beforeF (betweenWhitespace' kAs) identifier)
+    (beforeF (between' (foldMap ws) kAs) identifier)
     r

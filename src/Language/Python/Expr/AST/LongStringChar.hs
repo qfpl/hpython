@@ -70,7 +70,7 @@ parseLongStringCharFinalSingle
   => m (LongStringCharFinal SingleQuote)
 parseLongStringCharFinalSingle =
   (\c -> fromMaybe (error $ show c) $ c ^? _LongStringCharFinalSingle) <$>
-  oneOfSet (CharSet.ascii CharSet.\\ CharSet.fromList "\\'\0")
+  noneOfSet (CharSet.fromList "\\'\0")
 
 parseLongStringCharFinalDouble
   :: ( HasCallStack
@@ -78,7 +78,7 @@ parseLongStringCharFinalDouble
      ) => m (LongStringCharFinal DoubleQuote)
 parseLongStringCharFinalDouble =
   (\c -> fromMaybe (error $ show c) $ c ^? _LongStringCharFinalDouble) <$>
-  oneOfSet (CharSet.ascii CharSet.\\ CharSet.fromList "\\\"\0")
+  noneOfSet (CharSet.fromList "\\\"\0")
 
 parseLongStringChar
   :: ( HasCallStack
@@ -86,4 +86,4 @@ parseLongStringChar
      ) => m LongStringChar
 parseLongStringChar =
   (\c -> fromMaybe (error $ show c) $ c ^? _LongStringChar) <$>
-  oneOfSet CharSet.ascii
+  noneOfSet (CharSet.fromList "\0")

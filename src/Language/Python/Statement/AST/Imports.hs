@@ -57,11 +57,11 @@ data ImportFrom a
              (Compose
                (Between LeftParen RightParen)
                (Compose
-                 (Between' [WhitespaceChar])
-                 ImportAsNames))))
+                 (Between' [AnyWhitespaceChar])
+                 (ImportAsNames AnyWhitespaceChar)))))
          (Compose
            (Before (NonEmpty WhitespaceChar))
-           ImportAsNames)
+           (ImportAsNames WhitespaceChar))
        a
   , _importFrom_ann :: a
   }
@@ -70,32 +70,32 @@ deriving instance Eq a => Eq (ImportFrom a)
 deriving instance Ord a => Ord (ImportFrom a)
 deriving instance Show a => Show (ImportFrom a)
 
-data ImportAsNames a
+data ImportAsNames ws a
   = ImportAsNames
-  { _importAsNames_head :: ImportAsName a
+  { _importAsNames_head :: ImportAsName ws a
   , _importAsNames_tail
     :: Compose
          []
          (Compose
-           (Before (Between' [WhitespaceChar] Comma))
-           ImportAsName)
+           (Before (Between' [ws] Comma))
+           (ImportAsName ws))
          a
-  , _importAsNames_comma :: Maybe (Between' [WhitespaceChar] Comma)
+  , _importAsNames_comma :: Maybe (Between' [ws] Comma)
   , _importAsNames_ann :: a
   }
   deriving (Functor, Foldable, Traversable)
-deriving instance Eq a => Eq (ImportAsNames a)
-deriving instance Ord a => Ord (ImportAsNames a)
-deriving instance Show a => Show (ImportAsNames a)
+deriving instance (Eq ws, Eq a) => Eq (ImportAsNames ws a)
+deriving instance (Ord ws, Ord a) => Ord (ImportAsNames ws a)
+deriving instance (Show ws, Show a) => Show (ImportAsNames ws a)
 
-data ImportAsName a
+data ImportAsName ws a
   = ImportAsName
   { _importAsName_left :: Identifier a
   , _importAsName_right
     :: Compose
          Maybe
          (Compose
-           (Before (Between' (NonEmpty WhitespaceChar) KAs))
+           (Before (Between' (NonEmpty ws) KAs))
            Identifier)
          a
   , _importAsName_ann :: a

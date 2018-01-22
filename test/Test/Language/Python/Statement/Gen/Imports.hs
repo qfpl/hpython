@@ -4,8 +4,7 @@ import Papa
 
 import Data.Functor.Compose
 import Data.Functor.Sum
-import Data.Separated.Between
-
+import Data.Separated.Between 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
@@ -48,22 +47,29 @@ genDottedAsNames =
 
 genImportAsName
   :: MonadGen m
-  => m (ImportAsName ())
-genImportAsName =
+  => m ws
+  -> m (ImportAsName ws ())
+genImportAsName ws =
   ImportAsName <$>
   genIdentifier <*>
   genMaybeF
-    (genBeforeF (genBetweenWhitespace1 $ pure KAs) genIdentifier) <*>
+    (genBeforeF
+      (genBetween'1 ws $ pure KAs)
+      genIdentifier) <*>
   pure ()
 
 genImportAsNames
   :: MonadGen m
-  => m (ImportAsNames ())
-genImportAsNames =
+  => m ws
+  -> m (ImportAsNames ws ())
+genImportAsNames ws =
   ImportAsNames <$>
-  genImportAsName <*>
-  genListF (genBeforeF (genBetweenWhitespace $ pure Comma) genImportAsName) <*>
-  Gen.maybe (genBetweenWhitespace $ pure Comma) <*>
+  genImportAsName ws <*>
+  genListF
+    (genBeforeF
+      (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure Comma)
+      (genImportAsName ws)) <*>
+  Gen.maybe (genBetween' (Gen.list (Range.linear 0 10) ws) $ pure Comma) <*>
   pure ()
 
 genImportName
@@ -105,9 +111,11 @@ genImportFrom =
         [ pure . InL $ Const Asterisk
         , fmap (InR . Compose) $
           Between LeftParen <$>
-          genBetweenWhitespaceF genImportAsNames <*>
+          genBetween'F
+            (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
+            (genImportAsNames genAnyWhitespaceChar) <*>
           pure RightParen
         ]
-    , InR <$> genWhitespaceBefore1F genImportAsNames
+    , InR <$> genWhitespaceBefore1F (genImportAsNames genWhitespaceChar)
     ] <*>
   pure ()

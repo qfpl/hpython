@@ -70,8 +70,8 @@ parseShortStringCharSingle
      ) => m (ShortStringChar SingleQuote)
 parseShortStringCharSingle =
   (\c -> fromMaybe (error $ show c) $ c ^? _ShortStringCharSingle) <$>
-  oneOfSet
-    (CharSet.ascii CharSet.\\ CharSet.fromList "\n\r'\\\0")
+  noneOfSet
+    (CharSet.fromList "\n\r'\\\0")
 
 parseShortStringCharDouble
   :: ( HasCallStack
@@ -79,5 +79,5 @@ parseShortStringCharDouble
      ) => m (ShortStringChar DoubleQuote)
 parseShortStringCharDouble =
   (\c -> fromMaybe (error $ show c) $ c ^? _ShortStringCharDouble) <$>
-  oneOfSet
-    (CharSet.ascii CharSet.\\ CharSet.fromList "\n\r\"\\\0")
+  noneOfSet
+    (CharSet.fromList "\n\r\"\\\0")

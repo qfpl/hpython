@@ -184,7 +184,7 @@ stringPrefix =
   (char 'r' $> StringPrefix_r) <|>
   (char 'u' $> StringPrefix_u) <|>
   (char 'R' $> StringPrefix_R) <|>
-  (char 'u' $> StringPrefix_U)
+  (char 'U' $> StringPrefix_U)
 
 shortString :: (HasCallStack, DeltaParsing m, LookAheadParsing m) => Unspaced m (ShortString SrcInfo)
 shortString = shortStringSingle <|> shortStringDouble
@@ -209,14 +209,14 @@ longString = longStringDouble <|> longStringSingle
     longStringSingle =
       annotated $
       LongStringSingle <$>
-      (tripleSinglequote *>
+      (try tripleSinglequote *>
        parseStringContentSingle parseLongStringChar tripleSinglequote <*
        tripleSinglequote)
 
     longStringDouble =
       annotated $
       LongStringDouble <$>
-      (tripleDoublequote *>
+      (try tripleDoublequote *>
        parseStringContentDouble parseLongStringChar tripleDoublequote <*
        tripleDoublequote)
 
@@ -225,7 +225,7 @@ stringLiteral =
   annotated $
   StringLiteral <$>
   beforeF
-    (optional stringPrefix)
+    (optional . try $ stringPrefix <* lookAhead (char '"' <|> char '\''))
     ((InR <$> longString) <|> (InL <$> shortString))
 
 bytesPrefix :: (DeltaParsing m, LookAheadParsing m) => m BytesPrefix
@@ -264,8 +264,8 @@ shortBytes = shortBytesSingle <|> shortBytesDouble
 
 longBytes :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (LongBytes SrcInfo)
 longBytes =
-  (try longBytesSingle <|> longBytesSingleEmpty) <|>
-  (try longBytesDouble <|> longBytesDoubleEmpty)
+  (longBytesSingle <|> longBytesSingleEmpty) <|>
+  (longBytesDouble <|> longBytesDoubleEmpty)
   where
     longBytesSingleEmpty =
       annotated $
@@ -282,14 +282,14 @@ longBytes =
     longBytesSingle =
       annotated $
       LongBytesSingle <$>
-      (tripleSinglequote *>
+      (try tripleSinglequote *>
        parseStringContentSingle parseLongBytesChar tripleSinglequote <*
        tripleSinglequote)
 
     longBytesDouble =
       annotated $
       LongBytesDouble <$>
-      (tripleDoublequote *>
+      (try tripleDoublequote *>
        parseStringContentDouble parseLongBytesChar tripleDoublequote <*
        tripleDoublequote)
 
@@ -297,7 +297,7 @@ bytesLiteral :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (BytesLiteral
 bytesLiteral =
   annotated $
   BytesLiteral <$>
-  bytesPrefix <*>
+  try (bytesPrefix <* lookAhead (char '"' <|> char '\'')) <*>
   ((InR <$> longBytes) <|> (InL <$> shortBytes))
 
 nonZeroDigit :: (DeltaParsing m, LookAheadParsing m) => m NonZeroDigit
@@ -581,7 +581,7 @@ atomNoInt ws =
   atomBracket <|>
   atomCurly <|>
   try atomFloat <|>
-  (try atomString <?> "string literal") <|>
+  (atomString <?> "string literal") <|>
   atomEllipsis <|>
   (try atomNone <?> "None") <|>
   (try atomTrue <?> "True") <|>
@@ -624,7 +624,7 @@ atomNoInt ws =
       annotated $
       AtomFloat <$> float
 
-    stringOrBytes = (InL <$> try stringLiteral) <|> (InR <$> bytesLiteral)
+    stringOrBytes = (InL <$> stringLiteral) <|> (InR <$> bytesLiteral)
 
     atomString =
       annotated $
@@ -760,7 +760,10 @@ power ws =
   annotated $
   Power <$>
   atomExpr ws <*>
-  optionalF (beforeF (try $ between' (many ws) doubleAsterisk) (factor ws))
+  optionalF
+    (beforeF
+      (try $ between' (many ws) (doubleAsterisk <* notFollowedBy equals))
+      (factor ws))
 
 factorOp :: (DeltaParsing m, LookAheadParsing m) => m FactorOperator
 factorOp =
@@ -783,10 +786,10 @@ factor ws = factorOne <|> factorNone
 
 termOp :: (DeltaParsing m, LookAheadParsing m) => m TermOperator
 termOp =
-  (char '*' $> TermMult) <|>
-  (char '@' $> TermAt) <|>
-  (char '/' *> ((char '/' $> TermFloorDiv) <|> pure TermDiv)) <|>
-  (char '%' $> TermMod)
+  ((char '*' $> TermMult) <|>
+   (char '@' $> TermAt) <|>
+   (char '/' *> ((char '/' $> TermFloorDiv) <|> pure TermDiv)) <|>
+   (char '%' $> TermMod)) <* notFollowedBy equals
 
 term
   :: (DeltaParsing m, LookAheadParsing m)
@@ -806,7 +809,10 @@ arithExpr ws =
   annotated $
   ArithExpr <$>
   term ws <*>
-  manyF (beforeF (try $ between' (many ws) plusOrMinus) (term ws))
+  manyF
+    (beforeF
+      (try $ between' (many ws) (plusOrMinus <* notFollowedBy equals))
+      (term ws))
 
 shiftExpr
   :: (DeltaParsing m, LookAheadParsing m)
@@ -819,8 +825,9 @@ shiftExpr ws =
   manyF (beforeF (try $ between' (many ws) shiftLeftOrRight) (arithExpr ws))
   where
     shiftLeftOrRight =
-      (symbol "<<" $> Left DoubleLT) <|>
-      (symbol ">>" $> Right DoubleGT)
+      ((symbol "<<" $> Left DoubleLT) <|>
+       (symbol ">>" $> Right DoubleGT)) <*
+      notFollowedBy equals
 
 andExpr
   :: (DeltaParsing m, LookAheadParsing m)
@@ -830,7 +837,10 @@ andExpr ws =
   annotated $
   AndExpr <$>
   shiftExpr ws <*>
-  manyF (beforeF (try . between' (many ws) $ char '&' $> Ampersand) (shiftExpr ws))
+  manyF
+    (beforeF
+      (try . between' (many ws) $ char '&' $> Ampersand)
+      (shiftExpr ws))
 
 xorExpr
   :: (DeltaParsing m, LookAheadParsing m)
@@ -840,7 +850,13 @@ xorExpr ws =
   annotated $
   XorExpr <$>
   andExpr ws <*>
-  manyF (beforeF (try . between' (many ws) $ char '^' $> S.Caret) (andExpr ws))
+  manyF
+    (beforeF
+      (try $
+       between'
+         (many ws)
+         (char '^' <* notFollowedBy equals $> S.Caret))
+      (andExpr ws))
 
 expr
   :: (DeltaParsing m, LookAheadParsing m)
@@ -850,7 +866,13 @@ expr ws =
   annotated $
   Expr <$>
   xorExpr ws <*>
-  manyF (beforeF (try . between' (many ws) $ char '|' $> Pipe) (xorExpr ws))
+  manyF
+    (beforeF
+       (try $
+        between'
+          (many ws)
+          (char '|' <* notFollowedBy equals $> Pipe))
+       (xorExpr ws))
 
 compOperator :: (DeltaParsing m, LookAheadParsing m) => m ws -> m (CompOperator ws)
 compOperator ws =

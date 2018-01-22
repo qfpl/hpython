@@ -3,6 +3,7 @@ module Language.Python.Statement.Parser where
 
 import Papa hiding (Sum, Product)
 import Control.Monad.State
+import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Separated.Between (Between'(..))
@@ -102,11 +103,11 @@ smallStatement =
 
     smallStatementDel =
       SmallStatementDel <$>
-      (string "del" *>
+      (kDel *>
        whitespaceBefore1F (exprList whitespaceChar))
 
     smallStatementPass =
-      string "pass" $>
+      kPass $>
       SmallStatementPass
 
     smallStatementFlow =
@@ -119,19 +120,19 @@ smallStatement =
 
     smallStatementGlobal =
       SmallStatementGlobal <$>
-      (string "global" *>
+      (kGlobal *>
        whitespaceBefore1F identifier) <*>
       manyF (beforeF (betweenWhitespace comma) identifier)
 
     smallStatementNonlocal =
       SmallStatementNonlocal <$>
-      (string "nonlocal" *>
+      (kNonlocal *>
        whitespaceBefore1F identifier) <*>
       manyF (beforeF (betweenWhitespace comma) identifier)
 
     smallStatementAssert =
       SmallStatementAssert <$>
-      (string "assert" *>
+      (kAssert *>
        whitespaceBefore1F (test whitespaceChar)) <*>
       optionalF (beforeF (betweenWhitespace comma) (test whitespaceChar))
 
@@ -142,13 +143,13 @@ flowStatement
   => Unspaced (StateT [NonEmpty IndentationChar] m) (FlowStatement SrcInfo)
 flowStatement =
   annotated $
-  (symbol "break" $> FlowStatementBreak) <|>
-  (symbol "continue" $> FlowStatementContinue) <|>
+  (kBreak $> FlowStatementBreak) <|>
+  (kContinue $> FlowStatementContinue) <|>
   (FlowStatementReturn <$>
-    (symbol "return" *>
+    (kReturn *>
     optionalF (try $ whitespaceBefore1F (testList whitespaceChar)))) <|>
   (FlowStatementRaise <$>
-    (symbol "raise" *>
+    (kRaise *>
     optionalF (try $ whitespaceBefore1F raiseStatement))) <|>
   (FlowStatementYield <$> yieldExpr whitespaceChar)
 
@@ -187,7 +188,7 @@ asyncStatement
   => Unspaced (StateT [NonEmpty IndentationChar] m) (AsyncStatement SrcInfo)
 asyncStatement =
   annotated $ do
-  ws <- string "async" *> some1 whitespaceChar
+  ws <- kAsync *> some1 whitespaceChar
   asyncStatementFuncDef ws <|> asyncStatementWith ws <|> asyncStatementFor ws
   where
     asyncStatementFuncDef ws = AsyncStatementFuncDef <$> beforeF (pure ws) funcDef
@@ -202,7 +203,7 @@ asyncFuncDef
 asyncFuncDef =
   annotated $
   AsyncFuncDef <$>
-  (string "async" *>
+  (kAsync *>
    whitespaceBefore1F funcDef)
 
 decorator
@@ -234,10 +235,11 @@ decorated
 decorated =
   annotated $
   Decorated <$>
-  some1F decorator <*>
-  ((InL . InL <$> classDef) <|>
-   (InL . InR <$> funcDef) <|>
-   (InR <$> asyncFuncDef))
+  (Compose <$> liftA2 (:|) decorator (many . try $ level *> decorator)) <*>
+  (level *>
+   ((InL . InL <$> classDef) <|>
+    (InL . InR <$> funcDef) <|>
+    (InR <$> asyncFuncDef)))
 
 classDef
   :: ( LookAheadParsing m
@@ -247,7 +249,7 @@ classDef
 classDef =
   annotated $
   ClassDef <$>
-  (string "class" *>
+  (kClass *>
    whitespaceBefore1F identifier) <*>
   optionalF
     (try .
@@ -300,7 +302,7 @@ funcDef
 funcDef =
   annotated $
   FuncDef <$>
-  (string "def" *> whitespaceBefore1F identifier) <*>
+  (kDef *> whitespaceBefore1F identifier) <*>
   whitespaceBeforeF parameters <*>
   optionalF (beforeF (try $ betweenWhitespace rightArrow) (test whitespaceChar)) <*>
   beforeF (betweenWhitespace colon) suite
@@ -324,7 +326,7 @@ withStatement
 withStatement =
   annotated $
   WithStatement <$>
-  (string "with" *>
+  (kWith *>
    whitespaceBefore1F withItem) <*>
   manyF (beforeF (betweenWhitespace comma) withItem) <*>
   beforeF (betweenWhitespace colon) suite
@@ -337,7 +339,7 @@ exceptClause
 exceptClause =
   annotated $
   ExceptClause <$>
-  (try (level *> string "except") *>
+  (try (level *> kExcept) *>
    optionalF
      (try . whitespaceBefore1F $
        Pair <$>
@@ -357,21 +359,21 @@ tryStatement =
   where
     tryStatementExcepts =
       TryStatementExcepts <$>
-      (string "try" *>
+      (kTry *>
        beforeF (betweenWhitespace colon) suite) <*>
       some1F
         (Pair <$>
          exceptClause <*>
          beforeF (betweenWhitespace colon) suite) <*>
       optionalF
-        (try (level *> string "else") *> beforeF (betweenWhitespace colon) suite) <*>
+        (try (level *> kElse) *> beforeF (betweenWhitespace colon) suite) <*>
       optionalF
-        (try (level *> string "finally") *> beforeF (betweenWhitespace colon) suite)
+        (try (level *> kFinally) *> beforeF (betweenWhitespace colon) suite)
     tryStatementFinally =
       TryStatementFinally <$>
-      (string "try" *>
+      (kTry *>
        beforeF (betweenWhitespace colon) suite) <*>
-       (try (level *> string "finally") *>
+       (try (level *> kFinally) *>
         beforeF (betweenWhitespace colon) suite)
 
 whileStatement
@@ -382,11 +384,11 @@ whileStatement
 whileStatement =
   annotated $
   WhileStatement <$>
-  (string "while" *>
+  (kWhile *>
    whitespaceBefore1F (test whitespaceChar)) <*>
   beforeF (betweenWhitespace colon) suite <*>
   optionalF
-    (try (level *> string "else") *>
+    (try (level *> kElse) *>
      beforeF (betweenWhitespace colon) suite)
 
 forStatement
@@ -397,13 +399,13 @@ forStatement
 forStatement =
   annotated $
   ForStatement <$>
-  (string "for" *>
+  (kFor *>
    betweenWhitespace1F (testlistStarExpr whitespaceChar expr starExpr)) <*>
-  (string "in" *>
+  (kIn *>
    whitespaceBefore1F (testList whitespaceChar)) <*>
   beforeF (betweenWhitespace colon) suite <*>
   optionalF
-    (try (level *> string "else") *>
+    (try (level *> kElse) *>
      beforeF (betweenWhitespace colon) suite)
 
 ifStatement
@@ -414,16 +416,16 @@ ifStatement
 ifStatement =
   annotated $
   IfStatement <$>
-  (string "if" *>
+  (kIf *>
    whitespaceBefore1F (test whitespaceChar)) <*>
   beforeF (betweenWhitespace colon) suite <*>
   manyF
-    (try (level *> string "elif") *>
+    (try (level *> kElif) *>
      (Pair <$>
       whitespaceBefore1F (test whitespaceChar) <*>
       beforeF (betweenWhitespace colon) suite)) <*>
   optionalF
-    (try (level *> string "else") *>
+    (try (level *> kElse) *>
      beforeF (betweenWhitespace colon) suite)
 
 indentations

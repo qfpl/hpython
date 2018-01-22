@@ -16,6 +16,7 @@ import Papa hiding (Plus, Sum, Product)
 
 import Data.Deriving
 import Data.Functor.Compose
+import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Separated.After
 import Data.Separated.Before
@@ -79,13 +80,8 @@ deriving instance Traversable (CompIter ws a b)
 data CompIf :: * -> AtomType -> DefinitionContext -> * -> * where
   CompIf ::
     { _compIf_if :: Between' (NonEmpty ws) KIf
-    , _compIf_expr
-      :: TestNocond ws 'NotAssignable ctxt a
-    , _compIf_iter
-      :: Compose
-          Maybe
-          (Compose (Before [ws]) (CompIter ws 'NotAssignable ctxt))
-          a
+    , _compIf_expr :: TestNocond ws 'NotAssignable ctxt a
+    , _compIf_iter :: Compose Maybe (CompIter ws 'NotAssignable ctxt) a
     , _compIf_ann :: a
     } -> CompIf ws 'NotAssignable ctxt a
 deriving instance (Eq c, Eq ws) => Eq (CompIf ws a b c)
@@ -147,15 +143,13 @@ data CompFor :: * -> AtomType -> DefinitionContext -> * -> * where
           (Before (Between' (NonEmpty ws) KFor))
           (Compose
             (After (NonEmpty ws))
-            (TestlistStarExpr ws Expr StarExpr 'Assignable ctxt))
+            (ExprList ws 'Assignable ctxt))
           a
     , _compFor_expr :: Compose (Before (NonEmpty ws)) (OrTest ws 'NotAssignable ctxt) a
     , _compFor_iter
       :: Compose
           Maybe
-          (Compose
-            (Before [ws])
-            (CompIter ws 'NotAssignable ctxt))
+          (CompIter ws 'NotAssignable ctxt)
           a
     , _compFor_ann :: a
     } -> CompFor ws 'NotAssignable ctxt a
@@ -231,10 +225,20 @@ data Trailer :: * -> AtomType -> DefinitionContext -> * -> * where
   TrailerCall ::
     { _trailerCall_value
       :: Compose
-          (Between' [AnyWhitespaceChar])
+          (Before [AnyWhitespaceChar])
           (Compose
             Maybe
-            (ArgumentList Identifier Test 'NotAssignable ctxt))
+            (ArgumentList
+              (Product
+                (Test AnyWhitespaceChar 'NotAssignable ctxt)
+                (Compose
+                  Maybe
+                  (CompFor AnyWhitespaceChar 'NotAssignable ctxt)))
+              (Test AnyWhitespaceChar 'NotAssignable ctxt)
+              Identifier
+              Test
+              'NotAssignable
+              ctxt))
           a
     , _trailerCall_ann :: a
     } -> Trailer ws 'NotAssignable ctxt a

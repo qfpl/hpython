@@ -1,0 +1,4 @@
+try:
+  pass
+except b as c:
+  pass

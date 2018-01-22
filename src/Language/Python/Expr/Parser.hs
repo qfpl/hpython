@@ -13,6 +13,7 @@ import GHC.Stack
 
 import Papa hiding (Space, zero, o, Plus, (\\), Product, argument)
 import Data.Functor.Compose
+import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Separated.After (After(..))
 import Data.Separated.Before (Before(..))
@@ -60,7 +61,7 @@ ifThenElse
   -> Unspaced m (IfThenElse ws SrcInfo)
 ifThenElse ws =
   IfThenElse <$>
-  after1 ws (string "if" $> KIf) <*>
+  after1 ws kIf <*>
   orTest ws <*>
   between'1 ws (string "else" $> KElse) <*>
   test ws
@@ -69,14 +70,14 @@ test
   :: (DeltaParsing m, LookAheadParsing m)
   => Unspaced m ws
   -> Unspaced m (Test ws SrcInfo)
-test ws = try testCond <|> testLambdef
+test ws = testCond <|> testLambdef
   where
     testLambdef = annotated $ TestLambdef <$> lambdef ws
     testCond =
       annotated $
       TestCond <$>
       orTest ws <*>
-      optionalF (try $ (before1F <*> ifThenElse) ws)
+      optionalF (beforeF (try $ some1 ws <* lookAhead kIf) $ ifThenElse ws)
 
 lambdef
   :: (DeltaParsing m, LookAheadParsing m)
@@ -97,7 +98,7 @@ orTest ws =
   annotated $
   OrTest <$>
   andTest ws <*>
-  manyF (try $ beforeF (between'1 ws kOr) (andTest ws))
+  manyF (beforeF (try $ between'1 ws kOr) (andTest ws))
 
 lambdefNocond
   :: (DeltaParsing m, LookAheadParsing m)
@@ -105,13 +106,14 @@ lambdefNocond
   -> Unspaced m (LambdefNocond ws SrcInfo)
 lambdefNocond ws =
   annotated $
-  LambdefNocond <$>
-  optionalF
-    (try $ betweenF
-      (some1 ws)
-      (many ws)
-      (argsList ws (test ws) identifier)) <*>
-  beforeF (many ws) (testNocond ws)
+  string "lambda" *>
+  (LambdefNocond <$>
+   optionalF
+     (betweenF
+       (some1 ws)
+       (many ws)
+       (argsList ws (test ws) identifier)) <*>
+   beforeF (string ":" *> many ws) (testNocond ws))
 
 testNocond
   :: (DeltaParsing m, LookAheadParsing m)
@@ -119,7 +121,7 @@ testNocond
   -> Unspaced m (TestNocond ws SrcInfo)
 testNocond ws =
   annotated $
-  TestNocond <$> (try (InL <$> orTest ws) <|> (InR <$> lambdefNocond ws))
+  TestNocond <$> ((InL <$> orTest ws) <|> (InR <$> lambdefNocond ws))
 
 compIf
   :: (DeltaParsing m, LookAheadParsing m)
@@ -128,9 +130,9 @@ compIf
 compIf ws =
   annotated $
   CompIf <$>
-  between'1 ws (string "if" $> KIf) <*>
+  try (between'1 ws kIf) <*>
   testNocond ws <*>
-  optionalF (try $ beforeF (many ws) (compIter ws))
+  optionalF (compIter ws)
 
 compIter
   :: (DeltaParsing m, LookAheadParsing m)
@@ -138,7 +140,7 @@ compIter
   -> Unspaced m (CompIter ws SrcInfo)
 compIter ws =
   annotated $
-  CompIter <$> (try (InL <$> compFor ws) <|> (InR <$> compIf ws))
+  CompIter <$> ((InL <$> compFor ws) <|> (InR <$> compIf ws))
 
 starExpr
   :: (DeltaParsing m, LookAheadParsing m)
@@ -157,10 +159,13 @@ exprList ws =
   annotated $
   ExprList <$>
   exprOrStar <*>
-  manyF (try $ beforeF (between' (many ws) comma) exprOrStar) <*>
+  manyF
+    (beforeF
+      (try $ between' (many ws) comma <* notFollowedBy (void kIn <|> void newlineChar))
+      exprOrStar) <*>
   optional (try $ before (many ws) comma)
   where
-    exprOrStar = try (InL <$> expr ws) <|> (InR <$> starExpr ws)
+    exprOrStar = (InL <$> expr ws) <|> (InR <$> starExpr ws)
 
 compFor
   :: (DeltaParsing m, LookAheadParsing m)
@@ -170,20 +175,20 @@ compFor ws =
   annotated $
   CompFor <$>
   beforeF
-    (between'1 ws $ string "for" $> KFor)
-    (after1F ws $ testlistStarExpr ws expr starExpr) <*>
-  (string "in" *> (before1F <*> orTest) ws) <*>
-  optionalF (try $ beforeF (many ws) (compIter ws))
+    (try . between'1 ws $ kFor)
+    ((after1F <*> exprList) ws) <*>
+  (kIn *> (before1F <*> orTest) ws) <*>
+  optionalF (compIter ws)
 
 stringPrefix :: (DeltaParsing m, LookAheadParsing m) => m StringPrefix
 stringPrefix =
-  try (char 'r' $> StringPrefix_r) <|>
-  try (char 'u' $> StringPrefix_u) <|>
-  try (char 'R' $> StringPrefix_R) <|>
+  (char 'r' $> StringPrefix_r) <|>
+  (char 'u' $> StringPrefix_u) <|>
+  (char 'R' $> StringPrefix_R) <|>
   (char 'u' $> StringPrefix_U)
 
 shortString :: (HasCallStack, DeltaParsing m, LookAheadParsing m) => Unspaced m (ShortString SrcInfo)
-shortString = try shortStringSingle <|> shortStringDouble
+shortString = shortStringSingle <|> shortStringDouble
   where
     shortStringSingle =
       annotated $
@@ -200,8 +205,7 @@ shortString = try shortStringSingle <|> shortStringDouble
        doubleQuote)
 
 longString :: (HasCallStack, DeltaParsing m, LookAheadParsing m) => Unspaced m (LongString SrcInfo)
-longString =
-  try longStringDouble <|> longStringSingle
+longString = longStringDouble <|> longStringSingle
   where
     longStringSingle =
       annotated $
@@ -222,24 +226,28 @@ stringLiteral =
   annotated $
   StringLiteral <$>
   beforeF
-    (optional $ try stringPrefix)
+    (optional stringPrefix)
     ((InR <$> longString) <|> (InL <$> shortString))
 
 bytesPrefix :: (DeltaParsing m, LookAheadParsing m) => m BytesPrefix
 bytesPrefix =
-  try (char 'b' $> BytesPrefix_b) <|>
-  try (char 'B' $> BytesPrefix_B) <|>
-  try (string "br" $> BytesPrefix_br) <|>
-  try (string "Br" $> BytesPrefix_Br) <|>
-  try (string "bR" $> BytesPrefix_bR) <|>
-  try (string "BR" $> BytesPrefix_BR) <|>
-  try (string "rb" $> BytesPrefix_rb) <|>
-  try (string "rB" $> BytesPrefix_rB) <|>
-  try (string "Rb" $> BytesPrefix_Rb) <|>
-  (string "RB" $> BytesPrefix_RB)
+  (char 'b' *>
+    ((char 'r' $> BytesPrefix_br) <|>
+     (char 'R' $> BytesPrefix_bR) <|>
+     pure BytesPrefix_b)) <|>
+  (char 'B' *>
+    ((char 'r' $> BytesPrefix_Br) <|>
+     (char 'R' $> BytesPrefix_BR) <|>
+     pure BytesPrefix_B)) <|>
+  (char 'r' *>
+    ((char 'b' $> BytesPrefix_rb) <|>
+     (char 'B' $> BytesPrefix_rB))) <|>
+  (char 'R' *>
+    ((char 'b' $> BytesPrefix_Rb) <|>
+     (char 'B' $> BytesPrefix_RB)))
 
 shortBytes :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (ShortBytes SrcInfo)
-shortBytes = try shortBytesSingle <|> shortBytesDouble
+shortBytes = shortBytesSingle <|> shortBytesDouble
   where
     shortBytesSingle =
       annotated $
@@ -295,97 +303,95 @@ bytesLiteral =
 
 nonZeroDigit :: (DeltaParsing m, LookAheadParsing m) => m NonZeroDigit
 nonZeroDigit =
-  try (char '1' $> NonZeroDigit_1) <|>
-  try (char '2' $> NonZeroDigit_2) <|>
-  try (char '3' $> NonZeroDigit_3) <|>
-  try (char '4' $> NonZeroDigit_4) <|>
-  try (char '5' $> NonZeroDigit_5) <|>
-  try (char '6' $> NonZeroDigit_6) <|>
-  try (char '7' $> NonZeroDigit_7) <|>
-  try (char '8' $> NonZeroDigit_8) <|>
+  (char '1' $> NonZeroDigit_1) <|>
+  (char '2' $> NonZeroDigit_2) <|>
+  (char '3' $> NonZeroDigit_3) <|>
+  (char '4' $> NonZeroDigit_4) <|>
+  (char '5' $> NonZeroDigit_5) <|>
+  (char '6' $> NonZeroDigit_6) <|>
+  (char '7' $> NonZeroDigit_7) <|>
+  (char '8' $> NonZeroDigit_8) <|>
   (char '9' $> NonZeroDigit_9)
 
 digit' :: (DeltaParsing m, LookAheadParsing m) => m Digit
 digit' =
-  try (char '0' $> Digit_0) <|>
-  try (char '1' $> Digit_1) <|>
-  try (char '2' $> Digit_2) <|>
-  try (char '3' $> Digit_3) <|>
-  try (char '4' $> Digit_4) <|>
-  try (char '5' $> Digit_5) <|>
-  try (char '6' $> Digit_6) <|>
-  try (char '7' $> Digit_7) <|>
-  try (char '8' $> Digit_8) <|>
+  (char '0' $> Digit_0) <|>
+  (char '1' $> Digit_1) <|>
+  (char '2' $> Digit_2) <|>
+  (char '3' $> Digit_3) <|>
+  (char '4' $> Digit_4) <|>
+  (char '5' $> Digit_5) <|>
+  (char '6' $> Digit_6) <|>
+  (char '7' $> Digit_7) <|>
+  (char '8' $> Digit_8) <|>
   (char '9' $> Digit_9)
 
 octDigit :: (DeltaParsing m, LookAheadParsing m) => m OctDigit
 octDigit =
-  try (char '0' $> OctDigit_0) <|>
-  try (char '1' $> OctDigit_1) <|>
-  try (char '2' $> OctDigit_2) <|>
-  try (char '3' $> OctDigit_3) <|>
-  try (char '4' $> OctDigit_4) <|>
-  try (char '5' $> OctDigit_5) <|>
-  try (char '6' $> OctDigit_6) <|>
+  (char '0' $> OctDigit_0) <|>
+  (char '1' $> OctDigit_1) <|>
+  (char '2' $> OctDigit_2) <|>
+  (char '3' $> OctDigit_3) <|>
+  (char '4' $> OctDigit_4) <|>
+  (char '5' $> OctDigit_5) <|>
+  (char '6' $> OctDigit_6) <|>
   (char '7' $> OctDigit_7)
 
 hexDigit :: (DeltaParsing m, LookAheadParsing m) => m HexDigit
 hexDigit =
-  try (char '0' $> HexDigit_0) <|>
-  try (char '1' $> HexDigit_1) <|>
-  try (char '2' $> HexDigit_2) <|>
-  try (char '3' $> HexDigit_3) <|>
-  try (char '4' $> HexDigit_4) <|>
-  try (char '5' $> HexDigit_5) <|>
-  try (char '6' $> HexDigit_6) <|>
-  try (char '7' $> HexDigit_7) <|>
-  try (char '8' $> HexDigit_8) <|>
-  try (char '9' $> HexDigit_9) <|>
-  try (char 'a' $> HexDigit_a) <|>
-  try (char 'A' $> HexDigit_A) <|>
-  try (char 'b' $> HexDigit_b) <|>
-  try (char 'B' $> HexDigit_B) <|>
-  try (char 'c' $> HexDigit_c) <|>
-  try (char 'C' $> HexDigit_C) <|>
-  try (char 'd' $> HexDigit_d) <|>
-  try (char 'D' $> HexDigit_D) <|>
-  try (char 'e' $> HexDigit_e) <|>
-  try (char 'E' $> HexDigit_E) <|>
-  try (char 'f' $> HexDigit_f) <|>
+  (char '0' $> HexDigit_0) <|>
+  (char '1' $> HexDigit_1) <|>
+  (char '2' $> HexDigit_2) <|>
+  (char '3' $> HexDigit_3) <|>
+  (char '4' $> HexDigit_4) <|>
+  (char '5' $> HexDigit_5) <|>
+  (char '6' $> HexDigit_6) <|>
+  (char '7' $> HexDigit_7) <|>
+  (char '8' $> HexDigit_8) <|>
+  (char '9' $> HexDigit_9) <|>
+  (char 'a' $> HexDigit_a) <|>
+  (char 'A' $> HexDigit_A) <|>
+  (char 'b' $> HexDigit_b) <|>
+  (char 'B' $> HexDigit_B) <|>
+  (char 'c' $> HexDigit_c) <|>
+  (char 'C' $> HexDigit_C) <|>
+  (char 'd' $> HexDigit_d) <|>
+  (char 'D' $> HexDigit_D) <|>
+  (char 'e' $> HexDigit_e) <|>
+  (char 'E' $> HexDigit_E) <|>
+  (char 'f' $> HexDigit_f) <|>
   (char 'F' $> HexDigit_F)
 
 binDigit :: (DeltaParsing m, LookAheadParsing m) => m BinDigit
-binDigit = try (char '0' $> BinDigit_0) <|> (char '1' $> BinDigit_1)
+binDigit = (char '0' $> BinDigit_0) <|> (char '1' $> BinDigit_1)
 
 integer :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Integer' SrcInfo)
 integer =
-  try integerBin <|>
-  try integerOct <|>
-  try integerHex <|>
+  integerBin <|>
+  integerOct <|>
+  integerHex <|>
   integerDecimal
   where
     integerDecimal =
       annotated $
       IntegerDecimal <$>
-      (try (Left <$> liftA2 (,) nonZeroDigit (many digit')) <|>
+      ((Left <$> liftA2 (,) nonZeroDigit (many digit')) <|>
       (Right <$> some1 zero))
     integerOct =
       annotated .
       fmap IntegerOct $
-      Before <$> (zero *> oO) <*> some1 octDigit
+      Before <$> (try $ zero *> oO) <*> some1 octDigit
     integerHex =
       annotated .
       fmap IntegerHex $
-      Before <$> (zero *> xX) <*> some1 hexDigit
+      Before <$> (try $ zero *> xX) <*> some1 hexDigit
     integerBin =
       annotated .
       fmap IntegerBin $
-      Before <$> (zero *> bB) <*> some1 binDigit
+      Before <$> (try $ zero *> bB) <*> some1 binDigit
 
 plusOrMinus :: (DeltaParsing m, LookAheadParsing m) => m (Either Plus Minus)
-plusOrMinus =
-  try (fmap Left plus) <|>
-  fmap Right minus
+plusOrMinus = (Left <$> plus) <|> (Right <$> minus)
 
 float :: (DeltaParsing m, LookAheadParsing m) => Unspaced m (Float' SrcInfo)
 float = try floatDecimalBase <|> try floatDecimalNoBase <|> floatNoDecimal
@@ -447,7 +453,7 @@ dictOrSetMaker
   :: (DeltaParsing m, LookAheadParsing m)
   => Unspaced m ws
   -> Unspaced m (DictOrSetMaker ws SrcInfo)
-dictOrSetMaker ws = try dictOrSetMakerDict <|> dictOrSetMakerSet
+dictOrSetMaker ws = dictOrSetMakerDict <|> dictOrSetMakerSet
   where
     dictOrSetMakerDict =
       annotated $
@@ -458,10 +464,13 @@ dictOrSetMaker ws = try dictOrSetMakerDict <|> dictOrSetMakerSet
     itemOrUnpacking = try (InL <$> dictItem ws) <|> (InR <$> dictUnpacking ws)
 
     dictCompOrList =
-      (InL <$> try (compFor ws)) <|>
+      (InL <$> compFor ws) <|>
       (InR <$> afterF
         (optional . try $ between' (many ws) comma)
-        (manyF . try $ beforeF (between' (many ws) comma) itemOrUnpacking))
+        (manyF $
+         beforeF
+           (try $ between' (many ws) comma <* notFollowedBy (char '}'))
+           itemOrUnpacking))
 
     dictOrSetMakerSet =
       annotated $
@@ -469,56 +478,63 @@ dictOrSetMaker ws = try dictOrSetMakerDict <|> dictOrSetMakerSet
       testOrStar <*>
       setCompOrList
 
-    testOrStar = try (InL <$> test ws) <|> (InR <$> starExpr ws)
+    testOrStar = (InL <$> test ws) <|> (InR <$> starExpr ws)
 
     setCompOrList =
-      (InL <$> try (compFor ws)) <|>
+      (InL <$> compFor ws) <|>
       (InR <$> afterF
         (optional . try $ between' (many ws) comma)
-        (manyF . try $ beforeF (between' (many ws) comma) testOrStar))
+        (manyF $
+         beforeF (try $ between' (many ws) comma <* notFollowedBy (char '}')) testOrStar))
 
 
 tupleTestlistComp
   :: (DeltaParsing m, LookAheadParsing m)
   => Unspaced m ws
   -> Unspaced m (TupleTestlistComp ws SrcInfo)
-tupleTestlistComp ws = try tupleTestlistCompFor <|> tupleTestlistCompList
+tupleTestlistComp ws = do
+  t <- testOrStar
+  tupleTestlistCompFor t <|> tupleTestlistCompList t
   where
-    tupleTestlistCompFor =
+    tupleTestlistCompFor t =
       annotated $
-      TupleTestlistCompFor <$>
-      testOrStar <*>
+      TupleTestlistCompFor t <$>
       compFor ws
 
-    tupleTestlistCompList =
+    tupleTestlistCompList t =
       annotated $
-      TupleTestlistCompList <$>
-      testOrStar <*>
-      manyF (try $ beforeF (between' (many ws) comma) testOrStar) <*>
+      TupleTestlistCompList t <$>
+      manyF
+        (beforeF
+          (try $ between' (many ws) comma <* notFollowedBy (char ')'))
+          testOrStar) <*>
       optional (try $ before (many ws) comma)
 
-    testOrStar = try (InL <$> test ws) <|> (InR <$> starExpr ws)
+    testOrStar = (InL <$> test ws) <|> (InR <$> starExpr ws)
 
 listTestlistComp
   :: (DeltaParsing m, LookAheadParsing m)
   => Unspaced m ws
   -> Unspaced m (ListTestlistComp ws SrcInfo)
-listTestlistComp ws = try listTestlistCompFor <|> listTestlistCompList
+listTestlistComp ws = do
+  t <- testOrStar
+  listTestlistCompFor t <|> listTestlistCompList t
   where
-    listTestlistCompFor =
+    listTestlistCompFor t =
       annotated $
-      ListTestlistCompFor <$>
-      testOrStar <*>
+      ListTestlistCompFor t <$>
       compFor ws
 
-    listTestlistCompList =
+    listTestlistCompList t =
       annotated $
-      ListTestlistCompList <$>
-      testOrStar <*>
-      manyF (try $ beforeF (between' (many ws) comma) testOrStar) <*>
+      ListTestlistCompList t <$>
+      manyF
+        (beforeF
+          (try $ between' (many ws) comma <* notFollowedBy (char ']'))
+          testOrStar) <*>
       optional (try $ before (many ws) comma)
 
-    testOrStar = try (InL <$> test ws) <|> (InR <$> starExpr ws)
+    testOrStar = (InL <$> test ws) <|> (InR <$> starExpr ws)
 
 testList
   :: (DeltaParsing m, LookAheadParsing m)
@@ -528,19 +544,22 @@ testList ws =
   annotated $
   TestList <$>
   test ws <*>
-  manyF (beforeF (between' (many ws) comma) (test ws)) <*>
+  manyF
+    (beforeF
+      (try $ between' (many ws) comma <* notFollowedBy (void semicolon <|> void newlineChar))
+      (test ws)) <*>
   optional (try $ before (many ws) comma)
 
 yieldArg
   :: (DeltaParsing m, LookAheadParsing m)
   => Unspaced m ws
   -> Unspaced m (YieldArg ws SrcInfo)
-yieldArg ws = try yieldArgFrom <|> yieldArgList
+yieldArg ws = yieldArgFrom <|> yieldArgList
   where
     yieldArgFrom =
       annotated $
       YieldArgFrom <$>
-      (string "from" *> (before1F <*> test) ws)
+      (kFrom *> (before1F <*> test) ws)
     yieldArgList =
       annotated $
       YieldArgList <$> testList ws
@@ -559,15 +578,15 @@ atomNoInt
   => Unspaced m ws
   -> Unspaced m (AtomNoInt ws SrcInfo)
 atomNoInt ws =
-  try atomParen <|>
-  try atomBracket <|>
-  try atomCurly <|>
+  atomParen <|>
+  atomBracket <|>
+  atomCurly <|>
   try atomFloat <|>
-  try atomString <|>
-  try atomEllipsis <|>
-  try atomNone <|>
-  try atomTrue <|>
-  try atomFalse <|>
+  (try atomString <?> "string literal") <|>
+  atomEllipsis <|>
+  (try atomNone <?> "None") <|>
+  (try atomTrue <?> "True") <|>
+  (try atomFalse <?> "False") <|>
   atomIdentifier
   where
     atomIdentifier =
@@ -582,7 +601,7 @@ atomNoInt ws =
        between'F
          (many anyWhitespaceChar)
          (optionalF
-           (try $ (InL <$> try (yieldExpr anyWhitespaceChar)) <|>
+           ((InL <$> yieldExpr anyWhitespaceChar) <|>
             (InR <$> tupleTestlistComp anyWhitespaceChar))) <*
        char ')')
 
@@ -591,7 +610,7 @@ atomNoInt ws =
       AtomBracket <$>
         (char '[' *>
          between'F (many anyWhitespaceChar)
-           (optionalF $ try (listTestlistComp anyWhitespaceChar)) <*
+           (optionalF $ listTestlistComp anyWhitespaceChar) <*
          char ']')
 
     atomCurly =
@@ -599,7 +618,7 @@ atomNoInt ws =
       AtomCurly <$>
         (char '{' *>
          between'F (many anyWhitespaceChar)
-           (optionalF $ try (dictOrSetMaker anyWhitespaceChar)) <*
+           (optionalF $ dictOrSetMaker anyWhitespaceChar) <*
          char '}')
 
     atomFloat =
@@ -635,7 +654,7 @@ atom
   => Unspaced m ws
   -> Unspaced m (Atom ws SrcInfo)
 atom ws =
-  try atomInteger <|>
+  atomInteger <|>
   annotated (AtomNoInt <$> atomNoInt ws)
   where
     atomInteger =
@@ -664,7 +683,7 @@ subscript ws = try subscriptTest <|> subscriptSlice
     subscriptSlice =
       annotated $
       SubscriptSlice <$>
-      afterF (many ws) (optionalF $ try (test ws)) <*>
+      afterF (many ws) (optionalF $ test ws) <*>
       after (many ws) (char ':' $> Colon) <*>
       optionalF (try $ afterF (many ws) (test ws)) <*>
       optionalF (try $ afterF (many ws) (sliceOp ws))
@@ -677,7 +696,10 @@ subscriptList ws =
   annotated $
   SubscriptList <$>
   subscript ws <*>
-  manyF (try $ beforeF (between' (many ws) comma) (subscript ws)) <*>
+  manyF
+    (beforeF
+      (try $ between' (many ws) comma <* notFollowedBy (char ']'))
+      (subscript ws)) <*>
   optional (try $ before (many ws) comma)
 
 trailer
@@ -690,9 +712,16 @@ trailer ws = trailerCall <|> trailerSubscript <|> trailerAccess
       annotated $
       TrailerCall <$>
         (char '(' *>
-         between'F
-           (many anyWhitespaceChar)
-           (optionalF $ argumentList identifier test) <*
+         anyWhitespaceBeforeF
+           (optionalF $
+            argumentList
+              (liftA2
+                 Pair
+                 (test anyWhitespaceChar)
+                 (optionalF (compFor anyWhitespaceChar)))
+              (test anyWhitespaceChar)
+              identifier
+              test) <*
          char ')')
 
     trailerSubscript =
@@ -712,21 +741,17 @@ atomExpr
   => Unspaced m ws
   -> Unspaced m (AtomExpr ws SrcInfo)
 atomExpr ws =
-  try atomExprTrailers <|>
-  atomExprSingle
-  where
-    atomExprSingle =
-      annotated $
-      AtomExprSingle <$>
-      (optional . try $ string "await" *> after1 ws (pure KAwait)) <*>
-      atom ws
-
-    atomExprTrailers =
-      annotated $
-      AtomExprTrailers <$>
-      (optional . try $ string "await" *> after1 ws (pure KAwait)) <*>
-      atomNoInt ws <*>
-      some1F (try $ beforeF (many ws) (trailer ws))
+  annotated $ do
+    aw <- optional $ string "await" *> after1 ws (pure KAwait)
+    (do
+        a@(AtomNoInt anoi _) <- annotated $ AtomNoInt <$> atomNoInt ws
+        (AtomExprTrailers aw anoi <$>
+         some1F
+           (beforeF
+             (try $ many ws <* lookAhead (char '.' <|> char '[' <|> char '('))
+             (trailer ws))) <|>
+          pure (AtomExprSingle aw a)) <|>
+      (AtomExprSingle aw <$> annotated (AtomInteger <$> integer))
 
 power
   :: (DeltaParsing m, LookAheadParsing m)
@@ -736,19 +761,19 @@ power ws =
   annotated $
   Power <$>
   atomExpr ws <*>
-  optionalF (try $ beforeF (between' (many ws) doubleAsterisk) (factor ws))
+  optionalF (beforeF (try $ between' (many ws) doubleAsterisk) (factor ws))
 
 factorOp :: (DeltaParsing m, LookAheadParsing m) => m FactorOperator
 factorOp =
-  try (char '-' $> FactorNeg) <|>
-  try (char '+' $> FactorPos) <|>
+  (char '-' $> FactorNeg) <|>
+  (char '+' $> FactorPos) <|>
   (char '~' $> FactorInv)
 
 factor
   :: (DeltaParsing m, LookAheadParsing m)
   => Unspaced m ws
   -> Unspaced m (Factor ws SrcInfo)
-factor ws = try factorOne <|> factorNone
+factor ws = factorOne <|> factorNone
   where
     factorNone = annotated $ FactorNone <$> power ws
     factorOne =
@@ -759,10 +784,9 @@ factor ws = try factorOne <|> factorNone
 
 termOp :: (DeltaParsing m, LookAheadParsing m) => m TermOperator
 termOp =
-  try (char '*' $> TermMult) <|>
-  try (char '@' $> TermAt) <|>
-  try (string "//" $> TermFloorDiv) <|>
-  try (char '/' $> TermDiv) <|>
+  (char '*' $> TermMult) <|>
+  (char '@' $> TermAt) <|>
+  (char '/' *> ((char '/' $> TermFloorDiv) <|> pure TermDiv)) <|>
   (char '%' $> TermMod)
 
 term
@@ -773,7 +797,7 @@ term ws =
   annotated $
   Term <$>
   factor ws <*>
-  manyF (try $ beforeF (between' (many ws) termOp) (factor ws))
+  manyF (beforeF (try $ between' (many ws) termOp) (factor ws))
 
 arithExpr
   :: (DeltaParsing m, LookAheadParsing m)
@@ -783,7 +807,7 @@ arithExpr ws =
   annotated $
   ArithExpr <$>
   term ws <*>
-  manyF (try $ beforeF (between' (many ws) plusOrMinus) (term ws))
+  manyF (beforeF (try $ between' (many ws) plusOrMinus) (term ws))
 
 shiftExpr
   :: (DeltaParsing m, LookAheadParsing m)
@@ -793,7 +817,7 @@ shiftExpr ws =
   annotated $
   ShiftExpr <$>
   arithExpr ws <*>
-  manyF (try $ beforeF (between' (many ws) shiftLeftOrRight) (arithExpr ws))
+  manyF (beforeF (try $ between' (many ws) shiftLeftOrRight) (arithExpr ws))
   where
     shiftLeftOrRight =
       (symbol "<<" $> Left DoubleLT) <|>
@@ -807,7 +831,7 @@ andExpr ws =
   annotated $
   AndExpr <$>
   shiftExpr ws <*>
-  manyF (try $ beforeF (between' (many ws) $ char '&' $> Ampersand) (shiftExpr ws))
+  manyF (beforeF (try . between' (many ws) $ char '&' $> Ampersand) (shiftExpr ws))
 
 xorExpr
   :: (DeltaParsing m, LookAheadParsing m)
@@ -817,7 +841,7 @@ xorExpr ws =
   annotated $
   XorExpr <$>
   andExpr ws <*>
-  manyF (try $ beforeF (between' (many ws) $ char '^' $> S.Caret) (andExpr ws))
+  manyF (beforeF (try . between' (many ws) $ char '^' $> S.Caret) (andExpr ws))
 
 expr
   :: (DeltaParsing m, LookAheadParsing m)
@@ -827,7 +851,7 @@ expr ws =
   annotated $
   Expr <$>
   xorExpr ws <*>
-  manyF (try $ beforeF (between' (many ws) $ char '|' $> Pipe) (xorExpr ws))
+  manyF (beforeF (try . between' (many ws) $ char '|' $> Pipe) (xorExpr ws))
 
 compOperator :: (DeltaParsing m, LookAheadParsing m) => m ws -> m (CompOperator ws)
 compOperator ws =
@@ -844,32 +868,32 @@ compOperator ws =
   where
     compEq =
       CompEq <$>
-      (many (try ws) <* string "==") <*>
+      (many ws <* string "==") <*>
       many ws
 
     compGEq =
       CompGEq <$>
-      (many (try ws) <* string ">=") <*>
+      (many ws <* string ">=") <*>
       many ws
 
     compNEq =
       CompNEq <$>
-      (many (try ws) <* string "!=") <*>
+      (many ws <* string "!=") <*>
       many ws
 
     compLEq =
       CompLEq <$>
-      (many (try ws) <* string "<=") <*>
+      (many ws <* string "<=") <*>
       many ws
 
     compLT =
       CompLT <$>
-      (many (try ws) <* string "<") <*>
+      (many ws <* string "<") <*>
       many ws
 
     compGT =
       CompGT <$>
-      (many (try ws) <* string ">") <*>
+      (many ws <* string ">") <*>
       many ws
 
     compIsNot =
@@ -902,13 +926,13 @@ comparison ws =
   annotated $
   Comparison <$>
   expr ws <*>
-  manyF (try $ beforeF (compOperator ws) (expr ws))
+  manyF (beforeF (try $ compOperator ws) (expr ws))
 
 notTest
   :: (DeltaParsing m, LookAheadParsing m)
   => Unspaced m ws
   -> Unspaced m (NotTest ws SrcInfo)
-notTest ws = try notTestMany <|> notTestOne
+notTest ws = notTestMany <|> notTestOne
   where
     notTestMany =
       annotated $
@@ -926,4 +950,4 @@ andTest ws =
   annotated $
   AndTest <$>
   notTest ws <*>
-  manyF (try $ beforeF (between'1 ws kAnd) (notTest ws))
+  manyF (beforeF (try $ between'1 ws kAnd) (notTest ws))

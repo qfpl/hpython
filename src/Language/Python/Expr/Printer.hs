@@ -40,7 +40,6 @@ import Language.Python.Printer.Combinators
 import Language.Python.Printer.Identifier
 import Language.Python.Printer.Keywords
 import Language.Python.Printer.Symbols
-import Language.Python.Printer.TestlistStarExpr
 
 stringPrefix :: StringPrefix -> Doc
 stringPrefix sp =
@@ -323,7 +322,7 @@ compIf :: Ord a => (ws -> Doc) -> CompIf ws atomType ctxt a -> Doc
 compIf ws (CompIf kw e i _) =
   between' (foldMap ws) (const $ text "if") kw <>
   testNocond ws e <>
-  foldMapF (beforeF (foldMap ws) (compIter ws)) i
+  foldMapF (compIter ws) i
 
 exprList :: Ord a => (ws -> Doc) -> ExprList ws atomType ctxt a -> Doc
 exprList ws e =
@@ -342,11 +341,11 @@ compFor :: Ord a => (ws -> Doc) -> CompFor ws atomType ctxt a -> Doc
 compFor ws (CompFor t e i _) =
   beforeF
     (between' (foldMap ws) . const $ text "for")
-    (afterF (foldMap ws) $ testlistStarExpr ws expr starExpr)
+    (afterF (foldMap ws) $ exprList ws)
     t <>
   text "in" <>
   beforeF (foldMap ws) (orTest ws) e <>
-  foldMapF (beforeF (foldMap ws) (compIter ws)) i
+  foldMapF (compIter ws) i
 
 prodElim
   :: Semigroup r
@@ -517,9 +516,18 @@ trailer ws t =
   case t of
     TrailerCall val _ ->
       parens $
-      between'F
+      beforeF
         (foldMap anyWhitespaceChar)
-        (foldMapF $ argumentList identifier test) val
+        (foldMapF $
+         argumentList
+           (\(Pair a b) ->
+              test anyWhitespaceChar a <>
+              foldMapOf
+                (_Wrapped.folded)
+                (compFor anyWhitespaceChar)
+                b)
+           (test anyWhitespaceChar)
+           identifier test) val
     TrailerSubscript val _ ->
       brackets $ between'F (foldMap anyWhitespaceChar) (subscriptList anyWhitespaceChar) val
     TrailerAccess val _ -> char '.' <> beforeF (foldMap ws) identifier val

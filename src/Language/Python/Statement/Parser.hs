@@ -35,8 +35,8 @@ statement
   => Unspaced (StateT [NonEmpty IndentationChar] m) (Statement SrcInfo)
 statement =
   annotated $
-  (StatementSimple <$> simpleStatement) <|>
-  (StatementCompound <$> compoundStatement)
+  (StatementCompound <$> compoundStatement) <|>
+  (StatementSimple <$> simpleStatement)
 
 simpleStatement
   :: ( LookAheadParsing m
@@ -48,9 +48,10 @@ simpleStatement =
   SimpleStatement <$>
   smallStatement <*>
   manyF
-    (try $
-     beforeF
-       (betweenWhitespace semicolon)
+    (beforeF
+       (try $
+        betweenWhitespace semicolon <*
+        notFollowedBy (void newlineChar <|> void (char '#')))
        smallStatement) <*>
   optional (try $ whitespaceBefore semicolon) <*>
   betweenF (many whitespaceChar) newlineChar (optionalF comment)
@@ -72,27 +73,27 @@ smallStatement =
   smallStatementAssert
   where
     augAssignSequence =
-      try $
       beforeF
-        (Between' <$>
+        (try $
+         Between' <$>
          between
            (many whitespaceChar <* notFollowedBy (char '#'))
            (many whitespaceChar)
            augAssign)
-        ((InL <$> try (yieldExpr whitespaceChar)) <|>
+        ((InL <$> yieldExpr whitespaceChar) <|>
          (InR <$> testList whitespaceChar))
 
     regularAssignSequence =
       manyF
-        (try $
-         beforeF
-           (Between' <$>
-            between
-              (many whitespaceChar <* notFollowedBy (char '#'))
-              (many whitespaceChar)
-              equals)
-           ((InL <$> try (yieldExpr whitespaceChar)) <|>
-            (InR <$> testlistStarExpr whitespaceChar test starExpr)))
+        (beforeF
+          (try $
+           Between' <$>
+           between
+             (many whitespaceChar <* notFollowedBy (char '#'))
+             (many whitespaceChar)
+             equals)
+          ((InL <$> yieldExpr whitespaceChar) <|>
+           (InR <$> testlistStarExpr whitespaceChar test starExpr)))
 
     smallStatementExpr =
       SmallStatementExpr <$>
@@ -161,7 +162,7 @@ raiseStatement =
   annotated $
   RaiseStatement <$>
   test whitespaceChar <*>
-  optionalF (try . beforeF kFrom $ whitespaceBefore1F (test whitespaceChar))
+  optionalF (beforeF kFrom . try $ whitespaceBefore1F (test whitespaceChar))
 
 compoundStatement
   :: ( LookAheadParsing m
@@ -186,13 +187,13 @@ asyncStatement
      )
   => Unspaced (StateT [NonEmpty IndentationChar] m) (AsyncStatement SrcInfo)
 asyncStatement =
-  annotated $
-  AsyncStatement <$>
-  (string "async" *>
-   whitespaceBefore1F
-     ((InL . InL <$> try funcDef) <|>
-      (InL . InR <$> try withStatement) <|>
-      (InR <$> forStatement)))
+  annotated $ do
+  ws <- string "async" *> some1 whitespaceChar
+  asyncStatementFuncDef ws <|> asyncStatementWith ws <|> asyncStatementFor ws
+  where
+    asyncStatementFuncDef ws = AsyncStatementFuncDef <$> beforeF (pure ws) funcDef
+    asyncStatementFor ws = AsyncStatementFor <$> beforeF (pure ws) forStatement
+    asyncStatementWith ws = AsyncStatementWith <$> beforeF (pure ws) withStatement
 
 asyncFuncDef
   :: ( LookAheadParsing m
@@ -216,10 +217,14 @@ decorator =
   (char '@' *>
    whitespaceBeforeF dottedName) <*>
   optionalF
-    (try .
-     parens .
+    (parens .
      between'F (many anyWhitespaceChar) .
-     optionalF $ try (argumentList identifier test)) <*>
+     optionalF $
+     argumentList
+       (test anyWhitespaceChar)
+       (test anyWhitespaceChar)
+       identifier
+       test) <*>
   newlineChar
 
 decorated
@@ -231,8 +236,8 @@ decorated =
   annotated $
   Decorated <$>
   some1F decorator <*>
-  ((InL . InL <$> try classDef) <|>
-   (InL . InR <$> try funcDef) <|>
+  ((InL . InL <$> classDef) <|>
+   (InL . InR <$> funcDef) <|>
    (InR <$> asyncFuncDef))
 
 classDef
@@ -251,7 +256,11 @@ classDef =
      parens .
      between'F (many anyWhitespaceChar) .
      optionalF $
-     try (argumentList identifier test)) <*>
+     argumentList
+       (test anyWhitespaceChar)
+       (test anyWhitespaceChar)
+       identifier
+       test) <*>
   beforeF (betweenWhitespace colon) suite
 
 typedArg
@@ -275,8 +284,14 @@ parameters =
   annotated $
   Parameters <$>
   parens
-  (between'F (many anyWhitespaceChar)
-    (optionalF $ argumentList (typedArg anyWhitespaceChar) test))
+    (between'F
+      (many anyWhitespaceChar)
+      (optionalF $
+       argumentList
+         (typedArg anyWhitespaceChar)
+         (typedArg anyWhitespaceChar)
+         (typedArg anyWhitespaceChar)
+         test))
 
 funcDef
   :: ( LookAheadParsing m
@@ -286,10 +301,9 @@ funcDef
 funcDef =
   annotated $
   FuncDef <$>
-  (string "def" *>
-   whitespaceBefore1F identifier) <*>
+  (string "def" *> whitespaceBefore1F identifier) <*>
   whitespaceBeforeF parameters <*>
-  optionalF (try $ beforeF (betweenWhitespace rightArrow) (test whitespaceChar)) <*>
+  optionalF (beforeF (try $ betweenWhitespace rightArrow) (test whitespaceChar)) <*>
   beforeF (betweenWhitespace colon) suite
 
 withItem
@@ -301,7 +315,7 @@ withItem =
   annotated $
   WithItem <$>
   test whitespaceChar <*>
-  optionalF (try $ beforeF (betweenWhitespace1 kAs) (expr whitespaceChar))
+  optionalF (beforeF (try $ betweenWhitespace1 kAs) (expr whitespaceChar))
 
 withStatement
   :: ( LookAheadParsing m
@@ -330,7 +344,7 @@ exceptClause =
        Pair <$>
        test whitespaceChar <*>
        optionalF
-         (try $ beforeF (betweenWhitespace1 kAs) identifier)))
+         (beforeF (try $ betweenWhitespace1 kAs) identifier)))
 
 tryStatement
   :: ( DeltaParsing m
@@ -466,10 +480,16 @@ suite = annotated $ suiteSingle <|> suiteMulti
     suiteMulti =
       SuiteMulti <$>
       whitespaceBeforeF (optionalF comment) <*>
-      (newlineChar <* indent) <*>
-      (suiteStatements <* dedent)
+      newlineChar <*>
+      manyF lineComment <*>
+      (indent *> suiteStatements <* dedent)
 
     suiteStatements =
       some1F $
-        try (InL <$> whitespaceBeforeF (afterF newlineChar (optionalF comment))) <|>
-        try (InR <$> beforeF level1 statement)
+        (InL <$> lineComment) <|>
+        (InR <$> beforeF (try level1) statement)
+    lineComment =
+      betweenF
+        (try $ many whitespaceChar <* lookAhead (void newlineChar <|> void (char '#')))
+        newlineChar
+        (optionalF comment)

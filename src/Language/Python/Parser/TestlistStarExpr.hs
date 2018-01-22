@@ -27,7 +27,12 @@ testlistStarExpr ws test starExpr =
   annotated $
   TestlistStarExpr <$>
   testOrStar <*>
-  manyF (try $ beforeF (between' (many ws) comma) testOrStar) <*>
+  manyF
+    (beforeF
+      (try $
+       between' (many ws) comma <*
+       notFollowedBy (void newlineChar <|> void (char '=') <|> void (char ';') <|> void (char '#')))
+      testOrStar) <*>
   optional (try $ between' (many ws) comma)
   where
-    testOrStar = (InL <$> try (test ws)) <|> (InR <$> (starExpr ws))
+    testOrStar = (InL <$> test ws) <|> (InR <$> starExpr ws)

@@ -9,6 +9,7 @@ import Prelude (div)
 
 import Data.Functor.Compose
 
+import Data.Functor.Product
 import Data.Functor.Sum
 import Hedgehog
 
@@ -712,7 +713,7 @@ genCompIf cfg ws =
   genBetween'1 ws (pure AST.KIf) <*>
   Gen.small (genTestNocond cfg ws) <*>
   genMaybeF
-    (Gen.small . genBeforeF (Gen.list (Range.linear 0 10) ws) $ genCompIter cfg ws) <*>
+    (Gen.small $ genCompIter cfg ws) <*>
   pure ()
 
 genCompIter
@@ -784,12 +785,11 @@ genCompFor cfg ws =
     (genBetween'1 ws $ pure AST.KFor)
     (genAfter1F ws .
      Gen.small $
-     genTestlistStarExpr genExpr genStarExpr (cfg & atomType .~ SAssignable) ws) <*>
+     genExprList (cfg & atomType .~ SAssignable) ws) <*>
   genBefore1F ws
     (Gen.small $ genOrTest (cfg & atomType .~ SNotAssignable) ws) <*>
   genMaybeF
-    (genBeforeF (Gen.list (Range.linear 0 10) ws) .
-     Gen.small $
+    (Gen.small $
      genCompIter (cfg & atomType .~ SNotAssignable) ws) <*>
   pure ()
 
@@ -851,8 +851,18 @@ genTrailer cfg ws =
         (commonNonRec cfg ws) $
         commonRec cfg ++
         [ AST.TrailerCall <$>
-          genBetween'F (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
-            (genMaybeF $ genArgumentList cfg genIdentifier genTest) <*>
+          genBeforeF (Gen.list (Range.linear 0 10) genAnyWhitespaceChar)
+            (genMaybeF $
+             genArgumentList
+               cfg
+               (liftA2
+                 Pair
+                 (genTest cfg genAnyWhitespaceChar)
+                 (genMaybeF
+                   (genCompFor cfg genAnyWhitespaceChar)))
+               (genTest cfg genAnyWhitespaceChar)
+               genIdentifier
+               genTest) <*>
           pure ()
         ]
     SAssignable ->

@@ -1,0 +1,6 @@
+try:
+  a
+except b as c:
+  pass
+except d as e:
+  pass

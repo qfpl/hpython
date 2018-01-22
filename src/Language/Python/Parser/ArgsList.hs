@@ -27,7 +27,8 @@ argsListArg ws p pname =
   annotated $
   ArgsListArg <$>
   pname <*>
-  optionalF (beforeF (between' (many ws) equals) p)
+  optionalF
+    (beforeF (try $ between' (many ws) equals) p)
 
 argsListStarPart
   :: ( DeltaParsing m
@@ -41,13 +42,18 @@ argsListStarPart
   -> Unspaced m (ArgsListStarPart ws name f SrcInfo)
 argsListStarPart ws p pname =
   annotated $
-  try argsListStarPartSome <|>
+  argsListStarPartSome <|>
   pure ArgsListStarPartEmpty
   where
     argsListStarPartSome =
       ArgsListStarPart <$>
-      beforeF (after (many ws) asterisk) pname <*>
-      manyF (beforeF (between' (many ws) comma) (argsListArg ws p pname)) <*>
+      try (beforeF (after (many ws) asterisk) pname) <*>
+      manyF
+        (beforeF
+          (try $
+           between' (many ws) comma <*
+           notFollowedBy doubleAsterisk)
+          (argsListArg ws p pname)) <*>
       optionalF
         (beforeF
           (between' (many ws) comma)
@@ -84,9 +90,14 @@ argsList ws p pname = argsListAll <|> argsListArgsKwargs
       argsListArg ws p pname <*>
       manyF
         (beforeF
-          (try $ between' (many ws) comma <* notFollowedBy asterisk)
+          (try $
+           between' (many ws) comma <*
+           notFollowedBy asterisk)
           (argsListArg ws p pname)) <*>
-      optionalF (beforeF (between' (many ws) comma) $ optionalF starOrDouble)
+      optionalF
+        (beforeF
+          (between' (many ws) comma)
+          (optionalF starOrDouble))
 
     argsListArgsKwargs =
       annotated $
@@ -94,5 +105,5 @@ argsList ws p pname = argsListAll <|> argsListArgsKwargs
       starOrDouble
 
     starOrDouble = 
-      (InL <$> try (argsListStarPart ws p pname)) <|>
+      (InL <$> argsListStarPart ws p pname) <|>
       (InR <$> argsListDoublestarArg ws pname)

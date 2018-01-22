@@ -44,7 +44,7 @@ _ShortStringCharSingle =
       '\n' -> Nothing
       '\r' -> Nothing
       '\'' -> Nothing
-      '\\' -> Nothing
+      -- '\\' -> Nothing
       '\0' -> Nothing
       c -> Just $ ShortStringCharSingle c)
 
@@ -56,7 +56,7 @@ _ShortStringCharDouble =
       '\n' -> Nothing
       '\r' -> Nothing
       '"' -> Nothing
-      '\\' -> Nothing
+      -- '\\' -> Nothing
       '\0' -> Nothing
       c -> Just $ ShortStringCharDouble c)
   
@@ -71,7 +71,7 @@ parseShortStringCharSingle
 parseShortStringCharSingle =
   (\c -> fromMaybe (error $ show c) $ c ^? _ShortStringCharSingle) <$>
   noneOfSet
-    (CharSet.fromList "\n\r'\\\0")
+    (CharSet.fromList "\n\r'\0")
 
 parseShortStringCharDouble
   :: ( HasCallStack
@@ -80,4 +80,4 @@ parseShortStringCharDouble
 parseShortStringCharDouble =
   (\c -> fromMaybe (error $ show c) $ c ^? _ShortStringCharDouble) <$>
   noneOfSet
-    (CharSet.fromList "\n\r\"\\\0")
+    (CharSet.fromList "\n\r\"\0")

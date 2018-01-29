@@ -85,3 +85,9 @@ kElif = reserve idStyle "elif" $> KElif
 
 kAsync :: (TokenParsing m, Monad m) => m KAsync
 kAsync = reserve idStyle "async" $> KAsync
+
+kIs :: (TokenParsing m, Monad m) => m KIs
+kIs = reserve idStyle "is" $> KIs
+
+kNot :: (TokenParsing m, Monad m) => m KNot
+kNot = reserve idStyle "not" $> KNot

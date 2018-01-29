@@ -217,6 +217,8 @@ prop_statement_ast_is_valid_python scfg ecfg =
         failure
       SyntaxCorrect -> success
 
+-- not (not x)
+
 makeParserPrinterTests :: IO [TestTree]
 makeParserPrinterTests = do
   exprFiles <-

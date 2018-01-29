@@ -32,22 +32,22 @@ data CompOperator ws
   , _compNEq_spaceAfter :: [ws]
   }
   | CompIs
-  { _compIs_spaceBefore :: NonEmpty ws
-  , _compIs_spaceAfter :: NonEmpty ws
+  { _compIs_spaceBefore :: [ws]
+  , _compIs_spaceAfter :: [ws]
   }
   | CompIsNot
-  { _compIsNot_spaceBefore :: NonEmpty ws
+  { _compIsNot_spaceBefore :: [ws]
   , _compIsNot_spaceBetween :: NonEmpty ws
-  , _compIsNot_spaceAfter :: NonEmpty ws
+  , _compIsNot_spaceAfter :: [ws]
   }
   | CompIn
-  { _compIn_spaceBefore :: NonEmpty ws
-  , _compIn_spaceAfter :: NonEmpty ws
+  { _compIn_spaceBefore :: [ws]
+  , _compIn_spaceAfter :: [ws]
   }
   | CompNotIn
-  { _compNotIn_spaceBefore :: NonEmpty ws
+  { _compNotIn_spaceBefore :: [ws]
   , _compNotIn_spaceBetween :: NonEmpty ws
-  , _compNotIn_spaceAfter :: NonEmpty ws
+  , _compNotIn_spaceAfter :: [ws]
   }
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 

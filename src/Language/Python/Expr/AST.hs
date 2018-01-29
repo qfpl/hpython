@@ -498,7 +498,7 @@ data NotTest :: * -> AtomType -> DefinitionContext -> * -> * where
   NotTestMany ::
     { _notTestMany_value
       :: Compose
-          (Before (After (NonEmpty ws) KNot))
+          (Before (After [ws] KNot))
           (NotTest ws 'NotAssignable ctxt)
           a
     , _notTestMany_ann :: a

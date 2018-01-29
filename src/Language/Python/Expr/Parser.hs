@@ -919,25 +919,25 @@ compOperator ws =
 
     compIsNot =
       CompIsNot <$>
-      (some1 ws <* string "is") <*>
-      (some1 ws <* string "not") <*>
-      some1 ws
+      (many ws <* kIs) <*>
+      (some1 ws <* kNot) <*>
+      many ws
 
     compIs =
       CompIs <$>
-      (some1 ws <* string "is") <*>
-      some1 ws
+      (many ws <* kIs) <*>
+      many ws
 
     compIn =
       CompIn <$>
-      (some1 ws <* string "in") <*>
-      some1 ws
+      (many ws <* kIn) <*>
+      many ws
 
     compNotIn =
       CompNotIn <$>
-      (some1 ws <* string "not") <*>
-      (some1 ws <* string "in") <*>
-      some1 ws
+      (many ws <* kNot) <*>
+      (some1 ws <* kIn) <*>
+      many ws
 
 comparison
   :: (DeltaParsing m, LookAheadParsing m)
@@ -958,7 +958,7 @@ notTest ws = notTestMany <|> notTestOne
     notTestMany =
       annotated $
       NotTestMany <$>
-      beforeF (after1 ws $ string "not" $> KNot) (notTest ws)
+      beforeF (after (many ws) kNot) (notTest ws)
 
     notTestOne =
       annotated $ NotTestOne <$> comparison ws

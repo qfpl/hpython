@@ -378,7 +378,7 @@ data NotTest ws a
   = NotTestMany
   { _notTestMany_value
     :: Compose
-        (Before (After (NonEmpty ws) KNot))
+        (Before (After [ws] KNot))
         (NotTest ws)
         a
   , _notTestMany_ann :: a

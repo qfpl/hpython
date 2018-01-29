@@ -1150,10 +1150,10 @@ genCompOperator ws =
       , AST.CompGEq <$> wss <*> wss
       , AST.CompLEq <$> wss <*> wss
       , AST.CompNEq <$> wss <*> wss
-      , AST.CompIs <$> wss1 <*> wss1
-      , AST.CompIn <$> wss1 <*> wss1
-      , AST.CompIsNot <$> wss1 <*> wss1 <*> wss1
-      , AST.CompNotIn <$> wss1 <*> wss1 <*> wss1
+      , AST.CompIs <$> wss <*> wss
+      , AST.CompIn <$> wss <*> wss
+      , AST.CompIsNot <$> wss <*> wss1 <*> wss
+      , AST.CompNotIn <$> wss <*> wss1 <*> wss
       ]
 
 genComparison
@@ -1195,7 +1195,7 @@ genNotTest cfg ws =
         [ notTestOne cfg ws ]
         [ AST.NotTestMany <$>
           genBeforeF
-            (genAfter1 ws $ pure AST.KNot)
+            (genAfter (Gen.list (Range.linear 0 10) ws) $ pure AST.KNot)
             (genNotTest cfg ws) <*>
           pure ()
         ]

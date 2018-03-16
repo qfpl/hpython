@@ -101,6 +101,12 @@ data Param (v :: [*]) a
   , _unsafeKeywordParamExpr :: Expr v a
   }
   deriving (Eq, Show)
+paramAnn :: Lens' (Param v a) a
+paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
+
+paramName :: Lens (Param v a) (Param '[] a) (Ident v a) (Ident v a)
+paramName = lens _paramName (\s a -> coerce $ s { _paramName = a})
+
 instance HasExprs Param where
   _Exprs f (KeywordParam a name ws1 ws2 expr) =
     KeywordParam a (coerce name) <$> pure ws1 <*> pure ws2 <*> f expr

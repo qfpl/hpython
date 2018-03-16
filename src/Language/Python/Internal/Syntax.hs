@@ -146,6 +146,8 @@ instance HasBlocks Statement where
   _Blocks _ s@Return{} = pure $ coerce s
   _Blocks _ s@Pass{} = pure $ coerce s
   _Blocks _ s@Break{} = pure $ coerce s
+  _Blocks _ s@Global{} = pure $ coerce s
+  _Blocks _ s@Nonlocal{} = pure $ coerce s
 
 data Newline = CR | LF | CRLF deriving (Eq, Show)
 
@@ -169,6 +171,8 @@ data Statement (v :: [*]) a
   | Assign a (Expr v a) [Whitespace] [Whitespace] (Expr v a)
   | Pass a
   | Break a
+  | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
+  | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   deriving (Eq, Show)
 instance Plated (Statement v a) where
   plate f (Fundef a ws1 b ws2 c ws3 ws4 nl sts) =
@@ -184,6 +188,8 @@ instance Plated (Statement v a) where
     While a ws1 b ws2 ws3 nl <$> (_Wrapped.traverse._3) f sts
   plate _ s@Break{} = pure $ coerce s
   plate _ s@Pass{} = pure $ coerce s
+  plate _ s@Global{} = pure $ coerce s
+  plate _ s@Nonlocal{} = pure $ coerce s
 
 data CommaSep a
   = CommaSepNone
@@ -194,6 +200,18 @@ listToCommaSep :: [a] -> CommaSep a
 listToCommaSep [] = CommaSepNone
 listToCommaSep [a] = CommaSepOne a
 listToCommaSep (a:as) = CommaSepMany a [] [Space] $ listToCommaSep as
+
+-- | Non-empty 'CommaSep'
+data CommaSep1 a
+  = CommaSepOne1 a
+  | CommaSepMany1 a [Whitespace] [Whitespace] (CommaSep1 a)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+listToCommaSep1 :: NonEmpty a -> CommaSep1 a
+listToCommaSep1 (a :| as) = go (a:as)
+  where
+    go [] = error "impossible"
+    go [x] = CommaSepOne1 x
+    go (x:xs) = CommaSepMany1 x [] [Space] $ go xs
 
 data Expr (v :: [*]) a
   = List
@@ -323,6 +341,8 @@ instance HasExprs Statement where
   _Exprs f (Assign a e1 ws1 ws2 e2) = Assign a <$> f e1 <*> pure ws1 <*> pure ws2 <*> f e2
   _Exprs _ p@Pass{} = pure $ coerce p
   _Exprs _ p@Break{} = pure $ coerce p
+  _Exprs _ p@Global{} = pure $ coerce p
+  _Exprs _ p@Nonlocal{} = pure $ coerce p
 
 -- | 'Traversal' over all the statements in a term
 class HasStatements s where

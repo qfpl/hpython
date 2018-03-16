@@ -117,3 +117,5 @@ instance HasNewlines Statement where
       Assign{} -> pure s
       Pass{} -> pure s
       Break{} -> pure s
+      Global{} -> pure s
+      Nonlocal{} -> pure s

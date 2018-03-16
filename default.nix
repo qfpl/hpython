@@ -4,7 +4,7 @@ let
 
   inherit (nixpkgs) pkgs;
 
-  f = import ./pyfactor.nix;
+  f = import ./hpython.nix;
 
 
   haskellPackages = if compiler == "default"

@@ -101,6 +101,13 @@ renderCommaSep f (CommaSepMany a ws1 ws2 c) =
   foldMap renderWhitespace ws1 <> "," <> foldMap renderWhitespace ws2 <>
   renderCommaSep f c
 
+renderCommaSep1 :: (a -> String) -> CommaSep1 a -> String
+renderCommaSep1 f (CommaSepOne1 a) = f a
+renderCommaSep1 f (CommaSepMany1 a ws1 ws2 c) =
+  f a <>
+  foldMap renderWhitespace ws1 <> "," <> foldMap renderWhitespace ws2 <>
+  renderCommaSep1 f c
+
 renderIdent :: Ident v a -> String
 renderIdent = _identValue
 
@@ -198,6 +205,10 @@ renderStatement (Assign _ lvalue ws1 ws2 rvalue) =
   foldMap renderWhitespace ws2 <> renderExpr rvalue
 renderStatement (Pass _) = OneLine "pass"
 renderStatement (Break _) = OneLine "break"
+renderStatement (Global _ ws ids) =
+  OneLine $ "global" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
+renderStatement (Nonlocal _ ws ids) =
+  OneLine $ "nonlocal" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
 
 renderArgs :: CommaSep (Arg v a) -> String
 renderArgs a = "(" <> renderCommaSep go a <> ")"

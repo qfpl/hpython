@@ -1,6 +1,0 @@
-try:
-  pass
-except a as b:
-  pass
-finally:
-  pass

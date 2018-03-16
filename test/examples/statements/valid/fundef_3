@@ -1,2 +1,0 @@
-def a(a, b=2):
-    pass

@@ -1,6 +1,0 @@
-def test(a,
-          b):
-
-  hello = b(
-    a
-    )

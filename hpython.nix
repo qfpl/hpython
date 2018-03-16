@@ -1,25 +1,16 @@
-{ mkDerivation, ansi-wl-pprint, base, charset, containers
-, deriving-compat, digit, directory, dlist, filepath, hedgehog
-, hspec-expectations-pretty-diff, indentation-trifecta, mtl, papa
-, parsers, pretty, process, singletons, stdenv, tasty
-, tasty-hedgehog, tasty-hspec, text, transformers, trifecta
-, unordered-containers, validation
+{ mkDerivation, base, hedgehog, lens, mtl, parsers, process, stdenv
+, transformers, trifecta, type-level-sets
 }:
 mkDerivation {
   pname = "hpython";
-  version = "0.0.1.0";
+  version = "0.1.0.0";
   src = ./.;
+  isLibrary = true;
+  isExecutable = true;
   libraryHaskellDepends = [
-    base charset containers deriving-compat digit dlist
-    indentation-trifecta mtl papa parsers pretty singletons text
-    transformers trifecta unordered-containers validation
+    base lens mtl parsers trifecta type-level-sets
   ];
-  testHaskellDepends = [
-    ansi-wl-pprint base directory filepath hedgehog
-    hspec-expectations-pretty-diff mtl papa pretty process tasty
-    tasty-hedgehog tasty-hspec text transformers trifecta
-  ];
-  homepage = "https://github.com/qfpl/hpython";
-  description = "Write Python using Haskell";
+  executableHaskellDepends = [ base lens ];
+  testHaskellDepends = [ base hedgehog lens process transformers ];
   license = stdenv.lib.licenses.bsd3;
 }

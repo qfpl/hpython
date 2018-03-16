@@ -1,5 +1,0 @@
-def a():
-  try:
-    pass
-  except:
-    pass

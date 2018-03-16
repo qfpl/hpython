@@ -1,23 +1,20 @@
-{ nixpkgs ? import <nixpkgs> { }, compiler ? "default" }:
+{ nixpkgs ? import <nixpkgs> {}, compiler ? "default" }:
+
 let
+
   inherit (nixpkgs) pkgs;
 
-  haskellPackages =
-    if compiler == "default"
-    then pkgs.haskellPackages
-    else pkgs.haskell.packages.${compiler};
+  f = import ./pyfactor.nix;
 
-  drv = haskellPackages.callPackage
-    ./hpython.nix
-    { digit =
-        haskellPackages.callPackage
-          (import ./nix/digit.nix { inherit pkgs; })
-          {};
-    };
 
-  drvWithPython =
-    drv.overrideAttrs (oldAttrs: oldAttrs // {
-      buildInputs = oldAttrs.buildInputs ++ [ pkgs.python3 ];
-    });
+  haskellPackages = if compiler == "default"
+                       then pkgs.haskellPackages
+                       else pkgs.haskell.packages.${compiler};
 
-in drvWithPython
+  type-level-sets = haskellPackages.callPackage ./nix/type-level-sets.nix {};
+
+  drv = haskellPackages.callPackage f { inherit type-level-sets; };
+
+in
+
+  pkgs.haskell.lib.dontHaddock drv

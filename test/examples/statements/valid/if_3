@@ -1,5 +1,0 @@
-if a:
-  # testing
-  b
-else:
-  c

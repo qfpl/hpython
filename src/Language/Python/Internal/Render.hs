@@ -209,6 +209,8 @@ renderStatement (Global _ ws ids) =
   OneLine $ "global" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
 renderStatement (Nonlocal _ ws ids) =
   OneLine $ "nonlocal" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
+renderStatement (Del _ ws ids) =
+  OneLine $ "del" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
 
 renderArgs :: CommaSep (Arg v a) -> String
 renderArgs a = "(" <> renderCommaSep go a <> ")"

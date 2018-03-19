@@ -9,6 +9,9 @@ import Language.Python.Internal.Syntax
 data ScopeError (v :: [*]) a
   = FoundNonlocal a
   | FoundGlobal a
+  | FoundDel a
+  | FoundDynamic a (Ident v a)
   | NotInScope (Ident v a)
+  deriving (Eq, Show)
 
 makeClassyPrisms ''ScopeError

@@ -107,3 +107,4 @@ validateStatementIndentation e@Pass{} = pure $ coerce e
 validateStatementIndentation e@Break{} = pure $ coerce e
 validateStatementIndentation e@Global{} = pure $ coerce e
 validateStatementIndentation e@Nonlocal{} = pure $ coerce e
+validateStatementIndentation e@Del{} = pure $ coerce e

@@ -154,6 +154,7 @@ instance HasBlocks Statement where
   _Blocks _ s@Break{} = pure $ coerce s
   _Blocks _ s@Global{} = pure $ coerce s
   _Blocks _ s@Nonlocal{} = pure $ coerce s
+  _Blocks _ s@Del{} = pure $ coerce s
 
 data Newline = CR | LF | CRLF deriving (Eq, Show)
 
@@ -179,6 +180,7 @@ data Statement (v :: [*]) a
   | Break a
   | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
+  | Del a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   deriving (Eq, Show)
 instance Plated (Statement v a) where
   plate f (Fundef a ws1 b ws2 c ws3 ws4 nl sts) =
@@ -196,6 +198,7 @@ instance Plated (Statement v a) where
   plate _ s@Pass{} = pure $ coerce s
   plate _ s@Global{} = pure $ coerce s
   plate _ s@Nonlocal{} = pure $ coerce s
+  plate _ s@Del{} = pure $ coerce s
 
 data CommaSep a
   = CommaSepNone
@@ -288,7 +291,7 @@ instance Num (Expr '[] ()) where
   (-) a = BinOp () a [Space] (Minus ()) [Space]
   signum = undefined
   abs = undefined
-instance Plated (Expr '[] ()) where
+instance Plated (Expr '[] a) where
   plate f (Parens a ws1 e ws2) = Parens a ws1 <$> f e <*> pure ws2
   plate f (List a ws1 exprs ws2) = List a ws1 <$> traverse f exprs <*> pure ws2
   plate f (Deref a expr ws1 ws2 name) =
@@ -349,6 +352,7 @@ instance HasExprs Statement where
   _Exprs _ p@Break{} = pure $ coerce p
   _Exprs _ p@Global{} = pure $ coerce p
   _Exprs _ p@Nonlocal{} = pure $ coerce p
+  _Exprs _ p@Del{} = pure $ coerce p
 
 -- | 'Traversal' over all the statements in a term
 class HasStatements s where

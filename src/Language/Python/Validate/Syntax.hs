@@ -34,6 +34,13 @@ data SyntaxContext
   , _inFunction :: Bool
   }
 
+initialSyntaxContext :: SyntaxContext
+initialSyntaxContext =
+  SyntaxContext
+  { _inLoop = False
+  , _inFunction = False
+  }
+
 class StartsWith s where
   startsWith :: s -> Maybe Char
 
@@ -246,6 +253,8 @@ validateStatementSyntax ctxt (Global a ws ids) =
   Global a ws <$> traverse validateIdent ids
 validateStatementSyntax ctxt (Nonlocal a ws ids) =
   Nonlocal a ws <$> traverse validateIdent ids
+validateStatementSyntax ctxt (Del a ws ids) =
+  Del a ws <$> traverse validateIdent ids
 
 canAssignTo :: Expr v a -> Bool
 canAssignTo None{} = False

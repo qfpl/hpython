@@ -119,3 +119,4 @@ instance HasNewlines Statement where
       Break{} -> pure s
       Global{} -> pure s
       Nonlocal{} -> pure s
+      Del{} -> pure s

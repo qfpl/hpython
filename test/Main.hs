@@ -8,6 +8,7 @@ import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Syntax.Error
 import Generators
+import Scope
 
 import Control.Lens
 import Control.Monad.IO.Class
@@ -18,6 +19,7 @@ import System.Exit
 import System.Process
 
 import Hedgehog
+import qualified Hedgehog.Gen as Gen
 
 validateExprSyntax'
   :: Expr '[Indentation] a
@@ -58,7 +60,7 @@ runPython3 shouldSucceed str = do
 syntax_expr :: Property
 syntax_expr =
   property $ do
-    ex <- forAll genSizedExpr
+    ex <- forAll $ Gen.resize 300 genSizedExpr
     let rex = renderExpr ex
     shouldSucceed <-
       case validateExprIndentation' ex of
@@ -75,7 +77,7 @@ syntax_expr =
 syntax_statement :: Property
 syntax_statement =
   property $ do
-    st <- forAll genSizedStatement
+    st <- forAll $ Gen.resize 300 genSizedStatement
     let rst = renderLines $ renderStatement st
     shouldSucceed <-
       case validateStatementIndentation' st of
@@ -88,5 +90,6 @@ syntax_statement =
     runPython3 shouldSucceed rst
 
 main = do
-  check $ withTests 1000 syntax_expr
-  check $ withTests 1000 syntax_statement
+  check $ withTests 200 syntax_expr
+  check $ withTests 200 syntax_statement
+  checkParallel scopeTests

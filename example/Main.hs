@@ -9,23 +9,39 @@ import Language.Python.Validate.Syntax
 import Language.Python.Validate.Syntax.Error
 import Language.Python.Validate.Indentation
 import Language.Python.Validate.Indentation.Error
+import Language.Python.Validate.Scope
+import Language.Python.Validate.Scope.Error
 import Language.Python.Internal.Render
 
-runExample x =
+runExampleSyntax x =
   case validateStatementIndentation x of
     Failure errs -> print (errs :: [IndentationError '[] ()])
     Success a ->
-      case validateStatementSyntax (SyntaxContext {_inLoop = False, _inFunction = False}) a of
+      case validateStatementSyntax initialSyntaxContext a of
         Failure errs -> print (errs :: [SyntaxError '[Indentation] ()])
         Success a' -> putStrLn . renderLines $ renderStatement a'
 
+runExampleScope x =
+  case validateStatementIndentation x of
+    Failure errs -> print (errs :: [IndentationError '[] ()])
+    Success a ->
+      case validateStatementSyntax initialSyntaxContext a of
+        Failure errs -> print (errs :: [SyntaxError '[Indentation] ()])
+        Success a' ->
+          case runValidateScope initialScopeContext (validateStatementScope a') of
+            Failure errs -> print (errs :: [ScopeError '[Syntax, Indentation] ()])
+            Success a'' ->
+              putStrLn . renderLines $ renderStatement a''
+
 main = do
-  runExample (append_to ())
-  runExample (rewrite fixMDA append_to')
-  runExample (append_to'' ())
-  runExample bracketing
-  runExample (indentSpaces 2 append_to')
-  runExample (indentTabs append_to')
-  runExample (rewrite optimize_tr fact_tr)
-  runExample (rewrite optimize_tr spin)
-  runExample (rewrite optimize_tr yes)
+  runExampleSyntax (append_to ())
+  runExampleSyntax (rewrite fixMDA append_to')
+  runExampleSyntax (append_to'' ())
+  runExampleSyntax bracketing
+  runExampleSyntax (indentSpaces 2 append_to')
+  runExampleSyntax (indentTabs append_to')
+  runExampleScope (rewrite optimize_tr fact_tr)
+  runExampleSyntax (rewrite optimize_tr spin)
+  runExampleSyntax (rewrite optimize_tr yes)
+  runExampleSyntax badly_scoped
+  runExampleScope badly_scoped

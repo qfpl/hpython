@@ -101,6 +101,12 @@ data Param (v :: [*]) a
   , _unsafeKeywordParamExpr :: Expr v a
   }
   deriving (Eq, Show)
+paramAnn :: Lens' (Param v a) a
+paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
+
+paramName :: Lens (Param v a) (Param '[] a) (Ident v a) (Ident v a)
+paramName = lens _paramName (\s a -> coerce $ s { _paramName = a})
+
 instance HasExprs Param where
   _Exprs f (KeywordParam a name ws1 ws2 expr) =
     KeywordParam a (coerce name) <$> pure ws1 <*> pure ws2 <*> f expr
@@ -146,6 +152,9 @@ instance HasBlocks Statement where
   _Blocks _ s@Return{} = pure $ coerce s
   _Blocks _ s@Pass{} = pure $ coerce s
   _Blocks _ s@Break{} = pure $ coerce s
+  _Blocks _ s@Global{} = pure $ coerce s
+  _Blocks _ s@Nonlocal{} = pure $ coerce s
+  _Blocks _ s@Del{} = pure $ coerce s
 
 data Newline = CR | LF | CRLF deriving (Eq, Show)
 
@@ -169,6 +178,9 @@ data Statement (v :: [*]) a
   | Assign a (Expr v a) [Whitespace] [Whitespace] (Expr v a)
   | Pass a
   | Break a
+  | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
+  | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
+  | Del a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   deriving (Eq, Show)
 instance Plated (Statement v a) where
   plate f (Fundef a ws1 b ws2 c ws3 ws4 nl sts) =
@@ -184,6 +196,9 @@ instance Plated (Statement v a) where
     While a ws1 b ws2 ws3 nl <$> (_Wrapped.traverse._3) f sts
   plate _ s@Break{} = pure $ coerce s
   plate _ s@Pass{} = pure $ coerce s
+  plate _ s@Global{} = pure $ coerce s
+  plate _ s@Nonlocal{} = pure $ coerce s
+  plate _ s@Del{} = pure $ coerce s
 
 data CommaSep a
   = CommaSepNone
@@ -194,6 +209,18 @@ listToCommaSep :: [a] -> CommaSep a
 listToCommaSep [] = CommaSepNone
 listToCommaSep [a] = CommaSepOne a
 listToCommaSep (a:as) = CommaSepMany a [] [Space] $ listToCommaSep as
+
+-- | Non-empty 'CommaSep'
+data CommaSep1 a
+  = CommaSepOne1 a
+  | CommaSepMany1 a [Whitespace] [Whitespace] (CommaSep1 a)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+listToCommaSep1 :: NonEmpty a -> CommaSep1 a
+listToCommaSep1 (a :| as) = go (a:as)
+  where
+    go [] = error "impossible"
+    go [x] = CommaSepOne1 x
+    go (x:xs) = CommaSepMany1 x [] [Space] $ go xs
 
 data Expr (v :: [*]) a
   = List
@@ -264,7 +291,7 @@ instance Num (Expr '[] ()) where
   (-) a = BinOp () a [Space] (Minus ()) [Space]
   signum = undefined
   abs = undefined
-instance Plated (Expr '[] ()) where
+instance Plated (Expr '[] a) where
   plate f (Parens a ws1 e ws2) = Parens a ws1 <$> f e <*> pure ws2
   plate f (List a ws1 exprs ws2) = List a ws1 <$> traverse f exprs <*> pure ws2
   plate f (Deref a expr ws1 ws2 name) =
@@ -323,6 +350,9 @@ instance HasExprs Statement where
   _Exprs f (Assign a e1 ws1 ws2 e2) = Assign a <$> f e1 <*> pure ws1 <*> pure ws2 <*> f e2
   _Exprs _ p@Pass{} = pure $ coerce p
   _Exprs _ p@Break{} = pure $ coerce p
+  _Exprs _ p@Global{} = pure $ coerce p
+  _Exprs _ p@Nonlocal{} = pure $ coerce p
+  _Exprs _ p@Del{} = pure $ coerce p
 
 -- | 'Traversal' over all the statements in a term
 class HasStatements s where

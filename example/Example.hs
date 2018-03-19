@@ -20,11 +20,6 @@ import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax
 
-{-
-def append_to(element, to=[]):
-    to.append(element)
-    return to
--}
 append_to a =
   Fundef a
     [Space]
@@ -238,3 +233,10 @@ optimize_tr st = do
               ]
       | otherwise = [r]
     looped name params s = [s]
+
+badly_scoped =
+  def_ "test" [p_ "a", p_ "b"]
+  [ var_ "c" .= 0
+  , if_ true_ [ var_ "c" .= 2]
+  , return_ $ var_ "a" .+ var_ "b" .+ var_ "c"
+  ]

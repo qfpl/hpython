@@ -22,6 +22,8 @@ library
                      , Language.Python.Internal.Parse
                      , Language.Python.Internal.Render
                      , Language.Python.Internal.Syntax
+                     , Language.Python.Validate.Scope
+                     , Language.Python.Validate.Scope.Error
                      , Language.Python.Validate.Syntax
                      , Language.Python.Validate.Syntax.Error
                      , Language.Python.Validate.Indentation
@@ -32,6 +34,7 @@ library
                      , parsers
                      , trifecta
                      , mtl
+                     , bytestring-trie >=0.2
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -O2

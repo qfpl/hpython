@@ -230,6 +230,9 @@ statementSize (While _ _ a _ _ _ b) = 1 + exprSize a + blockSize b
 statementSize (Assign _ a _ _ b) = 1 + exprSize a + exprSize b
 statementSize Pass{} = 1
 statementSize Break{} = 1
+statementSize (Global _ _ cs) = Size $ 1 + length cs
+statementSize (Nonlocal _ _ cs) = Size $ 1 + length cs
+statementSize (Del _ _ cs) = Size $ 1 + length cs
 
 genSizedStatement :: MonadGen m => m (Statement '[] ())
 genSizedStatement = Gen.sized $ \n ->

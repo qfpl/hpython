@@ -21,6 +21,7 @@ scopeTests =
   , ("Scope test 2", withTests 1 test_2)
   , ("Scope test 3", withTests 1 test_3)
   , ("Scope test 4", withTests 1 test_4)
+  , ("Scope test 5", withTests 1 test_5)
   ]
 
 validate
@@ -90,3 +91,15 @@ test_4 =
     res <- validate expr
     annotateShow res
     res === Failure [NotInScope (MkIdent () "g")]
+
+test_5 :: Property
+test_5 =
+  property $ do
+    let
+      expr =
+        def_ "test" [p_ "a"]
+          [ def_ "f" [k_ "b" (var_ "c")] [ pass_ ]
+          ]
+    res <- validate expr
+    annotateShow res
+    res === Failure [NotInScope (MkIdent () "c")]

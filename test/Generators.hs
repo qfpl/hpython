@@ -3,7 +3,6 @@ module Generators where
 
 import Control.Applicative
 import Control.Lens (sumOf, folded, _3, to)
-import Control.Monad
 import Data.List.NonEmpty (NonEmpty(..))
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -82,19 +81,6 @@ genCommaSep r m = do
       genWhitespaces <*>
       go s (n-1)
 
-genArg :: MonadGen m => m (Arg '[] ())
-genArg =
-  Gen.recursive Gen.choice
-    [ PositionalArg () <$> genExpr ]
-    [ KeywordArg () <$> genIdent <*> genWhitespaces <*> genWhitespaces <*> genExpr ]
-
-genParam :: MonadGen m => m (Param '[] ())
-genParam =
-  Gen.choice
-    [ PositionalParam () <$> genIdent
-    , KeywordParam () <$> genIdent <*> genWhitespaces <*> genWhitespaces <*> genExpr
-    ]
-
 blockSize :: Block v a -> Size
 blockSize (Block b) = sumOf (folded._3.to statementSize) b
 
@@ -171,8 +157,8 @@ genSizedBlock = do
               ((,,,) () indent <$> pure s1 <*> Gen.maybe genNewline)
               (pure $ unBlock b)
 
-genSizedCommaSep :: MonadGen m => (a -> Size) -> m a -> m (CommaSep a)
-genSizedCommaSep sm ma = Gen.sized $ \n ->
+genSizedCommaSep :: MonadGen m => m a -> m (CommaSep a)
+genSizedCommaSep ma = Gen.sized $ \n ->
   if n <= 1
   then pure CommaSepNone
   else
@@ -183,8 +169,24 @@ genSizedCommaSep sm ma = Gen.sized $ \n ->
           n' <- Gen.integral (Range.constant 1 (n-1))
           a <- Gen.resize n' ma
           Gen.subtermM
-            (Gen.resize (n - n') $ genSizedCommaSep sm ma)
+            (Gen.resize (n - n') $ genSizedCommaSep ma)
             (\b -> CommaSepMany a <$> genWhitespaces <*> genWhitespaces <*> pure b)
+      ]
+
+genSizedCommaSep1 :: MonadGen m => m a -> m (CommaSep1 a)
+genSizedCommaSep1 ma = Gen.sized $ \n ->
+  if n <= 1
+  then CommaSepOne1 <$> ma
+  else
+    Gen.resize (n-1) $
+    Gen.choice
+      [ CommaSepOne1 <$> ma
+      , Gen.sized $ \n -> do
+          n' <- Gen.integral (Range.constant 1 (n-1))
+          a <- Gen.resize n' ma
+          Gen.subtermM
+            (Gen.resize (n - n') $ genSizedCommaSep1 ma)
+            (\b -> CommaSepMany1 a <$> genWhitespaces <*> genWhitespaces <*> pure b)
       ]
 
 genSizedExpr :: MonadGen m => m (Expr '[] ())
@@ -196,7 +198,7 @@ genSizedExpr = Gen.sized $ \n ->
     Gen.choice $
       [ List () <$>
         genWhitespaces <*>
-        genSizedCommaSep exprSize genSizedExpr <*>
+        genSizedCommaSep genSizedExpr <*>
         genWhitespaces
       , Gen.subtermM
           genSizedExpr
@@ -209,7 +211,7 @@ genSizedExpr = Gen.sized $ \n ->
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
           a <- Gen.resize n' genSizedExpr
-          b <- Gen.resize (n - n') $ genSizedCommaSep argSize genSizedArg
+          b <- Gen.resize (n - n') $ genSizedCommaSep genSizedArg
           Call () a <$> genWhitespaces <*> pure b
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
@@ -243,33 +245,58 @@ genSizedStatement = Gen.sized $ \n ->
     Gen.choice
       [ Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
-          a <- Gen.resize n' $ genSizedCommaSep paramSize genSizedParam
+          a <- Gen.resize n' $ genSizedCommaSep genSizedParam
           b <- Gen.resize (n - n') genSizedBlock
           Fundef () <$> genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure a <*>
             genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
+      , Return () <$> genWhitespaces <*> genSizedExpr
+      , Expr () <$> genSizedExpr
+      , pure $ Pass ()
+      , pure $ Break ()
+      , Gen.sized $ \n -> do
+          n' <- Gen.integral (Range.constant 1 (n-1))
+          a <- Gen.resize n' genSizedExpr
+          b <- Gen.resize (n - n') genSizedExpr
+          Assign () a <$> genWhitespaces <*> genWhitespaces <*> pure b
+      , Gen.sized $ \n -> do
+          n' <- Gen.integral (Range.constant 1 (n-1))
+          n'' <- Gen.integral (Range.constant 0 (n-n'))
+          a <- Gen.resize n' genSizedExpr
+          b <- Gen.resize (n - n') genSizedBlock
+          c <-
+            if n - n' - n'' == 0
+            then pure Nothing
+            else
+              fmap Just $
+              (,,,) <$>
+              genWhitespaces <*>
+              genWhitespaces <*>
+              genNewline <*>
+              Gen.resize (n - n' - n'') genSizedBlock
+          If () <$> genWhitespaces <*> pure a <*>
+            genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b <*> pure c
+      , Gen.sized $ \n -> do
+          n' <- Gen.integral (Range.constant 1 (n-1))
+          a <- Gen.resize n' genSizedExpr
+          b <- Gen.resize (n - n') genSizedBlock
+          While () <$> genWhitespaces <*> pure a <*>
+            genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
+      , Gen.sized $ \n -> do
+          n' <- Gen.integral (Range.constant 2 (n-1))
+          Global () <$>
+            genWhitespaces1 <*>
+            Gen.resize n' (genSizedCommaSep1 genIdent)
+      , Gen.sized $ \n -> do
+          n' <- Gen.integral (Range.constant 2 (n-1))
+          Nonlocal () <$>
+            genWhitespaces1 <*>
+            Gen.resize n' (genSizedCommaSep1 genIdent)
+      , Gen.sized $ \n -> do
+          n' <- Gen.integral (Range.constant 2 (n-1))
+          Del () <$>
+            genWhitespaces1 <*>
+            Gen.resize n' (genSizedCommaSep1 genIdent)
       ]
-
-genList :: MonadGen m => m (Expr '[] ())
-genList =
-  List () <$>
-  genWhitespaces <*>
-  genCommaSep (Range.linear 0 5) genExpr <*>
-  genWhitespaces
-
-genDeref :: MonadGen m => m (Expr '[] ())
-genDeref =
-  Deref () <$>
-  genExpr <*>
-  genWhitespaces <*>
-  genWhitespaces <*>
-  genIdent
-
-genCall :: MonadGen m => m (Expr '[] ())
-genCall =
-  Call () <$>
-  genExpr <*>
-  genWhitespaces <*>
-  genCommaSep (Range.linear 0 5) genArg
 
 genNone :: MonadGen m => m (Expr '[] ())
 genNone = pure $ None ()
@@ -277,114 +304,8 @@ genNone = pure $ None ()
 genBool :: MonadGen m => m (Expr '[] ())
 genBool = Bool () <$> Gen.bool
 
-genBinOp :: MonadGen m => m (Expr '[] ())
-genBinOp =
-  BinOp () <$>
-  genExpr <*>
-  genWhitespaces <*>
-  genOp <*>
-  genWhitespaces <*>
-  genExpr
-
 genOp :: MonadGen m => m (BinOp ())
 genOp = Gen.element $ _opOperator <$> operatorTable
 
-genNegate :: MonadGen m => m (Expr '[] ())
-genNegate = Negate () <$> genWhitespaces <*> genExpr
-
-genParens :: MonadGen m => m (Expr '[] ())
-genParens = Parens () <$> genWhitespaces <*> genExpr <*> genWhitespaces
-
 genInt :: MonadGen m => m (Expr '[] ())
 genInt = Int () <$> Gen.integral (Range.constant (-2^16) (2^16))
-
-genExpr :: MonadGen m => m (Expr '[] ())
-genExpr =
-  Gen.recursive Gen.choice
-    [ genNone
-    , Ident () <$> genIdent
-    , genInt
-    , genBool
-    , String () <$> genString
-    ]
-    [ genList
-    , genDeref
-    , genCall
-    , genBinOp
-    , genNegate
-    , genParens
-    ]
-
-genBlock :: MonadGen m => Range Int -> m (Block '[] ())
-genBlock r = do
-  n <- Size <$> Gen.integral r
-  when (n == 0) $ error "cannot generate block of size 0"
-  Block . NonEmpty.fromList <$> Gen.sized (\s -> go (s `div` n) n)
-  where
-    go _ 0 = pure []
-    go s n =
-      liftA2
-        (:)
-        (Gen.resize s $
-         (,,,) () <$>
-         genWhitespaces <*>
-         genStatement <*>
-         Gen.maybe genNewline)
-        (go s $ n-1)
-
-genStatement :: MonadGen m => m (Statement '[] ())
-genStatement =
-  Gen.recursive Gen.choice
-    [ genPass
-    , genBreak
-    ]
-    [ genAssign
-    , genEx
-    , genReturn
-    , genFundef
-    , genIf
-    , genWhile
-    ]
-  where
-    genFundef =
-      Fundef () <$>
-      genWhitespaces1 <*>
-      genIdent <*>
-      genWhitespaces <*>
-      genCommaSep (Range.linear 0 5) genParam <*>
-      genWhitespaces <*>
-      genWhitespaces <*>
-      genNewline <*>
-      genBlock (Range.exponential 1 10)
-    genReturn = Return () <$> genWhitespaces <*> genExpr
-    genEx = Expr () <$> genExpr
-    genIf =
-      If () <$>
-      genWhitespaces <*>
-      genExpr <*>
-      genWhitespaces <*>
-      genWhitespaces <*>
-      genNewline <*>
-      genBlock (Range.exponential 1 10) <*>
-      Gen.maybe
-        ((,,,) <$>
-         genWhitespaces <*>
-         genWhitespaces <*>
-         genNewline <*>
-         genBlock (Range.exponential 1 10))
-    genWhile =
-      While () <$>
-      genWhitespaces <*>
-      genExpr <*>
-      genWhitespaces <*>
-      genWhitespaces <*>
-      genNewline <*>
-      genBlock (Range.exponential 1 10)
-    genPass = pure $ Pass ()
-    genBreak = pure $ Break ()
-    genAssign =
-      Assign () <$>
-      genExpr <*>
-      genWhitespaces <*>
-      genWhitespaces <*>
-      genExpr

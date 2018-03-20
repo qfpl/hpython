@@ -86,10 +86,9 @@ test_4 =
       expr =
         def_ "test" [p_ "a", p_ "b"]
           [ def_ "f" [] [ def_ "g" [] [pass_] ]
-          , expr_ $ call_ (var_ "f") []
+          , expr_ $ call_ (var_ "g") []
           ]
     res <- validate expr
-    annotateShow res
     res === Failure [NotInScope (MkIdent () "g")]
 
 test_5 :: Property

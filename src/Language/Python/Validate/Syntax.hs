@@ -251,8 +251,9 @@ validateStatementSyntax ctxt (Break a)
   | otherwise = Failure [_BreakOutsideLoop # a]
 validateStatementSyntax ctxt (Global a ws ids) =
   Global a ws <$> traverse validateIdent ids
-validateStatementSyntax ctxt (Nonlocal a ws ids) =
-  Nonlocal a ws <$> traverse validateIdent ids
+validateStatementSyntax ctxt (Nonlocal a ws ids)
+  | _inFunction ctxt = Nonlocal a ws <$> traverse validateIdent ids
+  | otherwise = Failure [_NonlocalOutsideFunction # a]
 validateStatementSyntax ctxt (Del a ws ids) =
   Del a ws <$> traverse validateIdent ids
 

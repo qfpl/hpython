@@ -3,7 +3,6 @@ module Generators where
 
 import Control.Applicative
 import Control.Lens (sumOf, folded, _3, to)
-import Control.Monad
 import Data.List.NonEmpty (NonEmpty(..))
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -81,19 +80,6 @@ genCommaSep r m = do
       genWhitespaces <*>
       genWhitespaces <*>
       go s (n-1)
-
-genArg :: MonadGen m => m (Arg '[] ())
-genArg =
-  Gen.recursive Gen.choice
-    [ PositionalArg () <$> genExpr ]
-    [ KeywordArg () <$> genIdent <*> genWhitespaces <*> genWhitespaces <*> genExpr ]
-
-genParam :: MonadGen m => m (Param '[] ())
-genParam =
-  Gen.choice
-    [ PositionalParam () <$> genIdent
-    , KeywordParam () <$> genIdent <*> genWhitespaces <*> genWhitespaces <*> genExpr
-    ]
 
 blockSize :: Block v a -> Size
 blockSize (Block b) = sumOf (folded._3.to statementSize) b
@@ -312,142 +298,14 @@ genSizedStatement = Gen.sized $ \n ->
             Gen.resize n' (genSizedCommaSep1 genIdent)
       ]
 
-genList :: MonadGen m => m (Expr '[] ())
-genList =
-  List () <$>
-  genWhitespaces <*>
-  genCommaSep (Range.linear 0 5) genExpr <*>
-  genWhitespaces
-
-genDeref :: MonadGen m => m (Expr '[] ())
-genDeref =
-  Deref () <$>
-  genExpr <*>
-  genWhitespaces <*>
-  genWhitespaces <*>
-  genIdent
-
-genCall :: MonadGen m => m (Expr '[] ())
-genCall =
-  Call () <$>
-  genExpr <*>
-  genWhitespaces <*>
-  genCommaSep (Range.linear 0 5) genArg
-
 genNone :: MonadGen m => m (Expr '[] ())
 genNone = pure $ None ()
 
 genBool :: MonadGen m => m (Expr '[] ())
 genBool = Bool () <$> Gen.bool
 
-genBinOp :: MonadGen m => m (Expr '[] ())
-genBinOp =
-  BinOp () <$>
-  genExpr <*>
-  genWhitespaces <*>
-  genOp <*>
-  genWhitespaces <*>
-  genExpr
-
 genOp :: MonadGen m => m (BinOp ())
 genOp = Gen.element $ _opOperator <$> operatorTable
 
-genNegate :: MonadGen m => m (Expr '[] ())
-genNegate = Negate () <$> genWhitespaces <*> genExpr
-
-genParens :: MonadGen m => m (Expr '[] ())
-genParens = Parens () <$> genWhitespaces <*> genExpr <*> genWhitespaces
-
 genInt :: MonadGen m => m (Expr '[] ())
 genInt = Int () <$> Gen.integral (Range.constant (-2^16) (2^16))
-
-genExpr :: MonadGen m => m (Expr '[] ())
-genExpr =
-  Gen.recursive Gen.choice
-    [ genNone
-    , Ident () <$> genIdent
-    , genInt
-    , genBool
-    , String () <$> genString
-    ]
-    [ genList
-    , genDeref
-    , genCall
-    , genBinOp
-    , genNegate
-    , genParens
-    ]
-
-genBlock :: MonadGen m => Range Int -> m (Block '[] ())
-genBlock r = do
-  n <- Size <$> Gen.integral r
-  when (n == 0) $ error "cannot generate block of size 0"
-  Block . NonEmpty.fromList <$> Gen.sized (\s -> go (s `div` n) n)
-  where
-    go _ 0 = pure []
-    go s n =
-      liftA2
-        (:)
-        (Gen.resize s $
-         (,,,) () <$>
-         genWhitespaces <*>
-         genStatement <*>
-         Gen.maybe genNewline)
-        (go s $ n-1)
-
-genStatement :: MonadGen m => m (Statement '[] ())
-genStatement =
-  Gen.recursive Gen.choice
-    [ genPass
-    , genBreak
-    ]
-    [ genAssign
-    , genEx
-    , genReturn
-    , genFundef
-    , genIf
-    , genWhile
-    ]
-  where
-    genFundef =
-      Fundef () <$>
-      genWhitespaces1 <*>
-      genIdent <*>
-      genWhitespaces <*>
-      genCommaSep (Range.linear 0 5) genParam <*>
-      genWhitespaces <*>
-      genWhitespaces <*>
-      genNewline <*>
-      genBlock (Range.exponential 1 10)
-    genReturn = Return () <$> genWhitespaces <*> genExpr
-    genEx = Expr () <$> genExpr
-    genIf =
-      If () <$>
-      genWhitespaces <*>
-      genExpr <*>
-      genWhitespaces <*>
-      genWhitespaces <*>
-      genNewline <*>
-      genBlock (Range.exponential 1 10) <*>
-      Gen.maybe
-        ((,,,) <$>
-         genWhitespaces <*>
-         genWhitespaces <*>
-         genNewline <*>
-         genBlock (Range.exponential 1 10))
-    genWhile =
-      While () <$>
-      genWhitespaces <*>
-      genExpr <*>
-      genWhitespaces <*>
-      genWhitespaces <*>
-      genNewline <*>
-      genBlock (Range.exponential 1 10)
-    genPass = pure $ Pass ()
-    genBreak = pure $ Break ()
-    genAssign =
-      Assign () <$>
-      genExpr <*>
-      genWhitespaces <*>
-      genWhitespaces <*>
-      genExpr

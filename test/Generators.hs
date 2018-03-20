@@ -171,8 +171,8 @@ genSizedBlock = do
               ((,,,) () indent <$> pure s1 <*> Gen.maybe genNewline)
               (pure $ unBlock b)
 
-genSizedCommaSep :: MonadGen m => (a -> Size) -> m a -> m (CommaSep a)
-genSizedCommaSep sm ma = Gen.sized $ \n ->
+genSizedCommaSep :: MonadGen m => m a -> m (CommaSep a)
+genSizedCommaSep ma = Gen.sized $ \n ->
   if n <= 1
   then pure CommaSepNone
   else
@@ -183,12 +183,12 @@ genSizedCommaSep sm ma = Gen.sized $ \n ->
           n' <- Gen.integral (Range.constant 1 (n-1))
           a <- Gen.resize n' ma
           Gen.subtermM
-            (Gen.resize (n - n') $ genSizedCommaSep sm ma)
+            (Gen.resize (n - n') $ genSizedCommaSep ma)
             (\b -> CommaSepMany a <$> genWhitespaces <*> genWhitespaces <*> pure b)
       ]
 
-genSizedCommaSep1 :: MonadGen m => (a -> Size) -> m a -> m (CommaSep1 a)
-genSizedCommaSep1 sm ma = Gen.sized $ \n ->
+genSizedCommaSep1 :: MonadGen m => m a -> m (CommaSep1 a)
+genSizedCommaSep1 ma = Gen.sized $ \n ->
   if n <= 1
   then CommaSepOne1 <$> ma
   else
@@ -199,7 +199,7 @@ genSizedCommaSep1 sm ma = Gen.sized $ \n ->
           n' <- Gen.integral (Range.constant 1 (n-1))
           a <- Gen.resize n' ma
           Gen.subtermM
-            (Gen.resize (n - n') $ genSizedCommaSep1 sm ma)
+            (Gen.resize (n - n') $ genSizedCommaSep1 ma)
             (\b -> CommaSepMany1 a <$> genWhitespaces <*> genWhitespaces <*> pure b)
       ]
 
@@ -212,7 +212,7 @@ genSizedExpr = Gen.sized $ \n ->
     Gen.choice $
       [ List () <$>
         genWhitespaces <*>
-        genSizedCommaSep exprSize genSizedExpr <*>
+        genSizedCommaSep genSizedExpr <*>
         genWhitespaces
       , Gen.subtermM
           genSizedExpr
@@ -225,7 +225,7 @@ genSizedExpr = Gen.sized $ \n ->
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
           a <- Gen.resize n' genSizedExpr
-          b <- Gen.resize (n - n') $ genSizedCommaSep argSize genSizedArg
+          b <- Gen.resize (n - n') $ genSizedCommaSep genSizedArg
           Call () a <$> genWhitespaces <*> pure b
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
@@ -259,7 +259,7 @@ genSizedStatement = Gen.sized $ \n ->
     Gen.choice
       [ Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
-          a <- Gen.resize n' $ genSizedCommaSep paramSize genSizedParam
+          a <- Gen.resize n' $ genSizedCommaSep genSizedParam
           b <- Gen.resize (n - n') genSizedBlock
           Fundef () <$> genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure a <*>
             genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
@@ -299,17 +299,17 @@ genSizedStatement = Gen.sized $ \n ->
           n' <- Gen.integral (Range.constant 2 (n-1))
           Global () <$>
             genWhitespaces1 <*>
-            Gen.resize n' (genSizedCommaSep1 (const 1) genIdent)
+            Gen.resize n' (genSizedCommaSep1 genIdent)
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 2 (n-1))
           Nonlocal () <$>
             genWhitespaces1 <*>
-            Gen.resize n' (genSizedCommaSep1 (const 1) genIdent)
+            Gen.resize n' (genSizedCommaSep1 genIdent)
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 2 (n-1))
           Del () <$>
             genWhitespaces1 <*>
-            Gen.resize n' (genSizedCommaSep1 (const 1) genIdent)
+            Gen.resize n' (genSizedCommaSep1 genIdent)
       ]
 
 genList :: MonadGen m => m (Expr '[] ())

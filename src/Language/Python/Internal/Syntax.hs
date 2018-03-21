@@ -124,7 +124,7 @@ data Arg (v :: [*]) a
   , _unsafeKeywordArgWhitespaceRight :: [Whitespace]
   , _argExpr :: Expr v a
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 instance IsString (Arg '[] ()) where fromString = PositionalArg () . fromString
 argExpr :: Lens (Arg v a) (Arg '[] a) (Expr v a) (Expr '[] a)
 argExpr = lens _argExpr (\s a -> (coerce s) { _argExpr = a })
@@ -280,7 +280,7 @@ data Expr (v :: [*]) a
   { _exprAnnotation :: a
   , _unsafeStringValue :: String
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 instance IsString (Expr '[] ()) where
   fromString = Ident () . MkIdent ()
 instance Num (Expr '[] ()) where

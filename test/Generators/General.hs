@@ -1,5 +1,5 @@
 {-# language DataKinds #-}
-module Generators where
+module Generators.General where
 
 import Control.Applicative
 import Control.Lens (sumOf, folded, _3, to)
@@ -11,75 +11,10 @@ import qualified Hedgehog.Range as Range
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax
-
-genNewline :: MonadGen m => m Newline
-genNewline = Gen.element [LF, CR, CRLF]
-
-whitespaceSize :: Whitespace -> Size
-whitespaceSize Space = 1
-whitespaceSize Tab = 1
-whitespaceSize (Continued _ ws) = 1 + sum (fmap whitespaceSize ws)
-
-genSizedWhitespace :: MonadGen m => m [Whitespace]
-genSizedWhitespace = Gen.sized $ \n ->
-  if n == 0
-  then pure []
-  else if n == 1
-  then Gen.element [[Space], [Tab]]
-  else do
-    Gen.resize (n-1) $ do
-      w <-
-        Gen.choice
-          [ pure Space
-          , pure Tab
-          , do
-              n' <- Gen.integral (Range.constant 1 (n-1))
-              Gen.resize n' $ Continued <$> genNewline <*> genSizedWhitespace
-          ]
-      l <- Gen.resize (n - whitespaceSize w) genSizedWhitespace
-      pure $ w : l
-
-genWhitespaces :: MonadGen m => m [Whitespace]
-genWhitespaces = do
-  n <- Gen.integral (Range.constant 0 10)
-  Gen.resize n genSizedWhitespace
-
-genWhitespaces1 :: MonadGen m => m (NonEmpty Whitespace)
-genWhitespaces1 = do
-  n <- Gen.integral (Range.constant 0 9)
-  liftA2 (:|) (head <$> Gen.resize 1 genSizedWhitespace) (Gen.resize n genSizedWhitespace)
+import Generators.Common
 
 genString :: MonadGen m => m String
 genString = Gen.list (Range.constant 0 50) (Gen.filter (/='\0') Gen.latin1)
-
-genIdent :: MonadGen m => m (Ident '[] ())
-genIdent =
-  MkIdent () <$>
-  liftA2 (:)
-    (Gen.choice [Gen.alpha, pure '_'])
-    (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_']))
-
-genCommaSep :: MonadGen m => Range Int -> m a -> m (CommaSep a)
-genCommaSep r m = do
-  s <- Gen.integral r
-  Gen.sized $ \n -> go (n `div` Size s) s
-  where
-    go s 0 = pure CommaSepNone
-    go s 1 =
-      Gen.choice
-        [ CommaSepOne <$> Gen.resize s m
-        , CommaSepMany <$>
-          Gen.resize s m <*>
-          genWhitespaces <*>
-          genWhitespaces <*>
-          go s 0
-        ]
-    go s n =
-      CommaSepMany <$>
-      Gen.resize s m <*>
-      genWhitespaces <*>
-      genWhitespaces <*>
-      go s (n-1)
 
 blockSize :: Block v a -> Size
 blockSize (Block b) = sumOf (folded._3.to statementSize) b
@@ -297,15 +232,3 @@ genSizedStatement = Gen.sized $ \n ->
             genWhitespaces1 <*>
             Gen.resize n' (genSizedCommaSep1 genIdent)
       ]
-
-genNone :: MonadGen m => m (Expr '[] ())
-genNone = pure $ None ()
-
-genBool :: MonadGen m => m (Expr '[] ())
-genBool = Bool () <$> Gen.bool
-
-genOp :: MonadGen m => m (BinOp ())
-genOp = Gen.element $ _opOperator <$> operatorTable
-
-genInt :: MonadGen m => m (Expr '[] ())
-genInt = Int () <$> Gen.integral (Range.constant (-2^16) (2^16))

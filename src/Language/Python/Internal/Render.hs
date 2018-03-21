@@ -131,7 +131,10 @@ renderExpr (List _ ws1 exprs ws2) =
   renderCommaSep renderExpr exprs <>
   foldMap renderWhitespace ws2 <> "]"
 renderExpr (Call _ expr ws args) =
-  renderExpr expr <>
+  (case expr of
+     Int _ n | n < 0 -> "(" <> renderExpr expr <> ")"
+     BinOp {} -> "(" <> renderExpr expr <> ")"
+     _ -> renderExpr expr) <>
   foldMap renderWhitespace ws <>
   renderArgs args
 renderExpr (Deref _ expr ws1 ws2 name) =

@@ -60,6 +60,7 @@ test-suite hpython-tests
   type:                exitcode-stdio-1.0
   other-modules:       Generators.General
                      , Generators.Common
+                     , Generators.Correct
   hs-source-dirs:      test
   build-depends:       base >=4.9 && <4.11
                      , hpython

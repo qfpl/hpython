@@ -9,12 +9,15 @@ module Language.Python.Validate.Syntax where
 import Control.Applicative
 import Control.Lens ((#), (^.), _head, _last)
 import Control.Lens.Fold
+import Control.Lens.Getter
 import Control.Lens.Tuple
 import Control.Lens.Traversal
 import Data.Char
 import Data.Coerce
 import Data.Foldable
+import Data.Function
 import Data.Functor
+import Data.List
 import Data.Semigroup (Semigroup(..))
 import Data.Type.Set
 import Data.Validate
@@ -28,17 +31,18 @@ import Language.Python.Validate.Syntax.Error
 
 data Syntax
 
-data SyntaxContext
+data SyntaxContext v a
   = SyntaxContext
   { _inLoop :: Bool
-  , _inFunction :: Bool
+  , _inFunction :: Maybe [Ident v a]
+  , _nonlocalScope :: [Ident v a]
   }
 
-initialSyntaxContext :: SyntaxContext
+initialSyntaxContext :: SyntaxContext v a
 initialSyntaxContext =
   SyntaxContext
   { _inLoop = False
-  , _inFunction = False
+  , _inFunction = Nothing
   }
 
 class StartsWith s where
@@ -123,7 +127,7 @@ instance EndsWith String where
   endsWith a = a ^? _last
 
 validateWhitespace
-  :: ( EndsWith x, StartsWith y
+  :: ( StartsWith x, EndsWith x, StartsWith y
      , AsSyntaxError e v a
      )
   => a
@@ -132,6 +136,13 @@ validateWhitespace
   -> (y, y -> String)
   -> Validate [e] [Whitespace]
 validateWhitespace ann (a, aStr) [] (b, bStr)
+  | Just c1 <- startsWith a
+  , Just c2 <- endsWith a
+  , Just c3 <- startsWith b
+  , isIdentifierStart c1
+  , isIdentifierChar c2
+  , isIdentifierChar c3
+  = Failure [_MissingSpacesIn # (ann, aStr a, bStr b)]
   | Just c2 <- endsWith a
   , Just c3 <- startsWith b
   , isIdentifierChar c2
@@ -181,7 +192,7 @@ validateBlockSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
      )
-  => SyntaxContext
+  => SyntaxContext v a
   -> Block v a
   -> Validate [e] (Block (Nub (Syntax ': v)) a)
 validateBlockSyntax ctxt (Block bs) = Block . NonEmpty.fromList <$> go (NonEmpty.toList bs)
@@ -199,20 +210,31 @@ validateStatementSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
      )
-  => SyntaxContext
+  => SyntaxContext v a
   -> Statement v a
   -> Validate [e] (Statement (Nub (Syntax ': v)) a)
 validateStatementSyntax ctxt (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
-  Fundef a ws1 <$>
-  validateIdent name <*>
-  pure ws2 <*>
-  validateParamsSyntax params <*>
-  pure ws3 <*>
-  pure ws4 <*>
-  pure nl <*>
-  validateBlockSyntax (ctxt { _inFunction = True}) body
+  let
+    paramIdents = params ^.. folded.getting paramName
+  in
+    Fundef a ws1 <$>
+    validateIdent name <*>
+    pure ws2 <*>
+    validateParamsSyntax params <*>
+    pure ws3 <*>
+    pure ws4 <*>
+    pure nl <*>
+    validateBlockSyntax
+      (ctxt
+       { _inFunction =
+           fmap
+             (\a -> unionBy (on (==) _identValue) a paramIdents)
+             (_inFunction ctxt) <|>
+           Just paramIdents
+       })
+      body
 validateStatementSyntax ctxt (Return a ws expr)
-  | _inFunction ctxt =
+  | Just{} <- _inFunction ctxt =
       Return a <$>
       validateWhitespace a ("return", id) ws (expr, renderExpr) <*>
       validateExprSyntax expr
@@ -238,22 +260,32 @@ validateStatementSyntax ctxt (While a ws1 expr ws2 ws3 nl body) =
   pure nl <*>
   validateBlockSyntax (ctxt { _inLoop = True}) body
 validateStatementSyntax ctxt (Assign a lvalue ws1 ws2 rvalue) =
-  Assign a <$>
-  (if canAssignTo lvalue
-   then validateExprSyntax lvalue
-   else Failure [_CannotAssignTo # (a, lvalue)]) <*>
-  pure ws1 <*>
-  pure ws2 <*>
-  validateExprSyntax rvalue
+  let
+    assigns =
+      if isJust (_inFunction ctxt)
+      then lvalue ^.. _Idents
+      else []
+  in
+    Assign a <$>
+    (if canAssignTo lvalue
+    then validateExprSyntax lvalue
+    else Failure [_CannotAssignTo # (a, lvalue)]) <*>
+    pure ws1 <*>
+    pure ws2 <*>
+    validateExprSyntax rvalue
 validateStatementSyntax ctxt p@Pass{} = pure $ coerce p
 validateStatementSyntax ctxt (Break a)
   | _inLoop ctxt = pure $ Break a
   | otherwise = Failure [_BreakOutsideLoop # a]
 validateStatementSyntax ctxt (Global a ws ids) =
   Global a ws <$> traverse validateIdent ids
-validateStatementSyntax ctxt (Nonlocal a ws ids)
-  | _inFunction ctxt = Nonlocal a ws <$> traverse validateIdent ids
-  | otherwise = Failure [_NonlocalOutsideFunction # a]
+validateStatementSyntax ctxt (Nonlocal a ws ids) =
+  case _inFunction ctxt of
+    Nothing -> Failure [_NonlocalOutsideFunction # a]
+    Just params ->
+      case intersectBy (on (==) _identValue) params (ids ^.. folded) of
+        [] -> Nonlocal a ws <$> traverse validateIdent ids
+        bad -> Failure [_ParametersNonlocal # (a, bad)]
 validateStatementSyntax ctxt (Del a ws ids) =
   Del a ws <$> traverse validateIdent ids
 

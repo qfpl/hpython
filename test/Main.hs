@@ -9,8 +9,10 @@ import Language.Python.Validate.Indentation
 import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Syntax.Error
-import Generators.General
 import Scope
+
+import qualified Generators.General as General
+import qualified Generators.Correct as Correct
 
 import Control.Lens
 import Control.Monad.IO.Class
@@ -38,8 +40,7 @@ validateStatementSyntax'
   :: Statement '[Indentation] a
   -> Validate [SyntaxError '[Indentation] a] (Statement '[Syntax, Indentation] a)
 validateStatementSyntax' =
-  validateStatementSyntax $
-  SyntaxContext {_inLoop = False, _inFunction = False}
+  validateStatementSyntax initialSyntaxContext
 
 validateStatementIndentation'
   :: Statement '[] a
@@ -63,7 +64,7 @@ runPython3 shouldSucceed str = do
 syntax_expr :: Property
 syntax_expr =
   property $ do
-    ex <- forAll $ Gen.resize 300 genSizedExpr
+    ex <- forAll $ Gen.resize 300 General.genExpr
     let rex = renderExpr ex
     shouldSucceed <-
       case validateExprIndentation' ex of
@@ -80,7 +81,7 @@ syntax_expr =
 syntax_statement :: Property
 syntax_statement =
   property $ do
-    st <- forAll $ Gen.resize 300 genSizedStatement
+    st <- forAll $ Gen.resize 300 General.genStatement
     let rst = renderLines $ renderStatement st
     shouldSucceed <-
       case validateStatementIndentation' st of
@@ -95,7 +96,7 @@ syntax_statement =
 expr_printparseprint_print :: Property
 expr_printparseprint_print =
   property $ do
-    ex <- forAll genSizedExpr
+    ex <- forAll General.genExpr
     annotate (renderExpr ex)
     case validateExprIndentation' ex of
       Failure errs -> annotateShow errs *> failure
@@ -108,8 +109,33 @@ expr_printparseprint_print =
               Trifecta.Success res'' ->
                 renderExpr (res' ^. unvalidated) === renderExpr (res'' $> ())
 
+correct_syntax_expr :: Property
+correct_syntax_expr =
+  property $ do
+    ex <- forAll Correct.genExpr
+    case validateExprIndentation' ex of
+      Failure errs -> annotateShow errs *> failure
+      Success res ->
+        case validateExprSyntax' res of
+          Failure errs' -> annotateShow errs' *> failure
+          Success res' -> runPython3 True (renderExpr ex)
+
+correct_syntax_statement :: Property
+correct_syntax_statement =
+  property $ do
+    st <- forAll $ Correct.genStatement initialSyntaxContext
+    annotate $ renderLines (renderStatement st)
+    case validateStatementIndentation' st of
+      Failure errs -> annotateShow errs *> failure
+      Success res ->
+        case validateStatementSyntax' res of
+          Failure errs' -> annotateShow errs' *> failure
+          Success res' -> runPython3 True (renderLines $ renderStatement st)
+
 main = do
   check $ withTests 200 syntax_expr
   check $ withTests 200 syntax_statement
+  check $ withTests 200 correct_syntax_expr
+  check $ withTests 200 correct_syntax_statement
   check expr_printparseprint_print
   checkParallel scopeTests

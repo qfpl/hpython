@@ -36,7 +36,7 @@ validate x =
       annotateShow (errs :: [IndentationError '[] ()])
       failure
     Success a ->
-      case validateStatementSyntax initialSyntaxContext a of
+      case runValidateSyntax initialSyntaxContext [] (validateStatementSyntax a) of
         Failure errs -> do
           annotateShow (errs :: [SyntaxError '[Indentation] ()])
           failure

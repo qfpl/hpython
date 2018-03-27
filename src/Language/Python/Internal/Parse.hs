@@ -143,7 +143,7 @@ expr = orExpr
       char '/' $> Divide ()
 
     factor =
-      annotated ((\a b c -> Negate c a b) <$ char '-' <*> many whitespace <*> expr) <|>
+      annotated ((\a b c -> Negate c a b) <$ char '-' <*> many whitespace <*> factor) <|>
       power
 
     power = do
@@ -213,24 +213,24 @@ statement =
   annotated $
   fundef <|>
   returnSt <|>
-  exprSt <|>
+  assignOrExpr <|>
   ifSt <|>
   while <|>
-  assign <|>
   pass <|>
   break
   where
     break = reserved "break" $> Break
     pass = reserved "pass" $> Pass
-    exprSt = flip Expr <$> expr
+    assignOrExpr = do
+      e <- expr
+      mws <- optional (many whitespace <* char '=')
+      case mws of
+        Nothing -> pure (`Expr` e)
+        Just ws ->
+          (\a b c -> Assign c e ws a b) <$>
+          many whitespace <*>
+          expr
     returnSt = (\a b c -> Return c a b) <$ reserved "return" <*> many whitespace <*> expr
-    assign =
-      (\a b c d e -> Assign e a b c d) <$>
-      expr <*>
-      many whitespace <*
-      char '=' <*>
-      many whitespace <*>
-      expr
     fundef =
       (\a b c d e f g h i -> Fundef i a b c d e f g h) <$
       reserved "def" <*> some1 whitespace <*> annotated identifier <*>

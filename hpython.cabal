@@ -58,14 +58,19 @@ executable example
 test-suite hpython-tests
   main-is:             Main.hs
   type:                exitcode-stdio-1.0
-  other-modules:       Generators
+  other-modules:       Generators.General
+                     , Generators.Common
+                     , Generators.Correct
   hs-source-dirs:      test
   build-depends:       base >=4.9 && <4.11
+                     , directory
                      , hpython
                      , hedgehog
                      , lens
+                     , mtl
                      , process
                      , transformers
+                     , trifecta
   default-language:    Haskell2010
   ghc-options:         -O2
                        -Wincomplete-patterns

@@ -131,7 +131,10 @@ renderExpr (List _ ws1 exprs ws2) =
   renderCommaSep renderExpr exprs <>
   foldMap renderWhitespace ws2 <> "]"
 renderExpr (Call _ expr ws args) =
-  renderExpr expr <>
+  (case expr of
+     Int _ n | n < 0 -> "(" <> renderExpr expr <> ")"
+     BinOp {} -> "(" <> renderExpr expr <> ")"
+     _ -> renderExpr expr) <>
   foldMap renderWhitespace ws <>
   renderArgs args
 renderExpr (Deref _ expr ws1 ws2 name) =
@@ -161,7 +164,8 @@ renderStatement (Fundef _ ws1 name ws2 params ws3 ws4 nl body) =
       foldMap renderWhitespace ws3 <> ":" <> foldMap renderWhitespace ws4
     restLines =
       foldMap
-        (\(_, a, b, nl) -> maybe id endWith nl $ (foldMap renderWhitespace a <>) <$> renderStatement b)
+        (\(_, a, b, nl) ->
+           maybe id endWith nl $ (foldMap renderWhitespace a <>) <$> renderStatement b)
         (view _Wrapped body)
 renderStatement (Return _ ws expr) =
   OneLine $ "return" <> foldMap renderWhitespace ws <> renderExpr expr
@@ -175,7 +179,8 @@ renderStatement (If _ ws1 expr ws2 ws3 nl body body') =
       foldMap renderWhitespace ws3
     restLines =
       foldMap
-        (\(_, a, b, nl) -> maybe id endWith nl $ (foldMap renderWhitespace a <>) <$> renderStatement b)
+        (\(_, a, b, nl) ->
+           maybe id endWith nl $ (foldMap renderWhitespace a <>) <$> renderStatement b)
         (view _Wrapped body)
     elseLines =
       ManyLines <$>

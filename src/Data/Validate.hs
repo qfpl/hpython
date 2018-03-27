@@ -19,4 +19,8 @@ instance Semigroup e => Applicative (Validate e) where
       Success _ -> e
       Failure e' -> e <> e'
 
+bindValidate :: Validate e a -> (a -> Validate e b) -> Validate e b
+bindValidate (Failure e) _ = Failure e
+bindValidate (Success a) f = f a
+
 makePrisms ''Validate

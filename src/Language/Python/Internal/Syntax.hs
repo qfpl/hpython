@@ -100,7 +100,7 @@ data Param (v :: [*]) a
   , _unsafeKeywordParamWhitespaceRight :: [Whitespace]
   , _unsafeKeywordParamExpr :: Expr v a
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 paramAnn :: Lens' (Param v a) a
 paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
 
@@ -124,7 +124,7 @@ data Arg (v :: [*]) a
   , _unsafeKeywordArgWhitespaceRight :: [Whitespace]
   , _argExpr :: Expr v a
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 instance IsString (Arg '[] ()) where fromString = PositionalArg () . fromString
 argExpr :: Lens (Arg v a) (Arg '[] a) (Expr v a) (Expr '[] a)
 argExpr = lens _argExpr (\s a -> (coerce s) { _argExpr = a })
@@ -135,7 +135,7 @@ instance HasExprs Arg where
 data Whitespace = Space | Tab | Continued Newline [Whitespace] deriving (Eq, Show)
 
 newtype Block v a = Block { unBlock :: NonEmpty (a, [Whitespace], Statement v a, Maybe Newline) }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 class HasBlocks s where
   _Blocks :: Traversal (s v a) (s '[] a) (Block v a) (Block '[] a)
 instance HasBlocks Statement where
@@ -181,7 +181,7 @@ data Statement (v :: [*]) a
   | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Del a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 instance Plated (Statement v a) where
   plate f (Fundef a ws1 b ws2 c ws3 ws4 nl sts) =
     Fundef a ws1 b ws2 c ws3 ws4 nl <$> (_Wrapped.traverse._3) f sts
@@ -209,6 +209,13 @@ listToCommaSep :: [a] -> CommaSep a
 listToCommaSep [] = CommaSepNone
 listToCommaSep [a] = CommaSepOne a
 listToCommaSep (a:as) = CommaSepMany a [] [Space] $ listToCommaSep as
+
+appendCommaSep :: CommaSep a -> CommaSep a -> CommaSep a
+appendCommaSep CommaSepNone b = b
+appendCommaSep (CommaSepOne a) CommaSepNone = CommaSepOne a
+appendCommaSep (CommaSepOne a) (CommaSepOne b) = CommaSepMany a [] [] (CommaSepOne b)
+appendCommaSep (CommaSepOne a) (CommaSepMany b ws1 ws2 cs) = CommaSepMany a [] [] (CommaSepMany b ws1 ws2 cs)
+appendCommaSep (CommaSepMany a ws1 ws2 cs) b = CommaSepMany a ws1 ws2 (appendCommaSep cs b)
 
 -- | Non-empty 'CommaSep'
 data CommaSep1 a
@@ -280,7 +287,7 @@ data Expr (v :: [*]) a
   { _exprAnnotation :: a
   , _unsafeStringValue :: String
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 instance IsString (Expr '[] ()) where
   fromString = Ident () . MkIdent ()
 instance Num (Expr '[] ()) where

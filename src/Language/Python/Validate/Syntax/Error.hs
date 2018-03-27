@@ -19,6 +19,8 @@ data SyntaxError (v :: [*]) a
   | BreakOutsideLoop a
   | ReturnOutsideFunction a
   | NonlocalOutsideFunction a
+  | ParametersNonlocal a [String]
+  | NoBindingNonlocal (Ident v a)
   deriving (Eq, Show)
 
 makeClassyPrisms ''SyntaxError

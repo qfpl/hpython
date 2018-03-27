@@ -150,12 +150,33 @@ expr_printparseprint_print =
                 annotateShow res''
                 renderExpr (res' ^. unvalidated) === renderExpr (res'' $> ())
 
+parseStatement = Trifecta.parseString (evalStateT statement []) mempty
+
+statement_printparseprint_print :: Property
+statement_printparseprint_print =
+  property $ do
+    st <- forAll $ evalStateT (Correct.genStatement initialSyntaxContext) []
+    annotate (renderLines $ renderStatement st)
+    case validateStatementIndentation' st of
+      Failure errs -> annotateShow errs *> failure
+      Success res ->
+        case validateStatementSyntax' res of
+          Failure errs' -> annotateShow errs' *> failure
+          Success res' ->
+            case parseStatement (renderLines $ renderStatement res') of
+              Trifecta.Failure errs'' -> annotateShow errs''
+              Trifecta.Success res'' -> do
+                annotateShow res''
+                renderLines (renderStatement (res' ^. unvalidated)) ===
+                  renderLines (renderStatement (res'' $> ()))
+
 main = do
   let file = "hedgehog-test.py"
   check . withTests 200 $ syntax_expr file
   check . withTests 200 $ syntax_statement file
   check . withTests 200 $ correct_syntax_expr file
   check . withTests 200 $ correct_syntax_statement file
-  check . withShrinks 2000 $ expr_printparseprint_print
+  check expr_printparseprint_print
+  check . withShrinks 2000 $ statement_printparseprint_print
   checkParallel scopeTests
   removeFile "hedgehog-test.py"

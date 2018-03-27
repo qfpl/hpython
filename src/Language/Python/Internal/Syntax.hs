@@ -100,7 +100,7 @@ data Param (v :: [*]) a
   , _unsafeKeywordParamWhitespaceRight :: [Whitespace]
   , _unsafeKeywordParamExpr :: Expr v a
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 paramAnn :: Lens' (Param v a) a
 paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
 
@@ -135,7 +135,7 @@ instance HasExprs Arg where
 data Whitespace = Space | Tab | Continued Newline [Whitespace] deriving (Eq, Show)
 
 newtype Block v a = Block { unBlock :: NonEmpty (a, [Whitespace], Statement v a, Maybe Newline) }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 class HasBlocks s where
   _Blocks :: Traversal (s v a) (s '[] a) (Block v a) (Block '[] a)
 instance HasBlocks Statement where
@@ -181,7 +181,7 @@ data Statement (v :: [*]) a
   | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Del a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 instance Plated (Statement v a) where
   plate f (Fundef a ws1 b ws2 c ws3 ws4 nl sts) =
     Fundef a ws1 b ws2 c ws3 ws4 nl <$> (_Wrapped.traverse._3) f sts

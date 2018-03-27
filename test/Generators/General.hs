@@ -1,8 +1,10 @@
-{-# language DataKinds #-}
+{-# language DataKinds, TypeFamilies #-}
+{-# language LambdaCase #-}
 module Generators.General where
 
 import Control.Applicative
-import Control.Lens (sumOf, folded, _3, to)
+import Control.Lens ((^?), _Wrapped, _Cons, _Snoc, sumOf, folded, _3, to)
+import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty(..))
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -12,6 +14,40 @@ import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax
 import Generators.Common
+
+genParam :: MonadGen m => m (Expr '[] ()) -> m (Param '[] ())
+genParam genExpr = Gen.sized $ \n ->
+  if n <= 1
+  then PositionalParam () <$> genIdent
+  else
+    Gen.resize (n-1) $
+    KeywordParam () <$> genIdent <*> genWhitespaces <*> genWhitespaces <*> genExpr
+
+genArg :: MonadGen m => m (Expr '[] ()) -> m (Arg '[] ())
+genArg genExpr = Gen.sized $ \n ->
+  if n <= 1
+  then -- error "arg for size 1"
+    Gen.choice
+      [ PositionalArg () <$> genExpr
+      , KeywordArg () <$> genIdent <*> genWhitespaces <*> genWhitespaces <*> genExpr
+      ]
+  else
+    Gen.resize (n-1) $
+    Gen.choice
+      [ PositionalArg () <$> genExpr
+      , KeywordArg () <$> genIdent <*> genWhitespaces <*> genWhitespaces <*> genExpr
+      ]
+
+
+genIdent :: MonadGen m => m (Ident '[] ())
+genIdent =
+  MkIdent () <$>
+  liftA2 (:)
+    (Gen.choice [Gen.alpha, pure '_'])
+    (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_']))
+
+genInt :: MonadGen m => m (Expr '[] ())
+genInt = Int () <$> Gen.integral (Range.constant (-2^32) (2^32))
 
 blockSize :: Block v a -> Size
 blockSize (Block b) = sumOf (folded._3.to statementSize) b
@@ -56,12 +92,20 @@ statementSize (Global _ _ cs) = Size $ 1 + length cs
 statementSize (Nonlocal _ _ cs) = Size $ 1 + length cs
 statementSize (Del _ _ cs) = Size $ 1 + length cs
 
-
 genBlock :: MonadGen m => m (Block '[] ())
-genBlock = do
+genBlock =
+  Gen.shrink ((++) <$> shrinkHead <*> shrinkTail) $ do
   indent <- NonEmpty.toList <$> genWhitespaces1
   go indent
   where
+    shrinkHead b
+      | Just (_, rest) <- b ^? _Wrapped.to toList._Cons
+      , not (null rest) = [Block $ NonEmpty.fromList rest]
+      | otherwise = []
+    shrinkTail b
+      | Just (rest, _) <- b ^? _Wrapped.to toList._Snoc
+      , not (null rest) = [Block $ NonEmpty.fromList rest]
+      | otherwise = []
     go indent =
       Gen.sized $ \n ->
       if n <= 1
@@ -81,10 +125,21 @@ genBlock = do
               ((,,,) () indent <$> pure s1 <*> Gen.maybe genNewline)
               (pure $ unBlock b)
 
+-- | This is necessary to prevent generating exponentials that will take forever to evaluate
+-- when python does constant folding
 genExpr :: MonadGen m => m (Expr '[] ())
-genExpr = Gen.sized $ \n ->
+genExpr = genExpr' False
+
+genExpr' :: MonadGen m => Bool -> m (Expr '[] ())
+genExpr' isExp = Gen.sized $ \n ->
   if n <= 1
-  then Gen.choice [Ident () <$> genIdent, genInt, genBool, String () <$> genString]
+  then
+    Gen.choice
+    [ Ident () <$> genIdent
+    , if isExp then genSmallInt else genInt
+    , genBool
+    , String () <$> genString
+    ]
   else
     Gen.resize (n-1) $
     Gen.choice $
@@ -100,18 +155,26 @@ genExpr = Gen.sized $ \n ->
              genWhitespaces <*>
              genWhitespaces <*>
              genIdent)
-      , Gen.sized $ \n -> do
+      , Gen.shrink
+          (\case
+              Call () a _ (CommaSepOne b) -> [a, _argExpr b]
+              Call () a _ _ -> [a]
+              _ -> []) $
+        Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
           a <- Gen.resize n' genExpr
           b <- Gen.resize (n - n') $ genSizedCommaSep (genArg genExpr)
           Call () a <$> genWhitespaces <*> pure b
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
+          op <- genOp
           Gen.subtermM2
             (Gen.resize n' genExpr)
-            (Gen.resize (n - n') genExpr)
-            (\a b -> BinOp () a <$> genWhitespaces <*> genOp <*> genWhitespaces <*> pure b)
-      , Parens () <$> genWhitespaces <*> genExpr <*> genWhitespaces
+            (Gen.resize (n - n') (genExpr' $ case op of; Exp{} -> True; _ -> False))
+            (\a b -> BinOp () a <$> genWhitespaces <*> pure op <*> genWhitespaces <*> pure b)
+      , Gen.subtermM
+          genExpr
+          (\a -> Parens () <$> genWhitespaces <*> pure a <*> genWhitespaces)
       ]
 
 genStatement :: MonadGen m => m (Statement '[] ())

@@ -63,9 +63,11 @@ test-suite hpython-tests
                      , Generators.Correct
   hs-source-dirs:      test
   build-depends:       base >=4.9 && <4.11
+                     , directory
                      , hpython
                      , hedgehog
                      , lens
+                     , mtl
                      , process
                      , transformers
                      , trifecta

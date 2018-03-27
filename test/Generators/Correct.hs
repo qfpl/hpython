@@ -1,9 +1,13 @@
 {-# language DataKinds #-}
+{-# language FlexibleContexts #-}
+{-# language LambdaCase #-}
 module Generators.Correct where
 
 import Control.Applicative
 import Control.Lens.Fold
-import Data.Function
+import Control.Lens.Plated
+import Control.Lens.Tuple
+import Control.Monad.State
 import Data.List
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
@@ -13,12 +17,24 @@ import qualified Hedgehog.Range as Range
 import qualified Data.List.NonEmpty as NonEmpty
 import GHC.Stack
 
+import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax
 import Language.Python.Validate.Syntax
 
 import Generators.Common
 
-genBlock :: MonadGen m => SyntaxContext '[] () -> m (Block '[] ())
+genIdent :: MonadGen m => m (Ident '[] ())
+genIdent =
+  Gen.filter (\i -> _identValue i `notElem` reservedWords) $
+  MkIdent () <$>
+  liftA2 (:)
+    (Gen.choice [Gen.alpha, pure '_'])
+    (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_']))
+
+genInt :: MonadGen m => m (Expr '[] ())
+genInt = Int () <$> Gen.integral (Range.constant 0 (2^32))
+
+genBlock :: (MonadGen m, MonadState [String] m) => SyntaxContext -> m (Block '[] ())
 genBlock ctxt = do
   indent <- NonEmpty.toList <$> genWhitespaces1
   go indent
@@ -76,10 +92,14 @@ genPositionalParams =
       i <- Gen.filter ((`notElem` seen) . _identValue) genIdent
       (i :) <$> go (_identValue i : seen) (n-1)
 
-genKeywordParam :: MonadGen m => m (Param '[] ())
-genKeywordParam =
+genKeywordParam :: MonadGen m => [String] -> m (Param '[] ())
+genKeywordParam positionals =
   Gen.scale (max 0 . subtract 1) $
-  KeywordParam () <$> genIdent <*> genWhitespaces <*> genWhitespaces <*> genExpr
+  KeywordParam () <$>
+  Gen.filter (\i -> _identValue i `notElem` positionals) genIdent <*>
+  genWhitespaces <*>
+  genWhitespaces <*>
+  genExpr
 
 genParams :: MonadGen m => m (CommaSep (Param '[] ()))
 genParams =
@@ -90,13 +110,19 @@ genParams =
 
     pparams <- Gen.resize n1 genPositionalParams
     -- sparams <- Gen.resize n2 $ genSizedCommaSep genStarParam
-    kwparams <- Gen.resize n3 $ genSizedCommaSep genKeywordParam
+    kwparams <-
+      Gen.resize n3 $
+      genSizedCommaSep (genKeywordParam $ pparams ^.. folded.paramName.identValue)
 
     -- appendCommaSep pparams (appendCommaSep sparams kwparams)
     pure $ appendCommaSep pparams kwparams
 
 genList :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
 genList genExpr' =
+  Gen.shrink
+    (\case
+        List _ _ (CommaSepOne e) _ -> [e]
+        _ -> []) $
   List () <$>
   genWhitespaces <*>
   genSizedCommaSep genExpr' <*>
@@ -116,10 +142,21 @@ genDeref =
         genWhitespaces <*>
         genIdent)
 
+-- | This is necessary to prevent generating exponentials that will take forever to evaluate
+-- when python does constant folding
 genExpr :: MonadGen m => m (Expr '[] ())
-genExpr = Gen.sized $ \n ->
+genExpr = genExpr' False
+
+genExpr' :: MonadGen m => Bool -> m (Expr '[] ())
+genExpr' isExp = Gen.sized $ \n ->
   if n <= 1
-  then Gen.choice [Ident () <$> genIdent, genInt, genBool, String () <$> genString]
+  then
+    Gen.choice
+    [ Ident () <$> genIdent
+    , if isExp then genSmallInt else genInt
+    , genBool
+    , String () <$> genString
+    ]
   else
     Gen.resize (n-1) .
     Gen.choice $
@@ -133,13 +170,14 @@ genExpr = Gen.sized $ \n ->
           Call () a <$> genWhitespaces <*> pure b
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
+          op <- genOp
           Gen.subtermM2
             (Gen.resize n' genExpr)
-            (Gen.resize (n - n') genExpr)
+            (Gen.resize (n - n') (genExpr' $ case op of; Exp{} -> True; _ -> False))
             (\a b ->
                BinOp () a <$>
                fmap NonEmpty.toList genWhitespaces1 <*>
-               genOp <*>
+               pure op <*>
                fmap NonEmpty.toList genWhitespaces1 <*>
                pure b)
       ]
@@ -153,77 +191,88 @@ genAssignable =
     , genDeref
     ]
 
-genStatement :: (HasCallStack, MonadGen m) => SyntaxContext '[] () -> m (Statement '[] ())
+genStatement
+  :: (HasCallStack, MonadGen m, MonadState [String] m)
+  => SyntaxContext
+  -> m (Statement '[] ())
 genStatement ctxt = Gen.sized $ \n ->
   if n <= 1
   then Gen.element $ [Pass ()] ++ [Break () | _inLoop ctxt]
-  else
+  else do
+    nonlocals <- get
     Gen.resize (n-1) .
-    Gen.choice $
-      [ Gen.sized $ \n -> do
-          n' <- Gen.integral (Range.constant 1 (n-1))
-          a <- Gen.resize n' genParams
-          let paramIdents = a ^.. folded.paramName
-          b <-
-            Gen.resize
-              (n - n')
-              (genBlock $
-               ctxt
-               { _inFunction =
-                   fmap
-                     (\b -> unionBy (on (==) _identValue) b paramIdents)
-                     (_inFunction ctxt) <|>
-                   Just paramIdents
-               })
-          Fundef () <$> genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure a <*>
-            genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
-      , Expr () <$> genExpr
-      , pure $ Pass ()
-      , Gen.sized $ \n -> do
-          n' <- Gen.integral (Range.constant 1 (n-1))
-          a <- Gen.resize n' genAssignable
-          b <- Gen.resize (n - n') genExpr
-          Assign () a <$> genWhitespaces <*> genWhitespaces <*> pure b
-      , Gen.sized $ \n -> do
-          n' <- Gen.integral (Range.constant 1 (n-1))
-          n'' <- Gen.integral (Range.constant 0 (n-n'))
-          a <- Gen.resize n' genExpr
-          b <- Gen.resize (n - n') (genBlock ctxt)
-          c <-
-            if n - n' - n'' == 0
-            then pure Nothing
-            else
-              fmap Just $
-              (,,,) <$>
-              genWhitespaces <*>
-              genWhitespaces <*>
-              genNewline <*>
-              Gen.resize (n - n' - n'') (genBlock ctxt)
-          If () <$> fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
-            genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b <*> pure c
-      , Gen.sized $ \n -> do
-          n' <- Gen.integral (Range.constant 1 (n-1))
-          a <- Gen.resize n' genExpr
-          b <- Gen.resize (n - n') (genBlock $ ctxt { _inLoop = True})
-          While () <$> fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
-            genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
-      , Gen.sized $ \n -> do
-          n' <- Gen.integral (Range.constant 2 (n-1))
-          Global () <$>
-            genWhitespaces1 <*>
-            Gen.resize n' (genSizedCommaSep1 genIdent)
-      , Gen.sized $ \n -> do
-          n' <- Gen.integral (Range.constant 2 (n-1))
-          Del () <$>
-            genWhitespaces1 <*>
-            Gen.resize n' (genSizedCommaSep1 genIdent)
-      ] ++
-      [pure (Break ()) | _inLoop ctxt] ++
-      [ Gen.sized $ \n -> do
-          n' <- Gen.integral (Range.constant 2 (n-1))
-          Nonlocal () <$>
-            genWhitespaces1 <*>
-            Gen.resize n' (genSizedCommaSep1 genIdent)
-      | isJust (_inFunction ctxt)
-      ] ++
-      [Return () <$> genWhitespaces <*> genExpr | isJust (_inFunction ctxt)]
+      Gen.choice $
+        [ Gen.sized $ \n -> do
+            n' <- Gen.integral (Range.constant 1 (n-1))
+            a <- Gen.resize n' genParams
+            let paramIdents = a ^.. folded.paramName.identValue
+            b <-
+              Gen.resize
+                (n - n')
+                (genBlock $
+                ctxt
+                { _inLoop = False
+                , _inFunction =
+                    fmap
+                      (\b -> union b paramIdents)
+                      (_inFunction ctxt) <|>
+                    Just paramIdents
+                })
+            Fundef () <$> genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure a <*>
+              genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
+        , Expr () <$> genExpr
+        , pure $ Pass ()
+        , Gen.sized $ \n -> do
+            n' <- Gen.integral (Range.constant 1 (n-1))
+            a <- Gen.resize n' genAssignable
+            modify ((a ^.. cosmos._Ident._2.identValue) ++)
+            b <- Gen.resize (n - n') genExpr
+            Assign () a <$> genWhitespaces <*> genWhitespaces <*> pure b
+        , Gen.sized $ \n -> do
+            n' <- Gen.integral (Range.constant 1 (n-1))
+            n'' <- Gen.integral (Range.constant 0 (n-n'))
+            a <- Gen.resize n' genExpr
+            b <- Gen.resize (n - n') (genBlock ctxt)
+            c <-
+              if n - n' - n'' == 0
+              then pure Nothing
+              else
+                fmap Just $
+                (,,,) <$>
+                genWhitespaces <*>
+                genWhitespaces <*>
+                genNewline <*>
+                Gen.resize (n - n' - n'') (genBlock ctxt)
+            If () <$> fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
+              genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b <*> pure c
+        , Gen.sized $ \n -> do
+            n' <- Gen.integral (Range.constant 1 (n-1))
+            a <- Gen.resize n' genExpr
+            b <- Gen.resize (n - n') (genBlock $ ctxt { _inLoop = True})
+            While () <$> fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
+              genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
+        , Gen.sized $ \n -> do
+            n' <- Gen.integral (Range.constant 2 (n-1))
+            Global () <$>
+              genWhitespaces1 <*>
+              Gen.resize n' (genSizedCommaSep1 genIdent)
+        , Gen.sized $ \n -> do
+            n' <- Gen.integral (Range.constant 2 (n-1))
+            Del () <$>
+              genWhitespaces1 <*>
+              Gen.resize n' (genSizedCommaSep1 genIdent)
+        ] ++
+        [pure (Break ()) | _inLoop ctxt] ++
+        [ Gen.sized $ \n -> do
+            n' <- Gen.integral (Range.constant 2 (n-1))
+            nonlocals <- get
+            Nonlocal () <$>
+              genWhitespaces1 <*>
+              Gen.resize n' (genSizedCommaSep1 . Gen.element $ MkIdent () <$> nonlocals)
+        | isJust (_inFunction ctxt) && not (null nonlocals)
+        ] ++
+        [ Return () <$>
+          fmap NonEmpty.toList genWhitespaces1 <*>
+          genExpr
+        | isJust (_inFunction ctxt)
+        ]

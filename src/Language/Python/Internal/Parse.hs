@@ -143,7 +143,7 @@ expr = orExpr
       char '/' $> Divide ()
 
     factor =
-      annotated ((\a b c -> Negate c a b) <$ char '-' <*> many whitespace <*> expr) <|>
+      annotated ((\a b c -> Negate c a b) <$ char '-' <*> many whitespace <*> factor) <|>
       power
 
     power = do

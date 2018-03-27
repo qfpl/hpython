@@ -1,5 +1,6 @@
 {-# language DataKinds, PolyKinds, LambdaCase, ViewPatterns #-}
 {-# language TemplateHaskell #-}
+{-# language DefaultSignatures, FlexibleContexts #-}
 module Language.Python.Internal.Optics where
 
 import Control.Lens
@@ -7,17 +8,16 @@ import Data.Coerce
 import Data.List.NonEmpty
 import Language.Python.Internal.Syntax
 
-class Validated s where
+class Validated (s :: [*] -> * -> *) where
   unvalidated :: Getter (s v a) (s '[] a)
+  default unvalidated :: Coercible (s v a) (s '[] a) => Getter (s v a) (s '[] a)
+  unvalidated = to coerce
 
 instance Validated Expr where
-  unvalidated = to coerce
-
 instance Validated Statement where
-  unvalidated = to coerce
-
 instance Validated Block where
-  unvalidated = to coerce
+instance Validated Ident where
+instance Validated Param where
 
 data KeywordParam v a
   = MkKeywordParam

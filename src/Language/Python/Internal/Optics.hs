@@ -60,8 +60,11 @@ _Fundef
        )
 _Fundef =
   prism
-    (\(a, b, c, d, e, f, g, h, i) -> Fundef a b c d e f g h i)
-    (\case; (coerce -> Fundef a b c d e f g h i) -> Right (a, b, c, d, e, f, g, h, i); (coerce -> a) -> Left a)
+    (\(a, b, c, d, e, f, g, h, i) -> CompoundStatement (Fundef a b c d e f g h i))
+    (\case
+        (coerce -> CompoundStatement (Fundef a b c d e f g h i)) ->
+          Right (a, b, c, d, e, f, g, h, i)
+        (coerce -> a) -> Left a)
 
 _Call
   :: Prism
@@ -97,15 +100,13 @@ class HasNewlines s where
 instance HasNewlines Block where
   _Newlines f (Block b) =
     Block <$>
-    traverse (\(a, b, c, d) -> (,,,) a b <$> _Newlines f c <*> traverse f d) b
+    traverse (\(a, b, c) -> (,,) a b <$> _Newlines f c) b
 
-instance HasNewlines Statement where
+instance HasNewlines CompoundStatement where
   _Newlines f s =
     case s of
       Fundef ann ws1 name ws2 params ws3 ws4 nl block ->
         Fundef ann ws1 name ws2 params ws3 ws4 <$> f nl <*> _Newlines f block
-      Return{} -> pure s
-      Expr{} -> pure s
       If ann ws1 cond ws2 ws3 nl block els ->
         If ann ws1 cond ws2 ws3 <$>
         f nl <*>
@@ -114,9 +115,7 @@ instance HasNewlines Statement where
           (\(a, b, c, d) -> (,,,) a b <$> f nl <*> _Newlines f block)
           els
       While ann ws1 cond ws2 ws3 nl block -> While ann ws1 cond ws2 ws3 <$> f nl <*> _Newlines f block
-      Assign{} -> pure s
-      Pass{} -> pure s
-      Break{} -> pure s
-      Global{} -> pure s
-      Nonlocal{} -> pure s
-      Del{} -> pure s
+
+instance HasNewlines Statement where
+  _Newlines f (CompoundStatement c) = CompoundStatement <$> _Newlines f c
+  _Newlines f (SmallStatements s ss sc nl) = SmallStatements s ss sc <$> f nl

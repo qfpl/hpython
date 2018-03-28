@@ -41,18 +41,18 @@ validateBlockIndentation a =
   go Nothing (NonEmpty.toList $ view _Wrapped a)
   where
     go _ [] = pure []
-    go a ((ann, ws, st, nl):xs)
+    go a ((ann, ws, st):xs)
       | null ws = Failure [_ExpectedIndent # ann] <*> go a xs
       | otherwise =
           case a of
             Nothing ->
               liftA2 (:)
-                ((,,,) ann ws <$> validateStatementIndentation st <*> pure nl)
+                ((,,) ann ws <$> validateStatementIndentation st)
                 (go (Just ws) xs)
             Just ws'
               | equivalentIndentation ws ws' ->
                   liftA2 (:)
-                    ((,,,) ann ws <$> validateStatementIndentation st <*> pure nl)
+                    ((,,) ann ws <$> validateStatementIndentation st)
                     (go a xs)
               | otherwise -> Failure [_WrongIndent # (ws', ws, ann)] <*> go a xs
 
@@ -74,18 +74,18 @@ validateArgsIndentation
   -> Validate [e] (CommaSep (Arg (Nub (Indentation ': v)) a))
 validateArgsIndentation e = pure $ coerce e
 
-validateStatementIndentation
+validateCompoundStatementIndentation
   :: AsIndentationError e v a
-  => Statement v a
-  -> Validate [e] (Statement (Nub (Indentation ': v)) a)
-validateStatementIndentation (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
+  => CompoundStatement v a
+  -> Validate [e] (CompoundStatement (Nub (Indentation ': v)) a)
+validateCompoundStatementIndentation (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
   Fundef a ws1 (coerce name) ws2 <$>
   validateParamsIndentation params <*>
   pure ws3 <*>
   pure ws4 <*>
   pure nl <*>
   validateBlockIndentation body
-validateStatementIndentation (If a ws1 expr ws2 ws3 nl body body') =
+validateCompoundStatementIndentation (If a ws1 expr ws2 ws3 nl body body') =
   If a ws1 <$>
   validateExprIndentation expr <*>
   pure ws2 <*>
@@ -93,18 +93,18 @@ validateStatementIndentation (If a ws1 expr ws2 ws3 nl body body') =
   pure nl <*>
   validateBlockIndentation body <*>
   traverseOf (traverse._4) validateBlockIndentation body'
-validateStatementIndentation (While a ws1 expr ws2 ws3 nl body) =
+validateCompoundStatementIndentation (While a ws1 expr ws2 ws3 nl body) =
   While a ws1 <$>
   validateExprIndentation expr <*>
   pure ws2 <*>
   pure ws3 <*>
   pure nl <*>
   validateBlockIndentation body
-validateStatementIndentation e@Return{} = pure $ coerce e
-validateStatementIndentation e@Expr{} = pure $ coerce e
-validateStatementIndentation e@Assign{} = pure $ coerce e
-validateStatementIndentation e@Pass{} = pure $ coerce e
-validateStatementIndentation e@Break{} = pure $ coerce e
-validateStatementIndentation e@Global{} = pure $ coerce e
-validateStatementIndentation e@Nonlocal{} = pure $ coerce e
-validateStatementIndentation e@Del{} = pure $ coerce e
+
+validateStatementIndentation
+  :: AsIndentationError e v a
+  => Statement v a
+  -> Validate [e] (Statement (Nub (Indentation ': v)) a)
+validateStatementIndentation (CompoundStatement c) =
+  CompoundStatement <$> validateCompoundStatementIndentation c
+validateStatementIndentation s@SmallStatements{} = pure $ coerce s

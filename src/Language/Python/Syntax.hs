@@ -20,6 +20,7 @@ instance HasKeyword (Arg '[] ()) where; k_ a = KeywordArg () a [] []
 
 def_ :: Ident '[] () -> [Param '[] ()] -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 def_ name params block =
+  CompoundStatement $
   Fundef ()
     [Space]
     name
@@ -28,16 +29,16 @@ def_ name params block =
     []
     []
     LF
-    (Block $ (\a -> (,,,) () [Space, Space, Space, Space] a $ Just LF) <$> block)
+    (Block $ (,,) () [Space, Space, Space, Space] <$> block)
 
 call_ :: Expr '[] () -> [Arg '[] ()] -> Expr '[] ()
 call_ expr args = Call () expr [] (listToCommaSep args)
 
 return_ :: Expr '[] () -> Statement '[] ()
-return_ = Return () [Space]
+return_ e = SmallStatements (Return () [Space] e) [] Nothing LF
 
 expr_ :: Expr '[] () -> Statement '[] ()
-expr_ = Expr ()
+expr_ e = SmallStatements (Expr () e) [] Nothing LF
 
 list_ :: [Expr '[] ()] -> Expr '[] ()
 list_ es = List () [] (listToCommaSep es) []
@@ -111,21 +112,24 @@ neg = negate
 
 if_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 if_ e sts =
+  CompoundStatement $
   If () [Space] e [] [] LF
-    (Block $ (\a -> (,,,) () [Space, Space, Space, Space] a $ Just LF) <$> sts)
+    (Block $ (,,) () [Space, Space, Space, Space] <$> sts)
     Nothing
 
 while_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 while_ e sts =
+  CompoundStatement $
   While () [Space] e
     [] [] LF
-    (Block $ (\a -> (,,,) () [Space, Space, Space, Space] a $ Just LF) <$> sts)
+    (Block $ (,,) () [Space, Space, Space, Space] <$> sts)
 
 ifElse_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 ifElse_ e sts sts' =
+  CompoundStatement $
   If () [Space] e [] [] LF
-    (Block $ (\a -> (,,,) () [Space, Space, Space, Space] a $ Just LF) <$> sts)
-    (Just ([], [], LF, Block $ (\a -> (,,,) () [Space, Space, Space, Space] a $ Just LF) <$> sts'))
+    (Block $ (,,) () [Space, Space, Space, Space] <$> sts)
+    (Just ([], [], LF, Block $ (,,) () [Space, Space, Space, Space] <$> sts'))
 
 var_ :: String -> Expr '[] ()
 var_ = Ident () . MkIdent ()
@@ -134,10 +138,10 @@ none_ :: Expr '[] ()
 none_ = None ()
 
 pass_ :: Statement '[] ()
-pass_ = Pass ()
+pass_ = SmallStatements (Pass ()) [] Nothing LF
 
 break_ :: Statement '[] ()
-break_ = Break ()
+break_ = SmallStatements (Break ()) [] Nothing LF
 
 true_ :: Expr '[] ()
 true_ = Bool () True
@@ -155,4 +159,4 @@ str_ :: String -> Expr '[] ()
 str_ = String ()
 
 (.=) :: Expr '[] () -> Expr '[] () -> Statement '[] ()
-(.=) a = Assign () a [Space] [Space]
+(.=) a b = SmallStatements (Assign () a [Space] [Space] b) [] Nothing LF

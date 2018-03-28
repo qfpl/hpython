@@ -261,20 +261,15 @@ validateBlockSyntax (Block bs) = Block . NonEmpty.fromList <$> go (NonEmpty.toLi
   where
     go [] = error "impossible"
     go [b] = pure <$> traverseOf _3 validateStatementSyntax b
-    go (b:bs) =
-      (:) <$>
-      (case b ^. _4 of
-         Nothing -> syntaxErrors [_ExpectedNewlineAfter # b]
-         Just{} -> traverseOf _3 validateStatementSyntax b) <*>
-      go bs
+    go (b:bs) = (:) <$> traverseOf _3 validateStatementSyntax b <*> go bs
 
-validateStatementSyntax
+validateCompoundStatementSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
      )
-  => Statement v a
-  -> ValidateSyntax e (Statement (Nub (Syntax ': v)) a)
-validateStatementSyntax (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
+  => CompoundStatement v a
+  -> ValidateSyntax e (CompoundStatement (Nub (Syntax ': v)) a)
+validateCompoundStatementSyntax (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
   let
     paramIdents = params ^.. folded.unvalidated.paramName.identValue
   in
@@ -297,18 +292,7 @@ validateStatementSyntax (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
                 Just paramIdents
             })
          (validateBlockSyntax body))
-validateStatementSyntax (Return a ws expr) =
-  syntaxContext `bindValidateSyntax` \sctxt ->
-    case _inFunction sctxt of
-      Just{} ->
-        Return a <$>
-        validateWhitespace a ("return", id) ws (expr, renderExpr) <*>
-        validateExprSyntax expr
-      _ -> syntaxErrors [_ReturnOutsideFunction # a]
-validateStatementSyntax (Expr a expr) =
-  Expr a <$>
-  validateExprSyntax expr
-validateStatementSyntax (If a ws1 expr ws2 ws3 nl body body') =
+validateCompoundStatementSyntax (If a ws1 expr ws2 ws3 nl body body') =
   If a <$>
   validateWhitespace a ("if", id) ws1 (expr, renderExpr) <*>
   validateExprSyntax expr <*>
@@ -317,7 +301,7 @@ validateStatementSyntax (If a ws1 expr ws2 ws3 nl body body') =
   pure nl <*>
   validateBlockSyntax body <*>
   traverseOf (traverse._4) validateBlockSyntax body'
-validateStatementSyntax (While a ws1 expr ws2 ws3 nl body) =
+validateCompoundStatementSyntax (While a ws1 expr ws2 ws3 nl body) =
   While a <$>
   validateWhitespace a ("while", id) ws1 (expr, renderExpr) <*>
   validateExprSyntax expr <*>
@@ -325,7 +309,25 @@ validateStatementSyntax (While a ws1 expr ws2 ws3 nl body) =
   pure ws3 <*>
   pure nl <*>
   localSyntaxContext (\ctxt -> ctxt { _inLoop = True}) (validateBlockSyntax body)
-validateStatementSyntax (Assign a lvalue ws1 ws2 rvalue) =
+
+validateSmallStatementSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => SmallStatement v a
+  -> ValidateSyntax e (SmallStatement (Nub (Syntax ': v)) a)
+validateSmallStatementSyntax (Return a ws expr) =
+  syntaxContext `bindValidateSyntax` \sctxt ->
+    case _inFunction sctxt of
+      Just{} ->
+        Return a <$>
+        validateWhitespace a ("return", id) ws (expr, renderExpr) <*>
+        validateExprSyntax expr
+      _ -> syntaxErrors [_ReturnOutsideFunction # a]
+validateSmallStatementSyntax (Expr a expr) =
+  Expr a <$>
+  validateExprSyntax expr
+validateSmallStatementSyntax (Assign a lvalue ws1 ws2 rvalue) =
   syntaxContext `bindValidateSyntax` \sctxt ->
     let
       assigns =
@@ -341,15 +343,15 @@ validateStatementSyntax (Assign a lvalue ws1 ws2 rvalue) =
       pure ws2 <*>
       validateExprSyntax rvalue) <*
       modifyNonlocals (assigns ++)
-validateStatementSyntax p@Pass{} = pure $ coerce p
-validateStatementSyntax (Break a) =
+validateSmallStatementSyntax p@Pass{} = pure $ coerce p
+validateSmallStatementSyntax (Break a) =
   syntaxContext `bindValidateSyntax` \sctxt ->
     if _inLoop sctxt
     then pure $ Break a
     else syntaxErrors [_BreakOutsideLoop # a]
-validateStatementSyntax (Global a ws ids) =
+validateSmallStatementSyntax (Global a ws ids) =
   Global a ws <$> traverse validateIdent ids
-validateStatementSyntax (Nonlocal a ws ids) =
+validateSmallStatementSyntax (Nonlocal a ws ids) =
   syntaxContext `bindValidateSyntax` \sctxt ->
   nonlocals `bindValidateSyntax` \nls ->
   (case deleteFirstsBy' (\a -> (==) (a ^. unvalidated.identValue)) (ids ^.. folded) nls of
@@ -361,8 +363,23 @@ validateStatementSyntax (Nonlocal a ws ids) =
       case intersect params (ids ^.. folded.unvalidated.identValue) of
         [] -> Nonlocal a ws <$> traverse validateIdent ids
         bad -> syntaxErrors [_ParametersNonlocal # (a, bad)]
-validateStatementSyntax (Del a ws ids) =
+validateSmallStatementSyntax (Del a ws ids) =
   Del a ws <$> traverse validateIdent ids
+
+validateStatementSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => Statement v a
+  -> ValidateSyntax e (Statement (Nub (Syntax ': v)) a)
+validateStatementSyntax (CompoundStatement c) =
+  CompoundStatement <$> validateCompoundStatementSyntax c
+validateStatementSyntax (SmallStatements s ss sc nl) =
+  SmallStatements <$>
+  validateSmallStatementSyntax s <*>
+  traverseOf (traverse._3) validateSmallStatementSyntax ss <*>
+  pure sc <*>
+  pure nl
 
 canAssignTo :: Expr v a -> Bool
 canAssignTo None{} = False

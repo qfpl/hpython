@@ -21,6 +21,7 @@ import Language.Python.Internal.Syntax
 import Language.Python.Syntax
 
 append_to a =
+  CompoundStatement $
   Fundef a
     [Space]
     "append_to"
@@ -34,13 +35,19 @@ append_to a =
     (Block
      [ ( a
        , replicate 4 Space
-       , Expr a $
-         Call a
-           (Deref a (Ident a "to") [] [] "append") []
-           (CommaSepOne $ PositionalArg a (Ident a "element"))
-       , Just LF
+       , SmallStatements
+         (Expr a $
+          Call a
+            (Deref a (Ident a "to") [] [] "append") []
+            (CommaSepOne $ PositionalArg a (Ident a "element")))
+         []
+         Nothing
+         LF
        )
-     , (a, replicate 4 Space, Return a [Space] (Ident a "to"), Just LF)
+     , ( a
+       , replicate 4 Space
+       , SmallStatements (Return a [Space] (Ident a "to")) [] Nothing LF
+       )
      ])
 
 {-
@@ -74,6 +81,7 @@ append_to' =
       ]
 
 append_to'' a =
+  CompoundStatement $
   Fundef a
     [Space]
     "append_to"
@@ -87,12 +95,23 @@ append_to'' a =
     (Block
      [ ( a
        , replicate 4 Space
-       , Expr a $
-         Call a
-           (Deref a (Ident a "to") [] [] "append") []
-           (CommaSepOne $ PositionalArg a (Ident a "element"))
-       , Just LF)
-     , (a, replicate 4 Space ++ [Continued LF [Space, Space]], Return a [Space] (Ident a "to"), Just LF)
+       , SmallStatements
+         (Expr a $
+          Call a
+            (Deref a (Ident a "to") [] [] "append") []
+            (CommaSepOne $ PositionalArg a (Ident a "element")))
+         []
+         Nothing
+         LF
+       )
+     , ( a
+       , replicate 4 Space ++ [Continued LF [Space, Space]]
+       , SmallStatements
+         (Return a [Space] (Ident a "to"))
+         []
+         Nothing
+         LF
+       )
      ])
 
 bracketing =
@@ -130,10 +149,10 @@ fixMDA input = do
   pure $
     def_ name newparams (fixed :| (body ^.. _Statements))
 
-indentSpaces :: Natural -> Statement v a -> Statement v a
+indentSpaces :: Natural -> Statement '[] a -> Statement '[] a
 indentSpaces n = transform (_Indents .~ replicate (fromIntegral n) Space)
 
-indentTabs :: Statement v a -> Statement v a
+indentTabs :: Statement '[] a -> Statement '[] a
 indentTabs = transform (_Indents .~ [Tab])
 
 fact_tr =
@@ -186,11 +205,14 @@ optimize_tr st = do
     hasTC :: String -> Statement '[] () -> Bool
     hasTC name st =
       case st of
-        Return _ _ e -> isTailCall name e
-        Expr _ e -> isTailCall name e
-        If _ _ e _ _ _ sts sts' ->
+        CompoundStatement (If _ _ e _ _ _ sts sts') ->
           allOf _last (hasTC name) (sts ^.. _Statements) ||
           allOf _last (hasTC name) (sts' ^.. _Just._4._Statements)
+        SmallStatements s ss _ _ ->
+          case last (s : fmap (^. _3) ss) of
+            Return _ _ e -> isTailCall name e
+            Expr _ e -> isTailCall name e
+            _ -> False
         _ -> False
 
     renameIn :: [String] -> String -> Expr '[] () -> Expr '[] ()
@@ -199,40 +221,59 @@ optimize_tr st = do
         (_Ident._2.identValue %~ (\a -> if a `elem` params then a <> suffix else a))
 
     looped :: String -> [String] -> Statement '[] () -> [Statement '[] ()]
-    looped name params r@(Return _ _ e) =
-      case e ^? _Call of
-        Just (_, f, _, args)
-          | Just name' <- f ^? _Ident._2.identValue
-          , name' == name ->
-              fmap (\a -> var_ (a <> "__tr__old") .= (var_ $ a <> "__tr")) params <>
-              zipWith
-                (\a b -> var_ (a <> "__tr") .= b)
-                params
-                (transformOn traverse (renameIn params "__tr__old") $ args ^.. folded.argExpr)
-        _ -> [ "__res__tr" .= e, break_ ]
-    looped name params r@(Expr _ e)
-      | isTailCall name e = [pass_]
-      | otherwise = [r]
-    looped name params r@(If _ _ e _ _ _ sts sts')
-      | hasTC name r =
-          case sts' of
-            Nothing ->
-              [ if_ e
-                  (NonEmpty.fromList $
-                   (toListOf _Statements sts ^?! _init) <>
-                   looped name params (toListOf _Statements sts ^?! _last))
-              ]
-            Just (_, _, _, sts'') ->
-              [ ifElse_ e
-                  (NonEmpty.fromList $
-                   (toListOf _Statements sts ^?! _init) <>
-                   looped name params (toListOf _Statements sts ^?! _last))
-                  (NonEmpty.fromList $
-                   (toListOf _Statements sts'' ^?! _init) <>
-                   looped name params (toListOf _Statements sts'' ^?! _last))
-              ]
-      | otherwise = [r]
-    looped name params s = [s]
+    looped name params st =
+      case st of
+        CompoundStatement c ->
+          case c of
+            If _ _ e _ _ _ sts sts'
+              | hasTC name st ->
+                  case sts' of
+                    Nothing ->
+                      [ if_ e
+                          (NonEmpty.fromList $
+                          (toListOf _Statements sts ^?! _init) <>
+                          looped name params (toListOf _Statements sts ^?! _last))
+                      ]
+                    Just (_, _, _, sts'') ->
+                      [ ifElse_ e
+                          (NonEmpty.fromList $
+                          (toListOf _Statements sts ^?! _init) <>
+                          looped name params (toListOf _Statements sts ^?! _last))
+                          (NonEmpty.fromList $
+                          (toListOf _Statements sts'' ^?! _init) <>
+                          looped name params (toListOf _Statements sts'' ^?! _last))
+                      ]
+            _ -> [st]
+        SmallStatements s ss sc nl ->
+          let
+            initExps = foldr (\_ _ -> init ss) [] ss
+            lastExp =
+              foldrOf (folded._3) (\_ _ -> last ss ^. _3) s ss
+            newSts =
+              case initExps of
+                [] -> []
+                (_, _, a) : rest ->
+                  let
+                    lss = last ss
+                  in
+                    [SmallStatements a rest (Just (lss ^. _1, lss ^. _2)) nl]
+          in
+            case lastExp of
+              Return _ _ e ->
+                case e ^? _Call of
+                  Just (_, f, _, args)
+                    | Just name' <- f ^? _Ident._2.identValue
+                    , name' == name ->
+                        newSts <>
+                        fmap (\a -> var_ (a <> "__tr__old") .= (var_ $ a <> "__tr")) params <>
+                        zipWith
+                          (\a b -> var_ (a <> "__tr") .= b)
+                          params
+                          (transformOn traverse (renameIn params "__tr__old") $ args ^.. folded.argExpr)
+                  _ -> newSts <> [ "__res__tr" .= e, break_ ]
+              Expr _ e
+                | isTailCall name e -> newSts <> [pass_]
+              _ -> [st]
 
 badly_scoped =
   def_ "test" [p_ "a", p_ "b"]

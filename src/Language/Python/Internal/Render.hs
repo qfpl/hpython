@@ -5,7 +5,7 @@ module Language.Python.Internal.Render where
 import Control.Lens.Getter
 import Control.Lens.Wrapped
 import Data.Char (ord)
-import Data.Foldable
+import Data.Maybe
 import Data.Semigroup (Semigroup(..))
 import Language.Python.Internal.Syntax
 
@@ -154,8 +154,24 @@ renderExpr (BinOp _ e1 ws1 op ws2 e2) =
   where
     bracket a = "(" <> a <> ")"
 
-renderStatement :: Statement v a -> Lines String
-renderStatement (Fundef _ ws1 name ws2 params ws3 ws4 nl body) =
+renderSmallStatement :: SmallStatement v a -> String
+renderSmallStatement (Return _ ws expr) =
+  "return" <> foldMap renderWhitespace ws <> renderExpr expr
+renderSmallStatement (Expr _ expr) = renderExpr expr
+renderSmallStatement (Assign _ lvalue ws1 ws2 rvalue) =
+  renderExpr lvalue <> foldMap renderWhitespace ws1 <> "=" <>
+  foldMap renderWhitespace ws2 <> renderExpr rvalue
+renderSmallStatement (Pass _) = "pass"
+renderSmallStatement (Break _) = "break"
+renderSmallStatement (Global _ ws ids) =
+  "global" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
+renderSmallStatement (Nonlocal _ ws ids) =
+  "nonlocal" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
+renderSmallStatement (Del _ ws ids) =
+  "del" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
+
+renderCompoundStatement :: CompoundStatement v a -> Lines String
+renderCompoundStatement (Fundef _ ws1 name ws2 params ws3 ws4 nl body) =
   ManyLines firstLine nl restLines
   where
     firstLine =
@@ -164,14 +180,10 @@ renderStatement (Fundef _ ws1 name ws2 params ws3 ws4 nl body) =
       foldMap renderWhitespace ws3 <> ":" <> foldMap renderWhitespace ws4
     restLines =
       foldMap
-        (\(_, a, b, nl) ->
-           maybe id endWith nl $ (foldMap renderWhitespace a <>) <$> renderStatement b)
+        (\(_, a, b) -> (foldMap renderWhitespace a <>) <$> renderStatement b)
         (view _Wrapped body)
-renderStatement (Return _ ws expr) =
-  OneLine $ "return" <> foldMap renderWhitespace ws <> renderExpr expr
-renderStatement (Expr _ expr) = OneLine $ renderExpr expr
-renderStatement (If _ ws1 expr ws2 ws3 nl body body') =
-  ManyLines firstLine nl restLines <> fold elseLines
+renderCompoundStatement (If _ ws1 expr ws2 ws3 nl body body') =
+  ManyLines firstLine nl restLines
   where
     firstLine =
       "if" <> foldMap renderWhitespace ws1 <>
@@ -179,9 +191,9 @@ renderStatement (If _ ws1 expr ws2 ws3 nl body body') =
       foldMap renderWhitespace ws3
     restLines =
       foldMap
-        (\(_, a, b, nl) ->
-           maybe id endWith nl $ (foldMap renderWhitespace a <>) <$> renderStatement b)
-        (view _Wrapped body)
+        (\(_, a, b) -> (foldMap renderWhitespace a <>) <$> renderStatement b)
+        (view _Wrapped body) <>
+      fromMaybe mempty elseLines
     elseLines =
       ManyLines <$>
       fmap
@@ -193,29 +205,34 @@ renderStatement (If _ ws1 expr ws2 ws3 nl body body') =
       fmap
         (\(_, _, _, body'') ->
            foldMap
-             (\(_, a, b, nl) -> maybe id endWith nl $ (foldMap renderWhitespace a <>) <$> renderStatement b)
+             (\(_, a, b) -> (foldMap renderWhitespace a <>) <$> renderStatement b)
              (view _Wrapped body''))
         body'
-renderStatement (While _ ws1 expr ws2 ws3 nl body) =
+renderCompoundStatement (While _ ws1 expr ws2 ws3 nl body) =
   ManyLines
     ("while" <> foldMap renderWhitespace ws1 <> renderExpr expr <>
      foldMap renderWhitespace ws2 <> ":" <> foldMap renderWhitespace ws3)
     nl
     (foldMap
-       (\(_, a, b, nl) -> maybe id endWith nl $ (foldMap renderWhitespace a <>) <$> renderStatement b)
+       (\(_, a, b) -> (foldMap renderWhitespace a <>) <$> renderStatement b)
        (view _Wrapped body))
-renderStatement (Assign _ lvalue ws1 ws2 rvalue) =
-  OneLine $
-  renderExpr lvalue <> foldMap renderWhitespace ws1 <> "=" <>
-  foldMap renderWhitespace ws2 <> renderExpr rvalue
-renderStatement (Pass _) = OneLine "pass"
-renderStatement (Break _) = OneLine "break"
-renderStatement (Global _ ws ids) =
-  OneLine $ "global" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
-renderStatement (Nonlocal _ ws ids) =
-  OneLine $ "nonlocal" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
-renderStatement (Del _ ws ids) =
-  OneLine $ "del" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
+
+renderStatement :: Statement v a -> Lines String
+renderStatement (CompoundStatement c) = renderCompoundStatement c
+renderStatement (SmallStatements s ss sc nl) =
+  ManyLines
+  (renderSmallStatement s <>
+   foldMap
+     (\(a, b, c) ->
+        foldMap renderWhitespace a <> ";" <>
+        foldMap renderWhitespace b <>
+        renderSmallStatement c)
+     ss <>
+   foldMap
+     (\(a, b) -> foldMap renderWhitespace a <> ";" <> foldMap renderWhitespace b)
+     sc)
+  nl
+  NoLines
 
 renderArgs :: CommaSep (Arg v a) -> String
 renderArgs a = "(" <> renderCommaSep go a <> ")"

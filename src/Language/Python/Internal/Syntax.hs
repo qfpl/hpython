@@ -1,4 +1,4 @@
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language DataKinds, PolyKinds #-}
 {-# language TemplateHaskell, TypeFamilies, FlexibleInstances,
   MultiParamTypeClasses #-}
@@ -20,6 +20,7 @@ import Data.List.NonEmpty hiding (fromList)
 import Data.Monoid
 import Data.String
 import GHC.Exts
+import GHC.Generics
 import Text.Parser.Char
 import Text.Parser.Token
 import Text.Parser.Token.Highlight
@@ -134,11 +135,14 @@ instance HasExprs Arg where
 
 data Whitespace = Space | Tab | Continued Newline [Whitespace] deriving (Eq, Show)
 
-newtype Block v a = Block { unBlock :: NonEmpty (a, [Whitespace], Statement v a, Maybe Newline) }
+newtype Block v a = Block { unBlock :: NonEmpty (a, [Whitespace], Statement v a) }
   deriving (Eq, Show, Functor)
 class HasBlocks s where
   _Blocks :: Traversal (s v a) (s '[] a) (Block v a) (Block '[] a)
 instance HasBlocks Statement where
+  _Blocks f (CompoundStatement c) = CompoundStatement <$> _Blocks f c
+  _Blocks _ s@SmallStatements{} = pure $ coerce s
+instance HasBlocks CompoundStatement where
   _Blocks f (Fundef a ws1 name ws2 params ws3 ws4 nl b) =
     Fundef a ws1 (coerce name) ws2 (coerce params) ws3 ws4 nl <$> coerce (f b)
   _Blocks f (If a ws1 e1 ws2 ws3 nl b b') =
@@ -147,25 +151,36 @@ instance HasBlocks Statement where
     traverseOf (traverse._4) (coerce . f) b'
   _Blocks f (While a ws1 e1 ws2 ws3 nl b) =
     While a ws1 (coerce e1) ws2 ws3 nl <$> coerce (f b)
-  _Blocks _ s@Assign{} = pure $ coerce s
-  _Blocks _ s@Expr{} = pure $ coerce s
-  _Blocks _ s@Return{} = pure $ coerce s
-  _Blocks _ s@Pass{} = pure $ coerce s
-  _Blocks _ s@Break{} = pure $ coerce s
-  _Blocks _ s@Global{} = pure $ coerce s
-  _Blocks _ s@Nonlocal{} = pure $ coerce s
-  _Blocks _ s@Del{} = pure $ coerce s
 
 data Newline = CR | LF | CRLF deriving (Eq, Show)
 
 data Statement (v :: [*]) a
+  = SmallStatements
+      (SmallStatement v a)
+      [([Whitespace], [Whitespace], SmallStatement v a)]
+      (Maybe ([Whitespace], [Whitespace]))
+      Newline
+  | CompoundStatement (CompoundStatement v a)
+  deriving (Eq, Show, Functor)
+
+data SmallStatement (v :: [*]) a
+  = Return a [Whitespace] (Expr v a)
+  | Expr a (Expr v a)
+  | Assign a (Expr v a) [Whitespace] [Whitespace] (Expr v a)
+  | Pass a
+  | Break a
+  | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
+  | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
+  | Del a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
+  deriving (Eq, Show, Functor, Generic)
+instance Plated (SmallStatement '[] a) where; plate = gplate
+
+data CompoundStatement (v :: [*]) a
   = Fundef a
       (NonEmpty Whitespace) (Ident v a)
       [Whitespace] (CommaSep (Param v a))
       [Whitespace] [Whitespace] Newline
       (Block v a)
-  | Return a [Whitespace] (Expr v a)
-  | Expr a (Expr v a)
   | If a
       [Whitespace] (Expr v a)
       [Whitespace] [Whitespace] Newline
@@ -175,30 +190,20 @@ data Statement (v :: [*]) a
       [Whitespace] (Expr v a)
       [Whitespace] [Whitespace] Newline
       (Block v a)
-  | Assign a (Expr v a) [Whitespace] [Whitespace] (Expr v a)
-  | Pass a
-  | Break a
-  | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
-  | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
-  | Del a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   deriving (Eq, Show, Functor)
-instance Plated (Statement v a) where
-  plate f (Fundef a ws1 b ws2 c ws3 ws4 nl sts) =
-    Fundef a ws1 b ws2 c ws3 ws4 nl <$> (_Wrapped.traverse._3) f sts
-  plate f (If a ws1 b ws2 ws3 nl sts sts') =
-    If a ws1 b ws2 ws3 nl <$>
-    (_Wrapped.traverse._3) f sts <*>
-    (traverse._4._Wrapped.traverse._3) f sts'
-  plate _ s@Return{} = pure $ coerce s
-  plate _ s@Expr{} = pure $ coerce s
-  plate _ s@Assign{} = pure $ coerce s
-  plate f (While a ws1 b ws2 ws3 nl sts) =
-    While a ws1 b ws2 ws3 nl <$> (_Wrapped.traverse._3) f sts
-  plate _ s@Break{} = pure $ coerce s
-  plate _ s@Pass{} = pure $ coerce s
-  plate _ s@Global{} = pure $ coerce s
-  plate _ s@Nonlocal{} = pure $ coerce s
-  plate _ s@Del{} = pure $ coerce s
+instance Plated (Statement '[] a) where
+  plate _ s@SmallStatements{} = pure s
+  plate f (CompoundStatement s) =
+    CompoundStatement <$>
+    case s of
+      Fundef a ws1 b ws2 c ws3 ws4 nl sts ->
+        Fundef a ws1 b ws2 c ws3 ws4 nl <$> (_Wrapped.traverse._3) f sts
+      If a ws1 b ws2 ws3 nl sts sts' ->
+        If a ws1 b ws2 ws3 nl <$>
+        (_Wrapped.traverse._3) f sts <*>
+        (traverse._4._Wrapped.traverse._3) f sts'
+      While a ws1 b ws2 ws3 nl sts ->
+        While a ws1 b ws2 ws3 nl <$> (_Wrapped.traverse._3) f sts
 
 data CommaSep a
   = CommaSepNone
@@ -329,7 +334,16 @@ data BinOp a
 class HasExprs s where
   _Exprs :: Traversal (s v a) (s '[] a) (Expr v a) (Expr '[] a)
 
-instance HasExprs Statement where
+instance HasExprs SmallStatement where
+  _Exprs f (Return a ws e) = Return a ws <$> f e
+  _Exprs f (Expr a e) = Expr a <$> f e
+  _Exprs f (Assign a e1 ws1 ws2 e2) = Assign a <$> f e1 <*> pure ws1 <*> pure ws2 <*> f e2
+  _Exprs _ p@Pass{} = pure $ coerce p
+  _Exprs _ p@Break{} = pure $ coerce p
+  _Exprs _ p@Global{} = pure $ coerce p
+  _Exprs _ p@Nonlocal{} = pure $ coerce p
+  _Exprs _ p@Del{} = pure $ coerce p
+instance HasExprs CompoundStatement where
   _Exprs f (Fundef a ws1 name ws2 params ws3 ws4 nl sts) =
     Fundef a ws1 (coerce name) ws2 <$>
     (traverse._Exprs) f params <*>
@@ -337,8 +351,6 @@ instance HasExprs Statement where
     pure ws4 <*>
     pure nl <*>
     (_Wrapped.traverse._3._Exprs) f sts
-  _Exprs f (Return a ws e) = Return a ws <$> f e
-  _Exprs f (Expr a e) = Expr a <$> f e
   _Exprs f (If a ws1 e ws2 ws3 nl sts sts') =
     If a ws1 <$>
     f e <*>
@@ -354,12 +366,14 @@ instance HasExprs Statement where
     pure ws3 <*>
     pure nl <*>
     (_Wrapped.traverse._3._Exprs) f sts
-  _Exprs f (Assign a e1 ws1 ws2 e2) = Assign a <$> f e1 <*> pure ws1 <*> pure ws2 <*> f e2
-  _Exprs _ p@Pass{} = pure $ coerce p
-  _Exprs _ p@Break{} = pure $ coerce p
-  _Exprs _ p@Global{} = pure $ coerce p
-  _Exprs _ p@Nonlocal{} = pure $ coerce p
-  _Exprs _ p@Del{} = pure $ coerce p
+instance HasExprs Statement where
+  _Exprs f (SmallStatements s ss a b) =
+    SmallStatements <$>
+    _Exprs f s <*>
+    (traverse._3._Exprs) f ss <*>
+    pure a <*>
+    pure b
+  _Exprs f (CompoundStatement c) = CompoundStatement <$> _Exprs f c
 
 -- | 'Traversal' over all the statements in a term
 class HasStatements s where

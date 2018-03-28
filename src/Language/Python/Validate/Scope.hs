@@ -131,11 +131,11 @@ inScope s =
       ((,) Clean <$> ings) <|>
       ((,) Dirty <$> inls)
 
-validateStatementScope
+validateCompoundStatementScope
   :: AsScopeError e v a
-  => Statement v a
-  -> ValidateScope a e (Statement (Nub (Scope ': v)) a)
-validateStatementScope (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
+  => CompoundStatement v a
+  -> ValidateScope a e (CompoundStatement (Nub (Scope ': v)) a)
+validateCompoundStatementScope (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
   (locallyOver scLocalScope (const Trie.empty) $
    locallyOver scImmediateScope (const Trie.empty) $
      Fundef a ws1 (coerce name) ws2 <$>
@@ -150,9 +150,7 @@ validateStatementScope (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
        (validateBlockScope body)) <*
   extendScope scLocalScope [(_identAnnotation &&& _identValue) name] <*
   extendScope scImmediateScope [(_identAnnotation &&& _identValue) name]
-validateStatementScope (Return a ws e) = Return a ws <$> validateExprScope e
-validateStatementScope (Expr a e) = Expr a <$> validateExprScope e
-validateStatementScope (If a ws1 e ws2 ws3 nl b melse) =
+validateCompoundStatementScope (If a ws1 e ws2 ws3 nl b melse) =
   scopeContext scLocalScope `bindValidateScope` (\ls ->
   scopeContext scImmediateScope `bindValidateScope` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
@@ -164,7 +162,7 @@ validateStatementScope (If a ws1 e ws2 ws3 nl b melse) =
      pure nl <*>
      validateBlockScope b <*>
      traverseOf (traverse._4) validateBlockScope melse)))
-validateStatementScope (While a ws1 e ws2 ws3 nl b) =
+validateCompoundStatementScope (While a ws1 e ws2 ws3 nl b) =
   scopeContext scLocalScope `bindValidateScope` (\ls ->
   scopeContext scImmediateScope `bindValidateScope` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
@@ -175,20 +173,40 @@ validateStatementScope (While a ws1 e ws2 ws3 nl b) =
      pure ws3 <*>
      pure nl <*>
      validateBlockScope b)))
-validateStatementScope (Assign a l ws1 ws2 r) =
+
+validateSmallStatementScope
+  :: AsScopeError e v a
+  => SmallStatement v a
+  -> ValidateScope a e (SmallStatement (Nub (Scope ': v)) a)
+validateSmallStatementScope (Return a ws e) = Return a ws <$> validateExprScope e
+validateSmallStatementScope (Expr a e) = Expr a <$> validateExprScope e
+validateSmallStatementScope (Assign a l ws1 ws2 r) =
   let
     ls = l ^.. unvalidated.cosmos._Ident._2.to (_identAnnotation &&& _identValue)
   in
   (Assign a (coerce l) ws1 ws2 <$> validateExprScope r) <*
   extendScope scLocalScope ls <*
   extendScope scImmediateScope ls
-validateStatementScope (Global a _ _) = scopeErrors [_FoundGlobal # a]
-validateStatementScope (Nonlocal a _ _) = scopeErrors [_FoundNonlocal # a]
-validateStatementScope (Del a ws cs) =
+validateSmallStatementScope (Global a _ _) = scopeErrors [_FoundGlobal # a]
+validateSmallStatementScope (Nonlocal a _ _) = scopeErrors [_FoundNonlocal # a]
+validateSmallStatementScope (Del a ws cs) =
   scopeErrors [_FoundDel # a] <*>
   traverse validateIdentScope cs
-validateStatementScope s@Pass{} = pure $ coerce s
-validateStatementScope s@Break{} = pure $ coerce s
+validateSmallStatementScope s@Pass{} = pure $ coerce s
+validateSmallStatementScope s@Break{} = pure $ coerce s
+
+validateStatementScope
+  :: AsScopeError e v a
+  => Statement v a
+  -> ValidateScope a e (Statement (Nub (Scope ': v)) a)
+validateStatementScope (CompoundStatement c) =
+  CompoundStatement <$> validateCompoundStatementScope c
+validateStatementScope (SmallStatements s ss sc nl) =
+  SmallStatements <$>
+  validateSmallStatementScope s <*>
+  traverseOf (traverse._3) validateSmallStatementScope ss <*>
+  pure sc <*>
+  pure nl
 
 validateIdentScope
   :: AsScopeError e v a

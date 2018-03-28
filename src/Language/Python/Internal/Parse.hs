@@ -195,42 +195,25 @@ block = fmap Block (liftA2 (:|) first go) <* dedent
     first =
       (\(f :~ a) -> f a) <$>
       spanned
-        ((\a b c d -> (d, a, b, c)) <$>
+        ((\a b d -> (d, a, b)) <$>
          (indent *> fmap head get) <*>
-         statement <*>
-         optional newline)
+         statement)
     go =
       many $
       (\(f :~ a) -> f a) <$>
       spanned
-        ((\a b c d -> (d, a, b, c)) <$>
+        ((\a b d -> (d, a, b)) <$>
          (try level *> fmap head get) <*>
-         statement <*>
-         optional newline)
+         statement)
 
-statement :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (Statement '[] Span)
-statement =
+compoundStatement
+  :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (CompoundStatement '[] Span)
+compoundStatement =
   annotated $
   fundef <|>
-  returnSt <|>
-  assignOrExpr <|>
   ifSt <|>
-  while <|>
-  pass <|>
-  break
+  while
   where
-    break = reserved "break" $> Break
-    pass = reserved "pass" $> Pass
-    assignOrExpr = do
-      e <- expr
-      mws <- optional (many whitespace <* char '=')
-      case mws of
-        Nothing -> pure (`Expr` e)
-        Just ws ->
-          (\a b c -> Assign c e ws a b) <$>
-          many whitespace <*>
-          expr
-    returnSt = (\a b c -> Return c a b) <$ reserved "return" <*> many whitespace <*> expr
     fundef =
       (\a b c d e f g h i -> Fundef i a b c d e f g h) <$
       reserved "def" <*> some1 whitespace <*> annotated identifier <*>
@@ -247,3 +230,41 @@ statement =
       (\a b c d e f g -> While g a b c d e f) <$>
       (reserved "while" *> many whitespace) <*> expr <*> many whitespace <* char ':' <*>
       many whitespace <*> newline <*> block
+
+smallStatement :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (SmallStatement '[] Span)
+smallStatement =
+  annotated $
+  returnSt <|>
+  assignOrExpr <|>
+  pass <|>
+  break
+  where
+    break = reserved "break" $> Break
+    pass = reserved "pass" $> Pass
+    assignOrExpr = do
+      e <- expr
+      mws <- optional (many whitespace <* char '=')
+      case mws of
+        Nothing -> pure (`Expr` e)
+        Just ws ->
+          (\a b c -> Assign c e ws a b) <$>
+          many whitespace <*>
+          expr
+    returnSt = (\a b c -> Return c a b) <$ reserved "return" <*> many whitespace <*> expr
+
+statement :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (Statement '[] Span)
+statement =
+  CompoundStatement <$> compoundStatement <|>
+  smallStatements
+  where
+    smallStatements =
+      SmallStatements <$>
+      smallStatement <*>
+      many
+        (try $
+         (,,) <$>
+         many whitespace <* char ';' <*>
+         many whitespace <*>
+         smallStatement) <*>
+      optional ((,) <$> many whitespace <* char ';' <*> many whitespace) <*>
+      newline

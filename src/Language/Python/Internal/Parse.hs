@@ -268,3 +268,11 @@ statement =
          smallStatement) <*>
       optional ((,) <$> many whitespace <* char ';' <*> many whitespace) <*>
       newline
+
+module_ :: DeltaParsing m => m (Module '[] Span)
+module_ =
+  Module <$>
+  many
+    (try (Left <$> liftA2 (,) (many whitespace) newline) <|>
+     Right <$> evalStateT statement [])
+  <* eof

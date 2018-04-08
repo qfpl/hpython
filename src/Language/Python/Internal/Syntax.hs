@@ -80,7 +80,7 @@ data Ident (v :: [*]) a
   = MkIdent
   { _identAnnotation :: a
   , _identValue :: String
-  } deriving (Eq, Show, Functor)
+  } deriving (Eq, Show, Functor, Foldable)
 instance IsString (Ident '[] ()) where
   fromString = MkIdent ()
 identValue :: Lens (Ident v a) (Ident '[] a) String String
@@ -101,7 +101,7 @@ data Param (v :: [*]) a
   , _unsafeKeywordParamWhitespaceRight :: [Whitespace]
   , _unsafeKeywordParamExpr :: Expr v a
   }
-  deriving (Eq, Show, Functor)
+  deriving (Eq, Show, Functor, Foldable)
 paramAnn :: Lens' (Param v a) a
 paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
 
@@ -125,7 +125,7 @@ data Arg (v :: [*]) a
   , _unsafeKeywordArgWhitespaceRight :: [Whitespace]
   , _argExpr :: Expr v a
   }
-  deriving (Eq, Show, Functor)
+  deriving (Eq, Show, Functor, Foldable)
 instance IsString (Arg '[] ()) where fromString = PositionalArg () . fromString
 argExpr :: Lens (Arg v a) (Arg '[] a) (Expr v a) (Expr '[] a)
 argExpr = lens _argExpr (\s a -> (coerce s) { _argExpr = a })
@@ -136,7 +136,7 @@ instance HasExprs Arg where
 data Whitespace = Space | Tab | Continued Newline [Whitespace] deriving (Eq, Show)
 
 newtype Block v a = Block { unBlock :: NonEmpty (a, [Whitespace], Statement v a) }
-  deriving (Eq, Show, Functor)
+  deriving (Eq, Show, Functor, Foldable)
 class HasBlocks s where
   _Blocks :: Traversal (s v a) (s '[] a) (Block v a) (Block '[] a)
 instance HasBlocks Statement where
@@ -161,7 +161,7 @@ data Statement (v :: [*]) a
       (Maybe ([Whitespace], [Whitespace]))
       Newline
   | CompoundStatement (CompoundStatement v a)
-  deriving (Eq, Show, Functor)
+  deriving (Eq, Show, Functor, Foldable)
 
 data SmallStatement (v :: [*]) a
   = Return a [Whitespace] (Expr v a)
@@ -172,7 +172,7 @@ data SmallStatement (v :: [*]) a
   | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Del a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
-  deriving (Eq, Show, Functor, Generic)
+  deriving (Eq, Show, Functor, Foldable, Generic)
 instance Plated (SmallStatement '[] a) where; plate = gplate
 
 data CompoundStatement (v :: [*]) a
@@ -190,7 +190,7 @@ data CompoundStatement (v :: [*]) a
       [Whitespace] (Expr v a)
       [Whitespace] [Whitespace] Newline
       (Block v a)
-  deriving (Eq, Show, Functor)
+  deriving (Eq, Show, Functor, Foldable)
 instance Plated (Statement '[] a) where
   plate _ s@SmallStatements{} = pure s
   plate f (CompoundStatement s) =
@@ -292,7 +292,7 @@ data Expr (v :: [*]) a
   { _exprAnnotation :: a
   , _unsafeStringValue :: String
   }
-  deriving (Eq, Show, Functor)
+  deriving (Eq, Show, Functor, Foldable)
 instance IsString (Expr '[] ()) where
   fromString = Ident () . MkIdent ()
 instance Num (Expr '[] ()) where
@@ -318,6 +318,11 @@ instance Plated (Expr '[] a) where
   plate _ e@Ident{} = pure $ coerce e
   plate _ e@Int{} = pure $ coerce e
 
+newtype Module v a = Module [Either ([Whitespace], Newline) (Statement v a)]
+  deriving (Eq, Show, Functor, Foldable)
+instance HasStatements Module where
+  _Statements = _Wrapped.traverse._Right
+
 data BinOp a
   = Is a
   | Minus a
@@ -328,7 +333,7 @@ data BinOp a
   | Divide a
   | Plus a
   | Equals a
-  deriving (Eq, Show, Functor)
+  deriving (Eq, Show, Functor, Foldable)
 
 -- | 'Traversal' over all the expressions in a term
 class HasExprs s where
@@ -456,5 +461,6 @@ shouldBracketRight op right =
   in
     rightf || rightf'
 
+makeWrapped ''Module
 makeWrapped ''Block
 makeLenses ''Expr

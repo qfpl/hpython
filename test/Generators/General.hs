@@ -41,7 +41,6 @@ genArg genExpr = Gen.sized $ \n ->
       , KeywordArg () <$> genIdent <*> genWhitespaces <*> genWhitespaces <*> genExpr
       ]
 
-
 genIdent :: MonadGen m => m (Ident '[] ())
 genIdent =
   MkIdent () <$>
@@ -233,3 +232,16 @@ genStatement =
           Gen.maybe ((,) <$> genWhitespaces <*> genWhitespaces) <*>
           genNewline
     ]
+
+genModule :: MonadGen m => m (Module '[] ())
+genModule = Gen.sized $ \n -> do
+  num <- Gen.integral (Range.constant 1 n)
+  Module <$>
+    Gen.list
+      (Range.singleton $ unSize num)
+      (Gen.resize
+         (n `div` num)
+         (Gen.choice
+          [ Left <$> liftA2 (,) genWhitespaces genNewline
+          , Right <$> genStatement
+          ]))

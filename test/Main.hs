@@ -49,6 +49,17 @@ validateStatementIndentation'
   -> Validate [IndentationError '[] a] (Statement '[Indentation] a)
 validateStatementIndentation' = validateStatementIndentation
 
+validateModuleSyntax'
+  :: Module '[Indentation] a
+  -> Validate [SyntaxError '[Indentation] a] (Module '[Syntax, Indentation] a)
+validateModuleSyntax' =
+  runValidateSyntax initialSyntaxContext [] . validateModuleSyntax
+
+validateModuleIndentation'
+  :: Module '[] a
+  -> Validate [IndentationError '[] a] (Module '[Indentation] a)
+validateModuleIndentation' = validateModuleIndentation
+
 runPython3 :: (MonadTest m, MonadIO m) => FilePath -> Bool -> String -> m ()
 runPython3 path shouldSucceed str = do
   () <- liftIO $ writeFile path str
@@ -110,6 +121,27 @@ syntax_statement path =
     annotate rst
     runPython3 path shouldSucceed rst
 
+syntax_module :: FilePath -> Property
+syntax_module path =
+  property $ do
+    st <- forAll $ Gen.resize 300 General.genModule
+    let rst = renderModule st
+    shouldSucceed <-
+      case validateModuleIndentation' st of
+        Failure errs -> annotateShow errs $> False
+        Success res ->
+          case validateModuleSyntax' res of
+            Failure errs' ->
+              let
+                errs'' = filter (hasn't _MissingSpacesIn) errs'
+              in
+                if null errs''
+                then pure True
+                else annotateShow errs'' $> False
+            Success res' -> pure True
+    annotate rst
+    runPython3 path shouldSucceed rst
+
 correct_syntax_expr :: FilePath -> Property
 correct_syntax_expr path =
   property $ do
@@ -124,7 +156,7 @@ correct_syntax_expr path =
 correct_syntax_statement :: FilePath -> Property
 correct_syntax_statement path =
   property $ do
-    st <- forAll $ evalStateT (Correct.genStatement initialSyntaxContext) []
+    st <- forAll $ evalStateT Correct.genStatement Correct.initialGenState
     annotate $ renderLines (renderStatement st)
     case validateStatementIndentation' st of
       Failure errs -> annotateShow errs *> failure
@@ -155,7 +187,7 @@ parseStatement = Trifecta.parseString (evalStateT statement []) mempty
 statement_printparseprint_print :: Property
 statement_printparseprint_print =
   property $ do
-    st <- forAll $ evalStateT (Correct.genStatement initialSyntaxContext) []
+    st <- forAll $ evalStateT Correct.genStatement Correct.initialGenState
     annotate (renderLines $ renderStatement st)
     case validateStatementIndentation' st of
       Failure errs -> annotateShow errs *> failure
@@ -174,6 +206,7 @@ main = do
   let file = "hedgehog-test.py"
   check . withTests 200 $ syntax_expr file
   check . withTests 200 $ syntax_statement file
+  check . withTests 200 $ syntax_module file
   check . withTests 200 $ correct_syntax_expr file
   check . withTests 200 $ correct_syntax_statement file
   check expr_printparseprint_print

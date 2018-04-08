@@ -261,3 +261,11 @@ renderBinOp (Exp _) = "**"
 renderBinOp (BoolAnd _) = "and"
 renderBinOp (BoolOr _) = "or"
 renderBinOp (Equals _) = "=="
+
+renderModule :: Module v a -> String
+renderModule (Module ms) =
+  foldMap
+    (either
+       (\(a, b) -> foldMap renderWhitespace a <> renderNewline b)
+       (renderLines . renderStatement))
+    ms

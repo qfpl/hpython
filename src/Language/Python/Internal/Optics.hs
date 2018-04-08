@@ -119,3 +119,6 @@ instance HasNewlines CompoundStatement where
 instance HasNewlines Statement where
   _Newlines f (CompoundStatement c) = CompoundStatement <$> _Newlines f c
   _Newlines f (SmallStatements s ss sc nl) = SmallStatements s ss sc <$> f nl
+
+instance HasNewlines Module where
+  _Newlines = _Wrapped.traverse.failing (_Left._2) (_Right._Newlines)

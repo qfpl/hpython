@@ -13,10 +13,12 @@ import Control.Lens.Cons
 import Control.Lens.Fold
 import Control.Lens.Getter
 import Control.Lens.Plated
+import Control.Lens.Prism
 import Control.Lens.Review
 import Control.Lens.TH
 import Control.Lens.Tuple
 import Control.Lens.Traversal
+import Control.Lens.Wrapped
 import Control.Monad.State
 import Control.Monad.Reader
 import Data.Char
@@ -467,5 +469,14 @@ validateParamsSyntax e = go [] False (toList e) $> coerce e
              pure ws2 <*>
              validateExprSyntax expr)
             (go (_identValue name:names) True params)
+
+validateModuleSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => Module v a
+  -> ValidateSyntax e (Module (Nub (Syntax ': v)) a)
+validateModuleSyntax =
+  traverseOf (_Wrapped.traverse._Right) validateStatementSyntax
 
 makeWrapped ''ValidateSyntax

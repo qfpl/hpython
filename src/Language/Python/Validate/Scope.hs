@@ -11,11 +11,13 @@ import Control.Lens.Fold
 import Control.Lens.Getter
 import Control.Lens.Lens
 import Control.Lens.Plated
+import Control.Lens.Prism
 import Control.Lens.Review
 import Control.Lens.Setter
 import Control.Lens.TH
 import Control.Lens.Tuple
 import Control.Lens.Traversal
+import Control.Lens.Wrapped
 import Control.Monad.State
 import Data.Coerce
 import Data.Functor.Compose
@@ -285,3 +287,10 @@ validateExprScope e@None{} = pure $ coerce e
 validateExprScope e@Int{} = pure $ coerce e
 validateExprScope e@Bool{} = pure $ coerce e
 validateExprScope e@String{} = pure $ coerce e
+
+validateModuleScope
+  :: AsScopeError e v a
+  => Module v a
+  -> ValidateScope a e (Module (Nub (Scope ': v)) a)
+validateModuleScope =
+  traverseOf (_Wrapped.traverse._Right) validateStatementScope

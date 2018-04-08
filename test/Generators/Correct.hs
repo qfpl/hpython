@@ -1,16 +1,21 @@
 {-# language DataKinds #-}
 {-# language FlexibleContexts #-}
 {-# language LambdaCase #-}
+{-# language TemplateHaskell #-}
 module Generators.Correct where
 
 import Control.Applicative
 import Control.Lens.Fold
+import Control.Lens.Getter
 import Control.Lens.Plated
+import Control.Lens.Setter
 import Control.Lens.Tuple
+import Control.Lens.TH
 import Control.Monad.State
 import Data.List
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
+import Data.Semigroup ((<>))
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
@@ -19,9 +24,31 @@ import GHC.Stack
 
 import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax
-import Language.Python.Validate.Syntax
 
 import Generators.Common
+
+initialGenState =
+  GenState
+  { _inFunction = Nothing
+  , _currentNonlocals = []
+  , _willBeNonlocals = []
+  , _inLoop = False
+  }
+
+data GenState
+  = GenState
+  { _inFunction :: Maybe [String]
+  , _currentNonlocals :: [String]
+  , _willBeNonlocals :: [String]
+  , _inLoop :: Bool
+  }
+makeLenses ''GenState
+
+localState m = do
+  a <- get
+  b <- m
+  put a
+  pure b
 
 genIdent :: MonadGen m => m (Ident '[] ())
 genIdent =
@@ -34,8 +61,8 @@ genIdent =
 genInt :: MonadGen m => m (Expr '[] ())
 genInt = Int () <$> Gen.integral (Range.constant 0 (2^32))
 
-genBlock :: (MonadGen m, MonadState [String] m) => SyntaxContext -> m (Block '[] ())
-genBlock ctxt = do
+genBlock :: (MonadGen m, MonadState GenState m) => m (Block '[] ())
+genBlock = do
   indent <- NonEmpty.toList <$> genWhitespaces1
   go indent
   where
@@ -43,11 +70,11 @@ genBlock ctxt = do
       Gen.sized $ \n ->
       if n <= 1
         then do
-          s1 <- genStatement ctxt
+          s1 <- genStatement
           pure . Block $ ((), indent, s1) :| []
         else do
           n' <- Gen.integral (Range.constant 1 (n-1))
-          s1 <- Gen.resize n' (genStatement ctxt)
+          s1 <- Gen.resize n' genStatement
           let n'' = n - n'
           b <- Gen.resize n'' (go indent)
           pure . Block $ NonEmpty.cons ((), indent, s1) (unBlock b)
@@ -186,14 +213,14 @@ genAssignable =
     ]
 
 genSmallStatement
-  :: (HasCallStack, MonadGen m, MonadState [String] m)
-  => SyntaxContext
-  -> m (SmallStatement '[] ())
-genSmallStatement ctxt = Gen.sized $ \n ->
+  :: (HasCallStack, MonadGen m, MonadState GenState m)
+  => m (SmallStatement '[] ())
+genSmallStatement = Gen.sized $ \n -> do
+  ctxt <- get
   if n <= 1
   then Gen.element $ [Pass ()] ++ [Break () | _inLoop ctxt]
   else do
-    nonlocals <- get
+    nonlocals <- use currentNonlocals
     Gen.resize (n-1) .
       Gen.choice $
         [ Expr () <$> genExpr
@@ -201,7 +228,9 @@ genSmallStatement ctxt = Gen.sized $ \n ->
         , Gen.sized $ \n -> do
             n' <- Gen.integral (Range.constant 1 (n-1))
             a <- Gen.resize n' genAssignable
-            modify ((a ^.. cosmos._Ident._2.identValue) ++)
+            isInFunction <- use inFunction
+            when (isJust isInFunction) $
+              willBeNonlocals %= ((a ^.. cosmos._Ident._2.identValue) ++)
             b <- Gen.resize (n - n') genExpr
             Assign () a <$> genWhitespaces <*> genWhitespaces <*> pure b
         , Gen.sized $ \n -> do
@@ -218,7 +247,7 @@ genSmallStatement ctxt = Gen.sized $ \n ->
         [pure (Break ()) | _inLoop ctxt] ++
         [ Gen.sized $ \n -> do
             n' <- Gen.integral (Range.constant 2 (n-1))
-            nonlocals <- get
+            nonlocals <- use currentNonlocals
             Nonlocal () <$>
               genWhitespaces1 <*>
               Gen.resize n' (genSizedCommaSep1 . Gen.element $ MkIdent () <$> nonlocals)
@@ -231,10 +260,9 @@ genSmallStatement ctxt = Gen.sized $ \n ->
         ]
 
 genCompoundStatement
-  :: (HasCallStack, MonadGen m, MonadState [String] m)
-  => SyntaxContext
-  -> m (CompoundStatement '[] ())
-genCompoundStatement ctxt =
+  :: (HasCallStack, MonadGen m, MonadState GenState m)
+  => m (CompoundStatement '[] ())
+genCompoundStatement =
   Gen.sized $ \n ->
   Gen.resize (n-1) .
   Gen.choice $
@@ -245,22 +273,25 @@ genCompoundStatement ctxt =
         b <-
           Gen.resize
             (n - n')
-            (genBlock $
-            ctxt
-            { _inLoop = False
-            , _inFunction =
-                fmap
-                  (\b -> union b paramIdents)
-                  (_inFunction ctxt) <|>
-                Just paramIdents
-            })
+            (localState $ do
+               (modify $ \ctxt ->
+                   ctxt
+                   { _inLoop = False
+                   , _inFunction =
+                       fmap
+                         (\b -> union b paramIdents)
+                         (_inFunction ctxt) <|>
+                       Just paramIdents
+                   , _currentNonlocals = _willBeNonlocals ctxt <> _currentNonlocals ctxt
+                   })
+               genBlock)
         Fundef () <$> genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure a <*>
           genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
     , Gen.sized $ \n -> do
         n' <- Gen.integral (Range.constant 1 (n-1))
         n'' <- Gen.integral (Range.constant 0 (n-n'))
         a <- Gen.resize n' genExpr
-        b <- Gen.resize (n - n') (genBlock ctxt)
+        b <- Gen.resize (n - n') (localState genBlock)
         c <-
           if n - n' - n'' == 0
           then pure Nothing
@@ -270,46 +301,45 @@ genCompoundStatement ctxt =
             genWhitespaces <*>
             genWhitespaces <*>
             genNewline <*>
-            Gen.resize (n - n' - n'') (genBlock ctxt)
+            Gen.resize (n - n' - n'') (localState genBlock)
         If () <$> fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
           genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b <*> pure c
     , Gen.sized $ \n -> do
         n' <- Gen.integral (Range.constant 1 (n-1))
         a <- Gen.resize n' genExpr
-        b <- Gen.resize (n - n') (genBlock $ ctxt { _inLoop = True})
+        b <- Gen.resize (n - n') (localState $ (inLoop .= True) *> genBlock)
         While () <$> fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
           genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
     ]
 
 genStatement
-  :: (HasCallStack, MonadGen m, MonadState [String] m)
-  => SyntaxContext
-  -> m (Statement '[] ())
-genStatement ctxt =
+  :: (HasCallStack, MonadGen m, MonadState GenState m)
+  => m (Statement '[] ())
+genStatement =
   Gen.sized $ \n ->
   if n < 4
   then
     SmallStatements <$>
-    genSmallStatement ctxt <*>
+    localState genSmallStatement <*>
     pure [] <*>
     Gen.maybe ((,) <$> genWhitespaces <*> genWhitespaces) <*>
     genNewline
   else
     Gen.scale (subtract 1) $
     Gen.choice
-    [ CompoundStatement <$> genCompoundStatement ctxt
+    [ CompoundStatement <$> localState genCompoundStatement
     , Gen.sized $ \n -> do
         n' <- Gen.integral (Range.constant 1 n)
         n'' <- Gen.integral (Range.constant 0 (n-n'))
         SmallStatements <$>
-          Gen.resize n' (genSmallStatement ctxt) <*>
+          Gen.resize n' (localState genSmallStatement) <*>
           (if n'' == 0
             then pure []
             else
              Gen.list
                (Range.singleton $ unSize n'')
                (Gen.resize ((n-n') `div` n'') $
-                (,,) <$> genWhitespaces <*> genWhitespaces <*> genSmallStatement ctxt)) <*>
+                (,,) <$> genWhitespaces <*> genWhitespaces <*> localState genSmallStatement)) <*>
           Gen.maybe ((,) <$> genWhitespaces <*> genWhitespaces) <*>
           genNewline
     ]

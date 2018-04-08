@@ -3,7 +3,7 @@
 module Language.Python.Validate.Indentation where
 
 import Control.Applicative
-import Control.Lens ((#), _Wrapped, view, from, _4, traverseOf)
+import Control.Lens ((#), _Wrapped, view, from, _4, traverseOf, _Right)
 import Data.Coerce
 import Data.Type.Set
 import Data.Validate
@@ -108,3 +108,10 @@ validateStatementIndentation
 validateStatementIndentation (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementIndentation c
 validateStatementIndentation s@SmallStatements{} = pure $ coerce s
+
+validateModuleIndentation
+  :: AsIndentationError e v a
+  => Module v a
+  -> Validate [e] (Module (Nub (Indentation ': v)) a)
+validateModuleIndentation =
+  traverseOf (_Wrapped.traverse._Right) validateStatementIndentation

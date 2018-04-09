@@ -2,10 +2,10 @@
 {-# language FlexibleContexts #-}
 module Language.Python.Internal.Parse where
 
-import Control.Applicative
+import Control.Applicative ((<|>), liftA2)
 import Control.Lens hiding (List, argument)
 import Control.Monad.State
-import Data.Char (isAscii)
+import Data.Char (chr, isAscii)
 import Data.Foldable
 import Data.Functor
 import Data.List.NonEmpty (NonEmpty(..), some1)
@@ -16,6 +16,55 @@ import Text.Trifecta hiding (newline, commaSep)
 import Language.Python.Internal.Syntax
 
 type Untagged s a = a -> s '[] a
+
+stringChar :: (CharParsing m, Monad m) => m Char
+stringChar = (char '\\' *> (escapeChar <|> hexChar)) <|> other
+  where
+    other = satisfy isAscii
+    escapeChar =
+      asum
+      [ char '\\'
+      , char '\''
+      , char '"'
+      , char 'a' $> '\a'
+      , char 'b' $> '\b'
+      , char 'f' $> '\f'
+      , char 'n' $> '\n'
+      , char 'r' $> '\r'
+      , char 't' $> '\t'
+      , char 'v' $> '\v'
+      ]
+
+    hexChar =
+      char 'U' *>
+      (hexToInt <$> replicateM 8 (oneOf "0123456789ABCDEF") >>=
+       \a -> if a <= 0x10FFFF then pure (chr a) else unexpected "value outside unicode range")
+
+    hexDigitInt c =
+      case c of
+        '0' -> 0
+        '1' -> 1
+        '2' -> 2
+        '3' -> 3
+        '4' -> 4
+        '5' -> 5
+        '6' -> 6
+        '7' -> 7
+        '8' -> 8
+        '9' -> 9
+        'A' -> 10
+        'B' -> 11
+        'C' -> 12
+        'D' -> 13
+        'E' -> 14
+        'F' -> 15
+        _ -> error "impossible"
+
+    hexToInt str =
+      let
+        size = length str
+      in
+        snd $! foldr (\a (sz, val) -> (sz-1, hexDigitInt a * 16 ^ sz + val)) (size, 0) str
 
 newline :: CharParsing m => m Newline
 newline =
@@ -98,13 +147,12 @@ expr = orExpr
 
     tripleSingle = try (string "''") *> char '\'' <?> "'''"
     tripleDouble = try (string "\"\"") *> char '"' <?> "\"\"\""
-    ascii = satisfy isAscii
 
     strLit =
-      fmap (\a b -> String b LongSingle a) (tripleSingle *> manyTill ascii (string "'''")) <|>
-      fmap (\a b -> String b LongDouble a) (tripleDouble *> manyTill ascii (string "\"\"\"")) <|>
-      fmap (\a b -> String b ShortSingle a) (char '\'' *> manyTill ascii (char '\'')) <|>
-      fmap (\a b -> String b ShortDouble a) (char '\"' *> manyTill ascii (char '\"'))
+      fmap (\a b -> String b LongSingle a) (tripleSingle *> manyTill stringChar (string "'''")) <|>
+      fmap (\a b -> String b LongDouble a) (tripleDouble *> manyTill stringChar (string "\"\"\"")) <|>
+      fmap (\a b -> String b ShortSingle a) (char '\'' *> manyTill stringChar (char '\'')) <|>
+      fmap (\a b -> String b ShortDouble a) (char '\"' *> manyTill stringChar (char '\"'))
 
     int = (\a b -> Int b $ read a) <$> some digit
 

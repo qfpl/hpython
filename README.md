@@ -4,6 +4,10 @@ Haskell-based language tools for Python
 
 <img src="http://i.imgur.com/0h9dFhl.png" width="300px"/>
 
+## Examples
+
+See the `example` directory
+
 ## `hpython` contains proofs of concept for a few of ideas:
 
 ### Validation Stages
@@ -12,6 +16,8 @@ Using phantom types and type-level sets to re-use the same abstract syntax tree,
 recieve different validation guarantees. A Python program begins in the "unvalidated"
 state (type-level empty set). Then, increasing levels of validation are imposed, and its
 level of validation is updated to reflect this (members are added to the set).
+
+This also means that "un-validating" data has no runtime cost.
 
 ### Optics-based Refactoring
 

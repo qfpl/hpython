@@ -3,7 +3,11 @@ module Main where
 
 import Control.Lens
 
-import Example
+import Programs
+import FixMutableDefaultArguments
+import OptimizeTailRecursion
+import Indentation
+
 import Data.Validate
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Syntax.Error
@@ -35,13 +39,9 @@ runExampleScope x =
 
 main = do
   runExampleSyntax (append_to ())
-  runExampleSyntax (rewrite fixMDA append_to')
-  runExampleSyntax (append_to'' ())
-  runExampleSyntax bracketing
+  runExampleSyntax (rewrite fixMutableDefaultArguments append_to')
   runExampleSyntax (indentSpaces 2 append_to')
   runExampleSyntax (indentTabs append_to')
-  runExampleScope (rewrite optimize_tr fact_tr)
-  runExampleSyntax (rewrite optimize_tr spin)
-  runExampleSyntax (rewrite optimize_tr yes)
-  runExampleSyntax badly_scoped
-  runExampleScope badly_scoped
+  runExampleScope (rewrite optimizeTailRecursion fact_tr)
+  runExampleSyntax (rewrite optimizeTailRecursion spin)
+  runExampleSyntax (rewrite optimizeTailRecursion yes)

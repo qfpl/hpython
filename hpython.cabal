@@ -45,7 +45,10 @@ library
 
 executable example
   main-is:             Main.hs
-  other-modules:       Example
+  other-modules:       Indentation
+                     , FixMutableDefaultArguments
+                     , OptimizeTailRecursion
+                     , Programs
   hs-source-dirs:      example
   build-depends:       base >=4.9 && <4.11, lens, hpython
   default-language:    Haskell2010

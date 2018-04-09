@@ -5,6 +5,7 @@ module Language.Python.Internal.Parse where
 import Control.Applicative
 import Control.Lens hiding (List, argument)
 import Control.Monad.State
+import Data.Char (isAscii)
 import Data.Foldable
 import Data.Functor
 import Data.List.NonEmpty (NonEmpty(..), some1)
@@ -95,10 +96,15 @@ expr = orExpr
     none =
       reserved "None" $> None
 
+    tripleSingle = try (string "''") *> char '\'' <?> "'''"
+    tripleDouble = try (string "\"\"") *> char '"' <?> "\"\"\""
+    ascii = satisfy isAscii
+
     strLit =
-      fmap (flip String) $
-      char '"' *>
-      manyTill letter (char '"')
+      fmap (\a b -> String b LongSingle a) (tripleSingle *> manyTill ascii (string "'''")) <|>
+      fmap (\a b -> String b LongDouble a) (tripleDouble *> manyTill ascii (string "\"\"\"")) <|>
+      fmap (\a b -> String b ShortSingle a) (char '\'' *> manyTill ascii (char '\'')) <|>
+      fmap (\a b -> String b ShortDouble a) (char '\"' *> manyTill ascii (char '\"'))
 
     int = (\a b -> Int b $ read a) <$> some digit
 

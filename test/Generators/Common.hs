@@ -24,6 +24,9 @@ genString = Gen.list (Range.constant 0 50) (Gen.filter (/='\0') Gen.latin1)
 genNewline :: MonadGen m => m Newline
 genNewline = Gen.element [LF, CR, CRLF]
 
+genStringType :: MonadGen m => m StringType
+genStringType = Gen.element [ShortSingle, ShortDouble, LongSingle, LongDouble]
+
 genSizedWhitespace :: MonadGen m => m [Whitespace]
 genSizedWhitespace = Gen.sized $ \n ->
   if n == 0

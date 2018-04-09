@@ -64,9 +64,12 @@ test-suite hpython-tests
   other-modules:       Generators.General
                      , Generators.Common
                      , Generators.Correct
+                     , Scope
+                     , Roundtrip
   hs-source-dirs:      test
   build-depends:       base >=4.9 && <4.11
                      , directory
+                     , filepath
                      , hpython
                      , hedgehog
                      , lens

@@ -9,7 +9,9 @@ import Language.Python.Validate.Indentation
 import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Syntax.Error
+
 import Scope
+import Roundtrip
 
 import qualified Generators.General as General
 import qualified Generators.Correct as Correct
@@ -212,4 +214,5 @@ main = do
   check expr_printparseprint_print
   check . withShrinks 2000 $ statement_printparseprint_print
   checkParallel scopeTests
+  checkParallel roundtripTests
   removeFile "hedgehog-test.py"

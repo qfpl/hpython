@@ -13,33 +13,33 @@ import Language.Python.Syntax
 -- @
 --
 -- Written without the DSL
-append_to a =
+append_to =
   CompoundStatement $
-  Fundef a
+  Fundef ()
     [Space]
     "append_to"
     []
-    ( CommaSepMany (PositionalParam a "element") [] [Space] $
-      CommaSepOne (KeywordParam a "to" [] [] (List a [] CommaSepNone []))
+    ( CommaSepMany (PositionalParam () "element") [] [Space] $
+      CommaSepOne (KeywordParam () "to" [] [] (List () [] CommaSepNone []))
     )
     []
     []
     LF
     (Block
-     [ ( a
+     [ ( ()
        , replicate 4 Space
        , SmallStatements
-         (Expr a $
-          Call a
-            (Deref a (Ident a "to") [] [] "append") []
-            (CommaSepOne $ PositionalArg a (Ident a "element")))
+         (Expr () $
+          Call ()
+            (Deref () (Ident () "to") [] [] "append") []
+            (CommaSepOne $ PositionalArg () (Ident () "element")))
          []
          Nothing
          LF
        )
-     , ( a
+     , ( ()
        , replicate 4 Space
-       , SmallStatements (Return a [Space] (Ident a "to")) [] Nothing LF
+       , SmallStatements (Return () [Space] (Ident () "to")) [] Nothing LF
        )
      ])
 
@@ -95,3 +95,16 @@ yes =
   [ expr_ $ call_ "print" [p_ $ str_ "yes"]
   , expr_ $ call_ "yes" []
   ]
+
+everything =
+  Module
+    [ Right append_to
+    , Left ([], LF)
+    , Right append_to'
+    , Left ([], LF)
+    , Right fact_tr
+    , Left ([], LF)
+    , Right spin
+    , Left ([], LF)
+    , Right yes
+    ]

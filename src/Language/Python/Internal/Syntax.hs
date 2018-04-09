@@ -234,6 +234,13 @@ listToCommaSep1 (a :| as) = go (a:as)
     go [x] = CommaSepOne1 x
     go (x:xs) = CommaSepMany1 x [] [Space] $ go xs
 
+data StringType
+  = ShortSingle
+  | ShortDouble
+  | LongSingle
+  | LongDouble
+  deriving (Eq, Show)
+
 data Expr (v :: [*]) a
   = List
   { _exprAnnotation :: a
@@ -290,6 +297,7 @@ data Expr (v :: [*]) a
   }
   | String
   { _exprAnnotation :: a
+  , _unsafeStringType :: StringType
   , _unsafeStringValue :: String
   }
   deriving (Eq, Show, Functor, Foldable)

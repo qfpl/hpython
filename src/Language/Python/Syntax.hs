@@ -156,7 +156,10 @@ or_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
 or_ a = BinOp () a [Space] (BoolOr ()) [Space]
 
 str_ :: String -> Expr '[] ()
-str_ = String ()
+str_ = String () ShortDouble
+
+longStr_ :: String -> Expr '[] ()
+longStr_ = String () LongDouble
 
 (.=) :: Expr '[] () -> Expr '[] () -> Statement '[] ()
 (.=) a b = SmallStatements (Assign () a [Space] [Space] b) [] Nothing LF

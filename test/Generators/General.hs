@@ -91,7 +91,7 @@ genExpr' isExp = Gen.sized $ \n ->
     [ Ident () <$> genIdent
     , if isExp then genSmallInt else genInt
     , genBool
-    , String () <$> genString
+    , String () <$> genStringType <*> genString
     ]
   else
     Gen.resize (n-1) $

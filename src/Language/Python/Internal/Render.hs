@@ -123,7 +123,16 @@ renderExpr (Negate _ ws expr) =
       BinOp _ _ _ Exp{} _ _ -> renderExpr expr
       BinOp{} -> "(" <> renderExpr expr <> ")"
       _ -> renderExpr expr
-renderExpr (String _ b) = "\"" ++ foldMap renderChar b ++ "\""
+renderExpr (String _ strType b) =
+  let
+    quote =
+      case strType of
+        ShortSingle -> "'"
+        ShortDouble -> "\""
+        LongSingle -> "'''"
+        LongDouble -> "\"\"\""
+  in
+    quote ++ foldMap renderChar b ++ quote
 renderExpr (Int _ n) = show n
 renderExpr (Ident _ name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) =

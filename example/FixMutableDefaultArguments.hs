@@ -3,7 +3,6 @@
 module FixMutableDefaultArguments where
 
 import Control.Lens.Fold ((^..), (^?), filtered, folded)
-import Control.Lens.Getter ((^.))
 import Control.Lens.Setter ((.~))
 import Data.Foldable (toList)
 import Data.Function ((&))
@@ -19,19 +18,21 @@ fixMutableDefaultArguments input = do
   (_, _, name, _, params, _, _, _, body) <- input ^? _Fundef
 
   let paramsList = toList params
-  targetParam <- paramsList ^? folded._KeywordParam.filtered (isMutable._kpExpr)
+  targetParams <- paramsList ^? folded._KeywordParam.filtered (isMutable._kpExpr)
 
   let
-    pname = targetParam ^. kpName.identValue
+    conditionalAssignments =
+      (\(pname, value) -> if_ (var_ pname `is_` none_) [ var_ pname .= value ]) <$>
+      zip
+        (targetParams ^.. kpName.identValue)
+        (paramsList ^.. folded._KeywordParam.kpExpr.filtered isMutable)
 
     newparams =
       paramsList & traverse._KeywordParam.filtered (isMutable._kpExpr).kpExpr .~ none_
 
-    fixed =
-      fmap (\value -> if_ (var_ pname `is_` none_) [ var_ pname .= value ]) $
-      paramsList ^.. folded._KeywordParam.kpExpr.filtered isMutable
-
-  pure $ def_ name newparams (NonEmpty.fromList $ fixed <> (body ^.. _Statements))
+  pure $
+    def_ name newparams
+    (NonEmpty.fromList $ conditionalAssignments <> (body ^.. _Statements))
   where
     isMutable :: Expr v a -> Bool
     isMutable None{} = False

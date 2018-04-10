@@ -7,7 +7,8 @@ import Control.Lens.Getter ((^.))
 import Control.Lens.Setter ((.~))
 import Data.Foldable (toList)
 import Data.Function ((&))
-import Data.List.NonEmpty (NonEmpty(..))
+import Data.Semigroup ((<>))
+import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax
@@ -16,30 +17,31 @@ import Language.Python.Syntax
 fixMutableDefaultArguments :: Statement '[] () -> Maybe (Statement '[] ())
 fixMutableDefaultArguments input = do
   (_, _, name, _, params, _, _, _, body) <- input ^? _Fundef
-  let params' = toList params
-  targetParam <- params' ^? folded._KeywordParam.filtered (isMutable._kpExpr)
+
+  let paramsList = toList params
+  targetParam <- paramsList ^? folded._KeywordParam.filtered (isMutable._kpExpr)
 
   let
     pname = targetParam ^. kpName.identValue
 
     newparams =
-      params' & traverse._KeywordParam.filtered (isMutable._kpExpr).kpExpr .~ none_
+      paramsList & traverse._KeywordParam.filtered (isMutable._kpExpr).kpExpr .~ none_
 
     fixed =
-      if_ (var_ pname `is_` none_) [ var_ pname .= list_ [] ]
+      fmap (\value -> if_ (var_ pname `is_` none_) [ var_ pname .= value ]) $
+      paramsList ^.. folded._KeywordParam.kpExpr.filtered isMutable
 
-  pure $
-    def_ name newparams (fixed :| (body ^.. _Statements))
+  pure $ def_ name newparams (NonEmpty.fromList $ fixed <> (body ^.. _Statements))
   where
     isMutable :: Expr v a -> Bool
     isMutable None{} = False
+    isMutable Int{} = False
+    isMutable Bool{} = False
+    isMutable String{} = False
     isMutable List{} = True
     isMutable Deref{} = True
     isMutable Call{} = True
     isMutable BinOp{} = True
     isMutable Negate{} = True
-    isMutable (Parens _ _ a _) = isMutable a
     isMutable Ident{} = True
-    isMutable Int{} = False
-    isMutable Bool{} = False
-    isMutable String{} = False
+    isMutable (Parens _ _ a _) = isMutable a

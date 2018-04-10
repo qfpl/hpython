@@ -83,6 +83,10 @@ instance Semigroup a => Monoid (Lines a) where
   mempty = NoLines
   mappend = (<>)
 
+renderAnyWhitespace :: Either Newline Whitespace -> String
+renderAnyWhitespace (Left nl) = renderNewline nl
+renderAnyWhitespace (Right sp) = renderWhitespace sp
+
 renderWhitespace :: Whitespace -> String
 renderWhitespace Space = " "
 renderWhitespace Tab = "\t"
@@ -107,6 +111,15 @@ renderCommaSep1 f (CommaSepMany1 a ws1 ws2 c) =
   f a <>
   foldMap renderWhitespace ws1 <> "," <> foldMap renderWhitespace ws2 <>
   renderCommaSep1 f c
+
+renderCommaSep1' :: (ws -> String) -> (a -> String) -> CommaSep1' ws a -> String
+renderCommaSep1' ws f (CommaSepOne1' a b) =
+  f a <>
+  foldMap (\(x, y) -> foldMap ws x <> "," <> foldMap ws y) b
+renderCommaSep1' ws f (CommaSepMany1' a ws1 ws2 c) =
+  f a <>
+  foldMap ws ws1 <> "," <> foldMap ws ws2 <>
+  renderCommaSep1' ws f c
 
 renderIdent :: Ident v a -> String
 renderIdent = _identValue
@@ -163,6 +176,35 @@ renderExpr (BinOp _ e1 ws1 op ws2 e2) =
   where
     bracket a = "(" <> a <> ")"
 
+renderModuleName :: ModuleName v a -> String
+renderModuleName (ModuleNameOne _ s) = renderIdent s
+renderModuleName (ModuleNameMany _ n ws1 ws2 rest) =
+  renderIdent n <> foldMap renderWhitespace ws1 <> "." <> foldMap renderWhitespace ws2 <>
+  renderModuleName rest
+
+renderDot :: Dot -> String
+renderDot (Dot ws) = "." <> foldMap renderWhitespace ws
+
+renderRelativeModuleName :: RelativeModuleName v a -> String
+renderRelativeModuleName (RelativeWithName ds mn) =
+  foldMap renderDot ds <> renderModuleName mn
+renderRelativeModuleName (Relative ds) = foldMap renderDot ds
+
+renderAs1 :: (a -> String) -> As1 a -> String
+renderAs1 f (As1 ws1 ws2 a) =
+  foldMap renderWhitespace ws1 <> "as" <> foldMap renderWhitespace ws2 <> f a
+
+renderImportTargets :: ImportTargets v a -> String
+renderImportTargets ImportAll = "*"
+renderImportTargets (ImportSome ts) =
+  renderCommaSep1 (\(mn, mAs) -> renderIdent mn <> foldMap (renderAs1 renderIdent) mAs) ts
+renderImportTargets (ImportSomeParens ws1 ts ws2) =
+  "(" <> foldMap renderAnyWhitespace ws1 <>
+  renderCommaSep1'
+    renderAnyWhitespace
+    (\(mn, mAs) -> renderIdent mn <> foldMap (renderAs1 renderIdent) mAs) ts <>
+  foldMap renderAnyWhitespace ws2 <> ")"
+
 renderSmallStatement :: SmallStatement v a -> String
 renderSmallStatement (Return _ ws expr) =
   "return" <> foldMap renderWhitespace ws <> renderExpr expr
@@ -178,6 +220,15 @@ renderSmallStatement (Nonlocal _ ws ids) =
   "nonlocal" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
 renderSmallStatement (Del _ ws ids) =
   "del" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
+renderSmallStatement (Import _ ws ns) =
+  "import" <> foldMap renderWhitespace ws <>
+  renderCommaSep1
+    (\(mn, mAs) -> renderModuleName mn <> foldMap (renderAs1 renderIdent) mAs) ns
+renderSmallStatement (From _ ws1 name ws2 ws3 ns) =
+  "from" <> foldMap renderWhitespace ws1 <>
+  renderRelativeModuleName name <>
+  foldMap renderWhitespace ws2 <> "import" <> foldMap renderWhitespace ws3 <>
+  renderImportTargets ns
 
 renderCompoundStatement :: CompoundStatement v a -> Lines String
 renderCompoundStatement (Fundef _ ws1 name ws2 params ws3 ws4 nl body) =

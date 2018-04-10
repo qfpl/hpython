@@ -58,6 +58,42 @@ genIdent =
     (Gen.choice [Gen.alpha, pure '_'])
     (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_']))
 
+genModuleName :: MonadGen m => m (ModuleName '[] ())
+genModuleName =
+  Gen.recursive Gen.choice
+  [ ModuleNameOne () <$> genIdent ]
+  [ ModuleNameMany () <$>
+    genIdent <*>
+    genWhitespaces <*>
+    genWhitespaces <*>
+    genModuleName
+  ]
+
+genRelativeModuleName :: MonadGen m => m (RelativeModuleName '[] ())
+genRelativeModuleName =
+  Gen.choice
+  [ Relative <$>
+    Gen.nonEmpty (Range.constant 1 10) genDot
+  , RelativeWithName <$>
+    Gen.list (Range.constant 1 10) genDot <*>
+    genModuleName
+  ]
+
+genImportTargets :: MonadGen m => m (ImportTargets '[] ())
+genImportTargets =
+  Gen.choice
+  [ pure ImportAll
+  , ImportSome <$>
+    genSizedCommaSep1
+      ((,) <$> genIdent <*> Gen.maybe (genAs1 genIdent))
+  , ImportSomeParens <$>
+    genAnyWhitespaces <*>
+    genSizedCommaSep1'
+      genAnyWhitespaces
+      ((,) <$> genIdent <*> Gen.maybe (genAs1 genIdent)) <*>
+    genAnyWhitespaces
+  ]
+
 genInt :: MonadGen m => m (Expr '[] ())
 genInt = Int () <$> Gen.integral (Range.constant 0 (2^32))
 
@@ -243,6 +279,16 @@ genSmallStatement = Gen.sized $ \n -> do
             Del () <$>
               genWhitespaces1 <*>
               Gen.resize n' (genSizedCommaSep1 genIdent)
+        , Import () <$>
+          genWhitespaces1 <*>
+          genSizedCommaSep1
+            ((,) <$> genModuleName <*> Gen.maybe (genAs1 genIdent))
+        , From () <$>
+          genWhitespaces <*>
+          genRelativeModuleName <*>
+          genWhitespaces1 <*>
+          (NonEmpty.toList <$> genWhitespaces1) <*>
+          genImportTargets
         ] ++
         [pure (Break ()) | _inLoop ctxt] ++
         [ Gen.sized $ \n -> do

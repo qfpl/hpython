@@ -41,6 +41,9 @@ genArg genExpr = Gen.sized $ \n ->
       , KeywordArg () <$> genIdent <*> genWhitespaces <*> genWhitespaces <*> genExpr
       ]
 
+genInt :: MonadGen m => m (Expr '[] ())
+genInt = Int () <$> Gen.integral (Range.constant (-2^32) (2^32))
+
 genIdent :: MonadGen m => m (Ident '[] ())
 genIdent =
   MkIdent () <$>
@@ -48,8 +51,41 @@ genIdent =
     (Gen.choice [Gen.alpha, pure '_'])
     (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_']))
 
-genInt :: MonadGen m => m (Expr '[] ())
-genInt = Int () <$> Gen.integral (Range.constant (-2^32) (2^32))
+genModuleName :: MonadGen m => m (ModuleName '[] ())
+genModuleName =
+  Gen.recursive Gen.choice
+  [ ModuleNameOne () <$> genIdent ]
+  [ ModuleNameMany () <$>
+    genIdent <*>
+    genWhitespaces <*>
+    genWhitespaces <*>
+    genModuleName
+  ]
+
+genRelativeModuleName :: MonadGen m => m (RelativeModuleName '[] ())
+genRelativeModuleName =
+  Gen.choice
+  [ Relative <$>
+    Gen.nonEmpty (Range.constant 1 10) genDot
+  , RelativeWithName <$>
+    Gen.list (Range.constant 1 10) genDot <*>
+    genModuleName
+  ]
+
+genImportTargets :: MonadGen m => m (ImportTargets '[] ())
+genImportTargets =
+  Gen.choice
+  [ pure ImportAll
+  , ImportSome <$>
+    genSizedCommaSep1
+      ((,) <$> genIdent <*> Gen.maybe (genAs1 genIdent))
+  , ImportSomeParens <$>
+    genAnyWhitespaces <*>
+    genSizedCommaSep1'
+      genAnyWhitespaces
+      ((,) <$> genIdent <*> Gen.maybe (genAs1 genIdent)) <*>
+    genAnyWhitespaces
+  ]
 
 genBlock :: MonadGen m => m (Block '[] ())
 genBlock =
@@ -163,6 +199,16 @@ genSmallStatement = Gen.sized $ \n ->
         , Return () <$>
           genWhitespaces <*>
           genExpr
+        , Import () <$>
+          genWhitespaces1 <*>
+          genSizedCommaSep1
+            ((,) <$> genModuleName <*> Gen.maybe (genAs1 genIdent))
+        , From () <$>
+          genWhitespaces <*>
+          genRelativeModuleName <*>
+          genWhitespaces1 <*>
+          genWhitespaces <*>
+          genImportTargets
         ]
 
 genCompoundStatement

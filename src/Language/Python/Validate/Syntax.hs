@@ -201,6 +201,22 @@ instance EndToken String where
 instance StartToken String where
   startToken s = fromMaybe s (words s ^? _head)
 
+instance StartToken (ImportTargets v a) where
+  startToken ImportAll = "*"
+  startToken (ImportSome ts) =
+    case ts of
+      CommaSepOne1 (s, _) -> renderIdent s
+      CommaSepMany1 (s, _) _ _ _ -> renderIdent s
+  startToken ImportSomeParens{} = "("
+
+instance EndToken (ModuleName v a) where
+  endToken (ModuleNameOne _ s) = renderIdent s
+  endToken (ModuleNameMany _ _ _ _ rest) = endToken rest
+
+instance EndToken (RelativeModuleName v a) where
+  endToken (RelativeWithName _ mn) = endToken mn
+  endToken (Relative ds) = renderDot (toList ds ^?! _last)
+
 validateWhitespace
   :: ( EndToken x, StartToken y
      , AsSyntaxError e v a
@@ -367,6 +383,16 @@ validateSmallStatementSyntax (Nonlocal a ws ids) =
         bad -> syntaxErrors [_ParametersNonlocal # (a, bad)]
 validateSmallStatementSyntax (Del a ws ids) =
   Del a ws <$> traverse validateIdent ids
+validateSmallStatementSyntax (Import a ws mns) =
+  Import a ws <$> traverse (pure . coerce) mns
+validateSmallStatementSyntax (From a ws1 mn ws2 ws3 ts) =
+  From a ws1 (coerce mn) ws2 <$>
+  validateWhitespace
+    a
+    (mn, renderRelativeModuleName)
+    ws3
+    (ts, renderImportTargets) <*>
+  pure (coerce ts)
 
 validateStatementSyntax
   :: ( AsSyntaxError e v a

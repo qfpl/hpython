@@ -10,8 +10,10 @@ import Data.Foldable
 import Data.Functor
 import Data.List.NonEmpty (NonEmpty(..), some1)
 import Data.Semigroup hiding (Arg)
-import Text.Parser.Token hiding (commaSep)
-import Text.Trifecta hiding (newline, commaSep)
+import Text.Parser.Token hiding (commaSep, commaSep1, dot)
+import Text.Trifecta hiding (newline, commaSep, commaSep1, dot)
+
+import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax
 
@@ -80,22 +82,42 @@ whitespace =
   (char '\t' $> Tab) <|>
   (Continued <$ char '\\' <*> newline <*> many whitespace)
 
+anyWhitespace :: CharParsing m => m (Either Newline Whitespace)
+anyWhitespace = Left <$> newline <|> Right <$> whitespace
+
 identifier :: (TokenParsing m, Monad m) => m (Untagged Ident Span)
 identifier = fmap (flip MkIdent) . runUnspaced $ ident idStyle
 
 commaSep :: (CharParsing m, Monad m) => m a -> m (CommaSep a)
 commaSep e = someCommaSep <|> pure CommaSepNone
   where
-    someCommaSep = do
-      val <- e
-      res <-
-        optional $
-          CommaSepMany val <$>
+    someCommaSep =
+      (\val -> maybe (CommaSepOne val) ($ val)) <$>
+      e <*>
+      optional
+        ((\a b c d -> CommaSepMany d a b c) <$>
           many whitespace <* char ',' <*>
-          many whitespace <*> commaSep e
-      case res of
-        Nothing -> pure $ CommaSepOne val
-        Just a -> pure a
+          many whitespace <*> commaSep e)
+
+commaSep1 :: (CharParsing m, Monad m) => m a -> m (CommaSep1 a)
+commaSep1 e =
+  (\val -> maybe (CommaSepOne1 val) ($ val)) <$>
+  e <*>
+  optional
+    ((\a b c d -> CommaSepMany1 d a b c) <$>
+      many whitespace <* char ',' <*>
+      many whitespace <*> commaSep1 e)
+
+commaSep1' :: (CharParsing m, Monad m) => m ws -> m a -> m (CommaSep1' ws a)
+commaSep1' ws e =
+  (\val rest c -> maybe (CommaSepOne1' val c) ($ val) rest) <$>
+  e <*>
+  optional
+    (try $
+     (\a b c d -> CommaSepMany1' d a b c) <$>
+      many ws <* char ',' <*>
+      many ws <*> commaSep1' ws e) <*>
+  optional ((,) <$> many ws <* char ',' <*> many ws)
 
 parameter :: DeltaParsing m => m (Untagged Param Span)
 parameter = kwparam <|> posparam
@@ -291,6 +313,8 @@ smallStatement =
   returnSt <|>
   assignOrExpr <|>
   pass <|>
+  from <|>
+  import_ <|>
   break
   where
     break = reserved "break" $> Break
@@ -300,11 +324,48 @@ smallStatement =
       mws <- optional (many whitespace <* char '=')
       case mws of
         Nothing -> pure (`Expr` e)
-        Just ws ->
+        Just ws -> 
           (\a b c -> Assign c e ws a b) <$>
           many whitespace <*>
           expr
     returnSt = (\a b c -> Return c a b) <$ reserved "return" <*> many whitespace <*> expr
+    dot = Dot <$> (char '.' *> many whitespace)
+    importTargets =
+      (char '*' $> ImportAll) <|>
+      between (char '(') (char ')')
+        (ImportSomeParens <$>
+         many anyWhitespace <*>
+         commaSep1'
+           anyWhitespace
+           ((,) <$> annotated identifier <*> optional (as1 $ annotated identifier)) <*>
+         many anyWhitespace) <|>
+      ImportSome <$>
+      commaSep1
+        ((,) <$> annotated identifier <*> optional (as1 $ annotated identifier))
+    as1 m = As1 <$> some1 whitespace <* string "as" <*> some1 whitespace <*> m
+    moduleName =
+      (\a b c -> maybe (ModuleNameOne c a) (\(x, y, z) -> ModuleNameMany c a x y z) b) <$>
+      annotated identifier <*>
+      optional
+        ((,,) <$> try (many whitespace <* char '.') <*> many whitespace <*> annotated moduleName)
+    relativeModuleName =
+      (\ds -> maybe (Relative $ NonEmpty.fromList ds) (RelativeWithName ds)) <$>
+      some dot <*>
+      optional (annotated moduleName)
+      <|>
+      RelativeWithName [] <$> annotated moduleName
+    from =
+      (\a b c d e f -> From f a b c d e) <$>
+      (reserved "from" *> some whitespace) <*>
+      relativeModuleName <*>
+      some1 whitespace <*
+      reserved "import" <*>
+      many whitespace <*>
+      importTargets
+    import_ =
+      (\a b c -> Import c a b) <$>
+      (reserved "import" *> some1 whitespace) <*>
+      commaSep1 ((,) <$> annotated moduleName <*> optional (as1 $ annotated identifier))
 
 statement :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (Statement '[] Span)
 statement =

@@ -163,6 +163,31 @@ data Statement (v :: [*]) a
   | CompoundStatement (CompoundStatement v a)
   deriving (Eq, Show, Functor, Foldable)
 
+data ModuleName v a
+  = ModuleNameOne a (Ident v a)
+  | ModuleNameMany a (Ident v a) [Whitespace] [Whitespace] (ModuleName v a)
+  deriving (Eq, Show, Functor, Foldable)
+
+data Dot = Dot [Whitespace]
+  deriving (Eq, Show)
+
+data As1 a = As1 (NonEmpty Whitespace) (NonEmpty Whitespace) a
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+data ImportTargets v a
+  = ImportAll
+  | ImportSome (CommaSep1 (Ident v a, Maybe (As1 (Ident v a))))
+  | ImportSomeParens
+      [Either Newline Whitespace]
+      (CommaSep1' (Either Newline Whitespace) (Ident v a, Maybe (As1 (Ident v a))))
+      [Either Newline Whitespace]
+  deriving (Eq, Show, Functor, Foldable)
+
+data RelativeModuleName v a
+  = RelativeWithName [Dot] (ModuleName v a)
+  | Relative (NonEmpty Dot)
+  deriving (Eq, Show, Functor, Foldable)
+
 data SmallStatement (v :: [*]) a
   = Return a [Whitespace] (Expr v a)
   | Expr a (Expr v a)
@@ -172,6 +197,17 @@ data SmallStatement (v :: [*]) a
   | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Del a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
+  | Import
+      a
+      (NonEmpty Whitespace)
+      (CommaSep1 (ModuleName v a, Maybe (As1 (Ident v a))))
+  | From
+      a
+      [Whitespace]
+      (RelativeModuleName v a)
+      (NonEmpty Whitespace)
+      [Whitespace]
+      (ImportTargets v a)
   deriving (Eq, Show, Functor, Foldable, Generic)
 instance Plated (SmallStatement '[] a) where; plate = gplate
 
@@ -233,6 +269,12 @@ listToCommaSep1 (a :| as) = go (a:as)
     go [] = error "impossible"
     go [x] = CommaSepOne1 x
     go (x:xs) = CommaSepMany1 x [] [Space] $ go xs
+
+-- | Non-empty 'CommaSep', optionally terminated by a comma
+data CommaSep1' ws a
+  = CommaSepOne1' a (Maybe ([ws], [ws]))
+  | CommaSepMany1' a [ws] [ws] (CommaSep1' ws a)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data StringType
   = ShortSingle
@@ -356,6 +398,8 @@ instance HasExprs SmallStatement where
   _Exprs _ p@Global{} = pure $ coerce p
   _Exprs _ p@Nonlocal{} = pure $ coerce p
   _Exprs _ p@Del{} = pure $ coerce p
+  _Exprs _ p@Import{} = pure $ coerce p
+  _Exprs _ p@From{} = pure $ coerce p
 instance HasExprs CompoundStatement where
   _Exprs f (Fundef a ws1 name ws2 params ws3 ws4 nl sts) =
     Fundef a ws1 (coerce name) ws2 <$>

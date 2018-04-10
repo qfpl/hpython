@@ -15,7 +15,9 @@ roundtripTests :: Group
 roundtripTests =
   Group "Roundtrip tests" $
   (\name -> (fromString name, withTests 1 $ doRoundtrip name)) <$>
-  ["django.py"]
+  [ "django.py"
+  , "test.py"
+  ]
 
 doRoundtrip :: String -> Property
 doRoundtrip name =

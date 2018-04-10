@@ -18,13 +18,15 @@ fixMutableDefaultArguments input = do
   (_, _, name, _, params, _, _, _, body) <- input ^? _Fundef
 
   let paramsList = toList params
-  targetParams <- paramsList ^? folded._KeywordParam.filtered (isMutable._kpExpr)
+  _ <- paramsList ^? folded._KeywordParam.filtered (isMutable._kpExpr)
 
   let
+    targetParams = paramsList ^.. folded._KeywordParam.filtered (isMutable._kpExpr)
+
     conditionalAssignments =
       (\(pname, value) -> if_ (var_ pname `is_` none_) [ var_ pname .= value ]) <$>
       zip
-        (targetParams ^.. kpName.identValue)
+        (targetParams ^.. folded.kpName.identValue)
         (paramsList ^.. folded._KeywordParam.kpExpr.filtered isMutable)
 
     newparams =

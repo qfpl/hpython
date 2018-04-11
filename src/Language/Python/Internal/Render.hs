@@ -1,5 +1,4 @@
 {-# language GeneralizedNewtypeDeriving, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
-{-# language TemplateHaskell #-}
 module Language.Python.Internal.Render where
 
 import Control.Lens.Getter
@@ -8,6 +7,9 @@ import Data.Char (ord)
 import Data.Maybe
 import Data.Semigroup (Semigroup(..))
 import Language.Python.Internal.Syntax
+
+bracket :: String -> String
+bracket a = "(" <> a <> ")"
 
 escapeChars :: [Char]
 escapeChars = "\\\'\"\a\b\f\n\r\t\v"
@@ -115,7 +117,7 @@ renderCommaSep1 f (CommaSepMany1 a ws1 ws2 c) =
 renderCommaSep1' :: (ws -> String) -> (a -> String) -> CommaSep1' ws a -> String
 renderCommaSep1' ws f (CommaSepOne1' a b) =
   f a <>
-  foldMap (\(x, y) -> foldMap ws x <> "," <> foldMap ws y) b
+  foldMap (\x -> foldMap ws x <> ",") b
 renderCommaSep1' ws f (CommaSepMany1' a ws1 ws2 c) =
   f a <>
   foldMap ws ws1 <> "," <> foldMap ws ws2 <>
@@ -156,6 +158,7 @@ renderExpr (Call _ expr ws args) =
   (case expr of
      Int _ n | n < 0 -> "(" <> renderExpr expr <> ")"
      BinOp {} -> "(" <> renderExpr expr <> ")"
+     Tuple {} -> "(" <> renderExpr expr <> ")"
      _ -> renderExpr expr) <>
   foldMap renderWhitespace ws <>
   renderArgs args
@@ -173,8 +176,17 @@ renderExpr (BinOp _ e1 ws1 op ws2 e2) =
   renderBinOp op <>
   foldMap renderWhitespace ws2 <>
   (if shouldBracketRight op e2 then bracket else id) (renderExpr e2)
-  where
-    bracket a = "(" <> a <> ")"
+renderExpr (Tuple _ a b c) =
+  renderExpr a <>
+  foldMap renderWhitespace b <> "," <>
+  foldMap
+    (\(ws, cs) ->
+       foldMap renderWhitespace ws <>
+       renderCommaSep1'
+         renderWhitespace
+         (\a -> (case a of; Tuple{} -> bracket; _ -> id) $ renderExpr a)
+         cs)
+    c
 
 renderModuleName :: ModuleName v a -> String
 renderModuleName (ModuleNameOne _ s) = renderIdent s

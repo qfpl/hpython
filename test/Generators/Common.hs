@@ -93,6 +93,13 @@ genSizedCommaSep ma = Gen.sized $ \n ->
             (\b -> CommaSepMany a <$> genWhitespaces <*> genWhitespaces <*> pure b)
       ]
 
+genTuple :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
+genTuple expr =
+  Tuple () <$>
+  expr <*>
+  genWhitespaces <*>
+  Gen.maybe ((,) <$> genWhitespaces <*> genSizedCommaSep1' genWhitespaces expr)
+
 genSizedCommaSep1 :: MonadGen m => m a -> m (CommaSep1 a)
 genSizedCommaSep1 ma = Gen.sized $ \n ->
   if n <= 1
@@ -112,11 +119,11 @@ genSizedCommaSep1 ma = Gen.sized $ \n ->
 genSizedCommaSep1' :: MonadGen m => m [ws] -> m a -> m (CommaSep1' ws a)
 genSizedCommaSep1' ws ma = Gen.sized $ \n ->
   if n <= 1
-  then CommaSepOne1' <$> ma <*> Gen.maybe ((,) <$> ws <*> ws)
+  then CommaSepOne1' <$> ma <*> Gen.maybe ws
   else
     Gen.resize (n-1) $
     Gen.choice
-      [ CommaSepOne1' <$> ma <*> Gen.maybe ((,) <$> ws <*> ws)
+      [ CommaSepOne1' <$> ma <*> Gen.maybe ws
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
           a <- Gen.resize n' ma

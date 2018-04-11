@@ -169,6 +169,14 @@ instance StartToken (BinOp a) where
   startToken Plus{} = "+"
   startToken Equals{} = "="
 
+instance EndToken a => EndToken (CommaSep1 a) where
+  endToken (CommaSepOne1 a) = endToken a
+  endToken (CommaSepMany1 _ _ _ rest) = endToken rest
+
+instance EndToken a => EndToken (CommaSep1' ws a) where
+  endToken (CommaSepOne1' a b) = maybe (endToken a) (const ",") b
+  endToken (CommaSepMany1' _ _ _ rest) = endToken rest
+
 instance EndToken (Expr v a) where
   endToken List{} = "]"
   endToken (Deref _ _ _ _ i) = _identValue i
@@ -181,6 +189,7 @@ instance EndToken (Expr v a) where
   endToken (Int _ i) = show i
   endToken (Bool _ b) = show b
   endToken String{} = "\""
+  endToken (Tuple _ _ _ b) = maybe "," (endToken . snd) b
 
 instance StartToken (Expr v a) where
   startToken List{} = "["
@@ -194,6 +203,7 @@ instance StartToken (Expr v a) where
   startToken (Int _ i) = show i
   startToken (Bool _ b) = show b
   startToken String{} = "\""
+  startToken (Tuple _ a _ _) = startToken a
 
 instance EndToken String where
   endToken s = fromMaybe s (words s ^? _last)
@@ -268,6 +278,11 @@ validateExprSyntax e@(BinOp a e1 ws1 op ws2 e2) =
    then pure ws2
    else validateWhitespace a (op, renderBinOp) ws2 (e2, renderExpr)) <*>
   validateExprSyntax e2
+validateExprSyntax (Tuple a b c d) =
+  Tuple a <$>
+  validateExprSyntax b <*>
+  pure c <*>
+  traverseOf (traverse._2.traverse) validateExprSyntax d
 
 validateBlockSyntax
   :: ( AsSyntaxError e v a
@@ -419,6 +434,7 @@ canAssignTo Bool{} = False
 canAssignTo (Parens _ _ a _) = canAssignTo a
 canAssignTo String{} = False
 canAssignTo (List _ _ a _) = all canAssignTo a
+canAssignTo (Tuple _ a _ b) = all canAssignTo $ a : toListOf (folded._2.folded) b
 canAssignTo _ = True
 
 validateArgsSyntax

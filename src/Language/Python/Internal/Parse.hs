@@ -113,11 +113,21 @@ commaSep1' ws e =
   (\val rest c -> maybe (CommaSepOne1' val c) ($ val) rest) <$>
   e <*>
   optional
-    (try $
-     (\a b c d -> CommaSepMany1' d a b c) <$>
+    ((\a b c d -> CommaSepMany1' d a b c) <$>
       many ws <* char ',' <*>
       many ws <*> commaSep1' ws e) <*>
-  optional ((,) <$> many ws <* char ',' <*> many ws)
+  optional (many ws <* char ',')
+
+commaSep1'_try :: (CharParsing m, Monad m) => m ws -> m a -> m (CommaSep1' ws a)
+commaSep1'_try ws e =
+  (\val rest c -> maybe (CommaSepOne1' val c) ($ val) rest) <$>
+  e <*>
+  optional
+    (try $
+     (\a b c d -> CommaSepMany1' d a b c) <$>
+     many ws <* char ',' <*>
+     many ws <*> commaSep1'_try ws e) <*>
+  optional (try $ many ws <* char ',')
 
 parameter :: DeltaParsing m => m (Untagged Param Span)
 parameter = kwparam <|> posparam
@@ -144,7 +154,7 @@ argument = kwarg <|> posarg
     posarg = flip PositionalArg <$> expr
 
 expr :: DeltaParsing m => m (Expr '[] Span)
-expr = orExpr
+expr = annotated tuple_list
   where
     atom =
       annotated $
@@ -156,9 +166,21 @@ expr = orExpr
       list <|>
       parenthesis
 
+    tuple_list =
+      (\a b c ->
+         case b of
+           Nothing -> a
+           Just (ws, b') -> Tuple c a ws b') <$>
+      orExpr <*>
+      optional
+        ((,) <$>
+         try (many whitespace <* comma) <*>
+         optional
+           ((,) <$> many whitespace <*> commaSep1'_try whitespace orExpr))
+
     list =
       (\a b c d -> List d a b c) <$
-      char '[' <*> many whitespace <*> commaSep expr <*> many whitespace <* char ']'
+      char '[' <*> many whitespace <*> commaSep orExpr <*> many whitespace <* char ']'
 
     bool = fmap (flip Bool) $
       (reserved "True" $> True) <|>
@@ -182,7 +204,7 @@ expr = orExpr
       (\a b c d -> Parens d a b c) <$>
       (char '(' *> many whitespace) <*>
       expr <*>
-      (many whitespace <* char ')')
+      manyTill whitespace (char ')')
 
     binOpL inner p = chainl1 inner $ do
       (ws1, op, s) <- try $ do
@@ -332,13 +354,12 @@ smallStatement =
     dot = Dot <$> (char '.' *> many whitespace)
     importTargets =
       (char '*' $> ImportAll) <|>
-      between (char '(') (char ')')
-        (ImportSomeParens <$>
-         many anyWhitespace <*>
-         commaSep1'
-           anyWhitespace
-           ((,) <$> annotated identifier <*> optional (as1 $ annotated identifier)) <*>
-         many anyWhitespace) <|>
+      (ImportSomeParens <$
+       char '(' <*> many anyWhitespace <*>
+       commaSep1'_try
+         anyWhitespace
+         ((,) <$> annotated identifier <*> optional (as1 $ annotated identifier)) <*>
+       manyTill anyWhitespace (char ')')) <|>
       ImportSome <$>
       commaSep1
         ((,) <$> annotated identifier <*> optional (as1 $ annotated identifier))

@@ -272,7 +272,7 @@ listToCommaSep1 (a :| as) = go (a:as)
 
 -- | Non-empty 'CommaSep', optionally terminated by a comma
 data CommaSep1' ws a
-  = CommaSepOne1' a (Maybe ([ws], [ws]))
+  = CommaSepOne1' a (Maybe [ws])
   | CommaSepMany1' a [ws] [ws] (CommaSep1' ws a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -342,7 +342,12 @@ data Expr (v :: [*]) a
   , _unsafeStringType :: StringType
   , _unsafeStringValue :: String
   }
-  deriving (Eq, Show, Functor, Foldable)
+  | Tuple
+  { _exprAnnotation :: a
+  , _unsafeTupleHead :: Expr v a
+  , _unsafeTupleComma :: [Whitespace]
+  , _unsafeTupleTail :: Maybe ([Whitespace], CommaSep1' Whitespace (Expr v a))
+  } deriving (Eq, Show, Functor, Foldable, Generic)
 instance IsString (Expr '[] ()) where
   fromString = Ident () . MkIdent ()
 instance Num (Expr '[] ()) where
@@ -353,20 +358,7 @@ instance Num (Expr '[] ()) where
   (-) a = BinOp () a [Space] (Minus ()) [Space]
   signum = undefined
   abs = undefined
-instance Plated (Expr '[] a) where
-  plate f (Parens a ws1 e ws2) = Parens a ws1 <$> f e <*> pure ws2
-  plate f (List a ws1 exprs ws2) = List a ws1 <$> traverse f exprs <*> pure ws2
-  plate f (Deref a expr ws1 ws2 name) =
-    Deref a <$> f expr <*> pure ws1 <*> pure ws2 <*> pure name
-  plate f (Call a expr ws args) = Call a <$> f expr <*> pure ws <*> (traverse._Exprs) f args
-  plate f (BinOp a e1 ws1 op ws2 e2) =
-    (\e1' e2' -> BinOp a e1' ws1 op ws2 e2') <$> f e1 <*> f e2
-  plate f (Negate a ws expr) = Negate a ws <$> f expr
-  plate _ e@String{} = pure $ coerce e
-  plate _ e@None{} = pure $ coerce e
-  plate _ e@Bool{} = pure $ coerce e
-  plate _ e@Ident{} = pure $ coerce e
-  plate _ e@Int{} = pure $ coerce e
+instance Plated (Expr '[] a) where; plate = gplate
 
 newtype Module v a = Module [Either ([Whitespace], Newline) (Statement v a)]
   deriving (Eq, Show, Functor, Foldable)

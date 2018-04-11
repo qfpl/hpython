@@ -237,6 +237,7 @@ genExpr' isExp = Gen.sized $ \n ->
                pure op <*>
                fmap NonEmpty.toList genWhitespaces1 <*>
                pure b)
+      , genTuple genExpr
       ]
 
 genAssignable :: MonadGen m => m (Expr '[] ())
@@ -245,6 +246,8 @@ genAssignable =
   Gen.choice
     [ genList genAssignable
     , genParens genAssignable
+    , genTuple genAssignable
+    , Ident () <$> genIdent
     , genDeref
     ]
 

@@ -285,6 +285,11 @@ validateExprScope (Parens a ws1 e ws2) =
 validateExprScope (Ident a i) =
   Ident a <$>
   validateIdentScope i
+validateExprScope (Tuple a b c d) =
+  Tuple a <$>
+  validateExprScope b <*>
+  pure c <*>
+  traverseOf (traverse._2.traverse) validateExprScope d
 validateExprScope e@None{} = pure $ coerce e
 validateExprScope e@Int{} = pure $ coerce e
 validateExprScope e@Bool{} = pure $ coerce e

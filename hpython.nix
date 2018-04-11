@@ -1,6 +1,6 @@
-{ mkDerivation, base, bytestring-trie, directory, hedgehog, lens
-, mtl, parsers, process, stdenv, transformers, trifecta
-, type-level-sets
+{ mkDerivation, base, bytestring-trie, directory, filepath
+, hedgehog, lens, mtl, parsers, process, stdenv, these
+, transformers, trifecta, type-level-sets
 }:
 mkDerivation {
   pname = "hpython";
@@ -9,11 +9,13 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    base bytestring-trie lens mtl parsers trifecta type-level-sets
+    base bytestring-trie lens mtl parsers these trifecta
+    type-level-sets
   ];
   executableHaskellDepends = [ base lens ];
   testHaskellDepends = [
-    base directory hedgehog lens mtl process transformers trifecta
+    base directory filepath hedgehog lens mtl process transformers
+    trifecta
   ];
   license = stdenv.lib.licenses.bsd3;
 }

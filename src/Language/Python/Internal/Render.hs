@@ -166,6 +166,7 @@ renderExpr (Deref _ expr ws1 ws2 name) =
   (case expr of
     Int{} -> "(" <> renderExpr expr <> ")"
     BinOp{} -> "(" <> renderExpr expr <> ")"
+    Tuple{} -> "(" <> renderExpr expr <> ")"
     _ -> renderExpr expr) <>
   foldMap renderWhitespace ws1 <> "." <> foldMap renderWhitespace ws2 <>
   renderIdent name

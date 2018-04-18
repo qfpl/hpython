@@ -85,8 +85,12 @@ whitespace =
 anyWhitespace :: CharParsing m => m (Either Newline Whitespace)
 anyWhitespace = Left <$> newline <|> Right <$> whitespace
 
-identifier :: (TokenParsing m, Monad m) => m (Untagged Ident Span)
-identifier = fmap (flip MkIdent) . runUnspaced $ ident idStyle
+identifier :: (TokenParsing m, DeltaParsing m) => m (Ident '[] Span)
+identifier =
+  annotated $
+  (\a b c -> MkIdent c a b) <$>
+  runUnspaced (ident idStyle) <*>
+  many whitespace
 
 commaSep :: (CharParsing m, Monad m) => m a -> m (CommaSep a)
 commaSep e = someCommaSep <|> pure CommaSepNone
@@ -124,11 +128,11 @@ parameter = kwparam <|> posparam
     kwparam =
       try
         ((\a b c d e -> KeywordParam e a b c d) <$>
-         annotated identifier <*>
+         identifier <*>
          many whitespace <*
          char '=') <*>
       many whitespace <*> expr
-    posparam = flip PositionalParam <$> annotated identifier
+    posparam = flip PositionalParam <$> identifier
 
 argument :: DeltaParsing m => m (Untagged Arg Span)
 argument = kwarg <|> posarg
@@ -136,7 +140,7 @@ argument = kwarg <|> posarg
     kwarg =
       try
         ((\a b c d e -> KeywordArg e a b c d) <$>
-         annotated identifier <*>
+         identifier <*>
          many whitespace <*
          char '=') <*>
       many whitespace <*> expr
@@ -156,7 +160,7 @@ expr = tuple_list
 
     ident' =
       annotated $
-      (\a b c -> Ident c a b) <$> annotated identifier <*> many whitespace
+      (\a b c -> Ident c a b) <$> identifier <*> many whitespace
 
     tuple_list =
       annotated $
@@ -267,7 +271,7 @@ expr = tuple_list
         deref =
           (\ws1 (str :~ s) ws2 a -> Deref (a ^. exprAnnotation <> s) a ws1 str ws2) <$>
           (char '.' *> many whitespace) <*>
-          spanned (annotated identifier) <*>
+          spanned identifier <*>
           many whitespace
         call =
           (\ws1 (csep :~ s) ws2 a -> Call (a ^. exprAnnotation <> s) a ws1 csep ws2) <$>
@@ -318,7 +322,7 @@ compoundStatement =
   where
     fundef =
       (\a b c d e f g h i -> Fundef i a b c d e f g h) <$
-      reserved "def" <*> some1 whitespace <*> annotated identifier <*>
+      reserved "def" <*> some1 whitespace <*> identifier <*>
       many whitespace <*> between (char '(') (char ')') (commaSep $ annotated parameter) <*>
       many whitespace <* char ':' <*> many whitespace <*> newline <*> block
     ifSt =
@@ -362,15 +366,15 @@ smallStatement =
        char '(' <*> many anyWhitespace <*>
        commaSep1'
          anyWhitespace
-         ((,) <$> annotated identifier <*> optional (as1 $ annotated identifier)) <*>
+         ((,) <$> identifier <*> optional (as1 identifier)) <*>
        manyTill anyWhitespace (char ')')) <|>
       ImportSome <$>
       commaSep1
-        ((,) <$> annotated identifier <*> optional (as1 $ annotated identifier))
+        ((,) <$> identifier <*> optional (as1 identifier))
     as1 m = As1 <$> some1 whitespace <* string "as" <*> some1 whitespace <*> m
     moduleName =
       (\a b c -> maybe (ModuleNameOne c a) (\(x, y, z) -> ModuleNameMany c a x y z) b) <$>
-      annotated identifier <*>
+      identifier <*>
       optional
         ((,,) <$> try (many whitespace <* char '.') <*> many whitespace <*> annotated moduleName)
     relativeModuleName =
@@ -380,17 +384,16 @@ smallStatement =
       <|>
       RelativeWithName [] <$> annotated moduleName
     from =
-      (\a b c d e f -> From f a b c d e) <$>
+      (\a b c d e f -> From f a b d e) <$>
       (reserved "from" *> some whitespace) <*>
       relativeModuleName <*>
-      some1 whitespace <*
       reserved "import" <*>
       many whitespace <*>
       importTargets
     import_ =
       (\a b c -> Import c a b) <$>
       (reserved "import" *> some1 whitespace) <*>
-      commaSep1 ((,) <$> annotated moduleName <*> optional (as1 $ annotated identifier))
+      commaSep1 ((,) <$> annotated moduleName <*> optional (as1 identifier))
 
 statement :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (Statement '[] Span)
 statement =

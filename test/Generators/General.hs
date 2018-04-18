@@ -49,7 +49,8 @@ genIdent =
   MkIdent () <$>
   liftA2 (:)
     (Gen.choice [Gen.alpha, pure '_'])
-    (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_']))
+    (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_'])) <*>
+  genWhitespaces
 
 genModuleName :: MonadGen m => m (ModuleName '[] ())
 genModuleName =

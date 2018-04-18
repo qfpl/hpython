@@ -57,7 +57,8 @@ genIdent =
   MkIdent () <$>
   liftA2 (:)
     (Gen.choice [Gen.alpha, pure '_'])
-    (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_']))
+    (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_'])) <*>
+  genWhitespaces
 
 genModuleName :: MonadGen m => m (ModuleName '[] ())
 genModuleName =
@@ -299,7 +300,7 @@ genSmallStatement = Gen.sized $ \n -> do
             nonlocals <- use currentNonlocals
             Nonlocal () <$>
               genWhitespaces1 <*>
-              Gen.resize n' (genSizedCommaSep1 . Gen.element $ MkIdent () <$> nonlocals)
+              Gen.resize n' (genSizedCommaSep1 . Gen.element $ MkIdent () <$> nonlocals <*> pure [])
         | isJust (_inFunction ctxt) && not (null nonlocals)
         ] ++
         [ Return () <$>

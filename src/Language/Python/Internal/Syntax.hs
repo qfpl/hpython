@@ -3,6 +3,7 @@
 {-# language TemplateHaskell, TypeFamilies, FlexibleInstances,
   MultiParamTypeClasses #-}
 {-# language LambdaCase #-}
+{-# language FunctionalDependencies #-}
 module Language.Python.Internal.Syntax where
 
 import Control.Applicative
@@ -82,9 +83,10 @@ data Ident (v :: [*]) a
   = MkIdent
   { _identAnnotation :: a
   , _identValue :: String
+  , _identWhitespace :: [Whitespace]
   } deriving (Eq, Show, Functor, Foldable)
 instance IsString (Ident '[] ()) where
-  fromString = MkIdent ()
+  fromString s = MkIdent () s []
 identValue :: Lens (Ident v a) (Ident '[] a) String String
 identValue = lens _identValue (\s a -> s { _identValue = a })
 
@@ -207,7 +209,6 @@ data SmallStatement (v :: [*]) a
       a
       [Whitespace]
       (RelativeModuleName v a)
-      (NonEmpty Whitespace)
       [Whitespace]
       (ImportTargets v a)
   deriving (Eq, Show, Functor, Foldable, Generic)
@@ -379,53 +380,99 @@ data Expr (v :: [*]) a
   , _unsafeTupleTail :: Maybe (CommaSep1' Whitespace (Expr v a))
   } deriving (Eq, Show, Functor, Foldable, Generic)
 
-whitespaceAfter :: Lens' (Expr v a) [Whitespace]
-whitespaceAfter =
-  lens
-    (\case
-        None _ ws -> ws
-        List _ _ _ ws -> ws
-        Deref _ _ _ _ ws -> ws
-        Call _ _ _ _ ws -> ws
-        BinOp _ _ _ _ e -> e ^. whitespaceAfter
-        Negate _ _ e -> e ^. whitespaceAfter
-        Parens _ _ _ ws -> ws
-        Ident _ _ ws -> ws
-        Int _ _ ws -> ws
-        Bool _ _ ws -> ws
-        String _ _ _ ws -> ws
-        Tuple _ _ ws Nothing -> ws
-        Tuple _ _ _ (Just cs) -> go cs
-          where
-            go cs =
-              case cs of
-                CommaSepOne1' e Nothing -> e ^. whitespaceAfter
-                CommaSepOne1' _ (Just ws) -> ws
-                CommaSepMany1' _ _ rest -> go rest)
-    (\e ws ->
-       case e of
-         None a _ -> None a ws
-         List a b c _ -> List a b c ws
-         Deref a b c d _ -> Deref a b c d ws
-         Call a b c d _ -> Call a b c d ws
-         BinOp a b c d e -> BinOp a b c d (e & whitespaceAfter .~ ws)
-         Negate a b c -> Negate a b (c & whitespaceAfter .~ ws)
-         Parens a b c _ -> Parens a b c ws
-         Ident a b _ -> Ident a b ws
-         Int a b _ -> Int a b ws
-         Bool a b _ -> Bool a b ws
-         String a b c _ -> String a b c ws
-         Tuple a e _ Nothing -> Tuple a e ws Nothing
-         Tuple a b ws (Just cs) -> Tuple a b ws (Just $ go cs)
-           where
-             go cs =
-               case cs of
-                 CommaSepOne1' e Nothing -> CommaSepOne1' (e & whitespaceAfter .~ ws) Nothing
-                 CommaSepOne1' a (Just _) -> CommaSepOne1' a (Just ws)
-                 CommaSepMany1' a b rest -> CommaSepMany1' a b $ go rest)
+class Token t ws | t -> ws where
+  whitespaceAfter :: Lens' t [ws]
+  startChar :: t -> Char
+  endChar :: t -> Char
+
+instance Token t ws => Token (CommaSep1' ws t) ws where
+  whitespaceAfter =
+    lens
+      _
+      _
+
+  startChar (CommaSepOne1' a _) = _
+  startChar (CommaSepMany1' a _ _) = _
+
+  endChar (CommaSepOne1' a _) = _
+  endChar (CommaSepMany1' a _ _) = _
+
+instance Token (Expr v a) Whitespace where
+  startChar List{} = '['
+  startChar (Deref _ e _ _ _) = startChar e
+  startChar (Call _ e _ _ _) = startChar e
+  startChar None{} = 'N'
+  startChar (BinOp _ e _ _ _) = startChar e
+  startChar Negate{} = '-'
+  startChar Parens{} = '('
+  startChar (Ident _ i _) = Prelude.head $ _identValue i
+  startChar (Int _ i _) = Prelude.head $ show i
+  startChar (Bool _ b _) = Prelude.head $ show b
+  startChar String{} = '"'
+  startChar (Tuple _ a _ _) = startChar a
+
+  endChar List{} = ']'
+  endChar (Deref _ _ _ i _) = Prelude.last $ _identValue i
+  endChar Call{} = ')'
+  endChar None{} = 'e'
+  endChar (BinOp _ _ _ _ e) =
+    case e of
+      Tuple{} -> ')'
+      _ -> endChar e
+  endChar (Negate _ _ e) = endChar e
+  endChar Parens{} = ')'
+  endChar (Ident _ i _) = Prelude.last $ _identValue i
+  endChar (Int _ i _) = Prelude.last $ show i
+  endChar (Bool _ b _) = Prelude.last $ show b
+  endChar String{} = '"'
+  endChar (Tuple _ a _ c) = maybe (endChar a) endChar c
+
+  whitespaceAfter =
+    lens
+      (\case
+          None _ ws -> ws
+          List _ _ _ ws -> ws
+          Deref _ _ _ _ ws -> ws
+          Call _ _ _ _ ws -> ws
+          BinOp _ _ _ _ e -> e ^. whitespaceAfter
+          Negate _ _ e -> e ^. whitespaceAfter
+          Parens _ _ _ ws -> ws
+          Ident _ _ ws -> ws
+          Int _ _ ws -> ws
+          Bool _ _ ws -> ws
+          String _ _ _ ws -> ws
+          Tuple _ _ ws Nothing -> ws
+          Tuple _ _ _ (Just cs) -> go cs
+            where
+              go cs =
+                case cs of
+                  CommaSepOne1' e Nothing -> e ^. whitespaceAfter
+                  CommaSepOne1' _ (Just ws) -> ws
+                  CommaSepMany1' _ _ rest -> go rest)
+      (\e ws ->
+        case e of
+          None a _ -> None a ws
+          List a b c _ -> List a b c ws
+          Deref a b c d _ -> Deref a b c d ws
+          Call a b c d _ -> Call a b c d ws
+          BinOp a b c d e -> BinOp a b c d (e & whitespaceAfter .~ ws)
+          Negate a b c -> Negate a b (c & whitespaceAfter .~ ws)
+          Parens a b c _ -> Parens a b c ws
+          Ident a b _ -> Ident a b ws
+          Int a b _ -> Int a b ws
+          Bool a b _ -> Bool a b ws
+          String a b c _ -> String a b c ws
+          Tuple a e _ Nothing -> Tuple a e ws Nothing
+          Tuple a b ws (Just cs) -> Tuple a b ws (Just $ go cs)
+            where
+              go cs =
+                case cs of
+                  CommaSepOne1' e Nothing -> CommaSepOne1' (e & whitespaceAfter .~ ws) Nothing
+                  CommaSepOne1' a (Just _) -> CommaSepOne1' a (Just ws)
+                  CommaSepMany1' a b rest -> CommaSepMany1' a b $ go rest)
 
 instance IsString (Expr '[] ()) where
-  fromString s = Ident () (MkIdent () s) []
+  fromString s = Ident () (MkIdent () s []) []
 instance Num (Expr '[] ()) where
   fromInteger n = Int () n []
   negate = Negate () []

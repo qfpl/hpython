@@ -216,11 +216,11 @@ validateIdentScope
   :: AsScopeError e v a
   => Ident v a
   -> ValidateScope a e (Ident (Nub (Scope ': v)) a)
-validateIdentScope i@(MkIdent a s) =
+validateIdentScope i@(MkIdent a s ws) =
   inScope s `bindValidateScope`
   \context ->
   case context of
-    Just (Clean, _) -> pure $ MkIdent a s
+    Just (Clean, _) -> pure $ MkIdent a s ws
     Just (Dirty, ann)-> scopeErrors [_FoundDynamic # (ann, i)]
     Nothing -> scopeErrors [_NotInScope # i]
 

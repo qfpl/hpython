@@ -141,11 +141,11 @@ validateIdent
      )
   => Ident v ann
   -> ValidateSyntax e (Ident (Nub (Syntax ': v)) ann)
-validateIdent (MkIdent a name)
+validateIdent (MkIdent a name ws)
   | not (all isAscii name) = syntaxErrors [_BadCharacter # (a, name)]
   | null name = syntaxErrors [_EmptyIdentifier # a]
   | name `elem` reservedWords = syntaxErrors [_IdentifierReservedWord # (a, name)]
-  | otherwise = pure $ MkIdent a name
+  | otherwise = pure $ MkIdent a name ws
 
 instance EndToken (BinOp a) where
   endToken Is{} = Just "is"

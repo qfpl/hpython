@@ -134,7 +134,7 @@ ifElse_ e sts sts' =
     (Just ([], [], LF, Block $ (,,) () [Space, Space, Space, Space] <$> sts'))
 
 var_ :: String -> Expr '[] ()
-var_ s = Ident () (MkIdent () s) []
+var_ s = Ident () (MkIdent () s []) []
 
 none_ :: Expr '[] ()
 none_ = None () []

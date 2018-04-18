@@ -109,25 +109,14 @@ commaSep1 e =
       many whitespace <*> commaSep1 e)
 
 commaSep1' :: (CharParsing m, Monad m) => m ws -> m a -> m (CommaSep1' ws a)
-commaSep1' ws e =
-  (\val rest c -> maybe (CommaSepOne1' val c) ($ val) rest) <$>
-  e <*>
-  optional
-    ((\a b d -> CommaSepMany1' d a b) <$>
-      (char ',' *> many ws) <*>
-      commaSep1' ws e) <*>
-  optional (char ',' *> many ws)
-
-commaSep1'_try :: (CharParsing m, Monad m) => m ws -> m a -> m (CommaSep1' ws a)
-commaSep1'_try ws e =
-  (\val rest c -> maybe (CommaSepOne1' val c) ($ val) rest) <$>
-  e <*>
-  optional
-    (try $
-     (\a b d -> CommaSepMany1' d a b) <$>
-     (char ',' *> many ws) <*>
-     commaSep1'_try ws e) <*>
-  optional (char ',' *> many ws)
+commaSep1' ws e = do
+  e' <- e
+  ws' <- optional (char ',' *> many ws)
+  case ws' of
+    Nothing -> pure $ CommaSepOne1' e' Nothing
+    Just ws'' ->
+      maybe (CommaSepOne1' e' $ Just ws'') (CommaSepMany1' e' ws'') <$>
+      optional (commaSep1' ws e)
 
 parameter :: DeltaParsing m => m (Untagged Param Span)
 parameter = kwparam <|> posparam
@@ -175,7 +164,7 @@ expr = tuple_list
       orExpr <*>
       (fmap Left (notFollowedBy $ char ',') <|>
        fmap Right
-         ((,) <$> (char ',' *> many whitespace) <*> optional (commaSep1'_try whitespace orExpr)))
+         ((,) <$> (char ',' *> many whitespace) <*> optional (commaSep1' whitespace orExpr)))
 
     list =
       annotated $
@@ -371,7 +360,7 @@ smallStatement =
       (char '*' $> ImportAll) <|>
       (ImportSomeParens <$
        char '(' <*> many anyWhitespace <*>
-       commaSep1'_try
+       commaSep1'
          anyWhitespace
          ((,) <$> annotated identifier <*> optional (as1 $ annotated identifier)) <*>
        manyTill anyWhitespace (char ')')) <|>

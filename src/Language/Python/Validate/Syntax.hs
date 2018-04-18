@@ -186,15 +186,18 @@ instance EndToken (Expr v a) where
           (Deref _ _ _ i _) -> Just $ _identValue i
           Call{} -> Just ")"
           None{} -> Just "None"
-          (BinOp _ _ _ _ e) -> endToken e
-          (Negate _ _ e) -> endToken e
+          BinOp _ _ _ _ e ->
+            case e of
+              Tuple{} -> Just ")"
+              _ -> endToken e
+          Negate _ _ e -> endToken e
           Parens{} -> Just ")"
-          (Ident _ i _) -> Just $ _identValue i
-          (Int _ i _) -> Just $ show i
-          (Bool _ b _) -> Just $ show b
+          Ident _ i _ -> Just $ _identValue i
+          Int _ i _ -> Just $ show i
+          Bool _ b _ -> Just $ show b
           String{} -> Just "\""
-          (Tuple _ _ [] b) -> maybe (Just ",") endToken b
-          (Tuple _ _ _ b) -> b >>= endToken
+          Tuple _ _ [] b -> maybe (Just ",") endToken b
+          Tuple _ _ _ b -> b >>= endToken
 
 instance StartToken (Expr v a) where
   startToken List{} = "["

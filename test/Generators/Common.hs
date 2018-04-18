@@ -16,7 +16,7 @@ whitespaceSize Tab = 1
 whitespaceSize (Continued _ ws) = 1 + sum (fmap whitespaceSize ws)
 
 genSmallInt :: MonadGen m => m (Expr '[] ())
-genSmallInt = Int () <$> Gen.integral (Range.constant 0 100)
+genSmallInt = Int () <$> Gen.integral (Range.constant 0 100) <*> genWhitespaces
 
 genString :: MonadGen m => m String
 genString = Gen.list (Range.constant 0 50) (Gen.filter (/='\0') Gen.latin1)
@@ -63,10 +63,10 @@ genWhitespaces1 = do
   liftA2 (:|) (head <$> Gen.resize 1 genSizedWhitespace) (Gen.resize n genSizedWhitespace)
 
 genNone :: MonadGen m => m (Expr '[] ())
-genNone = pure $ None ()
+genNone = None () <$> genWhitespaces
 
 genBool :: MonadGen m => m (Expr '[] ())
-genBool = Bool () <$> Gen.bool
+genBool = Bool () <$> Gen.bool <*> genWhitespaces
 
 genOp :: MonadGen m => m (BinOp ())
 genOp = Gen.element $ _opOperator <$> operatorTable
@@ -98,7 +98,7 @@ genTuple expr =
   Tuple () <$>
   expr <*>
   genWhitespaces <*>
-  Gen.maybe ((,) <$> genWhitespaces <*> genSizedCommaSep1' genWhitespaces expr)
+  Gen.maybe (genSizedCommaSep1' genWhitespaces expr)
 
 genSizedCommaSep1 :: MonadGen m => m a -> m (CommaSep1 a)
 genSizedCommaSep1 ma = Gen.sized $ \n ->
@@ -129,5 +129,5 @@ genSizedCommaSep1' ws ma = Gen.sized $ \n ->
           a <- Gen.resize n' ma
           Gen.subtermM
             (Gen.resize (n - n') $ genSizedCommaSep1' ws ma)
-            (\b -> CommaSepMany1' a <$> ws <*> ws <*> pure b)
+            (\b -> CommaSepMany1' a <$> ws <*> pure b)
       ]

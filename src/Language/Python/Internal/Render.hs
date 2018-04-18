@@ -117,10 +117,9 @@ renderCommaSep1 f (CommaSepMany1 a ws1 ws2 c) =
 renderCommaSep1' :: (ws -> String) -> (a -> String) -> CommaSep1' ws a -> String
 renderCommaSep1' ws f (CommaSepOne1' a b) =
   f a <>
-  foldMap (\x -> foldMap ws x <> ",") b
-renderCommaSep1' ws f (CommaSepMany1' a ws1 ws2 c) =
-  f a <>
-  foldMap ws ws1 <> "," <> foldMap ws ws2 <>
+  foldMap (\x -> "," <> foldMap ws x) b
+renderCommaSep1' ws f (CommaSepMany1' a ws2 c) =
+  f a <> "," <> foldMap ws ws2 <>
   renderCommaSep1' ws f c
 
 renderIdent :: Ident v a -> String
@@ -129,16 +128,15 @@ renderIdent = _identValue
 renderExpr :: Expr v a -> String
 renderExpr (Parens _ ws1 e ws2) =
   "(" <> foldMap renderWhitespace ws1 <>
-  renderExpr e <>
-  foldMap renderWhitespace ws2 <> ")"
-renderExpr (Bool _ b) = show b
+  renderExpr e <> ")" <> foldMap renderWhitespace ws2
+renderExpr (Bool _ b ws) = show b <> foldMap renderWhitespace ws
 renderExpr (Negate _ ws expr) =
   "-" <> foldMap renderWhitespace ws <>
     case expr of
-      BinOp _ _ _ Exp{} _ _ -> renderExpr expr
+      BinOp _ _ Exp{} _ _ -> renderExpr expr
       BinOp{} -> "(" <> renderExpr expr <> ")"
       _ -> renderExpr expr
-renderExpr (String _ strType b) =
+renderExpr (String _ strType b ws) =
   let
     quote =
       case strType of
@@ -147,47 +145,49 @@ renderExpr (String _ strType b) =
         LongSingle -> "'''"
         LongDouble -> "\"\"\""
   in
-    quote ++ foldMap renderChar b ++ quote
-renderExpr (Int _ n) = show n
-renderExpr (Ident _ name) = renderIdent name
+    quote <> foldMap renderChar b <> quote <> foldMap renderWhitespace ws
+renderExpr (Int _ n ws) = show n <> foldMap renderWhitespace ws
+renderExpr (Ident _ name ws) = renderIdent name <> foldMap renderWhitespace ws
 renderExpr (List _ ws1 exprs ws2) =
   "[" <> foldMap renderWhitespace ws1 <>
   renderCommaSep renderExpr exprs <>
-  foldMap renderWhitespace ws2 <> "]"
-renderExpr (Call _ expr ws args) =
+  "]" <> foldMap renderWhitespace ws2
+renderExpr (Call _ expr ws args ws2) =
   (case expr of
-     Int _ n | n < 0 -> "(" <> renderExpr expr <> ")"
+     Int _ n _ | n < 0 -> "(" <> renderExpr expr <> ")"
      BinOp {} -> "(" <> renderExpr expr <> ")"
      Tuple {} -> "(" <> renderExpr expr <> ")"
      _ -> renderExpr expr) <>
-  foldMap renderWhitespace ws <>
-  renderArgs args
-renderExpr (Deref _ expr ws1 ws2 name) =
+  "(" <> foldMap renderWhitespace ws <> foldMap renderArg args <>
+  ")" <> foldMap renderWhitespace ws2
+renderExpr (Deref _ expr ws1 name ws2) =
   (case expr of
     Int{} -> "(" <> renderExpr expr <> ")"
     BinOp{} -> "(" <> renderExpr expr <> ")"
     Tuple{} -> "(" <> renderExpr expr <> ")"
     _ -> renderExpr expr) <>
-  foldMap renderWhitespace ws1 <> "." <> foldMap renderWhitespace ws2 <>
-  renderIdent name
-renderExpr (None _) = "None"
-renderExpr (BinOp _ e1 ws1 op ws2 e2) =
+  "." <>
+  foldMap renderWhitespace ws1 <>
+  renderIdent name <>
+  foldMap renderWhitespace ws2
+renderExpr (None _ ws) = "None" <> foldMap renderWhitespace ws
+renderExpr (BinOp _ e1 op ws2 e2) =
   (if shouldBracketLeft op e1 then bracket else id) (renderExpr e1) <>
-  foldMap renderWhitespace ws1  <>
   renderBinOp op <>
   foldMap renderWhitespace ws2 <>
   (if shouldBracketRight op e2 then bracket else id) (renderExpr e2)
-renderExpr (Tuple _ a b c) =
-  renderExpr a <>
-  foldMap renderWhitespace b <> "," <>
+renderExpr (Tuple _ a ws c) =
+  bracketTuple a (renderExpr a) <> "," <> foldMap renderWhitespace ws <>
   foldMap
-    (\(ws, cs) ->
-       foldMap renderWhitespace ws <>
-       renderCommaSep1'
-         renderWhitespace
-         (\a -> (case a of; Tuple{} -> bracket; _ -> id) $ renderExpr a)
-         cs)
+    (renderCommaSep1'
+       renderWhitespace
+       (\b -> bracketTuple b $ renderExpr b))
     c
+  where
+    bracketTuple a =
+      case a of
+        Tuple{} -> bracket
+        _ -> id
 
 renderModuleName :: ModuleName v a -> String
 renderModuleName (ModuleNameOne _ s) = renderIdent s
@@ -307,13 +307,11 @@ renderStatement (SmallStatements s ss sc nl) =
   nl
   NoLines
 
-renderArgs :: CommaSep (Arg v a) -> String
-renderArgs a = "(" <> renderCommaSep go a <> ")"
-  where
-    go (PositionalArg _ expr) = renderExpr expr
-    go (KeywordArg _ name ws1 ws2 expr) =
-      renderIdent name <> foldMap renderWhitespace ws1 <> "=" <>
-      foldMap renderWhitespace ws2 <> renderExpr expr
+renderArg :: Arg v a -> String
+renderArg (PositionalArg _ expr) = renderExpr expr
+renderArg (KeywordArg _ name ws1 ws2 expr) =
+  renderIdent name <> foldMap renderWhitespace ws1 <> "=" <>
+  foldMap renderWhitespace ws2 <> renderExpr expr
 
 renderParams :: CommaSep (Param v a) -> String
 renderParams a = "(" <> renderCommaSep go a <> ")"

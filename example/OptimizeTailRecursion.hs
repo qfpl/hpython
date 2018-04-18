@@ -106,7 +106,7 @@ optimizeTailRecursion st = do
             case lastExp of
               Return _ _ e ->
                 case e ^? _Call of
-                  Just (_, f, _, args)
+                  Just (_, f, _, args, _)
                     | Just name' <- f ^? _Ident._2.identValue
                     , name' == name ->
                         newSts <>

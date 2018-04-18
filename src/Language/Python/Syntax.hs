@@ -3,6 +3,8 @@
 {-# language OverloadedLists #-}
 module Language.Python.Syntax where
 
+import Data.Function ((&))
+import Control.Lens.Setter ((.~))
 import Data.List.NonEmpty (NonEmpty)
 
 import Language.Python.Internal.Syntax
@@ -32,7 +34,7 @@ def_ name params block =
     (Block $ (,,) () [Space, Space, Space, Space] <$> block)
 
 call_ :: Expr '[] () -> [Arg '[] ()] -> Expr '[] ()
-call_ expr args = Call () expr [] (listToCommaSep args)
+call_ expr args = Call () expr [] (listToCommaSep args) []
 
 return_ :: Expr '[] () -> Statement '[] ()
 return_ e = SmallStatements (Return () [Space] e) [] Nothing LF
@@ -44,11 +46,11 @@ list_ :: [Expr '[] ()] -> Expr '[] ()
 list_ es = List () [] (listToCommaSep es) []
 
 is_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-is_ a = BinOp () a [Space] (Is ()) [Space]
+is_ a = BinOp () (a & whitespaceAfter .~ [Space]) (Is ()) [Space]
 infixl 1 `is_`
 
 (.==) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-(.==) a = BinOp () a [Space] (Equals ()) [Space]
+(.==) a = BinOp () (a & whitespaceAfter .~ [Space]) (Equals ()) [Space]
 infixl 1 .==
 
 (.|) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
@@ -88,7 +90,7 @@ infixl 7 .*
 infixl 7 .@
 
 (./) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-(./) a = BinOp () a [Space] (Divide ()) [Space]
+(./) a = BinOp () (a & whitespaceAfter .~ [Space]) (Divide ()) [Space]
 infixl 7 ./
 
 (.//) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
@@ -100,11 +102,11 @@ infixl 7 .//
 infixl 7 .%
 
 (.**) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-(.**) a = BinOp () a [Space] (Exp ()) [Space]
+(.**) a = BinOp () (a & whitespaceAfter .~ [Space]) (Exp ()) [Space]
 infixr 8 .**
 
 (/>) :: Expr '[] () -> Ident '[] () -> Expr '[] ()
-(/>) a = Deref () a [] []
+(/>) a b = Deref () a [] b []
 infixl 9 />
 
 neg :: Expr '[] () -> Expr '[] ()
@@ -132,10 +134,10 @@ ifElse_ e sts sts' =
     (Just ([], [], LF, Block $ (,,) () [Space, Space, Space, Space] <$> sts'))
 
 var_ :: String -> Expr '[] ()
-var_ = Ident () . MkIdent ()
+var_ s = Ident () (MkIdent () s) []
 
 none_ :: Expr '[] ()
-none_ = None ()
+none_ = None () []
 
 pass_ :: Statement '[] ()
 pass_ = SmallStatements (Pass ()) [] Nothing LF
@@ -144,22 +146,22 @@ break_ :: Statement '[] ()
 break_ = SmallStatements (Break ()) [] Nothing LF
 
 true_ :: Expr '[] ()
-true_ = Bool () True
+true_ = Bool () True []
 
 false_ :: Expr '[] ()
-false_ = Bool () False
+false_ = Bool () False []
 
 and_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-and_ a = BinOp () a [Space] (BoolAnd ()) [Space]
+and_ a = BinOp () (a & whitespaceAfter .~ [Space]) (BoolAnd ()) [Space]
 
 or_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-or_ a = BinOp () a [Space] (BoolOr ()) [Space]
+or_ a = BinOp () (a & whitespaceAfter .~ [Space]) (BoolOr ()) [Space]
 
 str_ :: String -> Expr '[] ()
-str_ = String () ShortDouble
+str_ s = String () ShortDouble s []
 
 longStr_ :: String -> Expr '[] ()
-longStr_ = String () LongDouble
+longStr_ s = String () LongDouble s []
 
 (.=) :: Expr '[] () -> Expr '[] () -> Statement '[] ()
 (.=) a b = SmallStatements (Assign () a [Space] [Space] b) [] Nothing LF

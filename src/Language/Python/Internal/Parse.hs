@@ -113,10 +113,10 @@ commaSep1' ws e =
   (\val rest c -> maybe (CommaSepOne1' val c) ($ val) rest) <$>
   e <*>
   optional
-    ((\a b c d -> CommaSepMany1' d a b c) <$>
-      many ws <* char ',' <*>
-      many ws <*> commaSep1' ws e) <*>
-  optional (many ws <* char ',')
+    ((\a b d -> CommaSepMany1' d a b) <$>
+      (char ',' *> many ws) <*>
+      commaSep1' ws e) <*>
+  optional (char ',' *> many ws)
 
 commaSep1'_try :: (CharParsing m, Monad m) => m ws -> m a -> m (CommaSep1' ws a)
 commaSep1'_try ws e =
@@ -124,10 +124,10 @@ commaSep1'_try ws e =
   e <*>
   optional
     (try $
-     (\a b c d -> CommaSepMany1' d a b c) <$>
-     many ws <* char ',' <*>
-     many ws <*> commaSep1'_try ws e) <*>
-  optional (try $ many ws <* char ',')
+     (\a b d -> CommaSepMany1' d a b) <$>
+     (char ',' *> many ws) <*>
+     commaSep1'_try ws e) <*>
+  optional (char ',' *> many ws)
 
 parameter :: DeltaParsing m => m (Untagged Param Span)
 parameter = kwparam <|> posparam
@@ -154,65 +154,79 @@ argument = kwarg <|> posarg
     posarg = flip PositionalArg <$> expr
 
 expr :: DeltaParsing m => m (Expr '[] Span)
-expr = annotated tuple_list
+expr = tuple_list
   where
     atom =
-      annotated $
       bool <|>
       none <|>
       strLit <|>
       int <|>
-      (flip Ident <$> annotated identifier) <|>
+      ident' <|>
       list <|>
       parenthesis
 
+    ident' =
+      annotated $
+      (\a b c -> Ident c a b) <$> annotated identifier <*> many whitespace
+
     tuple_list =
-      (\a b c ->
-         case b of
-           Nothing -> a
-           Just (ws, b') -> Tuple c a ws b') <$>
+      annotated $
+      (\a b c -> either (const a) (uncurry (Tuple c a)) b) <$>
       orExpr <*>
-      optional
-        ((,) <$>
-         try (many whitespace <* comma) <*>
-         optional
-           ((,) <$> many whitespace <*> commaSep1'_try whitespace orExpr))
+      (fmap Left (notFollowedBy $ char ',') <|>
+       fmap Right
+         ((,) <$> (char ',' *> many whitespace) <*> optional (commaSep1'_try whitespace orExpr)))
 
     list =
+      annotated $
       (\a b c d -> List d a b c) <$
-      char '[' <*> many whitespace <*> commaSep orExpr <*> many whitespace <* char ']'
+      char '[' <*> many whitespace <*> commaSep orExpr <*> (char ']' *> many whitespace) 
 
-    bool = fmap (flip Bool) $
-      (reserved "True" $> True) <|>
-      (reserved "False" $> False)
+    bool =
+      annotated $
+      (\a b c -> Bool c a b) <$>
+      (reserved "True" $> True <|> reserved "False" $> False) <*>
+      many whitespace
 
     none =
-      reserved "None" $> None
+      annotated $
+      flip None <$
+      reserved "None" <*>
+      many whitespace
 
     tripleSingle = try (string "''") *> char '\'' <?> "'''"
     tripleDouble = try (string "\"\"") *> char '"' <?> "\"\"\""
 
     strLit =
-      fmap (\a b -> String b LongSingle a) (tripleSingle *> manyTill stringChar (string "'''")) <|>
-      fmap (\a b -> String b LongDouble a) (tripleDouble *> manyTill stringChar (string "\"\"\"")) <|>
-      fmap (\a b -> String b ShortSingle a) (char '\'' *> manyTill stringChar (char '\'')) <|>
-      fmap (\a b -> String b ShortDouble a) (char '\"' *> manyTill stringChar (char '\"'))
+      annotated $
+      ((\a b c -> String c LongSingle a b) <$>
+         (tripleSingle *> manyTill stringChar (string "'''")) <|>
+       (\a b c -> String c LongDouble a b) <$>
+         (tripleDouble *> manyTill stringChar (string "\"\"\"")) <|>
+       (\a b c -> String c ShortSingle a b) <$>
+         (char '\'' *> manyTill stringChar (char '\'')) <|>
+       (\a b c -> String c ShortDouble a b) <$>
+         (char '\"' *> manyTill stringChar (char '\"'))) <*>
+      many whitespace
 
-    int = (\a b -> Int b $ read a) <$> some digit
+    int =
+      annotated $
+      (\a b c -> Int c (read a) b) <$>
+      some digit <*>
+      many whitespace
 
     parenthesis =
+      annotated $
       (\a b c d -> Parens d a b c) <$>
       (char '(' *> many whitespace) <*>
-      expr <*>
-      manyTill whitespace (char ')')
+      expr <*> (char ')' *> many whitespace)
 
     binOpL inner p = chainl1 inner $ do
-      (ws1, op, s) <- try $ do
-        ws1 <- many whitespace
+      (op, s) <- do
         op :~ s <- spanned p
-        pure (ws1, op, s)
+        pure (op, s)
       ws2 <- many whitespace
-      pure $ \a b -> BinOp (a ^. exprAnnotation <> b ^. exprAnnotation) a ws1 (op $> s) ws2 b
+      pure $ \a b -> BinOp (a ^. exprAnnotation <> b ^. exprAnnotation) a (op $> s) ws2 b
 
     orExpr = binOpL andExpr (reserved "or" $> BoolOr ())
 
@@ -248,13 +262,13 @@ expr = annotated tuple_list
       a <- atomExpr
       v <-
         optional
-          (try ((,,,) <$> many whitespace <*> spanned (string "**")) <*>
+          (try ((,,) <$> spanned (string "**")) <*>
            many whitespace <*>
            factor)
       case v of
         Nothing -> pure a
-        Just (ws1, _ :~ s, ws2, b) ->
-          pure $ BinOp (a ^. exprAnnotation <> b ^. exprAnnotation) a ws1 (Exp s) ws2 b
+        Just (_ :~ s, ws2, b) ->
+          pure $ BinOp (a ^. exprAnnotation <> b ^. exprAnnotation) a (Exp s) ws2 b
 
     atomExpr =
       (\a afters -> case afters of; [] -> a; _ -> foldl' (\b f -> f b) a afters) <$>
@@ -262,14 +276,15 @@ expr = annotated tuple_list
       many (deref <|> call)
       where
         deref =
-          (\ws1 ws2 (str :~ s) a -> Deref (a ^. exprAnnotation <> s) a ws1 ws2 str) <$>
-          try (many whitespace <* char '.') <*>
-          many whitespace <*>
-          spanned (annotated identifier)
+          (\ws1 (str :~ s) ws2 a -> Deref (a ^. exprAnnotation <> s) a ws1 str ws2) <$>
+          (char '.' *> many whitespace) <*>
+          spanned (annotated identifier) <*>
+          many whitespace
         call =
-          (\ws1 (csep :~ s) a -> Call (a ^. exprAnnotation <> s) a ws1 csep) <$>
-          try (many whitespace <* char '(') <*>
-          spanned (commaSep (annotated argument) <* char ')')
+          (\ws1 (csep :~ s) ws2 a -> Call (a ^. exprAnnotation <> s) a ws1 csep ws2) <$>
+          (char '(' *> many whitespace) <*>
+          spanned (commaSep (annotated argument)) <*>
+          (char ')' *> many whitespace)
 
 indent :: (CharParsing m, MonadState [[Whitespace]] m) => m ()
 indent = do

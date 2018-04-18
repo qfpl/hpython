@@ -257,21 +257,21 @@ validateExprScope (List a ws1 es ws2) =
   List a ws1 <$>
   traverse validateExprScope es <*>
   pure ws2
-validateExprScope (Deref a e ws1 ws2 r) =
+validateExprScope (Deref a e ws1 r ws2) =
   Deref a <$>
   validateExprScope e <*>
   pure ws1 <*>
-  pure ws2 <*>
-  validateIdentScope r
-validateExprScope (Call a e ws1 as) =
+  validateIdentScope r <*>
+  pure ws2
+validateExprScope (Call a e ws1 as ws2) =
   Call a <$>
   validateExprScope e <*>
   pure ws1 <*>
-  traverse validateArgScope as
-validateExprScope (BinOp a l ws1 op ws2 r) =
+  traverse validateArgScope as <*>
+  pure ws2
+validateExprScope (BinOp a l op ws2 r) =
   BinOp a <$>
   validateExprScope l <*>
-  pure ws1 <*>
   pure op <*>
   pure ws2 <*>
   validateExprScope r
@@ -282,14 +282,15 @@ validateExprScope (Parens a ws1 e ws2) =
   Parens a ws1 <$>
   validateExprScope e <*>
   pure ws2
-validateExprScope (Ident a i) =
+validateExprScope (Ident a i ws) =
   Ident a <$>
-  validateIdentScope i
-validateExprScope (Tuple a b c d) =
+  validateIdentScope i <*>
+  pure ws
+validateExprScope (Tuple a b ws d) =
   Tuple a <$>
   validateExprScope b <*>
-  pure c <*>
-  traverseOf (traverse._2.traverse) validateExprScope d
+  pure ws <*>
+  traverseOf (traverse.traverse) validateExprScope d
 validateExprScope e@None{} = pure $ coerce e
 validateExprScope e@Int{} = pure $ coerce e
 validateExprScope e@Bool{} = pure $ coerce e

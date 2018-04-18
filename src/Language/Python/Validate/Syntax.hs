@@ -118,7 +118,7 @@ initialSyntaxContext =
   }
 
 class EndToken s where
-  endToken :: s -> String
+  endToken :: s -> Maybe String
 
 class StartToken s where
   startToken :: s -> String
@@ -148,15 +148,15 @@ validateIdent (MkIdent a name)
   | otherwise = pure $ MkIdent a name
 
 instance EndToken (BinOp a) where
-  endToken Is{} = "is"
-  endToken Minus{} = "-"
-  endToken Exp{} = "*"
-  endToken BoolAnd{} = "and"
-  endToken BoolOr{} = "or"
-  endToken Multiply{} = "*"
-  endToken Divide{} = "/"
-  endToken Plus{} = "+"
-  endToken Equals{} = "="
+  endToken Is{} = Just "is"
+  endToken Minus{} = Just "-"
+  endToken Exp{} = Just "*"
+  endToken BoolAnd{} = Just "and"
+  endToken BoolOr{} = Just "or"
+  endToken Multiply{} = Just "*"
+  endToken Divide{} = Just "/"
+  endToken Plus{} = Just "+"
+  endToken Equals{} = Just "="
 
 instance StartToken (BinOp a) where
   startToken Is{} = "is"
@@ -174,39 +174,44 @@ instance EndToken a => EndToken (CommaSep1 a) where
   endToken (CommaSepMany1 _ _ _ rest) = endToken rest
 
 instance EndToken a => EndToken (CommaSep1' ws a) where
-  endToken (CommaSepOne1' a b) = maybe (endToken a) (const ",") b
-  endToken (CommaSepMany1' _ _ _ rest) = endToken rest
+  endToken (CommaSepOne1' a b) = maybe (endToken a) (Just . const ",") b
+  endToken (CommaSepMany1' _ _ rest) = endToken rest
 
 instance EndToken (Expr v a) where
-  endToken List{} = "]"
-  endToken (Deref _ _ _ _ i) = _identValue i
-  endToken Call{} = ")"
-  endToken None{} = "None"
-  endToken (BinOp _ _ _ _ _ e) = endToken e
-  endToken (Negate _ _ e) = endToken e
-  endToken Parens{} = ")"
-  endToken (Ident _ i) = _identValue i
-  endToken (Int _ i) = show i
-  endToken (Bool _ b) = show b
-  endToken String{} = "\""
-  endToken (Tuple _ _ _ b) = maybe "," (endToken . snd) b
+  endToken e
+    | _:_ <- e ^. whitespaceAfter = Nothing
+    | otherwise =
+        case e of
+          List{} -> Just "]"
+          (Deref _ _ _ i _) -> Just $ _identValue i
+          Call{} -> Just ")"
+          None{} -> Just "None"
+          (BinOp _ _ _ _ e) -> endToken e
+          (Negate _ _ e) -> endToken e
+          Parens{} -> Just ")"
+          (Ident _ i _) -> Just $ _identValue i
+          (Int _ i _) -> Just $ show i
+          (Bool _ b _) -> Just $ show b
+          String{} -> Just "\""
+          (Tuple _ _ [] b) -> maybe (Just ",") endToken b
+          (Tuple _ _ _ b) -> b >>= endToken
 
 instance StartToken (Expr v a) where
   startToken List{} = "["
   startToken (Deref _ e _ _ _) = startToken e
-  startToken (Call _ e _ _) = startToken e
+  startToken (Call _ e _ _ _) = startToken e
   startToken None{} = "None"
-  startToken (BinOp _ e _ _ _ _) = startToken e
+  startToken (BinOp _ e _ _ _) = startToken e
   startToken Negate{} = "-"
   startToken Parens{} = "("
-  startToken (Ident _ i) = _identValue i
-  startToken (Int _ i) = show i
-  startToken (Bool _ b) = show b
+  startToken (Ident _ i _) = _identValue i
+  startToken (Int _ i _) = show i
+  startToken (Bool _ b _) = show b
   startToken String{} = "\""
   startToken (Tuple _ a _ _) = startToken a
 
 instance EndToken String where
-  endToken s = fromMaybe s (words s ^? _last)
+  endToken s = Just $ fromMaybe s (words s ^? _last)
 
 instance StartToken String where
   startToken s = fromMaybe s (words s ^? _head)
@@ -220,12 +225,12 @@ instance StartToken (ImportTargets v a) where
   startToken ImportSomeParens{} = "("
 
 instance EndToken (ModuleName v a) where
-  endToken (ModuleNameOne _ s) = renderIdent s
+  endToken (ModuleNameOne _ s) = Just $ renderIdent s
   endToken (ModuleNameMany _ _ _ _ rest) = endToken rest
 
 instance EndToken (RelativeModuleName v a) where
   endToken (RelativeWithName _ mn) = endToken mn
-  endToken (Relative ds) = renderDot (toList ds ^?! _last)
+  endToken (Relative ds) = Just $ renderDot (toList ds ^?! _last)
 
 validateWhitespace
   :: ( EndToken x, StartToken y
@@ -237,9 +242,25 @@ validateWhitespace
   -> (y, y -> String)
   -> ValidateSyntax e [Whitespace]
 validateWhitespace ann (a, aStr) [] (b, bStr)
-  | isIdentifier (endToken a ++ startToken b)
+  | Just ea <- endToken a
+  , isIdentifier (ea ++ startToken b)
   = syntaxErrors [_MissingSpacesIn # (ann, aStr a, bStr b)]
 validateWhitespace _ _ ws _ = pure ws
+
+validateAdjacent
+  :: ( AsSyntaxError e v a
+     , StartToken x
+     )
+  => a
+  -> Expr v a
+  -> (x, x -> String)
+  -> ValidateSyntax e x
+validateAdjacent ann a (b, bStr)
+  | [] <- a ^. whitespaceAfter
+  , Just ea <- endToken a
+  , isIdentifier (ea ++ startToken b)
+  = syntaxErrors [_MissingSpacesIn # (ann, renderExpr a, bStr b)]
+  | otherwise = pure b
 
 validateExprSyntax
   :: ( AsSyntaxError e v a
@@ -248,41 +269,41 @@ validateExprSyntax
   => Expr v a
   -> ValidateSyntax e (Expr (Nub (Syntax ': v)) a)
 validateExprSyntax (Parens a ws1 e ws2) = Parens a ws1 <$> validateExprSyntax e <*> pure ws2
-validateExprSyntax (Bool a b) = pure $ Bool a b
+validateExprSyntax (Bool a b ws) = pure $ Bool a b ws
 validateExprSyntax (Negate a ws expr) = Negate a ws <$> validateExprSyntax expr
-validateExprSyntax (String a strType b) = pure $ String a strType b
-validateExprSyntax (Int a n) = pure $ Int a n
-validateExprSyntax (Ident a name) = Ident a <$> validateIdent name
+validateExprSyntax (String a strType b ws) = pure $ String a strType b ws
+validateExprSyntax (Int a n ws) = pure $ Int a n ws
+validateExprSyntax (Ident a name ws) = Ident a <$> validateIdent name <*> pure ws
 validateExprSyntax (List a ws1 exprs ws2) =
   List a ws1 <$> traverse validateExprSyntax exprs <*> pure ws2
-validateExprSyntax (Deref a expr ws1 ws2 name) =
+validateExprSyntax (Deref a expr ws1 name ws2) =
   Deref a <$>
   validateExprSyntax expr <*>
   pure ws1 <*>
-  pure ws2 <*>
-  validateIdent name
-validateExprSyntax (Call a expr ws args) =
+  validateIdent name <*>
+  pure ws2
+validateExprSyntax (Call a expr ws args ws2) =
   Call a <$>
   validateExprSyntax expr <*>
   pure ws <*>
-  validateArgsSyntax args
-validateExprSyntax (None a) = pure $ None a
-validateExprSyntax e@(BinOp a e1 ws1 op ws2 e2) =
+  validateArgsSyntax args <*>
+  pure ws2
+validateExprSyntax (None a ws) = pure $ None a ws
+validateExprSyntax e@(BinOp a e1 op ws2 e2) =
   BinOp a <$>
   validateExprSyntax e1 <*>
   (if shouldBracketLeft op e1
-   then pure ws1
-   else validateWhitespace a (e1, renderExpr) ws1 (op, renderBinOp)) <*>
-  pure op <*>
+   then pure op
+   else validateAdjacent a e1 (op, renderBinOp)) <*>
   (if shouldBracketRight op e2
    then pure ws2
    else validateWhitespace a (op, renderBinOp) ws2 (e2, renderExpr)) <*>
   validateExprSyntax e2
-validateExprSyntax (Tuple a b c d) =
+validateExprSyntax (Tuple a b ws d) =
   Tuple a <$>
   validateExprSyntax b <*>
-  pure c <*>
-  traverseOf (traverse._2.traverse) validateExprSyntax d
+  pure ws <*>
+  traverseOf (traverse.traverse) validateExprSyntax d
 
 validateBlockSyntax
   :: ( AsSyntaxError e v a
@@ -434,7 +455,7 @@ canAssignTo Bool{} = False
 canAssignTo (Parens _ _ a _) = canAssignTo a
 canAssignTo String{} = False
 canAssignTo (List _ _ a _) = all canAssignTo a
-canAssignTo (Tuple _ a _ b) = all canAssignTo $ a : toListOf (folded._2.folded) b
+canAssignTo (Tuple _ a _ b) = all canAssignTo $ a : toListOf (folded.folded) b
 canAssignTo _ = True
 
 validateArgsSyntax

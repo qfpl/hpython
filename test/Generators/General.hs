@@ -42,7 +42,7 @@ genArg genExpr = Gen.sized $ \n ->
       ]
 
 genInt :: MonadGen m => m (Expr '[] ())
-genInt = Int () <$> Gen.integral (Range.constant (-2^32) (2^32))
+genInt = Int () <$> Gen.integral (Range.constant (-2^32) (2^32)) <*> genWhitespaces
 
 genIdent :: MonadGen m => m (Ident '[] ())
 genIdent =
@@ -124,10 +124,10 @@ genExpr' isExp = Gen.sized $ \n ->
   if n <= 1
   then
     Gen.choice
-    [ Ident () <$> genIdent
+    [ Ident () <$> genIdent <*> genWhitespaces
     , if isExp then genSmallInt else genInt
     , genBool
-    , String () <$> genStringType <*> genString
+    , String () <$> genStringType <*> genString <*> genWhitespaces
     ]
   else
     Gen.resize (n-1) $
@@ -142,25 +142,25 @@ genExpr' isExp = Gen.sized $ \n ->
              Deref () <$>
              pure a <*>
              genWhitespaces <*>
-             genWhitespaces <*>
-             genIdent)
+             genIdent <*>
+             genWhitespaces)
       , Gen.shrink
           (\case
-              Call () a _ (CommaSepOne b) -> [a, _argExpr b]
-              Call () a _ _ -> [a]
+              Call () a _ (CommaSepOne b) _ -> [a, _argExpr b]
+              Call () a _ _ _ -> [a]
               _ -> []) $
         Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
           a <- Gen.resize n' genExpr
           b <- Gen.resize (n - n') $ genSizedCommaSep (genArg genExpr)
-          Call () a <$> genWhitespaces <*> pure b
+          Call () a <$> genWhitespaces <*> pure b <*> genWhitespaces
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
           op <- genOp
           Gen.subtermM2
             (Gen.resize n' genExpr)
             (Gen.resize (n - n') (genExpr' $ case op of; Exp{} -> True; _ -> False))
-            (\a b -> BinOp () a <$> genWhitespaces <*> pure op <*> genWhitespaces <*> pure b)
+            (\a b -> BinOp () a <$> pure op <*> genWhitespaces <*> pure b)
       , Gen.subtermM
           genExpr
           (\a -> Parens () <$> genWhitespaces <*> pure a <*> genWhitespaces)

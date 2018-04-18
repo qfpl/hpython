@@ -2,6 +2,7 @@
 {-# language DataKinds, PolyKinds #-}
 {-# language TemplateHaskell, TypeFamilies, FlexibleInstances,
   MultiParamTypeClasses #-}
+{-# language LambdaCase #-}
 module Language.Python.Internal.Syntax where
 
 import Control.Applicative
@@ -12,6 +13,7 @@ import Control.Lens.TH
 import Control.Lens.Tuple
 import Control.Lens.Plated
 import Control.Lens.Prism
+import Control.Lens.Setter
 import Control.Lens.Traversal
 import Control.Lens.Wrapped
 import Data.Coerce
@@ -271,9 +273,10 @@ listToCommaSep1 (a :| as) = go (a:as)
     go (x:xs) = CommaSepMany1 x [] [Space] $ go xs
 
 -- | Non-empty 'CommaSep', optionally terminated by a comma
+-- Assumes that the contents consumes trailing whitespace
 data CommaSep1' ws a
   = CommaSepOne1' a (Maybe [ws])
-  | CommaSepMany1' a [ws] [ws] (CommaSep1' ws a)
+  | CommaSepMany1' a [ws] (CommaSep1' ws a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data StringType
@@ -286,76 +289,149 @@ data StringType
 data Expr (v :: [*]) a
   = List
   { _exprAnnotation :: a
+  -- [ spaces
   , _unsafeListWhitespaceLeft :: [Whitespace]
+  -- exprs
   , _unsafeListValues :: CommaSep (Expr v a)
+  -- ] spaces
   , _unsafeListWhitespaceRight :: [Whitespace]
   }
   | Deref
   { _exprAnnotation :: a
+  -- expr
   , _unsafeDerefValueLeft :: Expr v a
+  -- . spaces
   , _unsafeDerefWhitespaceLeft :: [Whitespace]
-  , _unsafeDerefWhitespaceRight :: [Whitespace]
+  -- ident
   , _unsafeDerefValueRight :: Ident v a
+  -- spaces
+  , _unsafeDerefWhitespaceRight :: [Whitespace]
   }
   | Call
   { _exprAnnotation :: a
+  -- expr
   , _unsafeCallFunction :: Expr v a
-  , _unsafeCallWhitespace :: [Whitespace]
+  -- ( spaces
+  , _unsafeCallWhitespaceLeft :: [Whitespace]
+  -- exprs
   , _unsafeCallArguments :: CommaSep (Arg v a)
+  -- ) spaces
+  , _unsafeCallWhitespaceRight :: [Whitespace]
   }
   | None
   { _exprAnnotation :: a
+  , _unsafeNoneWhitespace :: [Whitespace]
   }
   | BinOp
   { _exprAnnotation :: a
+  -- expr
   , _unsafeBinOpExprLeft :: Expr v a
-  , _unsafeBinOpWhitespaceLeft :: [Whitespace]
+  -- binop spaces
   , _unsafeBinOpOp :: BinOp a
   , _unsafeBinOpWhitesepaceRight :: [Whitespace]
+  -- expr
   , _unsafeBinOpExprRight :: Expr v a
   }
   | Negate
   { _exprAnnotation :: a
+  -- - spaces
   , _unsafeNegateWhitespace :: [Whitespace]
+  -- expr
   , _unsafeNegateValue :: Expr v a
   }
   | Parens
   { _exprAnnotation :: a
+  -- ( spaces
   , _unsafeParensWhitespaceLeft :: [Whitespace]
+  -- expr
   , _unsafeParensValue :: Expr v a
-  , _unsafeParensWhitespaceRight :: [Whitespace]
+  -- ) spaces
+  , _unsafeParensWhitespaceAfter :: [Whitespace]
   }
   | Ident
   { _exprAnnotation :: a
   , _unsafeIdentValue :: Ident v a
+  , _unsafeIdentWhitespace :: [Whitespace]
   }
   | Int
   { _exprAnnotation :: a
   , _unsafeIntValue :: Integer
+  , _unsafeIntWhitespace :: [Whitespace]
   }
   | Bool
   { _exprAnnotation :: a
   , _unsafeBoolValue :: Bool
+  , _unsafeBoolWhitespace :: [Whitespace]
   }
   | String
   { _exprAnnotation :: a
   , _unsafeStringType :: StringType
   , _unsafeStringValue :: String
+  , _unsafeStringWhitespace :: [Whitespace]
   }
   | Tuple
   { _exprAnnotation :: a
+  -- expr
   , _unsafeTupleHead :: Expr v a
-  , _unsafeTupleComma :: [Whitespace]
-  , _unsafeTupleTail :: Maybe ([Whitespace], CommaSep1' Whitespace (Expr v a))
+  -- , spaces
+  , _unsafeTupleWhitespace :: [Whitespace]
+  -- [exprs]
+  , _unsafeTupleTail :: Maybe (CommaSep1' Whitespace (Expr v a))
   } deriving (Eq, Show, Functor, Foldable, Generic)
+
+whitespaceAfter :: Lens' (Expr v a) [Whitespace]
+whitespaceAfter =
+  lens
+    (\case
+        None _ ws -> ws
+        List _ _ _ ws -> ws
+        Deref _ _ _ _ ws -> ws
+        Call _ _ _ _ ws -> ws
+        BinOp _ _ _ _ e -> e ^. whitespaceAfter
+        Negate _ _ e -> e ^. whitespaceAfter
+        Parens _ _ _ ws -> ws
+        Ident _ _ ws -> ws
+        Int _ _ ws -> ws
+        Bool _ _ ws -> ws
+        String _ _ _ ws -> ws
+        Tuple _ _ ws Nothing -> ws
+        Tuple _ _ _ (Just cs) -> go cs
+          where
+            go cs =
+              case cs of
+                CommaSepOne1' e Nothing -> e ^. whitespaceAfter
+                CommaSepOne1' _ (Just ws) -> ws
+                CommaSepMany1' _ _ rest -> go rest)
+    (\e ws ->
+       case e of
+         None a _ -> None a ws
+         List a b c _ -> List a b c ws
+         Deref a b c d _ -> Deref a b c d ws
+         Call a b c d _ -> Call a b c d ws
+         BinOp a b c d e -> BinOp a b c d (e & whitespaceAfter .~ ws)
+         Negate a b c -> Negate a b (c & whitespaceAfter .~ ws)
+         Parens a b c _ -> Parens a b c ws
+         Ident a b _ -> Ident a b ws
+         Int a b _ -> Int a b ws
+         Bool a b _ -> Bool a b ws
+         String a b c _ -> String a b c ws
+         Tuple a e _ Nothing -> Tuple a e ws Nothing
+         Tuple a b ws (Just cs) -> Tuple a b ws (Just $ go cs)
+           where
+             go cs =
+               case cs of
+                 CommaSepOne1' e Nothing -> CommaSepOne1' (e & whitespaceAfter .~ ws) Nothing
+                 CommaSepOne1' a (Just _) -> CommaSepOne1' a (Just ws)
+                 CommaSepMany1' a b rest -> CommaSepMany1' a b $ go rest)
+
 instance IsString (Expr '[] ()) where
-  fromString = Ident () . MkIdent ()
+  fromString s = Ident () (MkIdent () s) []
 instance Num (Expr '[] ()) where
-  fromInteger = Int ()
+  fromInteger n = Int () n []
   negate = Negate () []
-  (+) a = BinOp () a [Space] (Plus ()) [Space]
-  (*) a = BinOp () a [Space] (Multiply ()) [Space]
-  (-) a = BinOp () a [Space] (Minus ()) [Space]
+  (+) a = BinOp () (a & whitespaceAfter .~ [Space]) (Plus ()) [Space]
+  (*) a = BinOp () (a & whitespaceAfter .~ [Space]) (Multiply ()) [Space]
+  (-) a = BinOp () (a & whitespaceAfter .~ [Space]) (Minus ()) [Space]
   signum = undefined
   abs = undefined
 instance Plated (Expr '[] a) where; plate = gplate
@@ -471,7 +547,7 @@ shouldBracketLeft op left =
 
     lEntry =
       case left of
-        BinOp _ _ _ lOp _ _ -> Just $ lookupOpEntry lOp operatorTable
+        BinOp _ _ lOp _ _ -> Just $ lookupOpEntry lOp operatorTable
         _ -> Nothing
 
     leftf =
@@ -482,6 +558,7 @@ shouldBracketLeft op left =
     leftf' =
       case (left, op) of
         (Negate{}, Exp{}) -> True
+        (Tuple{}, _) -> True
         _ -> maybe False (\p -> p < entry ^. opPrec) (lEntry ^? _Just.opPrec)
   in
     leftf || leftf'
@@ -493,7 +570,7 @@ shouldBracketRight op right =
 
     rEntry =
       case right of
-        BinOp _ _ _ rOp _ _ -> Just $ lookupOpEntry rOp operatorTable
+        BinOp _ _ rOp _ _ -> Just $ lookupOpEntry rOp operatorTable
         _ -> Nothing
 
     rightf =
@@ -501,7 +578,10 @@ shouldBracketRight op right =
         L | Just L <- rEntry ^? _Just.opAssoc -> True
         _ -> False
 
-    rightf' = maybe False (\p -> p < entry ^. opPrec) (rEntry ^? _Just.opPrec)
+    rightf' =
+      case (op, right) of
+        (_, Tuple{}) -> True
+        _ -> maybe False (\p -> p < entry ^. opPrec) (rEntry ^? _Just.opPrec)
   in
     rightf || rightf'
 

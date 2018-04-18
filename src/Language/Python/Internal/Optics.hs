@@ -3,7 +3,12 @@
 {-# language DefaultSignatures, FlexibleContexts #-}
 module Language.Python.Internal.Optics where
 
-import Control.Lens
+import Control.Lens.Getter (Getter, to)
+import Control.Lens.TH (makeLenses)
+import Control.Lens.Traversal (Traversal', failing)
+import Control.Lens.Tuple (_2)
+import Control.Lens.Prism (Prism, _Right, _Left, prism)
+import Control.Lens.Wrapped (_Wrapped)
 import Data.Coerce
 import Data.List.NonEmpty
 import Language.Python.Internal.Syntax
@@ -70,23 +75,23 @@ _Call
   :: Prism
        (Expr v a)
        (Expr '[] a)
-       (a, Expr v a, [Whitespace], CommaSep (Arg v a))
-       (a, Expr '[] a, [Whitespace], CommaSep (Arg '[] a))
+       (a, Expr v a, [Whitespace], CommaSep (Arg v a), [Whitespace])
+       (a, Expr '[] a, [Whitespace], CommaSep (Arg '[] a), [Whitespace])
 _Call =
   prism
-    (\(a, b, c, d) -> Call a b c d)
-    (\case; (coerce -> Call a b c d) -> Right (a, b, c, d); (coerce -> a) -> Left a)
+    (\(a, b, c, d, e) -> Call a b c d e)
+    (\case; (coerce -> Call a b c d e) -> Right (a, b, c, d, e); (coerce -> a) -> Left a)
 
 _Ident
   :: Prism
        (Expr v a)
        (Expr '[] a)
-       (a, Ident v a)
-       (a, Ident '[] a)
+       (a, Ident v a, [Whitespace])
+       (a, Ident '[] a, [Whitespace])
 _Ident =
   prism
-    (uncurry Ident)
-    (\case; (coerce -> Ident a b) -> Right (a, b); (coerce -> a) -> Left a)
+    (\(a, b, c) -> Ident a b c)
+    (\case; (coerce -> Ident a b c) -> Right (a, b, c); (coerce -> a) -> Left a)
 
 _Indents
   :: Traversal'

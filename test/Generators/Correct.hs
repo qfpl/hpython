@@ -12,6 +12,7 @@ import Control.Lens.Setter
 import Control.Lens.Tuple
 import Control.Lens.TH
 import Control.Monad.State
+import Data.Function
 import Data.List
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
@@ -95,7 +96,7 @@ genImportTargets =
   ]
 
 genInt :: MonadGen m => m (Expr '[] ())
-genInt = Int () <$> Gen.integral (Range.constant 0 (2^32))
+genInt = Int () <$> Gen.integral (Range.constant 0 (2^32)) <*> genWhitespaces
 
 genBlock :: (MonadGen m, MonadState GenState m) => m (Block '[] ())
 genBlock = do
@@ -196,8 +197,8 @@ genDeref =
         Deref () <$>
         pure a <*>
         genWhitespaces <*>
-        genWhitespaces <*>
-        genIdent)
+        genIdent <*>
+        genWhitespaces)
 
 -- | This is necessary to prevent generating exponentials that will take forever to evaluate
 -- when python does constant folding
@@ -209,10 +210,10 @@ genExpr' isExp = Gen.sized $ \n ->
   if n <= 1
   then
     Gen.choice
-    [ Ident () <$> genIdent
+    [ Ident () <$> genIdent <*> genWhitespaces
     , if isExp then genSmallInt else genInt
     , genBool
-    , String () <$> genStringType <*> genString
+    , String () <$> genStringType <*> genString <*> genWhitespaces
     ]
   else
     Gen.resize (n-1) .
@@ -224,7 +225,7 @@ genExpr' isExp = Gen.sized $ \n ->
           n' <- Gen.integral (Range.constant 1 (n-1))
           a <- Gen.resize n' genExpr
           b <- Gen.resize (n - n') genArgs
-          Call () a <$> genWhitespaces <*> pure b
+          Call () a <$> genWhitespaces <*> pure b <*> genWhitespaces
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
           op <- genOp
@@ -232,8 +233,7 @@ genExpr' isExp = Gen.sized $ \n ->
             (Gen.resize n' genExpr)
             (Gen.resize (n - n') (genExpr' $ case op of; Exp{} -> True; _ -> False))
             (\a b ->
-               BinOp () a <$>
-               fmap NonEmpty.toList genWhitespaces1 <*>
+               BinOp () (a & whitespaceAfter .~ [Space]) <$>
                pure op <*>
                fmap NonEmpty.toList genWhitespaces1 <*>
                pure b)
@@ -247,7 +247,7 @@ genAssignable =
     [ genList genAssignable
     , genParens genAssignable
     , genTuple genAssignable
-    , Ident () <$> genIdent
+    , Ident () <$> genIdent <*> genWhitespaces
     , genDeref
     ]
 

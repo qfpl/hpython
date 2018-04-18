@@ -48,3 +48,4 @@ fixMutableDefaultArguments input = do
     isMutable Negate{} = True
     isMutable Ident{} = True
     isMutable (Parens _ _ a _) = isMutable a
+    isMutable (Tuple _ _ a) = any (any isMutable . snd) a

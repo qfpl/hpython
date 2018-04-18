@@ -31,15 +31,17 @@ append_to =
        , SmallStatements
          (Expr () $
           Call ()
-            (Deref () (Ident () "to") [] [] "append") []
-            (CommaSepOne $ PositionalArg () (Ident () "element")))
+            (Deref () (Ident () "to" []) [] "append" [])
+            []
+            (CommaSepOne $ PositionalArg () (Ident () "element" []))
+            [])
          []
          Nothing
          LF
        )
      , ( ()
        , replicate 4 Space
-       , SmallStatements (Return () [Space] (Ident () "to")) [] Nothing LF
+       , SmallStatements (Return () [Space] (Ident () "to" [])) [] Nothing LF
        )
      ])
 

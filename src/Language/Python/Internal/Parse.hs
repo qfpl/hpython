@@ -82,9 +82,6 @@ whitespace =
   (char '\t' $> Tab) <|>
   (Continued <$ char '\\' <*> newline <*> many whitespace)
 
-anyWhitespace :: CharParsing m => m (Either Newline Whitespace)
-anyWhitespace = Left <$> newline <|> Right <$> whitespace
-
 identifier :: (TokenParsing m, DeltaParsing m) => m (Ident '[] Span)
 identifier =
   annotated $
@@ -99,51 +96,47 @@ commaSep e = someCommaSep <|> pure CommaSepNone
       (\val -> maybe (CommaSepOne val) ($ val)) <$>
       e <*>
       optional
-        ((\a b c d -> CommaSepMany d a b c) <$>
-          many whitespace <* char ',' <*>
-          many whitespace <*> commaSep e)
+        ((\a b c -> CommaSepMany c a b) <$>
+          (char ',' *> many whitespace) <*>
+          commaSep e)
 
 commaSep1 :: (CharParsing m, Monad m) => m a -> m (CommaSep1 a)
 commaSep1 e =
   (\val -> maybe (CommaSepOne1 val) ($ val)) <$>
   e <*>
   optional
-    ((\a b c d -> CommaSepMany1 d a b c) <$>
-      many whitespace <* char ',' <*>
-      many whitespace <*> commaSep1 e)
+    ((\a b c -> CommaSepMany1 c a b) <$>
+     (char ',' *> many whitespace) <*>
+     commaSep1 e)
 
-commaSep1' :: (CharParsing m, Monad m) => m ws -> m a -> m (CommaSep1' ws a)
-commaSep1' ws e = do
+commaSep1' :: (CharParsing m, Monad m) => m a -> m (CommaSep1' a)
+commaSep1' e = do
   e' <- e
-  ws' <- optional (char ',' *> many ws)
+  ws' <- optional (char ',' *> many whitespace)
   case ws' of
     Nothing -> pure $ CommaSepOne1' e' Nothing
     Just ws'' ->
       maybe (CommaSepOne1' e' $ Just ws'') (CommaSepMany1' e' ws'') <$>
-      optional (commaSep1' ws e)
+      optional (commaSep1' e)
 
 parameter :: DeltaParsing m => m (Untagged Param Span)
 parameter = kwparam <|> posparam
   where
     kwparam =
-      try
-        ((\a b c d e -> KeywordParam e a b c d) <$>
-         identifier <*>
-         many whitespace <*
-         char '=') <*>
-      many whitespace <*> expr
+      (\a b c d -> KeywordParam d a b c) <$>
+      (identifier <* char '=') <*>
+      many whitespace <*>
+      expr
     posparam = flip PositionalParam <$> identifier
 
 argument :: DeltaParsing m => m (Untagged Arg Span)
 argument = kwarg <|> posarg
   where
     kwarg =
-      try
-        ((\a b c d e -> KeywordArg e a b c d) <$>
-         identifier <*>
-         many whitespace <*
-         char '=') <*>
-      many whitespace <*> expr
+      (\a b c d -> KeywordArg d a b c) <$>
+      (identifier <* char '=') <*>
+      many whitespace <*>
+      expr
     posarg = flip PositionalArg <$> expr
 
 expr :: DeltaParsing m => m (Expr '[] Span)
@@ -160,7 +153,7 @@ expr = tuple_list
 
     ident' =
       annotated $
-      (\a b c -> Ident c a b) <$> identifier <*> many whitespace
+      flip Ident <$> identifier
 
     tuple_list =
       annotated $
@@ -168,7 +161,7 @@ expr = tuple_list
       orExpr <*>
       (fmap Left (notFollowedBy $ char ',') <|>
        fmap Right
-         ((,) <$> (char ',' *> many whitespace) <*> optional (commaSep1' whitespace orExpr)))
+         ((,) <$> (char ',' *> many whitespace) <*> optional (commaSep1' orExpr)))
 
     list =
       annotated $
@@ -218,18 +211,17 @@ expr = tuple_list
       (op, s) <- do
         op :~ s <- spanned p
         pure (op, s)
-      ws2 <- many whitespace
-      pure $ \a b -> BinOp (a ^. exprAnnotation <> b ^. exprAnnotation) a (op $> s) ws2 b
+      pure $ \a b -> BinOp (a ^. exprAnnotation <> b ^. exprAnnotation) a (op $> s) b
 
-    orExpr = binOpL andExpr (reserved "or" $> BoolOr ())
+    orExpr = binOpL andExpr (BoolOr () <$> (reserved "or" *> many whitespace))
 
-    andExpr = binOpL notExpr (reserved "and" $> BoolAnd ())
+    andExpr = binOpL notExpr (BoolAnd () <$> (reserved "and" *> many whitespace))
 
     notExpr = comparison
 
     comparison = binOpL bitOr $
-      reserved "is" $> Is () <|>
-      string "==" $> Equals ()
+      Is () <$> (reserved "is" *> many whitespace) <|>
+      Equals () <$> (string "==" *> many whitespace)
 
     bitOr = bitXor
 
@@ -240,12 +232,12 @@ expr = tuple_list
     bitShift = arith
 
     arith = binOpL term $
-      char '+' $> Plus () <|>
-      char '-' $> Minus ()
+      Plus () <$> (char '+' *> many whitespace) <|>
+      Minus () <$> (char '-' *> many whitespace)
 
     term = binOpL factor $
-      char '*' $> Multiply () <|>
-      char '/' $> Divide ()
+      Multiply () <$> (char '*' *> many whitespace) <|>
+      Divide () <$> (char '/' *> many whitespace)
 
     factor =
       annotated ((\a b c -> Negate c a b) <$ char '-' <*> many whitespace <*> factor) <|>
@@ -261,7 +253,7 @@ expr = tuple_list
       case v of
         Nothing -> pure a
         Just (_ :~ s, ws2, b) ->
-          pure $ BinOp (a ^. exprAnnotation <> b ^. exprAnnotation) a (Exp s) ws2 b
+          pure $ BinOp (a ^. exprAnnotation <> b ^. exprAnnotation) a (Exp s ws2) b
 
     atomExpr =
       (\a afters -> case afters of; [] -> a; _ -> foldl' (\b f -> f b) a afters) <$>
@@ -269,10 +261,9 @@ expr = tuple_list
       many (deref <|> call)
       where
         deref =
-          (\ws1 (str :~ s) ws2 a -> Deref (a ^. exprAnnotation <> s) a ws1 str ws2) <$>
+          (\ws1 (str :~ s) a -> Deref (a ^. exprAnnotation <> s) a ws1 str) <$>
           (char '.' *> many whitespace) <*>
-          spanned identifier <*>
-          many whitespace
+          spanned identifier
         call =
           (\ws1 (csep :~ s) ws2 a -> Call (a ^. exprAnnotation <> s) a ws1 csep ws2) <$>
           (char '(' *> many whitespace) <*>
@@ -291,6 +282,7 @@ level = (get >>= foldl (\b a -> b <* traverse parseWs a) (pure ())) <?> "level i
     parseWs Space = char ' '$> ()
     parseWs Tab = char '\t' $> ()
     parseWs (Continued nl ws) = pure ()
+    parseWs Newline{} = error "newline in indentation state"
 
 dedent :: MonadState [[Whitespace]] m => m ()
 dedent = modify tail
@@ -363,11 +355,10 @@ smallStatement =
     importTargets =
       (char '*' $> ImportAll) <|>
       (ImportSomeParens <$
-       char '(' <*> many anyWhitespace <*>
+       char '(' <*> many whitespace <*>
        commaSep1'
-         anyWhitespace
          ((,) <$> identifier <*> optional (as1 identifier)) <*>
-       manyTill anyWhitespace (char ')')) <|>
+       manyTill whitespace (char ')')) <|>
       ImportSome <$>
       commaSep1
         ((,) <$> identifier <*> optional (as1 identifier))

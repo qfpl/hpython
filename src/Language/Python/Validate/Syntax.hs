@@ -117,12 +117,6 @@ initialSyntaxContext =
   , _inFunction = Nothing
   }
 
-class EndToken s where
-  endToken :: s -> Maybe String
-
-class StartToken s where
-  startToken :: s -> String
-
 isIdentifierChar :: Char -> Bool
 isIdentifierChar = foldr (liftA2 (||)) (pure False) [isIdentifierStart, isDigit]
 
@@ -147,86 +141,6 @@ validateIdent (MkIdent a name ws)
   | name `elem` reservedWords = syntaxErrors [_IdentifierReservedWord # (a, name)]
   | otherwise = pure $ MkIdent a name ws
 
-instance EndToken (BinOp a) where
-  endToken Is{} = Just "is"
-  endToken Minus{} = Just "-"
-  endToken Exp{} = Just "*"
-  endToken BoolAnd{} = Just "and"
-  endToken BoolOr{} = Just "or"
-  endToken Multiply{} = Just "*"
-  endToken Divide{} = Just "/"
-  endToken Plus{} = Just "+"
-  endToken Equals{} = Just "="
-
-instance StartToken (BinOp a) where
-  startToken Is{} = "is"
-  startToken Minus{} = "-"
-  startToken Exp{} = "*"
-  startToken BoolAnd{} = "and"
-  startToken BoolOr{} = "or"
-  startToken Multiply{} = "*"
-  startToken Divide{} = "/"
-  startToken Plus{} = "+"
-  startToken Equals{} = "="
-
-instance EndToken a => EndToken (CommaSep1 a) where
-  endToken (CommaSepOne1 a) = endToken a
-  endToken (CommaSepMany1 _ _ _ rest) = endToken rest
-
-instance EndToken a => EndToken (CommaSep1' ws a) where
-  endToken (CommaSepOne1' a b) = maybe (endToken a) (Just . const ",") b
-  endToken (CommaSepMany1' _ _ rest) = endToken rest
-
-instance EndToken (Expr v a) where
-  endToken e
-    | _:_ <- e ^. whitespaceAfter = Nothing
-    | otherwise =
-        case e of
-          List{} -> Just "]"
-          (Deref _ _ _ i _) -> Just $ _identValue i
-          Call{} -> Just ")"
-          None{} -> Just "None"
-          BinOp _ _ _ _ e ->
-            case e of
-              Tuple{} -> Just ")"
-              _ -> endToken e
-          Negate _ _ e -> endToken e
-          Parens{} -> Just ")"
-          Ident _ i _ -> Just $ _identValue i
-          Int _ i _ -> Just $ show i
-          Bool _ b _ -> Just $ show b
-          String{} -> Just "\""
-          Tuple _ _ [] b -> maybe (Just ",") endToken b
-          Tuple _ _ _ b -> b >>= endToken
-
-instance StartToken (Expr v a) where
-  startToken List{} = "["
-  startToken (Deref _ e _ _ _) = startToken e
-  startToken (Call _ e _ _ _) = startToken e
-  startToken None{} = "None"
-  startToken (BinOp _ e _ _ _) = startToken e
-  startToken Negate{} = "-"
-  startToken Parens{} = "("
-  startToken (Ident _ i _) = _identValue i
-  startToken (Int _ i _) = show i
-  startToken (Bool _ b _) = show b
-  startToken String{} = "\""
-  startToken (Tuple _ a _ _) = startToken a
-
-instance EndToken String where
-  endToken s = Just $ fromMaybe s (words s ^? _last)
-
-instance StartToken String where
-  startToken s = fromMaybe s (words s ^? _head)
-
-instance StartToken (ImportTargets v a) where
-  startToken ImportAll = "*"
-  startToken (ImportSome ts) =
-    case ts of
-      CommaSepOne1 (s, _) -> renderIdent s
-      CommaSepMany1 (s, _) _ _ _ -> renderIdent s
-  startToken ImportSomeParens{} = "("
-
 instance EndToken (ModuleName v a) where
   endToken (ModuleNameOne _ s) = Just $ renderIdent s
   endToken (ModuleNameMany _ _ _ _ rest) = endToken rest
@@ -250,7 +164,7 @@ validateWhitespace ann (a, aStr) [] (b, bStr)
   = syntaxErrors [_MissingSpacesIn # (ann, aStr a, bStr b)]
 validateWhitespace _ _ ws _ = pure ws
 
-validateAdjacent
+validateAdjacentR
   :: ( AsSyntaxError e v a
      , StartToken x
      )
@@ -258,12 +172,27 @@ validateAdjacent
   -> Expr v a
   -> (x, x -> String)
   -> ValidateSyntax e x
-validateAdjacent ann a (b, bStr)
+validateAdjacentR ann a (b, bStr)
   | [] <- a ^. whitespaceAfter
   , Just ea <- endToken a
   , isIdentifier (ea ++ startToken b)
   = syntaxErrors [_MissingSpacesIn # (ann, renderExpr a, bStr b)]
   | otherwise = pure b
+
+validateAdjacentL
+  :: ( AsSyntaxError e v a
+     , StartToken x
+     )
+  => a
+  -> Expr v a
+  -> (x, x -> String)
+  -> ValidateSyntax e (Expr v a)
+validateAdjacentL ann a (b, bStr)
+  | [] <- a ^. whitespaceAfter
+  , Just ea <- endToken a
+  , isIdentifier (ea ++ startToken b)
+  = syntaxErrors [_MissingSpacesIn # (ann, renderExpr a, bStr b)]
+  | otherwise = pure a
 
 validateExprSyntax
   :: ( AsSyntaxError e v a
@@ -297,7 +226,7 @@ validateExprSyntax e@(BinOp a e1 op ws2 e2) =
   validateExprSyntax e1 <*>
   (if shouldBracketLeft op e1
    then pure op
-   else validateAdjacent a e1 (op, renderBinOp)) <*>
+   else validateAdjacentR a e1 (op, renderBinOp)) <*>
   (if shouldBracketRight op e2
    then pure ws2
    else validateWhitespace a (op, renderBinOp) ws2 (e2, renderExpr)) <*>
@@ -424,8 +353,8 @@ validateSmallStatementSyntax (Del a ws ids) =
   Del a ws <$> traverse validateIdent ids
 validateSmallStatementSyntax (Import a ws mns) =
   Import a ws <$> traverse (pure . coerce) mns
-validateSmallStatementSyntax (From a ws1 mn ws2 ws3 ts) =
-  From a ws1 (coerce mn) ws2 <$>
+validateSmallStatementSyntax (From a ws1 mn ts) =
+  From a ws1 (coerce mn) <$>
   validateWhitespace
     a
     (mn, renderRelativeModuleName)
@@ -483,7 +412,7 @@ validateArgsSyntax e = go [] False (toList e) $> coerce e
     go names True (PositionalArg a expr : args) =
       syntaxErrors [_PositionalAfterKeywordArg # (a, expr)] <*>
       go names True args
-    go names _ (KeywordArg a name ws1 ws2 expr : args)
+    go names _ (KeywordArg a name ws2 expr : args)
       | _identValue name `elem` names =
           syntaxErrors [_DuplicateArgument # (a, _identValue name)] <*>
           validateIdent name <*>
@@ -492,7 +421,6 @@ validateArgsSyntax e = go [] False (toList e) $> coerce e
           liftA2 (:)
             (KeywordArg a <$>
              validateIdent name <*>
-             pure ws1 <*>
              pure ws2 <*>
              validateExprSyntax expr)
             (go (_identValue name:names) True args)
@@ -524,14 +452,13 @@ validateParamsSyntax e = go [] False (toList e) $> coerce e
             [_PositionalAfterKeywordParam # (a, name')]
       in
         syntaxErrors errs <*> go (name':names) True params
-    go names _ (KeywordParam a name ws1 ws2 expr : params)
+    go names _ (KeywordParam a name ws2 expr : params)
       | _identValue name `elem` names =
           syntaxErrors [_DuplicateArgument # (a, _identValue name)] <*> go names True params
       | otherwise =
           liftA2 (:)
             (KeywordParam a <$>
              validateIdent name <*>
-             pure ws1 <*>
              pure ws2 <*>
              validateExprSyntax expr)
             (go (_identValue name:names) True params)

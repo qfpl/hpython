@@ -28,7 +28,6 @@ data KeywordParam v a
   = MkKeywordParam
   { _kpAnn :: a
   , _kpName :: Ident v a
-  , _kpWhitespaceLeft :: [Whitespace]
   , _kpWhitespaceRight :: [Whitespace]
   , _kpExpr :: Expr v a
   } deriving (Eq, Show)
@@ -42,9 +41,9 @@ _KeywordParam
        (KeywordParam '[] a)
 _KeywordParam =
   prism
-    (\(MkKeywordParam a b c d e) -> KeywordParam a b c d e)
+    (\(MkKeywordParam a b d e) -> KeywordParam a b d e)
     (\case
-        (coerce -> KeywordParam a b c d e) -> Right (MkKeywordParam a b c d e)
+        (coerce -> KeywordParam a b d e) -> Right (MkKeywordParam a b d e)
         (coerce -> a) -> Left a)
 
 _Fundef
@@ -86,12 +85,12 @@ _Ident
   :: Prism
        (Expr v a)
        (Expr '[] a)
-       (a, Ident v a, [Whitespace])
-       (a, Ident '[] a, [Whitespace])
+       (a, Ident v a)
+       (a, Ident '[] a)
 _Ident =
   prism
-    (\(a, b, c) -> Ident a b c)
-    (\case; (coerce -> Ident a b c) -> Right (a, b, c); (coerce -> a) -> Left a)
+    (\(a, b) -> Ident a b)
+    (\case; (coerce -> Ident a b) -> Right (a, b); (coerce -> a) -> Left a)
 
 _Indents
   :: Traversal'

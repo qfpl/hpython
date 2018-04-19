@@ -230,8 +230,8 @@ validateArgScope
   -> ValidateScope a e (Arg (Nub (Scope ': v)) a)
 validateArgScope (PositionalArg a e) =
   PositionalArg a <$> validateExprScope e
-validateArgScope (KeywordArg a ident ws1 ws2 expr) =
-  KeywordArg a (coerce ident) ws1 ws2 <$> validateExprScope expr
+validateArgScope (KeywordArg a ident ws2 expr) =
+  KeywordArg a (coerce ident) ws2 <$> validateExprScope expr
 
 validateParamScope
   :: AsScopeError e v a
@@ -239,8 +239,8 @@ validateParamScope
   -> ValidateScope a e (Param (Nub (Scope ': v)) a)
 validateParamScope (PositionalParam a ident) =
   pure . PositionalParam a $ coerce ident
-validateParamScope (KeywordParam a ident ws1 ws2 expr) =
-  KeywordParam a (coerce ident) ws1 ws2 <$> validateExprScope expr
+validateParamScope (KeywordParam a ident ws2 expr) =
+  KeywordParam a (coerce ident) ws2 <$> validateExprScope expr
 
 validateBlockScope
   :: AsScopeError e v a
@@ -257,23 +257,21 @@ validateExprScope (List a ws1 es ws2) =
   List a ws1 <$>
   traverse validateExprScope es <*>
   pure ws2
-validateExprScope (Deref a e ws1 r ws2) =
+validateExprScope (Deref a e ws1 r) =
   Deref a <$>
   validateExprScope e <*>
   pure ws1 <*>
-  validateIdentScope r <*>
-  pure ws2
+  validateIdentScope r
 validateExprScope (Call a e ws1 as ws2) =
   Call a <$>
   validateExprScope e <*>
   pure ws1 <*>
   traverse validateArgScope as <*>
   pure ws2
-validateExprScope (BinOp a l op ws2 r) =
+validateExprScope (BinOp a l op r) =
   BinOp a <$>
   validateExprScope l <*>
   pure op <*>
-  pure ws2 <*>
   validateExprScope r
 validateExprScope (Negate a ws e) =
   Negate a ws <$>
@@ -282,10 +280,9 @@ validateExprScope (Parens a ws1 e ws2) =
   Parens a ws1 <$>
   validateExprScope e <*>
   pure ws2
-validateExprScope (Ident a i ws) =
+validateExprScope (Ident a i) =
   Ident a <$>
-  validateIdentScope i <*>
-  pure ws
+  validateIdentScope i
 validateExprScope (Tuple a b ws d) =
   Tuple a <$>
   validateExprScope b <*>

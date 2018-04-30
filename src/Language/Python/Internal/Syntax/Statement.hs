@@ -19,7 +19,6 @@ import Control.Lens.Wrapped (_Wrapped)
 import Data.Coerce (coerce)
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty)
-import Data.Maybe (fromMaybe)
 import GHC.Generics (Generic)
 
 import Language.Python.Internal.Syntax.CommaSep
@@ -115,61 +114,63 @@ instance HasExprs Statement where
   _Exprs f (CompoundStatement c) = CompoundStatement <$> _Exprs f c
 
 data ImportAs e v a
-  = ImportAs (e v a) (Maybe (NonEmpty Whitespace, Ident v a))
+  = ImportAs a (e a) (Maybe (NonEmpty Whitespace, Ident v a))
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-instance Token (e v a) (e '[] a) => Token (ImportAs e v a) (ImportAs e '[] a) where
-  unvalidate (ImportAs a b) = ImportAs (unvalidate a) (over (mapped._2) unvalidate b)
+instance Token (e a) (e' a) => Token (ImportAs e v a) (ImportAs e' '[] a) where
+  unvalidate (ImportAs x a b) = ImportAs x (unvalidate a) (over (mapped._2) unvalidate b)
 
   whitespaceAfter =
     lens
-      (\(ImportAs a b) ->
+      (\(ImportAs _ a b) ->
          maybe (a ^. getting whitespaceAfter) (^. _2.getting whitespaceAfter) b)
-      (\(ImportAs a b) ws ->
+      (\(ImportAs x a b) ws ->
          ImportAs
+           x
            (maybe (a & whitespaceAfter .~ ws) (const $ unvalidate a) b)
            (b & _Just._2.whitespaceAfter .~ ws))
 
-  startChar (ImportAs a _) = startChar a
+  startChar (ImportAs _ a _) = startChar a
 
-  endChar (ImportAs a Nothing) = endChar a
-  endChar (ImportAs _ (Just (_, b))) = endChar b
+  endChar (ImportAs _ a Nothing) = endChar a
+  endChar (ImportAs _ _ (Just (_, b))) = endChar b
 
 data ImportTargets v a
-  = ImportAll [Whitespace]
-  | ImportSome (CommaSep1 (ImportAs Ident v a))
+  = ImportAll a [Whitespace]
+  | ImportSome a (CommaSep1 (ImportAs (Ident v) v a))
   | ImportSomeParens
+      a
       -- ( spaces
       [Whitespace]
       -- imports as
-      (CommaSep1' (ImportAs Ident v a))
+      (CommaSep1' (ImportAs (Ident v) v a))
       -- ) spaces
       [Whitespace]
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance Token (ImportTargets v a) (ImportTargets '[] a) where
-  unvalidate (ImportAll a) = ImportAll a
-  unvalidate (ImportSome cs) = ImportSome $ unvalidate <$> cs
-  unvalidate (ImportSomeParens a b c) = ImportSomeParens a (unvalidate <$> b) c
+  unvalidate (ImportAll a b) = ImportAll a b
+  unvalidate (ImportSome a cs) = ImportSome a $ unvalidate <$> cs
+  unvalidate (ImportSomeParens x a b c) = ImportSomeParens x a (unvalidate <$> b) c
 
   whitespaceAfter =
     lens
       (\case
-          ImportAll ws -> ws
-          ImportSome cs -> cs ^. getting whitespaceAfter
-          ImportSomeParens _ _ ws -> ws)
+          ImportAll _ ws -> ws
+          ImportSome _ cs -> cs ^. getting whitespaceAfter
+          ImportSomeParens _ _ _ ws -> ws)
       (\ts ws ->
          case ts of
-           ImportAll _ -> ImportAll ws
-           ImportSome cs -> ImportSome (cs & whitespaceAfter .~ ws)
-           ImportSomeParens a b _ -> ImportSomeParens a (unvalidate b) ws)
+           ImportAll a _ -> ImportAll a ws
+           ImportSome a cs -> ImportSome a (cs & whitespaceAfter .~ ws)
+           ImportSomeParens x a b _ -> ImportSomeParens x a (unvalidate b) ws)
 
   startChar ImportAll{} = '*'
-  startChar (ImportSome ts) = startChar ts
+  startChar (ImportSome _ ts) = startChar ts
   startChar ImportSomeParens{} = '('
 
   endChar ImportAll{} = '*'
-  endChar (ImportSome ts) = endChar ts
+  endChar (ImportSome _ ts) = endChar ts
   endChar ImportSomeParens{} = ')'
 
 data SmallStatement (v :: [*]) a
@@ -184,7 +185,7 @@ data SmallStatement (v :: [*]) a
   | Import
       a
       (NonEmpty Whitespace)
-      (CommaSep1 (ImportAs ModuleName v a))
+      (CommaSep1 (ImportAs (ModuleName v) v a))
   | From
       a
       [Whitespace]

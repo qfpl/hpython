@@ -124,7 +124,7 @@ renderCommaSep1' f (CommaSepMany1' a ws2 c) =
   renderCommaSep1' f c
 
 renderIdent :: Ident v a -> String
-renderIdent = _identValue
+renderIdent (MkIdent _ a b) = a <> foldMap renderWhitespace b
 
 renderExpr :: Expr v a -> String
 renderExpr (Parens _ ws1 e ws2) =
@@ -188,8 +188,8 @@ renderExpr (Tuple _ a ws c) =
 
 renderModuleName :: ModuleName v a -> String
 renderModuleName (ModuleNameOne _ s) = renderIdent s
-renderModuleName (ModuleNameMany _ n ws1 ws2 rest) =
-  renderIdent n <> foldMap renderWhitespace ws1 <> "." <> foldMap renderWhitespace ws2 <>
+renderModuleName (ModuleNameMany _ n ws2 rest) =
+  renderIdent n <> "." <> foldMap renderWhitespace ws2 <>
   renderModuleName rest
 
 renderDot :: Dot -> String
@@ -198,19 +198,20 @@ renderDot (Dot ws) = "." <> foldMap renderWhitespace ws
 renderRelativeModuleName :: RelativeModuleName v a -> String
 renderRelativeModuleName (RelativeWithName ds mn) =
   foldMap renderDot ds <> renderModuleName mn
-renderRelativeModuleName (Relative ds) = foldMap renderDot ds
+renderRelativeModuleName (Relative ds ws) =
+  foldMap renderDot ds <> foldMap renderWhitespace ws
 
-renderAs1 :: (a -> String) -> As1 a -> String
-renderAs1 f (As1 ws1 ws2 a) =
-  foldMap renderWhitespace ws1 <> "as" <> foldMap renderWhitespace ws2 <> f a
+renderImportAs :: (e a -> String) -> ImportAs e v a -> String
+renderImportAs f (ImportAs _ ea m) =
+  f ea <> foldMap (\(a, b) -> "as" <> foldMap renderWhitespace a <> renderIdent b) m
 
 renderImportTargets :: ImportTargets v a -> String
-renderImportTargets ImportAll = "*"
-renderImportTargets (ImportSome ts) =
-  renderCommaSep1 (\(mn, mAs) -> renderIdent mn <> foldMap (renderAs1 renderIdent) mAs) ts
-renderImportTargets (ImportSomeParens ws1 ts ws2) =
+renderImportTargets (ImportAll _ ws) = "*" <> foldMap renderWhitespace ws
+renderImportTargets (ImportSome _ ts) =
+  renderCommaSep1 (renderImportAs renderIdent) ts
+renderImportTargets (ImportSomeParens _ ws1 ts ws2) =
   "(" <> foldMap renderWhitespace ws1 <>
-  renderCommaSep1' (\(mn, mAs) -> renderIdent mn <> foldMap (renderAs1 renderIdent) mAs) ts <>
+  renderCommaSep1' (renderImportAs renderIdent) ts <>
   ")" <> foldMap renderWhitespace ws2
 
 renderSmallStatement :: SmallStatement v a -> String
@@ -230,8 +231,7 @@ renderSmallStatement (Del _ ws ids) =
   "del" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
 renderSmallStatement (Import _ ws ns) =
   "import" <> foldMap renderWhitespace ws <>
-  renderCommaSep1
-    (\(mn, mAs) -> renderModuleName mn <> foldMap (renderAs1 renderIdent) mAs) ns
+  renderCommaSep1 (renderImportAs renderModuleName) ns
 renderSmallStatement (From _ ws1 name ws3 ns) =
   "from" <> foldMap renderWhitespace ws1 <>
   renderRelativeModuleName name <> "import" <> foldMap renderWhitespace ws3 <>

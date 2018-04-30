@@ -82,12 +82,15 @@ whitespace =
   (char '\t' $> Tab) <|>
   (Continued <$ char '\\' <*> newline <*> many whitespace)
 
-identifier :: (TokenParsing m, DeltaParsing m) => m (Ident '[] Span)
-identifier =
+anyWhitespace :: CharParsing m => m Whitespace
+anyWhitespace = whitespace <|> Newline <$> newline
+
+identifier :: (TokenParsing m, DeltaParsing m) => m Whitespace -> m (Ident '[] Span)
+identifier ws =
   annotated $
   (\a b c -> MkIdent c a b) <$>
   runUnspaced (ident idStyle) <*>
-  many whitespace
+  many ws
 
 commaSep :: (CharParsing m, Monad m) => m a -> m (CommaSep a)
 commaSep e = someCommaSep <|> pure CommaSepNone
@@ -109,38 +112,38 @@ commaSep1 e =
      (char ',' *> many whitespace) <*>
      commaSep1 e)
 
-commaSep1' :: (CharParsing m, Monad m) => m a -> m (CommaSep1' a)
-commaSep1' e = do
+commaSep1' :: (CharParsing m, Monad m) => m Whitespace -> m a -> m (CommaSep1' a)
+commaSep1' ws e = do
   e' <- e
-  ws' <- optional (char ',' *> many whitespace)
+  ws' <- optional (char ',' *> many ws)
   case ws' of
     Nothing -> pure $ CommaSepOne1' e' Nothing
     Just ws'' ->
       maybe (CommaSepOne1' e' $ Just ws'') (CommaSepMany1' e' ws'') <$>
-      optional (commaSep1' e)
+      optional (commaSep1' ws e)
 
 parameter :: DeltaParsing m => m (Untagged Param Span)
 parameter = kwparam <|> posparam
   where
     kwparam =
       (\a b c d -> KeywordParam d a b c) <$>
-      (identifier <* char '=') <*>
-      many whitespace <*>
-      expr
-    posparam = flip PositionalParam <$> identifier
+      (identifier anyWhitespace <* char '=') <*>
+      many anyWhitespace <*>
+      expr anyWhitespace
+    posparam = flip PositionalParam <$> identifier anyWhitespace
 
 argument :: DeltaParsing m => m (Untagged Arg Span)
 argument = kwarg <|> posarg
   where
     kwarg =
       (\a b c d -> KeywordArg d a b c) <$>
-      (identifier <* char '=') <*>
-      many whitespace <*>
-      expr
-    posarg = flip PositionalArg <$> expr
+      (identifier anyWhitespace <* char '=') <*>
+      many anyWhitespace <*>
+      expr anyWhitespace
+    posarg = flip PositionalArg <$> expr anyWhitespace
 
-expr :: DeltaParsing m => m (Expr '[] Span)
-expr = tuple_list
+expr :: DeltaParsing m => m Whitespace -> m (Expr '[] Span)
+expr ws = tuple_list
   where
     atom =
       bool <|>
@@ -153,32 +156,35 @@ expr = tuple_list
 
     ident' =
       annotated $
-      flip Ident <$> identifier
+      flip Ident <$> identifier ws
 
     tuple_list =
       annotated $
       (\a b c -> either (const a) (uncurry (Tuple c a)) b) <$>
-      orExpr <*>
+      orExpr ws <*>
       (fmap Left (notFollowedBy $ char ',') <|>
        fmap Right
-         ((,) <$> (char ',' *> many whitespace) <*> optional (commaSep1' orExpr)))
+         ((,) <$> (char ',' *> many ws) <*> optional (commaSep1' ws (orExpr ws))))
 
     list =
       annotated $
       (\a b c d -> List d a b c) <$
-      char '[' <*> many whitespace <*> commaSep orExpr <*> (char ']' *> many whitespace) 
+      char '[' <*>
+      many anyWhitespace <*>
+      commaSep (orExpr anyWhitespace) <*>
+      (char ']' *> many ws) 
 
     bool =
       annotated $
       (\a b c -> Bool c a b) <$>
       (reserved "True" $> True <|> reserved "False" $> False) <*>
-      many whitespace
+      many ws
 
     none =
       annotated $
       flip None <$
       reserved "None" <*>
-      many whitespace
+      many ws
 
     tripleSingle = try (string "''") *> char '\'' <?> "'''"
     tripleDouble = try (string "\"\"") *> char '"' <?> "\"\"\""
@@ -193,19 +199,19 @@ expr = tuple_list
          (char '\'' *> manyTill stringChar (char '\'')) <|>
        (\a b c -> String c ShortDouble a b) <$>
          (char '\"' *> manyTill stringChar (char '\"'))) <*>
-      many whitespace
+      many ws
 
     int =
       annotated $
       (\a b c -> Int c (read a) b) <$>
       some digit <*>
-      many whitespace
+      many ws
 
     parenthesis =
       annotated $
       (\a b c d -> Parens d a b c) <$>
-      (char '(' *> many whitespace) <*>
-      expr <*> (char ')' *> many whitespace)
+      (char '(' *> many anyWhitespace) <*>
+      expr anyWhitespace <*> (char ')' *> many ws)
 
     binOpL inner p = chainl1 inner $ do
       (op, s) <- do
@@ -213,15 +219,15 @@ expr = tuple_list
         pure (op, s)
       pure $ \a b -> BinOp (a ^. exprAnnotation <> b ^. exprAnnotation) a (op $> s) b
 
-    orExpr = binOpL andExpr (BoolOr () <$> (reserved "or" *> many whitespace))
+    orExpr ws' = binOpL (andExpr ws') (BoolOr () <$> (reserved "or" *> many ws'))
 
-    andExpr = binOpL notExpr (BoolAnd () <$> (reserved "and" *> many whitespace))
+    andExpr ws' = binOpL (notExpr ws') (BoolAnd () <$> (reserved "and" *> many ws'))
 
     notExpr = comparison
 
-    comparison = binOpL bitOr $
-      Is () <$> (reserved "is" *> many whitespace) <|>
-      Equals () <$> (string "==" *> many whitespace)
+    comparison ws' = binOpL (bitOr ws') $
+      Is () <$> (reserved "is" *> many ws') <|>
+      Equals () <$> (string "==" *> many ws')
 
     bitOr = bitXor
 
@@ -231,44 +237,44 @@ expr = tuple_list
 
     bitShift = arith
 
-    arith = binOpL term $
-      Plus () <$> (char '+' *> many whitespace) <|>
-      Minus () <$> (char '-' *> many whitespace)
+    arith ws' = binOpL (term ws') $
+      Plus () <$> (char '+' *> many ws') <|>
+      Minus () <$> (char '-' *> many ws')
 
-    term = binOpL factor $
-      Multiply () <$> (char '*' *> many whitespace) <|>
-      Divide () <$> (char '/' *> many whitespace)
+    term ws' = binOpL (factor ws' ) $
+      Multiply () <$> (char '*' *> many ws') <|>
+      Divide () <$> (char '/' *> many ws')
 
-    factor =
-      annotated ((\a b c -> Negate c a b) <$ char '-' <*> many whitespace <*> factor) <|>
-      power
+    factor ws' =
+      annotated ((\a b c -> Negate c a b) <$ char '-' <*> many ws' <*> factor ws') <|>
+      power ws'
 
-    power = do
-      a <- atomExpr
+    power ws' = do
+      a <- atomExpr ws'
       v <-
         optional
           (try ((,,) <$> spanned (string "**")) <*>
-           many whitespace <*>
-           factor)
+           many ws' <*>
+           factor ws')
       case v of
         Nothing -> pure a
         Just (_ :~ s, ws2, b) ->
           pure $ BinOp (a ^. exprAnnotation <> b ^. exprAnnotation) a (Exp s ws2) b
 
-    atomExpr =
+    atomExpr ws' =
       (\a afters -> case afters of; [] -> a; _ -> foldl' (\b f -> f b) a afters) <$>
       atom <*>
       many (deref <|> call)
       where
         deref =
           (\ws1 (str :~ s) a -> Deref (a ^. exprAnnotation <> s) a ws1 str) <$>
-          (char '.' *> many whitespace) <*>
-          spanned identifier
+          (char '.' *> many ws') <*>
+          spanned (identifier ws')
         call =
           (\ws1 (csep :~ s) ws2 a -> Call (a ^. exprAnnotation <> s) a ws1 csep ws2) <$>
-          (char '(' *> many whitespace) <*>
+          (char '(' *> many anyWhitespace) <*>
           spanned (commaSep (annotated argument)) <*>
-          (char ')' *> many whitespace)
+          (char ')' *> many ws')
 
 indent :: (CharParsing m, MonadState [[Whitespace]] m) => m ()
 indent = do
@@ -314,19 +320,23 @@ compoundStatement =
   where
     fundef =
       (\a b c d e f g h i -> Fundef i a b c d e f g h) <$
-      reserved "def" <*> some1 whitespace <*> identifier <*>
+      reserved "def" <*> some1 whitespace <*> identifier whitespace <*>
       many whitespace <*> between (char '(') (char ')') (commaSep $ annotated parameter) <*>
       many whitespace <* char ':' <*> many whitespace <*> newline <*> block
     ifSt =
       (\a b c d e f g h -> If h a b c d e f g) <$>
-      (reserved "if" *> many whitespace) <*> expr <*> many whitespace <* char ':' <*>
+      (reserved "if" *> many whitespace) <*>
+      expr whitespace <*>
+      many whitespace <* char ':' <*>
       many whitespace <*> newline <*> block <*>
       optional
         ((,,,) <$> (reserved "else" *> many whitespace) <*
          char ':' <*> many whitespace <*> newline <*> block)
     while =
       (\a b c d e f g -> While g a b c d e f) <$>
-      (reserved "while" *> many whitespace) <*> expr <*> many whitespace <* char ':' <*>
+      (reserved "while" *> many whitespace) <*>
+      expr whitespace <*>
+      many whitespace <* char ':' <*>
       many whitespace <*> newline <*> block
 
 smallStatement :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (SmallStatement '[] Span)
@@ -341,39 +351,51 @@ smallStatement =
   where
     break = reserved "break" $> Break
     pass = reserved "pass" $> Pass
+
     assignOrExpr = do
-      e <- expr
+      e <- expr whitespace
       mws <- optional (many whitespace <* char '=')
       case mws of
         Nothing -> pure (`Expr` e)
-        Just ws -> 
+        Just ws ->
           (\a b c -> Assign c e ws a b) <$>
           many whitespace <*>
-          expr
-    returnSt = (\a b c -> Return c a b) <$ reserved "return" <*> many whitespace <*> expr
+          expr whitespace
+
+    returnSt =
+      (\a b c -> Return c a b) <$ reserved "return" <*> many whitespace <*> expr whitespace
+
     dot = Dot <$> (char '.' *> many whitespace)
+
     importTargets =
-      (char '*' $> ImportAll) <|>
-      (ImportSomeParens <$
-       char '(' <*> many whitespace <*>
-       commaSep1'
-         ((,) <$> identifier <*> optional (as1 identifier)) <*>
-       manyTill whitespace (char ')')) <|>
-      ImportSome <$>
-      commaSep1
-        ((,) <$> identifier <*> optional (as1 identifier))
-    as1 m = As1 <$> some1 whitespace <* string "as" <*> some1 whitespace <*> m
-    moduleName =
-      (\a b c -> maybe (ModuleNameOne c a) (\(x, y, z) -> ModuleNameMany c a x y z) b) <$>
-      identifier <*>
+      annotated $
+      (char '*' $> flip ImportAll <*> many whitespace) <|>
+      ((\a b c d -> ImportSomeParens d a b c) <$>
+       (char '(' *> many anyWhitespace) <*>
+       commaSep1' anyWhitespace (importAs anyWhitespace identifier) <*>
+       manyTill anyWhitespace (char ')')) <|>
+      flip ImportSome <$> commaSep1 (importAs whitespace identifier)
+
+    importAs ws p =
+      annotated $
+      (\a b c -> ImportAs c a b) <$>
+      p ws <*>
+      optional (string "as" $> (,) <*> some1 ws <*> identifier ws)
+
+    moduleName ws =
+      annotated $
+      (\a c d -> maybe (ModuleNameOne d a) (\(x, y) -> ModuleNameMany d a x y) c) <$>
+      identifier ws <*>
       optional
-        ((,,) <$> try (many whitespace <* char '.') <*> many whitespace <*> annotated moduleName)
+        ((,) <$> (char '.' *> many ws) <*> moduleName ws)
+
     relativeModuleName =
-      (\ds -> maybe (Relative $ NonEmpty.fromList ds) (RelativeWithName ds)) <$>
+      (\ds -> either (RelativeWithName ds) (Relative $ NonEmpty.fromList ds)) <$>
       some dot <*>
-      optional (annotated moduleName)
+      (Left <$> moduleName whitespace <|> Right <$> some whitespace)
       <|>
-      RelativeWithName [] <$> annotated moduleName
+      RelativeWithName [] <$> moduleName whitespace
+
     from =
       (\a b c d e f -> From f a b d e) <$>
       (reserved "from" *> some whitespace) <*>
@@ -381,10 +403,11 @@ smallStatement =
       reserved "import" <*>
       many whitespace <*>
       importTargets
+
     import_ =
       (\a b c -> Import c a b) <$>
       (reserved "import" *> some1 whitespace) <*>
-      commaSep1 ((,) <$> annotated moduleName <*> optional (as1 identifier))
+      commaSep1 (importAs whitespace moduleName)
 
 statement :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (Statement '[] Span)
 statement =

@@ -24,7 +24,7 @@ genParam genExpr = Gen.sized $ \n ->
   then PositionalParam () <$> genIdent
   else
     Gen.resize (n-1) $
-    KeywordParam () <$> genIdent <*> genWhitespaces <*> genWhitespaces <*> genExpr
+    KeywordParam () <$> genIdent <*> genWhitespaces <*> genExpr
 
 genArg :: MonadGen m => m (Expr '[] ()) -> m (Arg '[] ())
 genArg genExpr = Gen.sized $ \n ->
@@ -32,13 +32,13 @@ genArg genExpr = Gen.sized $ \n ->
   then -- error "arg for size 1"
     Gen.choice
       [ PositionalArg () <$> genExpr
-      , KeywordArg () <$> genIdent <*> genWhitespaces <*> genWhitespaces <*> genExpr
+      , KeywordArg () <$> genIdent <*> genWhitespaces <*> genExpr
       ]
   else
     Gen.resize (n-1) $
     Gen.choice
       [ PositionalArg () <$> genExpr
-      , KeywordArg () <$> genIdent <*> genWhitespaces <*> genWhitespaces <*> genExpr
+      , KeywordArg () <$> genIdent <*> genWhitespaces <*> genExpr
       ]
 
 genInt :: MonadGen m => m (Expr '[] ())
@@ -59,7 +59,6 @@ genModuleName =
   [ ModuleNameMany () <$>
     genIdent <*>
     genWhitespaces <*>
-    genWhitespaces <*>
     genModuleName
   ]
 
@@ -67,7 +66,8 @@ genRelativeModuleName :: MonadGen m => m (RelativeModuleName '[] ())
 genRelativeModuleName =
   Gen.choice
   [ Relative <$>
-    Gen.nonEmpty (Range.constant 1 10) genDot
+    Gen.nonEmpty (Range.constant 1 10) genDot <*>
+    genWhitespaces
   , RelativeWithName <$>
     Gen.list (Range.constant 1 10) genDot <*>
     genModuleName
@@ -76,16 +76,13 @@ genRelativeModuleName =
 genImportTargets :: MonadGen m => m (ImportTargets '[] ())
 genImportTargets =
   Gen.choice
-  [ pure ImportAll
-  , ImportSome <$>
-    genSizedCommaSep1
-      ((,) <$> genIdent <*> Gen.maybe (genAs1 genIdent))
-  , ImportSomeParens <$>
-    genAnyWhitespaces <*>
-    genSizedCommaSep1'
-      genAnyWhitespaces
-      ((,) <$> genIdent <*> Gen.maybe (genAs1 genIdent)) <*>
-    genAnyWhitespaces
+  [ ImportAll () <$> genWhitespaces
+  , ImportSome () <$>
+    genSizedCommaSep1 (genImportAs genIdent genIdent)
+  , ImportSomeParens () <$>
+    genWhitespaces <*>
+    genSizedCommaSep1' (genImportAs genIdent genIdent) <*>
+    genWhitespaces
   ]
 
 genBlock :: MonadGen m => m (Block '[] ())
@@ -125,7 +122,7 @@ genExpr' isExp = Gen.sized $ \n ->
   if n <= 1
   then
     Gen.choice
-    [ Ident () <$> genIdent <*> genWhitespaces
+    [ Ident () <$> genIdent
     , if isExp then genSmallInt else genInt
     , genBool
     , String () <$> genStringType <*> genString <*> genWhitespaces
@@ -143,8 +140,7 @@ genExpr' isExp = Gen.sized $ \n ->
              Deref () <$>
              pure a <*>
              genWhitespaces <*>
-             genIdent <*>
-             genWhitespaces)
+             genIdent)
       , Gen.shrink
           (\case
               Call () a _ (CommaSepOne b) _ -> [a, _argExpr b]
@@ -158,10 +154,10 @@ genExpr' isExp = Gen.sized $ \n ->
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
           op <- genOp
-          Gen.subtermM2
+          Gen.subterm2
             (Gen.resize n' genExpr)
             (Gen.resize (n - n') (genExpr' $ case op of; Exp{} -> True; _ -> False))
-            (\a b -> BinOp () a <$> pure op <*> genWhitespaces <*> pure b)
+            (\a b -> BinOp () a op b)
       , Gen.subtermM
           genExpr
           (\a -> Parens () <$> genWhitespaces <*> pure a <*> genWhitespaces)
@@ -203,12 +199,10 @@ genSmallStatement = Gen.sized $ \n ->
           genExpr
         , Import () <$>
           genWhitespaces1 <*>
-          genSizedCommaSep1
-            ((,) <$> genModuleName <*> Gen.maybe (genAs1 genIdent))
+          genSizedCommaSep1 (genImportAs genModuleName genIdent)
         , From () <$>
           genWhitespaces <*>
           genRelativeModuleName <*>
-          genWhitespaces1 <*>
           genWhitespaces <*>
           genImportTargets
         ]

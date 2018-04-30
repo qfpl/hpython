@@ -6,6 +6,7 @@
 {-# language TypeSynonymInstances, FlexibleInstances #-}
 {-# language TemplateHaskell, TypeFamilies, MultiParamTypeClasses #-}
 {-# language RankNTypes #-}
+{-# language LambdaCase #-}
 module Language.Python.Validate.Syntax where
 
 import Control.Applicative
@@ -27,6 +28,7 @@ import Data.Foldable
 import Data.Functor
 import Data.Functor.Compose
 import Data.List
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
 import Data.Semigroup (Semigroup(..))
 import Data.Type.Set (Nub, Member)
@@ -39,6 +41,7 @@ import Language.Python.Internal.Render
 import Language.Python.Internal.Syntax
 import Language.Python.Validate.Indentation
 import Language.Python.Validate.Syntax.Error
+import Language.Python.Internal.Syntax.Keyword
 
 deleteBy' :: (a -> b -> Bool) -> a -> [b] -> [b]
 deleteBy' _ _ [] = []
@@ -53,6 +56,7 @@ data SyntaxContext
   = SyntaxContext
   { _inLoop :: Bool
   , _inFunction :: Maybe [String]
+  , _inParens :: Bool
   }
 
 newtype ValidateSyntax e a
@@ -115,6 +119,7 @@ initialSyntaxContext =
   SyntaxContext
   { _inLoop = False
   , _inFunction = Nothing
+  , _inParens = False
   }
 
 isIdentifierChar :: Char -> Bool
@@ -141,57 +146,45 @@ validateIdent (MkIdent a name ws)
   | name `elem` reservedWords = syntaxErrors [_IdentifierReservedWord # (a, name)]
   | otherwise = pure $ MkIdent a name ws
 
-instance EndToken (ModuleName v a) where
-  endToken (ModuleNameOne _ s) = Just $ renderIdent s
-  endToken (ModuleNameMany _ _ _ _ rest) = endToken rest
-
-instance EndToken (RelativeModuleName v a) where
-  endToken (RelativeWithName _ mn) = endToken mn
-  endToken (Relative ds) = Just $ renderDot (toList ds ^?! _last)
-
 validateWhitespace
-  :: ( EndToken x, StartToken y
-     , AsSyntaxError e v a
-     )
+  :: AsSyntaxError e v a
   => a
-  -> (x, x -> String)
   -> [Whitespace]
-  -> (y, y -> String)
   -> ValidateSyntax e [Whitespace]
-validateWhitespace ann (a, aStr) [] (b, bStr)
-  | Just ea <- endToken a
-  , isIdentifier (ea ++ startToken b)
-  = syntaxErrors [_MissingSpacesIn # (ann, aStr a, bStr b)]
-validateWhitespace _ _ ws _ = pure ws
+validateWhitespace ann ws =
+  syntaxContext `bindValidateSyntax` \ctxt ->
+  if _inParens ctxt
+  then pure ws
+  else if any (\case; Newline _ -> True; _ -> False) ws
+  then syntaxErrors [_UnexpectedNewline # ann]
+  else pure ws
 
 validateAdjacentR
   :: ( AsSyntaxError e v a
-     , StartToken x
+     , Token x x', Token y y'
      )
   => a
-  -> Expr v a
   -> (x, x -> String)
-  -> ValidateSyntax e x
-validateAdjacentR ann a (b, bStr)
-  | [] <- a ^. whitespaceAfter
-  , Just ea <- endToken a
-  , isIdentifier (ea ++ startToken b)
-  = syntaxErrors [_MissingSpacesIn # (ann, renderExpr a, bStr b)]
+  -> (y, y -> String)
+  -> ValidateSyntax e y
+validateAdjacentR ann (a, aStr) (b, bStr)
+  | [] <- a ^. getting whitespaceAfter
+  , isIdentifier [endChar a, startChar b]
+  = syntaxErrors [_MissingSpacesIn # (ann, aStr a, bStr b)]
   | otherwise = pure b
 
 validateAdjacentL
   :: ( AsSyntaxError e v a
-     , StartToken x
+     , Token x x', Token y y'
      )
   => a
-  -> Expr v a
   -> (x, x -> String)
-  -> ValidateSyntax e (Expr v a)
-validateAdjacentL ann a (b, bStr)
-  | [] <- a ^. whitespaceAfter
-  , Just ea <- endToken a
-  , isIdentifier (ea ++ startToken b)
-  = syntaxErrors [_MissingSpacesIn # (ann, renderExpr a, bStr b)]
+  -> (y, y -> String)
+  -> ValidateSyntax e x
+validateAdjacentL ann (a, aStr) (b, bStr)
+  | [] <- a ^. getting whitespaceAfter
+  , isIdentifier [endChar a, startChar b]
+  = syntaxErrors [_MissingSpacesIn # (ann, aStr a, bStr b)]
   | otherwise = pure a
 
 validateExprSyntax
@@ -200,37 +193,43 @@ validateExprSyntax
      )
   => Expr v a
   -> ValidateSyntax e (Expr (Nub (Syntax ': v)) a)
-validateExprSyntax (Parens a ws1 e ws2) = Parens a ws1 <$> validateExprSyntax e <*> pure ws2
+validateExprSyntax (Parens a ws1 e ws2) =
+  Parens a ws1 <$>
+  localSyntaxContext (\c -> c { _inParens = True }) (validateExprSyntax e) <*>
+  pure ws2
 validateExprSyntax (Bool a b ws) = pure $ Bool a b ws
 validateExprSyntax (Negate a ws expr) = Negate a ws <$> validateExprSyntax expr
 validateExprSyntax (String a strType b ws) = pure $ String a strType b ws
 validateExprSyntax (Int a n ws) = pure $ Int a n ws
-validateExprSyntax (Ident a name ws) = Ident a <$> validateIdent name <*> pure ws
+validateExprSyntax (Ident a name) = Ident a <$> validateIdent name
 validateExprSyntax (List a ws1 exprs ws2) =
   List a ws1 <$> traverse validateExprSyntax exprs <*> pure ws2
-validateExprSyntax (Deref a expr ws1 name ws2) =
+validateExprSyntax (Deref a expr ws1 name) =
   Deref a <$>
   validateExprSyntax expr <*>
   pure ws1 <*>
-  validateIdent name <*>
-  pure ws2
+  validateIdent name
 validateExprSyntax (Call a expr ws args ws2) =
   Call a <$>
   validateExprSyntax expr <*>
   pure ws <*>
-  validateArgsSyntax args <*>
+  localSyntaxContext (\c -> c { _inParens = True }) (validateArgsSyntax args) <*>
   pure ws2
 validateExprSyntax (None a ws) = pure $ None a ws
-validateExprSyntax e@(BinOp a e1 op ws2 e2) =
+validateExprSyntax (BinOp a e1 op e2) =
   BinOp a <$>
-  validateExprSyntax e1 <*>
-  (if shouldBracketLeft op e1
-   then pure op
-   else validateAdjacentR a e1 (op, renderBinOp)) <*>
-  (if shouldBracketRight op e2
-   then pure ws2
-   else validateWhitespace a (op, renderBinOp) ws2 (e2, renderExpr)) <*>
-  validateExprSyntax e2
+  (validateExprSyntax e1 <*
+   (if shouldBracketLeft op e1
+    then pure e1
+    else validateAdjacentL a (e1, renderExpr) (op, renderBinOp))) <*>
+
+  pure op <*>
+
+  (validateExprSyntax e2 <*
+   (if shouldBracketRight op e2
+    then pure e2
+    else validateAdjacentR a (op, renderBinOp) (e2, renderExpr)))
+
 validateExprSyntax (Tuple a b ws d) =
   Tuple a <$>
   validateExprSyntax b <*>
@@ -280,21 +279,55 @@ validateCompoundStatementSyntax (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
          (validateBlockSyntax body))
 validateCompoundStatementSyntax (If a ws1 expr ws2 ws3 nl body body') =
   If a <$>
-  validateWhitespace a ("if", id) ws1 (expr, renderExpr) <*>
+  (validateWhitespace a ws1 <*
+   validateAdjacentL a (Keyword ('i' :| "f") ws1, keyword) (expr, renderExpr)) <*>
   validateExprSyntax expr <*>
-  pure ws2 <*>
-  pure ws3 <*>
+  validateWhitespace a ws2 <*>
+  validateWhitespace a ws3 <*>
   pure nl <*>
   validateBlockSyntax body <*>
   traverseOf (traverse._4) validateBlockSyntax body'
 validateCompoundStatementSyntax (While a ws1 expr ws2 ws3 nl body) =
   While a <$>
-  validateWhitespace a ("while", id) ws1 (expr, renderExpr) <*>
+  (validateWhitespace a ws1 <*
+   validateAdjacentL a (Keyword ('w' :| "hile") ws1, keyword) (expr, renderExpr)) <*>
   validateExprSyntax expr <*>
-  pure ws2 <*>
-  pure ws3 <*>
+  validateWhitespace a ws2 <*>
+  validateWhitespace a ws3 <*>
   pure nl <*>
   localSyntaxContext (\ctxt -> ctxt { _inLoop = True}) (validateBlockSyntax body)
+
+validateImportAs
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => (t a -> ValidateSyntax e (t' a))
+  -> ImportAs t v a
+  -> ValidateSyntax e (ImportAs t' (Nub (Syntax ': v)) a)
+validateImportAs v (ImportAs x a b) =
+  ImportAs x <$>
+  v a <*>
+  traverse
+    (\(c, d) ->
+       (,) <$>
+       (validateWhitespace x (NonEmpty.toList c) $> c) <*>
+       validateIdent d)
+    b
+
+validateImportTargets
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => ImportTargets v a
+  -> ValidateSyntax e (ImportTargets (Nub (Syntax ': v)) a)
+validateImportTargets (ImportAll a ws) = ImportAll a <$> validateWhitespace a ws
+validateImportTargets (ImportSome a cs) =
+  ImportSome a <$> traverse (validateImportAs validateIdent) cs
+validateImportTargets (ImportSomeParens a ws1 cs ws2) =
+  ImportSomeParens a <$>
+  validateWhitespace a ws1 <*>
+  traverse (validateImportAs validateIdent) cs <*>
+  validateWhitespace a ws2
 
 validateSmallStatementSyntax
   :: ( AsSyntaxError e v a
@@ -307,7 +340,8 @@ validateSmallStatementSyntax (Return a ws expr) =
     case _inFunction sctxt of
       Just{} ->
         Return a <$>
-        validateWhitespace a ("return", id) ws (expr, renderExpr) <*>
+        (validateWhitespace a ws <*
+         validateAdjacentL a (Keyword ('r' :| "eturn") ws, keyword) (expr, renderExpr)) <*>
         validateExprSyntax expr
       _ -> syntaxErrors [_ReturnOutsideFunction # a]
 validateSmallStatementSyntax (Expr a expr) =
@@ -353,14 +387,13 @@ validateSmallStatementSyntax (Del a ws ids) =
   Del a ws <$> traverse validateIdent ids
 validateSmallStatementSyntax (Import a ws mns) =
   Import a ws <$> traverse (pure . coerce) mns
-validateSmallStatementSyntax (From a ws1 mn ts) =
+validateSmallStatementSyntax (From a ws1 mn ws2 ts) =
   From a ws1 (coerce mn) <$>
-  validateWhitespace
-    a
-    (mn, renderRelativeModuleName)
-    ws3
-    (ts, renderImportTargets) <*>
-  pure (coerce ts)
+  validateWhitespace a ws2 <*>
+  (validateImportTargets ts <*
+   (case ws2 of
+     [] -> validateAdjacentR a (mn, renderRelativeModuleName) (ts, renderImportTargets)
+     _ -> pure ts))
 
 validateStatementSyntax
   :: ( AsSyntaxError e v a

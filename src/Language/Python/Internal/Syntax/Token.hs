@@ -16,6 +16,12 @@ class Token s t | s -> t where
   startChar :: s -> Char
   endChar :: s -> Char
 
+instance Token String String where
+  unvalidate = id
+  whitespaceAfter = lens (const []) const
+  startChar = head
+  endChar = last
+
 instance (Token s t, Token s' t') => Token (s, s') (t, t') where
   unvalidate (a, b) = (unvalidate a, unvalidate b)
 

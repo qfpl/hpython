@@ -16,9 +16,9 @@ class HasKeyword p where
   k_ :: Ident '[] () -> Expr '[] () -> p
 
 instance HasPositional (Param '[] ()) (Ident '[] ()) where; p_ = PositionalParam ()
-instance HasKeyword (Param '[] ()) where; k_ a = KeywordParam () a [] []
+instance HasKeyword (Param '[] ()) where; k_ a = KeywordParam () a []
 instance HasPositional (Arg '[] ()) (Expr '[] ()) where; p_ = PositionalArg ()
-instance HasKeyword (Arg '[] ()) where; k_ a = KeywordArg () a [] []
+instance HasKeyword (Arg '[] ()) where; k_ a = KeywordArg () a []
 
 def_ :: Ident '[] () -> [Param '[] ()] -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 def_ name params block =
@@ -46,11 +46,11 @@ list_ :: [Expr '[] ()] -> Expr '[] ()
 list_ es = List () [] (listToCommaSep es) []
 
 is_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-is_ a = BinOp () (a & whitespaceAfter .~ [Space]) (Is ()) [Space]
+is_ a = BinOp () (a & whitespaceAfter .~ [Space]) (Is () [Space])
 infixl 1 `is_`
 
 (.==) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-(.==) a = BinOp () (a & whitespaceAfter .~ [Space]) (Equals ()) [Space]
+(.==) a = BinOp () (a & whitespaceAfter .~ [Space]) (Equals () [Space])
 infixl 1 .==
 
 (.|) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
@@ -90,7 +90,7 @@ infixl 7 .*
 infixl 7 .@
 
 (./) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-(./) a = BinOp () (a & whitespaceAfter .~ [Space]) (Divide ()) [Space]
+(./) a = BinOp () (a & whitespaceAfter .~ [Space]) (Divide () [Space])
 infixl 7 ./
 
 (.//) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
@@ -102,11 +102,11 @@ infixl 7 .//
 infixl 7 .%
 
 (.**) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-(.**) a = BinOp () (a & whitespaceAfter .~ [Space]) (Exp ()) [Space]
+(.**) a = BinOp () (a & whitespaceAfter .~ [Space]) (Exp () [Space])
 infixr 8 .**
 
 (/>) :: Expr '[] () -> Ident '[] () -> Expr '[] ()
-(/>) a b = Deref () a [] b []
+(/>) a b = Deref () a [] b
 infixl 9 />
 
 neg :: Expr '[] () -> Expr '[] ()
@@ -134,7 +134,7 @@ ifElse_ e sts sts' =
     (Just ([], [], LF, Block $ (,,) () [Space, Space, Space, Space] <$> sts'))
 
 var_ :: String -> Expr '[] ()
-var_ s = Ident () (MkIdent () s) []
+var_ s = Ident () (MkIdent () s [])
 
 none_ :: Expr '[] ()
 none_ = None () []
@@ -152,10 +152,10 @@ false_ :: Expr '[] ()
 false_ = Bool () False []
 
 and_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-and_ a = BinOp () (a & whitespaceAfter .~ [Space]) (BoolAnd ()) [Space]
+and_ a = BinOp () (a & whitespaceAfter .~ [Space]) (BoolAnd () [Space])
 
 or_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-or_ a = BinOp () (a & whitespaceAfter .~ [Space]) (BoolOr ()) [Space]
+or_ a = BinOp () (a & whitespaceAfter .~ [Space]) (BoolOr () [Space])
 
 str_ :: String -> Expr '[] ()
 str_ s = String () ShortDouble s []

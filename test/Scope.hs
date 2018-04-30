@@ -52,7 +52,7 @@ test_1 =
           , return_ $ var_ "a" .+ var_ "b" .+ var_ "c"
           ]
     res <- validate expr
-    res === Failure [FoundDynamic () (MkIdent () "c")]
+    res === Failure [FoundDynamic () (MkIdent () "c" [])]
 
 test_2 :: Property
 test_2 =
@@ -77,7 +77,7 @@ test_3 =
           [ return_ $ var_ "a" .+ var_ "b" .+ var_ "c" ]
     res <- validate expr
     annotateShow res
-    res === Failure [NotInScope (MkIdent () "c")]
+    res === Failure [NotInScope (MkIdent () "c" [])]
 
 test_4 :: Property
 test_4 =
@@ -89,7 +89,7 @@ test_4 =
           , expr_ $ call_ (var_ "g") []
           ]
     res <- validate expr
-    res === Failure [NotInScope (MkIdent () "g")]
+    res === Failure [NotInScope (MkIdent () "g" [])]
 
 test_5 :: Property
 test_5 =
@@ -101,4 +101,4 @@ test_5 =
           ]
     res <- validate expr
     annotateShow res
-    res === Failure [NotInScope (MkIdent () "c")]
+    res === Failure [NotInScope (MkIdent () "c" [])]

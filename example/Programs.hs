@@ -19,8 +19,8 @@ append_to =
     [Space]
     "append_to"
     []
-    ( CommaSepMany (PositionalParam () "element") [] [Space] $
-      CommaSepOne (KeywordParam () "to" [] [] (List () [] CommaSepNone []))
+    ( CommaSepMany (PositionalParam () "element") [Space] $
+      CommaSepOne (KeywordParam () "to" [] (List () [] CommaSepNone []))
     )
     []
     []
@@ -31,9 +31,9 @@ append_to =
        , SmallStatements
          (Expr () $
           Call ()
-            (Deref () (Ident () "to" []) [] "append" [])
+            (Deref () (Ident () "to") [] "append")
             []
-            (CommaSepOne $ PositionalArg () (Ident () "element" []))
+            (CommaSepOne $ PositionalArg () (Ident () "element"))
             [])
          []
          Nothing
@@ -41,7 +41,7 @@ append_to =
        )
      , ( ()
        , replicate 4 Space
-       , SmallStatements (Return () [Space] (Ident () "to" [])) [] Nothing LF
+       , SmallStatements (Return () [Space] (Ident () "to")) [] Nothing LF
        )
      ])
 

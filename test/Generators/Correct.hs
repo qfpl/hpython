@@ -57,7 +57,8 @@ genIdent =
   MkIdent () <$>
   liftA2 (:)
     (Gen.choice [Gen.alpha, pure '_'])
-    (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_']))
+    (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_'])) <*>
+  genWhitespaces
 
 genModuleName :: MonadGen m => m (ModuleName '[] ())
 genModuleName =
@@ -66,7 +67,6 @@ genModuleName =
   [ ModuleNameMany () <$>
     genIdent <*>
     genWhitespaces <*>
-    genWhitespaces <*>
     genModuleName
   ]
 
@@ -74,7 +74,8 @@ genRelativeModuleName :: MonadGen m => m (RelativeModuleName '[] ())
 genRelativeModuleName =
   Gen.choice
   [ Relative <$>
-    Gen.nonEmpty (Range.constant 1 10) genDot
+    Gen.nonEmpty (Range.constant 1 10) genDot <*>
+    genWhitespaces
   , RelativeWithName <$>
     Gen.list (Range.constant 1 10) genDot <*>
     genModuleName
@@ -83,16 +84,13 @@ genRelativeModuleName =
 genImportTargets :: MonadGen m => m (ImportTargets '[] ())
 genImportTargets =
   Gen.choice
-  [ pure ImportAll
-  , ImportSome <$>
-    genSizedCommaSep1
-      ((,) <$> genIdent <*> Gen.maybe (genAs1 genIdent))
-  , ImportSomeParens <$>
-    genAnyWhitespaces <*>
-    genSizedCommaSep1'
-      genAnyWhitespaces
-      ((,) <$> genIdent <*> Gen.maybe (genAs1 genIdent)) <*>
-    genAnyWhitespaces
+  [ ImportAll () <$> genWhitespaces
+  , ImportSome () <$>
+    genSizedCommaSep1 (genImportAs genIdent genIdent)
+  , ImportSomeParens () <$>
+    genWhitespaces <*>
+    genSizedCommaSep1' (genImportAs genIdent genIdent) <*>
+    genWhitespaces
   ]
 
 genInt :: MonadGen m => m (Expr '[] ())
@@ -122,7 +120,7 @@ genPositionalArg = Gen.scale (max 0 . subtract 1) $ PositionalArg () <$> genExpr
 genKeywordArg :: MonadGen m => m (Arg '[] ())
 genKeywordArg =
   Gen.scale (max 0 . subtract 1) $
-  KeywordArg () <$> genIdent <*> genWhitespaces <*> genWhitespaces <*> genExpr
+  KeywordArg () <$> genIdent <*> genWhitespaces <*> genExpr
 
 genArgs :: MonadGen m => m (CommaSep (Arg '[] ()))
 genArgs =
@@ -155,7 +153,6 @@ genKeywordParam positionals =
   Gen.scale (max 0 . subtract 1) $
   KeywordParam () <$>
   Gen.filter (\i -> _identValue i `notElem` positionals) genIdent <*>
-  genWhitespaces <*>
   genWhitespaces <*>
   genExpr
 
@@ -194,11 +191,9 @@ genDeref =
   Gen.subtermM
     genExpr
     (\a ->
-        Deref () <$>
-        pure a <*>
+        Deref () a <$>
         genWhitespaces <*>
-        genIdent <*>
-        genWhitespaces)
+        genIdent)
 
 -- | This is necessary to prevent generating exponentials that will take forever to evaluate
 -- when python does constant folding
@@ -210,7 +205,7 @@ genExpr' isExp = Gen.sized $ \n ->
   if n <= 1
   then
     Gen.choice
-    [ Ident () <$> genIdent <*> genWhitespaces
+    [ Ident () <$> genIdent
     , if isExp then genSmallInt else genInt
     , genBool
     , String () <$> genStringType <*> genString <*> genWhitespaces
@@ -234,8 +229,7 @@ genExpr' isExp = Gen.sized $ \n ->
             (Gen.resize (n - n') (genExpr' $ case op of; Exp{} -> True; _ -> False))
             (\a b ->
                BinOp () (a & whitespaceAfter .~ [Space]) <$>
-               pure op <*>
-               fmap NonEmpty.toList genWhitespaces1 <*>
+               pure (op & whitespaceAfter .~ [Space]) <*>
                pure b)
       , genTuple genExpr
       ]
@@ -247,7 +241,7 @@ genAssignable =
     [ genList genAssignable
     , genParens genAssignable
     , genTuple genAssignable
-    , Ident () <$> genIdent <*> genWhitespaces
+    , Ident () <$> genIdent
     , genDeref
     ]
 
@@ -284,13 +278,11 @@ genSmallStatement = Gen.sized $ \n -> do
               Gen.resize n' (genSizedCommaSep1 genIdent)
         , Import () <$>
           genWhitespaces1 <*>
-          genSizedCommaSep1
-            ((,) <$> genModuleName <*> Gen.maybe (genAs1 genIdent))
+          genSizedCommaSep1 (genImportAs genModuleName genIdent)
         , From () <$>
           genWhitespaces <*>
           genRelativeModuleName <*>
-          genWhitespaces1 <*>
-          (NonEmpty.toList <$> genWhitespaces1) <*>
+          genWhitespaces <*>
           genImportTargets
         ] ++
         [pure (Break ()) | _inLoop ctxt] ++
@@ -299,7 +291,7 @@ genSmallStatement = Gen.sized $ \n -> do
             nonlocals <- use currentNonlocals
             Nonlocal () <$>
               genWhitespaces1 <*>
-              Gen.resize n' (genSizedCommaSep1 . Gen.element $ MkIdent () <$> nonlocals)
+              Gen.resize n' (genSizedCommaSep1 . Gen.element $ MkIdent () <$> nonlocals <*> pure [])
         | isJust (_inFunction ctxt) && not (null nonlocals)
         ] ++
         [ Return () <$>

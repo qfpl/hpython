@@ -178,7 +178,7 @@ expr_printparseprint_print =
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' ->
-            case Trifecta.parseString expr mempty (renderExpr res') of
+            case Trifecta.parseString (expr whitespace) mempty (renderExpr res') of
               Trifecta.Failure errs'' -> annotateShow errs''
               Trifecta.Success res'' -> do
                 annotateShow res''

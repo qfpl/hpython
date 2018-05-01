@@ -126,6 +126,9 @@ renderCommaSep1' f (CommaSepMany1' a ws2 c) =
 renderIdent :: Ident v a -> String
 renderIdent (MkIdent _ a b) = a <> foldMap renderWhitespace b
 
+renderComment :: Comment -> String
+renderComment (Comment s) = "#" <> s
+
 renderExpr :: Expr v a -> String
 renderExpr (Parens _ ws1 e ws2) =
   "(" <> foldMap renderWhitespace ws1 <>
@@ -237,6 +240,18 @@ renderSmallStatement (From _ ws1 name ws3 ns) =
   renderRelativeModuleName name <> "import" <> foldMap renderWhitespace ws3 <>
   renderImportTargets ns
 
+renderBlock :: Block v a -> Lines String
+renderBlock =
+  foldMap
+    (\(_, a, b) ->
+       (foldMap renderWhitespace a <>) <$>
+       either
+         (\(x, y, z) ->
+            OneLine $ foldMap renderWhitespace x <> renderComment y <> renderNewline z)
+          renderStatement
+          b) .
+  view _Wrapped
+
 renderCompoundStatement :: CompoundStatement v a -> Lines String
 renderCompoundStatement (Fundef _ ws1 name ws2 params ws3 ws4 nl body) =
   ManyLines firstLine nl restLines
@@ -245,10 +260,7 @@ renderCompoundStatement (Fundef _ ws1 name ws2 params ws3 ws4 nl body) =
       "def" <> foldMap renderWhitespace ws1 <> renderIdent name <>
       foldMap renderWhitespace ws2 <> renderParams params <>
       foldMap renderWhitespace ws3 <> ":" <> foldMap renderWhitespace ws4
-    restLines =
-      foldMap
-        (\(_, a, b) -> (foldMap renderWhitespace a <>) <$> renderStatement b)
-        (view _Wrapped body)
+    restLines = renderBlock body
 renderCompoundStatement (If _ ws1 expr ws2 ws3 nl body body') =
   ManyLines firstLine nl restLines
   where
@@ -256,11 +268,7 @@ renderCompoundStatement (If _ ws1 expr ws2 ws3 nl body body') =
       "if" <> foldMap renderWhitespace ws1 <>
       renderExpr expr <> foldMap renderWhitespace ws2 <> ":" <>
       foldMap renderWhitespace ws3
-    restLines =
-      foldMap
-        (\(_, a, b) -> (foldMap renderWhitespace a <>) <$> renderStatement b)
-        (view _Wrapped body) <>
-      fromMaybe mempty elseLines
+    restLines = renderBlock body <> fromMaybe mempty elseLines
     elseLines =
       ManyLines <$>
       fmap
@@ -269,20 +277,13 @@ renderCompoundStatement (If _ ws1 expr ws2 ws3 nl body body') =
            foldMap renderWhitespace ws4)
         body' <*>
       fmap (\(_, _, nl2, _) -> nl2) body' <*>
-      fmap
-        (\(_, _, _, body'') ->
-           foldMap
-             (\(_, a, b) -> (foldMap renderWhitespace a <>) <$> renderStatement b)
-             (view _Wrapped body''))
-        body'
+      fmap (\(_, _, _, body'') -> renderBlock body'') body'
 renderCompoundStatement (While _ ws1 expr ws2 ws3 nl body) =
   ManyLines
     ("while" <> foldMap renderWhitespace ws1 <> renderExpr expr <>
      foldMap renderWhitespace ws2 <> ":" <> foldMap renderWhitespace ws3)
     nl
-    (foldMap
-       (\(_, a, b) -> (foldMap renderWhitespace a <>) <$> renderStatement b)
-       (view _Wrapped body))
+    (renderBlock body)
 
 renderStatement :: Statement v a -> Lines String
 renderStatement (CompoundStatement c) = renderCompoundStatement c
@@ -330,6 +331,7 @@ renderModule :: Module v a -> String
 renderModule (Module ms) =
   foldMap
     (either
-       (\(a, b) -> foldMap renderWhitespace a <> renderNewline b)
+       (\(a, b, c) ->
+          foldMap renderWhitespace a <> foldMap renderComment b <> renderNewline c)
        (renderLines . renderStatement))
     ms

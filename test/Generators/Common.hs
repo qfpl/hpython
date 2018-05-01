@@ -64,6 +64,10 @@ genNormalWhitespace = Gen.sized $ \n ->
               genSizedWhitespace genNormalWhitespace
         ]
 
+genComment :: MonadGen m => m Comment
+genComment =
+  Comment <$> Gen.list (Range.linear 0 100) (Gen.filter (`notElem` "\0\r\n") Gen.ascii)
+
 genSizedWhitespace :: MonadGen m => m Whitespace -> m [Whitespace]
 genSizedWhitespace ws =
   Gen.sized $ \n ->

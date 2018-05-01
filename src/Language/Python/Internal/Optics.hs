@@ -6,7 +6,7 @@ module Language.Python.Internal.Optics where
 import Control.Lens.Getter (Getter, to)
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (Traversal', failing)
-import Control.Lens.Tuple (_2)
+import Control.Lens.Tuple (_2, _3)
 import Control.Lens.Prism (Prism, _Right, _Left, prism)
 import Control.Lens.Wrapped (_Wrapped)
 import Data.Coerce
@@ -104,7 +104,7 @@ class HasNewlines s where
 instance HasNewlines Block where
   _Newlines f (Block b) =
     Block <$>
-    traverse (\(a, b, c) -> (,,) a b <$> _Newlines f c) b
+    traverse (\(a, b, c) -> (,,) a b <$> (_Right._Newlines) f c) b
 
 instance HasNewlines CompoundStatement where
   _Newlines f s =
@@ -125,4 +125,4 @@ instance HasNewlines Statement where
   _Newlines f (SmallStatements s ss sc nl) = SmallStatements s ss sc <$> f nl
 
 instance HasNewlines Module where
-  _Newlines = _Wrapped.traverse.failing (_Left._2) (_Right._Newlines)
+  _Newlines = _Wrapped.traverse.failing (_Left._3) (_Right._Newlines)

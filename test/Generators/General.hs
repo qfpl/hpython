@@ -103,11 +103,20 @@ genBlock =
       Gen.sized $ \n ->
       if n <= 1
         then do
-          s1 <- genStatement
+          s1 <-
+            Gen.choice
+              [ Right <$> genStatement
+              , fmap Left $ (,,) <$> genWhitespaces <*> genComment <*> genNewline
+              ]
           pure . Block $ ((), indent, s1) :| []
         else do
           n' <- Gen.integral (Range.constant 1 (n-1))
-          s1 <- Gen.resize n' genStatement
+          s1 <-
+            Gen.resize n' $
+            Gen.choice
+              [ Right <$> genStatement
+              , fmap Left $ (,,) <$> genWhitespaces <*> genComment <*> genNewline
+              ]
           let n'' = n - n'
           b <- Gen.resize n'' (go indent)
           pure . Block $ NonEmpty.cons ((), indent, s1) (unBlock b)
@@ -122,9 +131,9 @@ genExpr' isExp = Gen.sized $ \n ->
   if n <= 1
   then
     Gen.choice
-    [ Ident () <$> genIdent
+    [ genBool
     , if isExp then genSmallInt else genInt
-    , genBool
+    , Ident () <$> genIdent
     , String () <$> genStringType <*> genString <*> genWhitespaces
     ]
   else
@@ -284,6 +293,6 @@ genModule = Gen.sized $ \n -> do
       (Gen.resize
          (n `div` num)
          (Gen.choice
-          [ Left <$> liftA2 (,) genWhitespaces genNewline
+          [ fmap Left $ (,,) <$> genWhitespaces <*> Gen.maybe genComment <*> genNewline
           , Right <$> genStatement
           ]))

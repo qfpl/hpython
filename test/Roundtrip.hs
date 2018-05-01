@@ -26,6 +26,8 @@ roundtripTests =
   [ "django.py"
   , "test.py"
   , "weird.py"
+  , "ansible.py"
+  , "comments.py"
   ]
 
 doRoundtrip :: String -> Property

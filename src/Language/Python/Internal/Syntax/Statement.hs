@@ -10,7 +10,7 @@ module Language.Python.Internal.Syntax.Statement where
 import Control.Lens.Getter ((^.), getting)
 import Control.Lens.Lens (Lens, Lens', lens)
 import Control.Lens.Plated (Plated(..), gplate)
-import Control.Lens.Prism (_Just)
+import Control.Lens.Prism (_Just, _Right)
 import Control.Lens.Setter ((.~), over, mapped)
 import Control.Lens.TH (makeWrapped)
 import Control.Lens.Traversal (Traversal, traverseOf)
@@ -22,6 +22,7 @@ import Data.List.NonEmpty (NonEmpty)
 import GHC.Generics (Generic)
 
 import Language.Python.Internal.Syntax.CommaSep
+import Language.Python.Internal.Syntax.Comment
 import Language.Python.Internal.Syntax.Expr
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.ModuleNames
@@ -57,7 +58,17 @@ instance HasExprs Param where
     KeywordParam a (coerce name) <$> pure ws2 <*> f expr
   _Exprs _ p@PositionalParam{} = pure $ coerce p
 
-newtype Block v a = Block { unBlock :: NonEmpty (a, [Whitespace], Statement v a) }
+newtype Block v a
+  = Block
+  { unBlock
+    :: NonEmpty
+         ( a
+         , [Whitespace]
+         , Either
+             ([Whitespace], Comment, Newline)
+             (Statement v a)
+         )
+  }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 class HasBlocks s where
@@ -74,7 +85,7 @@ instance HasBlocks CompoundStatement where
     While a ws1 (coerce e1) ws2 ws3 nl <$> coerce (f b)
 
 instance HasStatements Block where
-  _Statements = _Wrapped.traverse._3
+  _Statements = _Wrapped.traverse._3._Right
 
 data Statement (v :: [*]) a
   = SmallStatements
@@ -96,13 +107,13 @@ instance Plated (Statement '[] a) where
     CompoundStatement <$>
     case s of
       Fundef a ws1 b ws2 c ws3 ws4 nl sts ->
-        Fundef a ws1 b ws2 c ws3 ws4 nl <$> (_Wrapped.traverse._3) f sts
+        Fundef a ws1 b ws2 c ws3 ws4 nl <$> (_Wrapped.traverse._3._Right) f sts
       If a ws1 b ws2 ws3 nl sts sts' ->
         If a ws1 b ws2 ws3 nl <$>
-        (_Wrapped.traverse._3) f sts <*>
-        (traverse._4._Wrapped.traverse._3) f sts'
+        (_Wrapped.traverse._3._Right) f sts <*>
+        (traverse._4._Wrapped.traverse._3._Right) f sts'
       While a ws1 b ws2 ws3 nl sts ->
-        While a ws1 b ws2 ws3 nl <$> (_Wrapped.traverse._3) f sts
+        While a ws1 b ws2 ws3 nl <$> (_Wrapped.traverse._3._Right) f sts
 
 instance HasExprs Statement where
   _Exprs f (SmallStatements s ss a b) =
@@ -232,21 +243,21 @@ instance HasExprs CompoundStatement where
     pure ws3 <*>
     pure ws4 <*>
     pure nl <*>
-    (_Wrapped.traverse._3._Exprs) f sts
+    (_Wrapped.traverse._3._Right._Exprs) f sts
   _Exprs f (If a ws1 e ws2 ws3 nl sts sts') =
     If a ws1 <$>
     f e <*>
     pure ws2 <*>
     pure ws3 <*>
     pure nl <*>
-    (_Wrapped.traverse._3._Exprs) f sts <*>
-    (traverse._4._Wrapped.traverse._3._Exprs) f sts'
+    (_Wrapped.traverse._3._Right._Exprs) f sts <*>
+    (traverse._4._Wrapped.traverse._3._Right._Exprs) f sts'
   _Exprs f (While a ws1 e ws2 ws3 nl sts) =
     While a ws1 <$>
     f e <*>
     pure ws2 <*>
     pure ws3 <*>
     pure nl <*>
-    (_Wrapped.traverse._3._Exprs) f sts
+    (_Wrapped.traverse._3._Right._Exprs) f sts
 
 makeWrapped ''Block

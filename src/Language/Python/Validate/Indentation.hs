@@ -41,18 +41,19 @@ validateBlockIndentation a =
   go Nothing (NonEmpty.toList $ view _Wrapped a)
   where
     go _ [] = pure []
-    go a ((ann, ws, st):xs)
+    go a ((ann, ws, Left c):xs) = ((ann, ws, Left c) :) <$> go a xs
+    go a ((ann, ws, Right st):xs)
       | null ws = Failure [_ExpectedIndent # ann] <*> go a xs
       | otherwise =
           case a of
             Nothing ->
               liftA2 (:)
-                ((,,) ann ws <$> validateStatementIndentation st)
+                ((,,) ann ws . Right <$> validateStatementIndentation st)
                 (go (Just ws) xs)
             Just ws'
               | equivalentIndentation ws ws' ->
                   liftA2 (:)
-                    ((,,) ann ws <$> validateStatementIndentation st)
+                    ((,,) ann ws . Right <$> validateStatementIndentation st)
                     (go a xs)
               | otherwise -> Failure [_WrongIndent # (ws', ws, ann)] <*> go a xs
 

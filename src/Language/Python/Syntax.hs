@@ -31,7 +31,7 @@ def_ name params block =
     []
     []
     LF
-    (Block $ (,,) () [Space, Space, Space, Space] <$> block)
+    (Block $ (,,) () [Space, Space, Space, Space] . Right <$> block)
 
 call_ :: Expr '[] () -> [Arg '[] ()] -> Expr '[] ()
 call_ expr args = Call () expr [] (listToCommaSep args) []
@@ -116,7 +116,7 @@ if_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 if_ e sts =
   CompoundStatement $
   If () [Space] e [] [] LF
-    (Block $ (,,) () [Space, Space, Space, Space] <$> sts)
+    (Block $ (,,) () [Space, Space, Space, Space] . Right <$> sts)
     Nothing
 
 while_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
@@ -124,14 +124,14 @@ while_ e sts =
   CompoundStatement $
   While () [Space] e
     [] [] LF
-    (Block $ (,,) () [Space, Space, Space, Space] <$> sts)
+    (Block $ (,,) () [Space, Space, Space, Space] . Right <$> sts)
 
 ifElse_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 ifElse_ e sts sts' =
   CompoundStatement $
   If () [Space] e [] [] LF
-    (Block $ (,,) () [Space, Space, Space, Space] <$> sts)
-    (Just ([], [], LF, Block $ (,,) () [Space, Space, Space, Space] <$> sts'))
+    (Block $ (,,) () [Space, Space, Space, Space] . Right <$> sts)
+    (Just ([], [], LF, Block $ (,,) () [Space, Space, Space, Space] . Right <$> sts'))
 
 var_ :: String -> Expr '[] ()
 var_ s = Ident () (MkIdent () s [])

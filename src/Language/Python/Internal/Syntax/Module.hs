@@ -6,10 +6,11 @@ import Control.Lens.TH (makeWrapped)
 import Control.Lens.Prism (_Right)
 import Control.Lens.Wrapped (_Wrapped)
 
+import Language.Python.Internal.Syntax.Comment
 import Language.Python.Internal.Syntax.Statement
 import Language.Python.Internal.Syntax.Whitespace
 
-newtype Module v a = Module [Either ([Whitespace], Newline) (Statement v a)]
+newtype Module v a = Module [Either ([Whitespace], Maybe Comment, Newline) (Statement v a)]
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasStatements Module where

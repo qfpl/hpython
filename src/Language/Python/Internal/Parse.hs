@@ -3,7 +3,7 @@
 module Language.Python.Internal.Parse where
 
 import Control.Applicative ((<|>), liftA2)
-import Control.Lens hiding (List, argument)
+import Control.Lens.Getter ((^.))
 import Control.Monad.State
 import Data.Char (chr, isAscii)
 import Data.Foldable
@@ -301,14 +301,18 @@ block = fmap Block (liftA2 (:|) first go) <* dedent
       spanned
         ((\a b d -> (d, a, b)) <$>
          (indent *> fmap head get) <*>
-         statement)
+         statementOrComment)
     go =
       many $
       (\(f :~ a) -> f a) <$>
       spanned
         ((\a b d -> (d, a, b)) <$>
          (try level *> fmap head get) <*>
-         statement)
+         statementOrComment)
+
+    statementOrComment =
+      Left <$> (try ((,,) <$> many whitespace <*> comment) <*> newline) <|>
+      Right <$> statement
 
 compoundStatement
   :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (CompoundStatement '[] Span)
@@ -426,10 +430,13 @@ statement =
       optional ((,) <$> many whitespace <* char ';' <*> many whitespace) <*>
       newline
 
+comment :: DeltaParsing m => m Comment
+comment = Comment <$ char '#' <*> many (noneOf "\n\r")
+
 module_ :: DeltaParsing m => m (Module '[] Span)
 module_ =
   Module <$>
   many
-    (try (Left <$> liftA2 (,) (many whitespace) newline) <|>
+    (try (fmap Left $ (,,) <$> many whitespace <*> optional comment <*> newline) <|>
      Right <$> evalStateT statement [])
   <* eof

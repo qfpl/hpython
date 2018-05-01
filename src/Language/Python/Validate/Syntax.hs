@@ -245,8 +245,8 @@ validateBlockSyntax
 validateBlockSyntax (Block bs) = Block . NonEmpty.fromList <$> go (NonEmpty.toList bs)
   where
     go [] = error "impossible"
-    go [b] = pure <$> traverseOf _3 validateStatementSyntax b
-    go (b:bs) = (:) <$> traverseOf _3 validateStatementSyntax b <*> go bs
+    go [b] = pure <$> traverseOf (_3._Right) validateStatementSyntax b
+    go (b:bs) = (:) <$> traverseOf (_3._Right) validateStatementSyntax b <*> go bs
 
 validateCompoundStatementSyntax
   :: ( AsSyntaxError e v a

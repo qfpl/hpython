@@ -14,7 +14,7 @@ import Control.Lens.Prism (_Just, _Right)
 import Control.Lens.Setter ((.~), over, mapped)
 import Control.Lens.TH (makeWrapped)
 import Control.Lens.Traversal (Traversal, traverseOf)
-import Control.Lens.Tuple (_2, _3, _4)
+import Control.Lens.Tuple (_1, _2, _3, _4)
 import Control.Lens.Wrapped (_Wrapped)
 import Data.Coerce (coerce)
 import Data.Function ((&))
@@ -83,6 +83,18 @@ instance HasBlocks CompoundStatement where
     traverseOf (traverse._4) (coerce . f) b'
   _Blocks f (While a ws1 e1 ws2 ws3 nl b) =
     While a ws1 (coerce e1) ws2 ws3 nl <$> coerce (f b)
+  _Blocks fun (TryExcept a b c d e ws1 f ws nl bl g h) =
+    TryExcept a (coerce b) (coerce c) (coerce d) <$>
+    fun e <*>
+    pure ws1 <*>
+    pure (coerce f) <*>
+    pure ws <*> pure nl <*>
+    fun bl <*>
+    (traverse._4) fun g <*>
+    (traverse._4) fun h
+  _Blocks fun (TryFinally a b c d e f g h i) =
+    TryFinally a (coerce b) (coerce c) (coerce d) <$> fun e <*>
+    pure (coerce f) <*> pure (coerce g) <*> pure (coerce h) <*> fun i
 
 instance HasStatements Block where
   _Statements = _Wrapped.traverse._3._Right
@@ -103,17 +115,27 @@ instance HasBlocks Statement where
 
 instance Plated (Statement '[] a) where
   plate _ s@SmallStatements{} = pure s
-  plate f (CompoundStatement s) =
+  plate fun (CompoundStatement s) =
     CompoundStatement <$>
     case s of
       Fundef a ws1 b ws2 c ws3 ws4 nl sts ->
-        Fundef a ws1 b ws2 c ws3 ws4 nl <$> (_Wrapped.traverse._3._Right) f sts
+        Fundef a ws1 b ws2 c ws3 ws4 nl <$> (_Wrapped.traverse._3._Right) fun sts
       If a ws1 b ws2 ws3 nl sts sts' ->
         If a ws1 b ws2 ws3 nl <$>
-        (_Wrapped.traverse._3._Right) f sts <*>
-        (traverse._4._Wrapped.traverse._3._Right) f sts'
+        (_Wrapped.traverse._3._Right) fun sts <*>
+        (traverse._4._Wrapped.traverse._3._Right) fun sts'
       While a ws1 b ws2 ws3 nl sts ->
-        While a ws1 b ws2 ws3 nl <$> (_Wrapped.traverse._3._Right) f sts
+        While a ws1 b ws2 ws3 nl <$> (_Wrapped.traverse._3._Right) fun sts
+      TryExcept a b c d e ws1 f ws nl bl g h ->
+        TryExcept a b c d <$> (_Wrapped.traverse._3._Right) fun e <*>
+        pure ws1 <*>
+        pure f <*>
+        pure ws <*> pure nl <*> (_Wrapped.traverse._3._Right) fun bl <*>
+        (traverse._4._Wrapped.traverse._3._Right) fun g <*>
+        (traverse._4._Wrapped.traverse._3._Right) fun h
+      TryFinally a b c d e f g h i ->
+        TryFinally a b c d <$> (_Wrapped.traverse._3._Right) fun e <*>
+        pure f <*> pure g <*> pure h <*> (_Wrapped.traverse._3._Right) fun i
 
 instance HasExprs Statement where
   _Exprs f (SmallStatements s ss a b) =
@@ -234,6 +256,25 @@ data CompoundStatement (v :: [*]) a
       [Whitespace] (Expr v a)
       [Whitespace] [Whitespace] Newline
       (Block v a)
+  | TryExcept a
+      -- try:
+      [Whitespace] [Whitespace] Newline
+      (Block v a)
+      -- except things as things...:
+        [Whitespace]
+        (NonEmpty (Expr v a, [Whitespace], Ident v a))
+        [Whitespace] Newline (Block v a)
+      -- [else:]
+      (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
+      -- [finally:]
+      (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
+  | TryFinally a
+      -- try:
+      [Whitespace] [Whitespace] Newline
+      (Block v a)
+      -- finally:
+      [Whitespace] [Whitespace] Newline
+      (Block v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasExprs CompoundStatement where
@@ -259,5 +300,15 @@ instance HasExprs CompoundStatement where
     pure ws3 <*>
     pure nl <*>
     (_Wrapped.traverse._3._Right._Exprs) f sts
+  _Exprs fun (TryExcept a b c d e ws1 f ws nl bl g h) =
+    TryExcept a b c d <$> (_Wrapped.traverse._3._Right._Exprs) fun e <*>
+    pure ws1 <*>
+    (traverse._1) fun (over (mapped._3) coerce f) <*>
+    pure ws <*> pure nl <*> (_Wrapped.traverse._3._Right._Exprs) fun bl <*>
+    (traverse._4._Wrapped.traverse._3._Right._Exprs) fun g <*>
+    (traverse._4._Wrapped.traverse._3._Right._Exprs) fun h
+  _Exprs fun (TryFinally a b c d e f g h i) =
+    TryFinally a b c d <$> (_Wrapped.traverse._3._Right._Exprs) fun e <*>
+    pure f <*> pure g <*> pure h <*> (_Wrapped.traverse._3._Right._Exprs) fun i
 
 makeWrapped ''Block

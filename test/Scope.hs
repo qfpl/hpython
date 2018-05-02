@@ -102,3 +102,16 @@ test_5 =
     res <- validate expr
     annotateShow res
     res === Failure [NotInScope (MkIdent () "c" [])]
+
+test_6 :: Property
+test_6 =
+  property $ do
+    let
+      expr =
+        def_ "test" []
+          [ ifElse_ true_ [ var_ "x" .= 2 ] [ var_ "x" .= 3 ]
+          , call_ (var_ "print") (var_ "x")
+          ]
+    res <- validate expr
+    annotateShow res
+    res === Failure [NotInScope (MkIdent () "x" [])]

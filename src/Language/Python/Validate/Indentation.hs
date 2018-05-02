@@ -101,6 +101,26 @@ validateCompoundStatementIndentation (While a ws1 expr ws2 ws3 nl body) =
   pure ws3 <*>
   pure nl <*>
   validateBlockIndentation body
+validateCompoundStatementIndentation (TryExcept a b c d e f g h i j k l) =
+  TryExcept a b c d <$>
+  validateBlockIndentation e <*>
+  pure f <*>
+  traverse
+    (\(x, y, z) ->
+       (,,) <$>
+       validateExprIndentation x <*>
+       pure y <*>
+       pure (coerce z))
+    g <*>
+  pure h <*> pure i <*>
+  validateBlockIndentation j <*>
+  traverseOf (traverse._4) validateBlockIndentation k <*>
+  traverseOf (traverse._4) validateBlockIndentation l
+validateCompoundStatementIndentation (TryFinally a b c d e f g h i) =
+  TryFinally a b c d <$>
+  validateBlockIndentation e <*>
+  pure f <*> pure g <*> pure h <*>
+  validateBlockIndentation i
 
 validateStatementIndentation
   :: AsIndentationError e v a

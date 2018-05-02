@@ -302,6 +302,7 @@ block = fmap Block (liftA2 (:|) first go) <* dedent
         ((\a b d -> (d, a, b)) <$>
          (indent *> fmap head get) <*>
          statementOrComment)
+
     go =
       many $
       (\(f :~ a) -> f a) <$>
@@ -347,13 +348,19 @@ compoundStatement =
        ((,,,,,,) <$
         reserved "except" <*>
         many whitespace <*>
-        some1 exceptAs <*>
-        many whitespace <*
+        some1 exceptAs <*
         char ':' <*>
+        many whitespace <*>
         newline <*>
         block <*>
-        optional ((,,,) <$> many whitespace <*> many whitespace <*> newline <*> block) <*>
-        optional ((,,,) <$> many whitespace <*> many whitespace <*> newline <*> block)) <|>
+        optional
+          ((,,,) <$ string "else" <*>
+           many whitespace <* char ':' <*> many whitespace <*> newline <*>
+           block) <*>
+        optional
+          ((,,,) <$ string "finally" <*>
+           many whitespace <* char ':' <*> many whitespace <*> newline <*>
+           block)) <|>
 
        fmap Right
        ((,,,) <$

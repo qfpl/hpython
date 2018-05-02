@@ -2,6 +2,7 @@
 module Scope (scopeTests) where
 
 import Control.Lens (has)
+import Data.Functor (($>))
 import Data.Validate
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Syntax.Error
@@ -22,6 +23,9 @@ scopeTests =
   , ("Scope test 3", withTests 1 test_3)
   , ("Scope test 4", withTests 1 test_4)
   , ("Scope test 5", withTests 1 test_5)
+  , ("Scope test 6", withTests 1 test_6)
+  , ("Scope test 7", withTests 1 test_7)
+  , ("Scope test 8", withTests 1 test_8)
   ]
 
 validate
@@ -102,3 +106,43 @@ test_5 =
     res <- validate expr
     annotateShow res
     res === Failure [NotInScope (MkIdent () "c" [])]
+
+test_6 :: Property
+test_6 =
+  property $ do
+    let
+      expr =
+        def_ "test" []
+          [ ifElse_ true_ [ var_ "x" .= 2 ] [ pass_ ]
+          , expr_ "x"
+          ]
+    res <- validate expr
+    annotateShow res
+    res === Failure [FoundDynamic () (MkIdent () "x" [])]
+
+test_7 :: Property
+test_7 =
+  property $ do
+    let
+      expr =
+        def_ "test" []
+          [ ifElse_ true_ [ pass_ ] [ var_ "x" .= 3 ]
+          , expr_ "x"
+          ]
+    res <- validate expr
+    annotateShow res
+    res === Failure [FoundDynamic () (MkIdent () "x" [])]
+
+test_8 :: Property
+test_8 =
+  property $ do
+    let
+      expr =
+        def_ "test" []
+          [ ifElse_ true_ [ pass_ ] [ var_ "x" .= 3 ]
+          , var_ "x" .= 1
+          , expr_ "x"
+          ]
+    res <- validate expr
+    annotateShow res
+    (res $> ()) === Success ()

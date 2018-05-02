@@ -296,6 +296,49 @@ validateCompoundStatementSyntax (While a ws1 expr ws2 ws3 nl body) =
   validateWhitespace a ws3 <*>
   pure nl <*>
   localSyntaxContext (\ctxt -> ctxt { _inLoop = True}) (validateBlockSyntax body)
+validateCompoundStatementSyntax (TryExcept a b c d e f g h i j k l) =
+  TryExcept a <$>
+  validateWhitespace a b <*>
+  validateWhitespace a c <*>
+  pure d <*>
+  validateBlockSyntax e <*>
+  validateWhitespace a f <*>
+  (validateAdjacentR a
+     (Keyword ('e' :| "xcept") f, keyword)
+     (NonEmpty.head g ^. exceptAsExpr, renderExpr) *>
+   traverse validateExceptAsSyntax g) <*>
+  validateWhitespace a h <*>
+  pure i <*>
+  validateBlockSyntax j <*>
+  traverse
+    (\(x, y, z, w) ->
+       (,,,) <$>
+       validateWhitespace a x <*> validateWhitespace a y <*>
+       pure z <*> validateBlockSyntax w)
+    k <*>
+  traverse
+    (\(x, y, z, w) ->
+       (,,,) <$>
+       validateWhitespace a x <*> validateWhitespace a y <*>
+       pure z <*> validateBlockSyntax w)
+    l
+validateCompoundStatementSyntax (TryFinally a b c d e f g h i) =
+  TryFinally a <$>
+  validateWhitespace a b <*> validateWhitespace a c <*> pure d <*>
+  validateBlockSyntax e <*>
+  validateWhitespace a f <*> validateWhitespace a g <*> pure h <*>
+  validateBlockSyntax i
+
+validateExceptAsSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => ExceptAs v a
+  -> ValidateSyntax e (ExceptAs (Nub (Syntax ': v)) a)
+validateExceptAsSyntax (ExceptAs ann e f) =
+  ExceptAs ann <$>
+  validateExprSyntax e <*>
+  traverse (\(a, b) -> (,) <$> validateWhitespace ann a <*> validateIdent b) f
 
 validateImportAs
   :: ( AsSyntaxError e v a

@@ -133,6 +133,15 @@ inScope s =
       ((,) Clean <$> ings) <|>
       ((,) Dirty <$> inls)
 
+validateExceptAsScope
+  :: AsScopeError e v a
+  => ExceptAs v a
+  -> ValidateScope a e (ExceptAs (Nub (Scope ': v)) a)
+validateExceptAsScope (ExceptAs ann e f) =
+  ExceptAs ann <$>
+  validateExprScope e <*>
+  pure (over (mapped._2) coerce f)
+
 validateCompoundStatementScope
   :: AsScopeError e v a
   => CompoundStatement v a
@@ -175,6 +184,32 @@ validateCompoundStatementScope (While a ws1 e ws2 ws3 nl b) =
      pure ws3 <*>
      pure nl <*>
      validateBlockScope b)))
+validateCompoundStatementScope (TryExcept a b c d e f g h i j k l) =
+  scopeContext scLocalScope `bindValidateScope` (\ls ->
+  scopeContext scImmediateScope `bindValidateScope` (\is ->
+  locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
+  locallyOver scImmediateScope (const Trie.empty)
+    (TryExcept a b c d <$>
+     validateBlockScope e <*>
+     pure f <*>
+     traverse validateExceptAsScope g <*>
+     pure h <*>
+     pure i <*>
+     locallyExtendOver
+       scGlobalScope
+       (toListOf (folded.exceptAsName._Just._2.to (_identAnnotation &&& _identValue)) g)
+       (validateBlockScope j) <*>
+     traverseOf (traverse._4) validateBlockScope k <*>
+     traverseOf (traverse._4) validateBlockScope l)))
+validateCompoundStatementScope (TryFinally a b c d e f g h i) =
+  scopeContext scLocalScope `bindValidateScope` (\ls ->
+  scopeContext scImmediateScope `bindValidateScope` (\is ->
+  locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
+  locallyOver scImmediateScope (const Trie.empty)
+    (TryFinally a b c d <$>
+     validateBlockScope e <*>
+     pure f <*> pure g <*> pure h <*>
+     validateBlockScope i)))
 
 validateSmallStatementScope
   :: AsScopeError e v a

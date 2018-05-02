@@ -314,14 +314,56 @@ block = fmap Block (liftA2 (:|) first go) <* dedent
       Left <$> (try ((,,) <$> many whitespace <*> comment) <*> newline) <|>
       Right <$> statement
 
+exceptAs :: DeltaParsing m => m (ExceptAs '[] Span)
+exceptAs =
+  annotated $
+  (\a b c -> ExceptAs c a b) <$>
+  expr whitespace <*>
+  optional
+    ((,) <$ string "as" <*> many whitespace <*> identifier whitespace)
+
 compoundStatement
   :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (CompoundStatement '[] Span)
 compoundStatement =
   annotated $
   fundef <|>
   ifSt <|>
-  while
+  while <|>
+  trySt
   where
+    trySt =
+      (\b c d e f g ->
+         either
+           (\(h, i, j, k, l, m, n) -> TryExcept g b c d e h i j k l m n)
+           (\(h, i, j, k) -> TryFinally g b c d e h i j k)
+           f) <$
+      reserved "try" <*>
+      many whitespace <*
+      char ':' <*>
+      many whitespace <*>
+      newline <*>
+      block <*>
+      (fmap Left
+       ((,,,,,,) <$
+        reserved "except" <*>
+        many whitespace <*>
+        some1 exceptAs <*>
+        many whitespace <*
+        char ':' <*>
+        newline <*>
+        block <*>
+        optional ((,,,) <$> many whitespace <*> many whitespace <*> newline <*> block) <*>
+        optional ((,,,) <$> many whitespace <*> many whitespace <*> newline <*> block)) <|>
+
+       fmap Right
+       ((,,,) <$
+        reserved "finally" <*>
+        many whitespace <*
+        char ':' <*>
+        many whitespace <*>
+        newline <*>
+        block))
+
     fundef =
       (\a b c d e f g h i -> Fundef i a b c d e f g h) <$
       reserved "def" <*> some1 whitespace <*> identifier whitespace <*>

@@ -12,9 +12,9 @@ import Control.Lens.Lens (Lens, Lens', lens)
 import Control.Lens.Plated (Plated(..), gplate)
 import Control.Lens.Prism (_Just, _Right)
 import Control.Lens.Setter ((.~), over, mapped)
-import Control.Lens.TH (makeWrapped)
+import Control.Lens.TH (makeLenses, makeWrapped)
 import Control.Lens.Traversal (Traversal, traverseOf)
-import Control.Lens.Tuple (_1, _2, _3, _4)
+import Control.Lens.Tuple (_2, _3, _4)
 import Control.Lens.Wrapped (_Wrapped)
 import Data.Coerce (coerce)
 import Data.Function ((&))
@@ -241,6 +241,14 @@ instance HasExprs SmallStatement where
   _Exprs _ p@Import{} = pure $ coerce p
   _Exprs _ p@From{} = pure $ coerce p
 
+data ExceptAs v a
+  = ExceptAs
+  { _exceptAsAnn :: a
+  , _exceptAsExpr :: Expr v a
+  , _exceptAsName :: Maybe ([Whitespace], Ident v a)
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
 data CompoundStatement (v :: [*]) a
   = Fundef a
       (NonEmpty Whitespace) (Ident v a)
@@ -262,7 +270,7 @@ data CompoundStatement (v :: [*]) a
       (Block v a)
       -- except things as things...:
         [Whitespace]
-        (NonEmpty (Expr v a, [Whitespace], Ident v a))
+        (NonEmpty (ExceptAs v a))
         [Whitespace] Newline (Block v a)
       -- [else:]
       (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
@@ -276,6 +284,9 @@ data CompoundStatement (v :: [*]) a
       [Whitespace] [Whitespace] Newline
       (Block v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasExprs ExceptAs where
+  _Exprs f (ExceptAs ann e a) = ExceptAs ann <$> f e <*> pure (coerce a)
 
 instance HasExprs CompoundStatement where
   _Exprs f (Fundef a ws1 name ws2 params ws3 ws4 nl sts) =
@@ -303,7 +314,7 @@ instance HasExprs CompoundStatement where
   _Exprs fun (TryExcept a b c d e ws1 f ws nl bl g h) =
     TryExcept a b c d <$> (_Wrapped.traverse._3._Right._Exprs) fun e <*>
     pure ws1 <*>
-    (traverse._1) fun (over (mapped._3) coerce f) <*>
+    (traverse._Exprs) fun f <*>
     pure ws <*> pure nl <*> (_Wrapped.traverse._3._Right._Exprs) fun bl <*>
     (traverse._4._Wrapped.traverse._3._Right._Exprs) fun g <*>
     (traverse._4._Wrapped.traverse._3._Right._Exprs) fun h
@@ -312,3 +323,4 @@ instance HasExprs CompoundStatement where
     pure f <*> pure g <*> pure h <*> (_Wrapped.traverse._3._Right._Exprs) fun i
 
 makeWrapped ''Block
+makeLenses ''ExceptAs

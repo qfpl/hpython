@@ -9,6 +9,7 @@ import Control.Lens.Getter
 import Control.Lens.Wrapped
 import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty(..))
+
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
@@ -252,6 +253,50 @@ genCompoundStatement =
         b <- Gen.resize (n - n') genBlock
         While () <$> genWhitespaces <*> pure a <*>
           genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
+    , Gen.sized $ \n -> do
+        sz <- Gen.integral (Range.constant 1 5)
+        n1 <- Gen.integral (Range.constant 1 $ n - 2)
+        n2 <- Gen.integral (Range.constant 1 $ n - n1 - 1)
+        n3 <- Gen.integral (Range.constant 1 $ n - n2 - n1)
+        let remaining = n - n1 - n2 - n3
+        (e1, e2) <-
+          if remaining > 0
+          then do
+            n4 <- Gen.integral (Range.constant 0 remaining)
+            e1 <- Gen.resize n4 genBlock
+            e2 <- Gen.maybe (Gen.resize (remaining - n4) genBlock)
+            (,) <$>
+              fmap Just
+                ((,,,) <$> genWhitespaces <*> genWhitespaces <*> genNewline <*> pure e1) <*>
+              maybe
+                 (pure Nothing)
+                 (\e2' ->
+                    fmap Just $
+                    (,,,) <$> genWhitespaces <*> genWhitespaces <*> genNewline <*> pure e2')
+                 e2
+          else pure (Nothing, Nothing)
+        TryExcept () <$>
+          genWhitespaces <*> genWhitespaces <*> genNewline <*>
+          Gen.resize n1 genBlock <*>
+          genWhitespaces <*>
+          Gen.nonEmpty
+            (Range.singleton sz)
+            (ExceptAs () <$>
+             Gen.resize n2 genExpr <*>
+             Gen.maybe ((,) <$> genWhitespaces <*> genIdent)) <*>
+          genWhitespaces <*>
+          genNewline <*>
+          Gen.resize n3 genBlock <*>
+          pure e1 <*>
+          pure e2
+    , Gen.sized $ \n -> do
+        n1 <- Gen.integral (Range.constant 1 $ n-1)
+        n2 <- Gen.integral (Range.constant 1 n1)
+        TryFinally () <$>
+          genWhitespaces <*> genWhitespaces <*> genNewline <*>
+          Gen.resize n1 genBlock <*>
+          genWhitespaces <*> genWhitespaces <*> genNewline <*>
+          Gen.resize n2 genBlock
     ]
 
 genStatement :: MonadGen m => m (Statement '[] ())

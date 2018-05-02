@@ -3,7 +3,7 @@
 module Language.Python.Validate.Indentation where
 
 import Control.Applicative
-import Control.Lens ((#), _Wrapped, view, from, _4, traverseOf, _Right)
+import Control.Lens ((#), _Wrapped, view, over, from, _2, _4, traverseOf, _Right)
 import Data.Coerce
 import Data.Type.Set
 import Data.Validate
@@ -75,6 +75,15 @@ validateArgsIndentation
   -> Validate [e] (CommaSep (Arg (Nub (Indentation ': v)) a))
 validateArgsIndentation e = pure $ coerce e
 
+validateExceptAsIndentation
+  :: AsIndentationError e v a
+  => ExceptAs v a
+  -> Validate [e] (ExceptAs (Nub (Indentation ': v)) a)
+validateExceptAsIndentation (ExceptAs ann e f) =
+  ExceptAs ann <$>
+  validateExprIndentation e <*>
+  pure (over (traverse._2) coerce f)
+
 validateCompoundStatementIndentation
   :: AsIndentationError e v a
   => CompoundStatement v a
@@ -105,13 +114,7 @@ validateCompoundStatementIndentation (TryExcept a b c d e f g h i j k l) =
   TryExcept a b c d <$>
   validateBlockIndentation e <*>
   pure f <*>
-  traverse
-    (\(x, y, z) ->
-       (,,) <$>
-       validateExprIndentation x <*>
-       pure y <*>
-       pure (coerce z))
-    g <*>
+  traverse validateExceptAsIndentation g <*>
   pure h <*> pure i <*>
   validateBlockIndentation j <*>
   traverseOf (traverse._4) validateBlockIndentation k <*>

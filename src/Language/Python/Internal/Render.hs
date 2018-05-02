@@ -291,13 +291,7 @@ renderCompoundStatement (TryExcept _ a b c d ws1 e ws nl bl f g) =
     (renderBlock d) <>
   ManyLines
     ("except" <> foldMap renderWhitespace ws1 <>
-     foldMap
-       (\(expr, ws, name) ->
-          renderExpr expr <> "as" <>
-          foldMap renderWhitespace ws <>
-          renderIdent name)
-       e <>
-     foldMap renderWhitespace ws)
+     foldMap renderExceptAs e <> foldMap renderWhitespace ws)
     nl
     (renderBlock bl) <>
   foldMap
@@ -340,6 +334,11 @@ renderStatement (SmallStatements s ss sc nl) =
      sc)
   nl
   NoLines
+
+renderExceptAs :: ExceptAs v a -> String
+renderExceptAs (ExceptAs _ e f) =
+  renderExpr e <>
+  foldMap (\(a, b) -> foldMap renderWhitespace a <> renderIdent b) f
 
 renderArg :: Arg v a -> String
 renderArg (PositionalArg _ expr) = renderExpr expr

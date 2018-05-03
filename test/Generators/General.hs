@@ -107,7 +107,7 @@ genBlock =
           s1 <-
             Gen.choice
               [ Right <$> genStatement
-              , fmap Left $ (,,) <$> genWhitespaces <*> genComment <*> genNewline
+              , fmap Left $ (,) <$> genComment <*> genNewline
               ]
           pure . Block $ ((), indent, s1) :| []
         else do
@@ -116,7 +116,7 @@ genBlock =
             Gen.resize n' $
             Gen.choice
               [ Right <$> genStatement
-              , fmap Left $ (,,) <$> genWhitespaces <*> genComment <*> genNewline
+              , fmap Left $ (,) <$> genComment <*> genNewline
               ]
           let n'' = n - n'
           b <- Gen.resize n'' (go indent)

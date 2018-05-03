@@ -1,5 +1,6 @@
 {-# language DataKinds #-}
 {-# language FlexibleContexts #-}
+{-# language LambdaCase #-}
 module Language.Python.Internal.Parse where
 
 import Control.Applicative ((<|>), liftA2)
@@ -73,7 +74,7 @@ newline =
   char '\n' $> LF <|>
   char '\r' *> (char '\n' $> CRLF <|> pure CR)
 
-annotated :: DeltaParsing m => m (Untagged b Span) -> m (b '[] Span)
+annotated :: DeltaParsing m => m (Span -> b) -> m b
 annotated m = (\(f :~ sp) -> f sp) <$> spanned m
 
 whitespace :: CharParsing m => m Whitespace
@@ -291,29 +292,36 @@ level = (get >>= foldl (\b a -> b <* traverse parseWs a) (pure ())) <?> "level i
     parseWs Newline{} = error "newline in indentation state"
 
 dedent :: MonadState [[Whitespace]] m => m ()
-dedent = modify tail
+dedent = modify $ \case; [] -> error "cannot dedent further"; _:xs -> xs
 
 block :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (Block '[] Span)
-block = fmap Block (liftA2 (:|) first go) <* dedent
+block = fmap Block ((\(a :| b) c -> a :| (b ++ c)) <$> firsts <*> go) <* dedent
   where
-    first =
-      (\(f :~ a) -> f a) <$>
-      spanned
-        ((\a b d -> (d, a, b)) <$>
+    firsts =
+      liftA2 NonEmpty.cons
+        (annotated $
+         (\a b d -> (d, a, b)) <$>
+         try (many whitespace <* notFollowedBy (noneOf "#")) <*>
+         fmap Left ((,) <$> comment <*> newline))
+        firsts
+      <|>
+      fmap pure
+        (annotated $
+         (\a b d -> (d, a, b)) <$>
          (indent *> fmap head get) <*>
-         statementOrComment)
+         (Right <$> statement))
 
     go =
       many $
       (\(f :~ a) -> f a) <$>
       spanned
+        (((\a b d -> (d, a, b)) <$>
+         try (many whitespace <* notFollowedBy (noneOf "#")) <*>
+         fmap Left ((,) <$> comment <*> newline)) <|>
+
         ((\a b d -> (d, a, b)) <$>
          (try level *> fmap head get) <*>
-         statementOrComment)
-
-    statementOrComment =
-      Left <$> (try ((,,) <$> many whitespace <*> comment) <*> newline) <|>
-      Right <$> statement
+         (Right <$> statement)))
 
 exceptAs :: DeltaParsing m => m (ExceptAs '[] Span)
 exceptAs =

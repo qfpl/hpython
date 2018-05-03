@@ -292,8 +292,8 @@ genSmallStatement = Gen.sized $ \n -> do
           genSizedCommaSep1 (genImportAs genModuleName genIdent)
         , From () <$>
           genWhitespaces <*>
-          genRelativeModuleName <*>
-          genWhitespaces <*>
+          (genRelativeModuleName & mapped.whitespaceAfter .~ [Space]) <*>
+          (NonEmpty.toList <$> genWhitespaces1) <*>
           genImportTargets
         ] ++
         [pure (Break ()) | _inLoop ctxt] ++

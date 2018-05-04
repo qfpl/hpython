@@ -52,6 +52,23 @@ instance HasExprs Arg where
   _Exprs f (KeywordArg a name ws2 expr) = KeywordArg a (coerce name) ws2 <$> f expr
   _Exprs f (PositionalArg a expr) = PositionalArg a <$> f expr
 
+data StringPrefix
+  = Prefix_r
+  | Prefix_R
+  | Prefix_u
+  | Prefix_U
+  | Prefix_b
+  | Prefix_B
+  | Prefix_br
+  | Prefix_Br
+  | Prefix_bR
+  | Prefix_BR
+  | Prefix_rb
+  | Prefix_rB
+  | Prefix_Rb
+  | Prefix_RB
+  deriving (Eq, Show)
+
 data StringType
   = ShortSingle
   | ShortDouble
@@ -131,6 +148,7 @@ data Expr (v :: [*]) a
   }
   | String
   { _exprAnnotation :: a
+  , _unsafeStringPrefix :: Maybe StringPrefix
   , _unsafeStringType :: StringType
   , _unsafeStringValue :: String
   , _unsafeStringWhitespace :: [Whitespace]
@@ -190,7 +208,7 @@ instance Token (Expr v a) (Expr '[] a) where
           Ident _ a -> a ^. getting whitespaceAfter
           Int _ _ ws -> ws
           Bool _ _ ws -> ws
-          String _ _ _ ws -> ws
+          String _ _ _ _ ws -> ws
           Tuple _ _ ws Nothing -> ws
           Tuple _ _ _ (Just cs) -> go cs
             where
@@ -211,7 +229,7 @@ instance Token (Expr v a) (Expr '[] a) where
           Ident a b -> Ident a (b & whitespaceAfter .~ ws)
           Int a b _ -> Int a b ws
           Bool a b _ -> Bool a b ws
-          String a b c _ -> String a b c ws
+          String d a b c _ -> String d a b c ws
           Tuple a e _ Nothing -> Tuple a (coerce e) ws Nothing
           Tuple a b ws (Just cs) -> Tuple a (coerce b) ws (Just $ cs & whitespaceAfter .~ ws))
 

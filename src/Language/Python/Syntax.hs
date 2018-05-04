@@ -158,10 +158,10 @@ or_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
 or_ a = BinOp () (a & whitespaceAfter .~ [Space]) (BoolOr () [Space])
 
 str_ :: String -> Expr '[] ()
-str_ s = String () ShortDouble s []
+str_ s = String () Nothing ShortDouble s []
 
 longStr_ :: String -> Expr '[] ()
-longStr_ s = String () LongDouble s []
+longStr_ s = String () Nothing LongDouble s []
 
 (.=) :: Expr '[] () -> Expr '[] () -> Statement '[] ()
 (.=) a b = SmallStatements (Assign () a [Space] [Space] b) [] Nothing LF

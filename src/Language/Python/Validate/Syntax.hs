@@ -199,7 +199,8 @@ validateExprSyntax (Parens a ws1 e ws2) =
   pure ws2
 validateExprSyntax (Bool a b ws) = pure $ Bool a b ws
 validateExprSyntax (Negate a ws expr) = Negate a ws <$> validateExprSyntax expr
-validateExprSyntax (String a strType b ws) = pure $ String a strType b ws
+validateExprSyntax (String a prefix strType b ws) =
+  pure $ String a prefix strType b ws
 validateExprSyntax (Int a n ws) = pure $ Int a n ws
 validateExprSyntax (Ident a name) = Ident a <$> validateIdent name
 validateExprSyntax (List a ws1 exprs ws2) =

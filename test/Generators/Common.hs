@@ -64,6 +64,25 @@ genNormalWhitespace = Gen.sized $ \n ->
               genSizedWhitespace genNormalWhitespace
         ]
 
+genStringPrefix :: MonadGen m => m StringPrefix
+genStringPrefix =
+  Gen.element
+    [ Prefix_r
+    , Prefix_R
+    , Prefix_u
+    , Prefix_U
+    , Prefix_b
+    , Prefix_B
+    , Prefix_br
+    , Prefix_Br
+    , Prefix_bR
+    , Prefix_BR
+    , Prefix_rb
+    , Prefix_rB
+    , Prefix_Rb
+    , Prefix_RB
+    ]
+
 genComment :: MonadGen m => m Comment
 genComment =
   Comment <$> Gen.list (Range.linear 0 100) (Gen.filter (`notElem` "\0\r\n") Gen.ascii)

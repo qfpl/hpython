@@ -129,6 +129,24 @@ renderIdent (MkIdent _ a b) = a <> foldMap renderWhitespace b
 renderComment :: Comment -> String
 renderComment (Comment s) = "#" <> s
 
+renderPrefix :: StringPrefix -> String
+renderPrefix p =
+  case p of
+    Prefix_r -> "r"
+    Prefix_R -> "R"
+    Prefix_u -> "u"
+    Prefix_U -> "U"
+    Prefix_b -> "b"
+    Prefix_B -> "B"
+    Prefix_br -> "br"
+    Prefix_Br -> "Br"
+    Prefix_bR -> "bR"
+    Prefix_BR -> "BR"
+    Prefix_rb -> "rb"
+    Prefix_rB -> "rB"
+    Prefix_Rb -> "Rb"
+    Prefix_RB -> "RB"
+
 renderExpr :: Expr v a -> String
 renderExpr (Parens _ ws1 e ws2) =
   "(" <> foldMap renderWhitespace ws1 <>
@@ -140,7 +158,7 @@ renderExpr (Negate _ ws expr) =
       BinOp _ _ Exp{} _ -> renderExpr expr
       BinOp{} -> "(" <> renderExpr expr <> ")"
       _ -> renderExpr expr
-renderExpr (String _ strType b ws) =
+renderExpr (String _ prefix strType b ws) =
   let
     quote =
       case strType of
@@ -149,7 +167,8 @@ renderExpr (String _ strType b ws) =
         LongSingle -> "'''"
         LongDouble -> "\"\"\""
   in
-    quote <> foldMap renderChar b <> quote <> foldMap renderWhitespace ws
+    foldMap renderPrefix prefix <> quote <>
+    foldMap renderChar b <> quote <> foldMap renderWhitespace ws
 renderExpr (Int _ n ws) = show n <> foldMap renderWhitespace ws
 renderExpr (Ident _ name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) =

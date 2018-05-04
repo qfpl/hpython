@@ -143,6 +143,15 @@ argument = kwarg <|> posarg
       expr anyWhitespace
     posarg = flip PositionalArg <$> expr anyWhitespace
 
+stringPrefix :: CharParsing m => m StringPrefix
+stringPrefix =
+  (char 'r' *> (char 'b' $> Prefix_rb <|> char 'B' $> Prefix_rB <|> pure Prefix_r)) <|>
+  (char 'R' *> (char 'b' $> Prefix_Rb <|> char 'B' $> Prefix_RB <|> pure Prefix_R)) <|>
+  (char 'b' *> (char 'r' $> Prefix_br <|> char 'R' $> Prefix_bR <|> pure Prefix_b)) <|>
+  (char 'B' *> (char 'r' $> Prefix_Br <|> char 'R' $> Prefix_BR <|> pure Prefix_B)) <|>
+  (char 'u' $> Prefix_u) <|>
+  (char 'U' $> Prefix_U)
+
 expr :: DeltaParsing m => m Whitespace -> m (Expr '[] Span)
 expr ws = tuple_list
   where
@@ -173,7 +182,7 @@ expr ws = tuple_list
       char '[' <*>
       many anyWhitespace <*>
       commaSep (orExpr anyWhitespace) <*>
-      (char ']' *> many ws) 
+      (char ']' *> many ws)
 
     bool =
       annotated $
@@ -192,14 +201,18 @@ expr ws = tuple_list
 
     strLit =
       annotated $
-      ((\a b c -> String c LongSingle a b) <$>
-         (tripleSingle *> manyTill stringChar (string "'''")) <|>
-       (\a b c -> String c LongDouble a b) <$>
-         (tripleDouble *> manyTill stringChar (string "\"\"\"")) <|>
-       (\a b c -> String c ShortSingle a b) <$>
-         (char '\'' *> manyTill stringChar (char '\'')) <|>
-       (\a b c -> String c ShortDouble a b) <$>
-         (char '\"' *> manyTill stringChar (char '\"'))) <*>
+      ((\a b c d -> String d a LongSingle b c) <$>
+         try (optional stringPrefix <* tripleSingle) <*>
+         manyTill stringChar (string "'''") <|>
+       (\a b c d -> String d a LongDouble b c) <$>
+         try (optional stringPrefix <* tripleDouble) <*>
+         manyTill stringChar (string "\"\"\"") <|>
+       (\a b c d -> String d a ShortSingle b c) <$>
+         try (optional stringPrefix <* char '\'') <*>
+         manyTill stringChar (char '\'') <|>
+       (\a b c d -> String d a ShortDouble b c) <$>
+         try (optional stringPrefix <* char '\"') <*>
+         manyTill stringChar (char '\"')) <*>
       many ws
 
     int =

@@ -135,7 +135,11 @@ genExpr' isExp = Gen.sized $ \n ->
     [ genBool
     , if isExp then genSmallInt else genInt
     , Ident () <$> genIdent
-    , String () <$> genStringType <*> genString <*> genWhitespaces
+    , String () <$>
+      Gen.maybe genStringPrefix <*>
+      genStringType <*>
+      genString <*>
+      genWhitespaces
     ]
   else
     Gen.resize (n-1) $

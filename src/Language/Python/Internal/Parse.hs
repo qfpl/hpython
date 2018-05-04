@@ -348,10 +348,10 @@ compoundStatement
   :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (CompoundStatement '[] Span)
 compoundStatement =
   annotated $
-  fundef <|>
-  ifSt <|>
-  while <|>
-  trySt
+  (fundef <?> "function definition") <|>
+  (ifSt <?> "if statement") <|>
+  (while <?> "while statement") <|>
+  (trySt <?> "try statement")
   where
     trySt =
       (\b c d e f g ->
@@ -416,18 +416,18 @@ compoundStatement =
 smallStatement :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (SmallStatement '[] Span)
 smallStatement =
   annotated $
-  returnSt <|>
+  (returnSt <?> "return statement") <|>
   assignOrExpr <|>
-  pass <|>
-  from <|>
-  import_ <|>
-  break
+  (pass <?> "pass statement") <|>
+  (from <?> "import statement") <|>
+  (import_ <?> "import statement") <|>
+  (break <?> "break statement")
   where
     break = reserved "break" $> Break
     pass = reserved "pass" $> Pass
 
     assignOrExpr = do
-      e <- expr whitespace
+      e <- expr whitespace <?> "expression"
       mws <- optional (many whitespace <* char '=')
       case mws of
         Nothing -> pure (`Expr` e)
@@ -501,7 +501,7 @@ statement =
       newline
 
 comment :: DeltaParsing m => m Comment
-comment = Comment <$ char '#' <*> many (noneOf "\n\r")
+comment = (Comment <$ char '#' <*> many (noneOf "\n\r")) <?> "comment"
 
 module_ :: DeltaParsing m => m (Module '[] Span)
 module_ =

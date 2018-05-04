@@ -6,7 +6,7 @@ module Language.Python.Internal.Optics where
 import Control.Lens.Getter (Getter, to)
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (Traversal', failing)
-import Control.Lens.Tuple (_2, _3)
+import Control.Lens.Tuple (_2, _3, _4)
 import Control.Lens.Prism (Prism, _Right, _Left, prism)
 import Control.Lens.Wrapped (_Wrapped)
 import Data.Coerce
@@ -128,6 +128,8 @@ instance HasNewlines CompoundStatement where
       TryFinally a b c d e f g h i ->
         TryFinally a b c <$> fun d <*> _Newlines fun e <*>
         pure f <*> pure g <*> fun h <*> _Newlines fun i
+      For a b c d e f g h i ->
+        For a b c d e f <$> fun g <*> _Newlines fun h <*> (traverse._4._Newlines) fun i
 
 instance HasNewlines Statement where
   _Newlines f (CompoundStatement c) = CompoundStatement <$> _Newlines f c

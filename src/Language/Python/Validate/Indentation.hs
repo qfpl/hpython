@@ -124,6 +124,10 @@ validateCompoundStatementIndentation (TryFinally a b c d e f g h i) =
   validateBlockIndentation e <*>
   pure f <*> pure g <*> pure h <*>
   validateBlockIndentation i
+validateCompoundStatementIndentation (For a b c d e f g h i) =
+  For a b c d e f g <$>
+  validateBlockIndentation h <*>
+  traverseOf (traverse._4) validateBlockIndentation i
 
 validateStatementIndentation
   :: AsIndentationError e v a

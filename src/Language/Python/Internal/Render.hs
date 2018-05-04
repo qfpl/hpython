@@ -336,6 +336,20 @@ renderCompoundStatement (TryFinally _ a b c d e f g h) =
     ("finally" <> foldMap renderWhitespace e <> ":" <> foldMap renderWhitespace f)
     g
     (renderBlock h)
+renderCompoundStatement (For _ a b c d e f g h) =
+  ManyLines
+    ("for" <> foldMap renderWhitespace a <> renderExpr b <>
+     "in" <> foldMap renderWhitespace c <> renderExpr d <> ":" <>
+     foldMap renderWhitespace e)
+    f
+    (renderBlock g) <>
+  foldMap
+    (\(x, y, z, w) ->
+       ManyLines
+         ("else" <> foldMap renderWhitespace x <> ":" <> foldMap renderWhitespace y)
+         z
+         (renderBlock w))
+    h
 
 renderStatement :: Statement v a -> Lines String
 renderStatement (CompoundStatement c) = renderCompoundStatement c

@@ -124,24 +124,24 @@ commaSep1' ws e = do
       optional (commaSep1' ws e)
 
 parameter :: DeltaParsing m => m (Untagged Param Span)
-parameter = kwparam <|> posparam
+parameter = posparam <|> kwparam 
   where
     kwparam =
       (\a b c d -> KeywordParam d a b c) <$>
       (identifier anyWhitespace <* char '=') <*>
       many anyWhitespace <*>
       expr anyWhitespace
-    posparam = flip PositionalParam <$> identifier anyWhitespace
+    posparam = flip PositionalParam <$> identifier anyWhitespace <* notFollowedBy (char '=')
 
 argument :: DeltaParsing m => m (Untagged Arg Span)
-argument = kwarg <|> posarg
+argument = posarg <|> kwarg
   where
+    posarg = flip PositionalArg <$> expr anyWhitespace <* notFollowedBy (char '=')
     kwarg =
       (\a b c d -> KeywordArg d a b c) <$>
       (identifier anyWhitespace <* char '=') <*>
       many anyWhitespace <*>
       expr anyWhitespace
-    posarg = flip PositionalArg <$> expr anyWhitespace
 
 stringPrefix :: CharParsing m => m StringPrefix
 stringPrefix =

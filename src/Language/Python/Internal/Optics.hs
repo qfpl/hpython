@@ -107,18 +107,27 @@ instance HasNewlines Block where
     traverse (\(a, b, c) -> (,,) a b <$> (_Right._Newlines) f c) b
 
 instance HasNewlines CompoundStatement where
-  _Newlines f s =
+  _Newlines fun s =
     case s of
       Fundef ann ws1 name ws2 params ws3 ws4 nl block ->
-        Fundef ann ws1 name ws2 params ws3 ws4 <$> f nl <*> _Newlines f block
+        Fundef ann ws1 name ws2 params ws3 ws4 <$> fun nl <*> _Newlines fun block
       If ann ws1 cond ws2 ws3 nl block els ->
         If ann ws1 cond ws2 ws3 <$>
-        f nl <*>
-        _Newlines f block <*>
+        fun nl <*>
+        _Newlines fun block <*>
         traverse
-          (\(a, b, c, d) -> (,,,) a b <$> f nl <*> _Newlines f block)
+          (\(a, b, c, d) -> (,,,) a b <$> fun nl <*> _Newlines fun block)
           els
-      While ann ws1 cond ws2 ws3 nl block -> While ann ws1 cond ws2 ws3 <$> f nl <*> _Newlines f block
+      While ann ws1 cond ws2 ws3 nl block ->
+        While ann ws1 cond ws2 ws3 <$> fun nl <*> _Newlines fun block
+      TryExcept a b c d e f g h i j k l ->
+        TryExcept a b c <$> fun d <*> _Newlines fun e <*>
+        pure f <*> pure g <*> pure h <*> fun i <*> _Newlines fun j <*>
+        traverse (\(x, y, z, w) -> (,,,) x y <$> fun z <*> _Newlines fun w) k <*>
+        traverse (\(x, y, z, w) -> (,,,) x y <$> fun z <*> _Newlines fun w) l
+      TryFinally a b c d e f g h i ->
+        TryFinally a b c <$> fun d <*> _Newlines fun e <*>
+        pure f <*> pure g <*> fun h <*> _Newlines fun i
 
 instance HasNewlines Statement where
   _Newlines f (CompoundStatement c) = CompoundStatement <$> _Newlines f c

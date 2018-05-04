@@ -18,9 +18,11 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
 import Data.Semigroup ((<>))
 import Hedgehog
+
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import qualified Data.List.NonEmpty as NonEmpty
+
 import GHC.Stack
 
 import Language.Python.Internal.Optics
@@ -108,7 +110,7 @@ genBlock = do
           s1 <-
             Gen.choice
               [ Right <$> genStatement
-              , fmap Left $ (,,) <$> genWhitespaces <*> genComment <*> genNewline
+              , fmap Left $ (,) <$> genComment <*> genNewline
               ]
           pure . Block $ ((), indent, s1) :| []
         else do
@@ -117,7 +119,7 @@ genBlock = do
             Gen.resize n' $
             Gen.choice
               [ Right <$> genStatement
-              , fmap Left $ (,,) <$> genWhitespaces <*> genComment <*> genNewline
+              , fmap Left $ (,) <$> genComment <*> genNewline
               ]
           let n'' = n - n'
           b <- Gen.resize n'' (go indent)
@@ -290,8 +292,8 @@ genSmallStatement = Gen.sized $ \n -> do
           genSizedCommaSep1 (genImportAs genModuleName genIdent)
         , From () <$>
           genWhitespaces <*>
-          genRelativeModuleName <*>
-          genWhitespaces <*>
+          (genRelativeModuleName & mapped.whitespaceAfter .~ [Space]) <*>
+          (NonEmpty.toList <$> genWhitespaces1) <*>
           genImportTargets
         ] ++
         [pure (Break ()) | _inLoop ctxt] ++
@@ -360,6 +362,50 @@ genCompoundStatement =
         b <- Gen.resize (n - n') (localState $ (inLoop .= True) *> genBlock)
         While () <$> fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
           genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
+    , Gen.sized $ \n -> do
+        sz <- Gen.integral (Range.constant 1 5)
+        n1 <- Gen.integral (Range.constant 1 $ n - 2)
+        n2 <- Gen.integral (Range.constant 1 $ n - n1 - 1)
+        n3 <- Gen.integral (Range.constant 1 $ n - n2 - n1)
+        let remaining = n - n1 - n2 - n3
+        (e1, e2) <-
+          if remaining > 0
+          then do
+            n4 <- Gen.integral (Range.constant 0 remaining)
+            e1 <- Gen.resize n4 genBlock
+            e2 <- Gen.maybe (Gen.resize (remaining - n4) genBlock)
+            (,) <$>
+              fmap Just
+                ((,,,) <$> genWhitespaces <*> genWhitespaces <*> genNewline <*> pure e1) <*>
+              maybe
+                 (pure Nothing)
+                 (\e2' ->
+                    fmap Just $
+                    (,,,) <$> genWhitespaces <*> genWhitespaces <*> genNewline <*> pure e2')
+                 e2
+          else pure (Nothing, Nothing)
+        TryExcept () <$>
+          genWhitespaces <*> genWhitespaces <*> genNewline <*>
+          Gen.resize n1 genBlock <*>
+          (NonEmpty.toList <$> genWhitespaces1) <*>
+          Gen.nonEmpty
+            (Range.singleton sz)
+            (ExceptAs () <$>
+             (Gen.resize n2 genExpr & mapped.whitespaceAfter .~ [Space]) <*>
+             Gen.maybe ((,) <$> (NonEmpty.toList <$> genWhitespaces1) <*> genIdent)) <*>
+          genWhitespaces <*>
+          genNewline <*>
+          Gen.resize n3 genBlock <*>
+          pure e1 <*>
+          pure e2
+    , Gen.sized $ \n -> do
+        n1 <- Gen.integral (Range.constant 1 $ n-1)
+        n2 <- Gen.integral (Range.constant 1 n1)
+        TryFinally () <$>
+          genWhitespaces <*> genWhitespaces <*> genNewline <*>
+          Gen.resize n1 genBlock <*>
+          genWhitespaces <*> genWhitespaces <*> genNewline <*>
+          Gen.resize n2 genBlock
     ]
 
 genStatement

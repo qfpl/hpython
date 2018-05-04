@@ -246,8 +246,8 @@ renderBlock =
     (\(_, a, b) ->
        (foldMap renderWhitespace a <>) <$>
        either
-         (\(x, y, z) ->
-            OneLine $ foldMap renderWhitespace x <> renderComment y <> renderNewline z)
+         (\(y, z) ->
+            OneLine $ renderComment y <> renderNewline z)
           renderStatement
           b) .
   view _Wrapped
@@ -284,6 +284,39 @@ renderCompoundStatement (While _ ws1 expr ws2 ws3 nl body) =
      foldMap renderWhitespace ws2 <> ":" <> foldMap renderWhitespace ws3)
     nl
     (renderBlock body)
+renderCompoundStatement (TryExcept _ a b c d ws1 e ws nl bl f g) =
+  ManyLines
+    ("try" <> foldMap renderWhitespace a <> ":" <> foldMap renderWhitespace b)
+    c
+    (renderBlock d) <>
+  ManyLines
+    ("except" <> foldMap renderWhitespace ws1 <>
+     foldMap renderExceptAs e <> foldMap renderWhitespace ws)
+    nl
+    (renderBlock bl) <>
+  foldMap
+    (\(ws1, ws2, nl, bl) ->
+       ManyLines
+         ("else" <> foldMap renderWhitespace ws1 <> ":" <> foldMap renderWhitespace ws2)
+         nl
+         (renderBlock bl))
+    f <>
+  foldMap
+    (\(ws1, ws2, nl, bl) ->
+       ManyLines
+         ("finally" <> foldMap renderWhitespace ws1 <> ":" <> foldMap renderWhitespace ws2)
+         nl
+         (renderBlock bl))
+    g
+renderCompoundStatement (TryFinally _ a b c d e f g h) =
+  ManyLines
+    ("try" <> foldMap renderWhitespace a <> ":" <> foldMap renderWhitespace b)
+    c
+    (renderBlock d) <>
+  ManyLines
+    ("finally" <> foldMap renderWhitespace e <> ":" <> foldMap renderWhitespace f)
+    g
+    (renderBlock h)
 
 renderStatement :: Statement v a -> Lines String
 renderStatement (CompoundStatement c) = renderCompoundStatement c
@@ -301,6 +334,11 @@ renderStatement (SmallStatements s ss sc nl) =
      sc)
   nl
   NoLines
+
+renderExceptAs :: ExceptAs v a -> String
+renderExceptAs (ExceptAs _ e f) =
+  renderExpr e <>
+  foldMap (\(a, b) -> foldMap renderWhitespace a <> renderIdent b) f
 
 renderArg :: Arg v a -> String
 renderArg (PositionalArg _ expr) = renderExpr expr

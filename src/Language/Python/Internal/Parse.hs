@@ -1,5 +1,6 @@
 {-# language DataKinds #-}
 {-# language FlexibleContexts #-}
+{-# language LambdaCase #-}
 module Language.Python.Internal.Parse where
 
 import Control.Applicative ((<|>), liftA2)
@@ -73,7 +74,7 @@ newline =
   char '\n' $> LF <|>
   char '\r' *> (char '\n' $> CRLF <|> pure CR)
 
-annotated :: DeltaParsing m => m (Untagged b Span) -> m (b '[] Span)
+annotated :: DeltaParsing m => m (Span -> b) -> m b
 annotated m = (\(f :~ sp) -> f sp) <$> spanned m
 
 whitespace :: CharParsing m => m Whitespace
@@ -291,28 +292,44 @@ level = (get >>= foldl (\b a -> b <* traverse parseWs a) (pure ())) <?> "level i
     parseWs Newline{} = error "newline in indentation state"
 
 dedent :: MonadState [[Whitespace]] m => m ()
-dedent = modify tail
+dedent = modify $ \case; [] -> error "cannot dedent further"; _:xs -> xs
 
 block :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (Block '[] Span)
-block = fmap Block (liftA2 (:|) first go) <* dedent
+block = fmap Block ((\(a :| b) c -> a :| (b ++ c)) <$> firsts <*> go) <* dedent
   where
-    first =
-      (\(f :~ a) -> f a) <$>
-      spanned
-        ((\a b d -> (d, a, b)) <$>
+    firsts =
+      liftA2 NonEmpty.cons
+        (annotated $
+         (\a b d -> (d, a, b)) <$>
+         try (many whitespace <* notFollowedBy (noneOf "#")) <*>
+         fmap Left ((,) <$> comment <*> newline))
+        firsts
+      <|>
+      fmap pure
+        (annotated $
+         (\a b d -> (d, a, b)) <$>
          (indent *> fmap head get) <*>
-         statementOrComment)
+         (Right <$> statement))
+
     go =
       many $
       (\(f :~ a) -> f a) <$>
       spanned
+        (((\a b d -> (d, a, b)) <$>
+         try (many whitespace <* notFollowedBy (noneOf "#")) <*>
+         fmap Left ((,) <$> comment <*> newline)) <|>
+
         ((\a b d -> (d, a, b)) <$>
          (try level *> fmap head get) <*>
-         statementOrComment)
+         (Right <$> statement)))
 
-    statementOrComment =
-      Left <$> (try ((,,) <$> many whitespace <*> comment) <*> newline) <|>
-      Right <$> statement
+exceptAs :: DeltaParsing m => m (ExceptAs '[] Span)
+exceptAs =
+  annotated $
+  (\a b c -> ExceptAs c a b) <$>
+  expr whitespace <*>
+  optional
+    ((,) <$ string "as" <*> many whitespace <*> identifier whitespace)
 
 compoundStatement
   :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (CompoundStatement '[] Span)
@@ -320,8 +337,48 @@ compoundStatement =
   annotated $
   fundef <|>
   ifSt <|>
-  while
+  while <|>
+  trySt
   where
+    trySt =
+      (\b c d e f g ->
+         either
+           (\(h, i, j, k, l, m, n) -> TryExcept g b c d e h i j k l m n)
+           (\(h, i, j, k) -> TryFinally g b c d e h i j k)
+           f) <$
+      reserved "try" <*>
+      many whitespace <*
+      char ':' <*>
+      many whitespace <*>
+      newline <*>
+      block <*>
+      (fmap Left
+       ((,,,,,,) <$
+        reserved "except" <*>
+        many whitespace <*>
+        some1 exceptAs <*
+        char ':' <*>
+        many whitespace <*>
+        newline <*>
+        block <*>
+        optional
+          ((,,,) <$ string "else" <*>
+           many whitespace <* char ':' <*> many whitespace <*> newline <*>
+           block) <*>
+        optional
+          ((,,,) <$ string "finally" <*>
+           many whitespace <* char ':' <*> many whitespace <*> newline <*>
+           block)) <|>
+
+       fmap Right
+       ((,,,) <$
+        reserved "finally" <*>
+        many whitespace <*
+        char ':' <*>
+        many whitespace <*>
+        newline <*>
+        block))
+
     fundef =
       (\a b c d e f g h i -> Fundef i a b c d e f g h) <$
       reserved "def" <*> some1 whitespace <*> identifier whitespace <*>

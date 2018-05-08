@@ -176,6 +176,7 @@ genExpr' isExp = Gen.sized $ \n ->
           (genExpr' isExp)
           (\a -> Parens () <$> genWhitespaces <*> pure a <*> genWhitespaces)
       , genTuple genExpr
+      , Not () <$> genWhitespaces <*> genExpr
       ]
 
 genSmallStatement :: MonadGen m => m (SmallStatement '[] ())

@@ -148,6 +148,7 @@ renderPrefix p =
     Prefix_RB -> "RB"
 
 renderExpr :: Expr v a -> String
+renderExpr (Not _ ws e) = "not" <> foldMap renderWhitespace ws <> renderExpr e
 renderExpr (Parens _ ws1 e ws2) =
   "(" <> foldMap renderWhitespace ws1 <>
   renderExpr e <> ")" <> foldMap renderWhitespace ws2

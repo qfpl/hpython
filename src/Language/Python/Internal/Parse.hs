@@ -162,7 +162,14 @@ expr ws = tuple_list
       int <|>
       ident' <|>
       list <|>
-      parenthesis
+      parenthesis <|>
+      not
+
+    not =
+      annotated $
+      (\a b c -> Not c a b) <$>
+      (reserved "not" *> many ws) <*>
+      expr ws
 
     ident' =
       annotated $

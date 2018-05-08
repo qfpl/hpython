@@ -247,6 +247,7 @@ genExpr' isExp = Gen.sized $ \n ->
                pure (op & whitespaceAfter .~ [Space]) <*>
                pure b)
       , genTuple genExpr
+      , Not () <$> (NonEmpty.toList <$> genWhitespaces1) <*> genExpr
       ]
 
 genAssignable :: MonadGen m => m (Expr '[] ())

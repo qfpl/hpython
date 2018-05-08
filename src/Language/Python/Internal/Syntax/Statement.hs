@@ -95,6 +95,10 @@ instance HasBlocks CompoundStatement where
   _Blocks fun (TryFinally a b c d e f g h i) =
     TryFinally a (coerce b) (coerce c) (coerce d) <$> fun e <*>
     pure (coerce f) <*> pure (coerce g) <*> pure (coerce h) <*> fun i
+  _Blocks fun (For a b c d e f g h i) =
+    For a b (coerce c) d (coerce e) f g <$>
+    fun h <*>
+    (traverse._4) fun i
 
 instance HasStatements Block where
   _Statements = _Wrapped.traverse._3._Right
@@ -136,6 +140,10 @@ instance Plated (Statement '[] a) where
       TryFinally a b c d e f g h i ->
         TryFinally a b c d <$> (_Wrapped.traverse._3._Right) fun e <*>
         pure f <*> pure g <*> pure h <*> (_Wrapped.traverse._3._Right) fun i
+      For a b c d e f g h i ->
+        For a b c d e f g <$>
+        (_Wrapped.traverse._3._Right) fun h <*>
+        (traverse._4._Wrapped.traverse._3._Right) fun i
 
 instance HasExprs Statement where
   _Exprs f (SmallStatements s ss a b) =
@@ -283,6 +291,12 @@ data CompoundStatement (v :: [*]) a
       -- finally:
       [Whitespace] [Whitespace] Newline
       (Block v a)
+  | For a
+      -- for x in y:\n
+      [Whitespace] (Expr v a) [Whitespace] (Expr v a) [Whitespace] Newline
+      (Block v a)
+      -- [else:]
+      (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasExprs ExceptAs where
@@ -321,6 +335,10 @@ instance HasExprs CompoundStatement where
   _Exprs fun (TryFinally a b c d e f g h i) =
     TryFinally a b c d <$> (_Wrapped.traverse._3._Right._Exprs) fun e <*>
     pure f <*> pure g <*> pure h <*> (_Wrapped.traverse._3._Right._Exprs) fun i
+  _Exprs fun (For a b c d e f g h i) =
+    For a b <$> fun c <*> pure d <*> fun e <*>
+    pure f <*> pure g <*> (_Wrapped.traverse._3._Right._Exprs) fun h <*>
+    (traverse._4._Wrapped.traverse._3._Right._Exprs) fun i
 
 makeWrapped ''Block
 makeLenses ''ExceptAs

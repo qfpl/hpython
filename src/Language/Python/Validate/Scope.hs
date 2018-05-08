@@ -20,6 +20,7 @@ import Control.Lens.Traversal
 import Control.Lens.Wrapped
 import Control.Monad.State
 import Data.Coerce
+import Data.Functor (($>))
 import Data.Functor.Compose
 import Data.String
 import Data.Type.Set
@@ -210,6 +211,28 @@ validateCompoundStatementScope (TryFinally a b c d e f g h i) =
      validateBlockScope e <*>
      pure f <*> pure g <*> pure h <*>
      validateBlockScope i)))
+validateCompoundStatementScope (For a b c d e f g h i) =
+  scopeContext scLocalScope `bindValidateScope` (\ls ->
+  scopeContext scImmediateScope `bindValidateScope` (\is ->
+  locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
+  locallyOver scImmediateScope (const Trie.empty) $
+    For a b <$>
+    (traverse
+       (\s ->
+          inScope (s ^. identValue) `bindValidateScope` \res ->
+          maybe (pure ()) (\_ -> scopeErrors [_BadShadowing # coerce s]) res)
+       (c ^.. unvalidated.cosmos._Ident._2) $>
+       coerce c) <*>
+    pure d <*>
+    validateExprScope e <*>
+    pure f <*> pure g <*>
+    (let
+       ls = c ^.. unvalidated.cosmos._Ident._2.to (_identAnnotation &&& _identValue)
+     in
+       extendScope scLocalScope ls *>
+       extendScope scImmediateScope ls *>
+       validateBlockScope h) <*>
+    traverseOf (traverse._4) validateBlockScope i))
 
 validateSmallStatementScope
   :: AsScopeError e v a
@@ -251,11 +274,11 @@ validateIdentScope
   :: AsScopeError e v a
   => Ident v a
   -> ValidateScope a e (Ident (Nub (Scope ': v)) a)
-validateIdentScope i@(MkIdent a s ws) =
-  inScope s `bindValidateScope`
+validateIdentScope i =
+  inScope (_identValue i) `bindValidateScope`
   \context ->
   case context of
-    Just (Clean, _) -> pure $ MkIdent a s ws
+    Just (Clean, _) -> pure $ coerce i
     Just (Dirty, ann)-> scopeErrors [_FoundDynamic # (ann, i)]
     Nothing -> scopeErrors [_NotInScope # i]
 

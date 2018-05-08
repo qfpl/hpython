@@ -230,7 +230,7 @@ genExpr' isExp = Gen.sized $ \n ->
     Gen.choice $
       [ genList genExpr
       , genDeref
-      , genParens genExpr
+      , genParens (genExpr' isExp)
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
           a <- Gen.resize n' genExpr
@@ -410,6 +410,28 @@ genCompoundStatement =
           Gen.resize n1 genBlock <*>
           genWhitespaces <*> genWhitespaces <*> genNewline <*>
           Gen.resize n2 genBlock
+    ] ++
+    [ Gen.sized $ \n -> do
+        n1 <- Gen.integral $ Range.constant 1 (max 1 $ n-2)
+        n2 <- Gen.integral $ Range.constant 1 (max 1 $ n-n1-1)
+        n3 <- Gen.integral $ Range.constant 1 (max 1 $ n-n1-n2)
+        n4 <- Gen.integral $ Range.constant 0 (max 0 $ n-n1-n2-n3)
+        For () <$>
+          (NonEmpty.toList <$> genWhitespaces1) <*>
+          (Gen.resize n1 genAssignable & mapped.whitespaceAfter .~ [Space]) <*>
+          (NonEmpty.toList <$> genWhitespaces1) <*>
+          Gen.resize n2 genExpr <*>
+          genWhitespaces <*> genNewline <*>
+          Gen.resize n3 genBlock <*>
+          if n4 == 0
+          then pure Nothing
+          else
+            Gen.resize n4
+              (fmap Just $
+               (,,,) <$>
+               genWhitespaces <*> genWhitespaces <*>
+               genNewline <*> genBlock)
+    | n >= 4
     ]
 
 genStatement

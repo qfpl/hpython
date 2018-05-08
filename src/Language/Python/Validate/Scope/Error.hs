@@ -12,6 +12,7 @@ data ScopeError (v :: [*]) a
   | FoundDel a
   | FoundDynamic a (Ident v a)
   | NotInScope (Ident v a)
+  | BadShadowing (Ident v a)
   deriving (Eq, Show)
 
 makeClassyPrisms ''ScopeError

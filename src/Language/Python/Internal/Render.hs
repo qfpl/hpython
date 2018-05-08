@@ -245,6 +245,7 @@ renderSmallStatement (Assign _ lvalue ws1 ws2 rvalue) =
   renderExpr lvalue <> foldMap renderWhitespace ws1 <> "=" <>
   foldMap renderWhitespace ws2 <> renderExpr rvalue
 renderSmallStatement (Pass _) = "pass"
+renderSmallStatement (Continue _) = "continue"
 renderSmallStatement (Break _) = "break"
 renderSmallStatement (Global _ ws ids) =
   "global" <> foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids

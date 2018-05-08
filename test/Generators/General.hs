@@ -182,7 +182,7 @@ genExpr' isExp = Gen.sized $ \n ->
 genSmallStatement :: MonadGen m => m (SmallStatement '[] ())
 genSmallStatement = Gen.sized $ \n ->
   if n <= 1
-  then Gen.element $ [Pass (), Break ()]
+  then Gen.element $ [Pass (), Break (), Continue ()]
   else
     Gen.resize (n-1) .
       Gen.choice $
@@ -204,6 +204,7 @@ genSmallStatement = Gen.sized $ \n ->
               genWhitespaces1 <*>
               Gen.resize n' (genSizedCommaSep1 genIdent)
         , pure (Break ())
+        , pure (Continue ())
         , Gen.sized $ \n -> do
             n' <- Gen.integral (Range.constant 2 (n-1))
             Nonlocal () <$>

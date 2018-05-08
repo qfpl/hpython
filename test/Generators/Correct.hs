@@ -267,7 +267,7 @@ genSmallStatement
 genSmallStatement = Gen.sized $ \n -> do
   ctxt <- get
   if n <= 1
-  then Gen.element $ [Pass ()] ++ [Break () | _inLoop ctxt]
+  then Gen.element $ [Pass ()] ++ [Break () | _inLoop ctxt] ++ [Continue () | _inLoop ctxt]
   else do
     nonlocals <- use currentNonlocals
     Gen.resize (n-1) .
@@ -302,6 +302,7 @@ genSmallStatement = Gen.sized $ \n -> do
           genImportTargets
         ] ++
         [pure (Break ()) | _inLoop ctxt] ++
+        [pure (Continue ()) | _inLoop ctxt] ++
         [ Gen.sized $ \n -> do
             n' <- Gen.integral (Range.constant 2 (n-1))
             nonlocals <- use currentNonlocals

@@ -440,9 +440,11 @@ smallStatement =
   (pass <?> "pass statement") <|>
   (from <?> "import statement") <|>
   (import_ <?> "import statement") <|>
-  (break <?> "break statement")
+  (break <?> "break statement") <|>
+  (continue <?> "continue statement")
   where
     break = reserved "break" $> Break
+    continue = reserved "continue" $> Continue
     pass = reserved "pass" $> Pass
 
     assignOrExpr = do

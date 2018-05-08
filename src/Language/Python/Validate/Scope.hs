@@ -254,6 +254,7 @@ validateSmallStatementScope (Del a ws cs) =
   traverse validateIdentScope cs
 validateSmallStatementScope s@Pass{} = pure $ coerce s
 validateSmallStatementScope s@Break{} = pure $ coerce s
+validateSmallStatementScope s@Continue{} = pure $ coerce s
 validateSmallStatementScope s@Import{} = pure $ coerce s
 validateSmallStatementScope s@From{} = pure $ coerce s
 

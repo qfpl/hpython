@@ -438,6 +438,11 @@ validateSmallStatementSyntax (Break a) =
     if _inLoop sctxt
     then pure $ Break a
     else syntaxErrors [_BreakOutsideLoop # a]
+validateSmallStatementSyntax (Continue a) =
+  syntaxContext `bindValidateSyntax` \sctxt ->
+    if _inLoop sctxt
+    then pure $ Continue a
+    else syntaxErrors [_ContinueOutsideLoop # a]
 validateSmallStatementSyntax (Global a ws ids) =
   Global a ws <$> traverse validateIdent ids
 validateSmallStatementSyntax (Nonlocal a ws ids) =

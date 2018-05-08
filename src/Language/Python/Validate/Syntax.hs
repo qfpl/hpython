@@ -193,6 +193,11 @@ validateExprSyntax
      )
   => Expr v a
   -> ValidateSyntax e (Expr (Nub (Syntax ': v)) a)
+validateExprSyntax (Not a ws e) =
+  Not a <$>
+  validateWhitespace a ws <*>
+  (validateAdjacentR a (Keyword ('n' :| "ot") ws, keyword) (e, renderExpr) *>
+   validateExprSyntax e)
 validateExprSyntax (Parens a ws1 e ws2) =
   Parens a ws1 <$>
   localSyntaxContext (\c -> c { _inParens = True }) (validateExprSyntax e) <*>
@@ -433,6 +438,11 @@ validateSmallStatementSyntax (Break a) =
     if _inLoop sctxt
     then pure $ Break a
     else syntaxErrors [_BreakOutsideLoop # a]
+validateSmallStatementSyntax (Continue a) =
+  syntaxContext `bindValidateSyntax` \sctxt ->
+    if _inLoop sctxt
+    then pure $ Continue a
+    else syntaxErrors [_ContinueOutsideLoop # a]
 validateSmallStatementSyntax (Global a ws ids) =
   Global a ws <$> traverse validateIdent ids
 validateSmallStatementSyntax (Nonlocal a ws ids) =

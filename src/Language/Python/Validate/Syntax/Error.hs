@@ -18,6 +18,7 @@ data SyntaxError (v :: [*]) a
   | EmptyIdentifier a
   | BadCharacter a String
   | BreakOutsideLoop a
+  | ContinueOutsideLoop a
   | ReturnOutsideFunction a
   | NonlocalOutsideFunction a
   | ParametersNonlocal a [String]

@@ -254,6 +254,7 @@ validateSmallStatementScope (Del a ws cs) =
   traverse validateIdentScope cs
 validateSmallStatementScope s@Pass{} = pure $ coerce s
 validateSmallStatementScope s@Break{} = pure $ coerce s
+validateSmallStatementScope s@Continue{} = pure $ coerce s
 validateSmallStatementScope s@Import{} = pure $ coerce s
 validateSmallStatementScope s@From{} = pure $ coerce s
 
@@ -311,6 +312,7 @@ validateExprScope
   :: AsScopeError e v a
   => Expr v a
   -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
+validateExprScope (Not a ws e) = Not a ws <$> validateExprScope e
 validateExprScope (List a ws1 es ws2) =
   List a ws1 <$>
   traverse validateExprScope es <*>

@@ -161,7 +161,13 @@ data Expr (v :: [*]) a
   , _unsafeTupleWhitespace :: [Whitespace]
   -- [exprs]
   , _unsafeTupleTail :: Maybe (CommaSep1' (Expr v a))
-  } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+  }
+  | Not
+  { _exprAnnotation :: a
+  , _unsafeNotWhitespace :: [Whitespace]
+  , _unsafeNotValue :: Expr v a
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 instance Token (Expr v a) (Expr '[] a) where
   unvalidate = coerce
@@ -178,6 +184,7 @@ instance Token (Expr v a) (Expr '[] a) where
   startChar (Bool _ b _) = Prelude.head $ show b
   startChar String{} = '"'
   startChar (Tuple _ a _ _) = startChar a
+  startChar Not{} = 'n'
 
   endChar List{} = ']'
   endChar (Deref _ _ _ i) = Prelude.last $ _identValue i
@@ -194,6 +201,7 @@ instance Token (Expr v a) (Expr '[] a) where
   endChar (Bool _ b _) = Prelude.last $ show b
   endChar String{} = '"'
   endChar (Tuple _ a _ c) = maybe (endChar a) endChar c
+  endChar (Not _ _ e) = endChar e
 
   whitespaceAfter =
     lens
@@ -209,6 +217,7 @@ instance Token (Expr v a) (Expr '[] a) where
           Int _ _ ws -> ws
           Bool _ _ ws -> ws
           String _ _ _ _ ws -> ws
+          Not _ _ e -> e ^. getting whitespaceAfter
           Tuple _ _ ws Nothing -> ws
           Tuple _ _ _ (Just cs) -> go cs
             where
@@ -230,6 +239,7 @@ instance Token (Expr v a) (Expr '[] a) where
           Int a b _ -> Int a b ws
           Bool a b _ -> Bool a b ws
           String d a b c _ -> String d a b c ws
+          Not a b c -> Not a b (c & whitespaceAfter .~ ws)
           Tuple a e _ Nothing -> Tuple a (coerce e) ws Nothing
           Tuple a b ws (Just cs) -> Tuple a (coerce b) ws (Just $ cs & whitespaceAfter .~ ws))
 

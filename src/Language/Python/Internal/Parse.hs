@@ -162,7 +162,14 @@ expr ws = tuple_list
       int <|>
       ident' <|>
       list <|>
-      parenthesis
+      parenthesis <|>
+      not
+
+    not =
+      annotated $
+      (\a b c -> Not c a b) <$>
+      (reserved "not" *> many ws) <*>
+      expr ws
 
     ident' =
       annotated $
@@ -433,9 +440,11 @@ smallStatement =
   (pass <?> "pass statement") <|>
   (from <?> "import statement") <|>
   (import_ <?> "import statement") <|>
-  (break <?> "break statement")
+  (break <?> "break statement") <|>
+  (continue <?> "continue statement")
   where
     break = reserved "break" $> Break
+    continue = reserved "continue" $> Continue
     pass = reserved "pass" $> Pass
 
     assignOrExpr = do

@@ -220,6 +220,7 @@ data SmallStatement (v :: [*]) a
   | Assign a (Expr v a) [Whitespace] [Whitespace] (Expr v a)
   | Pass a
   | Break a
+  | Continue a
   | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Del a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
@@ -243,6 +244,7 @@ instance HasExprs SmallStatement where
   _Exprs f (Assign a e1 ws1 ws2 e2) = Assign a <$> f e1 <*> pure ws1 <*> pure ws2 <*> f e2
   _Exprs _ p@Pass{} = pure $ coerce p
   _Exprs _ p@Break{} = pure $ coerce p
+  _Exprs _ p@Continue{} = pure $ coerce p
   _Exprs _ p@Global{} = pure $ coerce p
   _Exprs _ p@Nonlocal{} = pure $ coerce p
   _Exprs _ p@Del{} = pure $ coerce p

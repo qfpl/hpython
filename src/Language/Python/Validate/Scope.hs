@@ -20,6 +20,7 @@ import Control.Lens.Traversal
 import Control.Lens.Wrapped
 import Control.Monad.State
 import Data.Coerce
+import Data.Functor (($>))
 import Data.Functor.Compose
 import Data.String
 import Data.Type.Set
@@ -215,7 +216,14 @@ validateCompoundStatementScope (For a b c d e f g h i) =
   scopeContext scImmediateScope `bindValidateScope` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty) $
-    For a b (coerce c) d <$>
+    For a b <$>
+    (traverse
+       (\s ->
+          inScope (s ^. identValue) `bindValidateScope` \res ->
+          maybe (pure ()) (\_ -> scopeErrors [_BadShadowing # coerce s]) res)
+       (c ^.. unvalidated.cosmos._Ident._2) $>
+       coerce c) <*>
+    pure d <*>
     validateExprScope e <*>
     pure f <*> pure g <*>
     (let
@@ -266,11 +274,11 @@ validateIdentScope
   :: AsScopeError e v a
   => Ident v a
   -> ValidateScope a e (Ident (Nub (Scope ': v)) a)
-validateIdentScope i@(MkIdent a s ws) =
-  inScope s `bindValidateScope`
+validateIdentScope i =
+  inScope (_identValue i) `bindValidateScope`
   \context ->
   case context of
-    Just (Clean, _) -> pure $ MkIdent a s ws
+    Just (Clean, _) -> pure $ coerce i
     Just (Dirty, ann)-> scopeErrors [_FoundDynamic # (ann, i)]
     Nothing -> scopeErrors [_NotInScope # i]
 

@@ -28,6 +28,7 @@ scopeTests =
   , ("Scope test 8", withTests 1 test_8)
   , ("Scope test 9", withTests 1 test_9)
   , ("Scope test 10", withTests 1 test_10)
+  , ("Scope test 11", withTests 1 test_11)
   ]
 
 validate
@@ -173,3 +174,16 @@ test_10 =
     res <- validate expr
     annotateShow res
     (res $> ()) === Success ()
+
+test_11 :: Property
+test_11 =
+  property $ do
+    let
+      expr =
+        def_ "test" []
+          [ "x" .= 2
+          , for_ "x" (list_ [1]) [ pass_ ]
+          ]
+    res <- validate expr
+    annotateShow res
+    res === Failure [BadShadowing (MkIdent () "x" [Space])]

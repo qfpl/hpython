@@ -230,7 +230,7 @@ genExpr' isExp = Gen.sized $ \n ->
     Gen.choice $
       [ genList genExpr
       , genDeref
-      , genParens genExpr
+      , genParens (genExpr' isExp)
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
           a <- Gen.resize n' genExpr

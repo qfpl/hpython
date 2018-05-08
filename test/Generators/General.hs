@@ -173,7 +173,7 @@ genExpr' isExp = Gen.sized $ \n ->
             (Gen.resize (n - n') (genExpr' $ case op of; Exp{} -> True; _ -> False))
             (\a b -> BinOp () a op b)
       , Gen.subtermM
-          genExpr
+          (genExpr' isExp)
           (\a -> Parens () <$> genWhitespaces <*> pure a <*> genWhitespaces)
       , genTuple genExpr
       ]
@@ -338,21 +338,21 @@ genStatement =
   else
     Gen.scale (subtract 1) $
     Gen.choice
-    [ CompoundStatement <$> genCompoundStatement
-    , Gen.sized $ \n -> do
+    [ Gen.sized $ \n -> do
         n' <- Gen.integral (Range.constant 1 n)
         n'' <- Gen.integral (Range.constant 0 (n-n'))
         SmallStatements <$>
           Gen.resize n' genSmallStatement <*>
           (if n'' == 0
-            then pure []
-            else
+           then pure []
+           else
              Gen.list
                (Range.singleton $ unSize n'')
                (Gen.resize ((n-n') `div` n'') $
                 (,,) <$> genWhitespaces <*> genWhitespaces <*> genSmallStatement)) <*>
           Gen.maybe ((,) <$> genWhitespaces <*> genWhitespaces) <*>
           genNewline
+    , CompoundStatement <$> genCompoundStatement
     ]
 
 genModule :: MonadGen m => m (Module '[] ())

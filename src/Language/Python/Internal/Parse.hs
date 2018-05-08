@@ -124,7 +124,7 @@ commaSep1' ws e = do
       optional (commaSep1' ws e)
 
 parameter :: DeltaParsing m => m (Untagged Param Span)
-parameter = posparam <|> kwparam 
+parameter = posparam <|> kwparam
   where
     kwparam =
       (\a b c d -> KeywordParam d a b c) <$>
@@ -351,7 +351,8 @@ compoundStatement =
   (fundef <?> "function definition") <|>
   (ifSt <?> "if statement") <|>
   (while <?> "while statement") <|>
-  (trySt <?> "try statement")
+  (trySt <?> "try statement") <|>
+  (for <?> "for statement")
   where
     trySt =
       (\b c d e f g ->
@@ -412,6 +413,17 @@ compoundStatement =
       expr whitespace <*>
       many whitespace <* char ':' <*>
       many whitespace <*> newline <*> block
+    for =
+      (\a b c d e f g h i -> For i a b c d e f g h) <$>
+      (reserved "for" *> many whitespace) <*> expr whitespace <*>
+      (reserved "in" *> many whitespace) <*> expr whitespace <*
+      char ':' <*> many whitespace <*> newline <*>
+      block <*>
+      optional
+        ((,,,) <$ reserved "else" <*>
+         many whitespace <* char ':' <*>
+         many whitespace <*> newline <*>
+         block)
 
 smallStatement :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (SmallStatement '[] Span)
 smallStatement =

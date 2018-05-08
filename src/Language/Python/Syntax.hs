@@ -112,11 +112,14 @@ infixl 9 />
 neg :: Expr '[] () -> Expr '[] ()
 neg = negate
 
+toBlock :: NonEmpty (Statement vs ()) -> Block vs ()
+toBlock sts = Block $ (,,) () [Space, Space, Space, Space] . Right <$> sts
+
 if_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 if_ e sts =
   CompoundStatement $
   If () [Space] e [] [] LF
-    (Block $ (,,) () [Space, Space, Space, Space] . Right <$> sts)
+    (toBlock sts)
     Nothing
 
 while_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
@@ -124,14 +127,14 @@ while_ e sts =
   CompoundStatement $
   While () [Space] e
     [] [] LF
-    (Block $ (,,) () [Space, Space, Space, Space] . Right <$> sts)
+    (toBlock sts)
 
 ifElse_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 ifElse_ e sts sts' =
   CompoundStatement $
   If () [Space] e [] [] LF
-    (Block $ (,,) () [Space, Space, Space, Space] . Right <$> sts)
-    (Just ([], [], LF, Block $ (,,) () [Space, Space, Space, Space] . Right <$> sts'))
+    (toBlock sts)
+    (Just ([], [], LF, toBlock sts'))
 
 var_ :: String -> Expr '[] ()
 var_ s = Ident () (MkIdent () s [])
@@ -165,3 +168,22 @@ longStr_ s = String () Nothing LongDouble s []
 
 (.=) :: Expr '[] () -> Expr '[] () -> Statement '[] ()
 (.=) a b = SmallStatements (Assign () a [Space] [Space] b) [] Nothing LF
+
+forElse_
+  :: Expr '[] ()
+  -> Expr '[] ()
+  -> NonEmpty (Statement '[] ())
+  -> NonEmpty (Statement '[] ())
+  -> Statement '[] ()
+forElse_ val vals block els =
+  CompoundStatement $
+  For () [Space] (val & whitespaceAfter .~ [Space]) [Space] vals [] LF
+    (toBlock block)
+    (Just ([], [], LF, toBlock els))
+
+for_ :: Expr '[] () -> Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
+for_ val vals block =
+  CompoundStatement $
+  For () [Space] (val & whitespaceAfter .~ [Space]) [Space] vals [] LF
+    (toBlock block)
+    Nothing

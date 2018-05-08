@@ -210,6 +210,21 @@ validateCompoundStatementScope (TryFinally a b c d e f g h i) =
      validateBlockScope e <*>
      pure f <*> pure g <*> pure h <*>
      validateBlockScope i)))
+validateCompoundStatementScope (For a b c d e f g h i) =
+  scopeContext scLocalScope `bindValidateScope` (\ls ->
+  scopeContext scImmediateScope `bindValidateScope` (\is ->
+  locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
+  locallyOver scImmediateScope (const Trie.empty) $
+    For a b (coerce c) d <$>
+    validateExprScope e <*>
+    pure f <*> pure g <*>
+    (let
+       ls = c ^.. unvalidated.cosmos._Ident._2.to (_identAnnotation &&& _identValue)
+     in
+       extendScope scLocalScope ls *>
+       extendScope scImmediateScope ls *>
+       validateBlockScope h) <*>
+    traverseOf (traverse._4) validateBlockScope i))
 
 validateSmallStatementScope
   :: AsScopeError e v a

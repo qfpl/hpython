@@ -26,6 +26,8 @@ scopeTests =
   , ("Scope test 6", withTests 1 test_6)
   , ("Scope test 7", withTests 1 test_7)
   , ("Scope test 8", withTests 1 test_8)
+  , ("Scope test 9", withTests 1 test_9)
+  , ("Scope test 10", withTests 1 test_10)
   ]
 
 validate
@@ -142,6 +144,31 @@ test_8 =
           [ ifElse_ true_ [ pass_ ] [ var_ "x" .= 3 ]
           , var_ "x" .= 1
           , expr_ "x"
+          ]
+    res <- validate expr
+    annotateShow res
+    (res $> ()) === Success ()
+
+test_9 :: Property
+test_9 =
+  property $ do
+    let
+      expr =
+        def_ "test" []
+          [ for_ "x" (list_ [1]) [ pass_ ]
+          , expr_ "x"
+          ]
+    res <- validate expr
+    annotateShow res
+    res === Failure [FoundDynamic () (MkIdent () "x" [])]
+
+test_10 :: Property
+test_10 =
+  property $ do
+    let
+      expr =
+        def_ "test" []
+          [ for_ "x" (list_ [1]) [ expr_ "x" ]
           ]
     res <- validate expr
     annotateShow res

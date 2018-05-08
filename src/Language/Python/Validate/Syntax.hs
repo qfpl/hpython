@@ -329,6 +329,26 @@ validateCompoundStatementSyntax (TryFinally a b c d e f g h i) =
   validateBlockSyntax e <*>
   validateWhitespace a f <*> validateWhitespace a g <*> pure h <*>
   validateBlockSyntax i
+validateCompoundStatementSyntax (For a b c d e f g h i) =
+  For a <$>
+  validateWhitespace a b <*>
+  (validateAdjacentR a (Keyword ('f' :| "or") b, keyword) (c, renderExpr) *>
+   if canAssignTo c
+   then validateExprSyntax c
+   else syntaxErrors [_CannotAssignTo # (a, c)]) <*>
+  validateWhitespace a d <*>
+  validateExprSyntax e <*>
+  validateWhitespace a f <*>
+  pure g <*>
+  validateBlockSyntax h <*>
+  traverse
+    (\(x, y, z, w) ->
+       (,,,) <$>
+       validateWhitespace a x <*>
+       validateWhitespace a y <*>
+       pure z <*>
+       validateBlockSyntax w)
+    i
 
 validateExceptAsSyntax
   :: ( AsSyntaxError e v a

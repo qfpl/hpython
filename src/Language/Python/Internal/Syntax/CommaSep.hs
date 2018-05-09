@@ -10,6 +10,7 @@ import Data.Function ((&))
 import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe)
+import Data.Semigroup (Semigroup(..))
 
 import Language.Python.Internal.Syntax.Token
 import Language.Python.Internal.Syntax.Whitespace
@@ -37,6 +38,13 @@ data CommaSep1 a
   = CommaSepOne1 a
   | CommaSepMany1 a [Whitespace] (CommaSep1 a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance Semigroup (CommaSep1 a) where
+  a <> b =
+    CommaSepMany1
+      (case a of; CommaSepOne1 x -> x;  CommaSepMany1 x _ _  -> x)
+      (case a of; CommaSepOne1 _ -> []; CommaSepMany1 _ ws _ -> ws)
+      (case a of; CommaSepOne1 _ -> b;  CommaSepMany1 _ _ x  -> x <> b)
 
 instance Token s t => Token (CommaSep1 s) (CommaSep1 t) where
   unvalidate = fmap unvalidate

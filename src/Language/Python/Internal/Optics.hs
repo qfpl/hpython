@@ -130,6 +130,8 @@ instance HasNewlines CompoundStatement where
         pure f <*> pure g <*> fun h <*> _Newlines fun i
       For a b c d e f g h i ->
         For a b c d e f <$> fun g <*> _Newlines fun h <*> (traverse._4._Newlines) fun i
+      ClassDef a b c d e f g ->
+        ClassDef a b (coerce c) (coerce d) e <$> fun f <*> _Newlines fun g
 
 instance HasNewlines Statement where
   _Newlines f (CompoundStatement c) = CompoundStatement <$> _Newlines f c

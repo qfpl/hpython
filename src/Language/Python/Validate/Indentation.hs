@@ -130,6 +130,8 @@ validateCompoundStatementIndentation (For a b c d e f g h i) =
   validateExprIndentation e <*> pure f <*> pure g <*>
   validateBlockIndentation h <*>
   traverseOf (traverse._4) validateBlockIndentation i
+validateCompoundStatementIndentation (ClassDef a b c d e f g) =
+  ClassDef a b (coerce c) (coerce d) e f <$> validateBlockIndentation g
 
 validateStatementIndentation
   :: AsIndentationError e v a

@@ -124,24 +124,25 @@ commaSep1' ws e = do
       optional (commaSep1' ws e)
 
 parameter :: DeltaParsing m => m (Untagged Param Span)
-parameter = posparam <|> kwparam
-  where
-    kwparam =
-      (\a b c d -> KeywordParam d a b c) <$>
-      (identifier anyWhitespace <* char '=') <*>
-      many anyWhitespace <*>
-      expr anyWhitespace
-    posparam = flip PositionalParam <$> identifier anyWhitespace <* notFollowedBy (char '=')
+parameter =
+  (\a b c -> maybe (PositionalParam c a) (uncurry $ KeywordParam c a) b) <$>
+  identifier anyWhitespace <*>
+  optional
+    ((,) <$>
+     (char '=' *> many anyWhitespace) <*>
+     expr anyWhitespace)
 
 argument :: DeltaParsing m => m (Untagged Arg Span)
-argument = posarg <|> kwarg
-  where
-    posarg = flip PositionalArg <$> expr anyWhitespace <* notFollowedBy (char '=')
-    kwarg =
-      (\a b c d -> KeywordArg d a b c) <$>
-      (identifier anyWhitespace <* char '=') <*>
-      many anyWhitespace <*>
-      expr anyWhitespace
+argument = do
+  e <- expr anyWhitespace
+  case e of
+    Ident _ f ->
+      (\a b -> maybe (PositionalArg b e) (uncurry $ KeywordArg b f) a) <$>
+      optional
+        ((,) <$>
+         (char '=' *> many anyWhitespace) <*>
+         expr anyWhitespace)
+    _ -> pure $ flip PositionalArg e
 
 stringPrefix :: CharParsing m => m StringPrefix
 stringPrefix =
@@ -359,7 +360,8 @@ compoundStatement =
   (ifSt <?> "if statement") <|>
   (while <?> "while statement") <|>
   (trySt <?> "try statement") <|>
-  (for <?> "for statement")
+  (for <?> "for statement") <|>
+  (classSt <?> "class definition")
   where
     trySt =
       (\b c d e f g ->
@@ -431,6 +433,18 @@ compoundStatement =
          many whitespace <* char ':' <*>
          many whitespace <*> newline <*>
          block)
+    classSt =
+      (\a b c d e f g -> ClassDef g a b c d e f) <$>
+      (reserved "class" *> some1 whitespace) <*>
+      identifier whitespace <*>
+      optional
+        ((,,) <$>
+         (char '(' *> many anyWhitespace) <*>
+         optional (commaSep1 (annotated argument)) <*>
+         (char ')' *> many whitespace)) <*>
+      (char ':' *> many whitespace) <*>
+      newline <*>
+      block
 
 smallStatement :: (DeltaParsing m, MonadState [[Whitespace]] m) => m (SmallStatement '[] Span)
 smallStatement =

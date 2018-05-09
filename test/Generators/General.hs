@@ -224,7 +224,8 @@ genSmallStatement = Gen.sized $ \n ->
         ]
 
 genCompoundStatement
-  :: MonadGen m => m (CompoundStatement '[] ())
+  :: MonadGen m
+  => m (CompoundStatement '[] ())
 genCompoundStatement =
   Gen.sized $ \n ->
   Gen.resize (n-1) .
@@ -303,6 +304,20 @@ genCompoundStatement =
           Gen.resize n1 genBlock <*>
           genWhitespaces <*> genWhitespaces <*> genNewline <*>
           Gen.resize n2 genBlock
+    , Gen.sized $ \n -> do
+        n1 <- Gen.integral $ Range.constant 0 (n-1)
+        ClassDef () <$>
+          genWhitespaces1 <*>
+          genIdent <*>
+          Gen.maybe
+            ((,,) <$>
+             genWhitespaces <*>
+             (if n1 == 0
+              then pure Nothing
+              else fmap Just . Gen.resize n1 $ genSizedCommaSep1 (genArg genExpr)) <*>
+             genWhitespaces) <*>
+          genWhitespaces <*> genNewline <*>
+          Gen.resize (n - n1 - 1) genBlock
     ] ++
     [ Gen.sized $ \n -> do
         n1 <- Gen.integral $ Range.constant 1 (max 1 $ n-2)

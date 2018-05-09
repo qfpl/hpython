@@ -233,6 +233,12 @@ validateCompoundStatementScope (For a b c d e f g h i) =
        extendScope scImmediateScope ls *>
        validateBlockScope h) <*>
     traverseOf (traverse._4) validateBlockScope i))
+validateCompoundStatementScope (ClassDef a b c d e f g) =
+  ClassDef a b (coerce c) <$>
+  traverseOf (traverse._2.traverse.traverse) validateArgScope d <*>
+  pure e <*> pure f <*>
+  validateBlockScope g <*
+  extendScope scImmediateScope [c ^. to (_identAnnotation &&& _identValue)]
 
 validateSmallStatementScope
   :: AsScopeError e v a

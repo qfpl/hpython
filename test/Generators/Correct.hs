@@ -147,6 +147,20 @@ genArgs =
     -- appendCommaSep pargs (appendCommaSep sargs kwargs)
     pure $ appendCommaSep pargs kwargs
 
+genArgs1 :: MonadGen m => m (CommaSep1 (Arg '[] ()))
+genArgs1 =
+  Gen.sized $ \n -> do
+    n1 <- Gen.integral (Range.constant 0 n)
+    n2 <- Gen.integral (Range.constant 0 $ n-n1)
+    let n3 = n - n1 - n2
+
+    pargs <- Gen.resize n1 $ genSizedCommaSep1 genPositionalArg
+    -- sargs <- Gen.resize n2 $ genSizedCommaSep genStarArg
+    kwargs <- Gen.resize n3 $ genSizedCommaSep1 genKeywordArg
+
+    -- appendCommaSep pargs (appendCommaSep sargs kwargs)
+    pure $ pargs <> kwargs
+
 genPositionalParams :: MonadGen m => m (CommaSep (Param '[] ()))
 genPositionalParams =
   Gen.scale (max 0 . subtract 1) $
@@ -412,6 +426,20 @@ genCompoundStatement =
           Gen.resize n1 genBlock <*>
           genWhitespaces <*> genWhitespaces <*> genNewline <*>
           Gen.resize n2 genBlock
+    , Gen.sized $ \n -> do
+        n1 <- Gen.integral $ Range.constant 0 (n-1)
+        ClassDef () <$>
+          genWhitespaces1 <*>
+          genIdent <*>
+          Gen.maybe
+            ((,,) <$>
+             genWhitespaces <*>
+             (if n1 == 0
+              then pure Nothing
+              else fmap Just $ Gen.resize n1 genArgs1) <*>
+             genWhitespaces) <*>
+          genWhitespaces <*> genNewline <*>
+          Gen.resize (n - n1 - 1) genBlock
     ] ++
     [ Gen.sized $ \n -> do
         n1 <- Gen.integral $ Range.constant 1 (max 1 $ n-2)

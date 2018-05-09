@@ -147,10 +147,10 @@ validateIdent (MkIdent a name ws)
   | otherwise = pure $ MkIdent a name ws
 
 validateWhitespace
-  :: AsSyntaxError e v a
+  :: (AsSyntaxError e v a, Foldable f)
   => a
-  -> [Whitespace]
-  -> ValidateSyntax e [Whitespace]
+  -> f Whitespace
+  -> ValidateSyntax e (f Whitespace)
 validateWhitespace ann ws =
   syntaxContext `bindValidateSyntax` \ctxt ->
   if _inParens ctxt
@@ -354,6 +354,21 @@ validateCompoundStatementSyntax (For a b c d e f g h i) =
        pure z <*>
        validateBlockSyntax w)
     i
+validateCompoundStatementSyntax (ClassDef a b c d e f g) =
+  ClassDef a <$>
+  validateWhitespace a b <*>
+  validateIdent c <*>
+  traverse
+    (\(x, y, z) ->
+       (,,) <$>
+       validateWhitespace a x <*>
+       traverse
+         (localSyntaxContext (\ctxt -> ctxt { _inParens = True}) . validateArgsSyntax)
+         y <*>
+       validateWhitespace a z)
+    d <*>
+  validateWhitespace a e <*> pure f <*>
+  validateBlockSyntax g
 
 validateExceptAsSyntax
   :: ( AsSyntaxError e v a
@@ -500,10 +515,12 @@ canAssignTo _ = True
 validateArgsSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
+     , Functor f
+     , Foldable f
      )
-  => CommaSep (Arg v a)
-  -> ValidateSyntax e (CommaSep (Arg (Nub (Syntax ': v)) a))
-validateArgsSyntax e = go [] False (toList e) $> coerce e
+  => f (Arg v a)
+  -> ValidateSyntax e (f (Arg (Nub (Syntax ': v)) a))
+validateArgsSyntax e = go [] False (toList e) $> fmap coerce e
   where
     go
       :: (AsSyntaxError e v a, Member Indentation v)

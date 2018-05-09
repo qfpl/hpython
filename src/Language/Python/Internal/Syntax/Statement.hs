@@ -65,7 +65,7 @@ newtype Block v a
          ( a
          , [Whitespace]
          , Either
-             (Comment, Newline)
+             (Maybe Comment, Newline)
              (Statement v a)
          )
   }
@@ -99,6 +99,8 @@ instance HasBlocks CompoundStatement where
     For a b (coerce c) d (coerce e) f g <$>
     fun h <*>
     (traverse._4) fun i
+  _Blocks fun (ClassDef a b c d e f g) =
+    ClassDef a b (coerce c) (coerce d) e f <$> fun g
 
 instance HasStatements Block where
   _Statements = _Wrapped.traverse._3._Right
@@ -144,6 +146,8 @@ instance Plated (Statement '[] a) where
         For a b c d e f g <$>
         (_Wrapped.traverse._3._Right) fun h <*>
         (traverse._4._Wrapped.traverse._3._Right) fun i
+      ClassDef a b c d e f g ->
+        ClassDef a b c d e f <$> (_Wrapped.traverse._3._Right) fun g
 
 instance HasExprs Statement where
   _Exprs f (SmallStatements s ss a b) =
@@ -299,6 +303,10 @@ data CompoundStatement (v :: [*]) a
       (Block v a)
       -- [else:]
       (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
+  | ClassDef a
+      (NonEmpty Whitespace) (Ident v a)
+      (Maybe ([Whitespace], Maybe (CommaSep1 (Arg v a)), [Whitespace])) [Whitespace] Newline
+      (Block v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasExprs ExceptAs where
@@ -341,6 +349,10 @@ instance HasExprs CompoundStatement where
     For a b <$> fun c <*> pure d <*> fun e <*>
     pure f <*> pure g <*> (_Wrapped.traverse._3._Right._Exprs) fun h <*>
     (traverse._4._Wrapped.traverse._3._Right._Exprs) fun i
+  _Exprs fun (ClassDef a b c d e f g) =
+    ClassDef a b (coerce c) <$>
+    (traverse._2.traverse.traverse._Exprs) fun d <*> pure e <*> pure f <*>
+    (_Wrapped.traverse._3._Right._Exprs) fun g
 
 makeWrapped ''Block
 makeLenses ''ExceptAs

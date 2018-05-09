@@ -268,7 +268,7 @@ renderBlock =
        (foldMap renderWhitespace a <>) <$>
        either
          (\(y, z) ->
-            OneLine $ renderComment y <> renderNewline z)
+            OneLine $ foldMap renderComment y <> renderNewline z)
           renderStatement
           b) .
   view _Wrapped
@@ -352,6 +352,18 @@ renderCompoundStatement (For _ a b c d e f g h) =
          z
          (renderBlock w))
     h
+renderCompoundStatement (ClassDef _ a b c d e f) =
+  ManyLines
+    ("class" <> foldMap renderWhitespace a <> renderIdent b <>
+     foldMap
+       (\(x, y, z) ->
+          "(" <> foldMap renderWhitespace x <>
+          foldMap (renderCommaSep1 renderArg) y <>
+          ")" <> foldMap renderWhitespace z)
+       c <>
+     ":" <> foldMap renderWhitespace d)
+    e
+    (renderBlock f)
 
 renderStatement :: Statement v a -> Lines String
 renderStatement (CompoundStatement c) = renderCompoundStatement c

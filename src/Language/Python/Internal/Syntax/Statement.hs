@@ -65,7 +65,7 @@ newtype Block v a
          ( a
          , [Whitespace]
          , Either
-             (Comment, Newline)
+             (Maybe Comment, Newline)
              (Statement v a)
          )
   }

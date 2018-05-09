@@ -322,8 +322,8 @@ block = fmap Block ((\(a :| b) c -> a :| (b ++ c)) <$> firsts <*> go) <* dedent
       liftA2 NonEmpty.cons
         (annotated $
          (\a b d -> (d, a, b)) <$>
-         try (many whitespace <* notFollowedBy (noneOf "#")) <*>
-         fmap Left ((,) <$> comment <*> newline))
+         try (many whitespace <* notFollowedBy (noneOf "#\r\n")) <*>
+         fmap Left ((,) <$> optional comment <*> newline))
         firsts
       <|>
       fmap pure
@@ -337,8 +337,8 @@ block = fmap Block ((\(a :| b) c -> a :| (b ++ c)) <$> firsts <*> go) <* dedent
       (\(f :~ a) -> f a) <$>
       spanned
         (((\a b d -> (d, a, b)) <$>
-         try (many whitespace <* notFollowedBy (noneOf "#")) <*>
-         fmap Left ((,) <$> comment <*> newline)) <|>
+         try (many whitespace <* notFollowedBy (noneOf "#\r\n")) <*>
+         fmap Left ((,) <$> optional comment <*> newline)) <|>
 
         ((\a b d -> (d, a, b)) <$>
          (try level *> fmap head get) <*>

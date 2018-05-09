@@ -378,7 +378,6 @@ class ModuleDepFinder(ast.NodeVisitor):
     # This code currently does not handle:
     # * relative imports from py2.6+ from . import urls
     IMPORT_PREFIX_SIZE = len('ansible.module_utils.')
-
     def __init__(self, *args, **kwargs):
         """
         Walk the ast tree for the python module.

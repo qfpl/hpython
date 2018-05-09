@@ -268,7 +268,7 @@ renderBlock =
        (foldMap renderWhitespace a <>) <$>
        either
          (\(y, z) ->
-            OneLine $ renderComment y <> renderNewline z)
+            OneLine $ foldMap renderComment y <> renderNewline z)
           renderStatement
           b) .
   view _Wrapped

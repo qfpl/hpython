@@ -46,6 +46,7 @@ fixMutableDefaultArguments input = do
     isMutable Call{} = True
     isMutable BinOp{} = True
     isMutable Negate{} = True
+    isMutable Not{} = True
     isMutable Ident{} = True
     isMutable (Parens _ _ a _) = isMutable a
     isMutable (Tuple _ a _ as) = isMutable a || any (any isMutable) as

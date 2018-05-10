@@ -182,7 +182,7 @@ renderExpr (Call _ expr ws args ws2) =
      BinOp {} -> "(" <> renderExpr expr <> ")"
      Tuple {} -> "(" <> renderExpr expr <> ")"
      _ -> renderExpr expr) <>
-  "(" <> foldMap renderWhitespace ws <> foldMap renderArg args <>
+  "(" <> foldMap renderWhitespace ws <> renderCommaSep renderArg args <>
   ")" <> foldMap renderWhitespace ws2
 renderExpr (Deref _ expr ws name) =
   (case expr of

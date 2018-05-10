@@ -45,6 +45,18 @@ data Param (v :: [*]) a
   , _unsafeKeywordParamWhitespaceRight :: [Whitespace]
   , _unsafeKeywordParamExpr :: Expr v a
   }
+  | StarParam
+  { _paramAnn :: a
+  -- '*' spaces
+  , _unsafeStarParamWhitespace :: [Whitespace]
+  , _paramName :: Ident v a
+  }
+  | DoubleStarParam
+  { _paramAnn :: a
+  -- '**' spaces
+  , _unsafeDoubleStarParamWhitespace :: [Whitespace]
+  , _paramName :: Ident v a
+  }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 paramAnn :: Lens' (Param v a) a

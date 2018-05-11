@@ -69,6 +69,8 @@ instance HasExprs Param where
   _Exprs f (KeywordParam a name ws2 expr) =
     KeywordParam a (coerce name) <$> pure ws2 <*> f expr
   _Exprs _ p@PositionalParam{} = pure $ coerce p
+  _Exprs _ p@StarParam{} = pure $ coerce p
+  _Exprs _ p@DoubleStarParam{} = pure $ coerce p
 
 newtype Block v a
   = Block

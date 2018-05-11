@@ -21,11 +21,15 @@ import Generators.Common
 
 genParam :: MonadGen m => m (Expr '[] ()) -> m (Param '[] ())
 genParam genExpr = Gen.sized $ \n ->
-  if n <= 1
-  then PositionalParam () <$> genIdent
-  else
-    Gen.resize (n-1) $
-    KeywordParam () <$> genIdent <*> genWhitespaces <*> genExpr
+  Gen.choice $
+    (if n <= 1
+     then PositionalParam () <$> genIdent
+     else
+       Gen.resize (n-1) $
+       KeywordParam () <$> genIdent <*> genWhitespaces <*> genExpr) :
+    [ StarParam () <$> genWhitespaces <*> genIdent
+    , DoubleStarParam () <$> genWhitespaces <*> genIdent
+    ]
 
 genArg :: MonadGen m => m (Expr '[] ()) -> m (Arg '[] ())
 genArg genExpr = Gen.sized $ \n ->

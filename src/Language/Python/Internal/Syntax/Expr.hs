@@ -279,6 +279,7 @@ shouldBracketLeft op left =
       case (left, op) of
         (Negate{}, Exp{}) -> True
         (Tuple{}, _) -> True
+        (Not{}, _) -> True
         _ -> maybe False (\p -> p < entry ^. opPrec) (lEntry ^? _Just.opPrec)
   in
     leftf || leftf'
@@ -301,6 +302,7 @@ shouldBracketRight op right =
     rightf' =
       case (op, right) of
         (_, Tuple{}) -> True
+        (_, Not{}) -> True
         _ -> maybe False (\p -> p < entry ^. opPrec) (rEntry ^? _Just.opPrec)
   in
     rightf || rightf'

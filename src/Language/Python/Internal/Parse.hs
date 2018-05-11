@@ -130,7 +130,15 @@ parameter =
   optional
     ((,) <$>
      (char '=' *> many anyWhitespace) <*>
-     expr anyWhitespace)
+     expr anyWhitespace) <|>
+  char '*' *>
+  ((\a b c -> DoubleStarParam c a b) <$
+   char '*' <*> many anyWhitespace <*>
+   identifier anyWhitespace <|>
+
+   (\a b c -> StarParam c a b) <$>
+   many anyWhitespace <*>
+   identifier anyWhitespace)
 
 argument :: DeltaParsing m => m (Untagged Arg Span)
 argument = do

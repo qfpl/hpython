@@ -189,6 +189,7 @@ renderExpr (Deref _ expr ws name) =
     Int{} -> "(" <> renderExpr expr <> ")"
     BinOp{} -> "(" <> renderExpr expr <> ")"
     Tuple{} -> "(" <> renderExpr expr <> ")"
+    Not{} -> "(" <> renderExpr expr <> ")"
     _ -> renderExpr expr) <>
   "." <>
   foldMap renderWhitespace ws <>

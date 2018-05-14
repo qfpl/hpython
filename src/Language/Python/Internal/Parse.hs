@@ -130,7 +130,15 @@ parameter =
   optional
     ((,) <$>
      (char '=' *> many anyWhitespace) <*>
-     expr anyWhitespace)
+     exprNoList anyWhitespace) <|>
+  char '*' *>
+  ((\a b c -> DoubleStarParam c a b) <$
+   char '*' <*> many anyWhitespace <*>
+   identifier anyWhitespace <|>
+
+   (\a b c -> StarParam c a b) <$>
+   many anyWhitespace <*>
+   identifier anyWhitespace)
 
 argument :: DeltaParsing m => m (Untagged Arg Span)
 argument = do
@@ -156,6 +164,17 @@ stringPrefix =
 expr :: DeltaParsing m => m Whitespace -> m (Expr '[] Span)
 expr ws = tuple_list
   where
+    tuple_list =
+      annotated $
+      (\a b c -> either (const a) (uncurry (Tuple c a)) b) <$>
+      exprNoList ws <*>
+      (fmap Left (notFollowedBy $ char ',') <|>
+       fmap Right
+         ((,) <$> (char ',' *> many ws) <*> optional (commaSep1' ws (exprNoList ws))))
+
+exprNoList :: DeltaParsing m => m Whitespace -> m (Expr '[] Span)
+exprNoList ws = orExpr ws
+  where
     atom =
       bool <|>
       none <|>
@@ -175,14 +194,6 @@ expr ws = tuple_list
     ident' =
       annotated $
       flip Ident <$> identifier ws
-
-    tuple_list =
-      annotated $
-      (\a b c -> either (const a) (uncurry (Tuple c a)) b) <$>
-      orExpr ws <*>
-      (fmap Left (notFollowedBy $ char ',') <|>
-       fmap Right
-         ((,) <$> (char ',' *> many ws) <*> optional (commaSep1' ws (orExpr ws))))
 
     list =
       annotated $

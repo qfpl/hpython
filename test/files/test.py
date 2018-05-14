@@ -6,3 +6,6 @@ def thing():
 
 def    hello():
     what; up;
+
+def boo(a, *b, c=1, **d):
+    pass

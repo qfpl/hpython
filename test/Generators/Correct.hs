@@ -8,6 +8,7 @@ import Control.Applicative
 import Control.Lens.Fold
 import Control.Lens.Getter
 import Control.Lens.Plated
+import Control.Lens.Prism (_Just)
 import Control.Lens.Setter
 import Control.Lens.Tuple
 import Control.Lens.TH
@@ -155,18 +156,14 @@ genArgs1 =
     let n3 = n - n1 - n2
 
     pargs <- Gen.resize n1 $ genSizedCommaSep1 genPositionalArg
-    -- sargs <- Gen.resize n2 $ genSizedCommaSep genStarArg
     kwargs <- Gen.resize n3 $ genSizedCommaSep1 genKeywordArg
 
-    -- appendCommaSep pargs (appendCommaSep sargs kwargs)
     pure $ pargs <> kwargs
 
 genPositionalParams :: MonadGen m => m (CommaSep (Param '[] ()))
 genPositionalParams =
   Gen.scale (max 0 . subtract 1) $
-  Gen.sized $ \n -> do
-    idents <- go [] n
-    pure . listToCommaSep $ PositionalParam () <$> idents
+  Gen.sized $ fmap (listToCommaSep . fmap (PositionalParam ())) . go []
   where
     go seen 0 = pure []
     go seen n = do
@@ -181,6 +178,20 @@ genKeywordParam positionals =
   genWhitespaces <*>
   genExpr
 
+genStarParam :: MonadGen m => [String] -> m (Param '[] ())
+genStarParam positionals =
+  Gen.scale (max 0 . subtract 1) $
+  StarParam () <$>
+  genWhitespaces <*>
+  Gen.filter (\i -> _identValue i `notElem` positionals) genIdent
+
+genDoubleStarParam :: MonadGen m => [String] -> m (Param '[] ())
+genDoubleStarParam positionals =
+  Gen.scale (max 0 . subtract 1) $
+  DoubleStarParam () <$>
+  genWhitespaces <*>
+  Gen.filter (\i -> _identValue i `notElem` positionals) genIdent
+
 genParams :: MonadGen m => m (CommaSep (Param '[] ()))
 genParams =
   Gen.sized $ \n -> do
@@ -189,13 +200,22 @@ genParams =
     let n3 = n - n1 - n2
 
     pparams <- Gen.resize n1 genPositionalParams
-    -- sparams <- Gen.resize n2 $ genSizedCommaSep genStarParam
+    let
+      pparamNames = pparams ^.. folded.paramName.identValue
+    sp <- Gen.maybe $ genStarParam pparamNames
+    let
+      pparamNames' = pparamNames <> (sp ^.. _Just.paramName.identValue)
     kwparams <-
       Gen.resize n3 $
-      genSizedCommaSep (genKeywordParam $ pparams ^.. folded.paramName.identValue)
+      genSizedCommaSep (genKeywordParam pparamNames')
+    let
+      pparamNames'' = pparamNames' <> kwparams ^.. folded.paramName.identValue
+    dsp <- Gen.maybe $ genDoubleStarParam pparamNames''
 
-    -- appendCommaSep pparams (appendCommaSep sparams kwparams)
-    pure $ appendCommaSep pparams kwparams
+    pure $
+      appendCommaSep
+        (pparams `appendCommaSep` maybe CommaSepNone CommaSepOne sp)
+        (kwparams `appendCommaSep` maybe CommaSepNone CommaSepOne dsp)
 
 genList :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
 genList genExpr' =

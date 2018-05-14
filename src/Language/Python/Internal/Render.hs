@@ -189,6 +189,7 @@ renderExpr (Deref _ expr ws name) =
     Int{} -> "(" <> renderExpr expr <> ")"
     BinOp{} -> "(" <> renderExpr expr <> ")"
     Tuple{} -> "(" <> renderExpr expr <> ")"
+    Not{} -> "(" <> renderExpr expr <> ")"
     _ -> renderExpr expr) <>
   "." <>
   foldMap renderWhitespace ws <>
@@ -397,6 +398,8 @@ renderParams :: CommaSep (Param v a) -> String
 renderParams a = "(" <> renderCommaSep go a <> ")"
   where
     go (PositionalParam _ name) = renderIdent name
+    go (StarParam _ ws name) = "*" <> foldMap renderWhitespace ws <> renderIdent name
+    go (DoubleStarParam _ ws name) = "**" <> foldMap renderWhitespace ws <> renderIdent name
     go (KeywordParam _ name ws2 expr) =
       renderIdent name <> "=" <>
       foldMap renderWhitespace ws2 <> renderExpr expr

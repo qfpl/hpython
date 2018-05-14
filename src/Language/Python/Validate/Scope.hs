@@ -306,6 +306,8 @@ validateParamScope (PositionalParam a ident) =
   pure . PositionalParam a $ coerce ident
 validateParamScope (KeywordParam a ident ws2 expr) =
   KeywordParam a (coerce ident) ws2 <$> validateExprScope expr
+validateParamScope a@StarParam{} = pure $ coerce a
+validateParamScope a@DoubleStarParam{} = pure $ coerce a
 
 validateBlockScope
   :: AsScopeError e v a

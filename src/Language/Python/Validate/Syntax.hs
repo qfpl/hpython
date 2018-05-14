@@ -568,6 +568,16 @@ validateParamsSyntax e = go [] False (toList e) $> coerce e
             (:)
             (PositionalParam a <$> validateIdent name)
             (go (_identValue name:names) False params)
+    go names seen (StarParam a ws name : params)
+      | _identValue name `elem` names =
+          syntaxErrors [_DuplicateArgument # (a, _identValue name)] <*>
+          validateIdent name <*>
+          go (_identValue name:names) seen params
+      | otherwise =
+          liftA2
+            (:)
+            (StarParam a ws <$> validateIdent name)
+            (go (_identValue name:names) seen params)
     go names True (PositionalParam a name : params) =
       let
         name' = _identValue name
@@ -586,6 +596,16 @@ validateParamsSyntax e = go [] False (toList e) $> coerce e
              pure ws2 <*>
              validateExprSyntax expr)
             (go (_identValue name:names) True params)
+    go names _ [DoubleStarParam a ws name]
+      | _identValue name `elem` names =
+          syntaxErrors [_DuplicateArgument # (a, _identValue name)]
+      | otherwise =
+          fmap pure $ DoubleStarParam a ws <$> validateIdent name
+    go names _ (DoubleStarParam a ws name : _) =
+      (if _identValue name `elem` names
+       then syntaxErrors [_DuplicateArgument # (a, _identValue name)]
+       else pure ()) *>
+      syntaxErrors [_UnexpectedDoubleStarParam # (a, _identValue name)]
 
 validateModuleSyntax
   :: ( AsSyntaxError e v a

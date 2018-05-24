@@ -495,7 +495,7 @@ validateStatementSyntax (CompoundStatement c) =
 validateStatementSyntax (SmallStatements s ss sc nl) =
   SmallStatements <$>
   validateSmallStatementSyntax s <*>
-  traverseOf (traverse._3) validateSmallStatementSyntax ss <*>
+  traverseOf (traverse._2) validateSmallStatementSyntax ss <*>
   pure sc <*>
   pure nl
 

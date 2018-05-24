@@ -372,13 +372,13 @@ renderStatement (SmallStatements s ss sc nl) =
   ManyLines
   (renderSmallStatement s <>
    foldMap
-     (\(a, b, c) ->
-        foldMap renderWhitespace a <> ";" <>
+     (\(b, c) ->
+        ";" <>
         foldMap renderWhitespace b <>
         renderSmallStatement c)
      ss <>
    foldMap
-     (\(a, b) -> foldMap renderWhitespace a <> ";" <> foldMap renderWhitespace b)
+     (\b -> ";" <> foldMap renderWhitespace b)
      sc)
   nl
   NoLines

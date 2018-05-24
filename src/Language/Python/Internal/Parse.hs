@@ -8,6 +8,7 @@ import Control.Lens.Getter ((^.))
 import Control.Monad.State
 import Data.Char (chr, isAscii)
 import Data.Foldable
+import Data.Function ((&))
 import Data.Functor
 import Data.List.NonEmpty (NonEmpty(..), some1)
 import Data.Semigroup hiding (Arg)
@@ -189,7 +190,7 @@ exprNoList ws = orExpr ws
       annotated $
       (\a b c -> Not c a b) <$>
       (reserved "not" *> many ws) <*>
-      expr ws
+      exprNoList ws
 
     ident' =
       annotated $
@@ -295,7 +296,7 @@ exprNoList ws = orExpr ws
           pure $ BinOp (a ^. exprAnnotation <> b ^. exprAnnotation) a (Exp s ws2) b
 
     atomExpr ws' =
-      (\a afters -> case afters of; [] -> a; _ -> foldl' (\b f -> f b) a afters) <$>
+      (\a afters -> case afters of; [] -> a; _ -> foldl' (&) a afters) <$>
       atom <*>
       many (deref <|> call)
       where
@@ -539,11 +540,11 @@ statement =
       smallStatement <*>
       many
         (try $
-         (,,) <$>
-         many whitespace <* char ';' <*>
+         (,) <$
+         char ';' <*>
          many whitespace <*>
          smallStatement) <*>
-      optional ((,) <$> many whitespace <* char ';' <*> many whitespace) <*>
+      optional (char ';' *> many whitespace) <*>
       newline
 
 comment :: DeltaParsing m => m Comment

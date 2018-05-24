@@ -273,7 +273,7 @@ validateStatementScope (CompoundStatement c) =
 validateStatementScope (SmallStatements s ss sc nl) =
   SmallStatements <$>
   validateSmallStatementScope s <*>
-  traverseOf (traverse._3) validateSmallStatementScope ss <*>
+  traverseOf (traverse._2) validateSmallStatementScope ss <*>
   pure sc <*>
   pure nl
 

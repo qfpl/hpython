@@ -280,8 +280,8 @@ renderCompoundStatement (Fundef _ ws1 name ws2 params ws3 ws4 nl body) =
   where
     firstLine =
       "def" <> foldMap renderWhitespace ws1 <> renderIdent name <>
-      foldMap renderWhitespace ws2 <> renderParams params <>
-      foldMap renderWhitespace ws3 <> ":" <> foldMap renderWhitespace ws4
+      "(" <> foldMap renderWhitespace ws2 <> renderCommaSep renderParam params <>
+      ")" <> foldMap renderWhitespace ws3 <> ":" <> foldMap renderWhitespace ws4
     restLines = renderBlock body
 renderCompoundStatement (If _ ws1 expr ws2 ws3 nl body body') =
   ManyLines firstLine nl restLines
@@ -394,15 +394,13 @@ renderArg (KeywordArg _ name ws2 expr) =
   renderIdent name <> "=" <>
   foldMap renderWhitespace ws2 <> renderExpr expr
 
-renderParams :: CommaSep (Param v a) -> String
-renderParams a = "(" <> renderCommaSep go a <> ")"
-  where
-    go (PositionalParam _ name) = renderIdent name
-    go (StarParam _ ws name) = "*" <> foldMap renderWhitespace ws <> renderIdent name
-    go (DoubleStarParam _ ws name) = "**" <> foldMap renderWhitespace ws <> renderIdent name
-    go (KeywordParam _ name ws2 expr) =
-      renderIdent name <> "=" <>
-      foldMap renderWhitespace ws2 <> renderExpr expr
+renderParam :: Param v a -> String
+renderParam (PositionalParam _ name) = renderIdent name
+renderParam (StarParam _ ws name) = "*" <> foldMap renderWhitespace ws <> renderIdent name
+renderParam (DoubleStarParam _ ws name) = "**" <> foldMap renderWhitespace ws <> renderIdent name
+renderParam (KeywordParam _ name ws2 expr) =
+  renderIdent name <> "=" <>
+  foldMap renderWhitespace ws2 <> renderExpr expr
 
 renderBinOp :: BinOp a -> String
 renderBinOp (Is _ ws) = "is" <> foldMap renderWhitespace ws

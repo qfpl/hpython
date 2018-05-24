@@ -416,9 +416,10 @@ compoundStatement =
 
     fundef =
       (\a b c d e f g h i -> Fundef i a b c d e f g h) <$
-      reserved "def" <*> some1 whitespace <*> identifier whitespace <*>
-      many whitespace <*> between (char '(') (char ')') (commaSep $ annotated parameter) <*>
-      many whitespace <* char ':' <*> many whitespace <*> newline <*> block
+      reserved "def" <*> some1 whitespace <*> identifier whitespace <*
+      char '(' <*> many whitespace <*> commaSep (annotated parameter) <*
+      char ')' <*> many whitespace <* char ':' <*> many whitespace <*> newline <*>
+      block
     ifSt =
       (\a b c d e f g h -> If h a b c d e f g) <$>
       (reserved "if" *> many whitespace) <*>

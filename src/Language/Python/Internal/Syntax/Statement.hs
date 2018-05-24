@@ -279,6 +279,7 @@ data ExceptAs v a
 
 data CompoundStatement (v :: [*]) a
   = Fundef a
+  -- def <spaces> <indent> '(' <spaces> stuff ')' <spaces> ':' <spaces> <newline>
       (NonEmpty Whitespace) (Ident v a)
       [Whitespace] (CommaSep (Param v a))
       [Whitespace] [Whitespace] Newline

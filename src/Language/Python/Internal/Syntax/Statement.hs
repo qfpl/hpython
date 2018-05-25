@@ -248,11 +248,19 @@ data SmallStatement (v :: [*]) a
       (RelativeModuleName v a)
       [Whitespace]
       (ImportTargets v a)
+  | Raise a
+      [Whitespace]
+      (Maybe (Expr v a, Maybe ([Whitespace], Expr v a)))
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 instance Plated (SmallStatement '[] a) where; plate = gplate
 
 instance HasExprs SmallStatement where
+  _Exprs f (Raise a ws x) =
+    Raise a ws <$>
+    traverse
+      (\(b, c) -> (,) <$> f b <*> traverseOf (traverse._2) f c)
+      x
   _Exprs f (Return a ws e) = Return a ws <$> f e
   _Exprs f (Expr a e) = Expr a <$> f e
   _Exprs f (Assign a e1 ws1 ws2 e2) = Assign a <$> f e1 <*> pure ws1 <*> pure ws2 <*> f e2

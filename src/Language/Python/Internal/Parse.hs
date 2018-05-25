@@ -451,8 +451,8 @@ compoundStatement =
          block)
 
     classSt =
-      (\a b c d e f g -> ClassDef g a b c d e f) <$>
-      (reserved "class" *> some1 whitespace) <*>
+      (\a b c d e f g -> ClassDef g a b c d e f) <$
+      reserved "class" <*> some1 whitespace <*>
       identifier whitespace <*>
       optional
         ((,,) <$>

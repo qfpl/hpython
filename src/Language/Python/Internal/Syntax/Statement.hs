@@ -315,6 +315,8 @@ data CompoundStatement (v :: [*]) a
       [Whitespace] (Expr v a) [Whitespace] (Expr v a) [Whitespace] Newline
       (Block v a)
       (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
+  -- ^ 'class' <spaces> ident [ '(' <spaces> [ args ] ')' <spaces>] ':' <spaces> <newline>
+  --   <block>
   | ClassDef a
       (NonEmpty Whitespace) (Ident v a)
       (Maybe ([Whitespace], Maybe (CommaSep1 (Arg v a)), [Whitespace])) [Whitespace] Newline

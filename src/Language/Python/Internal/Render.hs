@@ -250,6 +250,17 @@ renderImportTargets (ImportSomeParens _ ws1 ts ws2) =
   ")" <> foldMap renderWhitespace ws2
 
 renderSmallStatement :: SmallStatement v a -> String
+renderSmallStatement (Raise _ ws x) =
+  "raise" <> foldMap renderWhitespace ws <>
+  foldMap
+    (\(b, c) ->
+       renderExpr b <>
+       foldMap
+         (\(d, e) ->
+            "as" <> foldMap renderWhitespace d <>
+            renderExpr e)
+         c)
+    x
 renderSmallStatement (Return _ ws expr) =
   "return" <> foldMap renderWhitespace ws <> renderExpr expr
 renderSmallStatement (Expr _ expr) = renderExpr expr

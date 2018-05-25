@@ -245,6 +245,14 @@ validateSmallStatementScope
   :: AsScopeError e v a
   => SmallStatement v a
   -> ValidateScope a e (SmallStatement (Nub (Scope ': v)) a)
+validateSmallStatementScope (Raise a ws f) =
+  Raise a ws <$>
+  traverse
+    (\(b, c) ->
+       (,) <$>
+       validateExprScope b <*>
+       traverseOf (traverse._2) validateExprScope c)
+    f
 validateSmallStatementScope (Return a ws e) = Return a ws <$> validateExprScope e
 validateSmallStatementScope (Expr a e) = Expr a <$> validateExprScope e
 validateSmallStatementScope (Assign a l ws1 ws2 r) =

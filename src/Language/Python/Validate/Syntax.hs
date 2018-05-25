@@ -421,6 +421,23 @@ validateSmallStatementSyntax
      )
   => SmallStatement v a
   -> ValidateSyntax e (SmallStatement (Nub (Syntax ': v)) a)
+validateSmallStatementSyntax (Raise a ws f) =
+  Raise a <$>
+  validateWhitespace a ws <*>
+  traverse
+    (\(b, c) ->
+       (,) <$
+       validateAdjacentL a (Keyword ('r' :| "aise") ws, keyword) (b, renderExpr) <*>
+       validateExprSyntax b <*>
+       traverse
+         (\(d, e) ->
+            (,) <$
+            validateAdjacentR a (b, renderExpr) (Keyword ('a' :| "s") d, keyword) <*>
+            validateWhitespace a d <*
+            validateAdjacentR a (Keyword ('a' :| "s") d, keyword) (e, renderExpr) <*>
+            validateExprSyntax e)
+         c)
+    f
 validateSmallStatementSyntax (Return a ws expr) =
   syntaxContext `bindValidateSyntax` \sctxt ->
     case _inFunction sctxt of

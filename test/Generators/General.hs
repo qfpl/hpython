@@ -225,6 +225,9 @@ genSmallStatement = Gen.sized $ \n ->
           genRelativeModuleName <*>
           genWhitespaces <*>
           genImportTargets
+        , Raise () <$>
+          genWhitespaces <*>
+          Gen.maybe ((,) <$> genExpr <*> Gen.maybe ((,) <$> genWhitespaces <*> genExpr))
         ]
 
 genCompoundStatement

@@ -334,6 +334,12 @@ genSmallStatement = Gen.sized $ \n -> do
           (genRelativeModuleName & mapped.whitespaceAfter .~ [Space]) <*>
           (NonEmpty.toList <$> genWhitespaces1) <*>
           genImportTargets
+        , Raise () <$>
+          fmap NonEmpty.toList genWhitespaces1 <*>
+          Gen.maybe
+            ((,) <$>
+             set (mapped.whitespaceAfter) [Space] genExpr <*>
+             Gen.maybe ((,) <$> fmap NonEmpty.toList genWhitespaces1 <*> genExpr))
         ] ++
         [pure (Break ()) | _inLoop ctxt] ++
         [pure (Continue ()) | _inLoop ctxt] ++

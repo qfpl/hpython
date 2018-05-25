@@ -472,11 +472,21 @@ smallStatement =
   (from <?> "import statement") <|>
   (import_ <?> "import statement") <|>
   (break <?> "break statement") <|>
-  (continue <?> "continue statement")
+  (continue <?> "continue statement") <|>
+  (raise <?> "raise statement")
   where
     break = reserved "break" $> Break
     continue = reserved "continue" $> Continue
     pass = reserved "pass" $> Pass
+
+    raise =
+      (\a b c -> Raise c a b) <$
+      reserved "raise" <*>
+      many whitespace <*>
+      optional
+        ((,) <$>
+         exprNoList whitespace <*>
+         optional ((,) <$ reserved "as" <*> many whitespace <*> exprNoList whitespace))
 
     assignOrExpr = do
       e <- expr whitespace <?> "expression"

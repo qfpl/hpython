@@ -304,18 +304,16 @@ data CompoundStatement (v :: [*]) a
       (NonEmpty ([Whitespace], ExceptAs v a, [Whitespace], Newline, Block v a))
       (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
       (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
+  -- ^ 'try' <spaces> ':' <spaces> <newline> <block>
+  --   'finally' <spaces> ':' <spaces> <newline> <block>
   | TryFinally a
-      -- try:
-      [Whitespace] [Whitespace] Newline
-      (Block v a)
-      -- finally:
-      [Whitespace] [Whitespace] Newline
-      (Block v a)
+      [Whitespace] [Whitespace] Newline (Block v a)
+      [Whitespace] [Whitespace] Newline (Block v a)
+  -- ^ 'for' <spaces> expr 'in' <spaces> expr ':' <spaces> <newline> <block>
+  --   [ 'else' <spaces> ':' <spaces> <newline> <block> ]
   | For a
-      -- for x in y:\n
       [Whitespace] (Expr v a) [Whitespace] (Expr v a) [Whitespace] Newline
       (Block v a)
-      -- [else:]
       (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
   | ClassDef a
       (NonEmpty Whitespace) (Ident v a)

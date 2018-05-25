@@ -439,9 +439,9 @@ compoundStatement =
       many whitespace <*> newline <*> block
 
     for =
-      (\a b c d e f g h i -> For i a b c d e f g h) <$>
-      (reserved "for" *> many whitespace) <*> expr whitespace <*>
-      (reserved "in" *> many whitespace) <*> expr whitespace <*
+      (\a b c d e f g h i -> For i a b c d e f g h) <$
+      reserved "for" <*> many whitespace <*> expr whitespace <*
+      reserved "in" <*> many whitespace <*> expr whitespace <*
       char ':' <*> many whitespace <*> newline <*>
       block <*>
       optional

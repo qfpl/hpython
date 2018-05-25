@@ -118,7 +118,7 @@ toBlock sts = Block $ (,,) () [Space, Space, Space, Space] . Right <$> sts
 if_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 if_ e sts =
   CompoundStatement $
-  If () [Space] e [] [] LF
+  If () [Space] e [] LF
     (toBlock sts)
     Nothing
 
@@ -132,7 +132,7 @@ while_ e sts =
 ifElse_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 ifElse_ e sts sts' =
   CompoundStatement $
-  If () [Space] e [] [] LF
+  If () [Space] e [] LF
     (toBlock sts)
     (Just ([], [], LF, toBlock sts'))
 

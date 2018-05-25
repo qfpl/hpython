@@ -91,8 +91,8 @@ class HasBlocks s where
 instance HasBlocks CompoundStatement where
   _Blocks f (Fundef a ws1 name ws2 params ws3 ws4 nl b) =
     Fundef a ws1 (coerce name) ws2 (coerce params) ws3 ws4 nl <$> coerce (f b)
-  _Blocks f (If a ws1 e1 ws2 ws3 nl b b') =
-    If a ws1 (coerce e1) ws2 ws3 nl <$>
+  _Blocks f (If a ws1 e1 ws3 nl b b') =
+    If a ws1 (coerce e1) ws3 nl <$>
     coerce (f b) <*>
     traverseOf (traverse._4) (coerce . f) b'
   _Blocks f (While a ws1 e1 ws2 ws3 nl b) =
@@ -140,8 +140,8 @@ instance Plated (Statement '[] a) where
     case s of
       Fundef a ws1 b ws2 c ws3 ws4 nl sts ->
         Fundef a ws1 b ws2 c ws3 ws4 nl <$> (_Wrapped.traverse._3._Right) fun sts
-      If a ws1 b ws2 ws3 nl sts sts' ->
-        If a ws1 b ws2 ws3 nl <$>
+      If a ws1 b ws3 nl sts sts' ->
+        If a ws1 b ws3 nl <$>
         (_Wrapped.traverse._3._Right) fun sts <*>
         (traverse._4._Wrapped.traverse._3._Right) fun sts'
       While a ws1 b ws2 ws3 nl sts ->
@@ -278,15 +278,20 @@ data ExceptAs v a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data CompoundStatement (v :: [*]) a
+  -- ^ 'def' <spaces> <ident> '(' <spaces> stuff ')' <spaces> ':' <spaces> <newline>
+  --   <block>
   = Fundef a
-  -- def <spaces> <indent> '(' <spaces> stuff ')' <spaces> ':' <spaces> <newline>
       (NonEmpty Whitespace) (Ident v a)
       [Whitespace] (CommaSep (Param v a))
       [Whitespace] [Whitespace] Newline
       (Block v a)
+  -- ^ 'if' <spaces> <expr> ':' <spaces> <newline>
+  --   <block>
+  --   [ 'else' <spaces> ':' <spaces> <newline>
+  --     <block>
+  --   ]
   | If a
-      [Whitespace] (Expr v a)
-      [Whitespace] [Whitespace] Newline
+      [Whitespace] (Expr v a) [Whitespace] Newline
       (Block v a)
       (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
   | While a
@@ -335,10 +340,9 @@ instance HasExprs CompoundStatement where
     pure ws4 <*>
     pure nl <*>
     (_Wrapped.traverse._3._Right._Exprs) f sts
-  _Exprs f (If a ws1 e ws2 ws3 nl sts sts') =
+  _Exprs f (If a ws1 e ws3 nl sts sts') =
     If a ws1 <$>
     f e <*>
-    pure ws2 <*>
     pure ws3 <*>
     pure nl <*>
     (_Wrapped.traverse._3._Right._Exprs) f sts <*>

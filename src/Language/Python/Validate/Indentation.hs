@@ -95,10 +95,9 @@ validateCompoundStatementIndentation (Fundef a ws1 name ws2 params ws3 ws4 nl bo
   pure ws4 <*>
   pure nl <*>
   validateBlockIndentation body
-validateCompoundStatementIndentation (If a ws1 expr ws2 ws3 nl body body') =
+validateCompoundStatementIndentation (If a ws1 expr ws3 nl body body') =
   If a ws1 <$>
   validateExprIndentation expr <*>
-  pure ws2 <*>
   pure ws3 <*>
   pure nl <*>
   validateBlockIndentation body <*>

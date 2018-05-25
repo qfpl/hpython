@@ -257,7 +257,7 @@ genCompoundStatement =
             genNewline <*>
             Gen.resize (n - n' - n'') genBlock
         If () <$> genWhitespaces <*> pure a <*>
-          genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b <*> pure c
+          genWhitespaces <*> genNewline <*> pure b <*> pure c
     , Gen.sized $ \n -> do
         n' <- Gen.integral (Range.constant 1 (n-1))
         a <- Gen.resize n' genExpr

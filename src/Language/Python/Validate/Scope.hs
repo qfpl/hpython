@@ -162,14 +162,13 @@ validateCompoundStatementScope (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
        (validateBlockScope body)) <*
   extendScope scLocalScope [(_identAnnotation &&& _identValue) name] <*
   extendScope scImmediateScope [(_identAnnotation &&& _identValue) name]
-validateCompoundStatementScope (If a ws1 e ws2 ws3 nl b melse) =
+validateCompoundStatementScope (If a ws1 e ws3 nl b melse) =
   scopeContext scLocalScope `bindValidateScope` (\ls ->
   scopeContext scImmediateScope `bindValidateScope` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty)
     (If a ws1 <$>
      validateExprScope e <*>
-     pure ws2 <*>
      pure ws3 <*>
      pure nl <*>
      validateBlockScope b <*>

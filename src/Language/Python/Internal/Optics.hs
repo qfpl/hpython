@@ -111,8 +111,8 @@ instance HasNewlines CompoundStatement where
     case s of
       Fundef ann ws1 name ws2 params ws3 ws4 nl block ->
         Fundef ann ws1 name ws2 params ws3 ws4 <$> fun nl <*> _Newlines fun block
-      If ann ws1 cond ws2 ws3 nl block els ->
-        If ann ws1 cond ws2 ws3 <$>
+      If ann ws1 cond ws3 nl block els ->
+        If ann ws1 cond ws3 <$>
         fun nl <*>
         _Newlines fun block <*>
         traverse

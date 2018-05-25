@@ -283,12 +283,11 @@ validateCompoundStatementSyntax (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
                 Just paramIdents
             })
          (validateBlockSyntax body))
-validateCompoundStatementSyntax (If a ws1 expr ws2 ws3 nl body body') =
+validateCompoundStatementSyntax (If a ws1 expr ws3 nl body body') =
   If a <$>
   (validateWhitespace a ws1 <*
    validateAdjacentL a (Keyword ('i' :| "f") ws1, keyword) (expr, renderExpr)) <*>
   validateExprSyntax expr <*>
-  validateWhitespace a ws2 <*>
   validateWhitespace a ws3 <*>
   pure nl <*>
   validateBlockSyntax body <*>

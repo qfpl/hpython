@@ -421,10 +421,9 @@ compoundStatement =
       char ')' <*> many whitespace <* char ':' <*> many whitespace <*> newline <*>
       block
     ifSt =
-      (\a b c d e f g h -> If h a b c d e f g) <$>
+      (\a b c d e f h -> If h a b c d e f) <$>
       (reserved "if" *> many whitespace) <*>
-      expr whitespace <*>
-      many whitespace <* char ':' <*>
+      expr whitespace <* char ':' <*>
       many whitespace <*> newline <*> block <*>
       optional
         ((,,,) <$> (reserved "else" *> many whitespace) <*

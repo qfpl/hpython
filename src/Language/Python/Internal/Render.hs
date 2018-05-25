@@ -179,8 +179,9 @@ renderExpr (List _ ws1 exprs ws2) =
 renderExpr (Call _ expr ws args ws2) =
   (case expr of
      Int _ n _ | n < 0 -> "(" <> renderExpr expr <> ")"
-     BinOp {} -> "(" <> renderExpr expr <> ")"
-     Tuple {} -> "(" <> renderExpr expr <> ")"
+     BinOp{} -> "(" <> renderExpr expr <> ")"
+     Tuple{} -> "(" <> renderExpr expr <> ")"
+     Not{} -> "(" <> renderExpr expr <> ")"
      _ -> renderExpr expr) <>
   "(" <> foldMap renderWhitespace ws <> renderCommaSep renderArg args <>
   ")" <> foldMap renderWhitespace ws2
@@ -283,12 +284,12 @@ renderCompoundStatement (Fundef _ ws1 name ws2 params ws3 ws4 nl body) =
       "(" <> foldMap renderWhitespace ws2 <> renderCommaSep renderParam params <>
       ")" <> foldMap renderWhitespace ws3 <> ":" <> foldMap renderWhitespace ws4
     restLines = renderBlock body
-renderCompoundStatement (If _ ws1 expr ws2 ws3 nl body body') =
+renderCompoundStatement (If _ ws1 expr ws3 nl body body') =
   ManyLines firstLine nl restLines
   where
     firstLine =
       "if" <> foldMap renderWhitespace ws1 <>
-      renderExpr expr <> foldMap renderWhitespace ws2 <> ":" <>
+      renderExpr expr <> ":" <>
       foldMap renderWhitespace ws3
     restLines = renderBlock body <> fromMaybe mempty elseLines
     elseLines =

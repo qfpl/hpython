@@ -353,7 +353,7 @@ block = fmap Block ((\(a :| b) c -> a :| (b ++ c)) <$> firsts <*> go) <* dedent
          fmap Left ((,) <$> optional comment <*> newline)) <|>
 
         ((\a b d -> (d, a, b)) <$>
-         (level *> fmap head get) <*>
+         (try level *> fmap head get) <*>
          (Right <$> statement)))
 
 exceptAs :: DeltaParsing m => m (ExceptAs '[] Span)

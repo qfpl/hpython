@@ -11,8 +11,18 @@ import Language.Python.Internal.Syntax
 bracket :: String -> String
 bracket a = "(" <> a <> ")"
 
-escapeChars :: [Char]
-escapeChars = "\\\'\"\a\b\f\n\r\t\v"
+escapeChars :: [(Char, Char)]
+escapeChars =
+  [ ('\\', '\\')
+  , ('"', '"')
+  , ('\a', 'a')
+  , ('\b', 'b')
+  , ('\f', 'f')
+  , ('\n', 'n')
+  , ('\r', 'r')
+  , ('\t', 't')
+  , ('\v', 'v')
+  ]
 
 intToHex :: Int -> String
 intToHex n = go n []
@@ -37,7 +47,7 @@ intToHex n = go n []
 
 renderChar :: Char -> String
 renderChar c
-  | c `elem` escapeChars = ['\\', c]
+  | Just c' <- lookup c escapeChars = ['\\', c']
   | otherwise =
       let
         shown = show c

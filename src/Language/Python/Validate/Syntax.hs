@@ -347,7 +347,7 @@ validateCompoundStatementSyntax (For a b c d e f g h i) =
   validateExprSyntax e <*>
   validateWhitespace a f <*>
   pure g <*>
-  validateBlockSyntax h <*>
+  localSyntaxContext (\c -> c { _inLoop = True }) (validateBlockSyntax h) <*>
   traverse
     (\(x, y, z, w) ->
        (,,,) <$>

@@ -289,15 +289,16 @@ genCompoundStatement =
         TryExcept () <$>
           genWhitespaces <*> genWhitespaces <*> genNewline <*>
           Gen.resize n1 genBlock <*>
-          genWhitespaces <*>
           Gen.nonEmpty
             (Range.singleton sz)
-            (ExceptAs () <$>
-             Gen.resize n2 genExpr <*>
-             Gen.maybe ((,) <$> genWhitespaces <*> genIdent)) <*>
-          genWhitespaces <*>
-          genNewline <*>
-          Gen.resize n3 genBlock <*>
+            ((,,,,) <$>
+             genWhitespaces <*>
+             (ExceptAs () <$>
+              Gen.resize n2 genExpr <*>
+              Gen.maybe ((,) <$> genWhitespaces <*> genIdent)) <*>
+             genWhitespaces <*>
+             genNewline <*>
+             Gen.resize n3 genBlock) <*>
           pure e1 <*>
           pure e2
     , Gen.sized $ \n -> do

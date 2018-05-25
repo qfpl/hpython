@@ -307,16 +307,19 @@ renderCompoundStatement (While _ ws1 expr ws3 nl body) =
      ":" <> foldMap renderWhitespace ws3)
     nl
     (renderBlock body)
-renderCompoundStatement (TryExcept _ a b c d ws1 e ws nl bl f g) =
+renderCompoundStatement (TryExcept _ a b c d e f g) =
   ManyLines
     ("try" <> foldMap renderWhitespace a <> ":" <> foldMap renderWhitespace b)
     c
     (renderBlock d) <>
-  ManyLines
-    ("except" <> foldMap renderWhitespace ws1 <>
-     foldMap renderExceptAs e <> foldMap renderWhitespace ws)
-    nl
-    (renderBlock bl) <>
+  foldMap
+    (\(ws1, eas, ws2, nl, bl) ->
+       ManyLines
+         ("except" <> foldMap renderWhitespace ws1 <>
+          renderExceptAs eas <> ":" <> foldMap renderWhitespace ws2)
+         nl
+         (renderBlock bl))
+    e <>
   foldMap
     (\(ws1, ws2, nl, bl) ->
        ManyLines

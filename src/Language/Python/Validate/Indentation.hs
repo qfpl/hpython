@@ -108,13 +108,17 @@ validateCompoundStatementIndentation (While a ws1 expr ws3 nl body) =
   pure ws3 <*>
   pure nl <*>
   validateBlockIndentation body
-validateCompoundStatementIndentation (TryExcept a b c d e f g h i j k l) =
+validateCompoundStatementIndentation (TryExcept a b c d e f k l) =
   TryExcept a b c d <$>
   validateBlockIndentation e <*>
-  pure f <*>
-  traverse validateExceptAsIndentation g <*>
-  pure h <*> pure i <*>
-  validateBlockIndentation j <*>
+  traverse
+    (\(a, b, c, d, e) ->
+       (,,,,) a <$>
+       validateExceptAsIndentation b <*>
+       pure c <*>
+       pure d <*>
+       validateBlockIndentation e)
+    f <*>
   traverseOf (traverse._4) validateBlockIndentation k <*>
   traverseOf (traverse._4) validateBlockIndentation l
 validateCompoundStatementIndentation (TryFinally a b c d e f g h i) =

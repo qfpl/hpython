@@ -300,20 +300,24 @@ validateCompoundStatementSyntax (While a ws1 expr ws3 nl body) =
   validateWhitespace a ws3 <*>
   pure nl <*>
   localSyntaxContext (\ctxt -> ctxt { _inLoop = True}) (validateBlockSyntax body)
-validateCompoundStatementSyntax (TryExcept a b c d e f g h i j k l) =
+validateCompoundStatementSyntax (TryExcept a b c d e f k l) =
   TryExcept a <$>
   validateWhitespace a b <*>
   validateWhitespace a c <*>
   pure d <*>
   validateBlockSyntax e <*>
-  validateWhitespace a f <*>
-  (validateAdjacentR a
-     (Keyword ('e' :| "xcept") f, keyword)
-     (NonEmpty.head g ^. exceptAsExpr, renderExpr) *>
-   traverse validateExceptAsSyntax g) <*>
-  validateWhitespace a h <*>
-  pure i <*>
-  validateBlockSyntax j <*>
+  traverse
+    (\(f, g, h, i, j) ->
+       (,,,,) <$>
+       validateWhitespace a f <*
+       validateAdjacentR a
+         (Keyword ('e' :| "xcept") f, keyword)
+         (g ^. exceptAsExpr, renderExpr) <*>
+       validateExceptAsSyntax g <*>
+       validateWhitespace a h <*>
+       pure i <*>
+       validateBlockSyntax j)
+    f <*>
   traverse
     (\(x, y, z, w) ->
        (,,,) <$>

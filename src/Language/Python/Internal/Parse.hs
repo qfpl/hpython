@@ -378,7 +378,7 @@ compoundStatement =
     trySt =
       (\b c d e f g ->
          either
-           (\(h, i, j, k, l, m, n) -> TryExcept g b c d e h i j k l m n)
+           (\(h, m, n) -> TryExcept g b c d e h m n)
            (\(h, i, j, k) -> TryFinally g b c d e h i j k)
            f) <$
       reserved "try" <*>
@@ -388,14 +388,16 @@ compoundStatement =
       newline <*>
       block <*>
       (fmap Left
-       ((,,,,,,) <$
-        reserved "except" <*>
-        many whitespace <*>
-        some1 exceptAs <*
-        char ':' <*>
-        many whitespace <*>
-        newline <*>
-        block <*>
+       ((,,) <$>
+        some1
+          ((,,,,) <$
+           reserved "except" <*>
+           many whitespace <*>
+           exceptAs <*
+           char ':' <*>
+           many whitespace <*>
+           newline <*>
+           block) <*>
         optional
           ((,,,) <$ string "else" <*>
            many whitespace <* char ':' <*> many whitespace <*> newline <*>
@@ -447,6 +449,7 @@ compoundStatement =
          many whitespace <* char ':' <*>
          many whitespace <*> newline <*>
          block)
+
     classSt =
       (\a b c d e f g -> ClassDef g a b c d e f) <$>
       (reserved "class" *> some1 whitespace) <*>

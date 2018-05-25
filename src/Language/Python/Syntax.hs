@@ -126,7 +126,7 @@ while_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 while_ e sts =
   CompoundStatement $
   While () [Space] e
-    [] [] LF
+    [] LF
     (toBlock sts)
 
 ifElse_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> NonEmpty (Statement '[] ()) -> Statement '[] ()

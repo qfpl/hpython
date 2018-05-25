@@ -292,12 +292,11 @@ validateCompoundStatementSyntax (If a ws1 expr ws3 nl body body') =
   pure nl <*>
   validateBlockSyntax body <*>
   traverseOf (traverse._4) validateBlockSyntax body'
-validateCompoundStatementSyntax (While a ws1 expr ws2 ws3 nl body) =
+validateCompoundStatementSyntax (While a ws1 expr ws3 nl body) =
   While a <$>
   (validateWhitespace a ws1 <*
    validateAdjacentL a (Keyword ('w' :| "hile") ws1, keyword) (expr, renderExpr)) <*>
   validateExprSyntax expr <*>
-  validateWhitespace a ws2 <*>
   validateWhitespace a ws3 <*>
   pure nl <*>
   localSyntaxContext (\ctxt -> ctxt { _inLoop = True}) (validateBlockSyntax body)

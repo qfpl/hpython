@@ -420,20 +420,22 @@ compoundStatement =
       char '(' <*> many whitespace <*> commaSep (annotated parameter) <*
       char ')' <*> many whitespace <* char ':' <*> many whitespace <*> newline <*>
       block
+
     ifSt =
-      (\a b c d e f h -> If h a b c d e f) <$>
-      (reserved "if" *> many whitespace) <*>
+      (\a b c d e f h -> If h a b c d e f) <$
+      reserved "if" <*> many whitespace <*>
       expr whitespace <* char ':' <*>
       many whitespace <*> newline <*> block <*>
       optional
         ((,,,) <$> (reserved "else" *> many whitespace) <*
          char ':' <*> many whitespace <*> newline <*> block)
+
     while =
-      (\a b c d e f g -> While g a b c d e f) <$>
-      (reserved "while" *> many whitespace) <*>
-      expr whitespace <*>
-      many whitespace <* char ':' <*>
+      (\a b c d e g -> While g a b c d e) <$
+      reserved "while" <*> many whitespace <*>
+      expr whitespace <* char ':' <*>
       many whitespace <*> newline <*> block
+
     for =
       (\a b c d e f g h i -> For i a b c d e f g h) <$>
       (reserved "for" *> many whitespace) <*> expr whitespace <*>

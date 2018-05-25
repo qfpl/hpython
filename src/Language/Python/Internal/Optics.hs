@@ -118,8 +118,8 @@ instance HasNewlines CompoundStatement where
         traverse
           (\(a, b, c, d) -> (,,,) a b <$> fun nl <*> _Newlines fun block)
           els
-      While ann ws1 cond ws2 ws3 nl block ->
-        While ann ws1 cond ws2 ws3 <$> fun nl <*> _Newlines fun block
+      While ann ws1 cond ws3 nl block ->
+        While ann ws1 cond ws3 <$> fun nl <*> _Newlines fun block
       TryExcept a b c d e f g h i j k l ->
         TryExcept a b c <$> fun d <*> _Newlines fun e <*>
         pure f <*> pure g <*> pure h <*> fun i <*> _Newlines fun j <*>

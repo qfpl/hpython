@@ -263,7 +263,7 @@ genCompoundStatement =
         a <- Gen.resize n' genExpr
         b <- Gen.resize (n - n') genBlock
         While () <$> genWhitespaces <*> pure a <*>
-          genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
+          genWhitespaces <*> genNewline <*> pure b
     , Gen.sized $ \n -> do
         sz <- Gen.integral (Range.constant 1 5)
         n1 <- Gen.integral (Range.constant 1 $ n - 2)

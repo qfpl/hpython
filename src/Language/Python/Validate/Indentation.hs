@@ -102,10 +102,9 @@ validateCompoundStatementIndentation (If a ws1 expr ws3 nl body body') =
   pure nl <*>
   validateBlockIndentation body <*>
   traverseOf (traverse._4) validateBlockIndentation body'
-validateCompoundStatementIndentation (While a ws1 expr ws2 ws3 nl body) =
+validateCompoundStatementIndentation (While a ws1 expr ws3 nl body) =
   While a ws1 <$>
   validateExprIndentation expr <*>
-  pure ws2 <*>
   pure ws3 <*>
   pure nl <*>
   validateBlockIndentation body

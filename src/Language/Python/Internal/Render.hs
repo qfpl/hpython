@@ -301,10 +301,10 @@ renderCompoundStatement (If _ ws1 expr ws3 nl body body') =
         body' <*>
       fmap (\(_, _, nl2, _) -> nl2) body' <*>
       fmap (\(_, _, _, body'') -> renderBlock body'') body'
-renderCompoundStatement (While _ ws1 expr ws2 ws3 nl body) =
+renderCompoundStatement (While _ ws1 expr ws3 nl body) =
   ManyLines
     ("while" <> foldMap renderWhitespace ws1 <> renderExpr expr <>
-     foldMap renderWhitespace ws2 <> ":" <> foldMap renderWhitespace ws3)
+     ":" <> foldMap renderWhitespace ws3)
     nl
     (renderBlock body)
 renderCompoundStatement (TryExcept _ a b c d ws1 e ws nl bl f g) =

@@ -173,14 +173,13 @@ validateCompoundStatementScope (If a ws1 e ws3 nl b melse) =
      pure nl <*>
      validateBlockScope b <*>
      traverseOf (traverse._4) validateBlockScope melse)))
-validateCompoundStatementScope (While a ws1 e ws2 ws3 nl b) =
+validateCompoundStatementScope (While a ws1 e ws3 nl b) =
   scopeContext scLocalScope `bindValidateScope` (\ls ->
   scopeContext scImmediateScope `bindValidateScope` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty)
     (While a ws1 <$>
      validateExprScope e <*>
-     pure ws2 <*>
      pure ws3 <*>
      pure nl <*>
      validateBlockScope b)))

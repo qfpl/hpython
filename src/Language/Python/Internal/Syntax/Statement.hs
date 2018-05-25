@@ -95,8 +95,8 @@ instance HasBlocks CompoundStatement where
     If a ws1 (coerce e1) ws3 nl <$>
     coerce (f b) <*>
     traverseOf (traverse._4) (coerce . f) b'
-  _Blocks f (While a ws1 e1 ws2 ws3 nl b) =
-    While a ws1 (coerce e1) ws2 ws3 nl <$> coerce (f b)
+  _Blocks f (While a ws1 e1 ws3 nl b) =
+    While a ws1 (coerce e1) ws3 nl <$> coerce (f b)
   _Blocks fun (TryExcept a b c d e ws1 f ws nl bl g h) =
     TryExcept a (coerce b) (coerce c) (coerce d) <$>
     fun e <*>
@@ -144,8 +144,8 @@ instance Plated (Statement '[] a) where
         If a ws1 b ws3 nl <$>
         (_Wrapped.traverse._3._Right) fun sts <*>
         (traverse._4._Wrapped.traverse._3._Right) fun sts'
-      While a ws1 b ws2 ws3 nl sts ->
-        While a ws1 b ws2 ws3 nl <$> (_Wrapped.traverse._3._Right) fun sts
+      While a ws1 b ws3 nl sts ->
+        While a ws1 b ws3 nl <$> (_Wrapped.traverse._3._Right) fun sts
       TryExcept a b c d e ws1 f ws nl bl g h ->
         TryExcept a b c d <$> (_Wrapped.traverse._3._Right) fun e <*>
         pure ws1 <*>
@@ -294,9 +294,10 @@ data CompoundStatement (v :: [*]) a
       [Whitespace] (Expr v a) [Whitespace] Newline
       (Block v a)
       (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
+  -- ^ 'if' <spaces> <expr> ':' <spaces> <newline>
+  --   <block>
   | While a
-      [Whitespace] (Expr v a)
-      [Whitespace] [Whitespace] Newline
+      [Whitespace] (Expr v a) [Whitespace] Newline
       (Block v a)
   | TryExcept a
       -- try:
@@ -347,10 +348,9 @@ instance HasExprs CompoundStatement where
     pure nl <*>
     (_Wrapped.traverse._3._Right._Exprs) f sts <*>
     (traverse._4._Wrapped.traverse._3._Right._Exprs) f sts'
-  _Exprs f (While a ws1 e ws2 ws3 nl sts) =
+  _Exprs f (While a ws1 e ws3 nl sts) =
     While a ws1 <$>
     f e <*>
-    pure ws2 <*>
     pure ws3 <*>
     pure nl <*>
     (_Wrapped.traverse._3._Right._Exprs) f sts

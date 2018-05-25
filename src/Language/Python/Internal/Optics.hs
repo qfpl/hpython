@@ -111,18 +111,18 @@ instance HasNewlines CompoundStatement where
     case s of
       Fundef ann ws1 name ws2 params ws3 ws4 nl block ->
         Fundef ann ws1 name ws2 params ws3 ws4 <$> fun nl <*> _Newlines fun block
-      If ann ws1 cond ws2 ws3 nl block els ->
-        If ann ws1 cond ws2 ws3 <$>
+      If ann ws1 cond ws3 nl block els ->
+        If ann ws1 cond ws3 <$>
         fun nl <*>
         _Newlines fun block <*>
         traverse
           (\(a, b, c, d) -> (,,,) a b <$> fun nl <*> _Newlines fun block)
           els
-      While ann ws1 cond ws2 ws3 nl block ->
-        While ann ws1 cond ws2 ws3 <$> fun nl <*> _Newlines fun block
-      TryExcept a b c d e f g h i j k l ->
+      While ann ws1 cond ws3 nl block ->
+        While ann ws1 cond ws3 <$> fun nl <*> _Newlines fun block
+      TryExcept a b c d e f k l ->
         TryExcept a b c <$> fun d <*> _Newlines fun e <*>
-        pure f <*> pure g <*> pure h <*> fun i <*> _Newlines fun j <*>
+        traverse (\(x, y, z, w, w') -> (,,,,) x y z <$> fun w <*> _Newlines fun w') f <*>
         traverse (\(x, y, z, w) -> (,,,) x y <$> fun z <*> _Newlines fun w) k <*>
         traverse (\(x, y, z, w) -> (,,,) x y <$> fun z <*> _Newlines fun w) l
       TryFinally a b c d e f g h i ->

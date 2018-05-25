@@ -8,6 +8,7 @@ import Control.Lens.Getter ((^.))
 import Control.Monad.State
 import Data.Char (chr, isAscii)
 import Data.Foldable
+import Data.Function ((&))
 import Data.Functor
 import Data.List.NonEmpty (NonEmpty(..), some1)
 import Data.Semigroup hiding (Arg)
@@ -189,7 +190,7 @@ exprNoList ws = orExpr ws
       annotated $
       (\a b c -> Not c a b) <$>
       (reserved "not" *> many ws) <*>
-      expr ws
+      exprNoList ws
 
     ident' =
       annotated $
@@ -295,7 +296,7 @@ exprNoList ws = orExpr ws
           pure $ BinOp (a ^. exprAnnotation <> b ^. exprAnnotation) a (Exp s ws2) b
 
     atomExpr ws' =
-      (\a afters -> case afters of; [] -> a; _ -> foldl' (\b f -> f b) a afters) <$>
+      (\a afters -> case afters of; [] -> a; _ -> foldl' (&) a afters) <$>
       atom <*>
       many (deref <|> call)
       where
@@ -352,7 +353,7 @@ block = fmap Block ((\(a :| b) c -> a :| (b ++ c)) <$> firsts <*> go) <* dedent
          fmap Left ((,) <$> optional comment <*> newline)) <|>
 
         ((\a b d -> (d, a, b)) <$>
-         (try level *> fmap head get) <*>
+         (level *> fmap head get) <*>
          (Right <$> statement)))
 
 exceptAs :: DeltaParsing m => m (ExceptAs '[] Span)
@@ -377,7 +378,7 @@ compoundStatement =
     trySt =
       (\b c d e f g ->
          either
-           (\(h, i, j, k, l, m, n) -> TryExcept g b c d e h i j k l m n)
+           (\(h, m, n) -> TryExcept g b c d e h m n)
            (\(h, i, j, k) -> TryFinally g b c d e h i j k)
            f) <$
       reserved "try" <*>
@@ -387,14 +388,16 @@ compoundStatement =
       newline <*>
       block <*>
       (fmap Left
-       ((,,,,,,) <$
-        reserved "except" <*>
-        many whitespace <*>
-        some1 exceptAs <*
-        char ':' <*>
-        many whitespace <*>
-        newline <*>
-        block <*>
+       ((,,) <$>
+        some1
+          ((,,,,) <$
+           reserved "except" <*>
+           many whitespace <*>
+           exceptAs <*
+           char ':' <*>
+           many whitespace <*>
+           newline <*>
+           block) <*>
         optional
           ((,,,) <$ string "else" <*>
            many whitespace <* char ':' <*> many whitespace <*> newline <*>
@@ -415,28 +418,30 @@ compoundStatement =
 
     fundef =
       (\a b c d e f g h i -> Fundef i a b c d e f g h) <$
-      reserved "def" <*> some1 whitespace <*> identifier whitespace <*>
-      many whitespace <*> between (char '(') (char ')') (commaSep $ annotated parameter) <*>
-      many whitespace <* char ':' <*> many whitespace <*> newline <*> block
+      reserved "def" <*> some1 whitespace <*> identifier whitespace <*
+      char '(' <*> many whitespace <*> commaSep (annotated parameter) <*
+      char ')' <*> many whitespace <* char ':' <*> many whitespace <*> newline <*>
+      block
+
     ifSt =
-      (\a b c d e f g h -> If h a b c d e f g) <$>
-      (reserved "if" *> many whitespace) <*>
-      expr whitespace <*>
-      many whitespace <* char ':' <*>
+      (\a b c d e f h -> If h a b c d e f) <$
+      reserved "if" <*> many whitespace <*>
+      expr whitespace <* char ':' <*>
       many whitespace <*> newline <*> block <*>
       optional
         ((,,,) <$> (reserved "else" *> many whitespace) <*
          char ':' <*> many whitespace <*> newline <*> block)
+
     while =
-      (\a b c d e f g -> While g a b c d e f) <$>
-      (reserved "while" *> many whitespace) <*>
-      expr whitespace <*>
-      many whitespace <* char ':' <*>
+      (\a b c d e g -> While g a b c d e) <$
+      reserved "while" <*> many whitespace <*>
+      expr whitespace <* char ':' <*>
       many whitespace <*> newline <*> block
+
     for =
-      (\a b c d e f g h i -> For i a b c d e f g h) <$>
-      (reserved "for" *> many whitespace) <*> expr whitespace <*>
-      (reserved "in" *> many whitespace) <*> expr whitespace <*
+      (\a b c d e f g h i -> For i a b c d e f g h) <$
+      reserved "for" <*> many whitespace <*> expr whitespace <*
+      reserved "in" <*> many whitespace <*> expr whitespace <*
       char ':' <*> many whitespace <*> newline <*>
       block <*>
       optional
@@ -444,9 +449,10 @@ compoundStatement =
          many whitespace <* char ':' <*>
          many whitespace <*> newline <*>
          block)
+
     classSt =
-      (\a b c d e f g -> ClassDef g a b c d e f) <$>
-      (reserved "class" *> some1 whitespace) <*>
+      (\a b c d e f g -> ClassDef g a b c d e f) <$
+      reserved "class" <*> some1 whitespace <*>
       identifier whitespace <*>
       optional
         ((,,) <$>
@@ -539,11 +545,11 @@ statement =
       smallStatement <*>
       many
         (try $
-         (,,) <$>
-         many whitespace <* char ';' <*>
+         (,) <$
+         char ';' <*>
          many whitespace <*>
          smallStatement) <*>
-      optional ((,) <$> many whitespace <* char ';' <*> many whitespace) <*>
+      optional (char ';' *> many whitespace) <*>
       newline
 
 comment :: DeltaParsing m => m Comment

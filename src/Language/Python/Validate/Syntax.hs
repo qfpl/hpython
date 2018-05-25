@@ -283,39 +283,41 @@ validateCompoundStatementSyntax (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
                 Just paramIdents
             })
          (validateBlockSyntax body))
-validateCompoundStatementSyntax (If a ws1 expr ws2 ws3 nl body body') =
+validateCompoundStatementSyntax (If a ws1 expr ws3 nl body body') =
   If a <$>
   (validateWhitespace a ws1 <*
    validateAdjacentL a (Keyword ('i' :| "f") ws1, keyword) (expr, renderExpr)) <*>
   validateExprSyntax expr <*>
-  validateWhitespace a ws2 <*>
   validateWhitespace a ws3 <*>
   pure nl <*>
   validateBlockSyntax body <*>
   traverseOf (traverse._4) validateBlockSyntax body'
-validateCompoundStatementSyntax (While a ws1 expr ws2 ws3 nl body) =
+validateCompoundStatementSyntax (While a ws1 expr ws3 nl body) =
   While a <$>
   (validateWhitespace a ws1 <*
    validateAdjacentL a (Keyword ('w' :| "hile") ws1, keyword) (expr, renderExpr)) <*>
   validateExprSyntax expr <*>
-  validateWhitespace a ws2 <*>
   validateWhitespace a ws3 <*>
   pure nl <*>
   localSyntaxContext (\ctxt -> ctxt { _inLoop = True}) (validateBlockSyntax body)
-validateCompoundStatementSyntax (TryExcept a b c d e f g h i j k l) =
+validateCompoundStatementSyntax (TryExcept a b c d e f k l) =
   TryExcept a <$>
   validateWhitespace a b <*>
   validateWhitespace a c <*>
   pure d <*>
   validateBlockSyntax e <*>
-  validateWhitespace a f <*>
-  (validateAdjacentR a
-     (Keyword ('e' :| "xcept") f, keyword)
-     (NonEmpty.head g ^. exceptAsExpr, renderExpr) *>
-   traverse validateExceptAsSyntax g) <*>
-  validateWhitespace a h <*>
-  pure i <*>
-  validateBlockSyntax j <*>
+  traverse
+    (\(f, g, h, i, j) ->
+       (,,,,) <$>
+       validateWhitespace a f <*
+       validateAdjacentR a
+         (Keyword ('e' :| "xcept") f, keyword)
+         (g ^. exceptAsExpr, renderExpr) <*>
+       validateExceptAsSyntax g <*>
+       validateWhitespace a h <*>
+       pure i <*>
+       validateBlockSyntax j)
+    f <*>
   traverse
     (\(x, y, z, w) ->
        (,,,) <$>
@@ -495,7 +497,7 @@ validateStatementSyntax (CompoundStatement c) =
 validateStatementSyntax (SmallStatements s ss sc nl) =
   SmallStatements <$>
   validateSmallStatementSyntax s <*>
-  traverseOf (traverse._3) validateSmallStatementSyntax ss <*>
+  traverseOf (traverse._2) validateSmallStatementSyntax ss <*>
   pure sc <*>
   pure nl
 

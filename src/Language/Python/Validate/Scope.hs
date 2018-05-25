@@ -162,44 +162,45 @@ validateCompoundStatementScope (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
        (validateBlockScope body)) <*
   extendScope scLocalScope [(_identAnnotation &&& _identValue) name] <*
   extendScope scImmediateScope [(_identAnnotation &&& _identValue) name]
-validateCompoundStatementScope (If a ws1 e ws2 ws3 nl b melse) =
+validateCompoundStatementScope (If a ws1 e ws3 nl b melse) =
   scopeContext scLocalScope `bindValidateScope` (\ls ->
   scopeContext scImmediateScope `bindValidateScope` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty)
     (If a ws1 <$>
      validateExprScope e <*>
-     pure ws2 <*>
      pure ws3 <*>
      pure nl <*>
      validateBlockScope b <*>
      traverseOf (traverse._4) validateBlockScope melse)))
-validateCompoundStatementScope (While a ws1 e ws2 ws3 nl b) =
+validateCompoundStatementScope (While a ws1 e ws3 nl b) =
   scopeContext scLocalScope `bindValidateScope` (\ls ->
   scopeContext scImmediateScope `bindValidateScope` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty)
     (While a ws1 <$>
      validateExprScope e <*>
-     pure ws2 <*>
      pure ws3 <*>
      pure nl <*>
      validateBlockScope b)))
-validateCompoundStatementScope (TryExcept a b c d e f g h i j k l) =
+validateCompoundStatementScope (TryExcept a b c d e f k l) =
   scopeContext scLocalScope `bindValidateScope` (\ls ->
   scopeContext scImmediateScope `bindValidateScope` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty)
     (TryExcept a b c d <$>
      validateBlockScope e <*>
-     pure f <*>
-     traverse validateExceptAsScope g <*>
-     pure h <*>
-     pure i <*>
-     locallyExtendOver
-       scGlobalScope
-       (toListOf (folded.exceptAsName._Just._2.to (_identAnnotation &&& _identValue)) g)
-       (validateBlockScope j) <*>
+     traverse
+       (\(ws, g, h, i, j) ->
+          (,,,,) ws <$>
+          validateExceptAsScope g <*>
+          pure h <*>
+          pure i <*>
+          locallyExtendOver
+            scGlobalScope
+            (toListOf (exceptAsName._Just._2.to (_identAnnotation &&& _identValue)) g)
+            (validateBlockScope j))
+       f <*>
      traverseOf (traverse._4) validateBlockScope k <*>
      traverseOf (traverse._4) validateBlockScope l)))
 validateCompoundStatementScope (TryFinally a b c d e f g h i) =
@@ -273,7 +274,7 @@ validateStatementScope (CompoundStatement c) =
 validateStatementScope (SmallStatements s ss sc nl) =
   SmallStatements <$>
   validateSmallStatementScope s <*>
-  traverseOf (traverse._3) validateSmallStatementScope ss <*>
+  traverseOf (traverse._2) validateSmallStatementScope ss <*>
   pure sc <*>
   pure nl
 

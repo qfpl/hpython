@@ -95,28 +95,30 @@ validateCompoundStatementIndentation (Fundef a ws1 name ws2 params ws3 ws4 nl bo
   pure ws4 <*>
   pure nl <*>
   validateBlockIndentation body
-validateCompoundStatementIndentation (If a ws1 expr ws2 ws3 nl body body') =
+validateCompoundStatementIndentation (If a ws1 expr ws3 nl body body') =
   If a ws1 <$>
   validateExprIndentation expr <*>
-  pure ws2 <*>
   pure ws3 <*>
   pure nl <*>
   validateBlockIndentation body <*>
   traverseOf (traverse._4) validateBlockIndentation body'
-validateCompoundStatementIndentation (While a ws1 expr ws2 ws3 nl body) =
+validateCompoundStatementIndentation (While a ws1 expr ws3 nl body) =
   While a ws1 <$>
   validateExprIndentation expr <*>
-  pure ws2 <*>
   pure ws3 <*>
   pure nl <*>
   validateBlockIndentation body
-validateCompoundStatementIndentation (TryExcept a b c d e f g h i j k l) =
+validateCompoundStatementIndentation (TryExcept a b c d e f k l) =
   TryExcept a b c d <$>
   validateBlockIndentation e <*>
-  pure f <*>
-  traverse validateExceptAsIndentation g <*>
-  pure h <*> pure i <*>
-  validateBlockIndentation j <*>
+  traverse
+    (\(a, b, c, d, e) ->
+       (,,,,) a <$>
+       validateExceptAsIndentation b <*>
+       pure c <*>
+       pure d <*>
+       validateBlockIndentation e)
+    f <*>
   traverseOf (traverse._4) validateBlockIndentation k <*>
   traverseOf (traverse._4) validateBlockIndentation l
 validateCompoundStatementIndentation (TryFinally a b c d e f g h i) =

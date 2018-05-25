@@ -395,13 +395,13 @@ genCompoundStatement =
             genNewline <*>
             Gen.resize (n - n' - n'') (localState genBlock)
         If () <$> fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
-          genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b <*> pure c
+          genWhitespaces <*> genNewline <*> pure b <*> pure c
     , Gen.sized $ \n -> do
         n' <- Gen.integral (Range.constant 1 (n-1))
         a <- Gen.resize n' genExpr
         b <- Gen.resize (n - n') (localState $ (inLoop .= True) *> genBlock)
         While () <$> fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
-          genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
+          genWhitespaces <*> genNewline <*> pure b
     , Gen.sized $ \n -> do
         sz <- Gen.integral (Range.constant 1 5)
         n1 <- Gen.integral (Range.constant 1 $ n - 2)
@@ -427,15 +427,16 @@ genCompoundStatement =
         TryExcept () <$>
           genWhitespaces <*> genWhitespaces <*> genNewline <*>
           Gen.resize n1 genBlock <*>
-          (NonEmpty.toList <$> genWhitespaces1) <*>
           Gen.nonEmpty
             (Range.singleton sz)
-            (ExceptAs () <$>
-             (Gen.resize n2 genExpr & mapped.whitespaceAfter .~ [Space]) <*>
-             Gen.maybe ((,) <$> (NonEmpty.toList <$> genWhitespaces1) <*> genIdent)) <*>
-          genWhitespaces <*>
-          genNewline <*>
-          Gen.resize n3 genBlock <*>
+            ((,,,,) <$>
+             (NonEmpty.toList <$> genWhitespaces1) <*>
+             (ExceptAs () <$>
+              (Gen.resize n2 genExpr & mapped.whitespaceAfter .~ [Space]) <*>
+              Gen.maybe ((,) <$> (NonEmpty.toList <$> genWhitespaces1) <*> genIdent)) <*>
+             genWhitespaces <*>
+             genNewline <*>
+             Gen.resize n3 genBlock) <*>
           pure e1 <*>
           pure e2
     , Gen.sized $ \n -> do
@@ -494,7 +495,7 @@ genStatement =
     SmallStatements <$>
     localState genSmallStatement <*>
     pure [] <*>
-    Gen.maybe ((,) <$> genWhitespaces <*> genWhitespaces) <*>
+    Gen.maybe genWhitespaces <*>
     genNewline
   else
     Gen.scale (subtract 1) $
@@ -511,7 +512,7 @@ genStatement =
              Gen.list
                (Range.singleton $ unSize n'')
                (Gen.resize ((n-n') `div` n'') $
-                (,,) <$> genWhitespaces <*> genWhitespaces <*> localState genSmallStatement)) <*>
-          Gen.maybe ((,) <$> genWhitespaces <*> genWhitespaces) <*>
+                (,) <$> genWhitespaces <*> localState genSmallStatement)) <*>
+          Gen.maybe genWhitespaces <*>
           genNewline
     ]

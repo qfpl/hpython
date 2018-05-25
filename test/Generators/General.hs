@@ -257,13 +257,13 @@ genCompoundStatement =
             genNewline <*>
             Gen.resize (n - n' - n'') genBlock
         If () <$> genWhitespaces <*> pure a <*>
-          genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b <*> pure c
+          genWhitespaces <*> genNewline <*> pure b <*> pure c
     , Gen.sized $ \n -> do
         n' <- Gen.integral (Range.constant 1 (n-1))
         a <- Gen.resize n' genExpr
         b <- Gen.resize (n - n') genBlock
         While () <$> genWhitespaces <*> pure a <*>
-          genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
+          genWhitespaces <*> genNewline <*> pure b
     , Gen.sized $ \n -> do
         sz <- Gen.integral (Range.constant 1 5)
         n1 <- Gen.integral (Range.constant 1 $ n - 2)
@@ -289,15 +289,16 @@ genCompoundStatement =
         TryExcept () <$>
           genWhitespaces <*> genWhitespaces <*> genNewline <*>
           Gen.resize n1 genBlock <*>
-          genWhitespaces <*>
           Gen.nonEmpty
             (Range.singleton sz)
-            (ExceptAs () <$>
-             Gen.resize n2 genExpr <*>
-             Gen.maybe ((,) <$> genWhitespaces <*> genIdent)) <*>
-          genWhitespaces <*>
-          genNewline <*>
-          Gen.resize n3 genBlock <*>
+            ((,,,,) <$>
+             genWhitespaces <*>
+             (ExceptAs () <$>
+              Gen.resize n2 genExpr <*>
+              Gen.maybe ((,) <$> genWhitespaces <*> genIdent)) <*>
+             genWhitespaces <*>
+             genNewline <*>
+             Gen.resize n3 genBlock) <*>
           pure e1 <*>
           pure e2
     , Gen.sized $ \n -> do
@@ -354,7 +355,7 @@ genStatement =
     SmallStatements <$>
     genSmallStatement <*>
     pure [] <*>
-    Gen.maybe ((,) <$> genWhitespaces <*> genWhitespaces) <*>
+    Gen.maybe genWhitespaces <*>
     genNewline
   else
     Gen.scale (subtract 1) $
@@ -370,8 +371,8 @@ genStatement =
              Gen.list
                (Range.singleton $ unSize n'')
                (Gen.resize ((n-n') `div` n'') $
-                (,,) <$> genWhitespaces <*> genWhitespaces <*> genSmallStatement)) <*>
-          Gen.maybe ((,) <$> genWhitespaces <*> genWhitespaces) <*>
+                (,) <$> genWhitespaces <*> genSmallStatement)) <*>
+          Gen.maybe genWhitespaces <*>
           genNewline
     , CompoundStatement <$> genCompoundStatement
     ]

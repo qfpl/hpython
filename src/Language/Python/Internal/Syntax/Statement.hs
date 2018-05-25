@@ -14,7 +14,7 @@ import Control.Lens.Prism (_Just, _Right)
 import Control.Lens.Setter ((.~), over, mapped)
 import Control.Lens.TH (makeLenses, makeWrapped)
 import Control.Lens.Traversal (Traversal, traverseOf)
-import Control.Lens.Tuple (_2, _3, _4)
+import Control.Lens.Tuple (_2, _3, _4, _5)
 import Control.Lens.Wrapped (_Wrapped)
 import Data.Coerce (coerce)
 import Data.Function ((&))
@@ -91,19 +91,17 @@ class HasBlocks s where
 instance HasBlocks CompoundStatement where
   _Blocks f (Fundef a ws1 name ws2 params ws3 ws4 nl b) =
     Fundef a ws1 (coerce name) ws2 (coerce params) ws3 ws4 nl <$> coerce (f b)
-  _Blocks f (If a ws1 e1 ws2 ws3 nl b b') =
-    If a ws1 (coerce e1) ws2 ws3 nl <$>
+  _Blocks f (If a ws1 e1 ws3 nl b b') =
+    If a ws1 (coerce e1) ws3 nl <$>
     coerce (f b) <*>
     traverseOf (traverse._4) (coerce . f) b'
-  _Blocks f (While a ws1 e1 ws2 ws3 nl b) =
-    While a ws1 (coerce e1) ws2 ws3 nl <$> coerce (f b)
-  _Blocks fun (TryExcept a b c d e ws1 f ws nl bl g h) =
+  _Blocks f (While a ws1 e1 ws3 nl b) =
+    While a ws1 (coerce e1) ws3 nl <$> coerce (f b)
+  _Blocks fun (TryExcept a b c d e f g h) =
     TryExcept a (coerce b) (coerce c) (coerce d) <$>
     fun e <*>
-    pure ws1 <*>
-    pure (coerce f) <*>
-    pure ws <*> pure nl <*>
-    fun bl <*>
+    -- (coerce f) downcasts the ExceptAs
+    (traverse._5) fun (coerce f) <*>
     (traverse._4) fun g <*>
     (traverse._4) fun h
   _Blocks fun (TryFinally a b c d e f g h i) =
@@ -122,8 +120,8 @@ instance HasStatements Block where
 data Statement (v :: [*]) a
   = SmallStatements
       (SmallStatement v a)
-      [([Whitespace], [Whitespace], SmallStatement v a)]
-      (Maybe ([Whitespace], [Whitespace]))
+      [([Whitespace], SmallStatement v a)]
+      (Maybe [Whitespace])
       Newline
   | CompoundStatement (CompoundStatement v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
@@ -131,7 +129,7 @@ data Statement (v :: [*]) a
 instance HasBlocks Statement where
   _Blocks f (CompoundStatement c) = CompoundStatement <$> _Blocks f c
   _Blocks _ (SmallStatements a b c d) =
-    pure $ SmallStatements (coerce a) (over (mapped._3) coerce b) c d
+    pure $ SmallStatements (coerce a) (over (mapped._2) coerce b) c d
 
 instance Plated (Statement '[] a) where
   plate _ s@SmallStatements{} = pure s
@@ -140,17 +138,15 @@ instance Plated (Statement '[] a) where
     case s of
       Fundef a ws1 b ws2 c ws3 ws4 nl sts ->
         Fundef a ws1 b ws2 c ws3 ws4 nl <$> (_Wrapped.traverse._3._Right) fun sts
-      If a ws1 b ws2 ws3 nl sts sts' ->
-        If a ws1 b ws2 ws3 nl <$>
+      If a ws1 b ws3 nl sts sts' ->
+        If a ws1 b ws3 nl <$>
         (_Wrapped.traverse._3._Right) fun sts <*>
         (traverse._4._Wrapped.traverse._3._Right) fun sts'
-      While a ws1 b ws2 ws3 nl sts ->
-        While a ws1 b ws2 ws3 nl <$> (_Wrapped.traverse._3._Right) fun sts
-      TryExcept a b c d e ws1 f ws nl bl g h ->
+      While a ws1 b ws3 nl sts ->
+        While a ws1 b ws3 nl <$> (_Wrapped.traverse._3._Right) fun sts
+      TryExcept a b c d e f g h ->
         TryExcept a b c d <$> (_Wrapped.traverse._3._Right) fun e <*>
-        pure ws1 <*>
-        pure f <*>
-        pure ws <*> pure nl <*> (_Wrapped.traverse._3._Right) fun bl <*>
+        (traverse._5._Wrapped.traverse._3._Right) fun f <*>
         (traverse._4._Wrapped.traverse._3._Right) fun g <*>
         (traverse._4._Wrapped.traverse._3._Right) fun h
       TryFinally a b c d e f g h i ->
@@ -167,7 +163,7 @@ instance HasExprs Statement where
   _Exprs f (SmallStatements s ss a b) =
     SmallStatements <$>
     _Exprs f s <*>
-    (traverse._3._Exprs) f ss <*>
+    (traverse._2._Exprs) f ss <*>
     pure a <*>
     pure b
   _Exprs f (CompoundStatement c) = CompoundStatement <$> _Exprs f c
@@ -278,45 +274,49 @@ data ExceptAs v a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data CompoundStatement (v :: [*]) a
+  -- ^ 'def' <spaces> <ident> '(' <spaces> stuff ')' <spaces> ':' <spaces> <newline>
+  --   <block>
   = Fundef a
       (NonEmpty Whitespace) (Ident v a)
       [Whitespace] (CommaSep (Param v a))
       [Whitespace] [Whitespace] Newline
       (Block v a)
+  -- ^ 'if' <spaces> <expr> ':' <spaces> <newline>
+  --   <block>
+  --   [ 'else' <spaces> ':' <spaces> <newline>
+  --     <block>
+  --   ]
   | If a
-      [Whitespace] (Expr v a)
-      [Whitespace] [Whitespace] Newline
+      [Whitespace] (Expr v a) [Whitespace] Newline
       (Block v a)
       (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
+  -- ^ 'if' <spaces> <expr> ':' <spaces> <newline>
+  --   <block>
   | While a
-      [Whitespace] (Expr v a)
-      [Whitespace] [Whitespace] Newline
+      [Whitespace] (Expr v a) [Whitespace] Newline
       (Block v a)
+  -- ^ 'try' <spaces> ':' <spaces> <newline> <block>
+  --   ( 'except' <spaces> exceptAs ':' <spaces> <newline> <block> )+
+  --   [ 'else' <spaces> ':' <spaces> <newline> <block> ]
+  --   [ 'finally' <spaces> ':' <spaces> <newline> <block> ]
   | TryExcept a
-      -- try:
-      [Whitespace] [Whitespace] Newline
-      (Block v a)
-      -- except things as things...:
-        [Whitespace]
-        (NonEmpty (ExceptAs v a))
-        [Whitespace] Newline (Block v a)
-      -- [else:]
+      [Whitespace] [Whitespace] Newline (Block v a)
+      (NonEmpty ([Whitespace], ExceptAs v a, [Whitespace], Newline, Block v a))
       (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
-      -- [finally:]
       (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
+  -- ^ 'try' <spaces> ':' <spaces> <newline> <block>
+  --   'finally' <spaces> ':' <spaces> <newline> <block>
   | TryFinally a
-      -- try:
-      [Whitespace] [Whitespace] Newline
-      (Block v a)
-      -- finally:
-      [Whitespace] [Whitespace] Newline
-      (Block v a)
+      [Whitespace] [Whitespace] Newline (Block v a)
+      [Whitespace] [Whitespace] Newline (Block v a)
+  -- ^ 'for' <spaces> expr 'in' <spaces> expr ':' <spaces> <newline> <block>
+  --   [ 'else' <spaces> ':' <spaces> <newline> <block> ]
   | For a
-      -- for x in y:\n
       [Whitespace] (Expr v a) [Whitespace] (Expr v a) [Whitespace] Newline
       (Block v a)
-      -- [else:]
       (Maybe ([Whitespace], [Whitespace], Newline, Block v a))
+  -- ^ 'class' <spaces> ident [ '(' <spaces> [ args ] ')' <spaces>] ':' <spaces> <newline>
+  --   <block>
   | ClassDef a
       (NonEmpty Whitespace) (Ident v a)
       (Maybe ([Whitespace], Maybe (CommaSep1 (Arg v a)), [Whitespace])) [Whitespace] Newline
@@ -326,6 +326,9 @@ data CompoundStatement (v :: [*]) a
 instance HasExprs ExceptAs where
   _Exprs f (ExceptAs ann e a) = ExceptAs ann <$> f e <*> pure (coerce a)
 
+instance HasExprs Block where
+  _Exprs = _Wrapped.traverse._3._Right._Exprs
+
 instance HasExprs CompoundStatement where
   _Exprs f (Fundef a ws1 name ws2 params ws3 ws4 nl sts) =
     Fundef a ws1 (coerce name) ws2 <$>
@@ -334,39 +337,36 @@ instance HasExprs CompoundStatement where
     pure ws4 <*>
     pure nl <*>
     (_Wrapped.traverse._3._Right._Exprs) f sts
-  _Exprs f (If a ws1 e ws2 ws3 nl sts sts') =
+  _Exprs f (If a ws1 e ws3 nl sts sts') =
     If a ws1 <$>
     f e <*>
-    pure ws2 <*>
     pure ws3 <*>
     pure nl <*>
-    (_Wrapped.traverse._3._Right._Exprs) f sts <*>
-    (traverse._4._Wrapped.traverse._3._Right._Exprs) f sts'
-  _Exprs f (While a ws1 e ws2 ws3 nl sts) =
+    _Exprs f sts <*>
+    (traverse._4._Exprs) f sts'
+  _Exprs f (While a ws1 e ws3 nl sts) =
     While a ws1 <$>
     f e <*>
-    pure ws2 <*>
     pure ws3 <*>
     pure nl <*>
-    (_Wrapped.traverse._3._Right._Exprs) f sts
-  _Exprs fun (TryExcept a b c d e ws1 f ws nl bl g h) =
-    TryExcept a b c d <$> (_Wrapped.traverse._3._Right._Exprs) fun e <*>
-    pure ws1 <*>
-    (traverse._Exprs) fun f <*>
-    pure ws <*> pure nl <*> (_Wrapped.traverse._3._Right._Exprs) fun bl <*>
-    (traverse._4._Wrapped.traverse._3._Right._Exprs) fun g <*>
-    (traverse._4._Wrapped.traverse._3._Right._Exprs) fun h
+    _Exprs f sts
+  _Exprs fun (TryExcept a b c d e f g h) =
+    TryExcept a b c d <$> _Exprs fun e <*>
+    -- (coerce f) downcasts the ExceptAs
+    (traverse._5._Exprs) fun (coerce f) <*>
+    (traverse._4._Exprs) fun g <*>
+    (traverse._4._Exprs) fun h
   _Exprs fun (TryFinally a b c d e f g h i) =
-    TryFinally a b c d <$> (_Wrapped.traverse._3._Right._Exprs) fun e <*>
-    pure f <*> pure g <*> pure h <*> (_Wrapped.traverse._3._Right._Exprs) fun i
+    TryFinally a b c d <$> _Exprs fun e <*>
+    pure f <*> pure g <*> pure h <*> _Exprs fun i
   _Exprs fun (For a b c d e f g h i) =
     For a b <$> fun c <*> pure d <*> fun e <*>
-    pure f <*> pure g <*> (_Wrapped.traverse._3._Right._Exprs) fun h <*>
-    (traverse._4._Wrapped.traverse._3._Right._Exprs) fun i
+    pure f <*> pure g <*> _Exprs fun h <*>
+    (traverse._4._Exprs) fun i
   _Exprs fun (ClassDef a b c d e f g) =
     ClassDef a b (coerce c) <$>
     (traverse._2.traverse.traverse._Exprs) fun d <*> pure e <*> pure f <*>
-    (_Wrapped.traverse._3._Right._Exprs) fun g
+    _Exprs fun g
 
 makeWrapped ''Block
 makeLenses ''ExceptAs

@@ -306,6 +306,10 @@ validateArgScope (PositionalArg a e) =
   PositionalArg a <$> validateExprScope e
 validateArgScope (KeywordArg a ident ws2 expr) =
   KeywordArg a (coerce ident) ws2 <$> validateExprScope expr
+validateArgScope (StarArg a ws e) =
+  StarArg a ws <$> validateExprScope e
+validateArgScope (DoubleStarArg a ws e) =
+  DoubleStarArg a ws <$> validateExprScope e
 
 validateParamScope
   :: AsScopeError e v a

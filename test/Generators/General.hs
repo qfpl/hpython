@@ -33,18 +33,13 @@ genParam genExpr = Gen.sized $ \n ->
 
 genArg :: MonadGen m => m (Expr '[] ()) -> m (Arg '[] ())
 genArg genExpr = Gen.sized $ \n ->
-  if n <= 1
-  then -- error "arg for size 1"
-    Gen.choice
-      [ PositionalArg () <$> genExpr
-      , KeywordArg () <$> genIdent <*> genWhitespaces <*> genExpr
-      ]
-  else
-    Gen.resize (n-1) $
-    Gen.choice
-      [ PositionalArg () <$> genExpr
-      , KeywordArg () <$> genIdent <*> genWhitespaces <*> genExpr
-      ]
+  Gen.resize (max 0 $ n-1) $
+  Gen.choice
+    [ PositionalArg () <$> genExpr
+    , KeywordArg () <$> genIdent <*> genWhitespaces <*> genExpr
+    , StarArg () <$> genWhitespaces <*> genExpr
+    , DoubleStarArg () <$> genWhitespaces <*> genExpr
+    ]
 
 genInt :: MonadGen m => m (Expr '[] ())
 genInt = Int () <$> Gen.integral (Range.constant (-2^32) (2^32)) <*> genWhitespaces

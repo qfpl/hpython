@@ -41,6 +41,16 @@ data Arg (v :: [*]) a
   , _unsafeKeywordArgWhitespaceRight :: [Whitespace]
   , _argExpr :: Expr v a
   }
+  | StarArg
+  { _argAnn :: a
+  , _unsafeStarArgWhitespace :: [Whitespace]
+  , _argExpr :: Expr v a
+  }
+  | DoubleStarArg
+  { _argAnn :: a
+  , _unsafeDoubleStarArgWhitespace :: [Whitespace]
+  , _argExpr :: Expr v a
+  }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance IsString (Arg '[] ()) where; fromString = PositionalArg () . fromString
@@ -51,6 +61,8 @@ argExpr = lens _argExpr (\s a -> (coerce s) { _argExpr = a })
 instance HasExprs Arg where
   _Exprs f (KeywordArg a name ws2 expr) = KeywordArg a (coerce name) ws2 <$> f expr
   _Exprs f (PositionalArg a expr) = PositionalArg a <$> f expr
+  _Exprs f (StarArg a ws expr) = StarArg a ws <$> f expr
+  _Exprs f (DoubleStarArg a ws expr) = StarArg a ws <$> f expr
 
 data StringPrefix
   = Prefix_r

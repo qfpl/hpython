@@ -127,12 +127,20 @@ genBlock = do
           pure . Block $ NonEmpty.cons ((), indent, s1) (unBlock b)
 
 genPositionalArg :: MonadGen m => m (Arg '[] ())
-genPositionalArg = Gen.scale (max 0 . subtract 1) $ PositionalArg () <$> genExpr
+genPositionalArg =
+  Gen.scale (max 0 . subtract 1) $
+  Gen.choice
+    [ PositionalArg () <$> genExpr
+    , StarArg () <$> genWhitespaces <*> genExpr
+    ]
 
 genKeywordArg :: MonadGen m => m (Arg '[] ())
 genKeywordArg =
   Gen.scale (max 0 . subtract 1) $
-  KeywordArg () <$> genIdent <*> genWhitespaces <*> genExpr
+  Gen.choice
+    [ KeywordArg () <$> genIdent <*> genWhitespaces <*> genExpr
+    , DoubleStarArg () <$> genWhitespaces <*> genExpr
+    ]
 
 genArgs :: MonadGen m => m (CommaSep (Arg '[] ()))
 genArgs =
@@ -142,10 +150,8 @@ genArgs =
     let n3 = n - n1 - n2
 
     pargs <- Gen.resize n1 $ genSizedCommaSep genPositionalArg
-    -- sargs <- Gen.resize n2 $ genSizedCommaSep genStarArg
     kwargs <- Gen.resize n3 $ genSizedCommaSep genKeywordArg
 
-    -- appendCommaSep pargs (appendCommaSep sargs kwargs)
     pure $ appendCommaSep pargs kwargs
 
 genArgs1 :: MonadGen m => m (CommaSep1 (Arg '[] ()))

@@ -539,34 +539,52 @@ validateArgsSyntax
      )
   => f (Arg v a)
   -> ValidateSyntax e (f (Arg (Nub (Syntax ': v)) a))
-validateArgsSyntax e = go [] False (toList e) $> fmap coerce e
+validateArgsSyntax e = go [] False False (toList e) $> fmap coerce e
   where
     go
       :: (AsSyntaxError e v a, Member Indentation v)
       => [String]
+      -- ^ Have we seen a keyword argument?
+      -> Bool
+      -- ^ Have we seen a **argument?
       -> Bool
       -> [Arg v a]
       -> ValidateSyntax e [Arg (Nub (Syntax ': v)) a]
-    go _ _ [] = pure []
-    go names False (PositionalArg a expr : args) =
+    go _ _ _ [] = pure []
+    go names False False (PositionalArg a expr : args) =
       liftA2 (:)
         (PositionalArg a <$> validateExprSyntax expr)
-        (go names False args)
-    go names True (PositionalArg a expr : args) =
-      syntaxErrors [_PositionalAfterKeywordArg # (a, expr)] <*>
-      go names True args
-    go names _ (KeywordArg a name ws2 expr : args)
+        (go names False False args)
+    go names seenKeyword seenUnpack (PositionalArg a expr : args) =
+      when seenKeyword (syntaxErrors [_PositionalAfterKeywordArg # (a, expr)]) *>
+      when seenUnpack (syntaxErrors [_PositionalAfterKeywordUnpacking # (a, expr)]) *>
+      go names seenKeyword seenUnpack args
+    go names False False (StarArg a ws expr : args) =
+      liftA2 (:)
+        (StarArg a <$> validateWhitespace a ws <*> validateExprSyntax expr)
+        (go names False False args)
+    go names seenKeyword seenUnpack (StarArg a ws expr : args) =
+      when seenKeyword (syntaxErrors [_PositionalAfterKeywordArg # (a, expr)]) *>
+      when seenUnpack (syntaxErrors [_PositionalAfterKeywordUnpacking # (a, expr)]) *>
+      go names seenKeyword seenUnpack args
+    go names _ seenUnpack (KeywordArg a name ws2 expr : args)
       | _identValue name `elem` names =
           syntaxErrors [_DuplicateArgument # (a, _identValue name)] <*>
           validateIdent name <*>
-          go names True args
+          go names True seenUnpack args
       | otherwise =
           liftA2 (:)
             (KeywordArg a <$>
              validateIdent name <*>
              pure ws2 <*>
              validateExprSyntax expr)
-            (go (_identValue name:names) True args)
+            (go (_identValue name:names) True seenUnpack args)
+    go names seenKeyword _ (DoubleStarArg a ws expr : args) =
+      liftA2 (:)
+        (DoubleStarArg a <$>
+         validateWhitespace a ws <*>
+         validateExprSyntax expr)
+        (go names seenKeyword True args)
 
 validateParamsSyntax
   :: ( AsSyntaxError e v a

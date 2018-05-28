@@ -142,16 +142,29 @@ parameter =
    identifier anyWhitespace)
 
 argument :: DeltaParsing m => m (Untagged Arg Span)
-argument = do
-  e <- expr anyWhitespace
-  case e of
-    Ident _ f ->
-      (\a b -> maybe (PositionalArg b e) (uncurry $ KeywordArg b f) a) <$>
-      optional
-        ((,) <$>
-         (char '=' *> many anyWhitespace) <*>
-         expr anyWhitespace)
-    _ -> pure $ flip PositionalArg e
+argument = stars <|> nonStars
+  where
+    stars =
+      char '*' *>
+      ((\a b c -> DoubleStarArg c a b) <$
+       char '*' <*>
+       many anyWhitespace <*>
+       exprNoList anyWhitespace
+       <|>
+       (\a b c -> StarArg c a b) <$>
+       many anyWhitespace <*>
+       exprNoList anyWhitespace)
+
+    nonStars = do
+      e <- exprNoList anyWhitespace
+      case e of
+        Ident _ f ->
+          (\a b -> maybe (PositionalArg b e) (uncurry $ KeywordArg b f) a) <$>
+          optional
+            ((,) <$>
+            (char '=' *> many anyWhitespace) <*>
+            exprNoList anyWhitespace)
+        _ -> pure $ flip PositionalArg e
 
 stringPrefix :: CharParsing m => m StringPrefix
 stringPrefix =

@@ -418,6 +418,8 @@ renderArg (PositionalArg _ expr) = renderExpr expr
 renderArg (KeywordArg _ name ws2 expr) =
   renderIdent name <> "=" <>
   foldMap renderWhitespace ws2 <> renderExpr expr
+renderArg (StarArg _ ws expr) = "*" <> foldMap renderWhitespace ws <> renderExpr expr
+renderArg (DoubleStarArg _ ws expr) = "**" <> foldMap renderWhitespace ws <> renderExpr expr
 
 renderParam :: Param v a -> String
 renderParam (PositionalParam _ name) = renderIdent name

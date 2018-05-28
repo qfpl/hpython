@@ -8,6 +8,7 @@ import Language.Python.Internal.Syntax
 
 data SyntaxError (v :: [*]) a
   = PositionalAfterKeywordArg a (Expr v a)
+  | PositionalAfterKeywordUnpacking a (Expr v a)
   | PositionalAfterKeywordParam a String
   | UnexpectedDoubleStarParam a String
   | CannotAssignTo a (Expr v a)

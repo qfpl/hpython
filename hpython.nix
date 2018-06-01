@@ -1,5 +1,5 @@
-{ mkDerivation, base, bytestring-trie, directory, filepath
-, hedgehog, lens, mtl, parsers, process, stdenv, these
+{ mkDerivation, base, bytestring-trie, containers, directory
+, filepath, hedgehog, lens, mtl, parsers, process, stdenv
 , transformers, trifecta, type-level-sets
 }:
 mkDerivation {
@@ -9,7 +9,7 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    base bytestring-trie lens mtl parsers these trifecta
+    base bytestring-trie containers lens mtl parsers trifecta
     type-level-sets
   ];
   executableHaskellDepends = [ base lens ];

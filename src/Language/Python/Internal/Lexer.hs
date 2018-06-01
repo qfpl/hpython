@@ -1,5 +1,7 @@
 {-# language DeriveFunctor #-}
 {-# language BangPatterns #-}
+{-# language OverloadedLists #-}
+{-# language TypeApplications #-}
 module Language.Python.Internal.Lexer where
 
 import Control.Applicative ((<|>), some, many, optional)
@@ -11,6 +13,7 @@ import Data.Foldable (asum)
 import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Semigroup ((<>))
+import Data.Sequence ((|>), Seq)
 import Text.Trifecta
   ( DeltaParsing, Caret, Careted(..), char, careted, letter, noneOf, digit, string, manyTill
   , parseString
@@ -105,7 +108,7 @@ pyTokenAnn tk =
 token :: DeltaParsing m => m (PyToken Caret)
 token =
   fmap (\(f :^ sp) -> f sp) . careted $
-  asum
+  asum @[]
     [ string "if" $> TkIf
     , string "def" $> TkDef
     , (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
@@ -148,9 +151,10 @@ tokenize = parseString (many token) mempty
 data LogicalLine a
   = LogicalLine
   { llAnn :: a
+  , llSpacesTokens :: [PyToken a]
   , llSpaces :: [Whitespace]
   , llLine :: [PyToken a]
-  , llEnd :: Maybe Newline
+  , llEnd :: Maybe (PyToken a, Newline)
   } deriving (Eq, Show)
 
 spaceToken :: PyToken a -> Maybe Whitespace
@@ -192,14 +196,15 @@ logicalLines :: [PyToken a] -> [LogicalLine a]
 logicalLines [] = []
 logicalLines tks =
   let
-    (spaces, rest) = caretMaybe spaceToken tks
-    (line, rest') = breakMaybe newlineToken rest
+    (spaces, rest) = caretMaybe (\a -> (,) a <$> spaceToken a) tks
+    (line, rest') = breakMaybe (\a -> (,) a <$> newlineToken a) rest
   in
     LogicalLine
       (case tks of
          [] -> error "couldn't generate annotation for logical line"
          tk : _ -> pyTokenAnn tk)
-      (collapseContinue spaces)
+      (fst <$> spaces)
+      (collapseContinue $ snd <$> spaces)
       line
       (fst <$> rest')
       :
@@ -264,7 +269,7 @@ indentation lls =
         else pure []
 
     go :: LogicalLine a -> StateT (NonEmpty [Whitespace]) (Either TabError) [IndentedLine a]
-    go ll@(LogicalLine ann spaces line nl) = do
+    go ll@(LogicalLine ann _ spaces line nl) = do
       i :| is <- get
       let
         et8 = countSpaces $ expandTabs 8 spaces
@@ -282,3 +287,31 @@ indentation lls =
         GT -> do
           modify $ NonEmpty.cons spaces
           pure [Indent ann, IndentedLine ll]
+
+newtype Nested a = Nested (Seq (Either (Nested a) (LogicalLine a)))
+  deriving (Eq, Show)
+
+data IndentationError
+  = UnexpectedDedent
+  | ExpectedDedent
+  deriving (Eq, Show)
+
+nested :: [IndentedLine a] -> Either IndentationError (Nested a)
+nested = fmap Nested . go []
+  where
+    go
+      :: [Seq (Either (Nested a) (LogicalLine a))]
+      -> [IndentedLine a]
+      -> Either
+           IndentationError
+           (Seq (Either (Nested a) (LogicalLine a)))
+    go [] [] = pure []
+    go (a : as) [] = foldr (\_ _ -> Left ExpectedDedent) (pure a) as
+    go ctxt (Indent a : is) = go ([] : ctxt) is
+    go [] (Dedent : is) = Left UnexpectedDedent
+    go (a : as) (Dedent : is) =
+      case as of
+        x : xs -> go ((x |> Left (Nested a)) : xs) is
+        [] -> go [[Left (Nested a)]] is
+    go [] (IndentedLine ll : is) = go [[Right ll]] is
+    go (a : as) (IndentedLine ll : is) = go ((a |> Right ll) : as) is

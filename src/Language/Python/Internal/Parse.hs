@@ -70,11 +70,6 @@ stringChar = (char '\\' *> (escapeChar <|> hexChar)) <|> other
       in
         snd $! foldr (\a (sz, val) -> (sz-1, hexDigitInt a * 16 ^ sz + val)) (size, 0) str
 
-newline :: CharParsing m => m Newline
-newline =
-  char '\n' $> LF <|>
-  char '\r' *> (char '\n' $> CRLF <|> pure CR)
-
 annotated :: DeltaParsing m => m (Span -> b) -> m b
 annotated m = (\(f :~ sp) -> f sp) <$> spanned m
 

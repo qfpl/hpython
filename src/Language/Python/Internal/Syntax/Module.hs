@@ -10,8 +10,10 @@ import Language.Python.Internal.Syntax.Comment
 import Language.Python.Internal.Syntax.Statement
 import Language.Python.Internal.Syntax.Whitespace
 
-newtype Module v a = Module [Either ([Whitespace], Maybe Comment, Newline) (Statement v a)]
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+newtype Module v a
+  = Module
+  { unModule :: [Either ([Whitespace], Maybe Comment, Maybe Newline) (Statement v a)]
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasStatements Module where
   _Statements = _Wrapped.traverse._Right

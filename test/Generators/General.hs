@@ -384,6 +384,6 @@ genModule = Gen.sized $ \n -> do
       (Gen.resize
          (n `div` num)
          (Gen.choice
-          [ fmap Left $ (,,) <$> genWhitespaces <*> Gen.maybe genComment <*> genNewline
+          [ fmap Left $ (,,) <$> genWhitespaces <*> Gen.maybe genComment <*> Gen.maybe genNewline
           , Right <$> genStatement
           ]))

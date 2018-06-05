@@ -138,4 +138,4 @@ instance HasNewlines Statement where
   _Newlines f (SmallStatements s ss sc nl) = SmallStatements s ss sc <$> traverse f nl
 
 instance HasNewlines Module where
-  _Newlines = _Wrapped.traverse.failing (_Left._3) (_Right._Newlines)
+  _Newlines = _Wrapped.traverse.failing (_Left._3.traverse) (_Right._Newlines)

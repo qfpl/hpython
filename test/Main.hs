@@ -13,6 +13,7 @@ import Language.Python.Validate.Syntax.Error
 import LexerParser
 import Scope
 import Roundtrip
+import Helpers (doToPython)
 
 import qualified Generators.General as General
 import qualified Generators.Correct as Correct
@@ -26,7 +27,6 @@ import Data.Validate
 import System.Directory
 import System.Exit
 import System.Process
-import qualified Text.Trifecta as Trifecta
 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -178,14 +178,9 @@ expr_printparseprint_print =
       Success res ->
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
-          Success res' ->
-            case Trifecta.parseString (expr whitespace) mempty (renderExpr res') of
-              Trifecta.Failure errs'' -> annotateShow errs''
-              Trifecta.Success res'' -> do
-                annotateShow res''
-                renderExpr (res' ^. unvalidated) === renderExpr (res'' $> ())
-
-parseStatement = Trifecta.parseString (evalStateT statement []) mempty
+          Success res' -> do
+            py <- doToPython expr (renderExpr res')
+            renderExpr (res' ^. unvalidated) === renderExpr (res $> ())
 
 statement_printparseprint_print :: Property
 statement_printparseprint_print =
@@ -197,13 +192,10 @@ statement_printparseprint_print =
       Success res ->
         case validateStatementSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
-          Success res' ->
-            case parseStatement (renderLines $ renderStatement res') of
-              Trifecta.Failure errs'' -> annotateShow errs''
-              Trifecta.Success res'' -> do
-                annotateShow res''
-                renderLines (renderStatement (res' ^. unvalidated)) ===
-                  renderLines (renderStatement (res'' $> ()))
+          Success res' -> do
+            py <- doToPython statement . renderLines $ renderStatement res'
+            renderLines (renderStatement (res' ^. unvalidated)) ===
+              renderLines (renderStatement (py $> ()))
 
 statement_printparse_id :: Property
 statement_printparse_id =
@@ -215,10 +207,9 @@ statement_printparse_id =
       Success res ->
         case validateStatementSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
-          Success res' ->
-            case parseStatement (renderLines $ renderStatement res') of
-              Trifecta.Failure errs'' -> annotateShow errs''
-              Trifecta.Success res'' -> res ^. unvalidated === st
+          Success res' -> do
+            py <- doToPython statement . renderLines $ renderStatement res'
+            res' ^. unvalidated === (() <$ py)
 
 main = do
   checkParallel lexerParserTests

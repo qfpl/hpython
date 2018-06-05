@@ -448,6 +448,6 @@ renderModule (Module ms) =
   foldMap
     (either
        (\(a, b, c) ->
-          foldMap renderWhitespace a <> foldMap renderComment b <> renderNewline c)
+          foldMap renderWhitespace a <> foldMap renderComment b <> foldMap renderNewline c)
        (renderLines . renderStatement))
     ms

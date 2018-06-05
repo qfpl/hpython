@@ -79,6 +79,7 @@ test-suite hpython-tests
   other-modules:       Generators.General
                      , Generators.Common
                      , Generators.Correct
+                     , Helpers
                      , LexerParser
                      , Scope
                      , Roundtrip

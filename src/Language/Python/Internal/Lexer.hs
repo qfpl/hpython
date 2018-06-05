@@ -6,10 +6,11 @@
 module Language.Python.Internal.Lexer where
 
 import Control.Applicative ((<|>), some, many, optional)
-import Control.Monad (when)
+import Control.Monad (when, replicateM)
 import Control.Monad.State (StateT, evalStateT, get, modify, put)
 import Control.Monad.Trans (lift)
 import Data.Bifunctor (first)
+import Data.Char (chr, isAscii)
 import Data.Deriving (deriveEq1)
 import Data.Foldable (asum)
 import Data.Functor (($>))
@@ -17,13 +18,14 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Semigroup ((<>))
 import Data.Sequence ((|>), Seq)
 import Text.Trifecta
-  ( DeltaParsing, Caret, Careted(..), char, careted, letter, noneOf, digit, string, manyTill
-  , parseString
+  ( CharParsing, DeltaParsing, Caret, Careted(..), char, careted, letter, noneOf
+  , digit, string, manyTill, parseString, unexpected, oneOf, satisfy
   )
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Text.Trifecta as Trifecta
 
+import Language.Python.Internal.Syntax (StringPrefix(..))
 import Language.Python.Internal.Syntax.Whitespace
   (Newline(..), Whitespace(..), newline)
 
@@ -37,8 +39,8 @@ data PyToken a
   | TkInt Integer a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
-  | TkShortString QuoteType String a
-  | TkLongString QuoteType String a
+  | TkShortString (Maybe StringPrefix) QuoteType String a
+  | TkLongString (Maybe StringPrefix) QuoteType String a
   | TkSpace a
   | TkTab a
   | TkNewline Newline a
@@ -82,8 +84,8 @@ pyTokenAnn tk =
     TkInt _ a -> a
     TkFloat _ _ a -> a
     TkIdent _ a -> a
-    TkShortString _ _ a -> a
-    TkLongString _ _ a -> a
+    TkShortString _ _ _ a -> a
+    TkLongString _ _ _ a -> a
     TkSpace a -> a
     TkTab a -> a
     TkNewline _ a -> a
@@ -111,6 +113,64 @@ pyTokenAnn tk =
     TkPercent a -> a
     TkShiftLeft a -> a
     TkShiftRight a -> a
+
+stringPrefix :: CharParsing m => m StringPrefix
+stringPrefix =
+  (char 'r' *> (char 'b' $> Prefix_rb <|> char 'B' $> Prefix_rB <|> pure Prefix_r)) <|>
+  (char 'R' *> (char 'b' $> Prefix_Rb <|> char 'B' $> Prefix_RB <|> pure Prefix_R)) <|>
+  (char 'b' *> (char 'r' $> Prefix_br <|> char 'R' $> Prefix_bR <|> pure Prefix_b)) <|>
+  (char 'B' *> (char 'r' $> Prefix_Br <|> char 'R' $> Prefix_BR <|> pure Prefix_B)) <|>
+  (char 'u' $> Prefix_u) <|>
+  (char 'U' $> Prefix_U)
+
+stringChar :: (CharParsing m, Monad m) => m Char
+stringChar = (char '\\' *> (escapeChar <|> hexChar)) <|> other
+  where
+    other = satisfy isAscii
+    escapeChar =
+      asum @[]
+      [ char '\\'
+      , char '\''
+      , char '"'
+      , char 'a' $> '\a'
+      , char 'b' $> '\b'
+      , char 'f' $> '\f'
+      , char 'n' $> '\n'
+      , char 'r' $> '\r'
+      , char 't' $> '\t'
+      , char 'v' $> '\v'
+      ]
+
+    hexChar =
+      char 'U' *>
+      (hexToInt <$> replicateM 8 (oneOf "0123456789ABCDEF") >>=
+       \a -> if a <= 0x10FFFF then pure (chr a) else unexpected "value outside unicode range")
+
+    hexDigitInt c =
+      case c of
+        '0' -> 0
+        '1' -> 1
+        '2' -> 2
+        '3' -> 3
+        '4' -> 4
+        '5' -> 5
+        '6' -> 6
+        '7' -> 7
+        '8' -> 8
+        '9' -> 9
+        'A' -> 10
+        'B' -> 11
+        'C' -> 12
+        'D' -> 13
+        'E' -> 14
+        'F' -> 15
+        _ -> error "impossible"
+
+    hexToInt str =
+      let
+        size = length str
+      in
+        snd $! foldr (\a (sz, val) -> (sz-1, hexDigitInt a * 16 ^ sz + val)) (size, 0) str
 
 parseToken :: DeltaParsing m => m (PyToken Caret)
 parseToken =
@@ -143,12 +203,22 @@ parseToken =
     , char '\\' $> TkContinue <*> newline
     , char ':' $> TkColon
     , char ';' $> TkSemicolon
-    , char '"' *>
-      (string "\"\"" $> TkLongString DoubleQuote <*> manyTill (noneOf "\"") (string "\"\"\"") <|>
-       TkShortString DoubleQuote <$> manyTill (noneOf "\"") (char '"'))
-    , char '\'' *>
-      (string "''" $> TkLongString SingleQuote <*> manyTill (noneOf "\'") (string "'''") <|>
-       TkShortString SingleQuote <$> manyTill (noneOf "\'") (char '\''))
+    , do
+        sp <- optional stringPrefix
+        char '"' *>
+          (string "\"\"" $>
+           TkLongString sp DoubleQuote <*>
+           manyTill stringChar (string "\"\"\"")
+           <|>
+           TkShortString sp DoubleQuote <$> manyTill stringChar (char '"'))
+    , do
+        sp <- optional stringPrefix
+        char '\'' *>
+          (string "''" $>
+           TkLongString sp SingleQuote <*>
+           manyTill stringChar (string "'''")
+           <|>
+           TkShortString sp SingleQuote <$> manyTill stringChar (char '\''))
     , TkComment <$ char '#' <*> many (noneOf "\r\n") <*> newline
     , char ',' $> TkComma
     , TkIdent <$> some letter

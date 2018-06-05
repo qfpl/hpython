@@ -10,6 +10,7 @@ import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Syntax.Error
 
+import LexerParser
 import Scope
 import Roundtrip
 
@@ -220,6 +221,7 @@ statement_printparse_id =
               Trifecta.Success res'' -> res ^. unvalidated === st
 
 main = do
+  checkParallel lexerParserTests
   let file = "hedgehog-test.py"
   check . withTests 200 $ syntax_expr file
   check . withTests 200 $ syntax_statement file

@@ -394,19 +394,22 @@ renderCompoundStatement (ClassDef _ a b c d e f) =
 renderStatement :: Statement v a -> Lines String
 renderStatement (CompoundStatement c) = renderCompoundStatement c
 renderStatement (SmallStatements s ss sc nl) =
-  ManyLines
-  (renderSmallStatement s <>
-   foldMap
-     (\(b, c) ->
-        ";" <>
-        foldMap renderWhitespace b <>
-        renderSmallStatement c)
-     ss <>
-   foldMap
-     (\b -> ";" <> foldMap renderWhitespace b)
-     sc)
-  nl
-  NoLines
+  f $
+  renderSmallStatement s <>
+  foldMap
+    (\(b, c) ->
+       ";" <>
+       foldMap renderWhitespace b <>
+       renderSmallStatement c)
+    ss <>
+  foldMap
+    (\b -> ";" <> foldMap renderWhitespace b)
+    sc
+  where
+    f a =
+      case nl of
+        Nothing -> OneLine a
+        Just nl' -> ManyLines a nl' NoLines
 
 renderExceptAs :: ExceptAs v a -> String
 renderExceptAs (ExceptAs _ e f) =

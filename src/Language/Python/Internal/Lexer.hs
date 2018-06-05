@@ -2,6 +2,7 @@
 {-# language BangPatterns #-}
 {-# language OverloadedLists #-}
 {-# language TypeApplications #-}
+{-# language TemplateHaskell #-}
 module Language.Python.Internal.Lexer where
 
 import Control.Applicative ((<|>), some, many, optional)
@@ -9,6 +10,7 @@ import Control.Monad (when)
 import Control.Monad.State (StateT, evalStateT, get, modify, put)
 import Control.Monad.Trans (lift)
 import Data.Bifunctor (first)
+import Data.Deriving (deriveEq1)
 import Data.Foldable (asum)
 import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty(..))
@@ -31,6 +33,7 @@ data QuoteType = SingleQuote | DoubleQuote
 data PyToken a
   = TkIf a
   | TkDef a
+  | TkReturn a
   | TkInt Integer a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
@@ -53,6 +56,7 @@ data PyToken a
   | TkGte a
   | TkContinue Newline a
   | TkColon a
+  | TkSemicolon a
   | TkComma a
   | TkPlus a
   | TkMinus a
@@ -65,11 +69,13 @@ data PyToken a
   | TkShiftLeft a
   | TkShiftRight a
   deriving (Eq, Show, Functor)
+deriveEq1 ''PyToken
 
 pyTokenAnn :: PyToken a -> a
 pyTokenAnn tk =
   case tk of
     TkDef a -> a
+    TkReturn a -> a
     TkPlus a -> a
     TkMinus a -> a
     TkIf a -> a
@@ -95,6 +101,7 @@ pyTokenAnn tk =
     TkGte a -> a
     TkContinue _ a -> a
     TkColon a -> a
+    TkSemicolon a -> a
     TkComma a -> a
     TkComment _ _ a -> a
     TkStar a -> a
@@ -105,12 +112,13 @@ pyTokenAnn tk =
     TkShiftLeft a -> a
     TkShiftRight a -> a
 
-token :: DeltaParsing m => m (PyToken Caret)
-token =
+parseToken :: DeltaParsing m => m (PyToken Caret)
+parseToken =
   fmap (\(f :^ sp) -> f sp) . careted $
   asum @[]
     [ string "if" $> TkIf
     , string "def" $> TkDef
+    , string "return" $> TkReturn
     , (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
         fmap read (some digit) <*>
         optional (char '.' *> optional (read <$> some digit))
@@ -134,6 +142,7 @@ token =
     , char '%' $> TkPercent
     , char '\\' $> TkContinue <*> newline
     , char ':' $> TkColon
+    , char ';' $> TkSemicolon
     , char '"' *>
       (string "\"\"" $> TkLongString DoubleQuote <*> manyTill (noneOf "\"") (string "\"\"\"") <|>
        TkShortString DoubleQuote <$> manyTill (noneOf "\"") (char '"'))
@@ -146,7 +155,7 @@ token =
     ]
 
 tokenize :: String -> Trifecta.Result [PyToken Caret]
-tokenize = parseString (many token) mempty
+tokenize = parseString (many parseToken) mempty
 
 data LogicalLine a
   = LogicalLine
@@ -174,14 +183,14 @@ newlineToken :: PyToken a -> Maybe Newline
 newlineToken (TkNewline nl _) = Just nl
 newlineToken _ = Nothing
 
-caretMaybe :: (a -> Maybe b) -> [a] -> ([b], [a])
-caretMaybe f as =
+spanMaybe :: (a -> Maybe b) -> [a] -> ([b], [a])
+spanMaybe f as =
   case as of
     [] -> ([], [])
     x : xs ->
       case f x of
         Nothing -> ([], as)
-        Just b -> first (b :) $ caretMaybe f xs
+        Just b -> first (b :) $ spanMaybe f xs
 
 breakMaybe :: (a -> Maybe b) -> [a] -> ([a], Maybe (b, [a]))
 breakMaybe f as =
@@ -196,7 +205,7 @@ logicalLines :: [PyToken a] -> [LogicalLine a]
 logicalLines [] = []
 logicalLines tks =
   let
-    (spaces, rest) = caretMaybe (\a -> (,) a <$> spaceToken a) tks
+    (spaces, rest) = spanMaybe (\a -> (,) a <$> spaceToken a) tks
     (line, rest') = breakMaybe (\a -> (,) a <$> newlineToken a) rest
   in
     LogicalLine
@@ -288,8 +297,10 @@ indentation lls =
           modify $ NonEmpty.cons spaces
           pure [Indent ann, IndentedLine ll]
 
-newtype Nested a = Nested (Seq (Either (Nested a) (LogicalLine a)))
-  deriving (Eq, Show)
+newtype Nested a
+  = Nested
+  { unNested :: Seq (Either (Nested a) (LogicalLine a))
+  } deriving (Eq, Show)
 
 data IndentationError
   = UnexpectedDedent

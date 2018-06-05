@@ -37,10 +37,10 @@ call_ :: Expr '[] () -> [Arg '[] ()] -> Expr '[] ()
 call_ expr args = Call () expr [] (listToCommaSep args) []
 
 return_ :: Expr '[] () -> Statement '[] ()
-return_ e = SmallStatements (Return () [Space] e) [] Nothing LF
+return_ e = SmallStatements (Return () [Space] e) [] Nothing (Just LF)
 
 expr_ :: Expr '[] () -> Statement '[] ()
-expr_ e = SmallStatements (Expr () e) [] Nothing LF
+expr_ e = SmallStatements (Expr () e) [] Nothing (Just LF)
 
 list_ :: [Expr '[] ()] -> Expr '[] ()
 list_ es = List () [] (listToCommaSep es) []
@@ -143,10 +143,10 @@ none_ :: Expr '[] ()
 none_ = None () []
 
 pass_ :: Statement '[] ()
-pass_ = SmallStatements (Pass ()) [] Nothing LF
+pass_ = SmallStatements (Pass ()) [] Nothing (Just LF)
 
 break_ :: Statement '[] ()
-break_ = SmallStatements (Break ()) [] Nothing LF
+break_ = SmallStatements (Break ()) [] Nothing (Just LF)
 
 true_ :: Expr '[] ()
 true_ = Bool () True []
@@ -167,7 +167,7 @@ longStr_ :: String -> Expr '[] ()
 longStr_ s = String () Nothing LongDouble s []
 
 (.=) :: Expr '[] () -> Expr '[] () -> Statement '[] ()
-(.=) a b = SmallStatements (Assign () a [Space] [Space] b) [] Nothing LF
+(.=) a b = SmallStatements (Assign () a [Space] [Space] b) [] Nothing (Just LF)
 
 forElse_
   :: Expr '[] ()

@@ -508,7 +508,7 @@ genStatement =
     localState genSmallStatement <*>
     pure [] <*>
     Gen.maybe genWhitespaces <*>
-    genNewline
+    (Just <$> genNewline)
   else
     Gen.scale (subtract 1) $
     Gen.choice
@@ -526,5 +526,5 @@ genStatement =
                (Gen.resize ((n-n') `div` n'') $
                 (,) <$> genWhitespaces <*> localState genSmallStatement)) <*>
           Gen.maybe genWhitespaces <*>
-          genNewline
+          (Just <$> genNewline)
     ]

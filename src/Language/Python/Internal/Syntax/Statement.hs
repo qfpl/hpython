@@ -122,8 +122,9 @@ data Statement (v :: [*]) a
       (SmallStatement v a)
       [([Whitespace], SmallStatement v a)]
       (Maybe [Whitespace])
-      Newline
-  | CompoundStatement (CompoundStatement v a)
+      (Maybe Newline)
+  | CompoundStatement
+      (CompoundStatement v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasBlocks Statement where

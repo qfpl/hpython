@@ -179,7 +179,7 @@ expr_printparseprint_print =
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <- doToPython expr (renderExpr res')
+            py <- doToPython (expr space) (renderExpr res')
             renderExpr (res' ^. unvalidated) === renderExpr (res $> ())
 
 statement_printparseprint_print :: Property

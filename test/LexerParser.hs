@@ -18,6 +18,7 @@ lexerParserTests =
   [ ("Test parse 1", test_parse_1)
   , ("Test parse 2", test_parse_2)
   , ("Test full trip 1", test_fulltrip_1)
+  , ("Test full trip 2", test_fulltrip_2)
   ]
 
 test_fulltrip_1 :: Property
@@ -26,6 +27,13 @@ test_fulltrip_1 =
     let str = "def a(x, y=2, *z, **w):\n   return 2 + 3"
     a <- doToPython statement str
     renderLines (renderStatement a) === str
+
+test_fulltrip_2 :: Property
+test_fulltrip_2 =
+  withTests 1 . property $ do
+    let str = "(   1\n       *\n  3\n    )"
+    a <- doToPython (expr space) str
+    renderExpr a === str
 
 parseTab :: Parser ann Whitespace
 parseTab = do

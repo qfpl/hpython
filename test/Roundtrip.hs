@@ -24,9 +24,9 @@ roundtripTests :: Group
 roundtripTests =
   Group "Roundtrip tests" $
   (\name -> (fromString name, withTests 1 $ doRoundtrip name)) <$>
-  [ "django.py"
+  [ "weird.py"
+  , "django.py"
   , "test.py"
-  , "weird.py"
   , "ansible.py"
   , "comments.py"
   ]

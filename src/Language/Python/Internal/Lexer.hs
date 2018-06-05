@@ -17,9 +17,10 @@ import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Semigroup ((<>))
 import Data.Sequence ((|>), Seq)
+import Text.Parser.LookAhead (LookAheadParsing, lookAhead)
 import Text.Trifecta
   ( CharParsing, DeltaParsing, Caret, Careted(..), char, careted, letter, noneOf
-  , digit, string, manyTill, parseString, unexpected, oneOf, satisfy
+  , digit, string, manyTill, parseString, unexpected, oneOf, satisfy, try
   )
 
 import qualified Data.List.NonEmpty as NonEmpty
@@ -27,7 +28,7 @@ import qualified Text.Trifecta as Trifecta
 
 import Language.Python.Internal.Syntax (StringPrefix(..))
 import Language.Python.Internal.Syntax.Whitespace
-  (Newline(..), Whitespace(..), newline)
+  (Newline(..), Whitespace(..))
 
 data QuoteType = SingleQuote | DoubleQuote
   deriving (Eq, Show)
@@ -36,6 +37,9 @@ data PyToken a
   = TkIf a
   | TkDef a
   | TkReturn a
+  | TkPass a
+  | TkBreak a
+  | TkContinue a
   | TkInt Integer a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
@@ -56,7 +60,7 @@ data PyToken a
   | TkDoubleEq a
   | TkGt a
   | TkGte a
-  | TkContinue Newline a
+  | TkContinued Newline a
   | TkColon a
   | TkSemicolon a
   | TkComma a
@@ -78,6 +82,9 @@ pyTokenAnn tk =
   case tk of
     TkDef a -> a
     TkReturn a -> a
+    TkPass a -> a
+    TkBreak a -> a
+    TkContinue a -> a
     TkPlus a -> a
     TkMinus a -> a
     TkIf a -> a
@@ -101,7 +108,7 @@ pyTokenAnn tk =
     TkDoubleEq a -> a
     TkGt a -> a
     TkGte a -> a
-    TkContinue _ a -> a
+    TkContinued _ a -> a
     TkColon a -> a
     TkSemicolon a -> a
     TkComma a -> a
@@ -113,6 +120,11 @@ pyTokenAnn tk =
     TkPercent a -> a
     TkShiftLeft a -> a
     TkShiftRight a -> a
+
+parseNewline :: CharParsing m => m Newline
+parseNewline =
+  char '\n' $> LF <|>
+  char '\r' *> (char '\n' $> CRLF <|> pure CR)
 
 stringPrefix :: CharParsing m => m StringPrefix
 stringPrefix =
@@ -172,20 +184,22 @@ stringChar = (char '\\' *> (escapeChar <|> hexChar)) <|> other
       in
         snd $! foldr (\a (sz, val) -> (sz-1, hexDigitInt a * 16 ^ sz + val)) (size, 0) str
 
-parseToken :: DeltaParsing m => m (PyToken Caret)
+parseToken :: (DeltaParsing m, LookAheadParsing m) => m (PyToken Caret)
 parseToken =
   fmap (\(f :^ sp) -> f sp) . careted $
   asum @[]
     [ string "if" $> TkIf
     , string "def" $> TkDef
     , string "return" $> TkReturn
+    , string "pass" $> TkPass
+    , string "break" $> TkBreak
+    , string "continue" $> TkContinue
     , (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
         fmap read (some digit) <*>
         optional (char '.' *> optional (read <$> some digit))
     , char ' ' $> TkSpace
     , char '\t' $> TkTab
-    , char '\n' $> TkNewline LF
-    , char '\r' *> (char '\n' $> TkNewline CRLF <|> pure (TkNewline CR))
+    , TkNewline <$> parseNewline
     , char '[' $> TkLeftBracket
     , char ']' $> TkRightBracket
     , char '(' $> TkLeftParen
@@ -200,11 +214,11 @@ parseToken =
     , char '+' $> TkPlus
     , char '-' $> TkMinus
     , char '%' $> TkPercent
-    , char '\\' $> TkContinue <*> newline
+    , char '\\' $> TkContinued <*> parseNewline
     , char ':' $> TkColon
     , char ';' $> TkSemicolon
     , do
-        sp <- optional stringPrefix
+        sp <- optional . try $ stringPrefix <* lookAhead (char '"')
         char '"' *>
           (string "\"\"" $>
            TkLongString sp DoubleQuote <*>
@@ -212,14 +226,14 @@ parseToken =
            <|>
            TkShortString sp DoubleQuote <$> manyTill stringChar (char '"'))
     , do
-        sp <- optional stringPrefix
+        sp <- optional . try $ stringPrefix <* lookAhead (char '"')
         char '\'' *>
           (string "''" $>
            TkLongString sp SingleQuote <*>
            manyTill stringChar (string "'''")
            <|>
            TkShortString sp SingleQuote <$> manyTill stringChar (char '\''))
-    , TkComment <$ char '#' <*> many (noneOf "\r\n") <*> newline
+    , TkComment <$ char '#' <*> many (noneOf "\r\n") <*> parseNewline
     , char ',' $> TkComma
     , TkIdent <$> some letter
     ]
@@ -239,7 +253,7 @@ data LogicalLine a
 spaceToken :: PyToken a -> Maybe Whitespace
 spaceToken TkSpace{} = Just Space
 spaceToken TkTab{} = Just Tab
-spaceToken (TkContinue nl _) = Just $ Continued nl []
+spaceToken (TkContinued nl _) = Just $ Continued nl []
 spaceToken _ = Nothing
 
 collapseContinue :: [Whitespace] -> [Whitespace]
@@ -262,21 +276,31 @@ spanMaybe f as =
         Nothing -> ([], as)
         Just b -> first (b :) $ spanMaybe f xs
 
-breakMaybe :: (a -> Maybe b) -> [a] -> ([a], Maybe (b, [a]))
-breakMaybe f as =
-  case as of
-    [] -> ([], Nothing)
-    x : xs ->
-      case f x of
-        Just b -> ([], Just (b, xs))
-        Nothing -> first (x :) $ breakMaybe f xs
+-- | Acts like break, but encodes the "insignificant whitespace" rule for parens, braces
+-- and brackets
+breakOnNewline :: [PyToken a] -> ([PyToken a], Maybe ((PyToken a, Newline), [PyToken a]))
+breakOnNewline = go 0
+  where
+    go _ [] = ([], Nothing)
+    go !careWhen0 (tk : tks) =
+      case tk of
+        TkLeftParen{} -> first (tk :) $ go (careWhen0 + 1) tks
+        TkLeftBracket{} -> first (tk :) $ go (careWhen0 + 1) tks
+        TkLeftBrace{} -> first (tk :) $ go (careWhen0 + 1) tks
+        TkRightParen{} -> first (tk :) $ go (max 0 $ careWhen0 - 1) tks
+        TkRightBracket{} -> first (tk :) $ go (max 0 $ careWhen0 - 1) tks
+        TkRightBrace{} -> first (tk :) $ go (max 0 $ careWhen0 - 1) tks
+        TkNewline nl _
+          | careWhen0 == 0 -> ([], Just ((tk, nl), tks))
+          | otherwise -> first (tk :) $ go careWhen0 tks
+        _ -> first (tk :) $ go careWhen0 tks
 
 logicalLines :: [PyToken a] -> [LogicalLine a]
 logicalLines [] = []
 logicalLines tks =
   let
     (spaces, rest) = spanMaybe (\a -> (,) a <$> spaceToken a) tks
-    (line, rest') = breakMaybe (\a -> (,) a <$> newlineToken a) rest
+    (line, rest') = breakOnNewline rest
   in
     LogicalLine
       (case tks of

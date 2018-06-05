@@ -29,6 +29,8 @@ data ParseError ann
   | ExpectedIndent
   | ExpectedEndOfBlock
   | ExpectedIdentifier { peGot :: PyToken ann }
+  | ExpectedContinued { peGot :: PyToken ann }
+  | ExpectedNewline { peGot :: PyToken ann }
   | ExpectedString { peGot :: PyToken ann }
   | ExpectedInteger { peGot :: PyToken ann }
   | ExpectedComment { peGot :: PyToken ann }
@@ -140,42 +142,73 @@ dedent = Parser $ do
         [] -> put rest *> tell (Consumed True)
         _ -> throwError ExpectedEndOfBlock
 
+continued :: Parser ann Whitespace
+continued = do
+  curTk <- currentToken
+  case curTk of
+    TkContinued nl _ -> do
+      Parser (tell $ Consumed True)
+      Continued nl <$> many space
+    _ -> Parser . throwError $ ExpectedContinued curTk
+
+newline :: Parser ann Newline
+newline = do
+  curTk <- currentToken
+  case curTk of
+    TkNewline nl _ -> do
+      Parser (tell $ Consumed True)
+      pure nl
+    _ -> Parser . throwError $ ExpectedNewline curTk
+
+anySpace :: Parser ann Whitespace
+anySpace =
+  Space <$ tokenEq (TkSpace ()) <!>
+  Tab <$ tokenEq (TkTab ()) <!>
+  continued <!>
+  Newline <$> newline
+
 space :: Parser ann Whitespace
 space =
-  Space <$ token (TkSpace ()) <!>
-  Tab <$ token (TkTab ())
+  Space <$ tokenEq (TkSpace ()) <!>
+  Tab <$ tokenEq (TkTab ()) <!>
+  continued
 
 parseError :: ParseError ann -> Parser ann a
 parseError pe = Parser $ throwError pe
 
-token :: PyToken b -> Parser ann (PyToken ann, [Whitespace])
-token tk = do
+tokenEq :: PyToken b -> Parser ann (PyToken ann)
+tokenEq tk = do
   curTk <- currentToken
   unless (liftEq (\_ _ -> True) tk curTk) .
     parseError $ ExpectedToken (() <$ tk) curTk
   Parser (tell $ Consumed True)
-  (,) curTk <$> many space
+  pure curTk
 
-identifier :: Parser ann (Ident '[] ann)
-identifier = do
+token :: Parser ann Whitespace -> PyToken b -> Parser ann (PyToken ann, [Whitespace])
+token ws tk = do
+  curTk <- tokenEq tk
+  (,) curTk <$> many ws
+
+identifier :: Parser ann Whitespace -> Parser ann (Ident '[] ann)
+identifier ws = do
   curTk <- currentToken
   case curTk of
     TkIdent n ann -> do
       Parser (tell $ Consumed True)
-      MkIdent ann n <$> many space
+      MkIdent ann n <$> many ws
     _ -> Parser . throwError $ ExpectedIdentifier curTk
 
-integer :: Parser ann (Expr '[] ann)
-integer = do
+integer :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+integer ws = do
   curTk <- currentToken
   case curTk of
     TkInt n ann -> do
       Parser (tell $ Consumed True)
-      Int ann n <$> many space
+      Int ann n <$> many ws
     _ -> Parser . throwError $ ExpectedInteger curTk
 
-string :: Parser ann (Expr '[] ann)
-string = do
+string :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+string ws = do
   curTk <- currentToken
   (case curTk of
     TkShortString sp qt val ann ->
@@ -193,7 +226,7 @@ string = do
          DoubleQuote -> LongDouble)
       val
     _ -> Parser . throwError $ ExpectedString curTk) <*>
-    many space
+    many ws
 
 between :: Parser ann left -> Parser ann right -> Parser ann a -> Parser ann a
 between left right pa = left *> pa <* right
@@ -209,23 +242,26 @@ indents = Parser $ do
         Right ll@(LogicalLine a _ is _ _) : rest' -> pure (is, a)
         Left _ : _ -> throwError UnexpectedIndent
 
-expr :: Parser ann (Expr '[] ann)
-expr =
-  binOp plusOp
+expr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+expr ws = arithExpr
   where
-    plusOp :: Parser ann (BinOp ann)
-    plusOp = (\(tk, ws) -> Plus (pyTokenAnn tk) ws) <$> token (TkPlus ())
+    arithOp = (\(tk, ws) -> Plus (pyTokenAnn tk) ws) <$> token ws (TkPlus ())
 
-    binOp :: Parser ann (BinOp ann) -> Parser ann (Expr '[] ann)
-    binOp op =
+    termOp =
+      (\(tk, ws) -> Multiply (pyTokenAnn tk) ws) <$> token ws (TkStar ()) <!>
+      (\(tk, ws) -> Divide (pyTokenAnn tk) ws) <$> token ws (TkDoubleSlash ())
+
+    binOp op tm =
       (\t ts ->
           case ts of
             [] -> t
             _ -> foldl (\tm (o, val) -> BinOp (tm ^. exprAnnotation) tm o val) t ts) <$>
-     term <*>
-     many ((,) <$> op <*> term)
+     tm <*>
+     many ((,) <$> op <*> tm)
 
-    term = factor
+    arithExpr = binOp arithOp term
+
+    term = binOp termOp factor
 
     factor = power
 
@@ -233,26 +269,40 @@ expr =
 
     atomExpr = atom
 
+    parens =
+      (\(a, b) c d -> Parens (pyTokenAnn a) b c d) <$>
+      token anySpace (TkLeftParen ()) <*>
+      expr anySpace <*>
+      fmap snd (token space $ TkRightParen ())
+
     atom =
-      integer <!>
-      string <!>
-      (\a -> Ident (_identAnnotation a) a) <$> identifier
+      integer ws <!>
+      string ws <!>
+      (\a -> Ident (_identAnnotation a) a) <$> identifier ws <!>
+      parens
 
 smallStatement :: Parser ann (SmallStatement '[] ann)
 smallStatement =
-  returnSt
+  returnSt <!>
+  passSt <!>
+  breakSt <!>
+  continueSt
   where
     returnSt =
       (\(tkReturn, retSpaces) -> Return (pyTokenAnn tkReturn) retSpaces) <$>
-      token (TkReturn ()) <*>
-      expr
+      token space (TkReturn ()) <*>
+      expr space
+
+    passSt = Pass . pyTokenAnn <$> tokenEq (TkPass ())
+    breakSt = Break . pyTokenAnn <$> tokenEq (TkBreak ())
+    continueSt = Continue . pyTokenAnn <$> tokenEq (TkContinue ())
 
 statement :: Parser ann (Statement '[] ann)
 statement =
   SmallStatements <$>
   smallStatement <*>
-  many ((,) <$> fmap snd (token $ TkSemicolon ()) <*> smallStatement) <*>
-  optional (snd <$> token (TkSemicolon ())) <*>
+  many ((,) <$> fmap snd (token space $ TkSemicolon ()) <*> smallStatement) <*>
+  optional (snd <$> token space (TkSemicolon ())) <*>
   (Just <$> eol <!> Nothing <$ eof)
 
   <!>
@@ -281,14 +331,14 @@ block = fmap Block $ (:|) <$> line <*> many line
         Left <$> commentOrEmpty <!>
         Right <$> statement
 
-comma :: Parser ann (PyToken ann, [Whitespace])
-comma = token $ TkComma ()
+comma :: Parser ann Whitespace -> Parser ann (PyToken ann, [Whitespace])
+comma ws = token ws $ TkComma ()
 
-commaSep :: Parser ann a -> Parser ann (CommaSep a)
-commaSep pa =
+commaSep :: Parser ann Whitespace -> Parser ann a -> Parser ann (CommaSep a)
+commaSep ws pa =
   (\a -> maybe (CommaSepOne a) (uncurry $ CommaSepMany a)) <$>
   pa <*>
-  optional ((,) <$> (snd <$> comma) <*> commaSep pa)
+  optional ((,) <$> (snd <$> comma ws) <*> commaSep ws pa)
 
   <!>
 
@@ -300,28 +350,30 @@ param =
      maybe
        (PositionalParam (_identAnnotation a) a)
        (uncurry $ KeywordParam (_identAnnotation a) a)) <$>
-  identifier <*>
-  optional ((,) <$> (snd <$> token (TkEq ())) <*> expr)
+  identifier anySpace <*>
+  optional ((,) <$> (snd <$> token anySpace (TkEq ())) <*> expr anySpace)
 
   <!>
 
-  (\(a, b) -> StarParam (pyTokenAnn a) b) <$> token (TkStar ()) <*> identifier
+  (\(a, b) -> StarParam (pyTokenAnn a) b) <$> token anySpace (TkStar ()) <*> identifier anySpace
 
   <!>
 
-  (\(a, b) -> DoubleStarParam (pyTokenAnn a) b) <$> token (TkDoubleStar ()) <*> identifier
+  (\(a, b) -> DoubleStarParam (pyTokenAnn a) b) <$>
+  token anySpace (TkDoubleStar ()) <*>
+  identifier anySpace
 
 compoundStatement :: Parser ann (CompoundStatement '[] ann)
 compoundStatement = fundef
   where
     fundef =
       (\(tkDef, defSpaces) -> Fundef (pyTokenAnn tkDef) (NonEmpty.fromList defSpaces)) <$>
-      token (TkDef ()) <*>
-      identifier <*>
-      fmap snd (token $ TkLeftParen ()) <*>
-      commaSep param <*>
-      fmap snd (token $ TkRightParen ()) <*>
-      fmap snd (token $ TkColon ()) <*>
+      token space (TkDef ()) <*>
+      identifier space <*>
+      fmap snd (token anySpace $ TkLeftParen ()) <*>
+      commaSep anySpace param <*>
+      fmap snd (token space $ TkRightParen ()) <*>
+      fmap snd (token space $ TkColon ()) <*>
       eol <*
       indent <*>
       block <*

@@ -35,6 +35,7 @@ data QuoteType = SingleQuote | DoubleQuote
 
 data PyToken a
   = TkIf a
+  | TkElse a
   | TkDef a
   | TkReturn a
   | TkPass a
@@ -113,6 +114,7 @@ pyTokenAnn tk =
     TkPlus a -> a
     TkMinus a -> a
     TkIf a -> a
+    TkElse a -> a
     TkInt _ a -> a
     TkFloat _ _ a -> a
     TkIdent _ a -> a
@@ -218,6 +220,7 @@ parseToken =
   fmap (\(f :^ sp) -> f sp) . careted $
   asum @[]
     [ string "if" $> TkIf
+    , string "else" $> TkElse
     , string "def" $> TkDef
     , string "return" $> TkReturn
     , string "pass" $> TkPass

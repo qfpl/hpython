@@ -591,7 +591,9 @@ arg =
   expr anySpace
 
 compoundStatement :: Parser ann (CompoundStatement '[] ann)
-compoundStatement = fundef
+compoundStatement =
+  fundef <!>
+  ifSt
   where
     fundef =
       (\(tkDef, defSpaces) -> Fundef (pyTokenAnn tkDef) (NonEmpty.fromList defSpaces)) <$>
@@ -605,6 +607,19 @@ compoundStatement = fundef
       indent <*>
       block <*
       dedent
+
+    ifSt =
+      (\(tk, s) -> If (pyTokenAnn tk) s) <$>
+      token space (TkIf ()) <*>
+      expr space <*>
+      (snd <$> colon space) <*>
+      eol <* indent <*> block <* dedent <*>
+      optional
+        ((,,,) <$>
+         (snd <$> token space (TkElse ())) <*>
+         (snd <$> colon space) <*>
+         eol <*
+         indent <*> block <* dedent)
 
 module_ :: Parser ann (Module '[] ann)
 module_ =

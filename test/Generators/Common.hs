@@ -158,28 +158,15 @@ genAnyWhitespaces1 = do
 
 genWhitespaces1 :: MonadGen m => m (NonEmpty Whitespace)
 genWhitespaces1 = do
-  n <- Gen.integral (Range.constant 1 10)
-  go n
+  n <- Gen.integral (Range.constant 0 9)
+  (:|) <$> Gen.element [Space, Tab] <*> genWhitespaces
   where
-    go 1 =
-      Gen.choice
-      [ pure $ pure Space
-      , pure $ pure Tab
-      , fmap pure $ Continued <$> genNewline <*> pure []
-      ]
+    go 0 = pure []
     go n =
       Gen.choice
-      [ (Space `NonEmpty.cons`) <$> go (n-1)
-      , (Tab `NonEmpty.cons`) <$> go (n-1)
-      , fmap pure $
-        Continued <$>
-        genNewline <*>
-        ((:) <$>
-         Gen.choice
-           [ pure Space
-           , pure Tab
-           ] <*>
-         (NonEmpty.toList <$> go (n-1)))
+      [ (Space :) <$> go (n-1)
+      , (Tab :) <$> go (n-1)
+      , fmap pure $ Continued <$> genNewline <*> go (n-1)
       ]
 
 genNone :: MonadGen m => m (Expr '[] ())

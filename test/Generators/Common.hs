@@ -178,7 +178,6 @@ genWhitespaces1 = do
          Gen.choice
            [ pure Space
            , pure Tab
-           , Newline <$> genNewline
            ] <*>
          (NonEmpty.toList <$> go (n-1)))
       ]

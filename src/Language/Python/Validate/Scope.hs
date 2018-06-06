@@ -255,11 +255,11 @@ validateSmallStatementScope (Raise a ws f) =
     f
 validateSmallStatementScope (Return a ws e) = Return a ws <$> validateExprScope e
 validateSmallStatementScope (Expr a e) = Expr a <$> validateExprScope e
-validateSmallStatementScope (Assign a l ws1 ws2 r) =
+validateSmallStatementScope (Assign a l ws2 r) =
   let
     ls = l ^.. unvalidated.cosmos._Ident._2.to (_identAnnotation &&& _identValue)
   in
-  (Assign a (coerce l) ws1 ws2 <$> validateExprScope r) <*
+  (Assign a (coerce l) ws2 <$> validateExprScope r) <*
   extendScope scLocalScope ls <*
   extendScope scImmediateScope ls
 validateSmallStatementScope (Global a _ _) = scopeErrors [_FoundGlobal # a]

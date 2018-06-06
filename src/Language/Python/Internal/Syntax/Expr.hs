@@ -231,13 +231,7 @@ instance Token (Expr v a) (Expr '[] a) where
           String _ _ _ _ ws -> ws
           Not _ _ e -> e ^. getting whitespaceAfter
           Tuple _ _ ws Nothing -> ws
-          Tuple _ _ _ (Just cs) -> go cs
-            where
-              go cs =
-                case cs of
-                  CommaSepOne1' e Nothing -> e ^. getting whitespaceAfter
-                  CommaSepOne1' _ (Just ws) -> ws
-                  CommaSepMany1' _ _ rest -> go rest)
+          Tuple _ _ _ (Just cs) -> cs ^. getting whitespaceAfter)
       (\e ws ->
         case e of
           None a _ -> None a ws

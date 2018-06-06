@@ -184,7 +184,13 @@ renderExpr (Int _ n ws) = show n <> foldMap renderWhitespace ws
 renderExpr (Ident _ name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) =
   "[" <> foldMap renderWhitespace ws1 <>
-  foldMap (renderCommaSep1' renderExpr) exprs <>
+  foldMap
+    (renderCommaSep1' $
+     \e ->
+       case e of
+         Tuple{} -> "(" <> renderExpr e <> ")"
+         _ -> renderExpr e)
+    exprs <>
   "]" <> foldMap renderWhitespace ws2
 renderExpr (Call _ expr ws args ws2) =
   (case expr of
@@ -264,8 +270,8 @@ renderSmallStatement (Raise _ ws x) =
 renderSmallStatement (Return _ ws expr) =
   "return" <> foldMap renderWhitespace ws <> renderExpr expr
 renderSmallStatement (Expr _ expr) = renderExpr expr
-renderSmallStatement (Assign _ lvalue ws1 ws2 rvalue) =
-  renderExpr lvalue <> foldMap renderWhitespace ws1 <> "=" <>
+renderSmallStatement (Assign _ lvalue ws2 rvalue) =
+  renderExpr lvalue <> "=" <>
   foldMap renderWhitespace ws2 <> renderExpr rvalue
 renderSmallStatement (Pass _) = "pass"
 renderSmallStatement (Continue _) = "continue"

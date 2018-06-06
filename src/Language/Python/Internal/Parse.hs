@@ -256,6 +256,15 @@ indents = Parser $ do
         Right ll@(LogicalLine a _ is _ _) : rest' -> pure (is, a)
         Left _ : _ -> throwError UnexpectedIndent
 
+exprList :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+exprList ws =
+  (\a -> maybe a (uncurry $ Tuple (_exprAnnotation a) a)) <$>
+  expr ws <*>
+  optional
+    ((,) <$>
+     (snd <$> comma ws) <*>
+     optional (commaSep1' ws $ expr ws))
+
 expr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 expr ws = orTest
   where
@@ -273,9 +282,14 @@ expr ws = orTest
     andOp = (\(tk, ws) -> BoolAnd (pyTokenAnn tk) ws) <$> token ws (TkAnd ())
     andTest = binOp andOp notTest
 
-    notTest = comparison
+    notTest =
+      (\(tk, s) -> Not (pyTokenAnn tk) s) <$> token ws (TkNot ()) <*> notTest <!>
+      comparison
 
-    comparison = orExpr
+    compOp =
+      (\(tk, ws) -> Is (pyTokenAnn tk) ws) <$> token ws (TkIs ()) <!>
+      (\(tk, ws) -> Equals (pyTokenAnn tk) ws) <$> token ws (TkDoubleEq ())
+    comparison = binOp compOp orExpr
 
     orExpr = xorExpr
 
@@ -285,14 +299,15 @@ expr ws = orTest
 
     shiftExpr = arithExpr
 
-    arithOp = (\(tk, ws) -> Plus (pyTokenAnn tk) ws) <$> token ws (TkPlus ())
-
-    termOp =
-      (\(tk, ws) -> Multiply (pyTokenAnn tk) ws) <$> token ws (TkStar ()) <!>
-      (\(tk, ws) -> Divide (pyTokenAnn tk) ws) <$> token ws (TkDoubleSlash ())
+    arithOp =
+      (\(tk, ws) -> Plus (pyTokenAnn tk) ws) <$> token ws (TkPlus ()) <!>
+      (\(tk, ws) -> Minus (pyTokenAnn tk) ws) <$> token ws (TkMinus ())
 
     arithExpr = binOp arithOp term
 
+    termOp =
+      (\(tk, ws) -> Multiply (pyTokenAnn tk) ws) <$> token ws (TkStar ()) <!>
+      (\(tk, ws) -> Divide (pyTokenAnn tk) ws) <$> token ws (TkSlash ())
     term = binOp termOp factor
 
     factor = power
@@ -316,7 +331,7 @@ expr ws = orTest
     parens =
       (\(a, b) c d -> Parens (pyTokenAnn a) b c d) <$>
       token anySpace (TkLeftParen ()) <*>
-      expr anySpace <*>
+      exprList anySpace <*>
       fmap snd (token space $ TkRightParen ())
 
     atom =
@@ -339,7 +354,7 @@ smallStatement =
   passSt <!>
   breakSt <!>
   continueSt <!>
-  exprSt
+  exprOrAssignSt
   where
     returnSt =
       (\(tkReturn, retSpaces) -> Return (pyTokenAnn tkReturn) retSpaces) <$>
@@ -350,7 +365,10 @@ smallStatement =
     breakSt = Break . pyTokenAnn <$> tokenEq (TkBreak ())
     continueSt = Continue . pyTokenAnn <$> tokenEq (TkContinue ())
 
-    exprSt = (\a -> Expr (_exprAnnotation a) a) <$> expr space
+    exprOrAssignSt =
+      (\a -> maybe (Expr (_exprAnnotation a) a) (uncurry $ Assign (_exprAnnotation a) a)) <$>
+      exprList space <*>
+      optional ((,) <$> (snd <$> token space (TkEq ())) <*> exprList space)
 
 sepBy1' :: Parser ann a -> Parser ann sep -> Parser ann (a, [(sep, a)], Maybe sep)
 sepBy1' val sep = go

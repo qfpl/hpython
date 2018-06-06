@@ -99,7 +99,8 @@ instance Token s t => Token (CommaSep1' s) (CommaSep1' t) where
              CommaSepOne1'
                (fromMaybe (a & whitespaceAfter .~ ws) $ b $> unvalidate a)
                (b $> ws)
-           CommaSepMany1' a b c -> CommaSepMany1' (unvalidate a) b (c & whitespaceAfter .~ ws))
+           CommaSepMany1' a b c ->
+             CommaSepMany1' (unvalidate a) b (c & whitespaceAfter .~ ws))
 
   startChar (CommaSepOne1' a _) = startChar a
   startChar (CommaSepMany1' a _ _) = startChar a

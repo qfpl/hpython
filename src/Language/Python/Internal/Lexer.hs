@@ -44,6 +44,8 @@ data PyToken a
   | TkFalse a
   | TkOr a
   | TkAnd a
+  | TkIs a
+  | TkNot a
   | TkInt Integer a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
@@ -94,6 +96,8 @@ pyTokenAnn tk =
     TkFalse a -> a
     TkOr a -> a
     TkAnd a -> a
+    TkIs a -> a
+    TkNot a -> a
     TkPlus a -> a
     TkMinus a -> a
     TkIf a -> a
@@ -211,6 +215,8 @@ parseToken =
     , string "False" $> TkFalse
     , string "or" $> TkOr
     , string "and" $> TkAnd
+    , string "is" $> TkIs
+    , string "not" $> TkNot
     , (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
         fmap read (some digit) <*>
         optional (char '.' *> optional (read <$> some digit))
@@ -243,7 +249,7 @@ parseToken =
            <|>
            TkShortString sp DoubleQuote <$> manyTill stringChar (char '"'))
     , do
-        sp <- optional . try $ stringPrefix <* lookAhead (char '"')
+        sp <- optional . try $ stringPrefix <* lookAhead (char '\'')
         char '\'' *>
           (string "''" $>
            TkLongString sp SingleQuote <*>

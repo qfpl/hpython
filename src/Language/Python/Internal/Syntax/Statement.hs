@@ -232,7 +232,7 @@ instance Token (ImportTargets v a) (ImportTargets '[] a) where
 data SmallStatement (v :: [*]) a
   = Return a [Whitespace] (Expr v a)
   | Expr a (Expr v a)
-  | Assign a (Expr v a) [Whitespace] [Whitespace] (Expr v a)
+  | Assign a (Expr v a) [Whitespace] (Expr v a)
   | Pass a
   | Break a
   | Continue a
@@ -264,7 +264,7 @@ instance HasExprs SmallStatement where
       x
   _Exprs f (Return a ws e) = Return a ws <$> f e
   _Exprs f (Expr a e) = Expr a <$> f e
-  _Exprs f (Assign a e1 ws1 ws2 e2) = Assign a <$> f e1 <*> pure ws1 <*> pure ws2 <*> f e2
+  _Exprs f (Assign a e1 ws2 e2) = Assign a <$> f e1 <*> pure ws2 <*> f e2
   _Exprs _ p@Pass{} = pure $ coerce p
   _Exprs _ p@Break{} = pure $ coerce p
   _Exprs _ p@Continue{} = pure $ coerce p

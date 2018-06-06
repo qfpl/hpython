@@ -167,7 +167,7 @@ longStr_ :: String -> Expr '[] ()
 longStr_ s = String () Nothing LongDouble s []
 
 (.=) :: Expr '[] () -> Expr '[] () -> Statement '[] ()
-(.=) a b = SmallStatements (Assign () a [Space] [Space] b) [] Nothing (Just LF)
+(.=) a b = SmallStatements (Assign () (a & whitespaceAfter .~ [Space]) [Space] b) [] Nothing (Just LF)
 
 forElse_
   :: Expr '[] ()

@@ -321,7 +321,7 @@ genSmallStatement = Gen.sized $ \n -> do
             when (isJust isInFunction) $
               willBeNonlocals %= ((a ^.. cosmos._Ident._2.identValue) ++)
             b <- Gen.resize (n - n') genExpr
-            Assign () a <$> genWhitespaces <*> genWhitespaces <*> pure b
+            Assign () a <$> genWhitespaces <*> pure b
         , Gen.sized $ \n -> do
             n' <- Gen.integral (Range.constant 2 (n-1))
             Global () <$>

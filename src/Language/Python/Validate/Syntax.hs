@@ -452,7 +452,7 @@ validateSmallStatementSyntax (Return a ws expr) =
 validateSmallStatementSyntax (Expr a expr) =
   Expr a <$>
   validateExprSyntax expr
-validateSmallStatementSyntax (Assign a lvalue ws1 ws2 rvalue) =
+validateSmallStatementSyntax (Assign a lvalue ws2 rvalue) =
   syntaxContext `bindValidateSyntax` \sctxt ->
     let
       assigns =
@@ -464,7 +464,6 @@ validateSmallStatementSyntax (Assign a lvalue ws1 ws2 rvalue) =
       (if canAssignTo lvalue
         then validateExprSyntax lvalue
         else syntaxErrors [_CannotAssignTo # (a, lvalue)]) <*>
-      pure ws1 <*>
       pure ws2 <*>
       validateExprSyntax rvalue) <*
       modifyNonlocals (assigns ++)

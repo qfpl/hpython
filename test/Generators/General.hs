@@ -191,7 +191,7 @@ genSmallStatement = Gen.sized $ \n ->
             n' <- Gen.integral (Range.constant 1 (n-1))
             a <- Gen.resize n' genExpr
             b <- Gen.resize (n - n') genExpr
-            Assign () a <$> genWhitespaces <*> genWhitespaces <*> pure b
+            Assign () a <$> genWhitespaces <*> pure b
         , Gen.sized $ \n -> do
             n' <- Gen.integral (Range.constant 2 (n-1))
             Global () <$>

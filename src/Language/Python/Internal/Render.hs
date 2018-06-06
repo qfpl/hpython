@@ -11,6 +11,12 @@ import Language.Python.Internal.Syntax
 bracket :: String -> String
 bracket a = "(" <> a <> ")"
 
+bracketTuple :: Expr v a -> String
+bracketTuple e =
+  case e of
+    Tuple{} -> bracket $ renderExpr e
+    _ -> renderExpr e
+
 escapeChars :: [(Char, Char)]
 escapeChars =
   [ ('\\', '\\')
@@ -158,7 +164,10 @@ renderPrefix p =
     Prefix_RB -> "RB"
 
 renderExpr :: Expr v a -> String
-renderExpr (Not _ ws e) = "not" <> foldMap renderWhitespace ws <> renderExpr e
+renderExpr (Not _ ws e) =
+  "not" <>
+  foldMap renderWhitespace ws <>
+  bracketTuple e
 renderExpr (Parens _ ws1 e ws2) =
   "(" <> foldMap renderWhitespace ws1 <>
   renderExpr e <> ")" <> foldMap renderWhitespace ws2
@@ -185,11 +194,7 @@ renderExpr (Ident _ name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) =
   "[" <> foldMap renderWhitespace ws1 <>
   foldMap
-    (renderCommaSep1' $
-     \e ->
-       case e of
-         Tuple{} -> "(" <> renderExpr e <> ")"
-         _ -> renderExpr e)
+    (renderCommaSep1' bracketTuple)
     exprs <>
   "]" <> foldMap renderWhitespace ws2
 renderExpr (Call _ expr ws args ws2) =
@@ -217,15 +222,10 @@ renderExpr (BinOp _ e1 op e2) =
   renderBinOp op <>
   (if shouldBracketRight op e2 then bracket else id) (renderExpr e2)
 renderExpr (Tuple _ a ws c) =
-  bracketTuple a (renderExpr a) <> "," <> foldMap renderWhitespace ws <>
+  bracketTuple a <> "," <> foldMap renderWhitespace ws <>
   foldMap
-    (renderCommaSep1' (\b -> bracketTuple b $ renderExpr b))
+    (renderCommaSep1' bracketTuple)
     c
-  where
-    bracketTuple a =
-      case a of
-        Tuple{} -> bracket
-        _ -> id
 
 renderModuleName :: ModuleName v a -> String
 renderModuleName (ModuleNameOne _ s) = renderIdent s
@@ -423,12 +423,19 @@ renderExceptAs (ExceptAs _ e f) =
   foldMap (\(a, b) -> foldMap renderWhitespace a <> renderIdent b) f
 
 renderArg :: Arg v a -> String
-renderArg (PositionalArg _ expr) = renderExpr expr
+renderArg (PositionalArg _ expr) = bracketTuple expr
 renderArg (KeywordArg _ name ws2 expr) =
   renderIdent name <> "=" <>
-  foldMap renderWhitespace ws2 <> renderExpr expr
-renderArg (StarArg _ ws expr) = "*" <> foldMap renderWhitespace ws <> renderExpr expr
-renderArg (DoubleStarArg _ ws expr) = "**" <> foldMap renderWhitespace ws <> renderExpr expr
+  foldMap renderWhitespace ws2 <>
+  bracketTuple expr
+renderArg (StarArg _ ws expr) =
+  "*" <>
+  foldMap renderWhitespace ws <>
+  bracketTuple expr
+renderArg (DoubleStarArg _ ws expr) =
+  "**" <>
+  foldMap renderWhitespace ws <>
+  bracketTuple expr
 
 renderParam :: Param v a -> String
 renderParam (PositionalParam _ name) = renderIdent name

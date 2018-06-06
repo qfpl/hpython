@@ -312,7 +312,11 @@ expr ws = orTest
 
     factor = power
 
-    power = atomExpr
+    powerOp = (\(tk, ws) -> Exp (pyTokenAnn tk) ws) <$> token ws (TkDoubleStar ())
+    power =
+      (\a -> maybe a (uncurry $ BinOp (_exprAnnotation a) a)) <$>
+      atomExpr <*>
+      optional ((,) <$> powerOp <*> factor)
 
     trailer =
       (\a b c -> Deref (_exprAnnotation c) c a b) <$>
@@ -354,6 +358,8 @@ smallStatement =
   passSt <!>
   breakSt <!>
   continueSt <!>
+  globalSt <!>
+  delSt <!>
   exprOrAssignSt
   where
     returnSt =
@@ -369,6 +375,16 @@ smallStatement =
       (\a -> maybe (Expr (_exprAnnotation a) a) (uncurry $ Assign (_exprAnnotation a) a)) <$>
       exprList space <*>
       optional ((,) <$> (snd <$> token space (TkEq ())) <*> exprList space)
+
+    globalSt =
+      (\(tk, s) -> Global (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
+      token space (TkGlobal ()) <*>
+      commaSep1 space (identifier space)
+
+    delSt =
+      (\(tk, s) -> Del (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
+      token space (TkDel ()) <*>
+      commaSep1 space (identifier space)
 
 sepBy1' :: Parser ann a -> Parser ann sep -> Parser ann (a, [(sep, a)], Maybe sep)
 sepBy1' val sep = go
@@ -449,6 +465,14 @@ commaSep ws pa =
 
   pure CommaSepNone
 
+commaSep1 :: Parser ann Whitespace -> Parser ann a -> Parser ann (CommaSep1 a)
+commaSep1 ws val = go
+  where
+    go =
+      (\a -> maybe (CommaSepOne1 a) (uncurry $ CommaSepMany1 a)) <$>
+      val <*>
+      optional ((,) <$> (snd <$> comma ws) <*> go)
+
 commaSep1' :: Parser ann Whitespace -> Parser ann a -> Parser ann (CommaSep1' a)
 commaSep1' ws pa =
   (\(a, b, c) -> from a b c) <$> sepBy1' pa (snd <$> comma ws)
@@ -477,13 +501,15 @@ param =
 
 arg :: Parser ann (Arg '[] ann)
 arg =
-  (\a ->
-     let ann = _identAnnotation a in
-     maybe
-       (PositionalArg ann $ Ident ann a)
-       (uncurry $ KeywordArg ann a)) <$>
-  identifier anySpace <*>
-  optional ((,) <$> (snd <$> token anySpace (TkEq ())) <*> expr anySpace)
+  (do
+      e <- expr anySpace
+      case e of
+        Ident _ ident -> do
+          eqSpaces <- optional $ snd <$> token anySpace (TkEq ())
+          case eqSpaces of
+            Nothing -> pure $ PositionalArg (_exprAnnotation e) e
+            Just s -> KeywordArg (_exprAnnotation e) ident s <$> expr anySpace
+        _ -> pure $ PositionalArg (_exprAnnotation e) e)
 
   <!>
 

@@ -46,6 +46,8 @@ data PyToken a
   | TkAnd a
   | TkIs a
   | TkNot a
+  | TkGlobal a
+  | TkDel a
   | TkInt Integer a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
@@ -98,6 +100,8 @@ pyTokenAnn tk =
     TkAnd a -> a
     TkIs a -> a
     TkNot a -> a
+    TkGlobal a -> a
+    TkDel a -> a
     TkPlus a -> a
     TkMinus a -> a
     TkIf a -> a
@@ -217,6 +221,8 @@ parseToken =
     , string "and" $> TkAnd
     , string "is" $> TkIs
     , string "not" $> TkNot
+    , string "global" $> TkGlobal
+    , string "del" $> TkDel
     , (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
         fmap read (some digit) <*>
         optional (char '.' *> optional (read <$> some digit))

@@ -42,6 +42,8 @@ data PyToken a
   | TkContinue a
   | TkTrue a
   | TkFalse a
+  | TkOr a
+  | TkAnd a
   | TkInt Integer a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
@@ -90,6 +92,8 @@ pyTokenAnn tk =
     TkContinue a -> a
     TkTrue a -> a
     TkFalse a -> a
+    TkOr a -> a
+    TkAnd a -> a
     TkPlus a -> a
     TkMinus a -> a
     TkIf a -> a
@@ -205,6 +209,8 @@ parseToken =
     , string "continue" $> TkContinue
     , string "True" $> TkTrue
     , string "False" $> TkFalse
+    , string "or" $> TkOr
+    , string "and" $> TkAnd
     , (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
         fmap read (some digit) <*>
         optional (char '.' *> optional (read <$> some digit))

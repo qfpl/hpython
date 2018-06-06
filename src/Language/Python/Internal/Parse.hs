@@ -257,14 +257,8 @@ indents = Parser $ do
         Left _ : _ -> throwError UnexpectedIndent
 
 expr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
-expr ws = arithExpr
+expr ws = orTest
   where
-    arithOp = (\(tk, ws) -> Plus (pyTokenAnn tk) ws) <$> token ws (TkPlus ())
-
-    termOp =
-      (\(tk, ws) -> Multiply (pyTokenAnn tk) ws) <$> token ws (TkStar ()) <!>
-      (\(tk, ws) -> Divide (pyTokenAnn tk) ws) <$> token ws (TkDoubleSlash ())
-
     binOp op tm =
       (\t ts ->
           case ts of
@@ -272,6 +266,30 @@ expr ws = arithExpr
             _ -> foldl (\tm (o, val) -> BinOp (tm ^. exprAnnotation) tm o val) t ts) <$>
      tm <*>
      many ((,) <$> op <*> tm)
+
+    orOp = (\(tk, ws) -> BoolOr (pyTokenAnn tk) ws) <$> token ws (TkOr ())
+    orTest = binOp orOp andTest
+
+    andOp = (\(tk, ws) -> BoolAnd (pyTokenAnn tk) ws) <$> token ws (TkAnd ())
+    andTest = binOp andOp notTest
+
+    notTest = comparison
+
+    comparison = orExpr
+
+    orExpr = xorExpr
+
+    xorExpr = andExpr
+
+    andExpr = shiftExpr
+
+    shiftExpr = arithExpr
+
+    arithOp = (\(tk, ws) -> Plus (pyTokenAnn tk) ws) <$> token ws (TkPlus ())
+
+    termOp =
+      (\(tk, ws) -> Multiply (pyTokenAnn tk) ws) <$> token ws (TkStar ()) <!>
+      (\(tk, ws) -> Divide (pyTokenAnn tk) ws) <$> token ws (TkDoubleSlash ())
 
     arithExpr = binOp arithOp term
 

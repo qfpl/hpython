@@ -11,9 +11,11 @@ import Control.Monad.State
   (StateT(..), get, put, evalStateT, runStateT)
 import Control.Monad.Writer.Strict (Writer, runWriter, writer, tell)
 import Data.Foldable (toList)
+import Data.Function ((&))
 import Data.Functor (($>))
 import Data.Functor.Alt (Alt((<!>)), many, optional)
 import Data.Functor.Classes (liftEq)
+import Data.List (foldl')
 import Data.List.NonEmpty (NonEmpty(..))
 
 import qualified Data.List.NonEmpty as NonEmpty
@@ -279,7 +281,19 @@ expr ws = arithExpr
 
     power = atomExpr
 
-    atomExpr = atom
+    trailer =
+      (\a b c -> Deref (_exprAnnotation c) c a b) <$>
+      (snd <$> token ws (TkDot ())) <*>
+      identifier ws
+
+      <!>
+
+      (\a b c d -> Call (_exprAnnotation d) d a b c) <$>
+      (snd <$> token anySpace (TkLeftParen ())) <*>
+      commaSep anySpace arg <*>
+      (snd <$> token anySpace (TkRightParen ()))
+
+    atomExpr = foldl' (&) <$> atom <*> many trailer
 
     parens =
       (\(a, b) c d -> Parens (pyTokenAnn a) b c d) <$>
@@ -424,6 +438,30 @@ param =
   (\(a, b) -> DoubleStarParam (pyTokenAnn a) b) <$>
   token anySpace (TkDoubleStar ()) <*>
   identifier anySpace
+
+arg :: Parser ann (Arg '[] ann)
+arg =
+  (\a ->
+     let ann = _identAnnotation a in
+     maybe
+       (PositionalArg ann $ Ident ann a)
+       (uncurry $ KeywordArg ann a)) <$>
+  identifier anySpace <*>
+  optional ((,) <$> (snd <$> token anySpace (TkEq ())) <*> expr anySpace)
+
+  <!>
+
+  (\a -> PositionalArg (_exprAnnotation a) a) <$> expr anySpace
+
+  <!>
+
+  (\(a, b) -> StarArg (pyTokenAnn a) b) <$> token anySpace (TkStar ()) <*> expr anySpace
+
+  <!>
+
+  (\(a, b) -> DoubleStarArg (pyTokenAnn a) b) <$>
+  token anySpace (TkDoubleStar ()) <*>
+  expr anySpace
 
 compoundStatement :: Parser ann (CompoundStatement '[] ann)
 compoundStatement = fundef

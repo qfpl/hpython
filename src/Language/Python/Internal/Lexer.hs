@@ -66,6 +66,7 @@ data PyToken a
   | TkColon a
   | TkSemicolon a
   | TkComma a
+  | TkDot a
   | TkPlus a
   | TkMinus a
   | TkComment String Newline a
@@ -116,6 +117,7 @@ pyTokenAnn tk =
     TkColon a -> a
     TkSemicolon a -> a
     TkComma a -> a
+    TkDot a -> a
     TkComment _ _ a -> a
     TkStar a -> a
     TkDoubleStar a -> a
@@ -244,6 +246,7 @@ parseToken =
            TkShortString sp SingleQuote <$> manyTill stringChar (char '\''))
     , TkComment <$ char '#' <*> many (noneOf "\r\n") <*> parseNewline
     , char ',' $> TkComma
+    , char '.' $> TkDot
     , fmap TkIdent $
       (:) <$>
       (letter <|> char '_') <*>

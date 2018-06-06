@@ -51,6 +51,7 @@ data PyToken a
   | TkImport a
   | TkFrom a
   | TkAs a
+  | TkRaise a
   | TkInt Integer a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
@@ -78,7 +79,7 @@ data PyToken a
   | TkDot a
   | TkPlus a
   | TkMinus a
-  | TkComment String Newline a
+  | TkComment String a
   | TkStar a
   | TkDoubleStar a
   | TkSlash a
@@ -108,6 +109,7 @@ pyTokenAnn tk =
     TkImport a -> a
     TkFrom a -> a
     TkAs a -> a
+    TkRaise a -> a
     TkPlus a -> a
     TkMinus a -> a
     TkIf a -> a
@@ -136,7 +138,7 @@ pyTokenAnn tk =
     TkSemicolon a -> a
     TkComma a -> a
     TkDot a -> a
-    TkComment _ _ a -> a
+    TkComment _ a -> a
     TkStar a -> a
     TkDoubleStar a -> a
     TkSlash a -> a
@@ -232,6 +234,7 @@ parseToken =
     , string "import" $> TkImport
     , string "from" $> TkFrom
     , string "as" $> TkAs
+    , string "raise" $> TkRaise
     , (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
         fmap read (some digit) <*>
         optional (char '.' *> optional (read <$> some digit))
@@ -271,7 +274,9 @@ parseToken =
            manyTill stringChar (string "'''")
            <|>
            TkShortString sp SingleQuote <$> manyTill stringChar (char '\''))
-    , TkComment <$ char '#' <*> many (noneOf "\r\n") <*> parseNewline
+    , TkComment <$
+      char '#' <*>
+      many (noneOf "\r\n")
     , char ',' $> TkComma
     , char '.' $> TkDot
     , fmap TkIdent $

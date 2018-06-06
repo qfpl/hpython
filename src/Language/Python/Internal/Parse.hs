@@ -361,6 +361,7 @@ smallStatement =
   globalSt <!>
   delSt <!>
   importSt <!>
+  raiseSt <!>
   exprOrAssignSt
   where
     returnSt =
@@ -387,9 +388,19 @@ smallStatement =
       token space (TkDel ()) <*>
       commaSep1 space (identifier space)
 
+    raiseSt =
+      (\(tk, s) -> Raise (pyTokenAnn tk) s) <$>
+      token space (TkRaise ()) <*>
+      optional
+        ((,) <$>
+         expr space <*>
+         optional
+           ((,) <$>
+            (snd <$> token space (TkFrom ())) <*>
+            expr space))
+
     importSt = importName <!> importFrom
       where
-        moduleName :: Parser ann (ModuleName '[] ann)
         moduleName =
           makeModuleName <$>
           identifier space <*>
@@ -398,7 +409,6 @@ smallStatement =
              (snd <$> token space (TkDot ())) <*>
              identifier space)
 
-        importAs :: Parser ann Whitespace -> (e ann -> ann) -> Parser ann (e ann) -> Parser ann (ImportAs e '[] ann)
         importAs ws getAnn p =
           (\a -> ImportAs (getAnn a) a) <$>
           p <*>
@@ -407,13 +417,11 @@ smallStatement =
              (NonEmpty.fromList . snd <$> token ws (TkAs ())) <*>
              identifier ws)
 
-        importName :: Parser ann (SmallStatement '[] ann)
         importName =
           (\(tk, s) -> Import (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
           token space (TkImport ()) <*>
           commaSep1 space (importAs space _moduleNameAnn moduleName)
 
-        relativeModuleName :: Parser ann (RelativeModuleName '[] ann)
         relativeModuleName =
           RelativeWithName [] <$> moduleName
 
@@ -423,7 +431,6 @@ smallStatement =
           some (Dot . snd <$> token space (TkDot ())) <*>
           optional moduleName
 
-        importTargets :: Parser ann (ImportTargets '[] ann)
         importTargets =
           (\(tk, s) -> ImportAll (pyTokenAnn tk) s) <$>
           token space (TkStar ())
@@ -440,7 +447,6 @@ smallStatement =
           (\a -> ImportSome (importAsAnn $ commaSep1Head a) a) <$>
           commaSep1 space (importAs space _identAnnotation (identifier space))
 
-        importFrom :: Parser ann (SmallStatement '[] ann)
         importFrom =
           (\(tk, s) -> From (pyTokenAnn tk) s) <$>
           token space (TkFrom ()) <*>
@@ -486,21 +492,18 @@ statement =
     smallst2 =
       optional ((,) <$> (snd <$> semicolon space) <*> optional smallst1)
 
-comment :: Parser ann (Comment, Newline)
+comment :: Parser ann Comment
 comment = do
   curTk <- currentToken
   case curTk of
-    TkComment str nl _ -> Parser (tell $ Consumed True) $> (Comment str, nl)
+    TkComment str _ ->
+      Parser (tell $ Consumed True) $> Comment str
     _ -> Parser . throwError $ ExpectedComment curTk
 
 block :: Parser ann (Block '[] ann)
 block = fmap Block $ (:|) <$> line <*> many line
   where
-    commentOrEmpty = do
-      cmt <- optional comment
-      case cmt of
-        Nothing -> (,) Nothing <$> eol
-        Just (cmt', nl) -> pure (Just cmt', nl)
+    commentOrEmpty = (,) <$> optional comment <*> eol
 
     line = do
       (ws, a) <- indents
@@ -609,11 +612,7 @@ module_ =
   many (Left <$> maybeComment <!> Right <$> statement)
   where
     maybeComment =
-      (\ws (cmt, nl) -> (ws, cmt, nl)) <$>
+      (\ws cmt nl -> (ws, cmt, nl)) <$>
       fmap fst indents <*>
-      (maybe (Nothing, Nothing) (\(a, b) -> (Just a, Just b)) <$>
-       optional comment
-
-       <!>
-
-       fmap ((,) Nothing) (Just <$> eol <!> Nothing <$ eof))
+      optional comment <*>
+      (Just <$> eol <!> Nothing <$ eof)

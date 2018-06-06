@@ -10,7 +10,7 @@ import Language.Python.Internal.Parse
 import Language.Python.Internal.Render
 import Language.Python.Internal.Syntax.Whitespace
 
-import Helpers (doToPython, doParse, doNested)
+import Helpers (doToPython, doParse, doNested, doTokenize, doIndentation)
 
 lexerParserTests :: Group
 lexerParserTests =
@@ -20,6 +20,7 @@ lexerParserTests =
   , ("Test full trip 1", test_fulltrip_1)
   , ("Test full trip 2", test_fulltrip_2)
   , ("Test full trip 3", test_fulltrip_3)
+  , ("Test full trip 4", test_fulltrip_4)
   ]
 
 test_fulltrip_1 :: Property
@@ -40,6 +41,27 @@ test_fulltrip_3 :: Property
 test_fulltrip_3 =
   withTests 1 . property $ do
     let str = "pass;"
+    a <- doToPython statement str
+    renderLines (renderStatement a) === str
+
+test_fulltrip_4 :: Property
+test_fulltrip_4 =
+  withTests 1 . property $ do
+    let str = "def a():\n pass\n #\n pass\n"
+
+    tks <- doTokenize str
+    annotateShow tks
+
+    let lls = logicalLines tks
+    length lls === 4
+    annotateShow lls
+
+    ils <- doIndentation lls
+    annotateShow ils
+
+    nst <- doNested ils
+    annotateShow nst
+
     a <- doToPython statement str
     renderLines (renderStatement a) === str
 

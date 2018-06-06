@@ -263,7 +263,7 @@ renderSmallStatement (Raise _ ws x) =
        renderExpr b <>
        foldMap
          (\(d, e) ->
-            "as" <> foldMap renderWhitespace d <>
+            "from" <> foldMap renderWhitespace d <>
             renderExpr e)
          c)
     x

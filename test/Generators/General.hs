@@ -66,8 +66,7 @@ genRelativeModuleName :: MonadGen m => m (RelativeModuleName '[] ())
 genRelativeModuleName =
   Gen.choice
   [ Relative <$>
-    Gen.nonEmpty (Range.constant 1 10) genDot <*>
-    genWhitespaces
+    Gen.nonEmpty (Range.constant 1 10) genDot
   , RelativeWithName <$>
     Gen.list (Range.constant 1 10) genDot <*>
     genModuleName

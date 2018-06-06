@@ -239,8 +239,8 @@ renderDot (Dot ws) = "." <> foldMap renderWhitespace ws
 renderRelativeModuleName :: RelativeModuleName v a -> String
 renderRelativeModuleName (RelativeWithName ds mn) =
   foldMap renderDot ds <> renderModuleName mn
-renderRelativeModuleName (Relative ds ws) =
-  foldMap renderDot ds <> foldMap renderWhitespace ws
+renderRelativeModuleName (Relative ds) =
+  foldMap renderDot ds
 
 renderImportAs :: (e a -> String) -> ImportAs e v a -> String
 renderImportAs f (ImportAs _ ea m) =

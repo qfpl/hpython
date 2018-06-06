@@ -13,7 +13,7 @@ import Control.Monad.Writer.Strict (Writer, runWriter, writer, tell)
 import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.Functor (($>))
-import Data.Functor.Alt (Alt((<!>)), many, optional)
+import Data.Functor.Alt (Alt((<!>)), many, some, optional)
 import Data.Functor.Classes (liftEq)
 import Data.List (foldl')
 import Data.List.NonEmpty (NonEmpty(..))
@@ -360,6 +360,7 @@ smallStatement =
   continueSt <!>
   globalSt <!>
   delSt <!>
+  importSt <!>
   exprOrAssignSt
   where
     returnSt =
@@ -385,6 +386,67 @@ smallStatement =
       (\(tk, s) -> Del (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
       token space (TkDel ()) <*>
       commaSep1 space (identifier space)
+
+    importSt = importName <!> importFrom
+      where
+        moduleName :: Parser ann (ModuleName '[] ann)
+        moduleName =
+          makeModuleName <$>
+          identifier space <*>
+          many
+            ((,) <$>
+             (snd <$> token space (TkDot ())) <*>
+             identifier space)
+
+        importAs :: Parser ann Whitespace -> (e ann -> ann) -> Parser ann (e ann) -> Parser ann (ImportAs e '[] ann)
+        importAs ws getAnn p =
+          (\a -> ImportAs (getAnn a) a) <$>
+          p <*>
+          optional
+            ((,) <$>
+             (NonEmpty.fromList . snd <$> token ws (TkAs ())) <*>
+             identifier ws)
+
+        importName :: Parser ann (SmallStatement '[] ann)
+        importName =
+          (\(tk, s) -> Import (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
+          token space (TkImport ()) <*>
+          commaSep1 space (importAs space _moduleNameAnn moduleName)
+
+        relativeModuleName :: Parser ann (RelativeModuleName '[] ann)
+        relativeModuleName =
+          RelativeWithName [] <$> moduleName
+
+          <!>
+
+          (\a -> maybe (Relative $ NonEmpty.fromList a) (RelativeWithName a)) <$>
+          some (Dot . snd <$> token space (TkDot ())) <*>
+          optional moduleName
+
+        importTargets :: Parser ann (ImportTargets '[] ann)
+        importTargets =
+          (\(tk, s) -> ImportAll (pyTokenAnn tk) s) <$>
+          token space (TkStar ())
+
+          <!>
+
+          (\(tk, s) -> ImportSomeParens (pyTokenAnn tk) s) <$>
+          token anySpace (TkLeftParen ()) <*>
+          commaSep1' anySpace (importAs anySpace _identAnnotation (identifier anySpace)) <*>
+          (snd <$> token space (TkRightParen ()))
+
+          <!>
+
+          (\a -> ImportSome (importAsAnn $ commaSep1Head a) a) <$>
+          commaSep1 space (importAs space _identAnnotation (identifier space))
+
+        importFrom :: Parser ann (SmallStatement '[] ann)
+        importFrom =
+          (\(tk, s) -> From (pyTokenAnn tk) s) <$>
+          token space (TkFrom ()) <*>
+          relativeModuleName <*>
+          (snd <$> token space (TkImport ())) <*>
+          importTargets
 
 sepBy1' :: Parser ann a -> Parser ann sep -> Parser ann (a, [(sep, a)], Maybe sep)
 sepBy1' val sep = go

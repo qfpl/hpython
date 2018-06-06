@@ -173,6 +173,9 @@ data ImportAs e v a
   = ImportAs a (e a) (Maybe (NonEmpty Whitespace, Ident v a))
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+importAsAnn :: ImportAs e v a -> a
+importAsAnn (ImportAs a _ _) = a
+
 instance Token (e a) (e' a) => Token (ImportAs e v a) (ImportAs e' '[] a) where
   unvalidate (ImportAs x a b) = ImportAs x (unvalidate a) (over (mapped._2) unvalidate b)
 

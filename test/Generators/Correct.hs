@@ -56,7 +56,7 @@ localState m = do
 
 genIdent :: MonadGen m => m (Ident '[] ())
 genIdent =
-  Gen.filter (\i -> _identValue i `notElem` reservedWords) $
+  Gen.filter (\i -> not $ any (`isPrefixOf` _identValue i) reservedWords) $
   MkIdent () <$>
   liftA2 (:)
     (Gen.choice [Gen.alpha, pure '_'])
@@ -77,8 +77,7 @@ genRelativeModuleName :: MonadGen m => m (RelativeModuleName '[] ())
 genRelativeModuleName =
   Gen.choice
   [ Relative <$>
-    Gen.nonEmpty (Range.constant 1 10) genDot <*>
-    genWhitespaces
+    Gen.nonEmpty (Range.constant 1 10) genDot
   , RelativeWithName <$>
     Gen.list (Range.constant 1 10) genDot <*>
     genModuleName

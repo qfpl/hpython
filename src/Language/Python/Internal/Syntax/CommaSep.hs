@@ -40,6 +40,10 @@ data CommaSep1 a
   | CommaSepMany1 a [Whitespace] (CommaSep1 a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+commaSep1Head :: CommaSep1 a -> a
+commaSep1Head (CommaSepOne1 a) = a
+commaSep1Head (CommaSepMany1 a _ _) = a
+
 instance Semigroup (CommaSep1 a) where
   a <> b =
     CommaSepMany1

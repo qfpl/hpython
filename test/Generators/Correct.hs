@@ -227,11 +227,11 @@ genList :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
 genList genExpr' =
   Gen.shrink
     (\case
-        List _ _ (CommaSepOne e) _ -> [e]
+        List _ _ (Just (CommaSepOne1' e _)) _ -> [e]
         _ -> []) $
   List () <$>
   genWhitespaces <*>
-  genSizedCommaSep genExpr' <*>
+  Gen.maybe (genSizedCommaSep1' genExpr') <*>
   genWhitespaces
 
 genParens :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())

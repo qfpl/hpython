@@ -17,7 +17,10 @@ whitespaceSize (Continued _ ws) = 1 + sum (fmap whitespaceSize ws)
 whitespaceSize (Newline _) = 1
 
 genSmallInt :: MonadGen m => m (Expr '[] ())
-genSmallInt = Int () <$> Gen.integral (Range.constant 0 100) <*> genWhitespaces
+genSmallInt =
+  Int () <$>
+  Gen.integral (Range.constant 0 100) <*>
+  genWhitespaces
 
 genString :: MonadGen m => m String
 genString = Gen.list (Range.constant 0 50) (Gen.filter (/='\0') Gen.latin1)
@@ -125,8 +128,8 @@ genAnyWhitespaces = do
       , (:) <$> (Newline <$> genNewline) <*> go (n-1)
       ]
 
-genWhitespaces1 :: MonadGen m => m (NonEmpty Whitespace)
-genWhitespaces1 = do
+genAnyWhitespaces1 :: MonadGen m => m (NonEmpty Whitespace)
+genAnyWhitespaces1 = do
   n <- Gen.integral (Range.constant 1 10)
   go n
   where
@@ -143,6 +146,24 @@ genWhitespaces1 = do
       , (Tab `NonEmpty.cons`) <$> go (n-1)
       , fmap pure $ Continued <$> genNewline <*> fmap NonEmpty.toList (go $ n-1)
       , NonEmpty.cons <$> (Newline <$> genNewline) <*> go (n-1)
+      ]
+
+genWhitespaces1 :: MonadGen m => m (NonEmpty Whitespace)
+genWhitespaces1 = do
+  n <- Gen.integral (Range.constant 1 10)
+  go n
+  where
+    go 1 =
+      Gen.choice
+      [ pure $ pure Space
+      , pure $ pure Tab
+      , fmap pure $ Continued <$> genNewline <*> pure []
+      ]
+    go n =
+      Gen.choice
+      [ (Space `NonEmpty.cons`) <$> go (n-1)
+      , (Tab `NonEmpty.cons`) <$> go (n-1)
+      , fmap pure $ Continued <$> genNewline <*> fmap NonEmpty.toList (go $ n-1)
       ]
 
 genNone :: MonadGen m => m (Expr '[] ())

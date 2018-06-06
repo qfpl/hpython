@@ -24,6 +24,7 @@ data CommaSep a
 listToCommaSep :: [a] -> CommaSep a
 listToCommaSep [] = CommaSepNone
 listToCommaSep [a] = CommaSepOne a
+  
 listToCommaSep (a:as) = CommaSepMany a [Space] $ listToCommaSep as
 
 appendCommaSep :: CommaSep a -> CommaSep a -> CommaSep a
@@ -78,6 +79,12 @@ data CommaSep1' a
   = CommaSepOne1' a (Maybe [Whitespace])
   | CommaSepMany1' a [Whitespace] (CommaSep1' a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
+
+listToCommaSep1' :: [a] -> Maybe (CommaSep1' a)
+listToCommaSep1' [] = Nothing
+listToCommaSep1' [a] = Just (CommaSepOne1' a Nothing)
+listToCommaSep1' (a:as) =
+  CommaSepMany1' a [Space] <$> listToCommaSep1' as
 
 instance Token s t => Token (CommaSep1' s) (CommaSep1' t) where
   unvalidate = fmap unvalidate

@@ -244,7 +244,10 @@ parseToken =
            TkShortString sp SingleQuote <$> manyTill stringChar (char '\''))
     , TkComment <$ char '#' <*> many (noneOf "\r\n") <*> parseNewline
     , char ',' $> TkComma
-    , TkIdent <$> some (letter <|> char '_')
+    , fmap TkIdent $
+      (:) <$>
+      (letter <|> char '_') <*>
+      many (letter <|> digit <|> char '_')
     ]
 
 tokenize :: String -> Trifecta.Result [PyToken Caret]

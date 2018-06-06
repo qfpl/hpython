@@ -43,7 +43,7 @@ expr_ :: Expr '[] () -> Statement '[] ()
 expr_ e = SmallStatements (Expr () e) [] Nothing (Just LF)
 
 list_ :: [Expr '[] ()] -> Expr '[] ()
-list_ es = List () [] (listToCommaSep es) []
+list_ es = List () [] (listToCommaSep1' es) []
 
 is_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
 is_ a = BinOp () (a & whitespaceAfter .~ [Space]) (Is () [Space])

@@ -209,7 +209,9 @@ validateExprSyntax (String a prefix strType b ws) =
 validateExprSyntax (Int a n ws) = pure $ Int a n ws
 validateExprSyntax (Ident a name) = Ident a <$> validateIdent name
 validateExprSyntax (List a ws1 exprs ws2) =
-  List a ws1 <$> traverse validateExprSyntax exprs <*> pure ws2
+  List a ws1 <$>
+  traverseOf (traverse.traverse) validateExprSyntax exprs <*>
+  pure ws2
 validateExprSyntax (Deref a expr ws1 name) =
   Deref a <$>
   validateExprSyntax expr <*>
@@ -527,7 +529,7 @@ canAssignTo BinOp{} = False
 canAssignTo Bool{} = False
 canAssignTo (Parens _ _ a _) = canAssignTo a
 canAssignTo String{} = False
-canAssignTo (List _ _ a _) = all canAssignTo a
+canAssignTo (List _ _ a _) = all (all canAssignTo) a
 canAssignTo (Tuple _ a _ b) = all canAssignTo $ a : toListOf (folded.folded) b
 canAssignTo _ = True
 

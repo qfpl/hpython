@@ -336,7 +336,7 @@ validateExprScope
 validateExprScope (Not a ws e) = Not a ws <$> validateExprScope e
 validateExprScope (List a ws1 es ws2) =
   List a ws1 <$>
-  traverse validateExprScope es <*>
+  traverseOf (traverse.traverse) validateExprScope es <*>
   pure ws2
 validateExprScope (Deref a e ws1 r) =
   Deref a <$>

@@ -288,6 +288,13 @@ expr ws = arithExpr
       fmap snd (token space $ TkRightParen ())
 
     atom =
+      (\(tk, s) -> List (pyTokenAnn tk) s) <$>
+      token ws (TkLeftBracket ()) <*>
+      optional (commaSep1' ws $ expr ws) <*>
+      (snd <$> token ws (TkRightBracket()))
+
+      <!>
+
       bool ws <!>
       integer ws <!>
       string ws <!>
@@ -313,10 +320,24 @@ smallStatement =
 
     exprSt = (\a -> Expr (_exprAnnotation a) a) <$> expr space
 
+sepBy1' :: Parser ann a -> Parser ann sep -> Parser ann (a, [(sep, a)], Maybe sep)
+sepBy1' val sep = go
+  where
+    go =
+      (\a b ->
+         case b of
+           Nothing -> (a, [], Nothing)
+           Just (sc, b') ->
+             case b' of
+               Nothing -> (a, [], Just sc)
+               Just (a', ls, sc') -> (a, (sc, a') : ls, sc')) <$>
+      val <*>
+      optional ((,) <$> sep <*> optional go)
+
 statement :: Parser ann (Statement '[] ann)
 statement =
   (\(a, b, c) -> SmallStatements a b c) <$>
-  smallst1 <*>
+  sepBy1' smallStatement (snd <$> semicolon space) <*>
   (Just <$> eol <!> Nothing <$ eof)
 
   <!>
@@ -333,6 +354,7 @@ statement =
                Just (a', ls, sc') -> (a, (sc, a') : ls, sc')) <$>
       smallStatement <*>
       smallst2
+
     smallst2 =
       optional ((,) <$> (snd <$> semicolon space) <*> optional smallst1)
 
@@ -376,6 +398,13 @@ commaSep ws pa =
   <!>
 
   pure CommaSepNone
+
+commaSep1' :: Parser ann Whitespace -> Parser ann a -> Parser ann (CommaSep1' a)
+commaSep1' ws pa =
+  (\(a, b, c) -> from a b c) <$> sepBy1' pa (snd <$> comma ws)
+  where
+    from a [] b = CommaSepOne1' a b
+    from a ((b, c) : bs) d = CommaSepMany1' a b $ from c bs d
 
 param :: Parser ann (Param '[] ann)
 param =

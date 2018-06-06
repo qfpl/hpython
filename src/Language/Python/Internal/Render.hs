@@ -184,7 +184,7 @@ renderExpr (Int _ n ws) = show n <> foldMap renderWhitespace ws
 renderExpr (Ident _ name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) =
   "[" <> foldMap renderWhitespace ws1 <>
-  renderCommaSep renderExpr exprs <>
+  foldMap (renderCommaSep1' renderExpr) exprs <>
   "]" <> foldMap renderWhitespace ws2
 renderExpr (Call _ expr ws args ws2) =
   (case expr of

@@ -94,7 +94,7 @@ data Expr (v :: [*]) a
   -- [ spaces
   , _unsafeListWhitespaceLeft :: [Whitespace]
   -- exprs
-  , _unsafeListValues :: CommaSep (Expr v a)
+  , _unsafeListValues :: Maybe (CommaSep1' (Expr v a))
   -- ] spaces
   , _unsafeListWhitespaceRight :: [Whitespace]
   }

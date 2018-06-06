@@ -145,7 +145,7 @@ genExpr' isExp = Gen.sized $ \n ->
     Gen.choice $
       [ List () <$>
         genWhitespaces <*>
-        genSizedCommaSep genExpr <*>
+        Gen.maybe (genSizedCommaSep1' genExpr) <*>
         genWhitespaces
       , Gen.subtermM
           genExpr

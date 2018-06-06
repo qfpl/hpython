@@ -40,6 +40,8 @@ data PyToken a
   | TkPass a
   | TkBreak a
   | TkContinue a
+  | TkTrue a
+  | TkFalse a
   | TkInt Integer a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
@@ -85,6 +87,8 @@ pyTokenAnn tk =
     TkPass a -> a
     TkBreak a -> a
     TkContinue a -> a
+    TkTrue a -> a
+    TkFalse a -> a
     TkPlus a -> a
     TkMinus a -> a
     TkIf a -> a
@@ -135,6 +139,32 @@ stringPrefix =
   (char 'u' $> Prefix_u) <|>
   (char 'U' $> Prefix_U)
 
+hexDigitInt :: Char -> Int
+hexDigitInt c =
+  case c of
+    '0' -> 0
+    '1' -> 1
+    '2' -> 2
+    '3' -> 3
+    '4' -> 4
+    '5' -> 5
+    '6' -> 6
+    '7' -> 7
+    '8' -> 8
+    '9' -> 9
+    'A' -> 10
+    'B' -> 11
+    'C' -> 12
+    'D' -> 13
+    'E' -> 14
+    'F' -> 15
+    _ -> error "impossible"
+
+hexToInt :: String -> Int
+hexToInt =
+  (snd $!) .
+  foldr (\a (sz, val) -> (sz+1, hexDigitInt a * 16 ^ sz + val)) (0, 0)
+
 stringChar :: (CharParsing m, Monad m) => m Char
 stringChar = (char '\\' *> (escapeChar <|> hexChar)) <|> other
   where
@@ -156,33 +186,10 @@ stringChar = (char '\\' *> (escapeChar <|> hexChar)) <|> other
     hexChar =
       char 'U' *>
       (hexToInt <$> replicateM 8 (oneOf "0123456789ABCDEF") >>=
-       \a -> if a <= 0x10FFFF then pure (chr a) else unexpected "value outside unicode range")
-
-    hexDigitInt c =
-      case c of
-        '0' -> 0
-        '1' -> 1
-        '2' -> 2
-        '3' -> 3
-        '4' -> 4
-        '5' -> 5
-        '6' -> 6
-        '7' -> 7
-        '8' -> 8
-        '9' -> 9
-        'A' -> 10
-        'B' -> 11
-        'C' -> 12
-        'D' -> 13
-        'E' -> 14
-        'F' -> 15
-        _ -> error "impossible"
-
-    hexToInt str =
-      let
-        size = length str
-      in
-        snd $! foldr (\a (sz, val) -> (sz-1, hexDigitInt a * 16 ^ sz + val)) (size, 0) str
+       \a ->
+         if a <= 0x10FFFF
+         then pure (chr a)
+         else unexpected $ "value: " <> show a <> " outside unicode range")
 
 parseToken :: (DeltaParsing m, LookAheadParsing m) => m (PyToken Caret)
 parseToken =
@@ -194,6 +201,8 @@ parseToken =
     , string "pass" $> TkPass
     , string "break" $> TkBreak
     , string "continue" $> TkContinue
+    , string "True" $> TkTrue
+    , string "False" $> TkFalse
     , (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
         fmap read (some digit) <*>
         optional (char '.' *> optional (read <$> some digit))
@@ -235,7 +244,7 @@ parseToken =
            TkShortString sp SingleQuote <$> manyTill stringChar (char '\''))
     , TkComment <$ char '#' <*> many (noneOf "\r\n") <*> parseNewline
     , char ',' $> TkComma
-    , TkIdent <$> some letter
+    , TkIdent <$> some (letter <|> char '_')
     ]
 
 tokenize :: String -> Trifecta.Result [PyToken Caret]

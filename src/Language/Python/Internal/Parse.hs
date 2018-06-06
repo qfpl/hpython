@@ -198,6 +198,18 @@ identifier ws = do
       MkIdent ann n <$> many ws
     _ -> Parser . throwError $ ExpectedIdentifier curTk
 
+bool :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+bool ws =
+  (\(tk, s) ->
+     Bool
+       (pyTokenAnn tk)
+       (case tk of
+          TkTrue{} -> True
+          TkFalse{} -> False
+          _ -> error "impossible")
+       s) <$>
+  (token ws (TkTrue ()) <!> token ws (TkFalse ()))
+
 integer :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 integer ws = do
   curTk <- currentToken
@@ -276,6 +288,7 @@ expr ws = arithExpr
       fmap snd (token space $ TkRightParen ())
 
     atom =
+      bool ws <!>
       integer ws <!>
       string ws <!>
       (\a -> Ident (_identAnnotation a) a) <$> identifier ws <!>
@@ -286,7 +299,8 @@ smallStatement =
   returnSt <!>
   passSt <!>
   breakSt <!>
-  continueSt
+  continueSt <!>
+  exprSt
   where
     returnSt =
       (\(tkReturn, retSpaces) -> Return (pyTokenAnn tkReturn) retSpaces) <$>
@@ -297,17 +311,30 @@ smallStatement =
     breakSt = Break . pyTokenAnn <$> tokenEq (TkBreak ())
     continueSt = Continue . pyTokenAnn <$> tokenEq (TkContinue ())
 
+    exprSt = (\a -> Expr (_exprAnnotation a) a) <$> expr space
+
 statement :: Parser ann (Statement '[] ann)
 statement =
-  SmallStatements <$>
-  smallStatement <*>
-  many ((,) <$> fmap snd (token space $ TkSemicolon ()) <*> smallStatement) <*>
-  optional (snd <$> token space (TkSemicolon ())) <*>
+  (\(a, b, c) -> SmallStatements a b c) <$>
+  smallst1 <*>
   (Just <$> eol <!> Nothing <$ eof)
 
   <!>
 
   CompoundStatement <$> compoundStatement
+  where
+    smallst1 =
+      (\a b ->
+         case b of
+           Nothing -> (a, [], Nothing)
+           Just (sc, b') ->
+             case b' of
+               Nothing -> (a, [], Just sc)
+               Just (a', ls, sc') -> (a, (sc, a') : ls, sc')) <$>
+      smallStatement <*>
+      smallst2
+    smallst2 =
+      optional ((,) <$> (snd <$> semicolon space) <*> optional smallst1)
 
 comment :: Parser ann (Comment, Newline)
 comment = do
@@ -333,6 +360,12 @@ block = fmap Block $ (:|) <$> line <*> many line
 
 comma :: Parser ann Whitespace -> Parser ann (PyToken ann, [Whitespace])
 comma ws = token ws $ TkComma ()
+
+colon :: Parser ann Whitespace -> Parser ann (PyToken ann, [Whitespace])
+colon ws = token ws $ TkColon ()
+
+semicolon :: Parser ann Whitespace -> Parser ann (PyToken ann, [Whitespace])
+semicolon ws = token ws $ TkSemicolon ()
 
 commaSep :: Parser ann Whitespace -> Parser ann a -> Parser ann (CommaSep a)
 commaSep ws pa =
@@ -373,7 +406,7 @@ compoundStatement = fundef
       fmap snd (token anySpace $ TkLeftParen ()) <*>
       commaSep anySpace param <*>
       fmap snd (token space $ TkRightParen ()) <*>
-      fmap snd (token space $ TkColon ()) <*>
+      fmap snd (colon space) <*>
       eol <*
       indent <*>
       block <*

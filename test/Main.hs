@@ -197,20 +197,6 @@ statement_printparseprint_print =
             renderLines (renderStatement (res' ^. unvalidated)) ===
               renderLines (renderStatement (py $> ()))
 
-statement_printparse_id :: Property
-statement_printparse_id =
-  property $ do
-    st <- forAll $ evalStateT Correct.genStatement Correct.initialGenState
-    annotate (renderLines $ renderStatement st)
-    case validateStatementIndentation' st of
-      Failure errs -> annotateShow errs *> failure
-      Success res ->
-        case validateStatementSyntax' res of
-          Failure errs' -> annotateShow errs' *> failure
-          Success res' -> do
-            py <- doToPython statement . renderLines $ renderStatement res'
-            res' ^. unvalidated === (() <$ py)
-
 main = do
   checkParallel lexerParserTests
   let file = "hedgehog-test.py"
@@ -221,7 +207,6 @@ main = do
   check . withTests 200 $ correct_syntax_statement file
   check expr_printparseprint_print
   check . withShrinks 2000 $ statement_printparseprint_print
-  check . withShrinks 2000 $ statement_printparse_id
   checkParallel scopeTests
   checkParallel roundtripTests
   removeFile "hedgehog-test.py"

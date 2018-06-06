@@ -5,8 +5,8 @@ import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
-import Control.Applicative
 import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax
 
@@ -101,20 +101,49 @@ genSizedWhitespace ws =
 genWhitespaces :: MonadGen m => m [Whitespace]
 genWhitespaces = do
   n <- Gen.integral (Range.constant 0 10)
-  Gen.resize n $ genSizedWhitespace genNormalWhitespace
+  go n
+  where
+    go 0 = pure []
+    go n =
+      Gen.choice
+      [ (Space :) <$> go (n-1)
+      , (Tab :) <$> go (n-1)
+      , fmap pure $ Continued <$> genNewline <*> go (n-1)
+      ]
 
 genAnyWhitespaces :: MonadGen m => m [Whitespace]
 genAnyWhitespaces = do
   n <- Gen.integral (Range.constant 0 10)
-  Gen.resize n $ genSizedWhitespace genAnyWhitespace
+  go n
+  where
+    go 0 = pure []
+    go n =
+      Gen.choice
+      [ (Space :) <$> go (n-1)
+      , (Tab :) <$> go (n-1)
+      , fmap pure $ Continued <$> genNewline <*> go (n-1)
+      , (:) <$> (Newline <$> genNewline) <*> go (n-1)
+      ]
 
 genWhitespaces1 :: MonadGen m => m (NonEmpty Whitespace)
 genWhitespaces1 = do
-  n <- Gen.integral (Range.constant 0 9)
-  liftA2
-    (:|)
-    (head <$> Gen.resize 1 (genSizedWhitespace genNormalWhitespace))
-    (Gen.resize n $ genSizedWhitespace genNormalWhitespace)
+  n <- Gen.integral (Range.constant 1 10)
+  go n
+  where
+    go 1 =
+      Gen.choice
+      [ pure $ pure Space
+      , pure $ pure Tab
+      , fmap pure $ Continued <$> genNewline <*> pure []
+      , fmap pure $ Newline <$> genNewline
+      ]
+    go n =
+      Gen.choice
+      [ (Space `NonEmpty.cons`) <$> go (n-1)
+      , (Tab `NonEmpty.cons`) <$> go (n-1)
+      , fmap pure $ Continued <$> genNewline <*> fmap NonEmpty.toList (go $ n-1)
+      , NonEmpty.cons <$> (Newline <$> genNewline) <*> go (n-1)
+      ]
 
 genNone :: MonadGen m => m (Expr '[] ())
 genNone = None () <$> genWhitespaces

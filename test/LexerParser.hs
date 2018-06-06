@@ -21,6 +21,7 @@ lexerParserTests =
   , ("Test full trip 2", test_fulltrip_2)
   , ("Test full trip 3", test_fulltrip_3)
   , ("Test full trip 4", test_fulltrip_4)
+  , ("Test full trip 5", test_fulltrip_5)
   ]
 
 test_fulltrip_1 :: Property
@@ -54,6 +55,27 @@ test_fulltrip_4 =
 
     let lls = logicalLines tks
     length lls === 4
+    annotateShow lls
+
+    ils <- doIndentation lls
+    annotateShow ils
+
+    nst <- doNested ils
+    annotateShow nst
+
+    a <- doToPython statement str
+    renderLines (renderStatement a) === str
+
+test_fulltrip_5 :: Property
+test_fulltrip_5 =
+  withTests 1 . property $ do
+    let str = "if False:\n pass\n pass\nelse:\n pass\n pass\n"
+
+    tks <- doTokenize str
+    annotateShow tks
+
+    let lls = logicalLines tks
+    length lls === 6
     annotateShow lls
 
     ils <- doIndentation lls

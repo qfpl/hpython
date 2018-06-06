@@ -593,7 +593,8 @@ arg =
 compoundStatement :: Parser ann (CompoundStatement '[] ann)
 compoundStatement =
   fundef <!>
-  ifSt
+  ifSt <!>
+  whileSt
   where
     fundef =
       (\(tkDef, defSpaces) -> Fundef (pyTokenAnn tkDef) (NonEmpty.fromList defSpaces)) <$>
@@ -620,6 +621,13 @@ compoundStatement =
          (snd <$> colon space) <*>
          eol <*
          indent <*> block <* dedent)
+
+    whileSt =
+      (\(tk, s) -> While (pyTokenAnn tk) s) <$>
+      token space (TkWhile ()) <*>
+      expr space <*>
+      (snd <$> colon space) <*>
+      eol <* indent <*> block <* dedent
 
 module_ :: Parser ann (Module '[] ann)
 module_ =

@@ -7,8 +7,8 @@ module Language.Python.Internal.Lexer where
 
 import Control.Applicative ((<|>), some, many, optional)
 import Control.Monad (when, replicateM)
+import Control.Monad.Except (throwError)
 import Control.Monad.State (StateT, evalStateT, get, modify, put)
-import Control.Monad.Trans (lift)
 import Data.Bifunctor (first)
 import Data.Char (chr, isAscii)
 import Data.Deriving (deriveEq1)
@@ -36,6 +36,7 @@ data QuoteType = SingleQuote | DoubleQuote
 data PyToken a
   = TkIf a
   | TkElse a
+  | TkWhile a
   | TkDef a
   | TkReturn a
   | TkPass a
@@ -115,6 +116,7 @@ pyTokenAnn tk =
     TkMinus a -> a
     TkIf a -> a
     TkElse a -> a
+    TkWhile a -> a
     TkInt _ a -> a
     TkFloat _ _ a -> a
     TkIdent _ a -> a
@@ -221,6 +223,7 @@ parseToken =
   asum @[]
     [ string "if" $> TkIf
     , string "else" $> TkElse
+    , string "while" $> TkWhile
     , string "def" $> TkDef
     , string "return" $> TkReturn
     , string "pass" $> TkPass
@@ -398,14 +401,17 @@ countSpaces (Tab : _) = error "tab in countSpaces"
 countSpaces (Newline{} : _) = error "newline in countSpaces"
 countSpaces _ = 0
 
-data TabError = TabError deriving (Eq, Show)
+data TabError a
+  = TabError
+  | IncorrectDedent a
+  deriving (Eq, Show)
 
-indentation :: [LogicalLine a] -> Either TabError [IndentedLine a]
+indentation :: [LogicalLine a] -> Either (TabError a) [IndentedLine a]
 indentation lls =
   flip evalStateT (pure []) $
   (<>) <$> (concat <$> traverse go lls) <*> finalDedents
   where
-    finalDedents :: StateT (NonEmpty [Whitespace]) (Either TabError) [IndentedLine a]
+    finalDedents :: StateT (NonEmpty [Whitespace]) (Either (TabError a)) [IndentedLine a]
     finalDedents = do
       i :| is <- get
       case is of
@@ -414,14 +420,18 @@ indentation lls =
           put $ i' :| is'
           (Dedent :) <$> finalDedents
 
-    dedents :: Int -> StateT (NonEmpty [Whitespace]) (Either TabError) [IndentedLine a]
-    dedents n = do
-      i :| is <- get
-      if countSpaces (expandTabs 8 i) < n
-        then (Dedent :) <$> dedents n
-        else pure []
+    dedents :: a -> Int -> StateT (NonEmpty [Whitespace]) (Either (TabError a)) [IndentedLine a]
+    dedents ann n = do
+      is <- get
+      let (popped, remainder) = NonEmpty.span ((> n) . countSpaces . expandTabs 8) is
+      when (n `notElem` fmap (countSpaces . expandTabs 8) (NonEmpty.toList is)) .
+        throwError $ IncorrectDedent ann
+      put $ case remainder of
+        [] -> error "I don't know whether this can happen"
+        x : xs -> x :| xs
+      pure $ replicate (length popped) Dedent
 
-    go :: LogicalLine a -> StateT (NonEmpty [Whitespace]) (Either TabError) [IndentedLine a]
+    go :: LogicalLine a -> StateT (NonEmpty [Whitespace]) (Either (TabError a)) [IndentedLine a]
     go ll@(LogicalLine ann _ spaces line nl) = do
       i :| is <- get
       let
@@ -433,9 +443,9 @@ indentation lls =
         (not (et8 < et8i && et1 < et1i) &&
          not (et8 > et8i && et1 > et1i) &&
          not (et8 == et8i && et1 == et1i))
-        (lift $ Left TabError)
+        (throwError TabError)
       case compare et8 et8i of
-        LT -> (<> [IndentedLine ll]) <$> dedents et8
+        LT -> (<> [IndentedLine ll]) <$> dedents ann et8
         EQ -> pure [IndentedLine ll]
         GT -> do
           modify $ NonEmpty.cons spaces

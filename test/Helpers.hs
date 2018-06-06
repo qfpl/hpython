@@ -18,7 +18,7 @@ doTokenize str = do
       failure
     Trifecta.Success a -> pure a
 
-doIndentation :: Monad m => [LogicalLine a] -> PropertyT m [IndentedLine a]
+doIndentation :: (Show a, Monad m) => [LogicalLine a] -> PropertyT m [IndentedLine a]
 doIndentation lls = do
   let res = indentation lls
   case res of

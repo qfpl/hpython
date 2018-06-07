@@ -634,7 +634,8 @@ compoundStatement =
   fundef <!>
   ifSt <!>
   whileSt <!>
-  trySt
+  trySt <!>
+  classSt
   where
     fundef =
       (\(tkDef, defSpaces) -> Fundef (pyTokenAnn tkDef) (NonEmpty.fromList defSpaces)) <$>
@@ -695,6 +696,17 @@ compoundStatement =
              ((,,,) <$>
               (snd <$> token space (TkFinally ())) <*>
               (snd <$> colon space) `thenSuite` ())))
+
+    classSt =
+      (\(tk, s) -> ClassDef (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
+      token space (TkClass ()) <*>
+      identifier space <*>
+      optional
+        ((,,) <$>
+         (snd <$> token anySpace (TkLeftParen ())) <*>
+         optional (commaSep1 anySpace arg) <*>
+         (snd <$> token space (TkRightParen ()))) <*>
+      (snd <$> colon space) `thenSuite` ()
 
 module_ :: Parser ann (Module '[] ann)
 module_ =

@@ -25,6 +25,7 @@ lexerParserTests =
   , ("Test full trip 6", test_fulltrip_6)
   , ("Test full trip 7", test_fulltrip_7)
   , ("Test full trip 8", test_fulltrip_8)
+  , ("Test full trip 9", test_fulltrip_9)
   ]
 
 test_fulltrip_1 :: Property
@@ -149,6 +150,30 @@ test_fulltrip_8 =
     annotateShow nst
 
     a <- doToPython module_ str
+    renderModule a === str
+
+test_fulltrip_9 :: Property
+test_fulltrip_9 =
+  withTests 1 . property $ do
+    let
+      str =
+        "try:\n pass\nexcept False:\n pass\nelse:\n pass\nfinally:\n pass\n def a():\n  pass\n pass\n"
+
+    tks <- doTokenize str
+    annotateShow tks
+
+    let lls = logicalLines tks
+    annotateShow lls
+
+    ils <- doIndentation lls
+    annotateShow ils
+
+    nst <- doNested ils
+    annotateShow nst
+
+    a <- doParse module_ nst
+    annotateShow a
+
     renderModule a === str
 
 parseTab :: Parser ann Whitespace

@@ -432,24 +432,26 @@ indentation lls =
       pure $ replicate (length popped) Dedent
 
     go :: LogicalLine a -> StateT (NonEmpty [Whitespace]) (Either (TabError a)) [IndentedLine a]
-    go ll@(LogicalLine ann _ spaces line nl) = do
-      i :| is <- get
-      let
-        et8 = countSpaces $ expandTabs 8 spaces
-        et1 = countSpaces $ expandTabs 1 spaces
-        et8i = countSpaces $ expandTabs 8 i
-        et1i = countSpaces $ expandTabs 1 i
-      when
-        (not (et8 < et8i && et1 < et1i) &&
-         not (et8 > et8i && et1 > et1i) &&
-         not (et8 == et8i && et1 == et1i))
-        (throwError TabError)
-      case compare et8 et8i of
-        LT -> (<> [IndentedLine ll]) <$> dedents ann et8
-        EQ -> pure [IndentedLine ll]
-        GT -> do
-          modify $ NonEmpty.cons spaces
-          pure [Indent ann, IndentedLine ll]
+    go ll@(LogicalLine ann _ spaces line nl)
+      | all isBlankToken line = pure [IndentedLine ll]
+      | otherwise = do
+          i :| is <- get
+          let
+            et8 = countSpaces $ expandTabs 8 spaces
+            et1 = countSpaces $ expandTabs 1 spaces
+            et8i = countSpaces $ expandTabs 8 i
+            et1i = countSpaces $ expandTabs 1 i
+          when
+            (not (et8 < et8i && et1 < et1i) &&
+            not (et8 > et8i && et1 > et1i) &&
+            not (et8 == et8i && et1 == et1i))
+            (throwError TabError)
+          case compare et8 et8i of
+            LT -> (<> [IndentedLine ll]) <$> dedents ann et8
+            EQ -> pure [IndentedLine ll]
+            GT -> do
+              modify $ NonEmpty.cons spaces
+              pure [Indent ann, IndentedLine ll]
 
 newtype Nested a
   = Nested

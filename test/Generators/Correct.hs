@@ -101,28 +101,27 @@ genInt = Int () <$> Gen.integral (Range.constant 0 (2^32)) <*> genWhitespaces
 genBlock :: (MonadGen m, MonadState GenState m) => m (Block '[] ())
 genBlock = do
   indent <- NonEmpty.toList <$> genWhitespaces1
-  go indent
+  go False indent
   where
-    go indent =
+    go b indent =
       Gen.sized $ \n ->
       if n <= 1
         then do
           s1 <-
-            Gen.choice
-              [ Right <$> genStatement
-              , fmap Left $ (,) <$> Gen.maybe genComment <*> genNewline
-              ]
+            Gen.choice $
+              [ Right <$> genStatement ] <>
+              [ fmap Left $ (,) <$> Gen.maybe genComment <*> genNewline | b ]
           pure . Block $ ((), indent, s1) :| []
         else do
           n' <- Gen.integral (Range.constant 1 (n-1))
-          s1 <-
+          (b', s1) <-
             Gen.resize n' $
             Gen.choice
-              [ Right <$> genStatement
-              , fmap Left $ (,) <$> Gen.maybe genComment <*> genNewline
+              [ (,) True . Right <$> genStatement
+              , fmap ((,) False . Left) $ (,) <$> Gen.maybe genComment <*> genNewline
               ]
           let n'' = n - n'
-          b <- Gen.resize n'' (go indent)
+          b <- Gen.resize n'' (go b' indent)
           pure . Block $ NonEmpty.cons ((), indent, s1) (unBlock b)
 
 genPositionalArg :: MonadGen m => m (Arg '[] ())

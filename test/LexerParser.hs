@@ -112,7 +112,7 @@ test_fulltrip_6 =
 test_fulltrip_7 :: Property
 test_fulltrip_7 =
   withTests 1 . property $ do
-    let str = "if False:\n pass\nelse \\\n      \\\r\n pass\n"
+    let str = "if False:\n pass\nelse \\\n      \\\r\n:\n pass\n"
 
     tks <- doTokenize str
     annotateShow tks

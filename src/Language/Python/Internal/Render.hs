@@ -324,7 +324,7 @@ renderCompoundStatement (If _ ws1 expr ws3 nl body body') =
       fmap
         (\(ws4, ws5, _, _) ->
            "else" <> foldMap renderWhitespace ws4 <> ":" <>
-           foldMap renderWhitespace ws4)
+           foldMap renderWhitespace ws5)
         body' <*>
       fmap (\(_, _, nl2, _) -> nl2) body' <*>
       fmap (\(_, _, _, body'') -> renderBlock body'') body'
@@ -461,6 +461,8 @@ renderModule (Module ms) =
   foldMap
     (either
        (\(a, b, c) ->
-          foldMap renderWhitespace a <> foldMap renderComment b <> foldMap renderNewline c)
+          foldMap renderWhitespace a <>
+          foldMap renderComment b <>
+          foldMap renderNewline c)
        (renderLines . renderStatement))
     ms

@@ -54,6 +54,9 @@ data PyToken a
   | TkFrom a
   | TkAs a
   | TkRaise a
+  | TkTry a
+  | TkExcept a
+  | TkFinally a
   | TkInt Integer a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
@@ -112,6 +115,9 @@ pyTokenAnn tk =
     TkFrom a -> a
     TkAs a -> a
     TkRaise a -> a
+    TkTry a -> a
+    TkExcept a -> a
+    TkFinally a -> a
     TkPlus a -> a
     TkMinus a -> a
     TkIf a -> a
@@ -241,6 +247,9 @@ parseToken =
     , string "from" $> TkFrom
     , string "as" $> TkAs
     , string "raise" $> TkRaise
+    , string "try" $> TkTry
+    , string "except" $> TkExcept
+    , string "finally" $> TkFinally
     , (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
         fmap read (some digit) <*>
         optional (char '.' *> optional (read <$> some digit))

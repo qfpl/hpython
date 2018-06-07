@@ -264,7 +264,7 @@ renderSmallStatement (Raise _ ws x) =
        foldMap
          (\(d, e) ->
             "from" <> foldMap renderWhitespace d <>
-            renderExpr e)
+            bracketTuple e)
          c)
     x
 renderSmallStatement (Return _ ws expr) =
@@ -419,8 +419,8 @@ renderStatement (SmallStatements s ss sc nl) =
 
 renderExceptAs :: ExceptAs v a -> String
 renderExceptAs (ExceptAs _ e f) =
-  renderExpr e <>
-  foldMap (\(a, b) -> foldMap renderWhitespace a <> renderIdent b) f
+  bracketTuple e <>
+  foldMap (\(a, b) -> "as" <> foldMap renderWhitespace a <> renderIdent b) f
 
 renderArg :: Arg v a -> String
 renderArg (PositionalArg _ expr) = bracketTuple expr

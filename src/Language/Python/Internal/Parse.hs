@@ -23,6 +23,9 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Language.Python.Internal.Lexer
 import Language.Python.Internal.Syntax
 
+some1 :: (Alt f, Applicative f) => f a -> f (NonEmpty a)
+some1 a = (:|) <$> a <*> many a
+
 data ParseError ann
   = UnexpectedEndOfInput
   | UnexpectedEndOfLine
@@ -511,6 +514,42 @@ block = fmap Block $ (:|) <$> line <*> many line
         Left <$> commentOrEmpty <!>
         Right <$> statement
 
+withSuite
+  :: Parser ann (Newline -> Block '[] ann -> r -> r')
+  -> Parser ann r
+  -> Parser ann r'
+withSuite p p'  = fmap uncurry p <*> suite <*> p'
+infixl 4 `withSuite`
+
+thenSuite
+  :: Parser ann (Newline -> Block '[] ann -> r)
+  -> ()
+  -> Parser ann r
+thenSuite p _  = fmap uncurry p <*> suite
+infixl 4 `thenSuite`
+
+suite :: Parser ann (Newline, Block '[] ann)
+suite =
+  (,) <$>
+  eol <*>
+  fmap Block
+    (flip (foldr NonEmpty.cons) <$>
+     commentOrIndent <*>
+     some1 line) <*
+  dedent
+  where
+    commentOrEmpty = (,) <$> optional comment <*> eol
+
+    commentOrIndent =
+      many ((\(a, b) -> (,,) b a) <$> indents <*> fmap Left commentOrEmpty) <*
+      indent
+
+    line =
+      (\(a, b) -> (,,) b a) <$>
+      indents <*>
+      (Left <$> commentOrEmpty <!>
+       Right <$> statement)
+
 comma :: Parser ann Whitespace -> Parser ann (PyToken ann, [Whitespace])
 comma ws = token ws $ TkComma ()
 
@@ -594,7 +633,8 @@ compoundStatement :: Parser ann (CompoundStatement '[] ann)
 compoundStatement =
   fundef <!>
   ifSt <!>
-  whileSt
+  whileSt <!>
+  trySt
   where
     fundef =
       (\(tkDef, defSpaces) -> Fundef (pyTokenAnn tkDef) (NonEmpty.fromList defSpaces)) <$>
@@ -603,31 +643,58 @@ compoundStatement =
       fmap snd (token anySpace $ TkLeftParen ()) <*>
       commaSep anySpace param <*>
       fmap snd (token space $ TkRightParen ()) <*>
-      fmap snd (colon space) <*>
-      eol <*
-      indent <*>
-      block <*
-      dedent
+      fmap snd (colon space) `thenSuite` ()
 
     ifSt =
       (\(tk, s) -> If (pyTokenAnn tk) s) <$>
       token space (TkIf ()) <*>
       expr space <*>
-      (snd <$> colon space) <*>
-      eol <* indent <*> block <* dedent <*>
+      (snd <$> colon space) `withSuite`
       optional
         ((,,,) <$>
          (snd <$> token space (TkElse ())) <*>
-         (snd <$> colon space) <*>
-         eol <*
-         indent <*> block <* dedent)
+         (snd <$> colon space) `thenSuite` ())
 
     whileSt =
       (\(tk, s) -> While (pyTokenAnn tk) s) <$>
       token space (TkWhile ()) <*>
       expr space <*>
-      (snd <$> colon space) <*>
-      eol <* indent <*> block <* dedent
+      (snd <$> colon space) `thenSuite` ()
+
+    exceptAs =
+      (\a -> ExceptAs (_exprAnnotation a) a) <$>
+      expr space <*>
+      optional ((,) <$> (snd <$> token space (TkAs())) <*> identifier space)
+
+    trySt =
+      (\(tk, s) a b c d ->
+         case d of
+           Left (e, f, g, h) -> TryFinally (pyTokenAnn tk) s a b c e f g h
+           Right (e, f, g) -> TryExcept (pyTokenAnn tk) s a b c e f g) <$>
+      token space (TkTry ()) <*>
+      (snd <$> colon space) `withSuite`
+      (fmap Left
+         ((,,,) <$>
+          (snd <$> token space (TkFinally ())) <*>
+          (snd <$> colon space) `thenSuite` ())
+
+        <!>
+
+        fmap Right
+          ((,,) <$>
+           some1
+             ((,,,,) <$>
+              (snd <$> token space (TkExcept ())) <*>
+              exceptAs <*>
+              (snd <$> colon space) `thenSuite` ()) <*>
+           optional
+             ((,,,) <$>
+              (snd <$> token space (TkElse ())) <*>
+              (snd <$> colon space) `thenSuite` ()) <*>
+           optional
+             ((,,,) <$>
+              (snd <$> token space (TkFinally ())) <*>
+              (snd <$> colon space) `thenSuite` ())))
 
 module_ :: Parser ann (Module '[] ann)
 module_ =

@@ -316,7 +316,7 @@ renderCompoundStatement (If _ ws1 expr ws3 nl body body') =
   where
     firstLine =
       "if" <> foldMap renderWhitespace ws1 <>
-      renderExpr expr <> ":" <>
+      bracketTuple expr <> ":" <>
       foldMap renderWhitespace ws3
     restLines = renderBlock body <> fromMaybe mempty elseLines
     elseLines =

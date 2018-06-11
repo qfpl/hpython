@@ -307,7 +307,6 @@ expr ws = orTest
     arithOp =
       (\(tk, ws) -> Plus (pyTokenAnn tk) ws) <$> token ws (TkPlus ()) <!>
       (\(tk, ws) -> Minus (pyTokenAnn tk) ws) <$> token ws (TkMinus ())
-
     arithExpr = binOp arithOp term
 
     termOp =
@@ -630,7 +629,8 @@ compoundStatement =
   ifSt <!>
   whileSt <!>
   trySt <!>
-  classSt
+  classSt <!>
+  forSt
   where
     fundef =
       (\(tkDef, defSpaces) -> Fundef (pyTokenAnn tkDef) (NonEmpty.fromList defSpaces)) <$>
@@ -702,6 +702,18 @@ compoundStatement =
          optional (commaSep1 anySpace arg) <*>
          (snd <$> token space (TkRightParen ()))) <*>
       (snd <$> colon space) `thenSuite` ()
+
+    forSt =
+      (\(tk, s) -> For (pyTokenAnn tk) s) <$>
+      token space (TkFor ()) <*>
+      exprList space <*>
+      (snd <$> token space (TkIn ())) <*>
+      exprList space <*>
+      (snd <$> colon space) `withSuite`
+      optional
+        ((,,,) <$>
+         (snd <$> token space (TkElse ())) <*>
+         (snd <$> colon space) `thenSuite` ())
 
 module_ :: Parser ann (Module '[] ann)
 module_ =

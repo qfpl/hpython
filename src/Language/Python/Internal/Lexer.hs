@@ -67,6 +67,8 @@ data PyToken a
   | TkExcept a
   | TkFinally a
   | TkClass a
+  | TkFor a
+  | TkIn a
   | TkInt Integer a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
@@ -129,6 +131,8 @@ pyTokenAnn tk =
     TkExcept a -> a
     TkFinally a -> a
     TkClass a -> a
+    TkFor a -> a
+    TkIn a -> a
     TkPlus a -> a
     TkMinus a -> a
     TkIf a -> a
@@ -267,6 +271,8 @@ parseToken =
     , string "except" $> TkExcept
     , string "finally" $> TkFinally
     , string "class" $> TkClass
+    , string "for" $> TkFor
+    , string "in" $> TkIn
     ] <>
     [ (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
         fmap read (some digit) <*>

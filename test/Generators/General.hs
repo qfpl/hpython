@@ -6,6 +6,7 @@ import Control.Applicative
 import Control.Lens.Cons
 import Control.Lens.Fold
 import Control.Lens.Getter
+import Control.Lens.Iso (from)
 import Control.Lens.Wrapped
 import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty(..))
@@ -87,7 +88,7 @@ genImportTargets =
 genBlock :: MonadGen m => m (Block '[] ())
 genBlock =
   Gen.shrink ((++) <$> shrinkHead <*> shrinkTail) $ do
-  indent <- NonEmpty.toList <$> genWhitespaces1
+  indent <- view (from indentWhitespaces) . NonEmpty.toList <$> genWhitespaces1
   go indent
   where
     shrinkHead b

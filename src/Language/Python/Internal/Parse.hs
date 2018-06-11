@@ -4,7 +4,9 @@
 {-# language GeneralizedNewtypeDeriving #-}
 module Language.Python.Internal.Parse where
 
-import Control.Lens.Getter ((^.))
+import Control.Lens.Getter ((^.), view)
+import Control.Lens.Setter (over, mapped)
+import Control.Lens.Tuple (_1)
 import Control.Monad (unless)
 import Control.Monad.Except (ExceptT(..), runExceptT, throwError)
 import Control.Monad.State
@@ -41,7 +43,7 @@ data ParseError ann
   | ExpectedComment { peGot :: PyToken ann }
   | ExpectedToken { peExpected :: PyToken (), peGot :: PyToken ann }
   | ExpectedEndOfLine { peGotTokens :: [PyToken ann] }
-  | ExpectedEndOfInput { peGotCtxt :: [Either (Nested ann) (LogicalLine ann)] }
+  | ExpectedEndOfInput { peGotCtxt :: [Either (Nested ann) (Line ann)] }
   deriving (Eq, Show)
 
 newtype Consumed = Consumed { unConsumed :: Bool }
@@ -55,7 +57,7 @@ newtype Parser ann a
   = Parser
   { unParser
       :: StateT
-           [[Either (Nested ann) (LogicalLine ann)]]
+           [[Either (Nested ann) (Line ann)]]
            (ExceptT (ParseError ann) (Writer Consumed))
            a
   } deriving (Functor, Applicative, Monad)
@@ -86,7 +88,7 @@ currentToken = Parser $ do
     current : rest ->
       case current of
         [] -> throwError UnexpectedEndOfBlock
-        Right ll@(LogicalLine _ _ _ tks nl) : rest' ->
+        Right ll@(Line _ _ tks nl) : rest' ->
           case tks of
             [] -> throwError UnexpectedEndOfLine
             [tk] | Nothing <- nl -> do
@@ -95,7 +97,7 @@ currentToken = Parser $ do
                 _ -> rest' : rest
               pure tk
             tk : rest'' ->
-              put ((Right (ll { llLine = rest'' }) : rest') : rest) $> tk
+              put ((Right (ll { lineLine = rest'' }) : rest') : rest) $> tk
         Left _ : _ -> throwError UnexpectedIndent
 
 eol :: Parser ann Newline
@@ -107,13 +109,13 @@ eol = Parser $ do
       case current of
         [] -> throwError UnexpectedEndOfBlock
         Left _ : _ -> throwError UnexpectedIndent
-        Right ll@(LogicalLine _ _ _ tks nl) : rest' ->
+        Right ll@(Line _ _ tks nl) : rest' ->
           case tks of
             _ : _ -> throwError $ ExpectedEndOfLine tks
             [] ->
               case nl of
                 Nothing -> throwError $ ExpectedEndOfLine tks
-                Just (_, nl') -> do
+                Just nl' -> do
                   put (rest' : rest)
                   tell (Consumed True) $> nl'
 
@@ -248,7 +250,7 @@ string ws = do
 between :: Parser ann left -> Parser ann right -> Parser ann a -> Parser ann a
 between left right pa = left *> pa <* right
 
-indents :: Parser ann ([Whitespace], ann)
+indents :: Parser ann ([Indent], ann)
 indents = Parser $ do
   ctxt <- get
   case ctxt of
@@ -256,7 +258,7 @@ indents = Parser $ do
     current : rest ->
       case current of
         [] -> throwError UnexpectedEndOfBlock
-        Right ll@(LogicalLine a _ is _ _) : rest' -> pure (is, a)
+        Right ll@(Line a is _ _) : rest' -> pure (is, a)
         Left _ : _ -> throwError UnexpectedIndent
 
 exprList :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
@@ -503,17 +505,6 @@ comment = do
       Parser (tell $ Consumed True) $> Comment str
     _ -> Parser . throwError $ ExpectedComment curTk
 
-block :: Parser ann (Block '[] ann)
-block = fmap Block $ (:|) <$> line <*> many line
-  where
-    commentOrEmpty = (,) <$> optional comment <*> eol
-
-    line = do
-      (ws, a) <- indents
-      fmap ((,,) a ws) $
-        Left <$> commentOrEmpty <!>
-        Right <$> statement
-
 withSuite
   :: Parser ann (Newline -> Block '[] ann -> r -> r')
   -> Parser ann r
@@ -529,24 +520,28 @@ thenSuite p _  = fmap uncurry p <*> suite
 infixl 4 `thenSuite`
 
 suite :: Parser ann (Newline, Block '[] ann)
-suite =
+suite = do
+  lv <- length <$> Parser get
   (,) <$>
-  eol <*>
-  fmap Block
-    (flip (foldr NonEmpty.cons) <$>
-     commentOrIndent <*>
-     some1 line) <*
-  dedent
+    eol <*>
+    fmap Block
+      (flip (foldr NonEmpty.cons) <$>
+       commentOrIndent lv <*>
+       some1 (line lv)) <*
+    dedent
   where
     commentOrEmpty = (,) <$> optional comment <*> eol
 
-    commentOrIndent =
-      many ((\(a, b) -> (,,) b a) <$> indents <*> fmap Left commentOrEmpty) <*
+    commentOrIndent lv =
+      many
+        ((\(a, b) -> (,,) b a) <$>
+         over (mapped._1) (!! pred lv) indents <*>
+         fmap Left commentOrEmpty) <*
       indent
 
-    line =
+    line lv =
       (\(a, b) -> (,,) b a) <$>
-      indents <*>
+      over (mapped._1) (!! pred lv) indents <*>
       (Left <$> commentOrEmpty <!>
        Right <$> statement)
 
@@ -715,6 +710,6 @@ module_ =
   where
     maybeComment =
       (\ws cmt nl -> (ws, cmt, nl)) <$>
-      fmap fst indents <*>
+      fmap ((view indentWhitespaces =<<) . fst) indents<*>
       optional comment <*>
       (Just <$> eol <!> Nothing <$ eof)

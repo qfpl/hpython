@@ -1,4 +1,4 @@
-{-# language OverloadedStrings #-}
+{-# language OverloadedStrings, OverloadedLists #-}
 module LexerParser (lexerParserTests) where
 
 import Data.Functor.Alt ((<!>))
@@ -198,7 +198,6 @@ test_parse_1 =
         [ IndentedLine
             LogicalLine
             { llAnn = ()
-            , llSpacesTokens = []
             , llSpaces = []
             , llLine = [ TkTab () ]
             , llEnd = Nothing
@@ -220,7 +219,6 @@ test_parse_2 =
         [ IndentedLine
             LogicalLine
             { llAnn = ()
-            , llSpacesTokens = []
             , llSpaces = []
             , llLine = [ TkSpace (), TkSpace (), TkSpace (), TkSpace () ]
             , llEnd = Nothing

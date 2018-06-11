@@ -3,9 +3,12 @@
 {-# language OverloadedLists #-}
 {-# language TypeApplications #-}
 {-# language TemplateHaskell #-}
+{-# language ViewPatterns #-}
 module Language.Python.Internal.Lexer where
 
 import Control.Applicative ((<|>), some, many, optional)
+import Control.Lens.Iso (from)
+import Control.Lens.Getter ((^.))
 import Control.Monad (when, replicateM)
 import Control.Monad.Except (throwError)
 import Control.Monad.State (StateT, evalStateT, get, modify, put)
@@ -16,19 +19,24 @@ import Data.Foldable (asum)
 import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Semigroup ((<>))
-import Data.Sequence ((|>), Seq)
+import Data.Sequence ((|>), ViewR(..), ViewL(..), Seq)
 import Text.Parser.LookAhead (LookAheadParsing, lookAhead)
 import Text.Trifecta
   ( CharParsing, DeltaParsing, Caret, Careted(..), char, careted, letter, noneOf
   , digit, string, manyTill, parseString, unexpected, oneOf, satisfy, try
   )
 
+import qualified Data.Sequence as Seq
+import qualified Data.FingerTree as FingerTree
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Text.Trifecta as Trifecta
 
 import Language.Python.Internal.Syntax (StringPrefix(..))
 import Language.Python.Internal.Syntax.Whitespace
-  (Newline(..), Whitespace(..))
+  ( Newline(..), Whitespace(..), Indent(..), indentWhitespaces
+  , getIndentLevel, indentLevel
+  , absoluteIndentLevel
+  )
 
 data QuoteType = SingleQuote | DoubleQuote
   deriving (Eq, Show)
@@ -309,8 +317,7 @@ tokenize = parseString (many parseToken) mempty
 data LogicalLine a
   = LogicalLine
   { llAnn :: a
-  , llSpacesTokens :: [PyToken a]
-  , llSpaces :: [Whitespace]
+  , llSpaces :: Indent
   , llLine :: [PyToken a]
   , llEnd :: Maybe (PyToken a, Newline)
   } deriving (Eq, Show)
@@ -321,12 +328,20 @@ spaceToken TkTab{} = Just Tab
 spaceToken (TkContinued nl _) = Just $ Continued nl []
 spaceToken _ = Nothing
 
-collapseContinue :: [Whitespace] -> [Whitespace]
+collapseContinue :: [(PyToken a, Whitespace)] -> [([PyToken a], Whitespace)]
 collapseContinue [] = []
-collapseContinue (Space : xs) = Space : collapseContinue xs
-collapseContinue (Tab : xs) = Tab : collapseContinue xs
-collapseContinue (Newline nl : xs) = Newline nl : collapseContinue xs
-collapseContinue (Continued nl ws : xs) = [Continued nl $ ws <> xs]
+collapseContinue ((tk@TkSpace{}, Space) : xs) =
+  ([tk], Space) : collapseContinue xs
+collapseContinue ((tk@TkTab{}, Tab) : xs) =
+  ([tk], Space) : collapseContinue xs
+collapseContinue ((tk@TkNewline{}, Newline{}) : xs) =
+  ([tk], Space) : collapseContinue xs
+collapseContinue ((tk@TkContinued{}, Continued nl ws) : xs) =
+  let
+    xs' = collapseContinue xs
+  in
+    [(tk : (xs' >>= fst), Continued nl $ ws <> fmap snd xs')]
+collapseContinue _ = error "invalid token/whitespace pair in collapseContinue"
 
 newlineToken :: PyToken a -> Maybe Newline
 newlineToken (TkNewline nl _) = Just nl
@@ -371,15 +386,14 @@ logicalLines tks =
       (case tks of
          [] -> error "couldn't generate annotation for logical line"
          tk : _ -> pyTokenAnn tk)
-      (fst <$> spaces)
-      (collapseContinue $ snd <$> spaces)
+      (fmap snd (collapseContinue spaces) ^. from indentWhitespaces)
       line
       (fst <$> rest')
       :
     logicalLines (maybe [] snd rest') 
 
 data IndentedLine a
-  = Indent a
+  = Indent Int a
   | Dedent
   | IndentedLine (LogicalLine a)
   deriving (Eq, Show)
@@ -391,28 +405,6 @@ isBlankToken TkComment{} = True
 isBlankToken TkNewline{} = True
 isBlankToken _ = False
 
-expandTabs :: Int -> [Whitespace] -> [Whitespace]
-expandTabs size = go 0
-  where
-    go !n (Tab : xs) =
-      let
-        (q, r) = quotRem n 8
-        count = size - r
-      in
-        Space :
-        if r == 0
-        then replicate (size-1) Space <> go (n + size) xs
-        else replicate (count-1) Space <> go (n + count) xs
-    go !n (Space : xs) = Space : go (n + 1) xs
-    go !n (Newline{} : _) = error "newline in expandTabs"
-    go !n xs = xs
-
-countSpaces :: [Whitespace] -> Int
-countSpaces (Space : xs) = 1 + countSpaces xs
-countSpaces (Tab : _) = error "tab in countSpaces"
-countSpaces (Newline{} : _) = error "newline in countSpaces"
-countSpaces _ = 0
-
 data TabError a
   = TabError
   | IncorrectDedent a
@@ -420,10 +412,10 @@ data TabError a
 
 indentation :: [LogicalLine a] -> Either (TabError a) [IndentedLine a]
 indentation lls =
-  flip evalStateT (pure []) $
+  flip evalStateT (pure mempty) $
   (<>) <$> (concat <$> traverse go lls) <*> finalDedents
   where
-    finalDedents :: StateT (NonEmpty [Whitespace]) (Either (TabError a)) [IndentedLine a]
+    finalDedents :: StateT (NonEmpty Indent) (Either (TabError a)) [IndentedLine a]
     finalDedents = do
       i :| is <- get
       case is of
@@ -432,42 +424,53 @@ indentation lls =
           put $ i' :| is'
           (Dedent :) <$> finalDedents
 
-    dedents :: a -> Int -> StateT (NonEmpty [Whitespace]) (Either (TabError a)) [IndentedLine a]
+    dedents :: a -> Int -> StateT (NonEmpty Indent) (Either (TabError a)) [IndentedLine a]
     dedents ann n = do
       is <- get
-      let (popped, remainder) = NonEmpty.span ((> n) . countSpaces . expandTabs 8) is
-      when (n `notElem` fmap (countSpaces . expandTabs 8) (NonEmpty.toList is)) .
+      let (popped, remainder) = NonEmpty.span ((> n) . indentLevel) is
+      when (n `notElem` fmap indentLevel (NonEmpty.toList is)) .
         throwError $ IncorrectDedent ann
       put $ case remainder of
         [] -> error "I don't know whether this can happen"
         x : xs -> x :| xs
       pure $ replicate (length popped) Dedent
 
-    go :: LogicalLine a -> StateT (NonEmpty [Whitespace]) (Either (TabError a)) [IndentedLine a]
-    go ll@(LogicalLine ann _ spaces line nl)
+    go :: LogicalLine a -> StateT (NonEmpty Indent) (Either (TabError a)) [IndentedLine a]
+    go ll@(LogicalLine ann spcs line nl)
       | all isBlankToken line = pure [IndentedLine ll]
       | otherwise = do
           i :| is <- get
           let
-            et8 = countSpaces $ expandTabs 8 spaces
-            et1 = countSpaces $ expandTabs 1 spaces
-            et8i = countSpaces $ expandTabs 8 i
-            et1i = countSpaces $ expandTabs 1 i
+            et8 = absoluteIndentLevel 8 spcs
+            et1 = absoluteIndentLevel 1 spcs
+            et8i = absoluteIndentLevel 8 i
+            et1i = absoluteIndentLevel 1 i
           when
             (not (et8 < et8i && et1 < et1i) &&
-            not (et8 > et8i && et1 > et1i) &&
-            not (et8 == et8i && et1 == et1i))
+             not (et8 > et8i && et1 > et1i) &&
+             not (et8 == et8i && et1 == et1i))
             (throwError TabError)
           case compare et8 et8i of
             LT -> (<> [IndentedLine ll]) <$> dedents ann et8
             EQ -> pure [IndentedLine ll]
             GT -> do
-              modify $ NonEmpty.cons spaces
-              pure [Indent ann, IndentedLine ll]
+              modify $ NonEmpty.cons spcs
+              pure [Indent (et8 - et8i) ann, IndentedLine ll]
+
+data Line a
+  = Line
+  { lineAnn :: a
+  , lineSpaces :: [Indent]
+  , lineLine :: [PyToken a]
+  , lineEnd :: Maybe Newline
+  } deriving (Eq, Show)
+
+logicalToLine :: Seq Int -> LogicalLine a -> Line a
+logicalToLine leaps (LogicalLine a b c d) = Line a (splitIndents leaps b) c (snd <$> d)
 
 newtype Nested a
   = Nested
-  { unNested :: Seq (Either (Nested a) (LogicalLine a))
+  { unNested :: Seq (Either (Nested a) (Line a))
   } deriving (Eq, Show)
 
 data IndentationError
@@ -475,22 +478,48 @@ data IndentationError
   | ExpectedDedent
   deriving (Eq, Show)
 
+-- | Given a list of indentation jumps (first to last) and some whitespace,
+-- divide the whitespace up into "blocks" which correspond to each jump
+splitIndents :: Seq Int -> Indent -> [Indent]
+splitIndents ns ws =
+  case Seq.viewl ns of
+    EmptyL -> [ws]
+    n :< ns'
+      | Seq.null ns' ->
+          let
+            il = indentLevel ws
+          in
+            if il < n
+            then error $ "expected whitespace of at least size " <> show n <> ", got " <> show ws
+            else [ws]
+      | otherwise ->
+          let
+            (befores, afters) = FingerTree.split ((> n) . getIndentLevel) $ unIndent ws
+          in
+            if FingerTree.null befores
+            then error $ "could not carve out " <> show n <> " from " <> show ws
+            else MkIndent befores : splitIndents ns' (MkIndent afters)
+
 nested :: [IndentedLine a] -> Either IndentationError (Nested a)
-nested = fmap Nested . go []
+nested = fmap Nested . go [] []
   where
     go
-      :: [Seq (Either (Nested a) (LogicalLine a))]
+      :: Seq Int
+      -> [Seq (Either (Nested a) (Line a))]
       -> [IndentedLine a]
       -> Either
            IndentationError
-           (Seq (Either (Nested a) (LogicalLine a)))
-    go [] [] = pure []
-    go (a : as) [] = foldr (\_ _ -> Left ExpectedDedent) (pure a) as
-    go ctxt (Indent a : is) = go ([] : ctxt) is
-    go [] (Dedent : is) = Left UnexpectedDedent
-    go (a : as) (Dedent : is) =
-      case as of
-        x : xs -> go ((x |> Left (Nested a)) : xs) is
-        [] -> go [[Left (Nested a)]] is
-    go [] (IndentedLine ll : is) = go [[Right ll]] is
-    go (a : as) (IndentedLine ll : is) = go ((a |> Right ll) : as) is
+           (Seq (Either (Nested a) (Line a)))
+    go leaps [] [] = pure []
+    go leaps (a : as) [] = foldr (\_ _ -> Left ExpectedDedent) (pure a) as
+    go leaps ctxt (Indent n a : is) = go (leaps |> n) ([] : ctxt) is
+    go leaps [] (Dedent : is) = Left UnexpectedDedent
+    go leaps (a : as) (Dedent : is) =
+      case Seq.viewr leaps of
+        EmptyR -> error "impossible"
+        leaps' :> _ ->
+          case as of
+            x : xs -> go leaps' ((x |> Left (Nested a)) : xs) is
+            [] -> go leaps' [[Left (Nested a)]] is
+    go leaps [] (IndentedLine ll : is) = go leaps [[Right $ logicalToLine leaps ll]] is
+    go leaps (a : as) (IndentedLine ll : is) = go leaps ((a |> Right (logicalToLine leaps ll)) : as) is

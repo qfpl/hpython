@@ -8,6 +8,7 @@ import Control.Applicative
 import Control.Lens.Cons (_last)
 import Control.Lens.Fold
 import Control.Lens.Getter
+import Control.Lens.Iso (from)
 import Control.Lens.Plated
 import Control.Lens.Prism (_Just)
 import Control.Lens.Setter
@@ -119,7 +120,7 @@ genInt = Int () <$> Gen.integral (Range.constant 0 (2^32)) <*> genWhitespaces
 
 genBlock :: (MonadGen m, MonadState GenState m) => m (Block '[] ())
 genBlock = do
-  indent <- NonEmpty.toList <$> genWhitespaces1
+  indent <- view (from indentWhitespaces) . NonEmpty.toList <$> genWhitespaces1
   go False indent
   where
     go b indent =

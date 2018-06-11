@@ -7,7 +7,7 @@ import Language.Python.Internal.Syntax
 import Control.Lens.TH
 
 data IndentationError (v :: [*]) a
-  = WrongIndent [Whitespace] [Whitespace] a
+  = WrongIndent Indent Indent a
   | ExpectedIndent a
   deriving (Eq, Show)
 

@@ -77,7 +77,7 @@ newtype Block v a
   { unBlock
     :: NonEmpty
          ( a
-         , [Whitespace]
+         , Indent
          , Either
              (Maybe Comment, Newline)
              (Statement v a)

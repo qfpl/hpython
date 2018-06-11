@@ -294,7 +294,7 @@ renderBlock :: Block v a -> Lines String
 renderBlock =
   foldMap
     (\(_, a, b) ->
-       (foldMap renderWhitespace a <>) <$>
+       (foldMap renderWhitespace (unIndent a) <>) <$>
        either
          (\(y, z) ->
             OneLine $ foldMap renderComment y <> renderNewline z)

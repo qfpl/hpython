@@ -96,7 +96,9 @@ _Indents
   :: Traversal'
        (Statement v a)
        [Whitespace]
-_Indents f = fmap coerce . (_Blocks._Wrapped) ((traverse._2) f . coerce)
+_Indents f =
+  fmap coerce .
+  (_Blocks._Wrapped) ((traverse._2.indentWhitespaces) f . coerce)
 
 class HasNewlines s where
   _Newlines :: Traversal' (s v a) Newline

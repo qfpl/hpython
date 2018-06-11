@@ -4,6 +4,7 @@ module Language.Python.Validate.Indentation where
 
 import Control.Applicative
 import Control.Lens ((#), _Wrapped, view, over, from, _2, _4, traverseOf, _Right)
+import Control.Lens.Getter ((^.))
 import Data.Coerce
 import Data.Type.Set
 import Data.Validate
@@ -43,7 +44,7 @@ validateBlockIndentation a =
     go _ [] = pure []
     go a ((ann, ws, Left c):xs) = ((ann, ws, Left c) :) <$> go a xs
     go a ((ann, ws, Right st):xs)
-      | null ws = Failure [_ExpectedIndent # ann] <*> go a xs
+      | null $ ws ^. indentWhitespaces = Failure [_ExpectedIndent # ann] <*> go a xs
       | otherwise =
           case a of
             Nothing ->
@@ -51,7 +52,7 @@ validateBlockIndentation a =
                 ((,,) ann ws . Right <$> validateStatementIndentation st)
                 (go (Just ws) xs)
             Just ws'
-              | equivalentIndentation ws ws' ->
+              | equivalentIndentation (ws ^. indentWhitespaces) (ws' ^. indentWhitespaces) ->
                   liftA2 (:)
                     ((,,) ann ws . Right <$> validateStatementIndentation st)
                     (go a xs)

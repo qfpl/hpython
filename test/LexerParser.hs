@@ -26,6 +26,8 @@ lexerParserTests =
   , ("Test full trip 7", test_fulltrip_7)
   , ("Test full trip 8", test_fulltrip_8)
   , ("Test full trip 9", test_fulltrip_9)
+  , ("Test full trip 10", test_fulltrip_10)
+  , ("Test full trip 11", test_fulltrip_11)
   ]
 
 test_fulltrip_1 :: Property
@@ -173,6 +175,75 @@ test_fulltrip_9 =
 
     a <- doParse module_ nst
     annotateShow a
+
+    renderModule a === str
+
+test_fulltrip_10 :: Property
+test_fulltrip_10 =
+  withTests 1 . property $ do
+    let
+      str =
+        unlines
+        [ "from blah import  boo"
+        , "import baz   as wop"
+        , ""
+        , "def thing():"
+        , "    pass"
+        , ""
+        , "def    hello():"
+        , "    what; up;"
+        , ""
+        , "def boo(a, *b, c=1, **d):"
+        , "    pass"
+        ]
+
+    tks <- doTokenize str
+    annotateShow $! tks
+
+    let lls = logicalLines tks
+    annotateShow $! lls
+
+    ils <- doIndentation lls
+    annotateShow $! ils
+
+
+    nst <- doNested ils
+    annotateShow $! nst
+
+    a <- doParse module_ nst
+    annotateShow $! a
+
+    renderModule a === str
+
+test_fulltrip_11 :: Property
+test_fulltrip_11 =
+  withTests 1 . property $ do
+    let
+      str =
+        unlines
+        [ "if False:"
+        , " pass"
+        , " pass"
+        , "else:"
+        , " \tpass"
+        , " \tpass"
+        ]
+
+    tks <- doTokenize str
+    annotateShow $! tks
+
+    let lls = logicalLines tks
+    annotateShow $! lls
+
+    ils <- doIndentation lls
+    annotateShow $! ils
+
+
+    nst <- doNested ils
+    annotateShow $! nst
+
+    a <- doParse module_ nst
+    annotateShow $! a
 
     renderModule a === str
 

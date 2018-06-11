@@ -24,6 +24,7 @@ import Text.Parser.LookAhead (LookAheadParsing, lookAhead)
 import Text.Trifecta
   ( CharParsing, DeltaParsing, Caret, Careted(..), char, careted, letter, noneOf
   , digit, string, manyTill, parseString, unexpected, oneOf, satisfy, try
+  , notFollowedBy
   )
 
 import qualified Data.Sequence as Seq
@@ -233,10 +234,15 @@ stringChar = (char '\\' *> (escapeChar <|> hexChar)) <|> other
          then pure (chr a)
          else unexpected $ "value: " <> show a <> " outside unicode range")
 
+identChar :: CharParsing m => m Char
+identChar = letter <|> digit <|> char '_'
+
 parseToken :: (DeltaParsing m, LookAheadParsing m) => m (PyToken Caret)
 parseToken =
   fmap (\(f :^ sp) -> f sp) . careted $
-  asum @[]
+  asum @[] $
+    fmap
+    (\p -> try $ p <* notFollowedBy identChar)
     [ string "if" $> TkIf
     , string "else" $> TkElse
     , string "while" $> TkWhile
@@ -261,7 +267,8 @@ parseToken =
     , string "except" $> TkExcept
     , string "finally" $> TkFinally
     , string "class" $> TkClass
-    , (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
+    ] <>
+    [ (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
         fmap read (some digit) <*>
         optional (char '.' *> optional (read <$> some digit))
     , char ' ' $> TkSpace
@@ -308,7 +315,7 @@ parseToken =
     , fmap TkIdent $
       (:) <$>
       (letter <|> char '_') <*>
-      many (letter <|> digit <|> char '_')
+      many identChar
     ]
 
 tokenize :: String -> Trifecta.Result [PyToken Caret]
@@ -333,9 +340,9 @@ collapseContinue [] = []
 collapseContinue ((tk@TkSpace{}, Space) : xs) =
   ([tk], Space) : collapseContinue xs
 collapseContinue ((tk@TkTab{}, Tab) : xs) =
-  ([tk], Space) : collapseContinue xs
-collapseContinue ((tk@TkNewline{}, Newline{}) : xs) =
-  ([tk], Space) : collapseContinue xs
+  ([tk], Tab) : collapseContinue xs
+collapseContinue ((tk@TkNewline{}, Newline nl) : xs) =
+  ([tk], Newline nl) : collapseContinue xs
 collapseContinue ((tk@TkContinued{}, Continued nl ws) : xs) =
   let
     xs' = collapseContinue xs
@@ -485,13 +492,7 @@ splitIndents ns ws =
   case Seq.viewl ns of
     EmptyL -> [ws]
     n :< ns'
-      | Seq.null ns' ->
-          let
-            il = indentLevel ws
-          in
-            if il < n
-            then error $ "expected whitespace of at least size " <> show n <> ", got " <> show ws
-            else [ws]
+      | Seq.null ns' -> [ws]
       | otherwise ->
           let
             (befores, afters) = FingerTree.split ((> n) . getIndentLevel) $ unIndent ws

@@ -530,12 +530,13 @@ genStatement
 genStatement =
   Gen.sized $ \n ->
   if n < 4
-  then
+  then do
+    (ws, nl) <- whitespaceAndNewline
     SmallStatements <$>
-    localState genSmallStatement <*>
-    pure [] <*>
-    Gen.maybe genWhitespaces <*>
-    (Just <$> genNewline)
+      localState genSmallStatement <*>
+      pure [] <*>
+      Gen.maybe (pure ws) <*>
+      pure (Just nl)
   else
     Gen.scale (subtract 1) $
     Gen.choice

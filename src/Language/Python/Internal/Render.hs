@@ -260,7 +260,7 @@ renderSmallStatement (Raise _ ws x) =
   "raise" <> foldMap renderWhitespace ws <>
   foldMap
     (\(b, c) ->
-       renderExpr b <>
+       bracketTuple b <>
        foldMap
          (\(d, e) ->
             "from" <> foldMap renderWhitespace d <>
@@ -330,7 +330,7 @@ renderCompoundStatement (If _ ws1 expr ws3 nl body body') =
       fmap (\(_, _, _, body'') -> renderBlock body'') body'
 renderCompoundStatement (While _ ws1 expr ws3 nl body) =
   ManyLines
-    ("while" <> foldMap renderWhitespace ws1 <> renderExpr expr <>
+    ("while" <> foldMap renderWhitespace ws1 <> bracketTuple expr <>
      ":" <> foldMap renderWhitespace ws3)
     nl
     (renderBlock body)

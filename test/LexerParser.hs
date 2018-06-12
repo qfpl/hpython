@@ -206,7 +206,6 @@ test_fulltrip_10 =
     ils <- doIndentation lls
     annotateShow $! ils
 
-
     nst <- doNested ils
     annotateShow $! nst
 
@@ -237,7 +236,6 @@ test_fulltrip_11 =
 
     ils <- doIndentation lls
     annotateShow $! ils
-
 
     nst <- doNested ils
     annotateShow $! nst

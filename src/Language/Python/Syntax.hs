@@ -4,9 +4,12 @@
 module Language.Python.Syntax where
 
 import Data.Function ((&))
-import Control.Lens.Setter ((.~))
+import Control.Lens.Getter ((^.))
+import Control.Lens.Iso (from)
+import Control.Lens.Setter ((.~), over)
 import Data.List.NonEmpty (NonEmpty)
 
+import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax
 
 class HasPositional p v | p -> v where
@@ -23,7 +26,7 @@ instance HasKeyword (Arg '[] ()) where; k_ a = KeywordArg () a []
 def_ :: Ident '[] () -> [Param '[] ()] -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 def_ name params block =
   CompoundStatement $
-  Fundef ()
+  Fundef (Indents [] ()) ()
     [Space]
     name
     []
@@ -31,16 +34,16 @@ def_ name params block =
     []
     []
     LF
-    (Block $ (,,) () [Space, Space, Space, Space] . Right <$> block)
+    (toBlock block)
 
 call_ :: Expr '[] () -> [Arg '[] ()] -> Expr '[] ()
 call_ expr args = Call () expr [] (listToCommaSep args) []
 
 return_ :: Expr '[] () -> Statement '[] ()
-return_ e = SmallStatements (Return () [Space] e) [] Nothing (Just LF)
+return_ e = SmallStatements (Indents [] ()) (Return () [Space] e) [] Nothing (Just LF)
 
 expr_ :: Expr '[] () -> Statement '[] ()
-expr_ e = SmallStatements (Expr () e) [] Nothing (Just LF)
+expr_ e = SmallStatements (Indents [] ()) (Expr () e) [] Nothing (Just LF)
 
 list_ :: [Expr '[] ()] -> Expr '[] ()
 list_ es = List () [] (listToCommaSep1' es) []
@@ -112,29 +115,33 @@ infixl 9 />
 neg :: Expr '[] () -> Expr '[] ()
 neg = negate
 
-toBlock :: NonEmpty (Statement vs ()) -> Block vs ()
-toBlock sts = Block $ (,,) () [Space, Space, Space, Space] . Right <$> sts
+toBlock :: NonEmpty (Statement '[] ()) -> Block '[] ()
+toBlock sts =
+  Block $
+  Right .
+  over (_Indents.indentsValue) (replicate 4 Space ^. from indentWhitespaces :) <$>
+  sts
 
 if_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 if_ e sts =
   CompoundStatement $
-  If () [Space] e [] LF
+  If (Indents [] ()) () [Space] e [] LF
     (toBlock sts)
     Nothing
 
 while_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 while_ e sts =
   CompoundStatement $
-  While () [Space] e
+  While (Indents [] ()) () [Space] e
     [] LF
     (toBlock sts)
 
 ifElse_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 ifElse_ e sts sts' =
   CompoundStatement $
-  If () [Space] e [] LF
+  If (Indents [] ()) () [Space] e [] LF
     (toBlock sts)
-    (Just ([], [], LF, toBlock sts'))
+    (Just (Indents [] (), [], [], LF, toBlock sts'))
 
 var_ :: String -> Expr '[] ()
 var_ s = Ident () (MkIdent () s [])
@@ -143,10 +150,10 @@ none_ :: Expr '[] ()
 none_ = None () []
 
 pass_ :: Statement '[] ()
-pass_ = SmallStatements (Pass ()) [] Nothing (Just LF)
+pass_ = SmallStatements (Indents [] ()) (Pass ()) [] Nothing (Just LF)
 
 break_ :: Statement '[] ()
-break_ = SmallStatements (Break ()) [] Nothing (Just LF)
+break_ = SmallStatements (Indents [] ()) (Break ()) [] Nothing (Just LF)
 
 true_ :: Expr '[] ()
 true_ = Bool () True []
@@ -167,7 +174,10 @@ longStr_ :: String -> Expr '[] ()
 longStr_ s = String () Nothing LongDouble s []
 
 (.=) :: Expr '[] () -> Expr '[] () -> Statement '[] ()
-(.=) a b = SmallStatements (Assign () (a & whitespaceAfter .~ [Space]) [Space] b) [] Nothing (Just LF)
+(.=) a b =
+  SmallStatements
+    (Indents [] ())
+    (Assign () (a & whitespaceAfter .~ [Space]) [Space] b) [] Nothing (Just LF)
 
 forElse_
   :: Expr '[] ()
@@ -177,13 +187,13 @@ forElse_
   -> Statement '[] ()
 forElse_ val vals block els =
   CompoundStatement $
-  For () [Space] (val & whitespaceAfter .~ [Space]) [Space] vals [] LF
+  For (Indents [] ()) () [Space] (val & whitespaceAfter .~ [Space]) [Space] vals [] LF
     (toBlock block)
-    (Just ([], [], LF, toBlock els))
+    (Just (Indents [] (), [], [], LF, toBlock els))
 
 for_ :: Expr '[] () -> Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 for_ val vals block =
   CompoundStatement $
-  For () [Space] (val & whitespaceAfter .~ [Space]) [Space] vals [] LF
+  For (Indents [] ()) () [Space] (val & whitespaceAfter .~ [Space]) [Space] vals [] LF
     (toBlock block)
     Nothing

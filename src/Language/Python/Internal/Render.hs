@@ -2,6 +2,8 @@
 module Language.Python.Internal.Render where
 
 import Control.Lens.Getter
+import Control.Lens.Setter (over)
+import Control.Lens.Traversal (Traversal')
 import Control.Lens.Wrapped
 import Data.Char (ord)
 import Data.Maybe
@@ -75,6 +77,11 @@ listToLines :: Newline -> [a] -> Lines a
 listToLines _ [] = NoLines
 listToLines _ [a] = OneLine a
 listToLines nl (a:as) = ManyLines a nl $ listToLines nl as
+
+firstLine :: Traversal' (Lines a) a
+firstLine f NoLines = pure NoLines
+firstLine f (OneLine a) = OneLine <$> f a
+firstLine f (ManyLines a nl ls) = (\a' -> ManyLines a' nl ls) <$> f a
 
 endWith :: Newline -> Lines a -> Lines a
 endWith nl NoLines = NoLines
@@ -293,28 +300,27 @@ renderSmallStatement (From _ ws1 name ws3 ns) =
 renderBlock :: Block v a -> Lines String
 renderBlock =
   foldMap
-    (\(_, a, b) ->
-       (foldMap renderWhitespace (unIndent a) <>) <$>
-       either
-         (\(y, z) ->
-            OneLine $ foldMap renderComment y <> renderNewline z)
-          renderStatement
-          b) .
+    (either
+       (\(x, y, z) ->
+          OneLine $ renderIndents x <> foldMap renderComment y <> renderNewline z)
+        renderStatement) .
   view _Wrapped
 
 renderCompoundStatement :: CompoundStatement v a -> Lines String
-renderCompoundStatement (Fundef _ ws1 name ws2 params ws3 ws4 nl body) =
+renderCompoundStatement (Fundef idnt _ ws1 name ws2 params ws3 ws4 nl body) =
   ManyLines firstLine nl restLines
   where
     firstLine =
+      renderIndents idnt <>
       "def" <> foldMap renderWhitespace ws1 <> renderIdent name <>
       "(" <> foldMap renderWhitespace ws2 <> renderCommaSep renderParam params <>
       ")" <> foldMap renderWhitespace ws3 <> ":" <> foldMap renderWhitespace ws4
     restLines = renderBlock body
-renderCompoundStatement (If _ ws1 expr ws3 nl body body') =
+renderCompoundStatement (If idnt _ ws1 expr ws3 nl body body') =
   ManyLines firstLine nl restLines
   where
     firstLine =
+      renderIndents idnt <>
       "if" <> foldMap renderWhitespace ws1 <>
       bracketTuple expr <> ":" <>
       foldMap renderWhitespace ws3
@@ -322,71 +328,82 @@ renderCompoundStatement (If _ ws1 expr ws3 nl body body') =
     elseLines =
       ManyLines <$>
       fmap
-        (\(ws4, ws5, _, _) ->
+        (\(idnt, ws4, ws5, _, _) ->
+           renderIndents idnt <>
            "else" <> foldMap renderWhitespace ws4 <> ":" <>
            foldMap renderWhitespace ws5)
         body' <*>
-      fmap (\(_, _, nl2, _) -> nl2) body' <*>
-      fmap (\(_, _, _, body'') -> renderBlock body'') body'
-renderCompoundStatement (While _ ws1 expr ws3 nl body) =
+      fmap (\(_, _, _, nl2, _) -> nl2) body' <*>
+      fmap (\(_, _, _, _, body'') -> renderBlock body'') body'
+renderCompoundStatement (While idnt _ ws1 expr ws3 nl body) =
   ManyLines
-    ("while" <> foldMap renderWhitespace ws1 <> bracketTuple expr <>
+    (renderIndents idnt <>
+     "while" <> foldMap renderWhitespace ws1 <> bracketTuple expr <>
      ":" <> foldMap renderWhitespace ws3)
     nl
     (renderBlock body)
-renderCompoundStatement (TryExcept _ a b c d e f g) =
+renderCompoundStatement (TryExcept idnt _ a b c d e f g) =
   ManyLines
-    ("try" <> foldMap renderWhitespace a <> ":" <> foldMap renderWhitespace b)
+    (renderIndents idnt <>
+     "try" <> foldMap renderWhitespace a <> ":" <> foldMap renderWhitespace b)
     c
     (renderBlock d) <>
   foldMap
-    (\(ws1, eas, ws2, nl, bl) ->
+    (\(idnt, ws1, eas, ws2, nl, bl) ->
        ManyLines
-         ("except" <> foldMap renderWhitespace ws1 <>
+         (renderIndents idnt <>
+          "except" <> foldMap renderWhitespace ws1 <>
           renderExceptAs eas <> ":" <> foldMap renderWhitespace ws2)
          nl
          (renderBlock bl))
     e <>
   foldMap
-    (\(ws1, ws2, nl, bl) ->
+    (\(idnt, ws1, ws2, nl, bl) ->
        ManyLines
-         ("else" <> foldMap renderWhitespace ws1 <> ":" <> foldMap renderWhitespace ws2)
+         (renderIndents idnt <>
+          "else" <> foldMap renderWhitespace ws1 <> ":" <> foldMap renderWhitespace ws2)
          nl
          (renderBlock bl))
     f <>
   foldMap
-    (\(ws1, ws2, nl, bl) ->
+    (\(idnt, ws1, ws2, nl, bl) ->
        ManyLines
-         ("finally" <> foldMap renderWhitespace ws1 <> ":" <> foldMap renderWhitespace ws2)
+         (renderIndents idnt <>
+          "finally" <> foldMap renderWhitespace ws1 <> ":" <> foldMap renderWhitespace ws2)
          nl
          (renderBlock bl))
     g
-renderCompoundStatement (TryFinally _ a b c d e f g h) =
+renderCompoundStatement (TryFinally idnt _ a b c d idnt2 e f g h) =
   ManyLines
-    ("try" <> foldMap renderWhitespace a <> ":" <> foldMap renderWhitespace b)
+    (renderIndents idnt <>
+     "try" <> foldMap renderWhitespace a <> ":" <> foldMap renderWhitespace b)
     c
     (renderBlock d) <>
   ManyLines
-    ("finally" <> foldMap renderWhitespace e <> ":" <> foldMap renderWhitespace f)
+    (renderIndents idnt2 <>
+     "finally" <> foldMap renderWhitespace e <> ":" <> foldMap renderWhitespace f)
     g
     (renderBlock h)
-renderCompoundStatement (For _ a b c d e f g h) =
+renderCompoundStatement (For idnt _ a b c d e f g h) =
   ManyLines
-    ("for" <> foldMap renderWhitespace a <> renderExpr b <>
+    (renderIndents idnt <>
+     "for" <> foldMap renderWhitespace a <> renderExpr b <>
      "in" <> foldMap renderWhitespace c <> renderExpr d <> ":" <>
      foldMap renderWhitespace e)
     f
     (renderBlock g) <>
   foldMap
-    (\(x, y, z, w) ->
+    (\(idnt, x, y, z, w) ->
        ManyLines
-         ("else" <> foldMap renderWhitespace x <> ":" <> foldMap renderWhitespace y)
+         (renderIndents idnt <>
+          "else" <> foldMap renderWhitespace x <> ":" <> foldMap renderWhitespace y)
          z
          (renderBlock w))
     h
-renderCompoundStatement (ClassDef _ a b c d e f) =
+renderCompoundStatement (ClassDef idnt _ a b c d e f) =
   ManyLines
-    ("class" <> foldMap renderWhitespace a <> renderIdent b <>
+    (renderIndents idnt <>
+     "class" <> foldMap renderWhitespace a <> renderIdent b <>
      foldMap
        (\(x, y, z) ->
           "(" <> foldMap renderWhitespace x <>
@@ -397,9 +414,13 @@ renderCompoundStatement (ClassDef _ a b c d e f) =
     e
     (renderBlock f)
 
+renderIndent :: Indent -> String
+renderIndent (MkIndent ws) = foldMap renderWhitespace ws
+
 renderStatement :: Statement v a -> Lines String
 renderStatement (CompoundStatement c) = renderCompoundStatement c
-renderStatement (SmallStatements s ss sc nl) =
+renderStatement (SmallStatements idnts s ss sc nl) =
+  over firstLine (renderIndents idnts <>) .
   f $
   renderSmallStatement s <>
   foldMap
@@ -456,12 +477,15 @@ renderBinOp (BoolAnd _ ws) = "and" <> foldMap renderWhitespace ws
 renderBinOp (BoolOr _ ws) = "or" <> foldMap renderWhitespace ws
 renderBinOp (Equals _ ws) = "==" <> foldMap renderWhitespace ws
 
+renderIndents :: Indents a -> String
+renderIndents (Indents is _) = foldMap renderIndent is
+
 renderModule :: Module v a -> String
 renderModule (Module ms) =
   foldMap
     (either
        (\(a, b, c) ->
-          foldMap renderWhitespace a <>
+          renderIndents a <>
           foldMap renderComment b <>
           foldMap renderNewline c)
        (renderLines . renderStatement))

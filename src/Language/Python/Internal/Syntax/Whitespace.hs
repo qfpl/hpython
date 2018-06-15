@@ -1,16 +1,20 @@
 {-# language GeneralizedNewtypeDeriving, MultiParamTypeClasses, BangPatterns #-}
 {-# language TypeFamilies #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language TemplateHaskell #-}
 module Language.Python.Internal.Syntax.Whitespace
   ( Newline(..)
   , Whitespace(..)
   , lastWhitespace
   , IndentLevel, getIndentLevel, indentLevel, absoluteIndentLevel
   , Indent(..), indentWhitespaces
+  , Indents(..), indentsValue, indentsAnn
   )
 where
 
 import Control.Lens.Iso (Iso', iso, from)
 import Control.Lens.Getter (view)
+import Control.Lens.TH (makeLenses)
 import Data.Foldable (toList)
 import Data.FingerTree (FingerTree, Measured(..), fromList)
 import Data.Monoid (Monoid, Endo(..), Dual(..))
@@ -85,3 +89,11 @@ instance IsList Indent where
 indentWhitespaces :: Iso' Indent [Whitespace]
 indentWhitespaces =
   iso (Data.Foldable.toList . unIndent) (MkIndent . Data.FingerTree.fromList)
+
+data Indents a
+  = Indents
+  { _indentsValue :: [Indent]
+  , _indentsAnn :: a
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
+
+makeLenses ''Indents

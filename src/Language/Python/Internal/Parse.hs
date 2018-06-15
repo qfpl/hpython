@@ -4,9 +4,7 @@
 {-# language GeneralizedNewtypeDeriving #-}
 module Language.Python.Internal.Parse where
 
-import Control.Lens.Getter ((^.), view)
-import Control.Lens.Setter (over, mapped)
-import Control.Lens.Tuple (_1)
+import Control.Lens.Getter ((^.))
 import Control.Monad (unless)
 import Control.Monad.Except (ExceptT(..), runExceptT, throwError)
 import Control.Monad.State
@@ -250,7 +248,7 @@ string ws = do
 between :: Parser ann left -> Parser ann right -> Parser ann a -> Parser ann a
 between left right pa = left *> pa <* right
 
-indents :: Parser ann ([Indent], ann)
+indents :: Parser ann (Indents ann)
 indents = Parser $ do
   ctxt <- get
   case ctxt of
@@ -258,7 +256,7 @@ indents = Parser $ do
     current : rest ->
       case current of
         [] -> throwError UnexpectedEndOfBlock
-        Right ll@(Line a is _ _) : rest' -> pure (is, a)
+        Right ll@(Line a is _ _) : rest' -> pure $ Indents is a
         Left _ : _ -> throwError UnexpectedIndent
 
 exprList :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
@@ -474,7 +472,8 @@ sepBy1' val sep = go
 
 statement :: Parser ann (Statement '[] ann)
 statement =
-  (\(a, b, c) -> SmallStatements a b c) <$>
+  (\d (a, b, c) -> SmallStatements d a b c) <$>
+  indents <*>
   sepBy1' smallStatement (snd <$> semicolon space) <*>
   (Just <$> eol <!> Nothing <$ eof)
 
@@ -520,29 +519,19 @@ infixl 4 `thenSuite`
 
 suite :: Parser ann (Newline, Block '[] ann)
 suite = do
-  lv <- length <$> Parser get
   (,) <$>
     eol <*>
     fmap Block
       (flip (foldr NonEmpty.cons) <$>
-       commentOrIndent lv <*>
-       some1 (line lv)) <*
+       commentOrIndent <*>
+       some1 line) <*
     dedent
   where
-    commentOrEmpty = (,) <$> optional comment <*> eol
+    commentOrEmpty = (,,) <$> indents <*> optional comment <*> eol
 
-    commentOrIndent lv =
-      many
-        ((\(a, b) -> (,,) b a) <$>
-         over (mapped._1) (!! pred lv) indents <*>
-         fmap Left commentOrEmpty) <*
-      indent
+    commentOrIndent = many (Left <$> commentOrEmpty) <* indent
 
-    line lv =
-      (\(a, b) -> (,,) b a) <$>
-      over (mapped._1) (!! pred lv) indents <*>
-      (Left <$> commentOrEmpty <!>
-       Right <$> statement)
+    line = Left <$> commentOrEmpty <!> Right <$> statement
 
 comma :: Parser ann Whitespace -> Parser ann (PyToken ann, [Whitespace])
 comma ws = token ws $ TkComma ()
@@ -633,7 +622,8 @@ compoundStatement =
   forSt
   where
     fundef =
-      (\(tkDef, defSpaces) -> Fundef (pyTokenAnn tkDef) (NonEmpty.fromList defSpaces)) <$>
+      (\a (tkDef, defSpaces) -> Fundef a (pyTokenAnn tkDef) (NonEmpty.fromList defSpaces)) <$>
+      indents <*>
       token space (TkDef ()) <*>
       identifier space <*>
       fmap snd (token anySpace $ TkLeftParen ()) <*>
@@ -642,17 +632,20 @@ compoundStatement =
       fmap snd (colon space) `thenSuite` ()
 
     ifSt =
-      (\(tk, s) -> If (pyTokenAnn tk) s) <$>
+      (\a (tk, s) -> If a (pyTokenAnn tk) s) <$>
+      indents <*>
       token space (TkIf ()) <*>
       expr space <*>
       (snd <$> colon space) `withSuite`
       optional
-        ((,,,) <$>
+        ((,,,,) <$>
+         indents <*>
          (snd <$> token space (TkElse ())) <*>
          (snd <$> colon space) `thenSuite` ())
 
     whileSt =
-      (\(tk, s) -> While (pyTokenAnn tk) s) <$>
+      (\a (tk, s) -> While a (pyTokenAnn tk) s) <$>
+      indents <*>
       token space (TkWhile ()) <*>
       expr space <*>
       (snd <$> colon space) `thenSuite` ()
@@ -663,14 +656,16 @@ compoundStatement =
       optional ((,) <$> (snd <$> token space (TkAs())) <*> identifier space)
 
     trySt =
-      (\(tk, s) a b c d ->
+      (\i (tk, s) a b c d ->
          case d of
-           Left (e, f, g, h) -> TryFinally (pyTokenAnn tk) s a b c e f g h
-           Right (e, f, g) -> TryExcept (pyTokenAnn tk) s a b c e f g) <$>
+           Left (e, f, g, h, j) -> TryFinally i (pyTokenAnn tk) s a b c e f g h j
+           Right (e, f, g) -> TryExcept i (pyTokenAnn tk) s a b c e f g) <$>
+      indents <*>
       token space (TkTry ()) <*>
       (snd <$> colon space) `withSuite`
       (fmap Left
-         ((,,,) <$>
+         ((,,,,) <$>
+          indents <*>
           (snd <$> token space (TkFinally ())) <*>
           (snd <$> colon space) `thenSuite` ())
 
@@ -679,21 +674,25 @@ compoundStatement =
         fmap Right
           ((,,) <$>
            some1
-             ((,,,,) <$>
+             ((,,,,,) <$>
+              indents <*>
               (snd <$> token space (TkExcept ())) <*>
               exceptAs <*>
               (snd <$> colon space) `thenSuite` ()) <*>
            optional
-             ((,,,) <$>
+             ((,,,,) <$>
+              indents <*>
               (snd <$> token space (TkElse ())) <*>
               (snd <$> colon space) `thenSuite` ()) <*>
            optional
-             ((,,,) <$>
+             ((,,,,) <$>
+              indents <*>
               (snd <$> token space (TkFinally ())) <*>
               (snd <$> colon space) `thenSuite` ())))
 
     classSt =
-      (\(tk, s) -> ClassDef (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
+      (\a (tk, s) -> ClassDef a (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
+      indents <*>
       token space (TkClass ()) <*>
       identifier space <*>
       optional
@@ -704,14 +703,16 @@ compoundStatement =
       (snd <$> colon space) `thenSuite` ()
 
     forSt =
-      (\(tk, s) -> For (pyTokenAnn tk) s) <$>
+      (\a (tk, s) -> For a (pyTokenAnn tk) s) <$>
+      indents <*>
       token space (TkFor ()) <*>
       exprList space <*>
       (snd <$> token space (TkIn ())) <*>
       exprList space <*>
       (snd <$> colon space) `withSuite`
       optional
-        ((,,,) <$>
+        ((,,,,) <$>
+         indents <*>
          (snd <$> token space (TkElse ())) <*>
          (snd <$> colon space) `thenSuite` ())
 
@@ -722,6 +723,6 @@ module_ =
   where
     maybeComment =
       (\ws cmt nl -> (ws, cmt, nl)) <$>
-      fmap ((view indentWhitespaces =<<) . fst) indents<*>
+      indents <*>
       optional comment <*>
       (Just <$> eol <!> Nothing <$ eof)

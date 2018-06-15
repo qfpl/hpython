@@ -250,11 +250,7 @@ validateBlockSyntax
      )
   => Block v a
   -> ValidateSyntax e (Block (Nub (Syntax ': v)) a)
-validateBlockSyntax (Block bs) = Block . NonEmpty.fromList <$> go (NonEmpty.toList bs)
-  where
-    go [] = error "impossible"
-    go [b] = pure <$> traverseOf (_3._Right) validateStatementSyntax b
-    go (b:bs) = (:) <$> traverseOf (_3._Right) validateStatementSyntax b <*> go bs
+validateBlockSyntax = traverseOf (_Wrapped.traverse._Right) validateStatementSyntax
 
 validateCompoundStatementSyntax
   :: ( AsSyntaxError e v a
@@ -262,11 +258,11 @@ validateCompoundStatementSyntax
      )
   => CompoundStatement v a
   -> ValidateSyntax e (CompoundStatement (Nub (Syntax ': v)) a)
-validateCompoundStatementSyntax (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
+validateCompoundStatementSyntax (Fundef idnts a ws1 name ws2 params ws3 ws4 nl body) =
   let
     paramIdents = params ^.. folded.unvalidated.paramName.identValue
   in
-    Fundef a ws1 <$>
+    Fundef idnts a ws1 <$>
     validateIdent name <*>
     pure ws2 <*>
     validateParamsSyntax params <*>
@@ -285,32 +281,32 @@ validateCompoundStatementSyntax (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
                 Just paramIdents
             })
          (validateBlockSyntax body))
-validateCompoundStatementSyntax (If a ws1 expr ws3 nl body body') =
-  If a <$>
+validateCompoundStatementSyntax (If idnts a ws1 expr ws3 nl body body') =
+  If idnts a <$>
   (validateWhitespace a ws1 <*
    validateAdjacentL a (Keyword ('i' :| "f") ws1, keyword) (expr, renderExpr)) <*>
   validateExprSyntax expr <*>
   validateWhitespace a ws3 <*>
   pure nl <*>
   validateBlockSyntax body <*>
-  traverseOf (traverse._4) validateBlockSyntax body'
-validateCompoundStatementSyntax (While a ws1 expr ws3 nl body) =
-  While a <$>
+  traverseOf (traverse._5) validateBlockSyntax body'
+validateCompoundStatementSyntax (While idnts a ws1 expr ws3 nl body) =
+  While idnts a <$>
   (validateWhitespace a ws1 <*
    validateAdjacentL a (Keyword ('w' :| "hile") ws1, keyword) (expr, renderExpr)) <*>
   validateExprSyntax expr <*>
   validateWhitespace a ws3 <*>
   pure nl <*>
   localSyntaxContext (\ctxt -> ctxt { _inLoop = True}) (validateBlockSyntax body)
-validateCompoundStatementSyntax (TryExcept a b c d e f k l) =
-  TryExcept a <$>
+validateCompoundStatementSyntax (TryExcept idnts a b c d e f k l) =
+  TryExcept idnts a <$>
   validateWhitespace a b <*>
   validateWhitespace a c <*>
   pure d <*>
   validateBlockSyntax e <*>
   traverse
-    (\(f, g, h, i, j) ->
-       (,,,,) <$>
+    (\(idnts, f, g, h, i, j) ->
+       (,,,,,) idnts <$>
        validateWhitespace a f <*
        validateAdjacentR a
          (Keyword ('e' :| "xcept") f, keyword)
@@ -321,25 +317,25 @@ validateCompoundStatementSyntax (TryExcept a b c d e f k l) =
        validateBlockSyntax j)
     f <*>
   traverse
-    (\(x, y, z, w) ->
-       (,,,) <$>
+    (\(idnts, x, y, z, w) ->
+       (,,,,) idnts <$>
        validateWhitespace a x <*> validateWhitespace a y <*>
        pure z <*> validateBlockSyntax w)
     k <*>
   traverse
-    (\(x, y, z, w) ->
-       (,,,) <$>
+    (\(idnts, x, y, z, w) ->
+       (,,,,) idnts <$>
        validateWhitespace a x <*> validateWhitespace a y <*>
        pure z <*> validateBlockSyntax w)
     l
-validateCompoundStatementSyntax (TryFinally a b c d e f g h i) =
-  TryFinally a <$>
+validateCompoundStatementSyntax (TryFinally idnts a b c d e idnts2 f g h i) =
+  TryFinally idnts a <$>
   validateWhitespace a b <*> validateWhitespace a c <*> pure d <*>
-  validateBlockSyntax e <*>
+  validateBlockSyntax e <*> pure idnts2 <*>
   validateWhitespace a f <*> validateWhitespace a g <*> pure h <*>
   validateBlockSyntax i
-validateCompoundStatementSyntax (For a b c d e f g h i) =
-  For a <$>
+validateCompoundStatementSyntax (For idnts a b c d e f g h i) =
+  For idnts a <$>
   validateWhitespace a b <*>
   (validateAdjacentR a (Keyword ('f' :| "or") b, keyword) (c, renderExpr) *>
    if canAssignTo c
@@ -351,15 +347,15 @@ validateCompoundStatementSyntax (For a b c d e f g h i) =
   pure g <*>
   localSyntaxContext (\c -> c { _inLoop = True }) (validateBlockSyntax h) <*>
   traverse
-    (\(x, y, z, w) ->
-       (,,,) <$>
+    (\(idnts, x, y, z, w) ->
+       (,,,,) idnts <$>
        validateWhitespace a x <*>
        validateWhitespace a y <*>
        pure z <*>
        validateBlockSyntax w)
     i
-validateCompoundStatementSyntax (ClassDef a b c d e f g) =
-  ClassDef a <$>
+validateCompoundStatementSyntax (ClassDef idnts a b c d e f g) =
+  ClassDef idnts a <$>
   validateWhitespace a b <*>
   validateIdent c <*>
   traverse
@@ -512,8 +508,8 @@ validateStatementSyntax
   -> ValidateSyntax e (Statement (Nub (Syntax ': v)) a)
 validateStatementSyntax (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementSyntax c
-validateStatementSyntax (SmallStatements s ss sc nl) =
-  SmallStatements <$>
+validateStatementSyntax (SmallStatements idnts s ss sc nl) =
+  SmallStatements idnts <$>
   validateSmallStatementSyntax s <*>
   traverseOf (traverse._2) validateSmallStatementSyntax ss <*>
   pure sc <*>

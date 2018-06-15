@@ -3,7 +3,8 @@
 module FixMutableDefaultArguments where
 
 import Control.Lens.Fold ((^..), (^?), filtered, folded)
-import Control.Lens.Setter ((.~))
+import Control.Lens.Getter ((^.))
+import Control.Lens.Setter ((.~), over)
 import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.Semigroup ((<>))
@@ -15,7 +16,7 @@ import Language.Python.Syntax
 
 fixMutableDefaultArguments :: Statement '[] () -> Maybe (Statement '[] ())
 fixMutableDefaultArguments input = do
-  (_, _, name, _, params, _, _, _, body) <- input ^? _Fundef
+  (idnts, _, _, name, _, params, _, _, _, body) <- input ^? _Fundef
 
   let paramsList = toList params
   _ <- paramsList ^? folded._KeywordParam.filtered (isMutable._kpExpr)
@@ -33,8 +34,9 @@ fixMutableDefaultArguments input = do
       paramsList & traverse._KeywordParam.filtered (isMutable._kpExpr).kpExpr .~ none_
 
   pure $
+    over (_Indents.indentsValue) (idnts ^. indentsValue <>) $
     def_ name newparams
-    (NonEmpty.fromList $ conditionalAssignments <> (body ^.. _Statements))
+    (NonEmpty.fromList $ conditionalAssignments <> (body ^.. _Statements.noIndents))
   where
     isMutable :: Expr v a -> Bool
     isMutable None{} = False

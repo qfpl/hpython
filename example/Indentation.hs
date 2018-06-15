@@ -9,7 +9,7 @@ import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax
 
 indentSpaces :: Natural -> Statement '[] a -> Statement '[] a
-indentSpaces n = transform (_Indents .~ replicate (fromIntegral n) Space)
+indentSpaces n = transform (_Indent .~ replicate (fromIntegral n) Space)
 
 indentTabs :: Statement '[] a -> Statement '[] a
-indentTabs = transform (_Indents .~ [Tab])
+indentTabs = transform (_Indent .~ [Tab])

@@ -7,8 +7,8 @@ import Control.Lens.Fold ((^..), (^?), (^?!), allOf, anyOf, folded, foldrOf, toL
 import Control.Lens.Getter ((^.))
 import Control.Lens.Plated (cosmos, transform, transformOn)
 import Control.Lens.Prism (_Just)
-import Control.Lens.Setter ((%~))
-import Control.Lens.Tuple (_1, _2, _3, _4)
+import Control.Lens.Setter ((%~), over)
+import Control.Lens.Tuple (_2, _5)
 import Data.Foldable (toList)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Semigroup ((<>))
@@ -19,7 +19,7 @@ import Language.Python.Syntax
 
 optimizeTailRecursion :: Statement '[] () -> Maybe (Statement '[] ())
 optimizeTailRecursion st = do
-  (_, _, name, _, params, _, _, _, body) <- st ^? _Fundef
+  (idnts, _, _, name, _, params, _, _, _, body) <- st ^? _Fundef
   bodyLast <- toListOf (unvalidated._Statements) body ^? _last
 
   let
@@ -30,6 +30,7 @@ optimizeTailRecursion st = do
     then Nothing
     else
       Just .
+      over (_Indents.indentsValue) (idnts ^. indentsValue <>) .
       def_ name params' . NonEmpty.fromList $
         zipWith (\a b -> var_ (a <> "__tr") .= var_ b) paramNames paramNames <>
         [ "__res__tr" .= none_
@@ -52,9 +53,9 @@ optimizeTailRecursion st = do
       case st of
         CompoundStatement (If _ _ e _ _ _ sts sts') ->
           allOf _last (hasTC name) (sts ^.. _Statements) ||
-          allOf _last (hasTC name) (sts' ^.. _Just._4._Statements)
-        SmallStatements s ss _ _ ->
-          case last (s : fmap (^. _3) ss) of
+          allOf _last (hasTC name) (sts' ^.. _Just._5._Statements)
+        SmallStatements _ s ss _ _ ->
+          case last (s : fmap (^. _2) ss) of
             Return _ _ e -> isTailCall name e
             Expr _ e -> isTailCall name e
             _ -> False
@@ -70,7 +71,7 @@ optimizeTailRecursion st = do
       case st of
         CompoundStatement c ->
           case c of
-            If _ _ e _ _ _ sts sts'
+            If _ _ _ e _ _ sts sts'
               | hasTC name st ->
                   case sts' of
                     Nothing ->
@@ -79,7 +80,7 @@ optimizeTailRecursion st = do
                           (toListOf _Statements sts ^?! _init) <>
                           looped name params (toListOf _Statements sts ^?! _last))
                       ]
-                    Just (_, _, _, sts'') ->
+                    Just (_, _, _, _, sts'') ->
                       [ ifElse_ e
                           (NonEmpty.fromList $
                           (toListOf _Statements sts ^?! _init) <>
@@ -89,19 +90,19 @@ optimizeTailRecursion st = do
                           looped name params (toListOf _Statements sts'' ^?! _last))
                       ]
             _ -> [st]
-        SmallStatements s ss sc nl ->
+        SmallStatements idnts s ss sc nl ->
           let
             initExps = foldr (\_ _ -> init ss) [] ss
             lastExp =
-              foldrOf (folded._3) (\_ _ -> last ss ^. _3) s ss
+              foldrOf (folded._2) (\_ _ -> last ss ^. _2) s ss
             newSts =
               case initExps of
                 [] -> []
-                (_, _, a) : rest ->
+                first : rest ->
                   let
                     lss = last ss
                   in
-                    [SmallStatements a rest (Just (lss ^. _1, lss ^. _2)) nl]
+                    [SmallStatements idnts (first ^. _2) rest sc nl]
           in
             case lastExp of
               Return _ _ e ->

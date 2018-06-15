@@ -8,7 +8,10 @@ import Control.Lens.TH
 
 data IndentationError (v :: [*]) a
   = WrongIndent Indent Indent a
+  | TabError a
   | ExpectedIndent a
+  | ExpectedDedent a
+  | ExpectedLevel [Indent] a
   deriving (Eq, Show)
 
 makeClassyPrisms ''IndentationError

@@ -235,14 +235,3 @@ genSizedCommaSep1' ma = Gen.sized $ \n ->
             (Gen.resize (n - n') $ genSizedCommaSep1' ma)
             (\b -> CommaSepMany1' a <$> genWhitespaces <*> pure b)
       ]
-
-genImportAs :: MonadGen m => m (e ()) -> m (Ident '[] ()) -> m (ImportAs e '[] ())
-genImportAs me genIdent =
-  Gen.sized $ \n -> do
-    n' <- Gen.integral (Range.constant 1 n)
-    let n'' = n - n'
-    ImportAs () <$>
-      Gen.resize n' me <*>
-      (if n'' <= 2
-       then pure Nothing
-       else fmap Just $ (,) <$> genWhitespaces1 <*> Gen.resize n'' genIdent)

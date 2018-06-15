@@ -463,12 +463,15 @@ indentation lls =
              not (et8 > et8i && et1 > et1i) &&
              not (et8 == et8i && et1 == et1i))
             (throwError TabError)
-          case compare et8 et8i of
-            LT -> (<> [IndentedLine ll]) <$> dedents ann et8
+          let
+            ilSpcs = indentLevel spcs
+            ili = indentLevel i
+          case compare ilSpcs ili of
+            LT -> (<> [IndentedLine ll]) <$> dedents ann ilSpcs
             EQ -> pure [IndentedLine ll]
             GT -> do
               modify $ NonEmpty.cons spcs
-              pure [Indent (et8 - et8i) ann, IndentedLine ll]
+              pure [Indent (ilSpcs - ili) ann, IndentedLine ll]
 
 data Line a
   = Line
@@ -479,7 +482,8 @@ data Line a
   } deriving (Eq, Show)
 
 logicalToLine :: Seq Int -> LogicalLine a -> Line a
-logicalToLine leaps (LogicalLine a b c d) = Line a (splitIndents leaps b) c (snd <$> d)
+logicalToLine leaps (LogicalLine a b c d) =
+  Line a (if all isBlankToken c then [b] else splitIndents leaps b) c (snd <$> d)
 
 newtype Nested a
   = Nested

@@ -28,6 +28,7 @@ lexerParserTests =
   , ("Test full trip 9", test_fulltrip_9)
   , ("Test full trip 10", test_fulltrip_10)
   , ("Test full trip 11", test_fulltrip_11)
+  , ("Test full trip 12", test_fulltrip_12)
   ]
 
 test_fulltrip_1 :: Property
@@ -226,6 +227,38 @@ test_fulltrip_11 =
         , "else:"
         , " \tpass"
         , " \tpass"
+        ]
+
+    tks <- doTokenize str
+    annotateShow $! tks
+
+    let lls = logicalLines tks
+    annotateShow $! lls
+
+    ils <- doIndentation lls
+    annotateShow $! ils
+
+    nst <- doNested ils
+    annotateShow $! nst
+
+    a <- doParse module_ nst
+    annotateShow $! a
+
+    renderModule a === str
+
+test_fulltrip_12 :: Property
+test_fulltrip_12 =
+  withTests 1 . property $ do
+    let
+      str =
+        unlines
+        [ "try:"
+        , " \tpass"
+        , " \tdef a():"
+        , " \t pass"
+        , " \tpass"
+        , "finally:"
+        , " pass"
         ]
 
     tks <- doTokenize str

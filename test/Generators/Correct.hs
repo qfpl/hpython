@@ -609,3 +609,14 @@ genStatement =
           Gen.maybe genWhitespaces <*>
           (Just <$> genNewline)
     ]
+
+genImportAs :: (Token (e ()) (e ()), MonadGen m) => m (e ()) -> m (Ident '[] ()) -> m (ImportAs e '[] ())
+genImportAs me genIdent =
+  Gen.sized $ \n -> do
+    n' <- Gen.integral (Range.constant 1 n)
+    let n'' = n - n'
+    ImportAs () <$>
+      set (mapped.whitespaceAfter) [Space] (Gen.resize n' me) <*>
+      (if n'' <= 2
+       then pure Nothing
+       else fmap Just $ (,) <$> genWhitespaces1 <*> Gen.resize n'' genIdent)

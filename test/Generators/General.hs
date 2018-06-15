@@ -422,3 +422,14 @@ genModule = Gen.sized $ \n -> do
           [ fmap Left $ (,,) <$> genIndents <*> Gen.maybe genComment <*> Gen.maybe genNewline
           , Right <$> genStatement
           ]))
+
+genImportAs :: MonadGen m => m (e ()) -> m (Ident '[] ()) -> m (ImportAs e '[] ())
+genImportAs me genIdent =
+  Gen.sized $ \n -> do
+    n' <- Gen.integral (Range.constant 1 n)
+    let n'' = n - n'
+    ImportAs () <$>
+      Gen.resize n' me <*>
+      (if n'' <= 2
+       then pure Nothing
+       else fmap Just $ (,) <$> genWhitespaces1 <*> Gen.resize n'' genIdent)

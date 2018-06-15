@@ -25,7 +25,6 @@ data Indentation
 data NextIndent
   = GreaterThan
   | EqualTo
-  | LessThan
   deriving (Eq, Show)
 
 newtype ValidateIndentation e a
@@ -81,15 +80,6 @@ checkIndent i =
           (_, GT) -> indentationError [_TabError # a]
           (GT, _) -> indentationError [_TabError # a]
           (LT, LT) -> indentationError [_ExpectedEqualTo # (i', i)]
-      LessThan ->
-        case (absolute1Comparison, absolute8Comparison) of
-          (LT, LT) -> pure i
-          (LT, _) -> indentationError [_TabError # a]
-          (_, LT) -> indentationError [_TabError # a]
-          (EQ, EQ) -> indentationError [_ExpectedDedent # a]
-          (_, EQ) -> indentationError [_TabError # a]
-          (EQ, _) -> indentationError [_TabError # a]
-          (GT, GT) -> indentationError [_ExpectedDedent # a]
 
 setNextIndent :: NextIndent -> [Indent] -> ValidateIndentation e ()
 setNextIndent ni is = ValidateIndentation . Compose $ pure () <$ put (ni, is)
@@ -268,4 +258,6 @@ validateModuleIndentation
   => Module v a
   -> ValidateIndentation e (Module (Nub (Indentation ': v)) a)
 validateModuleIndentation =
-  traverseOf (_Wrapped.traverse._Right) validateStatementIndentation
+  traverseOf
+    (_Wrapped.traverse._Right)
+    (\a -> setNextIndent EqualTo [] *> validateStatementIndentation a)

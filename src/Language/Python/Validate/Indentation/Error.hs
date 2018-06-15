@@ -10,7 +10,6 @@ data IndentationError (v :: [*]) a
   = WrongIndent Indent Indent a
   | TabError a
   | ExpectedGreaterThan [Indent] (Indents a)
-  | ExpectedDedent a
   | ExpectedEqualTo [Indent] (Indents a)
   deriving (Eq, Show)
 

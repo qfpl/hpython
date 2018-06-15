@@ -39,7 +39,7 @@ validateExprSyntax' = runValidateSyntax initialSyntaxContext [] . validateExprSy
 validateExprIndentation'
   :: Expr '[] a
   -> Validate [IndentationError '[] a] (Expr '[Indentation] a)
-validateExprIndentation' = validateExprIndentation
+validateExprIndentation' = runValidateIndentation . validateExprIndentation
 
 validateStatementSyntax'
   :: Statement '[Indentation] a
@@ -50,7 +50,7 @@ validateStatementSyntax' =
 validateStatementIndentation'
   :: Statement '[] a
   -> Validate [IndentationError '[] a] (Statement '[Indentation] a)
-validateStatementIndentation' = validateStatementIndentation
+validateStatementIndentation' = runValidateIndentation . validateStatementIndentation
 
 validateModuleSyntax'
   :: Module '[Indentation] a
@@ -61,7 +61,7 @@ validateModuleSyntax' =
 validateModuleIndentation'
   :: Module '[] a
   -> Validate [IndentationError '[] a] (Module '[Indentation] a)
-validateModuleIndentation' = validateModuleIndentation
+validateModuleIndentation' = runValidateIndentation . validateModuleIndentation
 
 runPython3 :: (MonadTest m, MonadIO m) => FilePath -> Bool -> String -> m ()
 runPython3 path shouldSucceed str = do

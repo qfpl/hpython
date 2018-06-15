@@ -8,6 +8,7 @@ import Control.Lens.Wrapped
 import Data.Char (ord)
 import Data.Maybe
 import Data.Semigroup (Semigroup(..))
+
 import Language.Python.Internal.Syntax
 
 bracket :: String -> String
@@ -174,7 +175,10 @@ renderExpr :: Expr v a -> String
 renderExpr (Not _ ws e) =
   "not" <>
   foldMap renderWhitespace ws <>
-  bracketTuple e
+  case e of
+    BinOp _ _ BoolAnd{} _ -> "(" <> renderExpr e <> ")"
+    BinOp _ _ BoolOr{} _ -> "(" <> renderExpr e <> ")"
+    _ -> bracketTuple e
 renderExpr (Parens _ ws1 e ws2) =
   "(" <> foldMap renderWhitespace ws1 <>
   renderExpr e <> ")" <> foldMap renderWhitespace ws2
@@ -302,7 +306,7 @@ renderBlock =
   foldMap
     (either
        (\(x, y, z) ->
-          OneLine $ renderIndents x <> foldMap renderComment y <> renderNewline z)
+          OneLine $ foldMap renderWhitespace x <> foldMap renderComment y <> renderNewline z)
         renderStatement) .
   view _Wrapped
 

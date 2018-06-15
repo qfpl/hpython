@@ -7,7 +7,6 @@
 {-# language UndecidableInstances #-}
 module Language.Python.Internal.Syntax.Statement where
 
-import Control.Lens.Fold (foldMapOf, folded)
 import Control.Lens.Getter ((^.), getting)
 import Control.Lens.Lens (Lens, Lens', lens)
 import Control.Lens.Plated (Plated(..), gplate)
@@ -15,11 +14,8 @@ import Control.Lens.Prism (_Just, _Right)
 import Control.Lens.Setter ((.~), over, mapped)
 import Control.Lens.TH (makeLenses, makeWrapped)
 import Control.Lens.Traversal (Traversal, traverseOf)
-import Control.Lens.Tuple (_1, _2, _5, _6)
+import Control.Lens.Tuple (_2, _5, _6)
 import Control.Lens.Wrapped (_Wrapped)
-import Data.Bifunctor (bimap)
-import Data.Bifoldable (bifoldMap)
-import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty)
@@ -81,19 +77,9 @@ newtype Block v a
   { unBlock
     :: NonEmpty
          (Either
-            (Indents a, Maybe Comment, Newline)
+            ([Whitespace], Maybe Comment, Newline)
             (Statement v a))
-  } deriving (Eq, Show)
-
-instance Functor (Block v) where
-  fmap f (Block b) = Block $ fmap (bimap (over (_1.mapped) f) (fmap f)) b
-
-instance Foldable (Block v) where
-  foldMap f (Block b) = foldMap (bifoldMap (foldMapOf (_1.folded) f) (foldMap f)) b
-
-instance Traversable (Block v) where
-  traverse f (Block b) =
-    Block <$> traverse (bitraverse (traverseOf (_1.traverse) f) (traverse f)) b
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
 
 class HasBlocks s where
   _Blocks :: Traversal (s v a) (s '[] a) (Block v a) (Block '[] a)

@@ -12,7 +12,8 @@ import Text.Trifecta (Caret)
 
 import Language.Python.Internal.Parse (module_)
 import Language.Python.Internal.Render (renderModule)
-import Language.Python.Validate.Indentation (Indentation, validateModuleIndentation)
+import Language.Python.Validate.Indentation
+  (Indentation, runValidateIndentation, validateModuleIndentation)
 import Language.Python.Validate.Indentation.Error (IndentationError)
 import Language.Python.Validate.Syntax
   (validateModuleSyntax, runValidateSyntax, initialSyntaxContext)
@@ -36,7 +37,7 @@ doRoundtrip name =
   property $ do
     file <- liftIO . readFile $ "test/files" </> name
     py <- doToPython module_ file
-    case validateModuleIndentation py of
+    case runValidateIndentation $ validateModuleIndentation py of
       Failure errs -> annotateShow (errs :: [IndentationError '[] Caret]) *> failure
       Success res ->
         case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of

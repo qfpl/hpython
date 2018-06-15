@@ -4,6 +4,7 @@
 {-# language GeneralizedNewtypeDeriving #-}
 module Language.Python.Internal.Parse where
 
+import Control.Lens.Fold (foldOf, folded)
 import Control.Lens.Getter ((^.))
 import Control.Monad (unless)
 import Control.Monad.Except (ExceptT(..), runExceptT, throwError)
@@ -527,7 +528,7 @@ suite = do
        some1 line) <*
     dedent
   where
-    commentOrEmpty = (,,) <$> indents <*> optional comment <*> eol
+    commentOrEmpty = (,,) <$> (foldOf (indentsValue.folded.indentWhitespaces) <$> indents) <*> optional comment <*> eol
 
     commentOrIndent = many (Left <$> commentOrEmpty) <* indent
 

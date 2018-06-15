@@ -5,8 +5,8 @@ import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
-import Control.Applicative
 import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax
 
@@ -17,7 +17,10 @@ whitespaceSize (Continued _ ws) = 1 + sum (fmap whitespaceSize ws)
 whitespaceSize (Newline _) = 1
 
 genSmallInt :: MonadGen m => m (Expr '[] ())
-genSmallInt = Int () <$> Gen.integral (Range.constant 0 100) <*> genWhitespaces
+genSmallInt =
+  Int () <$>
+  Gen.integral (Range.constant 0 100) <*>
+  genWhitespaces
 
 genString :: MonadGen m => m String
 genString = Gen.list (Range.constant 0 50) (Gen.filter (/='\0') Gen.latin1)
@@ -101,20 +104,70 @@ genSizedWhitespace ws =
 genWhitespaces :: MonadGen m => m [Whitespace]
 genWhitespaces = do
   n <- Gen.integral (Range.constant 0 10)
-  Gen.resize n $ genSizedWhitespace genNormalWhitespace
+  go n
+  where
+    go 0 = pure []
+    go n =
+      Gen.choice
+      [ (Space :) <$> go (n-1)
+      , (Tab :) <$> go (n-1)
+      , fmap pure $ Continued <$> genNewline <*> go (n-1)
+      ]
 
 genAnyWhitespaces :: MonadGen m => m [Whitespace]
 genAnyWhitespaces = do
   n <- Gen.integral (Range.constant 0 10)
-  Gen.resize n $ genSizedWhitespace genAnyWhitespace
+  go n
+  where
+    go 0 = pure []
+    go n =
+      Gen.choice
+      [ (Space :) <$> go (n-1)
+      , (Tab :) <$> go (n-1)
+      , fmap pure $ Continued <$> genNewline <*> go (n-1)
+      , (:) <$> (Newline <$> genNewline) <*> go (n-1)
+      ]
+
+genAnyWhitespaces1 :: MonadGen m => m (NonEmpty Whitespace)
+genAnyWhitespaces1 = do
+  n <- Gen.integral (Range.constant 1 10)
+  go n
+  where
+    go 1 =
+      Gen.choice
+      [ pure $ pure Space
+      , pure $ pure Tab
+      , fmap pure $ Continued <$> genNewline <*> pure []
+      , fmap pure $ Newline <$> genNewline
+      ]
+    go n =
+      Gen.choice
+      [ (Space `NonEmpty.cons`) <$> go (n-1)
+      , (Tab `NonEmpty.cons`) <$> go (n-1)
+      , fmap pure $
+        Continued <$>
+        genNewline <*>
+        ((:) <$>
+         Gen.choice
+           [ pure Space
+           , pure Tab
+           , Newline <$> genNewline
+           ] <*>
+         (NonEmpty.toList <$> go (n-1)))
+      ]
 
 genWhitespaces1 :: MonadGen m => m (NonEmpty Whitespace)
 genWhitespaces1 = do
   n <- Gen.integral (Range.constant 0 9)
-  liftA2
-    (:|)
-    (head <$> Gen.resize 1 (genSizedWhitespace genNormalWhitespace))
-    (Gen.resize n $ genSizedWhitespace genNormalWhitespace)
+  (:|) <$> Gen.element [Space, Tab] <*> genWhitespaces
+  where
+    go 0 = pure []
+    go n =
+      Gen.choice
+      [ (Space :) <$> go (n-1)
+      , (Tab :) <$> go (n-1)
+      , fmap pure $ Continued <$> genNewline <*> go (n-1)
+      ]
 
 genNone :: MonadGen m => m (Expr '[] ())
 genNone = None () <$> genWhitespaces
@@ -182,14 +235,3 @@ genSizedCommaSep1' ma = Gen.sized $ \n ->
             (Gen.resize (n - n') $ genSizedCommaSep1' ma)
             (\b -> CommaSepMany1' a <$> genWhitespaces <*> pure b)
       ]
-
-genImportAs :: MonadGen m => m (e ()) -> m (Ident '[] ()) -> m (ImportAs e '[] ())
-genImportAs me genIdent =
-  Gen.sized $ \n -> do
-    n' <- Gen.integral (Range.constant 1 n)
-    let n'' = n - n'
-    ImportAs () <$>
-      Gen.resize n' me <*>
-      (if n'' <= 2
-       then pure Nothing
-       else fmap Just $ (,) <$> genWhitespaces1 <*> Gen.resize n'' genIdent)

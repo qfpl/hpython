@@ -24,6 +24,7 @@ data CommaSep a
 listToCommaSep :: [a] -> CommaSep a
 listToCommaSep [] = CommaSepNone
 listToCommaSep [a] = CommaSepOne a
+  
 listToCommaSep (a:as) = CommaSepMany a [Space] $ listToCommaSep as
 
 appendCommaSep :: CommaSep a -> CommaSep a -> CommaSep a
@@ -38,6 +39,10 @@ data CommaSep1 a
   = CommaSepOne1 a
   | CommaSepMany1 a [Whitespace] (CommaSep1 a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
+
+commaSep1Head :: CommaSep1 a -> a
+commaSep1Head (CommaSepOne1 a) = a
+commaSep1Head (CommaSepMany1 a _ _) = a
 
 instance Semigroup (CommaSep1 a) where
   a <> b =
@@ -79,6 +84,12 @@ data CommaSep1' a
   | CommaSepMany1' a [Whitespace] (CommaSep1' a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+listToCommaSep1' :: [a] -> Maybe (CommaSep1' a)
+listToCommaSep1' [] = Nothing
+listToCommaSep1' [a] = Just (CommaSepOne1' a Nothing)
+listToCommaSep1' (a:as) =
+  CommaSepMany1' a [Space] <$> listToCommaSep1' as
+
 instance Token s t => Token (CommaSep1' s) (CommaSep1' t) where
   unvalidate = fmap unvalidate
   whitespaceAfter =
@@ -92,7 +103,8 @@ instance Token s t => Token (CommaSep1' s) (CommaSep1' t) where
              CommaSepOne1'
                (fromMaybe (a & whitespaceAfter .~ ws) $ b $> unvalidate a)
                (b $> ws)
-           CommaSepMany1' a b c -> CommaSepMany1' (unvalidate a) b (c & whitespaceAfter .~ ws))
+           CommaSepMany1' a b c ->
+             CommaSepMany1' (unvalidate a) b (c & whitespaceAfter .~ ws))
 
   startChar (CommaSepOne1' a _) = startChar a
   startChar (CommaSepMany1' a _ _) = startChar a

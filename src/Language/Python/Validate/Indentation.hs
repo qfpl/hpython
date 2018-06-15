@@ -1,19 +1,88 @@
 {-# language DataKinds #-}
 {-# language TypeOperators #-}
+{-# language GeneralizedNewtypeDeriving #-}
 module Language.Python.Validate.Indentation where
 
-import Control.Applicative
-import Control.Lens ((#), _Wrapped, view, over, from, _2, _4, traverseOf, _Right)
-import Data.Coerce
+import Control.Lens ((#), _Wrapped, over, _2, traverseOf, _Right)
+import Control.Lens.Fold ((^?!), folded)
+import Control.Lens.Getter ((^.))
+import Control.Monad.State (State, evalState, get, put)
+import Data.Coerce (coerce)
+import Data.Foldable (fold)
+import Data.Functor.Compose (Compose(..))
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Type.Set
 import Data.Validate
-
 import qualified Data.List.NonEmpty as NonEmpty
 
+import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax
 import Language.Python.Validate.Indentation.Error
 
 data Indentation
+
+-- | "The next line must be..."
+data NextIndent
+  = GreaterThan
+  | EqualTo
+  deriving (Eq, Show)
+
+newtype ValidateIndentation e a
+  = ValidateIndentation
+  { unValidateIndentation :: Compose (State (NextIndent, [Indent])) (Validate [e]) a
+  } deriving (Functor, Applicative)
+
+runValidateIndentation :: ValidateIndentation e a -> Validate [e] a
+runValidateIndentation = runValidateIndentation' EqualTo []
+
+runValidateIndentation' :: NextIndent -> [Indent] -> ValidateIndentation e a -> Validate [e] a
+runValidateIndentation' ni is =
+  flip evalState (ni, is) .
+  getCompose .
+  unValidateIndentation
+
+withNextIndent
+  :: (NextIndent -> [Indent] -> ValidateIndentation e a)
+  -> ValidateIndentation e a
+withNextIndent f =
+  ValidateIndentation . Compose $
+    get >>= getCompose . unValidateIndentation . uncurry f
+
+indentationError :: [e] -> ValidateIndentation e a
+indentationError = ValidateIndentation . Compose . pure . Failure
+
+checkIndent :: AsIndentationError e v a => Indents a -> ValidateIndentation e (Indents a)
+checkIndent i =
+  withNextIndent $ \ni i' ->
+  let
+    a = i ^. indentsAnn
+    ii = fold (i ^. indentsValue)
+    ii' = fold i'
+    absolute1Comparison = compare (absoluteIndentLevel 1 ii) (absoluteIndentLevel 1 ii')
+    absolute8Comparison = compare (absoluteIndentLevel 8 ii) (absoluteIndentLevel 8 ii')
+  in
+    case ni of
+      GreaterThan ->
+        case (absolute1Comparison, absolute8Comparison) of
+          (GT, GT) -> pure i
+          (GT, _) -> indentationError [_TabError # a]
+          (_, GT) -> indentationError [_TabError # a]
+          (EQ, EQ) -> indentationError [_ExpectedGreaterThan # (i', i)]
+          (_, EQ) -> indentationError [_TabError # a]
+          (EQ, _) -> indentationError [_TabError # a]
+          (LT, LT) -> indentationError [_ExpectedGreaterThan # (i', i)]
+      EqualTo ->
+        case (absolute1Comparison, absolute8Comparison) of
+          (EQ, EQ) -> pure i
+          (EQ, _) -> indentationError [_TabError # a]
+          (_, EQ) -> indentationError [_TabError # a]
+          (GT, GT) -> indentationError [_ExpectedEqualTo # (i', i)]
+          (_, GT) -> indentationError [_TabError # a]
+          (GT, _) -> indentationError [_TabError # a]
+          (LT, LT) -> indentationError [_ExpectedEqualTo # (i', i)]
+
+setNextIndent :: NextIndent -> [Indent] -> ValidateIndentation e ()
+setNextIndent ni is = ValidateIndentation . Compose $ pure () <$ put (ni, is)
 
 equivalentIndentation :: [Whitespace] -> [Whitespace] -> Bool
 equivalentIndentation [] [] = True
@@ -35,50 +104,49 @@ equivalentIndentation (x:xs) (y:ys) =
 validateBlockIndentation
   :: AsIndentationError e v a
   => Block v a
-  -> Validate [e] (Block (Nub (Indentation ': v)) a)
-validateBlockIndentation a =
-  view (from _Wrapped) . NonEmpty.fromList <$>
-  go Nothing (NonEmpty.toList $ view _Wrapped a)
+  -> ValidateIndentation e (Block (Nub (Indentation ': v)) a)
+validateBlockIndentation (Block (b :| bs)) =
+  Block <$> go False b bs
   where
-    go _ [] = pure []
-    go a ((ann, ws, Left c):xs) = ((ann, ws, Left c) :) <$> go a xs
-    go a ((ann, ws, Right st):xs)
-      | null ws = Failure [_ExpectedIndent # ann] <*> go a xs
-      | otherwise =
-          case a of
-            Nothing ->
-              liftA2 (:)
-                ((,,) ann ws . Right <$> validateStatementIndentation st)
-                (go (Just ws) xs)
-            Just ws'
-              | equivalentIndentation ws ws' ->
-                  liftA2 (:)
-                    ((,,) ann ws . Right <$> validateStatementIndentation st)
-                    (go a xs)
-              | otherwise -> Failure [_WrongIndent # (ws', ws, ann)] <*> go a xs
+    is = (b:|bs) ^?! folded._Right.unvalidated._Indents.indentsValue
+
+    go flag (Left e) rest =
+      case rest of
+        [] -> pure $ Left e :| []
+        r : rs -> NonEmpty.cons (Left e) <$> go flag r rs
+    go flag (Right st) rest =
+      let
+        validated =
+          Right <$
+          (if flag then setNextIndent EqualTo is else pure ()) <*>
+          validateStatementIndentation st
+      in
+      case rest of
+        [] -> (:| []) <$> validated
+        r : rs -> NonEmpty.cons <$> validated <*> go True r rs
 
 validateExprIndentation
   :: AsIndentationError e v a
   => Expr v a
-  -> Validate [e] (Expr (Nub (Indentation ': v)) a)
+  -> ValidateIndentation e (Expr (Nub (Indentation ': v)) a)
 validateExprIndentation e = pure $ coerce e
 
 validateParamsIndentation
   :: AsIndentationError e v a
   => CommaSep (Param v a)
-  -> Validate [e] (CommaSep (Param (Nub (Indentation ': v)) a))
+  -> ValidateIndentation e (CommaSep (Param (Nub (Indentation ': v)) a))
 validateParamsIndentation e = pure $ coerce e
 
 validateArgsIndentation
   :: AsIndentationError e v a
   => CommaSep (Arg v a)
-  -> Validate [e] (CommaSep (Arg (Nub (Indentation ': v)) a))
+  -> ValidateIndentation e (CommaSep (Arg (Nub (Indentation ': v)) a))
 validateArgsIndentation e = pure $ coerce e
 
 validateExceptAsIndentation
   :: AsIndentationError e v a
   => ExceptAs v a
-  -> Validate [e] (ExceptAs (Nub (Indentation ': v)) a)
+  -> ValidateIndentation e (ExceptAs (Nub (Indentation ': v)) a)
 validateExceptAsIndentation (ExceptAs ann e f) =
   ExceptAs ann <$>
   validateExprIndentation e <*>
@@ -87,58 +155,100 @@ validateExceptAsIndentation (ExceptAs ann e f) =
 validateCompoundStatementIndentation
   :: AsIndentationError e v a
   => CompoundStatement v a
-  -> Validate [e] (CompoundStatement (Nub (Indentation ': v)) a)
-validateCompoundStatementIndentation (Fundef a ws1 name ws2 params ws3 ws4 nl body) =
-  Fundef a ws1 (coerce name) ws2 <$>
-  validateParamsIndentation params <*>
-  pure ws3 <*>
-  pure ws4 <*>
-  pure nl <*>
+  -> ValidateIndentation e (CompoundStatement (Nub (Indentation ': v)) a)
+validateCompoundStatementIndentation (Fundef idnt a ws1 name ws2 params ws3 ws4 nl body) =
+  (\idnt' params' body' -> Fundef idnt' a ws1 (coerce name) ws2 params' ws3 ws4 nl body') <$>
+  checkIndent idnt <*>
+  validateParamsIndentation params <*
+  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
   validateBlockIndentation body
-validateCompoundStatementIndentation (If a ws1 expr ws3 nl body body') =
-  If a ws1 <$>
-  validateExprIndentation expr <*>
-  pure ws3 <*>
-  pure nl <*>
+validateCompoundStatementIndentation (If idnt a ws1 expr ws3 nl body body1) =
+  (\idnt' expr' body' body1' -> If idnt' a ws1 expr' ws3 nl body' body1') <$>
+  checkIndent idnt <*>
+  validateExprIndentation expr <*
+  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
   validateBlockIndentation body <*>
-  traverseOf (traverse._4) validateBlockIndentation body'
-validateCompoundStatementIndentation (While a ws1 expr ws3 nl body) =
-  While a ws1 <$>
-  validateExprIndentation expr <*>
-  pure ws3 <*>
-  pure nl <*>
+  traverse
+    (\(idnt2, a, b, c, d) ->
+       (\idnt2' -> (,,,,) idnt2' a b c) <$
+       setNextIndent EqualTo (idnt ^. indentsValue) <*>
+       checkIndent idnt2 <*
+       setNextIndent GreaterThan (idnt ^. indentsValue) <*>
+       validateBlockIndentation d)
+    body1
+validateCompoundStatementIndentation (While idnt a ws1 expr ws3 nl body) =
+  (\idnt' expr' body' -> While idnt' a ws1 expr' ws3 nl body') <$>
+  checkIndent idnt <*>
+  validateExprIndentation expr <*
+  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
   validateBlockIndentation body
-validateCompoundStatementIndentation (TryExcept a b c d e f k l) =
-  TryExcept a b c d <$>
+validateCompoundStatementIndentation (TryExcept idnt a b c d e f k l) =
+  (\idnt' -> TryExcept idnt' a b c d) <$>
+  checkIndent idnt <*
+  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
   validateBlockIndentation e <*>
   traverse
-    (\(a, b, c, d, e) ->
-       (,,,,) a <$>
-       validateExceptAsIndentation b <*>
-       pure c <*>
-       pure d <*>
-       validateBlockIndentation e)
-    f <*>
-  traverseOf (traverse._4) validateBlockIndentation k <*>
-  traverseOf (traverse._4) validateBlockIndentation l
-validateCompoundStatementIndentation (TryFinally a b c d e f g h i) =
-  TryFinally a b c d <$>
-  validateBlockIndentation e <*>
-  pure f <*> pure g <*> pure h <*>
+    (\(a, b, c, d, e, f) ->
+       (\a' c' -> (,,,,,) a' b c' d e) <$
+       setNextIndent EqualTo (idnt ^. indentsValue) <*>
+       checkIndent a <*>
+       validateExceptAsIndentation c <*
+       setNextIndent GreaterThan (idnt ^. indentsValue) <*>
+       validateBlockIndentation f)
+    f <*
+  setNextIndent EqualTo (idnt ^. indentsValue) <*>
+  traverse
+    (\(idnt2, a, b, c, d) ->
+       (\idnt2' -> (,,,,) idnt2' a b c) <$
+       setNextIndent EqualTo (idnt ^. indentsValue) <*>
+       checkIndent idnt2 <*
+       setNextIndent GreaterThan (idnt ^. indentsValue) <*>
+       validateBlockIndentation d)
+    k <*
+  setNextIndent EqualTo (idnt ^. indentsValue) <*>
+  traverse
+    (\(idnt2, a, b, c, d) ->
+       (\idnt2' -> (,,,,) idnt2' a b c) <$
+       setNextIndent EqualTo (idnt ^. indentsValue) <*>
+       checkIndent idnt2 <*
+       setNextIndent GreaterThan (idnt ^. indentsValue) <*>
+       validateBlockIndentation d)
+    l
+validateCompoundStatementIndentation (TryFinally idnt a b c d e idnt2 f g h i) =
+  (\idnt' e' idnt2' -> TryFinally idnt' a b c d e' idnt2' f g h) <$>
+  checkIndent idnt <*
+  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
+  validateBlockIndentation e <*
+  setNextIndent EqualTo (idnt ^. indentsValue) <*>
+  checkIndent idnt2 <*
+  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
   validateBlockIndentation i
-validateCompoundStatementIndentation (For a b c d e f g h i) =
-  For a b <$>
-  validateExprIndentation c <*> pure d <*>
-  validateExprIndentation e <*> pure f <*> pure g <*>
-  validateBlockIndentation h <*>
-  traverseOf (traverse._4) validateBlockIndentation i
-validateCompoundStatementIndentation (ClassDef a b c d e f g) =
-  ClassDef a b (coerce c) (coerce d) e f <$> validateBlockIndentation g
+validateCompoundStatementIndentation (For idnt a b c d e f g h i) =
+  (\idnt' c' e' -> For idnt' a b c' d e' f g) <$>
+  checkIndent idnt <*>
+  validateExprIndentation c <*>
+  validateExprIndentation e <*
+  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
+  validateBlockIndentation h <*
+  setNextIndent EqualTo (idnt ^. indentsValue) <*>
+  traverse
+    (\(idnt2, a, b, c, d) ->
+       (\idnt2' -> (,,,,) idnt2' a b c) <$
+       setNextIndent EqualTo (idnt ^. indentsValue) <*>
+       checkIndent idnt2 <*
+       setNextIndent GreaterThan (idnt ^. indentsValue) <*>
+       validateBlockIndentation d)
+    i
+validateCompoundStatementIndentation (ClassDef idnt a b c d e f g) =
+  (\idnt' -> ClassDef idnt' a b (coerce c) (coerce d) e f) <$>
+  checkIndent idnt <*
+  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
+  validateBlockIndentation g
 
 validateStatementIndentation
   :: AsIndentationError e v a
   => Statement v a
-  -> Validate [e] (Statement (Nub (Indentation ': v)) a)
+  -> ValidateIndentation e (Statement (Nub (Indentation ': v)) a)
 validateStatementIndentation (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementIndentation c
 validateStatementIndentation s@SmallStatements{} = pure $ coerce s
@@ -146,6 +256,8 @@ validateStatementIndentation s@SmallStatements{} = pure $ coerce s
 validateModuleIndentation
   :: AsIndentationError e v a
   => Module v a
-  -> Validate [e] (Module (Nub (Indentation ': v)) a)
+  -> ValidateIndentation e (Module (Nub (Indentation ': v)) a)
 validateModuleIndentation =
-  traverseOf (_Wrapped.traverse._Right) validateStatementIndentation
+  traverseOf
+    (_Wrapped.traverse._Right)
+    (\a -> setNextIndent EqualTo [] *> validateStatementIndentation a)

@@ -7,8 +7,10 @@ import Language.Python.Internal.Syntax
 import Control.Lens.TH
 
 data IndentationError (v :: [*]) a
-  = WrongIndent [Whitespace] [Whitespace] a
-  | ExpectedIndent a
+  = WrongIndent Indent Indent a
+  | TabError a
+  | ExpectedGreaterThan [Indent] (Indents a)
+  | ExpectedEqualTo [Indent] (Indents a)
   deriving (Eq, Show)
 
 makeClassyPrisms ''IndentationError

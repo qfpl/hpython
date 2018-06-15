@@ -38,7 +38,7 @@ validate
           [ScopeError '[Syntax, Indentation] ()]
           (Statement '[Scope, Syntax, Indentation] ()))
 validate x =
-  case validateStatementIndentation x of
+  case runValidateIndentation $ validateStatementIndentation x of
     Failure errs -> do
       annotateShow (errs :: [IndentationError '[] ()])
       failure

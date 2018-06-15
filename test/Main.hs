@@ -10,8 +10,10 @@ import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Syntax.Error
 
+import LexerParser
 import Scope
 import Roundtrip
+import Helpers (doToPython)
 
 import qualified Generators.General as General
 import qualified Generators.Correct as Correct
@@ -25,7 +27,6 @@ import Data.Validate
 import System.Directory
 import System.Exit
 import System.Process
-import qualified Text.Trifecta as Trifecta
 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -38,7 +39,7 @@ validateExprSyntax' = runValidateSyntax initialSyntaxContext [] . validateExprSy
 validateExprIndentation'
   :: Expr '[] a
   -> Validate [IndentationError '[] a] (Expr '[Indentation] a)
-validateExprIndentation' = validateExprIndentation
+validateExprIndentation' = runValidateIndentation . validateExprIndentation
 
 validateStatementSyntax'
   :: Statement '[Indentation] a
@@ -49,7 +50,7 @@ validateStatementSyntax' =
 validateStatementIndentation'
   :: Statement '[] a
   -> Validate [IndentationError '[] a] (Statement '[Indentation] a)
-validateStatementIndentation' = validateStatementIndentation
+validateStatementIndentation' = runValidateIndentation . validateStatementIndentation
 
 validateModuleSyntax'
   :: Module '[Indentation] a
@@ -60,7 +61,7 @@ validateModuleSyntax' =
 validateModuleIndentation'
   :: Module '[] a
   -> Validate [IndentationError '[] a] (Module '[Indentation] a)
-validateModuleIndentation' = validateModuleIndentation
+validateModuleIndentation' = runValidateIndentation . validateModuleIndentation
 
 runPython3 :: (MonadTest m, MonadIO m) => FilePath -> Bool -> String -> m ()
 runPython3 path shouldSucceed str = do
@@ -177,14 +178,9 @@ expr_printparseprint_print =
       Success res ->
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
-          Success res' ->
-            case Trifecta.parseString (expr whitespace) mempty (renderExpr res') of
-              Trifecta.Failure errs'' -> annotateShow errs''
-              Trifecta.Success res'' -> do
-                annotateShow res''
-                renderExpr (res' ^. unvalidated) === renderExpr (res'' $> ())
-
-parseStatement = Trifecta.parseString (evalStateT statement []) mempty
+          Success res' -> do
+            py <- doToPython (expr space) (renderExpr res')
+            renderExpr (res' ^. unvalidated) === renderExpr (res $> ())
 
 statement_printparseprint_print :: Property
 statement_printparseprint_print =
@@ -196,30 +192,13 @@ statement_printparseprint_print =
       Success res ->
         case validateStatementSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
-          Success res' ->
-            case parseStatement (renderLines $ renderStatement res') of
-              Trifecta.Failure errs'' -> annotateShow errs''
-              Trifecta.Success res'' -> do
-                annotateShow res''
-                renderLines (renderStatement (res' ^. unvalidated)) ===
-                  renderLines (renderStatement (res'' $> ()))
-
-statement_printparse_id :: Property
-statement_printparse_id =
-  property $ do
-    st <- forAll $ evalStateT Correct.genStatement Correct.initialGenState
-    annotate (renderLines $ renderStatement st)
-    case validateStatementIndentation' st of
-      Failure errs -> annotateShow errs *> failure
-      Success res ->
-        case validateStatementSyntax' res of
-          Failure errs' -> annotateShow errs' *> failure
-          Success res' ->
-            case parseStatement (renderLines $ renderStatement res') of
-              Trifecta.Failure errs'' -> annotateShow errs''
-              Trifecta.Success res'' -> res ^. unvalidated === st
+          Success res' -> do
+            py <- doToPython statement . renderLines $ renderStatement res'
+            renderLines (renderStatement (res' ^. unvalidated)) ===
+              renderLines (renderStatement (py $> ()))
 
 main = do
+  checkParallel lexerParserTests
   let file = "hedgehog-test.py"
   check . withTests 200 $ syntax_expr file
   check . withTests 200 $ syntax_statement file
@@ -228,7 +207,6 @@ main = do
   check . withTests 200 $ correct_syntax_statement file
   check expr_printparseprint_print
   check . withShrinks 2000 $ statement_printparseprint_print
-  check . withShrinks 2000 $ statement_printparse_id
   checkParallel scopeTests
   checkParallel roundtripTests
   removeFile "hedgehog-test.py"

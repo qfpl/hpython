@@ -2,6 +2,8 @@
 {-# language FlexibleContexts #-}
 module Programs where
 
+import Control.Lens.Getter ((^.))
+import Control.Lens.Iso (from)
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax
 
@@ -15,20 +17,20 @@ import Language.Python.Syntax
 -- Written without the DSL
 append_to =
   CompoundStatement $
-  Fundef ()
+  Fundef (Indents [] ()) ()
     [Space]
     "append_to"
     []
     ( CommaSepMany (PositionalParam () "element") [Space] $
-      CommaSepOne (KeywordParam () "to" [] (List () [] CommaSepNone []))
+      CommaSepOne (KeywordParam () "to" [] (List () [] Nothing []))
     )
     []
     []
     LF
     (Block
-     [ ( ()
-       , replicate 4 Space
-       , Right $ SmallStatements
+     [ Right $
+       SmallStatements
+         (Indents [replicate 4 Space ^. from indentWhitespaces] ())
          (Expr () $
           Call ()
             (Deref () (Ident () "to") [] "append")
@@ -37,12 +39,14 @@ append_to =
             [])
          []
          Nothing
-         LF
-       )
-     , ( ()
-       , replicate 4 Space
-       , Right $ SmallStatements (Return () [Space] (Ident () "to")) [] Nothing LF
-       )
+         (Just LF)
+     , Right $
+       SmallStatements
+         (Indents [replicate 4 Space ^. from indentWhitespaces] ())
+         (Return () [Space] (Ident () "to"))
+         []
+         Nothing
+         (Just LF)
      ])
 
 -- |
@@ -101,12 +105,12 @@ yes =
 everything =
   Module
     [ Right append_to
-    , Left ([], Nothing, LF)
+    , Left (Indents [] (), Nothing, Just LF)
     , Right append_to'
-    , Left ([], Nothing, LF)
+    , Left (Indents [] (), Nothing, Just LF)
     , Right fact_tr
-    , Left ([], Nothing, LF)
+    , Left (Indents [] (), Nothing, Just LF)
     , Right spin
-    , Left ([], Nothing, LF)
+    , Left (Indents [] (), Nothing, Just LF)
     , Right yes
     ]

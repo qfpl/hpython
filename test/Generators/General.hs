@@ -6,6 +6,7 @@ import Control.Applicative
 import Control.Lens.Cons
 import Control.Lens.Fold
 import Control.Lens.Getter
+import Control.Lens.Iso (from)
 import Control.Lens.Wrapped
 import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty(..))
@@ -66,8 +67,7 @@ genRelativeModuleName :: MonadGen m => m (RelativeModuleName '[] ())
 genRelativeModuleName =
   Gen.choice
   [ Relative <$>
-    Gen.nonEmpty (Range.constant 1 10) genDot <*>
-    genWhitespaces
+    Gen.nonEmpty (Range.constant 1 10) genDot
   , RelativeWithName <$>
     Gen.list (Range.constant 1 10) genDot <*>
     genModuleName
@@ -88,7 +88,7 @@ genImportTargets =
 genBlock :: MonadGen m => m (Block '[] ())
 genBlock =
   Gen.shrink ((++) <$> shrinkHead <*> shrinkTail) $ do
-  indent <- NonEmpty.toList <$> genWhitespaces1
+  indent <- view (from indentWhitespaces) . NonEmpty.toList <$> genWhitespaces1
   go indent
   where
     shrinkHead b
@@ -106,20 +106,20 @@ genBlock =
           s1 <-
             Gen.choice
               [ Right <$> genStatement
-              , fmap Left $ (,) <$> Gen.maybe genComment <*> genNewline
+              , fmap Left $ (,,) <$> genWhitespaces <*> Gen.maybe genComment <*> genNewline
               ]
-          pure . Block $ ((), indent, s1) :| []
+          pure . Block $ s1 :| []
         else do
           n' <- Gen.integral (Range.constant 1 (n-1))
           s1 <-
             Gen.resize n' $
             Gen.choice
               [ Right <$> genStatement
-              , fmap Left $ (,) <$> Gen.maybe genComment <*> genNewline
+              , fmap Left $ (,,) <$> genWhitespaces <*> Gen.maybe genComment <*> genNewline
               ]
           let n'' = n - n'
           b <- Gen.resize n'' (go indent)
-          pure . Block $ NonEmpty.cons ((), indent, s1) (unBlock b)
+          pure . Block $ NonEmpty.cons s1 (unBlock b)
 
 -- | This is necessary to prevent generating exponentials that will take forever to evaluate
 -- when python does constant folding
@@ -145,7 +145,7 @@ genExpr' isExp = Gen.sized $ \n ->
     Gen.choice $
       [ List () <$>
         genWhitespaces <*>
-        genSizedCommaSep genExpr <*>
+        Gen.maybe (genSizedCommaSep1' genExpr) <*>
         genWhitespaces
       , Gen.subtermM
           genExpr
@@ -191,7 +191,7 @@ genSmallStatement = Gen.sized $ \n ->
             n' <- Gen.integral (Range.constant 1 (n-1))
             a <- Gen.resize n' genExpr
             b <- Gen.resize (n - n') genExpr
-            Assign () a <$> genWhitespaces <*> genWhitespaces <*> pure b
+            Assign () a <$> genWhitespaces <*> pure b
         , Gen.sized $ \n -> do
             n' <- Gen.integral (Range.constant 2 (n-1))
             Global () <$>
@@ -237,7 +237,8 @@ genCompoundStatement =
         a <- Gen.resize n' $ genSizedCommaSep (genParam genExpr)
         let paramIdents = a ^.. folded.paramName.identValue
         b <- Gen.resize (n - n') genBlock
-        Fundef () <$> genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure a <*>
+        Fundef <$> genIndents <*> pure () <*>
+          genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure a <*>
           genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
     , Gen.sized $ \n -> do
         n' <- Gen.integral (Range.constant 1 (n-1))
@@ -249,18 +250,22 @@ genCompoundStatement =
           then pure Nothing
           else
             fmap Just $
-            (,,,) <$>
+            (,,,,) <$>
+            genIndents <*>
             genWhitespaces <*>
             genWhitespaces <*>
             genNewline <*>
             Gen.resize (n - n' - n'') genBlock
-        If () <$> genWhitespaces <*> pure a <*>
+        If <$> genIndents <*>
+          pure () <*> genWhitespaces <*> pure a <*>
           genWhitespaces <*> genNewline <*> pure b <*> pure c
     , Gen.sized $ \n -> do
         n' <- Gen.integral (Range.constant 1 (n-1))
         a <- Gen.resize n' genExpr
         b <- Gen.resize (n - n') genBlock
-        While () <$> genWhitespaces <*> pure a <*>
+        While <$>
+          genIndents <*>
+          pure () <*> genWhitespaces <*> pure a <*>
           genWhitespaces <*> genNewline <*> pure b
     , Gen.sized $ \n -> do
         sz <- Gen.integral (Range.constant 1 5)
@@ -276,20 +281,33 @@ genCompoundStatement =
             e2 <- Gen.maybe (Gen.resize (remaining - n4) genBlock)
             (,) <$>
               fmap Just
-                ((,,,) <$> genWhitespaces <*> genWhitespaces <*> genNewline <*> pure e1) <*>
+                ((,,,,) <$>
+                 genIndents <*>
+                 genWhitespaces <*>
+                 genWhitespaces <*>
+                 genNewline <*>
+                 pure e1) <*>
               maybe
                  (pure Nothing)
                  (\e2' ->
                     fmap Just $
-                    (,,,) <$> genWhitespaces <*> genWhitespaces <*> genNewline <*> pure e2')
+                    (,,,,) <$>
+                    genIndents <*>
+                    genWhitespaces <*>
+                    genWhitespaces <*>
+                    genNewline <*>
+                    pure e2')
                  e2
           else pure (Nothing, Nothing)
-        TryExcept () <$>
+        TryExcept <$>
+          genIndents <*>
+          pure () <*>
           genWhitespaces <*> genWhitespaces <*> genNewline <*>
           Gen.resize n1 genBlock <*>
           Gen.nonEmpty
             (Range.singleton sz)
-            ((,,,,) <$>
+            ((,,,,,) <$>
+             genIndents <*>
              genWhitespaces <*>
              (ExceptAs () <$>
               Gen.resize n2 genExpr <*>
@@ -302,14 +320,19 @@ genCompoundStatement =
     , Gen.sized $ \n -> do
         n1 <- Gen.integral (Range.constant 1 $ n-1)
         n2 <- Gen.integral (Range.constant 1 n1)
-        TryFinally () <$>
+        TryFinally <$>
+          genIndents <*>
+          pure () <*>
           genWhitespaces <*> genWhitespaces <*> genNewline <*>
           Gen.resize n1 genBlock <*>
+          genIndents <*>
           genWhitespaces <*> genWhitespaces <*> genNewline <*>
           Gen.resize n2 genBlock
     , Gen.sized $ \n -> do
         n1 <- Gen.integral $ Range.constant 0 (n-1)
-        ClassDef () <$>
+        ClassDef <$>
+          genIndents <*>
+          pure () <*>
           genWhitespaces1 <*>
           genIdent <*>
           Gen.maybe
@@ -327,7 +350,9 @@ genCompoundStatement =
         n2 <- Gen.integral $ Range.constant 1 (max 1 $ n-n1-1)
         n3 <- Gen.integral $ Range.constant 1 (max 1 $ n-n1-n2)
         n4 <- Gen.integral $ Range.constant 0 (max 0 $ n-n1-n2-n3)
-        For () <$>
+        For <$>
+          genIndents <*>
+          pure () <*>
           genWhitespaces <*>
           Gen.resize n1 genExpr <*>
           genWhitespaces <*>
@@ -339,7 +364,8 @@ genCompoundStatement =
           else
             Gen.resize n4
               (fmap Just $
-               (,,,) <$>
+               (,,,,) <$>
+               genIndents <*>
                genWhitespaces <*> genWhitespaces <*>
                genNewline <*> genBlock)
     | n >= 4
@@ -351,10 +377,11 @@ genStatement =
   if n < 4
   then
     SmallStatements <$>
+    genIndents <*>
     genSmallStatement <*>
     pure [] <*>
     Gen.maybe genWhitespaces <*>
-    genNewline
+    (Gen.maybe genNewline)
   else
     Gen.scale (subtract 1) $
     Gen.choice
@@ -362,6 +389,7 @@ genStatement =
         n' <- Gen.integral (Range.constant 1 n)
         n'' <- Gen.integral (Range.constant 0 (n-n'))
         SmallStatements <$>
+          genIndents <*>
           Gen.resize n' genSmallStatement <*>
           (if n'' == 0
            then pure []
@@ -371,9 +399,16 @@ genStatement =
                (Gen.resize ((n-n') `div` n'') $
                 (,) <$> genWhitespaces <*> genSmallStatement)) <*>
           Gen.maybe genWhitespaces <*>
-          genNewline
+          (Gen.maybe genNewline)
     , CompoundStatement <$> genCompoundStatement
     ]
+
+genIndent :: MonadGen m => m Indent
+genIndent =
+  view (from indentWhitespaces) <$> genWhitespaces
+
+genIndents :: MonadGen m => m (Indents ())
+genIndents = (\is -> Indents is ()) <$> Gen.list (Range.constant 0 10) genIndent
 
 genModule :: MonadGen m => m (Module '[] ())
 genModule = Gen.sized $ \n -> do
@@ -384,6 +419,17 @@ genModule = Gen.sized $ \n -> do
       (Gen.resize
          (n `div` num)
          (Gen.choice
-          [ fmap Left $ (,,) <$> genWhitespaces <*> Gen.maybe genComment <*> genNewline
+          [ fmap Left $ (,,) <$> genIndents <*> Gen.maybe genComment <*> Gen.maybe genNewline
           , Right <$> genStatement
           ]))
+
+genImportAs :: MonadGen m => m (e ()) -> m (Ident '[] ()) -> m (ImportAs e '[] ())
+genImportAs me genIdent =
+  Gen.sized $ \n -> do
+    n' <- Gen.integral (Range.constant 1 n)
+    let n'' = n - n'
+    ImportAs () <$>
+      Gen.resize n' me <*>
+      (if n'' <= 2
+       then pure Nothing
+       else fmap Just $ (,) <$> genWhitespaces1 <*> Gen.resize n'' genIdent)

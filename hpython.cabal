@@ -18,6 +18,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:     Data.Validate
                      , Language.Python.Syntax
+                     , Language.Python.Internal.Lexer
                      , Language.Python.Internal.Optics
                      , Language.Python.Internal.Parse
                      , Language.Python.Internal.Render
@@ -46,6 +47,10 @@ library
                      , trifecta
                      , mtl
                      , bytestring-trie >=0.2
+                     , containers >=0.5 && <0.6
+                     , deriving-compat >=0.4 && <0.5
+                     , semigroupoids >=5.2.2 && <5.3
+                     , fingertree >=0.1 && <0.2
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -O2
@@ -75,6 +80,8 @@ test-suite hpython-tests
   other-modules:       Generators.General
                      , Generators.Common
                      , Generators.Correct
+                     , Helpers
+                     , LexerParser
                      , Scope
                      , Roundtrip
   hs-source-dirs:      test
@@ -86,6 +93,7 @@ test-suite hpython-tests
                      , lens
                      , mtl
                      , process
+                     , semigroupoids >=5.2.2 && <5.3
                      , transformers
                      , trifecta
   default-language:    Haskell2010

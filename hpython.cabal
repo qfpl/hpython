@@ -23,6 +23,7 @@ library
                      , Language.Python.Internal.Parse
                      , Language.Python.Internal.Render
                      , Language.Python.Internal.Syntax
+                     , Language.Python.Internal.Token
                      , Language.Python.Internal.Syntax.BinOp
                      , Language.Python.Internal.Syntax.Comment
                      , Language.Python.Internal.Syntax.CommaSep

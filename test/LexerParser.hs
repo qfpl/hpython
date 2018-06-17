@@ -9,6 +9,7 @@ import Language.Python.Internal.Lexer
 import Language.Python.Internal.Parse
 import Language.Python.Internal.Render
 import Language.Python.Internal.Syntax.Whitespace
+import Language.Python.Internal.Token
 
 import Helpers (doToPython, doParse, doNested, doTokenize, doIndentation)
 

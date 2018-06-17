@@ -23,6 +23,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Lexer
 import Language.Python.Internal.Syntax
+import Language.Python.Internal.Token
 
 some1 :: (Alt f, Applicative f) => f a -> f (NonEmpty a)
 some1 a = (:|) <$> a <*> many a

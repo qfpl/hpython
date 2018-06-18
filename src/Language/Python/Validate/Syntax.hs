@@ -496,10 +496,10 @@ validateArgsSyntax e = go [] False False (toList e) $> fmap coerce e
       when seenKeyword (syntaxErrors [_PositionalAfterKeywordArg # (a, expr)]) *>
       when seenUnpack (syntaxErrors [_PositionalAfterKeywordUnpacking # (a, expr)]) *>
       go names seenKeyword seenUnpack args
-    go names False False (StarArg a ws expr : args) =
+    go names seenKeyword False (StarArg a ws expr : args) =
       liftA2 (:)
         (StarArg a <$> validateWhitespace a ws <*> validateExprSyntax expr)
-        (go names False False args)
+        (go names seenKeyword False args)
     go names seenKeyword seenUnpack (StarArg a ws expr : args) =
       when seenKeyword (syntaxErrors [_PositionalAfterKeywordArg # (a, expr)]) *>
       when seenUnpack (syntaxErrors [_PositionalAfterKeywordUnpacking # (a, expr)]) *>

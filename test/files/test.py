@@ -9,3 +9,6 @@ def    hello():
 
 def boo(a, *b, c=1, **d):
     pass
+
+def bar(a=1, *b):
+    f(a=1, *b)

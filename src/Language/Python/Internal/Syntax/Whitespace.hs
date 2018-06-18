@@ -5,7 +5,7 @@
 module Language.Python.Internal.Syntax.Whitespace
   ( Newline(..)
   , Whitespace(..)
-  , lastWhitespace
+  , HasTrailingWhitespace(..)
   , IndentLevel, getIndentLevel, indentLevel, absoluteIndentLevel
   , Indent(..), indentWhitespaces
   , Indents(..), indentsValue, indentsAnn
@@ -14,6 +14,7 @@ where
 
 import Control.Lens.Iso (Iso', iso, from)
 import Control.Lens.Getter (view)
+import Control.Lens.Lens (Lens')
 import Control.Lens.TH (makeLenses)
 import Data.Foldable (toList)
 import Data.FingerTree (FingerTree, Measured(..), fromList)
@@ -34,16 +35,8 @@ data Whitespace
   | Newline Newline
   deriving (Eq, Show)
 
-lastWhitespace :: [Whitespace] -> Maybe Whitespace
-lastWhitespace [] = Nothing
-lastWhitespace (w : ws) =
-  case ws of
-    [] ->
-      case w of
-        Continued nl [] -> Just $ Newline nl
-        Continued _ ws' -> lastWhitespace ws'
-        _ -> Just w
-    _ -> lastWhitespace ws
+class HasTrailingWhitespace s where
+  trailingWhitespace :: Lens' s [Whitespace]
 
 newtype IndentLevel
   = IndentLevel

@@ -5,7 +5,7 @@ module Language.Python.Internal.Syntax.ModuleNames where
 
 import Control.Lens.Cons (_last)
 import Control.Lens.Fold ((^?!))
-import Control.Lens.Getter ((^.), getting)
+import Control.Lens.Getter ((^.))
 import Control.Lens.Lens (lens)
 import Control.Lens.Setter ((.~))
 import Data.Coerce (coerce)
@@ -14,7 +14,6 @@ import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax.Ident
-import Language.Python.Internal.Syntax.Token
 import Language.Python.Internal.Syntax.Whitespace
 
 data RelativeModuleName v a
@@ -22,37 +21,25 @@ data RelativeModuleName v a
   | Relative (NonEmpty Dot)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-instance Token (RelativeModuleName v a) (RelativeModuleName '[] a) where
-  unvalidate = coerce
-  whitespaceAfter =
+instance HasTrailingWhitespace (RelativeModuleName v a) where
+  trailingWhitespace =
     lens
       (\case
-          RelativeWithName _ mn -> mn ^. getting whitespaceAfter
-          Relative (a :| as) -> (a : as) ^?! _last.whitespaceAfter)
+          RelativeWithName _ mn -> mn ^. trailingWhitespace
+          Relative (a :| as) -> (a : as) ^?! _last.trailingWhitespace)
       (\a ws -> case a of
-          RelativeWithName x mn -> RelativeWithName x (mn & whitespaceAfter .~ ws)
+          RelativeWithName x mn -> RelativeWithName x (mn & trailingWhitespace .~ ws)
           Relative (a :| as) ->
             Relative .
             NonEmpty.fromList $
-            (a : as) & _last.whitespaceAfter .~ ws)
-
-  startChar (RelativeWithName [] mn) = startChar mn
-  startChar (RelativeWithName (_:_) mn) = '.'
-  startChar (Relative _) = '.'
-
-  endChar (RelativeWithName _ mn) = endChar mn
-  endChar (Relative _) = '.'
+            (a : as) & _last.trailingWhitespace .~ ws)
 
 data Dot = Dot [Whitespace]
   deriving (Eq, Show)
 
-instance Token Dot Dot where
-  unvalidate = id
-  whitespaceAfter =
+instance HasTrailingWhitespace Dot where
+  trailingWhitespace =
     lens (\(Dot ws) -> ws) (\_ ws -> Dot ws)
-
-  startChar _ = '.'
-  endChar _ = '.'
 
 data ModuleName v a
   = ModuleNameOne a (Ident v a)
@@ -69,20 +56,13 @@ makeModuleName i ((a, b) : as) =
   ModuleNameMany (_identAnnotation i) i a $
   makeModuleName b as
 
-instance Token (ModuleName v a) (ModuleName '[] a) where
-  unvalidate = coerce
-  whitespaceAfter =
+instance HasTrailingWhitespace (ModuleName v a) where
+  trailingWhitespace =
     lens
       (\case
-          ModuleNameOne _ i -> i ^. getting whitespaceAfter
-          ModuleNameMany _ _ _ mn -> mn ^. getting whitespaceAfter)
+          ModuleNameOne _ i -> i ^. trailingWhitespace
+          ModuleNameMany _ _ _ mn -> mn ^. trailingWhitespace)
       (\mn ws -> case mn of
-          ModuleNameOne a b -> ModuleNameOne a (b & whitespaceAfter .~ ws)
+          ModuleNameOne a b -> ModuleNameOne a (b & trailingWhitespace .~ ws)
           ModuleNameMany a b d mn ->
-            ModuleNameMany a (unvalidate b) d (mn & whitespaceAfter .~ ws))
-
-  startChar (ModuleNameOne _ i) = startChar i
-  startChar (ModuleNameMany _ i _ _) = startChar i
-
-  endChar (ModuleNameOne _ i) = endChar i
-  endChar (ModuleNameMany _ _ _ mn) = endChar mn
+            ModuleNameMany a (coerce b) d (mn & trailingWhitespace .~ ws))

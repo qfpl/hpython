@@ -23,7 +23,6 @@ import GHC.Generics (Generic)
 import Language.Python.Internal.Syntax.BinOp
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Ident
-import Language.Python.Internal.Syntax.Token
 import Language.Python.Internal.Syntax.Whitespace
 
 -- | 'Traversal' over all the expressions in a term
@@ -181,73 +180,40 @@ data Expr (v :: [*]) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
-instance Token (Expr v a) (Expr '[] a) where
-  unvalidate = coerce
-
-  startChar List{} = '['
-  startChar (Deref _ e _ _) = startChar e
-  startChar (Call _ e _ _ _) = startChar e
-  startChar None{} = 'N'
-  startChar (BinOp _ e _ _) = startChar e
-  startChar Negate{} = '-'
-  startChar Parens{} = '('
-  startChar (Ident _ i) = Prelude.head $ _identValue i
-  startChar (Int _ i _) = Prelude.head $ show i
-  startChar (Bool _ b _) = Prelude.head $ show b
-  startChar String{} = '"'
-  startChar (Tuple _ a _ _) = startChar a
-  startChar Not{} = 'n'
-
-  endChar List{} = ']'
-  endChar (Deref _ _ _ i) = Prelude.last $ _identValue i
-  endChar Call{} = ')'
-  endChar None{} = 'e'
-  endChar (BinOp _ _ _ e) =
-    case e of
-      Tuple{} -> ')'
-      _ -> endChar e
-  endChar (Negate _ _ e) = endChar e
-  endChar Parens{} = ')'
-  endChar (Ident _ i) = Prelude.last $ _identValue i
-  endChar (Int _ i _) = Prelude.last $ show i
-  endChar (Bool _ b _) = Prelude.last $ show b
-  endChar String{} = '"'
-  endChar (Tuple _ a _ c) = maybe (endChar a) endChar c
-  endChar (Not _ _ e) = endChar e
-
-  whitespaceAfter =
+instance HasTrailingWhitespace (Expr v a) where
+  trailingWhitespace =
     lens
       (\case
           None _ ws -> ws
           List _ _ _ ws -> ws
-          Deref _ _ _ a -> a ^. getting whitespaceAfter
+          Deref _ _ _ a -> a ^. getting trailingWhitespace
           Call _ _ _ _ ws -> ws
-          BinOp _ _ _ e -> e ^. getting whitespaceAfter
-          Negate _ _ e -> e ^. getting whitespaceAfter
+          BinOp _ _ _ e -> e ^. getting trailingWhitespace
+          Negate _ _ e -> e ^. getting trailingWhitespace
           Parens _ _ _ ws -> ws
-          Ident _ a -> a ^. getting whitespaceAfter
+          Ident _ a -> a ^. getting trailingWhitespace
           Int _ _ ws -> ws
           Bool _ _ ws -> ws
           String _ _ _ _ ws -> ws
-          Not _ _ e -> e ^. getting whitespaceAfter
+          Not _ _ e -> e ^. getting trailingWhitespace
           Tuple _ _ ws Nothing -> ws
-          Tuple _ _ _ (Just cs) -> cs ^. getting whitespaceAfter)
+          Tuple _ _ _ (Just cs) -> cs ^. getting trailingWhitespace)
       (\e ws ->
         case e of
           None a _ -> None a ws
           List a b c _ -> List a b (coerce c) ws
-          Deref a b c d -> Deref a (coerce b) c (d & whitespaceAfter .~ ws)
+          Deref a b c d -> Deref a (coerce b) c (d & trailingWhitespace .~ ws)
           Call a b c d _ -> Call a (coerce b) c (coerce d) ws
-          BinOp a b c e -> BinOp a (coerce b) c (e & whitespaceAfter .~ ws)
-          Negate a b c -> Negate a b (c & whitespaceAfter .~ ws)
+          BinOp a b c e -> BinOp a (coerce b) c (e & trailingWhitespace .~ ws)
+          Negate a b c -> Negate a b (c & trailingWhitespace .~ ws)
           Parens a b c _ -> Parens a b (coerce c) ws
-          Ident a b -> Ident a (b & whitespaceAfter .~ ws)
+          Ident a b -> Ident a (b & trailingWhitespace .~ ws)
           Int a b _ -> Int a b ws
           Bool a b _ -> Bool a b ws
           String d a b c _ -> String d a b c ws
-          Not a b c -> Not a b (c & whitespaceAfter .~ ws)
+          Not a b c -> Not a b (c & trailingWhitespace .~ ws)
           Tuple a e _ Nothing -> Tuple a (coerce e) ws Nothing
-          Tuple a b ws (Just cs) -> Tuple a (coerce b) ws (Just $ cs & whitespaceAfter .~ ws))
+          Tuple a b ws (Just cs) -> Tuple a (coerce b) ws (Just $ cs & trailingWhitespace .~ ws))
 
 instance IsString (Expr '[] ()) where
   fromString s = Ident () (MkIdent () s [])
@@ -255,9 +221,9 @@ instance IsString (Expr '[] ()) where
 instance Num (Expr '[] ()) where
   fromInteger n = Int () n []
   negate = Negate () []
-  (+) a = BinOp () (a & whitespaceAfter .~ [Space]) (Plus () [Space])
-  (*) a = BinOp () (a & whitespaceAfter .~ [Space]) (Multiply () [Space])
-  (-) a = BinOp () (a & whitespaceAfter .~ [Space]) (Minus () [Space])
+  (+) a = BinOp () (a & trailingWhitespace .~ [Space]) (Plus () [Space])
+  (*) a = BinOp () (a & trailingWhitespace .~ [Space]) (Multiply () [Space])
+  (-) a = BinOp () (a & trailingWhitespace .~ [Space]) (Minus () [Space])
   signum = undefined
   abs = undefined
 

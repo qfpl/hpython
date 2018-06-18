@@ -10,7 +10,6 @@ import Control.Lens.TH (makeLenses)
 import Data.Functor (($>))
 import Data.Semigroup ((<>))
 
-import Language.Python.Internal.Syntax.Token
 import Language.Python.Internal.Syntax.Whitespace
 
 data BinOp a
@@ -26,32 +25,8 @@ data BinOp a
   | Percent a [Whitespace]
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-instance Token (BinOp a) (BinOp a) where
-  unvalidate = id
-
-  endChar Is{} = 's'
-  endChar Minus{} = '-'
-  endChar Exp{} = '*'
-  endChar BoolAnd{} = 'd'
-  endChar BoolOr{} = 'r'
-  endChar Multiply{} = '*'
-  endChar Divide{} = '/'
-  endChar Plus{} = '+'
-  endChar Equals{} = '='
-  endChar Percent{} = '%'
-
-  startChar Is{} = 's'
-  startChar Minus{} = '-'
-  startChar Exp{} = '*'
-  startChar BoolAnd{} = 'd'
-  startChar BoolOr{} = 'r'
-  startChar Multiply{} = '*'
-  startChar Divide{} = '/'
-  startChar Plus{} = '+'
-  startChar Equals{} = '='
-  startChar Percent{} = '%'
-
-  whitespaceAfter =
+instance HasTrailingWhitespace (BinOp a) where
+  trailingWhitespace =
     lens
       (\case
          Is _ a -> a

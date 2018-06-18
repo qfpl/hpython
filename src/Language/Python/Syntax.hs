@@ -49,11 +49,11 @@ list_ :: [Expr '[] ()] -> Expr '[] ()
 list_ es = List () [] (listToCommaSep1' es) []
 
 is_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-is_ a = BinOp () (a & whitespaceAfter .~ [Space]) (Is () [Space])
+is_ a = BinOp () (a & trailingWhitespace .~ [Space]) (Is () [Space])
 infixl 1 `is_`
 
 (.==) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-(.==) a = BinOp () (a & whitespaceAfter .~ [Space]) (Equals () [Space])
+(.==) a = BinOp () (a & trailingWhitespace .~ [Space]) (Equals () [Space])
 infixl 1 .==
 
 (.|) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
@@ -93,7 +93,7 @@ infixl 7 .*
 infixl 7 .@
 
 (./) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-(./) a = BinOp () (a & whitespaceAfter .~ [Space]) (Divide () [Space])
+(./) a = BinOp () (a & trailingWhitespace .~ [Space]) (Divide () [Space])
 infixl 7 ./
 
 (.//) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
@@ -105,7 +105,7 @@ infixl 7 .//
 infixl 7 .%
 
 (.**) :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-(.**) a = BinOp () (a & whitespaceAfter .~ [Space]) (Exp () [Space])
+(.**) a = BinOp () (a & trailingWhitespace .~ [Space]) (Exp () [Space])
 infixr 8 .**
 
 (/>) :: Expr '[] () -> Ident '[] () -> Expr '[] ()
@@ -162,10 +162,10 @@ false_ :: Expr '[] ()
 false_ = Bool () False []
 
 and_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-and_ a = BinOp () (a & whitespaceAfter .~ [Space]) (BoolAnd () [Space])
+and_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolAnd () [Space])
 
 or_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
-or_ a = BinOp () (a & whitespaceAfter .~ [Space]) (BoolOr () [Space])
+or_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolOr () [Space])
 
 str_ :: String -> Expr '[] ()
 str_ s = String () Nothing ShortDouble s []
@@ -177,7 +177,7 @@ longStr_ s = String () Nothing LongDouble s []
 (.=) a b =
   SmallStatements
     (Indents [] ())
-    (Assign () (a & whitespaceAfter .~ [Space]) [Space] b) [] Nothing (Just LF)
+    (Assign () (a & trailingWhitespace .~ [Space]) [Space] b) [] Nothing (Just LF)
 
 forElse_
   :: Expr '[] ()
@@ -187,13 +187,13 @@ forElse_
   -> Statement '[] ()
 forElse_ val vals block els =
   CompoundStatement $
-  For (Indents [] ()) () [Space] (val & whitespaceAfter .~ [Space]) [Space] vals [] LF
+  For (Indents [] ()) () [Space] (val & trailingWhitespace .~ [Space]) [Space] vals [] LF
     (toBlock block)
     (Just (Indents [] (), [], [], LF, toBlock els))
 
 for_ :: Expr '[] () -> Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 for_ val vals block =
   CompoundStatement $
-  For (Indents [] ()) () [Space] (val & whitespaceAfter .~ [Space]) [Space] vals [] LF
+  For (Indents [] ()) () [Space] (val & trailingWhitespace .~ [Space]) [Space] vals [] LF
     (toBlock block)
     Nothing

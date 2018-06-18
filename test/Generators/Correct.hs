@@ -303,8 +303,8 @@ genExpr' isExp = Gen.sized $ \n ->
             (Gen.resize n' genExpr)
             (Gen.resize (n - n') (genExpr' $ case op of; Exp{} -> True; _ -> False))
             (\a b ->
-               BinOp () (a & whitespaceAfter .~ [Space]) <$>
-               pure (op & whitespaceAfter .~ [Space]) <*>
+               BinOp () (a & trailingWhitespace .~ [Space]) <$>
+               pure (op & trailingWhitespace .~ [Space]) <*>
                pure b)
       , genTuple genExpr
       , Not () <$> (NonEmpty.toList <$> genWhitespaces1) <*> genExpr
@@ -357,14 +357,14 @@ genSmallStatement = Gen.sized $ \n -> do
           genSizedCommaSep1 (genImportAs genModuleName genIdent)
         , From () <$>
           genWhitespaces <*>
-          (genRelativeModuleName & mapped.whitespaceAfter .~ [Space]) <*>
+          (genRelativeModuleName & mapped.trailingWhitespace .~ [Space]) <*>
           (NonEmpty.toList <$> genWhitespaces1) <*>
           genImportTargets
         , Raise () <$>
           fmap NonEmpty.toList genWhitespaces1 <*>
           Gen.maybe
             ((,) <$>
-             set (mapped.whitespaceAfter) [Space] genExpr <*>
+             set (mapped.trailingWhitespace) [Space] genExpr <*>
              Gen.maybe ((,) <$> fmap NonEmpty.toList genWhitespaces1 <*> genExpr))
         ] ++
         [pure (Break ()) | _inLoop ctxt] ++
@@ -486,7 +486,7 @@ genCompoundStatement =
              use currentIndentation <*>
              (NonEmpty.toList <$> genWhitespaces1) <*>
              (ExceptAs () <$>
-              (Gen.resize n2 genExpr & mapped.whitespaceAfter .~ [Space]) <*>
+              (Gen.resize n2 genExpr & mapped.trailingWhitespace .~ [Space]) <*>
               Gen.maybe ((,) <$> (NonEmpty.toList <$> genWhitespaces1) <*> genIdent)) <*>
              genWhitespaces <*>
              genNewline <*>
@@ -530,7 +530,7 @@ genCompoundStatement =
           use currentIndentation <*>
           pure () <*>
           (NonEmpty.toList <$> genWhitespaces1) <*>
-          (Gen.resize n1 genAssignable & mapped.whitespaceAfter .~ [Space]) <*>
+          (Gen.resize n1 genAssignable & mapped.trailingWhitespace .~ [Space]) <*>
           (NonEmpty.toList <$> genWhitespaces1) <*>
           Gen.resize n2 genExpr <*>
           genWhitespaces <*> genNewline <*>
@@ -581,13 +581,13 @@ genStatement =
           (Just <$> genNewline)
     ]
 
-genImportAs :: (Token (e ()) (e ()), MonadGen m) => m (e ()) -> m (Ident '[] ()) -> m (ImportAs e '[] ())
+genImportAs :: (HasTrailingWhitespace (e ()), MonadGen m) => m (e ()) -> m (Ident '[] ()) -> m (ImportAs e '[] ())
 genImportAs me genIdent =
   Gen.sized $ \n -> do
     n' <- Gen.integral (Range.constant 1 n)
     let n'' = n - n'
     ImportAs () <$>
-      set (mapped.whitespaceAfter) [Space] (Gen.resize n' me) <*>
+      set (mapped.trailingWhitespace) [Space] (Gen.resize n' me) <*>
       (if n'' <= 2
        then pure Nothing
        else fmap Just $ (,) <$> genWhitespaces1 <*> Gen.resize n'' genIdent)

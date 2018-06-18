@@ -29,11 +29,9 @@ library
                      , Language.Python.Internal.Syntax.CommaSep
                      , Language.Python.Internal.Syntax.Expr
                      , Language.Python.Internal.Syntax.Ident
-                     , Language.Python.Internal.Syntax.Keyword
                      , Language.Python.Internal.Syntax.Module
                      , Language.Python.Internal.Syntax.ModuleNames
                      , Language.Python.Internal.Syntax.Statement
-                     , Language.Python.Internal.Syntax.Token
                      , Language.Python.Internal.Syntax.Whitespace
                      , Language.Python.Validate.Scope
                      , Language.Python.Validate.Scope.Error

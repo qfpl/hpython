@@ -10,7 +10,6 @@ module Language.Python.Internal.Syntax
   , module Language.Python.Internal.Syntax.Module
   , module Language.Python.Internal.Syntax.ModuleNames
   , module Language.Python.Internal.Syntax.Statement
-  , module Language.Python.Internal.Syntax.Token
   , module Language.Python.Internal.Syntax.Whitespace
   )
 where
@@ -29,7 +28,6 @@ import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Module
 import Language.Python.Internal.Syntax.ModuleNames
 import Language.Python.Internal.Syntax.Statement
-import Language.Python.Internal.Syntax.Token
 import Language.Python.Internal.Syntax.Whitespace
 
 reservedWords :: [String]

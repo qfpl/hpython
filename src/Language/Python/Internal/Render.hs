@@ -15,13 +15,11 @@ module Language.Python.Internal.Render
 where
 
 import Control.Lens.Getter (view)
-import Control.Lens.Setter (over)
-import Control.Lens.Traversal (Traversal')
 import Control.Lens.Wrapped (_Wrapped)
 import Control.Lens.Plated (rewrite)
 import Data.Char (ord)
 import Data.Foldable (toList)
-import Data.Maybe (fromMaybe, maybe)
+import Data.Maybe (maybe)
 import Data.Semigroup (Semigroup(..))
 
 import Language.Python.Internal.Syntax
@@ -226,46 +224,6 @@ renderChar c
               "\\U" ++ replicate (8 - length hex) '0' ++ hex
           _ -> [c]
 
-data Lines a
-  = NoLines
-  | OneLine a
-  | ManyLines a Newline (Lines a)
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-listToLines :: Newline -> [a] -> Lines a
-listToLines _ [] = NoLines
-listToLines _ [a] = OneLine a
-listToLines nl (a:as) = ManyLines a nl $ listToLines nl as
-
-firstLine :: Traversal' (Lines a) a
-firstLine f NoLines = pure NoLines
-firstLine f (OneLine a) = OneLine <$> f a
-firstLine f (ManyLines a nl ls) = (\a' -> ManyLines a' nl ls) <$> f a
-
-endWith :: Newline -> Lines a -> Lines a
-endWith nl NoLines = NoLines
-endWith nl (OneLine a) = ManyLines a nl NoLines
-endWith nl (ManyLines a nl' as) =
-  ManyLines
-    a
-    (case as of; NoLines -> nl; _ -> nl')
-    (case as of; NoLines -> NoLines; _ -> endWith nl as)
-
-renderLines :: (a -> RenderOutput) -> Lines a -> RenderOutput
-renderLines _ NoLines = mempty
-renderLines f (OneLine a) = f a
-renderLines f (ManyLines a nl ls) = f a <> singleton (renderNewline nl) <> renderLines f ls
-
-instance Semigroup a => Semigroup (Lines a) where
-  NoLines <> a = a
-  OneLine a <> NoLines = OneLine a
-  OneLine a <> OneLine b = OneLine (a <> b)
-  OneLine a <> ManyLines b nl ls = ManyLines (a <> b) nl ls
-  ManyLines a nl ls <> b = ManyLines a nl (ls <> b)
-
-instance Semigroup a => Monoid (Lines a) where
-  mempty = NoLines
-  mappend = (<>)
-
 renderWhitespace :: Whitespace -> RenderOutput
 renderWhitespace Space = singleton $ TkSpace ()
 renderWhitespace Tab = singleton $ TkTab ()
@@ -440,141 +398,124 @@ renderSmallStatement (From _ ws1 name ws3 ns) =
   singleton (TkImport ()) <> foldMap renderWhitespace ws3 <>
   renderImportTargets ns
 
-renderBlock :: Block v a -> Lines RenderOutput
+renderBlock :: Block v a -> RenderOutput
 renderBlock =
   foldMap
     (either
        (\(x, y, z) ->
-          OneLine $
           foldMap renderWhitespace x <>
           maybe mempty (singleton . renderComment) y
           <> singleton (renderNewline z))
         renderStatement) .
   view _Wrapped
 
-renderCompoundStatement :: CompoundStatement v a -> Lines RenderOutput
+renderCompoundStatement :: CompoundStatement v a -> RenderOutput
 renderCompoundStatement (Fundef idnt _ ws1 name ws2 params ws3 ws4 nl body) =
-  ManyLines firstLine nl restLines
-  where
-    firstLine =
-      renderIndents idnt <>
-      singleton (TkDef ()) <> foldMap renderWhitespace ws1 <> renderIdent name <>
-      bracket (foldMap renderWhitespace ws2 <> renderCommaSep renderParam params) <>
-      foldMap renderWhitespace ws3 <> singleton (TkColon ()) <> foldMap renderWhitespace ws4
-    restLines = renderBlock body
+  renderIndents idnt <>
+  singleton (TkDef ()) <> foldMap renderWhitespace ws1 <> renderIdent name <>
+  bracket (foldMap renderWhitespace ws2 <> renderCommaSep renderParam params) <>
+  foldMap renderWhitespace ws3 <> singleton (TkColon ()) <> foldMap renderWhitespace ws4 <>
+  singleton (renderNewline nl) <>
+  renderBlock body
 renderCompoundStatement (If idnt _ ws1 expr ws3 nl body body') =
-  ManyLines firstLine nl restLines
-  where
-    firstLine =
-      renderIndents idnt <>
-      singleton (TkIf ()) <> foldMap renderWhitespace ws1 <>
-      bracketTuple expr <>
-      singleton (TkColon ()) <> foldMap renderWhitespace ws3
-    restLines = renderBlock body <> fromMaybe mempty elseLines
-    elseLines =
-      ManyLines <$>
-      fmap
-        (\(idnt, ws4, ws5, _, _) ->
-           renderIndents idnt <>
-           singleton (TkElse ()) <> foldMap renderWhitespace ws4 <>
-           singleton (TkColon ()) <> foldMap renderWhitespace ws5)
-        body' <*>
-      fmap (\(_, _, _, nl2, _) -> nl2) body' <*>
-      fmap (\(_, _, _, _, body'') -> renderBlock body'') body'
+  renderIndents idnt <>
+  singleton (TkIf ()) <> foldMap renderWhitespace ws1 <>
+  bracketTuple expr <>
+  singleton (TkColon ()) <> foldMap renderWhitespace ws3 <>
+  singleton (renderNewline nl) <>
+  renderBlock body <>
+  maybe
+    mempty
+    (\(idnt, ws4, ws5, nl2, body'') ->
+        renderIndents idnt <>
+        singleton (TkElse ()) <> foldMap renderWhitespace ws4 <>
+        singleton (TkColon ()) <> foldMap renderWhitespace ws5 <>
+        singleton (renderNewline nl2) <>
+        renderBlock body'')
+    body'
 renderCompoundStatement (While idnt _ ws1 expr ws3 nl body) =
-  ManyLines
-    (renderIndents idnt <>
-     singleton (TkWhile ()) <> foldMap renderWhitespace ws1 <> bracketTuple expr <>
-     singleton (TkColon ()) <> foldMap renderWhitespace ws3)
-    nl
-    (renderBlock body)
+  renderIndents idnt <>
+  singleton (TkWhile ()) <> foldMap renderWhitespace ws1 <> bracketTuple expr <>
+  singleton (TkColon ()) <> foldMap renderWhitespace ws3 <>
+  singleton (renderNewline nl) <>
+  renderBlock body
 renderCompoundStatement (TryExcept idnt _ a b c d e f g) =
-  ManyLines
-    (renderIndents idnt <>
-     singleton (TkTry ()) <> foldMap renderWhitespace a <>
-     singleton (TkColon ()) <> foldMap renderWhitespace b)
-    c
-    (renderBlock d) <>
+  renderIndents idnt <>
+  singleton (TkTry ()) <> foldMap renderWhitespace a <>
+  singleton (TkColon ()) <> foldMap renderWhitespace b <>
+  singleton (renderNewline c) <>
+  renderBlock d <>
   foldMap
     (\(idnt, ws1, eas, ws2, nl, bl) ->
-       ManyLines
-         (renderIndents idnt <>
-          singleton (TkExcept ()) <> foldMap renderWhitespace ws1 <>
-          renderExceptAs eas <>
-          singleton (TkColon ()) <> foldMap renderWhitespace ws2)
-         nl
-         (renderBlock bl))
+       renderIndents idnt <>
+       singleton (TkExcept ()) <> foldMap renderWhitespace ws1 <>
+       renderExceptAs eas <>
+       singleton (TkColon ()) <> foldMap renderWhitespace ws2 <>
+       singleton (renderNewline nl) <>
+       renderBlock bl)
     e <>
   foldMap
     (\(idnt, ws1, ws2, nl, bl) ->
-       ManyLines
-         (renderIndents idnt <>
-          singleton (TkElse ()) <> foldMap renderWhitespace ws1 <>
-          singleton (TkColon ()) <> foldMap renderWhitespace ws2)
-         nl
-         (renderBlock bl))
+       renderIndents idnt <>
+       singleton (TkElse ()) <> foldMap renderWhitespace ws1 <>
+       singleton (TkColon ()) <> foldMap renderWhitespace ws2 <>
+       singleton (renderNewline nl) <>
+       renderBlock bl)
     f <>
   foldMap
     (\(idnt, ws1, ws2, nl, bl) ->
-       ManyLines
-         (renderIndents idnt <>
-          singleton (TkFinally ()) <> foldMap renderWhitespace ws1 <>
-          singleton (TkColon ()) <> foldMap renderWhitespace ws2)
-         nl
-         (renderBlock bl))
+       renderIndents idnt <>
+       singleton (TkFinally ()) <> foldMap renderWhitespace ws1 <>
+       singleton (TkColon ()) <> foldMap renderWhitespace ws2 <>
+       singleton (renderNewline nl) <>
+       renderBlock bl)
     g
 renderCompoundStatement (TryFinally idnt _ a b c d idnt2 e f g h) =
-  ManyLines
-    (renderIndents idnt <>
-     singleton (TkTry ()) <> foldMap renderWhitespace a <>
-     singleton (TkColon ()) <> foldMap renderWhitespace b)
-    c
-    (renderBlock d) <>
-  ManyLines
-    (renderIndents idnt2 <>
-     singleton (TkFinally ()) <> foldMap renderWhitespace e <>
-     singleton (TkColon ()) <> foldMap renderWhitespace f)
-    g
-    (renderBlock h)
+  renderIndents idnt <>
+  singleton (TkTry ()) <> foldMap renderWhitespace a <>
+  singleton (TkColon ()) <> foldMap renderWhitespace b <>
+  singleton (renderNewline c) <>
+  renderBlock d <>
+  renderIndents idnt2 <>
+  singleton (TkFinally ()) <> foldMap renderWhitespace e <>
+  singleton (TkColon ()) <> foldMap renderWhitespace f <>
+  singleton (renderNewline g) <>
+  renderBlock h
 renderCompoundStatement (For idnt _ a b c d e f g h) =
-  ManyLines
-    (renderIndents idnt <>
-     singleton (TkFor ()) <> foldMap renderWhitespace a <> renderExpr b <>
-     singleton (TkIn ()) <> foldMap renderWhitespace c <> renderExpr d <>
-     singleton (TkColon ()) <> foldMap renderWhitespace e)
-    f
-    (renderBlock g) <>
+  renderIndents idnt <>
+  singleton (TkFor ()) <> foldMap renderWhitespace a <> renderExpr b <>
+  singleton (TkIn ()) <> foldMap renderWhitespace c <> renderExpr d <>
+  singleton (TkColon ()) <> foldMap renderWhitespace e <>
+  singleton (renderNewline f) <>
+  renderBlock g <>
   foldMap
     (\(idnt, x, y, z, w) ->
-       ManyLines
-         (renderIndents idnt <>
-          singleton (TkElse ()) <> foldMap renderWhitespace x <>
-          singleton (TkColon ()) <> foldMap renderWhitespace y)
-         z
-         (renderBlock w))
+        renderIndents idnt <>
+        singleton (TkElse ()) <> foldMap renderWhitespace x <>
+        singleton (TkColon ()) <> foldMap renderWhitespace y <>
+        singleton (renderNewline z) <>
+        renderBlock w)
     h
 renderCompoundStatement (ClassDef idnt _ a b c d e f) =
-  ManyLines
-    (renderIndents idnt <>
-     singleton (TkClass ()) <> foldMap renderWhitespace a <>
-     renderIdent b <>
-     foldMap
-       (\(x, y, z) ->
-          bracket (foldMap renderWhitespace x <> foldMap (renderCommaSep1 renderArg) y) <>
-          foldMap renderWhitespace z)
-       c <>
-     singleton (TkColon ()) <> foldMap renderWhitespace d)
-    e
-    (renderBlock f)
+  renderIndents idnt <>
+  singleton (TkClass ()) <> foldMap renderWhitespace a <>
+  renderIdent b <>
+  foldMap
+    (\(x, y, z) ->
+      bracket (foldMap renderWhitespace x <> foldMap (renderCommaSep1 renderArg) y) <>
+      foldMap renderWhitespace z)
+    c <>
+  singleton (TkColon ()) <> foldMap renderWhitespace d <>
+  singleton (renderNewline e) <>
+  renderBlock f
 
 renderIndent :: Indent -> RenderOutput
 renderIndent (MkIndent ws) = foldMap renderWhitespace $ toList ws
 
-renderStatement :: Statement v a -> Lines RenderOutput
+renderStatement :: Statement v a -> RenderOutput
 renderStatement (CompoundStatement c) = renderCompoundStatement c
 renderStatement (SmallStatements idnts s ss sc nl) =
-  over firstLine (renderIndents idnts <>) .
-  f $
+  renderIndents idnts <>
   renderSmallStatement s <>
   foldMap
     (\(b, c) ->
@@ -584,12 +525,8 @@ renderStatement (SmallStatements idnts s ss sc nl) =
     ss <>
   foldMap
     (\b -> TkSemicolon () `cons` foldMap renderWhitespace b)
-    sc
-  where
-    f a =
-      case nl of
-        Nothing -> OneLine a
-        Just nl' -> ManyLines a nl' NoLines
+    sc <>
+  foldMap (singleton . renderNewline) nl
 
 renderExceptAs :: ExceptAs v a -> RenderOutput
 renderExceptAs (ExceptAs _ e f) =
@@ -644,14 +581,14 @@ renderModule (Module ms) =
           renderIndents a <>
           maybe mempty (singleton . renderComment) b <>
           maybe mempty (singleton . renderNewline) c)
-       (renderLines id . renderStatement))
+       renderStatement)
     ms
 
 showModule :: Module v a -> String
 showModule = showRenderOutput . renderModule
 
 showStatement :: Statement v a -> String
-showStatement = showRenderOutput . renderLines id . renderStatement
+showStatement = showRenderOutput . renderStatement
 
 showExpr :: Expr v a -> String
 showExpr = showRenderOutput . renderExpr

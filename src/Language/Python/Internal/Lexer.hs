@@ -1,6 +1,8 @@
 {-# language BangPatterns #-}
 {-# language OverloadedLists #-}
 {-# language TypeApplications #-}
+{-# language MultiParamTypeClasses #-}
+{-# language GeneralizedNewtypeDeriving #-}
 module Language.Python.Internal.Lexer where
 
 import Control.Applicative ((<|>), some, many, optional)
@@ -11,11 +13,13 @@ import Control.Monad.Except (throwError)
 import Control.Monad.State (StateT, evalStateT, get, modify, put)
 import Data.Bifunctor (first)
 import Data.Char (chr, isAscii)
+import Data.FingerTree (FingerTree, Measured(..))
 import Data.Foldable (asum)
 import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty(..))
+import Data.Monoid (Sum(..))
 import Data.Semigroup ((<>))
-import Data.Sequence ((!?), (|>), ViewR(..), ViewL(..), Seq)
+import Data.Sequence ((!?), (|>), Seq)
 import Text.Parser.LookAhead (LookAheadParsing, lookAhead)
 import Text.Trifecta
   ( CharParsing, DeltaParsing, Caret, Careted(..), char, careted, noneOf
@@ -23,7 +27,6 @@ import Text.Trifecta
   , notFollowedBy
   )
 
-import qualified Data.Sequence as Seq
 import qualified Data.FingerTree as FingerTree
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Text.Trifecta as Trifecta
@@ -152,6 +155,7 @@ parseToken =
     , char '>' *> (char '=' $> TkGte <|> char '>' $> TkShiftRight <|> pure TkGt)
     , char '*' *> (char '*' $> TkDoubleStar <|> pure TkStar)
     , char '/' *> (char '/' $> TkDoubleSlash <|> pure TkSlash)
+    , string "!=" $> TkBangEq
     , char '+' $> TkPlus
     , char '-' $> TkMinus
     , char '%' $> TkPercent
@@ -342,7 +346,7 @@ data Line a
   , lineEnd :: Maybe Newline
   } deriving (Eq, Show)
 
-logicalToLine :: Seq Int -> LogicalLine a -> Line a
+logicalToLine :: FingerTree (Sum Int) (Summed Int) -> LogicalLine a -> Line a
 logicalToLine leaps (LogicalLine a b c d) =
   Line a (if all isBlankToken c then [b] else splitIndents leaps b) c (snd <$> d)
 
@@ -359,27 +363,39 @@ data IndentationError
   | ExpectedDedent
   deriving (Eq, Show)
 
+newtype Summed a
+  = Summed
+  { getSummed :: a }
+  deriving (Eq, Show, Ord, Num)
+
+instance Num a => Measured (Sum a) (Summed a) where
+  measure (Summed a) = Sum a
+
 -- | Given a list of indentation jumps (first to last) and some whitespace,
 -- divide the whitespace up into "blocks" which correspond to each jump
-splitIndents :: Seq Int -> Indent -> [Indent]
-splitIndents ns ws =
-  case Seq.viewl ns of
-    EmptyL -> [ws]
-    n :< ns'
-      | Seq.null ns' -> [ws]
-      | otherwise ->
-          let
-            (befores, afters) = FingerTree.split ((> n) . getIndentLevel) $ unIndent ws
-          in
-            if FingerTree.null befores
-            then error $ "could not carve out " <> show n <> " from " <> show ws
-            else MkIndent befores : splitIndents ns' (MkIndent afters)
+splitIndents :: FingerTree (Sum Int) (Summed Int) -> Indent -> [Indent]
+splitIndents ns ws = go ns ws []
+  where
+    go :: FingerTree (Sum Int) (Summed Int) -> Indent -> [Indent] -> [Indent]
+    go ns ws =
+      case FingerTree.viewr ns of
+        FingerTree.EmptyR -> (ws :)
+        ns' FingerTree.:> n
+          | FingerTree.null ns' -> (ws :)
+          | otherwise ->
+              let
+                (befores, afters) =
+                  FingerTree.split ((> getSum (measure ns')) . getIndentLevel) $ unIndent ws
+              in
+                if FingerTree.null afters
+                then error $ "could not carve out " <> show n <> " from " <> show ws
+                else go ns' (MkIndent befores) .  (MkIndent afters :)
 
 nested :: [IndentedLine a] -> Either IndentationError (Nested a)
-nested = fmap Nested . go [] []
+nested = fmap Nested . go FingerTree.empty []
   where
     go
-      :: Seq Int
+      :: FingerTree (Sum Int) (Summed Int)
       -> [Seq (Either (Nested a) (Line a))]
       -> [IndentedLine a]
       -> Either
@@ -387,12 +403,12 @@ nested = fmap Nested . go [] []
            (Seq (Either (Nested a) (Line a)))
     go leaps [] [] = pure []
     go leaps (a : as) [] = foldr (\_ _ -> Left ExpectedDedent) (pure a) as
-    go leaps ctxt (Indent n a : is) = go (leaps |> n) ([] : ctxt) is
+    go leaps ctxt (Indent n a : is) = go (leaps FingerTree.|> Summed n) ([] : ctxt) is
     go leaps [] (Dedent : is) = Left UnexpectedDedent
     go leaps (a : as) (Dedent : is) =
-      case Seq.viewr leaps of
-        EmptyR -> error "impossible"
-        leaps' :> _ ->
+      case FingerTree.viewr leaps of
+        FingerTree.EmptyR -> error "impossible"
+        leaps' FingerTree.:> _ ->
           case as of
             x : xs -> go leaps' ((x |> Left (Nested a)) : xs) is
             [] -> go leaps' [[Left (Nested a)]] is

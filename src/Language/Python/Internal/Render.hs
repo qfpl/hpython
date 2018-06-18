@@ -156,6 +156,7 @@ showToken t =
     TkLte{} -> "<="
     TkEq{} -> "="
     TkDoubleEq{}-> "=="
+    TkBangEq{}-> "!="
     TkGt{} -> ">"
     TkGte{} -> ">="
     TkContinued nl _ ->
@@ -582,6 +583,11 @@ renderBinOp (Exp _ ws) = TkDoubleStar () `cons` foldMap renderWhitespace ws
 renderBinOp (BoolAnd _ ws) = TkAnd () `cons` foldMap renderWhitespace ws
 renderBinOp (BoolOr _ ws) = TkOr () `cons` foldMap renderWhitespace ws
 renderBinOp (Equals _ ws) = TkDoubleEq () `cons` foldMap renderWhitespace ws
+renderBinOp (Lt _ ws) = TkLt () `cons` foldMap renderWhitespace ws
+renderBinOp (LtEquals _ ws) = TkLte () `cons` foldMap renderWhitespace ws
+renderBinOp (Gt _ ws) = TkGt () `cons` foldMap renderWhitespace ws
+renderBinOp (GtEquals _ ws) = TkGte () `cons` foldMap renderWhitespace ws
+renderBinOp (NotEquals _ ws) = TkBangEq () `cons` foldMap renderWhitespace ws
 renderBinOp (Percent _ ws) = TkPercent () `cons` foldMap renderWhitespace ws
 
 renderIndents :: Indents a -> RenderOutput

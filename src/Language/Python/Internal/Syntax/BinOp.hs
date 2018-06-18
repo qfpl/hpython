@@ -18,11 +18,16 @@ data BinOp a
   | Exp a [Whitespace]
   | BoolAnd a [Whitespace]
   | BoolOr a [Whitespace]
+  | Equals a [Whitespace]
+  | Lt a [Whitespace]
+  | LtEquals a [Whitespace]
+  | Gt a [Whitespace]
+  | GtEquals a [Whitespace]
+  | NotEquals a [Whitespace]
   | Multiply a [Whitespace]
   | Divide a [Whitespace]
-  | Plus a [Whitespace]
-  | Equals a [Whitespace]
   | Percent a [Whitespace]
+  | Plus a [Whitespace]
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasTrailingWhitespace (BinOp a) where
@@ -38,6 +43,11 @@ instance HasTrailingWhitespace (BinOp a) where
          Divide _ a -> a
          Plus _ a -> a
          Equals _ a -> a
+         Lt _ a -> a
+         LtEquals _ a -> a
+         Gt _ a -> a
+         GtEquals _ a -> a
+         NotEquals _ a -> a
          Percent _ a -> a)
       (\op ws ->
          case op of
@@ -50,6 +60,11 @@ instance HasTrailingWhitespace (BinOp a) where
            Divide a _ -> Divide a ws
            Plus a _ -> Plus a ws
            Equals a _ -> Equals a ws
+           Lt a _ -> Lt a ws
+           LtEquals a _ -> LtEquals a ws
+           Gt a _ -> Gt a ws
+           GtEquals a _ -> GtEquals a ws
+           NotEquals a _ -> NotEquals a ws
            Percent a _ -> Equals a ws)
 
 data Assoc = L | R deriving (Eq, Show)
@@ -68,6 +83,11 @@ operatorTable =
   , entry BoolAnd 5 L
   , entry Is 10 L
   , entry Equals 10 L
+  , entry Lt 10 L
+  , entry LtEquals 10 L
+  , entry Gt 10 L
+  , entry GtEquals 10 L
+  , entry NotEquals 10 L
   , entry Minus 20 L
   , entry Plus 20 L
   , entry Multiply 25 L
@@ -85,6 +105,11 @@ sameOperator op op' =
     (BoolAnd{}, BoolAnd{}) -> True
     (Is{}, Is{}) -> True
     (Equals{}, Equals{}) -> True
+    (Lt{}, Lt{}) -> True
+    (LtEquals{}, LtEquals{}) -> True
+    (Gt{}, Gt{}) -> True
+    (GtEquals{}, GtEquals{}) -> True
+    (NotEquals{}, NotEquals{}) -> True
     (Minus{}, Minus{}) -> True
     (Plus{}, Plus{}) -> True
     (Multiply{}, Multiply{}) -> True

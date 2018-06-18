@@ -18,7 +18,7 @@ import Data.Semigroup ((<>))
 import Data.Sequence ((!?), (|>), ViewR(..), ViewL(..), Seq)
 import Text.Parser.LookAhead (LookAheadParsing, lookAhead)
 import Text.Trifecta
-  ( CharParsing, DeltaParsing, Caret, Careted(..), char, careted, letter, noneOf
+  ( CharParsing, DeltaParsing, Caret, Careted(..), char, careted, noneOf
   , digit, string, manyTill, parseString, unexpected, oneOf, satisfy, try
   , notFollowedBy
   )
@@ -28,7 +28,7 @@ import qualified Data.FingerTree as FingerTree
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Text.Trifecta as Trifecta
 
-import Language.Python.Internal.Syntax (StringPrefix(..))
+import Language.Python.Internal.Syntax (StringPrefix(..), isIdentifierStart, isIdentifierChar)
 import Language.Python.Internal.Syntax.Whitespace
   ( Newline(..), Whitespace(..), Indent(..), indentWhitespaces
   , getIndentLevel, indentLevel
@@ -102,15 +102,12 @@ stringChar = (char '\\' *> (escapeChar <|> hexChar)) <|> other
          then pure (chr a)
          else unexpected $ "value: " <> show a <> " outside unicode range")
 
-identChar :: CharParsing m => m Char
-identChar = letter <|> digit <|> char '_'
-
 parseToken :: (DeltaParsing m, LookAheadParsing m) => m (PyToken Caret)
 parseToken =
   fmap (\(f :^ sp) -> f sp) . careted $
   asum @[] $
     fmap
-    (\p -> try $ p <* notFollowedBy identChar)
+    (\p -> try $ p <* notFollowedBy (satisfy isIdentifierStart))
     [ string "if" $> TkIf
     , string "else" $> TkElse
     , string "while" $> TkWhile
@@ -184,8 +181,8 @@ parseToken =
     , char '.' $> TkDot
     , fmap TkIdent $
       (:) <$>
-      (letter <|> char '_') <*>
-      many identChar
+      satisfy isIdentifierStart <*>
+      many (satisfy isIdentifierChar)
     ]
 
 tokenize :: String -> Trifecta.Result [PyToken Caret]

@@ -16,7 +16,7 @@ where
 
 import Control.Lens.Getter (view)
 import Control.Lens.Wrapped (_Wrapped)
-import Control.Lens.Plated (rewrite)
+import Control.Lens.Plated (transform)
 import Data.Char (ord)
 import Data.Foldable (toList)
 import Data.Maybe (maybe)
@@ -40,17 +40,27 @@ infixr 5 `cons`
 showRenderOutput :: RenderOutput -> String
 showRenderOutput =
   foldMap showToken .
+  correctSpaces .
   correctNewlines .
   unRenderOutput
   where
+    correctSpaces =
+      transform $
+      \case
+        a : b : rest
+          | isIdentifierChar (last $ showToken a)
+          , isIdentifierStart (head $ showToken b)
+          -> a : TkSpace () : b : rest
+        a -> a
+
     correctNewlines =
-      rewrite $
+      transform $
       \case
         TkNewline CR () : TkNewline LF () : rest ->
-          Just $ TkNewline CRLF () : TkNewline LF () : rest
+          TkNewline CRLF () : TkNewline LF () : rest
         TkContinued CR () : TkNewline LF () : rest ->
-          Just $ TkContinued CRLF () : TkNewline LF () : rest
-        _ -> Nothing
+          TkContinued CRLF () : TkNewline LF () : rest
+        a -> a
 
 showStringPrefix :: StringPrefix -> String
 showStringPrefix sp =
@@ -557,7 +567,7 @@ renderParam (DoubleStarParam _ ws name) =
   TkDoubleStar () `cons` foldMap renderWhitespace ws <> renderIdent name
 renderParam (KeywordParam _ name ws2 expr) =
   renderIdent name <> singleton (TkEq ()) <>
-  foldMap renderWhitespace ws2 <> renderExpr expr
+  foldMap renderWhitespace ws2 <> bracketTuple expr
 
 renderBinOp :: BinOp a -> RenderOutput
 renderBinOp (Is _ ws) = TkIs () `cons` foldMap renderWhitespace ws

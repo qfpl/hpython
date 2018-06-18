@@ -89,13 +89,8 @@ syntax_expr path =
         Failure errs -> annotateShow errs $> False
         Success res ->
           case validateExprSyntax' res of
-            Failure errs' ->
-              let
-                errs'' = filter (hasn't _MissingSpacesIn) errs'
-              in
-                if null errs''
-                then pure True
-                else annotateShow errs'' $> False
+            Failure [] -> pure True
+            Failure errs'' -> annotateShow errs'' $> False
             Success res' -> pure True
     annotate rex
     runPython3
@@ -113,13 +108,8 @@ syntax_statement path =
         Failure errs -> annotateShow errs $> False
         Success res ->
           case validateStatementSyntax' res of
-            Failure errs' ->
-              let
-                errs'' = filter (hasn't _MissingSpacesIn) errs'
-              in
-                if null errs''
-                then pure True
-                else annotateShow errs'' $> False
+            Failure [] -> pure True
+            Failure errs'' -> annotateShow errs'' $> False
             Success res' -> pure True
     annotate rst
     runPython3 path shouldSucceed rst
@@ -134,13 +124,8 @@ syntax_module path =
         Failure errs -> annotateShow errs $> False
         Success res ->
           case validateModuleSyntax' res of
-            Failure errs' ->
-              let
-                errs'' = filter (hasn't _MissingSpacesIn) errs'
-              in
-                if null errs''
-                then pure True
-                else annotateShow errs'' $> False
+            Failure [] -> pure True
+            Failure errs'' -> annotateShow errs'' $> False
             Success res' -> pure True
     annotate rst
     runPython3 path shouldSucceed rst

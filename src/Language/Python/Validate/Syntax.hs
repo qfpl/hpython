@@ -164,13 +164,14 @@ validateAdjacentR
      , Token x x', Token y y'
      )
   => a
-  -> (x, x -> String)
-  -> (y, y -> String)
+  -> (x, x -> RenderOutput)
+  -> (y, y -> RenderOutput)
   -> ValidateSyntax e y
 validateAdjacentR ann (a, aStr) (b, bStr)
   | [] <- a ^. getting whitespaceAfter
   , isIdentifier [endChar a, startChar b]
-  = syntaxErrors [_MissingSpacesIn # (ann, aStr a, bStr b)]
+  = syntaxErrors
+    [_MissingSpacesIn # (ann, showRenderOutput $ aStr a, showRenderOutput $ bStr b)]
   | otherwise = pure b
 
 validateAdjacentL
@@ -178,13 +179,14 @@ validateAdjacentL
      , Token x x', Token y y'
      )
   => a
-  -> (x, x -> String)
-  -> (y, y -> String)
+  -> (x, x -> RenderOutput)
+  -> (y, y -> RenderOutput)
   -> ValidateSyntax e x
 validateAdjacentL ann (a, aStr) (b, bStr)
   | [] <- a ^. getting whitespaceAfter
   , isIdentifier [endChar a, startChar b]
-  = syntaxErrors [_MissingSpacesIn # (ann, aStr a, bStr b)]
+  = syntaxErrors
+    [_MissingSpacesIn # (ann, showRenderOutput $ aStr a, showRenderOutput $ bStr b)]
   | otherwise = pure a
 
 validateExprSyntax

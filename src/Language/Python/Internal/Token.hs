@@ -22,11 +22,13 @@ data PyToken a
   | TkContinue a
   | TkTrue a
   | TkFalse a
+  | TkNone a
   | TkOr a
   | TkAnd a
   | TkIs a
   | TkNot a
   | TkGlobal a
+  | TkNonlocal a
   | TkDel a
   | TkImport a
   | TkFrom a
@@ -86,11 +88,13 @@ pyTokenAnn tk =
     TkContinue a -> a
     TkTrue a -> a
     TkFalse a -> a
+    TkNone a -> a
     TkOr a -> a
     TkAnd a -> a
     TkIs a -> a
     TkNot a -> a
     TkGlobal a -> a
+    TkNonlocal a -> a
     TkDel a -> a
     TkImport a -> a
     TkFrom a -> a

@@ -11,7 +11,7 @@ import System.FilePath ((</>))
 import Text.Trifecta (Caret)
 
 import Language.Python.Internal.Parse (module_)
-import Language.Python.Internal.Render (renderModule)
+import Language.Python.Internal.Render (showModule)
 import Language.Python.Validate.Indentation
   (Indentation, runValidateIndentation, validateModuleIndentation)
 import Language.Python.Validate.Indentation.Error (IndentationError)
@@ -42,4 +42,4 @@ doRoundtrip name =
       Success res ->
         case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
           Failure errs' -> annotateShow (errs' :: [SyntaxError '[Indentation] Caret]) *> failure
-          Success _ -> renderModule py === file
+          Success _ -> showModule py === file

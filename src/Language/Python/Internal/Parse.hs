@@ -34,7 +34,7 @@ data ParseError ann
   | UnexpectedEndOfBlock
   | UnexpectedIndent
   | ExpectedIndent
-  | ExpectedEndOfBlock
+  | ExpectedEndOfBlock { peGotCtxt :: [Either (Nested ann) (Line ann)] }
   | ExpectedIdentifier { peGot :: PyToken ann }
   | ExpectedContinued { peGot :: PyToken ann }
   | ExpectedNewline { peGot :: PyToken ann }
@@ -124,6 +124,7 @@ eof = Parser $ do
   ctxt <- get
   case ctxt of
     [] -> tell $ Consumed True
+    [[]] -> tell $ Consumed True
     current : _ -> throwError $ ExpectedEndOfInput current
 
 indent :: Parser ann ()
@@ -136,7 +137,7 @@ indent = Parser $ do
         [] -> throwError UnexpectedEndOfBlock
         Right _ : _ -> throwError ExpectedIndent
         Left inner : rest' -> do
-          put $ toList (unNested inner) : (case rest' of; [] -> rest; _ -> rest' : rest)
+          put $ toList (unNested inner) : rest' : rest -- (case rest' of; [] -> rest; _ -> rest' : rest)
           tell $ Consumed True
 
 dedent :: Parser ann ()
@@ -147,7 +148,7 @@ dedent = Parser $ do
     current : rest ->
       case current of
         [] -> put rest *> tell (Consumed True)
-        _ -> throwError ExpectedEndOfBlock
+        _ -> throwError $ ExpectedEndOfBlock current
 
 continued :: Parser ann Whitespace
 continued = do
@@ -259,7 +260,7 @@ indents = Parser $ do
       case current of
         [] -> throwError UnexpectedEndOfBlock
         Right ll@(Line a is _ _) : rest' -> pure $ Indents is a
-        Left _ : _ -> throwError UnexpectedIndent
+        Left l : _ -> throwError UnexpectedIndent
 
 exprList :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 exprList ws =
@@ -529,7 +530,11 @@ suite = do
        some1 line) <*
     dedent
   where
-    commentOrEmpty = (,,) <$> (foldOf (indentsValue.folded.indentWhitespaces) <$> indents) <*> optional comment <*> eol
+    commentOrEmpty =
+      (,,) <$>
+      (foldOf (indentsValue.folded.indentWhitespaces) <$> indents) <*>
+      optional comment <*>
+      eol
 
     commentOrIndent = many (Left <$> commentOrEmpty) <* indent
 

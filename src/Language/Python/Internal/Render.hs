@@ -18,7 +18,7 @@ import Control.Lens.Getter (view)
 import Control.Lens.Setter (over)
 import Control.Lens.Traversal (Traversal')
 import Control.Lens.Wrapped (_Wrapped)
-import Control.Lens.Plated (transform)
+import Control.Lens.Plated (rewrite)
 import Data.Char (ord)
 import Data.Foldable (toList)
 import Data.Maybe (fromMaybe, maybe)
@@ -46,10 +46,13 @@ showRenderOutput =
   unRenderOutput
   where
     correctNewlines =
-      transform $
+      rewrite $
       \case
-        TkNewline CR () : TkNewline LF () : rest -> TkNewline CRLF () : TkNewline LF () : rest
-        input -> input
+        TkNewline CR () : TkNewline LF () : rest ->
+          Just $ TkNewline CRLF () : TkNewline LF () : rest
+        TkContinued CR () : TkNewline LF () : rest ->
+          Just $ TkContinued CRLF () : TkNewline LF () : rest
+        _ -> Nothing
 
 showStringPrefix :: StringPrefix -> String
 showStringPrefix sp =
@@ -95,7 +98,7 @@ showToken t =
     TkNot{} -> "not"
     TkGlobal{} -> "global"
     TkNonlocal{} -> "nonlocal"
-    TkDel{} -> "defl"
+    TkDel{} -> "del"
     TkImport{} -> "import"
     TkFrom{} -> "from"
     TkAs{} -> "as"
@@ -159,8 +162,8 @@ showToken t =
     TkComment s _ -> "#" <> s
     TkStar{} -> "*"
     TkDoubleStar{} -> "**"
-    TkSlash{} -> "\\"
-    TkDoubleSlash{} -> "\\\\"
+    TkSlash{} -> "/"
+    TkDoubleSlash{} -> "//"
     TkPercent{} -> "%"
     TkShiftLeft{} -> "<<"
     TkShiftRight{} -> ">>"

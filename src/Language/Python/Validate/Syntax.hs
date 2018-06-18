@@ -432,9 +432,9 @@ validateSmallStatementSyntax (Raise a ws f) =
        traverse
          (\(d, e) ->
             (,) <$
-            validateAdjacentR a (b, renderExpr) (Keyword ('a' :| "s") d, keyword) <*>
+            validateAdjacentR a (b, renderExpr) (Keyword ('f' :| "rom") d, keyword) <*>
             validateWhitespace a d <*
-            validateAdjacentR a (Keyword ('a' :| "s") d, keyword) (e, renderExpr) <*>
+            validateAdjacentR a (Keyword ('f' :| "rom") d, keyword) (e, renderExpr) <*>
             validateExprSyntax e)
          c)
     f

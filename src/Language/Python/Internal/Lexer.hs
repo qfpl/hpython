@@ -15,7 +15,7 @@ import Data.Foldable (asum)
 import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Semigroup ((<>))
-import Data.Sequence ((|>), ViewR(..), ViewL(..), Seq)
+import Data.Sequence ((!?), (|>), ViewR(..), ViewL(..), Seq)
 import Text.Parser.LookAhead (LookAheadParsing, lookAhead)
 import Text.Trifecta
   ( CharParsing, DeltaParsing, Caret, Careted(..), char, careted, letter, noneOf
@@ -353,6 +353,9 @@ newtype Nested a
   = Nested
   { unNested :: Seq (Either (Nested a) (Line a))
   } deriving (Eq, Show)
+
+nestedAnnotation :: Nested a -> Maybe a
+nestedAnnotation (Nested s) = s !? 0 >>= either nestedAnnotation (pure . lineAnn)
 
 data IndentationError
   = UnexpectedDedent

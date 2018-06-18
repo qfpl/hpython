@@ -2,10 +2,13 @@
 {-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language LambdaCase #-}
 module Language.Python.Internal.Render
-  ( RenderOutput, showRenderOutput, singleton, cons
-  , showQuoteType, showStringPrefix, showToken
-  , showModule, showStatement, showExpr
+  ( -- * Common Functions
+    showModule, showStatement, showExpr
+    -- * Rendering
+  , RenderOutput, showRenderOutput, singleton, cons
   , renderModule, renderStatement, renderExpr
+    -- * Miscellany
+  , showQuoteType, showStringPrefix, showToken
   , bracket, renderWhitespace, renderCommaSep, renderCommaSep1, renderCommaSep1'
   , renderIdent, renderComment, renderModuleName, renderDot, renderRelativeModuleName
   , renderImportAs, renderImportTargets, renderSmallStatement, renderCompoundStatement

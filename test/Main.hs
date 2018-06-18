@@ -83,19 +83,14 @@ syntax_expr :: FilePath -> Property
 syntax_expr path =
   property $ do
     ex <- forAll $ Gen.resize 300 General.genExpr
-    let rex = renderExpr ex
+    let rex = showExpr ex
     shouldSucceed <-
       case validateExprIndentation' ex of
         Failure errs -> annotateShow errs $> False
         Success res ->
           case validateExprSyntax' res of
-            Failure errs' ->
-              let
-                errs'' = filter (hasn't _MissingSpacesIn) errs'
-              in
-                if null errs''
-                then pure True
-                else annotateShow errs'' $> False
+            Failure [] -> pure True
+            Failure errs'' -> annotateShow errs'' $> False
             Success res' -> pure True
     annotate rex
     runPython3
@@ -107,19 +102,14 @@ syntax_statement :: FilePath -> Property
 syntax_statement path =
   property $ do
     st <- forAll $ Gen.resize 300 General.genStatement
-    let rst = renderLines $ renderStatement st
+    let rst = showStatement st
     shouldSucceed <-
       case validateStatementIndentation' st of
         Failure errs -> annotateShow errs $> False
         Success res ->
           case validateStatementSyntax' res of
-            Failure errs' ->
-              let
-                errs'' = filter (hasn't _MissingSpacesIn) errs'
-              in
-                if null errs''
-                then pure True
-                else annotateShow errs'' $> False
+            Failure [] -> pure True
+            Failure errs'' -> annotateShow errs'' $> False
             Success res' -> pure True
     annotate rst
     runPython3 path shouldSucceed rst
@@ -128,19 +118,14 @@ syntax_module :: FilePath -> Property
 syntax_module path =
   property $ do
     st <- forAll $ Gen.resize 300 General.genModule
-    let rst = renderModule st
+    let rst = showModule st
     shouldSucceed <-
       case validateModuleIndentation' st of
         Failure errs -> annotateShow errs $> False
         Success res ->
           case validateModuleSyntax' res of
-            Failure errs' ->
-              let
-                errs'' = filter (hasn't _MissingSpacesIn) errs'
-              in
-                if null errs''
-                then pure True
-                else annotateShow errs'' $> False
+            Failure [] -> pure True
+            Failure errs'' -> annotateShow errs'' $> False
             Success res' -> pure True
     annotate rst
     runPython3 path shouldSucceed rst
@@ -154,48 +139,48 @@ correct_syntax_expr path =
       Success res ->
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
-          Success res' -> runPython3 path True (renderExpr ex)
+          Success res' -> runPython3 path True (showExpr ex)
 
 correct_syntax_statement :: FilePath -> Property
 correct_syntax_statement path =
   property $ do
     st <- forAll $ evalStateT Correct.genStatement Correct.initialGenState
-    annotate $ renderLines (renderStatement st)
+    annotate $ showStatement st
     case validateStatementIndentation' st of
       Failure errs -> annotateShow errs *> failure
       Success res ->
         case validateStatementSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
-          Success res' -> runPython3 path True (renderLines $ renderStatement st)
+          Success res' -> runPython3 path True $ showStatement st
 
 expr_printparseprint_print :: Property
 expr_printparseprint_print =
   property $ do
     ex <- forAll Correct.genExpr
-    annotate (renderExpr ex)
+    annotate (showExpr ex)
     case validateExprIndentation' ex of
       Failure errs -> annotateShow errs *> failure
       Success res ->
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <- doToPython (expr space) (renderExpr res')
-            renderExpr (res' ^. unvalidated) === renderExpr (res $> ())
+            py <- doToPython (expr space) (showExpr res')
+            showExpr (res' ^. unvalidated) === showExpr (res $> ())
 
 statement_printparseprint_print :: Property
 statement_printparseprint_print =
   property $ do
     st <- forAll $ evalStateT Correct.genStatement Correct.initialGenState
-    annotate (renderLines $ renderStatement st)
+    annotate $ showStatement st
     case validateStatementIndentation' st of
       Failure errs -> annotateShow errs *> failure
       Success res ->
         case validateStatementSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <- doToPython statement . renderLines $ renderStatement res'
-            renderLines (renderStatement (res' ^. unvalidated)) ===
-              renderLines (renderStatement (py $> ()))
+            py <- doToPython statement $ showStatement res'
+            showStatement (res' ^. unvalidated) ===
+              showStatement (py $> ())
 
 main = do
   checkParallel lexerParserTests

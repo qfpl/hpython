@@ -6,8 +6,9 @@ import qualified Text.Trifecta as Trifecta
 import Hedgehog
 
 import Language.Python.Internal.Lexer
-  (PyToken, LogicalLine, IndentedLine, Nested, tokenize, logicalLines, indentation, nested)
+  (LogicalLine, IndentedLine, Nested, tokenize, logicalLines, indentation, nested)
 import Language.Python.Internal.Parse (Parser, runParser)
+import Language.Python.Internal.Token (PyToken)
 
 doTokenize :: Monad m => String -> PropertyT m [PyToken Trifecta.Caret]
 doTokenize str = do

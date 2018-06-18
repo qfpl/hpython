@@ -5,6 +5,7 @@
 module Language.Python.Internal.Syntax.Ident where
 
 import Control.Lens.Lens (Lens, lens)
+import Data.Char (isDigit, isLetter)
 import Data.Coerce (coerce)
 import Data.String (IsString(..))
 
@@ -17,6 +18,18 @@ data Ident (v :: [*]) a
   , _identValue :: String
   , _identWhitespace :: [Whitespace]
   } deriving (Eq, Show, Functor, Foldable, Traversable)
+
+isIdentifierStart :: Char -> Bool
+isIdentifierStart = do
+  a <- isLetter
+  b <- (=='_')
+  pure $ a || b
+
+isIdentifierChar :: Char -> Bool
+isIdentifierChar = do
+  a <- isIdentifierStart
+  b <- isDigit
+  pure $ a || b
 
 instance IsString (Ident '[] ()) where
   fromString s = MkIdent () s []

@@ -23,6 +23,7 @@ data BinOp a
   | Divide a [Whitespace]
   | Plus a [Whitespace]
   | Equals a [Whitespace]
+  | Percent a [Whitespace]
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance Token (BinOp a) (BinOp a) where
@@ -37,6 +38,7 @@ instance Token (BinOp a) (BinOp a) where
   endChar Divide{} = '/'
   endChar Plus{} = '+'
   endChar Equals{} = '='
+  endChar Percent{} = '%'
 
   startChar Is{} = 's'
   startChar Minus{} = '-'
@@ -47,6 +49,7 @@ instance Token (BinOp a) (BinOp a) where
   startChar Divide{} = '/'
   startChar Plus{} = '+'
   startChar Equals{} = '='
+  startChar Percent{} = '%'
 
   whitespaceAfter =
     lens
@@ -59,7 +62,8 @@ instance Token (BinOp a) (BinOp a) where
          Multiply _ a -> a
          Divide _ a -> a
          Plus _ a -> a
-         Equals _ a -> a)
+         Equals _ a -> a
+         Percent _ a -> a)
       (\op ws ->
          case op of
            Is a _ -> Is a ws
@@ -70,7 +74,8 @@ instance Token (BinOp a) (BinOp a) where
            Multiply a _ -> Multiply a ws
            Divide a _ -> Divide a ws
            Plus a _ -> Plus a ws
-           Equals a _ -> Equals a ws)
+           Equals a _ -> Equals a ws
+           Percent a _ -> Equals a ws)
 
 data Assoc = L | R deriving (Eq, Show)
 
@@ -92,6 +97,7 @@ operatorTable =
   , entry Plus 20 L
   , entry Multiply 25 L
   , entry Divide 25 L
+  , entry Percent 25 L
   , entry Exp 30 R
   ]
   where
@@ -109,6 +115,7 @@ sameOperator op op' =
     (Multiply{}, Multiply{}) -> True
     (Divide{}, Divide{}) -> True
     (Exp{}, Exp{}) -> True
+    (Percent{}, Percent{}) -> True
     _ -> False
 
 lookupOpEntry :: BinOp a -> [OpEntry] -> OpEntry

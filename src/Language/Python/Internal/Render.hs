@@ -582,6 +582,7 @@ renderBinOp (Exp _ ws) = TkDoubleStar () `cons` foldMap renderWhitespace ws
 renderBinOp (BoolAnd _ ws) = TkAnd () `cons` foldMap renderWhitespace ws
 renderBinOp (BoolOr _ ws) = TkOr () `cons` foldMap renderWhitespace ws
 renderBinOp (Equals _ ws) = TkDoubleEq () `cons` foldMap renderWhitespace ws
+renderBinOp (Percent _ ws) = TkPercent () `cons` foldMap renderWhitespace ws
 
 renderIndents :: Indents a -> RenderOutput
 renderIndents (Indents is _) = foldMap renderIndent is

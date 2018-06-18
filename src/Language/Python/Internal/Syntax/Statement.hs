@@ -26,7 +26,6 @@ import Language.Python.Internal.Syntax.Comment
 import Language.Python.Internal.Syntax.Expr
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.ModuleNames
-import Language.Python.Internal.Syntax.Token
 import Language.Python.Internal.Syntax.Whitespace
 
 -- | 'Traversal' over all the statements in a term
@@ -173,23 +172,16 @@ data ImportAs e v a
 importAsAnn :: ImportAs e v a -> a
 importAsAnn (ImportAs a _ _) = a
 
-instance Token (e a) (e' a) => Token (ImportAs e v a) (ImportAs e' '[] a) where
-  unvalidate (ImportAs x a b) = ImportAs x (unvalidate a) (over (mapped._2) unvalidate b)
-
-  whitespaceAfter =
+instance HasTrailingWhitespace (e a) => HasTrailingWhitespace (ImportAs e v a) where
+  trailingWhitespace =
     lens
       (\(ImportAs _ a b) ->
-         maybe (a ^. getting whitespaceAfter) (^. _2.getting whitespaceAfter) b)
+         maybe (a ^. getting trailingWhitespace) (^. _2.trailingWhitespace) b)
       (\(ImportAs x a b) ws ->
          ImportAs
            x
-           (maybe (a & whitespaceAfter .~ ws) (const $ unvalidate a) b)
-           (b & _Just._2.whitespaceAfter .~ ws))
-
-  startChar (ImportAs _ a _) = startChar a
-
-  endChar (ImportAs _ a Nothing) = endChar a
-  endChar (ImportAs _ _ (Just (_, b))) = endChar b
+           (maybe (a & trailingWhitespace .~ ws) (const a) b)
+           (b & _Just._2.trailingWhitespace .~ ws))
 
 data ImportTargets v a
   = ImportAll a [Whitespace]
@@ -204,30 +196,18 @@ data ImportTargets v a
       [Whitespace]
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-instance Token (ImportTargets v a) (ImportTargets '[] a) where
-  unvalidate (ImportAll a b) = ImportAll a b
-  unvalidate (ImportSome a cs) = ImportSome a $ unvalidate <$> cs
-  unvalidate (ImportSomeParens x a b c) = ImportSomeParens x a (unvalidate <$> b) c
-
-  whitespaceAfter =
+instance HasTrailingWhitespace (ImportTargets v a) where
+  trailingWhitespace =
     lens
       (\case
           ImportAll _ ws -> ws
-          ImportSome _ cs -> cs ^. getting whitespaceAfter
+          ImportSome _ cs -> cs ^. trailingWhitespace
           ImportSomeParens _ _ _ ws -> ws)
       (\ts ws ->
          case ts of
            ImportAll a _ -> ImportAll a ws
-           ImportSome a cs -> ImportSome a (cs & whitespaceAfter .~ ws)
-           ImportSomeParens x a b _ -> ImportSomeParens x a (unvalidate b) ws)
-
-  startChar ImportAll{} = '*'
-  startChar (ImportSome _ ts) = startChar ts
-  startChar ImportSomeParens{} = '('
-
-  endChar ImportAll{} = '*'
-  endChar (ImportSome _ ts) = endChar ts
-  endChar ImportSomeParens{} = ')'
+           ImportSome a cs -> ImportSome a (cs & trailingWhitespace .~ ws)
+           ImportSomeParens x a b _ -> ImportSomeParens x a b ws)
 
 data SmallStatement (v :: [*]) a
   = Return a [Whitespace] (Expr v a)

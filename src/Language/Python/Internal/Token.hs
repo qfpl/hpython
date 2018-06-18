@@ -58,6 +58,7 @@ data PyToken a
   | TkLte a
   | TkEq a
   | TkDoubleEq a
+  | TkBangEq a
   | TkGt a
   | TkGte a
   | TkContinued Newline a
@@ -129,6 +130,7 @@ pyTokenAnn tk =
     TkLte a -> a
     TkEq a -> a
     TkDoubleEq a -> a
+    TkBangEq a -> a
     TkGt a -> a
     TkGte a -> a
     TkContinued _ a -> a

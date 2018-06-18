@@ -10,7 +10,6 @@ import Control.Lens.TH (makeLenses)
 import Data.Functor (($>))
 import Data.Semigroup ((<>))
 
-import Language.Python.Internal.Syntax.Token
 import Language.Python.Internal.Syntax.Whitespace
 
 data BinOp a
@@ -19,36 +18,20 @@ data BinOp a
   | Exp a [Whitespace]
   | BoolAnd a [Whitespace]
   | BoolOr a [Whitespace]
+  | Equals a [Whitespace]
+  | Lt a [Whitespace]
+  | LtEquals a [Whitespace]
+  | Gt a [Whitespace]
+  | GtEquals a [Whitespace]
+  | NotEquals a [Whitespace]
   | Multiply a [Whitespace]
   | Divide a [Whitespace]
+  | Percent a [Whitespace]
   | Plus a [Whitespace]
-  | Equals a [Whitespace]
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-instance Token (BinOp a) (BinOp a) where
-  unvalidate = id
-
-  endChar Is{} = 's'
-  endChar Minus{} = '-'
-  endChar Exp{} = '*'
-  endChar BoolAnd{} = 'd'
-  endChar BoolOr{} = 'r'
-  endChar Multiply{} = '*'
-  endChar Divide{} = '/'
-  endChar Plus{} = '+'
-  endChar Equals{} = '='
-
-  startChar Is{} = 's'
-  startChar Minus{} = '-'
-  startChar Exp{} = '*'
-  startChar BoolAnd{} = 'd'
-  startChar BoolOr{} = 'r'
-  startChar Multiply{} = '*'
-  startChar Divide{} = '/'
-  startChar Plus{} = '+'
-  startChar Equals{} = '='
-
-  whitespaceAfter =
+instance HasTrailingWhitespace (BinOp a) where
+  trailingWhitespace =
     lens
       (\case
          Is _ a -> a
@@ -59,7 +42,13 @@ instance Token (BinOp a) (BinOp a) where
          Multiply _ a -> a
          Divide _ a -> a
          Plus _ a -> a
-         Equals _ a -> a)
+         Equals _ a -> a
+         Lt _ a -> a
+         LtEquals _ a -> a
+         Gt _ a -> a
+         GtEquals _ a -> a
+         NotEquals _ a -> a
+         Percent _ a -> a)
       (\op ws ->
          case op of
            Is a _ -> Is a ws
@@ -70,7 +59,13 @@ instance Token (BinOp a) (BinOp a) where
            Multiply a _ -> Multiply a ws
            Divide a _ -> Divide a ws
            Plus a _ -> Plus a ws
-           Equals a _ -> Equals a ws)
+           Equals a _ -> Equals a ws
+           Lt a _ -> Lt a ws
+           LtEquals a _ -> LtEquals a ws
+           Gt a _ -> Gt a ws
+           GtEquals a _ -> GtEquals a ws
+           NotEquals a _ -> NotEquals a ws
+           Percent a _ -> Equals a ws)
 
 data Assoc = L | R deriving (Eq, Show)
 
@@ -88,10 +83,16 @@ operatorTable =
   , entry BoolAnd 5 L
   , entry Is 10 L
   , entry Equals 10 L
+  , entry Lt 10 L
+  , entry LtEquals 10 L
+  , entry Gt 10 L
+  , entry GtEquals 10 L
+  , entry NotEquals 10 L
   , entry Minus 20 L
   , entry Plus 20 L
   , entry Multiply 25 L
   , entry Divide 25 L
+  , entry Percent 25 L
   , entry Exp 30 R
   ]
   where
@@ -104,11 +105,17 @@ sameOperator op op' =
     (BoolAnd{}, BoolAnd{}) -> True
     (Is{}, Is{}) -> True
     (Equals{}, Equals{}) -> True
+    (Lt{}, Lt{}) -> True
+    (LtEquals{}, LtEquals{}) -> True
+    (Gt{}, Gt{}) -> True
+    (GtEquals{}, GtEquals{}) -> True
+    (NotEquals{}, NotEquals{}) -> True
     (Minus{}, Minus{}) -> True
     (Plus{}, Plus{}) -> True
     (Multiply{}, Multiply{}) -> True
     (Divide{}, Divide{}) -> True
     (Exp{}, Exp{}) -> True
+    (Percent{}, Percent{}) -> True
     _ -> False
 
 lookupOpEntry :: BinOp a -> [OpEntry] -> OpEntry

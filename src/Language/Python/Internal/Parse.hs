@@ -442,10 +442,36 @@ smallStatement =
     breakSt = Break . pyTokenAnn <$> tokenEq (TkBreak ())
     continueSt = Continue . pyTokenAnn <$> tokenEq (TkContinue ())
 
+    augAssign =
+      (\(tk, s) -> PlusEq (pyTokenAnn tk) s) <$> token space (TkPlusEq ()) <!>
+      (\(tk, s) -> MinusEq (pyTokenAnn tk) s) <$> token space (TkMinusEq ()) <!>
+      (\(tk, s) -> AtEq (pyTokenAnn tk) s) <$> token space (TkAtEq ()) <!>
+      (\(tk, s) -> StarEq (pyTokenAnn tk) s) <$> token space (TkStarEq ()) <!>
+      (\(tk, s) -> SlashEq (pyTokenAnn tk) s) <$> token space (TkSlashEq ()) <!>
+      (\(tk, s) -> PercentEq (pyTokenAnn tk) s) <$> token space (TkPercentEq ()) <!>
+      (\(tk, s) -> AmphersandEq (pyTokenAnn tk) s) <$> token space (TkAmphersandEq ()) <!>
+      (\(tk, s) -> PipeEq (pyTokenAnn tk) s) <$> token space (TkPipeEq ()) <!>
+      (\(tk, s) -> CaretEq (pyTokenAnn tk) s) <$> token space (TkCaretEq ()) <!>
+      (\(tk, s) -> ShiftLeftEq (pyTokenAnn tk) s) <$> token space (TkShiftLeftEq ()) <!>
+      (\(tk, s) -> ShiftRightEq (pyTokenAnn tk) s) <$> token space (TkShiftRightEq ()) <!>
+      (\(tk, s) -> DoubleStarEq (pyTokenAnn tk) s) <$> token space (TkDoubleStarEq ()) <!>
+      (\(tk, s) -> DoubleSlashEq (pyTokenAnn tk) s) <$> token space (TkDoubleSlashEq ())
+
     exprOrAssignSt =
-      (\a -> maybe (Expr (_exprAnnotation a) a) (uncurry $ Assign (_exprAnnotation a) a)) <$>
+      (\a ->
+         maybe
+           (Expr (_exprAnnotation a) a)
+           (\(x, y) ->
+              either
+                (\z -> Assign (_exprAnnotation a) a z y)
+                (\z -> AugAssign (_exprAnnotation a) a z y)
+                x)) <$>
       exprList space <*>
-      optional ((,) <$> (snd <$> token space (TkEq ())) <*> exprList space)
+      optional
+        ((,) <$>
+         (Left . snd <$> token space (TkEq ()) <!>
+          Right <$> augAssign) <*>
+         exprList space)
 
     globalSt =
       (\(tk, s) -> Global (pyTokenAnn tk) $ NonEmpty.fromList s) <$>

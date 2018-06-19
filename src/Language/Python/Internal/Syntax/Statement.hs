@@ -209,10 +209,70 @@ instance HasTrailingWhitespace (ImportTargets v a) where
            ImportSome a cs -> ImportSome a (cs & trailingWhitespace .~ ws)
            ImportSomeParens x a b _ -> ImportSomeParens x a b ws)
 
+data AugAssign a
+  = PlusEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | MinusEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | StarEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | AtEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | SlashEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | PercentEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | AmphersandEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | PipeEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | CaretEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | ShiftLeftEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | ShiftRightEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | DoubleStarEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | DoubleSlashEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasTrailingWhitespace (AugAssign a) where
+  trailingWhitespace =
+    lens _augAssignWhitespace (\a b -> a { _augAssignWhitespace = b })
+
 data SmallStatement (v :: [*]) a
   = Return a [Whitespace] (Expr v a)
   | Expr a (Expr v a)
   | Assign a (Expr v a) [Whitespace] (Expr v a)
+  | AugAssign a (Expr v a) (AugAssign a) (Expr v a)
   | Pass a
   | Break a
   | Continue a
@@ -245,6 +305,7 @@ instance HasExprs SmallStatement where
   _Exprs f (Return a ws e) = Return a ws <$> f e
   _Exprs f (Expr a e) = Expr a <$> f e
   _Exprs f (Assign a e1 ws2 e2) = Assign a <$> f e1 <*> pure ws2 <*> f e2
+  _Exprs f (AugAssign a e1 as e2) = AugAssign a <$> f e1 <*> pure as <*> f e2
   _Exprs _ p@Pass{} = pure $ coerce p
   _Exprs _ p@Break{} = pure $ coerce p
   _Exprs _ p@Continue{} = pure $ coerce p

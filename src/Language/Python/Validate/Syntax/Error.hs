@@ -12,6 +12,7 @@ data SyntaxError (v :: [*]) a
   | PositionalAfterKeywordParam a String
   | UnexpectedDoubleStarParam a String
   | CannotAssignTo a (Expr v a)
+  | CannotAugAssignTo a (Expr v a)
   | DuplicateArgument a String
   | ExpectedNewlineAfter (a, [Whitespace], Statement v a, Maybe Newline)
   | UnexpectedNewline a

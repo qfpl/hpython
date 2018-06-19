@@ -181,6 +181,19 @@ showToken t =
     TkPercent{} -> "%"
     TkShiftLeft{} -> "<<"
     TkShiftRight{} -> ">>"
+    TkPlusEq{} -> "+="
+    TkMinusEq{} -> "-="
+    TkStarEq{} -> "*="
+    TkAtEq{} -> "@="
+    TkSlashEq{} -> "/="
+    TkPercentEq{} -> "%="
+    TkAmphersandEq{} -> "&="
+    TkPipeEq{} -> "|="
+    TkCaretEq{} -> "^="
+    TkShiftLeftEq{} -> "<<="
+    TkShiftRightEq{} -> ">>="
+    TkDoubleStarEq{} -> "**="
+    TkDoubleSlashEq{} -> "//="
 
 bracket :: RenderOutput -> RenderOutput
 bracket a = TkLeftParen () `cons` a <> singleton (TkRightParen ())
@@ -414,6 +427,23 @@ renderImportTargets (ImportSomeParens _ ws1 ts ws2) =
     (foldMap renderWhitespace ws1 <> renderCommaSep1' (renderImportAs renderIdent) ts) <>
   foldMap renderWhitespace ws2
 
+renderAugAssign :: AugAssign a -> RenderOutput
+renderAugAssign aa =
+  case aa of
+    PlusEq{} -> singleton $ TkPlusEq ()
+    MinusEq{} -> singleton $ TkMinusEq ()
+    StarEq{} -> singleton $ TkStarEq ()
+    AtEq{} -> singleton $ TkAtEq ()
+    SlashEq{} -> singleton $ TkSlashEq ()
+    PercentEq{} -> singleton $ TkPercentEq ()
+    AmphersandEq{} -> singleton $ TkAmphersandEq ()
+    PipeEq{} -> singleton $ TkPipeEq ()
+    CaretEq{} -> singleton $ TkCaretEq ()
+    ShiftLeftEq{} -> singleton $ TkShiftLeftEq ()
+    ShiftRightEq{} -> singleton $ TkShiftRightEq ()
+    DoubleStarEq{} -> singleton $ TkDoubleStarEq ()
+    DoubleSlashEq{} -> singleton $ TkDoubleSlashEq ()
+
 renderSmallStatement :: SmallStatement v a -> RenderOutput
 renderSmallStatement (Raise _ ws x) =
   TkRaise () `cons` foldMap renderWhitespace ws <>
@@ -432,6 +462,8 @@ renderSmallStatement (Expr _ expr) = renderExpr expr
 renderSmallStatement (Assign _ lvalue ws2 rvalue) =
   renderExpr lvalue <> singleton (TkEq ()) <>
   foldMap renderWhitespace ws2 <> renderExpr rvalue
+renderSmallStatement (AugAssign _ lvalue as rvalue) =
+  renderExpr lvalue <> renderAugAssign as <> renderExpr rvalue
 renderSmallStatement (Pass _) = singleton $ TkPass ()
 renderSmallStatement (Continue _) = singleton $ TkContinue ()
 renderSmallStatement (Break _) = singleton $ TkBreak ()

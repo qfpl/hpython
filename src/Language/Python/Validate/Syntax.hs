@@ -452,6 +452,17 @@ validateSmallStatementSyntax (Assign a lvalue ws2 rvalue) =
       pure ws2 <*>
       validateExprSyntax rvalue) <*
       modifyNonlocals (assigns ++)
+validateSmallStatementSyntax (AugAssign a lvalue aa rvalue) =
+  AugAssign a <$>
+  (if canAssignTo lvalue
+    then case lvalue of
+      Ident{} -> validateExprSyntax lvalue
+      Deref{} -> validateExprSyntax lvalue
+      Subscript{} -> validateExprSyntax lvalue
+      _ -> syntaxErrors [_CannotAugAssignTo # (a, lvalue)]
+    else syntaxErrors [_CannotAssignTo # (a, lvalue)]) <*>
+  pure aa <*>
+  validateExprSyntax rvalue
 validateSmallStatementSyntax p@Pass{} = pure $ coerce p
 validateSmallStatementSyntax (Break a) =
   syntaxContext `bindValidateSyntax` \sctxt ->

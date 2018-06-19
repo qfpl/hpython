@@ -235,3 +235,23 @@ genSizedCommaSep1' ma = Gen.sized $ \n ->
             (Gen.resize (n - n') $ genSizedCommaSep1' ma)
             (\b -> CommaSepMany1' a <$> genWhitespaces <*> pure b)
       ]
+
+genAugAssign :: MonadGen m => m (AugAssign ())
+genAugAssign =
+  Gen.element
+    [ PlusEq
+    , MinusEq
+    , StarEq
+    , AtEq
+    , SlashEq
+    , PercentEq
+    , AmphersandEq
+    , PipeEq
+    , CaretEq
+    , ShiftLeftEq
+    , ShiftRightEq
+    , DoubleStarEq
+    , DoubleSlashEq
+    ] <*>
+  pure () <*>
+  genWhitespaces

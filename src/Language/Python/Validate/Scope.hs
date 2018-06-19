@@ -265,6 +265,10 @@ validateSmallStatementScope (Assign a l ws2 r) =
   validateExprScope r <*
   extendScope scLocalScope ls <*
   extendScope scImmediateScope ls
+validateSmallStatementScope (AugAssign a l aa r) =
+  (\l' -> AugAssign a l' aa) <$>
+  validateExprScope l <*>
+  validateExprScope r
 validateSmallStatementScope (Global a _ _) = scopeErrors [_FoundGlobal # a]
 validateSmallStatementScope (Nonlocal a _ _) = scopeErrors [_FoundNonlocal # a]
 validateSmallStatementScope (Del a ws cs) =

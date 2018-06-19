@@ -76,6 +76,19 @@ data PyToken a
   | TkPercent a
   | TkShiftLeft a
   | TkShiftRight a
+  | TkPlusEq a
+  | TkMinusEq a
+  | TkStarEq a
+  | TkAtEq a
+  | TkSlashEq a
+  | TkPercentEq a
+  | TkAmphersandEq a
+  | TkPipeEq a
+  | TkCaretEq a
+  | TkShiftLeftEq a
+  | TkShiftRightEq a
+  | TkDoubleStarEq a
+  | TkDoubleSlashEq a
   deriving (Eq, Show, Functor)
 deriveEq1 ''PyToken
 
@@ -146,3 +159,16 @@ pyTokenAnn tk =
     TkPercent a -> a
     TkShiftLeft a -> a
     TkShiftRight a -> a
+    TkPlusEq a -> a
+    TkMinusEq a -> a
+    TkStarEq a -> a
+    TkAtEq a -> a
+    TkSlashEq a -> a
+    TkPercentEq a -> a
+    TkAmphersandEq a -> a
+    TkPipeEq a -> a
+    TkCaretEq a -> a
+    TkShiftLeftEq a -> a
+    TkShiftRightEq a -> a
+    TkDoubleStarEq a -> a
+    TkDoubleSlashEq a -> a

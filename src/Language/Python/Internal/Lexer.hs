@@ -150,15 +150,31 @@ parseToken =
     , char ')' $> TkRightParen
     , char '{' $> TkLeftBrace
     , char '}' $> TkRightBrace
-    , char '<' *> (char '=' $> TkLte <|> char '<' $> TkShiftLeft <|> pure TkLt)
+    , char '<' *>
+      (char '=' $> TkLte <|>
+       char '<' *> (TkShiftLeftEq <$ char '=' <|> pure TkShiftLeft) <|>
+       pure TkLt)
     , char '=' *> (char '=' $> TkDoubleEq <|> pure TkEq)
-    , char '>' *> (char '=' $> TkGte <|> char '>' $> TkShiftRight <|> pure TkGt)
-    , char '*' *> (char '*' $> TkDoubleStar <|> pure TkStar)
-    , char '/' *> (char '/' $> TkDoubleSlash <|> pure TkSlash)
+    , char '>' *>
+      (char '=' $> TkGte <|>
+       char '>' *> (TkShiftRightEq <$ char '=' <|> pure TkShiftRight) <|>
+       pure TkGt)
+    , char '*' *>
+      (char '*' *> (TkDoubleStarEq <$ char '=' <|> pure TkDoubleStar) <|>
+       TkStarEq <$ char '=' <|>
+       pure TkStar)
+    , char '/' *>
+      (char '/' *> (TkDoubleSlashEq <$ char '=' <|> pure TkDoubleSlash) <|>
+       TkSlashEq <$ char '=' <|>
+       pure TkSlash)
     , string "!=" $> TkBangEq
-    , char '+' $> TkPlus
-    , char '-' $> TkMinus
-    , char '%' $> TkPercent
+    , string "^=" $> TkCaretEq
+    , string "|=" $> TkPipeEq
+    , string "@=" $> TkAtEq
+    , string "&=" $> TkAmphersandEq
+    , char '+' *> (TkPlusEq <$ char '=' <|> pure TkPlus)
+    , char '-' *> (TkMinusEq <$ char '=' <|> pure TkMinus)
+    , char '%' *> (TkPercentEq <$ char '=' <|> pure TkPercent)
     , char '\\' $> TkContinued <*> parseNewline
     , char ':' $> TkColon
     , char ';' $> TkSemicolon

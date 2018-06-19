@@ -328,11 +328,7 @@ genExpr' isExp = Gen.sized $ \n ->
           a <- Gen.resize n' genExpr
           b <- Gen.resize (n - n') genArgs
           Call () a <$> genWhitespaces <*> pure b <*> genWhitespaces
-      , Gen.sized $ \n -> do
-          n' <- Gen.integral (Range.constant 1 (n-1))
-          a <- Gen.resize n' genExpr
-          b <- Gen.resize (n - n') genExpr
-          Subscript () a <$> genWhitespaces <*> pure b <*> genWhitespaces
+      , genSubscript
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
           op <- genOp
@@ -347,6 +343,14 @@ genExpr' isExp = Gen.sized $ \n ->
       , Not () <$> (NonEmpty.toList <$> genWhitespaces1) <*> genExpr
       ]
 
+genSubscript :: MonadGen m => m (Expr '[] ())
+genSubscript =
+  Gen.sized $ \n -> do
+    n' <- Gen.integral (Range.constant 0 . max 0 $ n-1)
+    a <- Gen.resize n' genExpr
+    b <- Gen.resize (max 0 $ n - n') genExpr
+    Subscript () a <$> genWhitespaces <*> pure b <*> genWhitespaces
+
 genAssignable :: MonadGen m => m (Expr '[] ())
 genAssignable =
   Gen.scale (max 0 . subtract 1) $
@@ -356,6 +360,16 @@ genAssignable =
     , genTuple genAssignable
     , Ident () <$> genIdent
     , genDeref
+    , genSubscript
+    ]
+
+genAugAssignable :: MonadGen m => m (Expr '[] ())
+genAugAssignable =
+  Gen.scale (max 0 . subtract 1) $
+  Gen.choice
+    [ Ident () <$> genIdent
+    , genDeref
+    , genSubscript
     ]
 
 genSmallStatement
@@ -379,6 +393,11 @@ genSmallStatement = Gen.sized $ \n -> do
               willBeNonlocals %= ((a ^.. cosmos._Ident._2.identValue) ++)
             b <- Gen.resize (n - n') genExpr
             Assign () a <$> genWhitespaces <*> pure b
+        , Gen.sized $ \n -> do
+            n' <- Gen.integral (Range.constant 1 (n-1))
+            a <- Gen.resize n' genAugAssignable
+            b <- Gen.resize (n - n') genExpr
+            AugAssign () a <$> genAugAssign <*> pure b
         , Gen.sized $ \n -> do
             n' <- Gen.integral (Range.constant 2 (n-1))
             Global () <$>

@@ -150,6 +150,17 @@ data Expr (v :: [*]) a
   -- ident
   , _unsafeDerefValueRight :: Ident v a
   }
+  | Subscript
+  { _exprAnnotation :: a
+  -- expr
+  , _unsafeSubscriptValueLeft :: Expr v a
+  -- [ spaces
+  , _unsafeSubscriptWhitespaceLeft :: [Whitespace]
+  -- expr
+  , _unsafeSubscriptValueRight :: Expr v a
+  -- ] spaces
+  , _unsafeSubscriptWhitespaceRight :: [Whitespace]
+  }
   | Call
   { _exprAnnotation :: a
   -- expr
@@ -232,6 +243,7 @@ instance HasTrailingWhitespace (Expr v a) where
           List _ _ _ ws -> ws
           ListComp _ _ _ ws -> ws
           Deref _ _ _ a -> a ^. getting trailingWhitespace
+          Subscript _ _ _ _ ws -> ws
           Call _ _ _ _ ws -> ws
           BinOp _ _ _ e -> e ^. getting trailingWhitespace
           Negate _ _ e -> e ^. getting trailingWhitespace
@@ -249,6 +261,7 @@ instance HasTrailingWhitespace (Expr v a) where
           List a b c _ -> List a b (coerce c) ws
           ListComp a b c _ -> ListComp a b (coerce c) ws
           Deref a b c d -> Deref a (coerce b) c (d & trailingWhitespace .~ ws)
+          Subscript a b c d _ -> Subscript a (coerce b) c d ws
           Call a b c d _ -> Call a (coerce b) c (coerce d) ws
           BinOp a b c e -> BinOp a (coerce b) c (e & trailingWhitespace .~ ws)
           Negate a b c -> Negate a b (c & trailingWhitespace .~ ws)
@@ -297,6 +310,8 @@ shouldBracketLeft op left =
       case (left, op) of
         (Negate{}, Exp{}) -> True
         (Tuple{}, _) -> True
+        (Not{}, BoolAnd{}) -> False
+        (Not{}, BoolOr{}) -> False
         (Not{}, _) -> True
         _ -> maybe False (\p -> p < entry ^. opPrec) (lEntry ^? _Just.opPrec)
   in
@@ -320,6 +335,8 @@ shouldBracketRight op right =
     rightf' =
       case (op, right) of
         (_, Tuple{}) -> True
+        (BoolAnd{}, Not{}) -> False
+        (BoolOr{}, Not{}) -> False
         (_, Not{}) -> True
         _ -> maybe False (\p -> p < entry ^. opPrec) (rEntry ^? _Just.opPrec)
   in

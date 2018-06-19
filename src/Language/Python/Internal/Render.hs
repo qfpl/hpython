@@ -304,6 +304,16 @@ renderComprehension (Comprehension _ expr cf cs) =
   foldMap (bifoldMap renderCompFor renderCompIf) cs
 
 renderExpr :: Expr v a -> RenderOutput
+renderExpr (Subscript _ a b c d) =
+  (case a of
+     BinOp{} -> bracket $ renderExpr a
+     Not{} -> bracket $ renderExpr a
+     _ -> bracketTuple a) <>
+  singleton (TkLeftBracket ()) <>
+  foldMap renderWhitespace b <>
+  renderExpr c <>
+  singleton (TkRightBracket ()) <>
+  foldMap renderWhitespace d
 renderExpr (Not _ ws e) =
   TkNot () `cons`
   foldMap renderWhitespace ws <>

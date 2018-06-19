@@ -358,6 +358,13 @@ orExpr ws = xorExpr
       commaSep anySpace arg <*>
       (snd <$> token anySpace (TkRightParen ()))
 
+      <!>
+
+      (\a b c d -> Subscript (_exprAnnotation d) d a b c) <$>
+      (snd <$> token anySpace (TkLeftBracket ())) <*>
+      exprList ws <*>
+      (snd <$> token anySpace (TkRightBracket ()))
+
     atomExpr = foldl' (&) <$> atom <*> many trailer
 
     parens =

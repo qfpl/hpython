@@ -366,6 +366,10 @@ validateAssignExprScope
   :: AsScopeError e v a
   => Expr v a
   -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
+validateAssignExprScope (Subscript a e1 ws1 e2 ws2) =
+  (\e1' e2' -> Subscript a e1' ws1 e2' ws2) <$>
+  validateAssignExprScope e1 <*>
+  validateExprScope e2
 validateAssignExprScope (List a ws1 es ws2) =
   List a ws1 <$>
   traverseOf (traverse.traverse) validateAssignExprScope es <*>
@@ -399,6 +403,10 @@ validateExprScope
   :: AsScopeError e v a
   => Expr v a
   -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
+validateExprScope (Subscript a b c d e) =
+  (\b' d' -> Subscript a b' c d' e) <$>
+  validateExprScope b <*>
+  validateExprScope d
 validateExprScope (Not a ws e) = Not a ws <$> validateExprScope e
 validateExprScope (List a ws1 es ws2) =
   List a ws1 <$>

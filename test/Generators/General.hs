@@ -200,6 +200,15 @@ genExpr' isExp = Gen.sized $ \n ->
           a <- Gen.resize n' genExpr
           b <- Gen.resize (n - n') $ genSizedCommaSep (genArg genExpr)
           Call () a <$> genWhitespaces <*> pure b <*> genWhitespaces
+      , Gen.shrink
+          (\case
+              Subscript () a _ b _ -> [a, b]
+              _ -> []) $
+        Gen.sized $ \n -> do
+          n' <- Gen.integral (Range.constant 1 (n-1))
+          a <- Gen.resize n' genExpr
+          b <- Gen.resize (n - n') genExpr
+          Subscript () a <$> genWhitespaces <*> pure b <*> genWhitespaces
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
           op <- genOp

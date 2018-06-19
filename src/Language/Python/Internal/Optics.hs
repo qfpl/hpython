@@ -234,6 +234,7 @@ assignTargets f e =
       (traverse.traverse.assignTargets) f d
     ListComp{} -> pure $ coerce e
     Deref{} -> pure $ coerce e
+    Subscript{} -> pure $ coerce e
     Call{} -> pure $ coerce e
     None{} -> pure $ coerce e
     BinOp{} -> pure $ coerce e

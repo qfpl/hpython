@@ -190,6 +190,10 @@ validateExprSyntax
      )
   => Expr v a
   -> ValidateSyntax e (Expr (Nub (Syntax ': v)) a)
+validateExprSyntax (Subscript a b c d e) =
+  (\b' d' -> Subscript a b' c d' e) <$>
+  validateExprSyntax b <*>
+  validateExprSyntax d
 validateExprSyntax (Not a ws e) =
   Not a <$>
   validateWhitespace a ws <*>

@@ -330,6 +330,11 @@ genExpr' isExp = Gen.sized $ \n ->
           Call () a <$> genWhitespaces <*> pure b <*> genWhitespaces
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
+          a <- Gen.resize n' genExpr
+          b <- Gen.resize (n - n') genExpr
+          Subscript () a <$> genWhitespaces <*> pure b <*> genWhitespaces
+      , Gen.sized $ \n -> do
+          n' <- Gen.integral (Range.constant 1 (n-1))
           op <- genOp
           Gen.subtermM2
             (Gen.resize n' genExpr)

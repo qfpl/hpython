@@ -272,17 +272,27 @@ exprList ws =
      (snd <$> comma ws) <*>
      optional (commaSep1' ws $ expr ws))
 
+orExprList :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+orExprList ws =
+  (\a -> maybe a (uncurry $ Tuple (_exprAnnotation a) a)) <$>
+  orExpr ws <*>
+  optional
+    ((,) <$>
+     (snd <$> comma ws) <*>
+     optional (commaSep1' ws $ orExpr ws))
+
+binOp :: Parser ann (BinOp ann) -> Parser ann (Expr '[] ann) -> Parser ann (Expr '[] ann)
+binOp op tm =
+  (\t ts ->
+      case ts of
+        [] -> t
+        _ -> foldl (\tm (o, val) -> BinOp (tm ^. exprAnnotation) tm o val) t ts) <$>
+  tm <*>
+  many ((,) <$> op <*> tm)
+
 expr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 expr ws = orTest
   where
-    binOp op tm =
-      (\t ts ->
-          case ts of
-            [] -> t
-            _ -> foldl (\tm (o, val) -> BinOp (tm ^. exprAnnotation) tm o val) t ts) <$>
-     tm <*>
-     many ((,) <$> op <*> tm)
-
     orOp = (\(tk, ws) -> BoolOr (pyTokenAnn tk) ws) <$> token ws (TkOr ())
     orTest = binOp orOp andTest
 
@@ -294,17 +304,23 @@ expr ws = orTest
       comparison
 
     compOp =
-      (\(tk, ws) -> Is (pyTokenAnn tk) ws) <$> token ws (TkIs ()) <!>
+      (\(tk, ws) -> maybe (Is (pyTokenAnn tk) ws) (IsNot (pyTokenAnn tk) ws)) <$>
+      token ws (TkIs ()) <*> optional (snd <$> token ws (TkNot ())) <!>
+      (\(tk, ws) -> NotIn (pyTokenAnn tk) ws) <$>
+      token ws (TkNot ()) <*>
+      (snd <$> token ws (TkIn ())) <!>
+      (\(tk, ws) -> In (pyTokenAnn tk) ws) <$> token ws (TkIn ()) <!>
       (\(tk, ws) -> Equals (pyTokenAnn tk) ws) <$> token ws (TkDoubleEq ()) <!>
       (\(tk, ws) -> Lt (pyTokenAnn tk) ws) <$> token ws (TkLt ()) <!>
       (\(tk, ws) -> LtEquals (pyTokenAnn tk) ws) <$> token ws (TkLte ()) <!>
       (\(tk, ws) -> Gt (pyTokenAnn tk) ws) <$> token ws (TkGt ()) <!>
       (\(tk, ws) -> GtEquals (pyTokenAnn tk) ws) <$> token ws (TkGte ()) <!>
       (\(tk, ws) -> NotEquals (pyTokenAnn tk) ws) <$> token ws (TkBangEq ())
-    comparison = binOp compOp orExpr
+    comparison = binOp compOp $ orExpr ws
 
-    orExpr = xorExpr
-
+orExpr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+orExpr ws = xorExpr
+  where
     xorExpr = andExpr
 
     andExpr = shiftExpr
@@ -368,7 +384,7 @@ expr ws = orTest
     compFor =
       (\(tk, s) -> CompFor (pyTokenAnn tk) s) <$>
       token anySpace (TkFor ()) <*>
-      exprList anySpace <*>
+      orExprList anySpace <*>
       (snd <$> token anySpace (TkIn ())) <*>
       expr anySpace
 
@@ -754,7 +770,7 @@ compoundStatement =
       (\a (tk, s) -> For a (pyTokenAnn tk) s) <$>
       indents <*>
       token space (TkFor ()) <*>
-      exprList space <*>
+      orExprList space <*>
       (snd <$> token space (TkIn ())) <*>
       exprList space <*>
       (snd <$> colon space) `withSuite`

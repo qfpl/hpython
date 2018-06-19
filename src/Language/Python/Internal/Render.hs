@@ -603,6 +603,17 @@ renderParam (KeywordParam _ name ws2 expr) =
 
 renderBinOp :: BinOp a -> RenderOutput
 renderBinOp (Is _ ws) = TkIs () `cons` foldMap renderWhitespace ws
+renderBinOp (IsNot _ ws1 ws2) =
+  TkIs () `cons`
+  foldMap renderWhitespace ws1 <>
+  singleton (TkNot ()) <>
+  foldMap renderWhitespace ws2
+renderBinOp (In _ ws) = TkIn () `cons` foldMap renderWhitespace ws
+renderBinOp (NotIn _ ws1 ws2) =
+  TkNot () `cons`
+  foldMap renderWhitespace ws1 <>
+  singleton (TkIn ()) <>
+  foldMap renderWhitespace ws2
 renderBinOp (Plus _ ws) = TkPlus () `cons` foldMap renderWhitespace ws
 renderBinOp (Minus _ ws) = TkMinus () `cons` foldMap renderWhitespace ws
 renderBinOp (Multiply _ ws) = TkStar () `cons` foldMap renderWhitespace ws

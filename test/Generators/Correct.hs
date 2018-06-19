@@ -266,6 +266,37 @@ genDeref =
         genWhitespaces <*>
         genIdent)
 
+genCompFor :: MonadGen m => m (CompFor '[] ())
+genCompFor =
+  Gen.sized $ \n -> do
+    s1 <- Gen.integral (Range.constant 0 . max 0 $ n-1)
+    s2 <- Gen.integral (Range.constant 0 $ s1)
+    CompFor () <$>
+      genWhitespaces <*>
+      Gen.resize s1 genAssignable <*>
+      genWhitespaces <*>
+      Gen.resize s2 (Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
+
+genCompIf :: MonadGen m => m (CompIf '[] ())
+genCompIf =
+  CompIf () <$>
+  genWhitespaces <*>
+  Gen.scale (max 0 . subtract 1) (Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
+
+genComprehension :: MonadGen m => m (Comprehension '[] ())
+genComprehension =
+  Gen.sized $ \n -> do
+    s1 <- Gen.integral (Range.constant 0 . max 0 $ n-2)
+    s2 <- Gen.integral (Range.constant 0 . max 0 $ s1-1)
+    s3 <- Gen.integral (Range.constant 0 $ s2)
+    s4 <- Gen.integral (Range.constant 0 10)
+    Comprehension () <$>
+      Gen.resize s1 (Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr) <*>
+      Gen.resize s2 genCompFor <*>
+      replicateM (unSize s4)
+        (Gen.resize (s3 `div` s4) $
+         Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
+
 -- | This is necessary to prevent generating exponentials that will take forever to evaluate
 -- when python does constant folding
 genExpr :: MonadGen m => m (Expr '[] ())
@@ -289,6 +320,7 @@ genExpr' isExp = Gen.sized $ \n ->
     Gen.resize (n-1) .
     Gen.choice $
       [ genList genExpr
+      , ListComp () <$> genWhitespaces <*> genComprehension <*> genWhitespaces
       , genDeref
       , genParens (genExpr' isExp)
       , Gen.sized $ \n -> do

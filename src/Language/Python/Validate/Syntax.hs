@@ -9,29 +9,29 @@
 {-# language LambdaCase #-}
 module Language.Python.Validate.Syntax where
 
-import Control.Applicative
-import Control.Lens.Cons
-import Control.Lens.Fold
-import Control.Lens.Getter
-import Control.Lens.Plated
-import Control.Lens.Prism
-import Control.Lens.Review
-import Control.Lens.TH
-import Control.Lens.Tuple
-import Control.Lens.Traversal
-import Control.Lens.Wrapped
-import Control.Monad.State
-import Control.Monad.Reader
-import Data.Char
-import Data.Coerce
-import Data.Foldable
-import Data.Functor
-import Data.Functor.Compose
-import Data.List
-import Data.Maybe
+import Control.Applicative ((<|>), liftA2)
+import Control.Lens.Cons (_Cons)
+import Control.Lens.Fold ((^..), (^?), folded, toListOf)
+import Control.Lens.Getter ((^.))
+import Control.Lens.Prism (_Right)
+import Control.Lens.Review ((#))
+import Control.Lens.TH (makeWrapped)
+import Control.Lens.Tuple (_2, _5)
+import Control.Lens.Traversal (traverseOf)
+import Control.Lens.Wrapped (_Wrapped)
+import Control.Monad (when)
+import Control.Monad.State (State, put, modify, get, evalState)
+import Control.Monad.Reader (ReaderT, local, ask, runReaderT)
+import Data.Char (isAscii)
+import Data.Coerce (coerce)
+import Data.Foldable (toList, traverse_)
+import Data.Bitraversable (bitraverse)
+import Data.Functor.Compose (Compose(..))
+import Data.List (intersect, union)
+import Data.Maybe (isJust)
 import Data.Semigroup (Semigroup(..))
 import Data.Type.Set (Nub, Member)
-import Data.Validate
+import Data.Validate (Validate(..))
 
 import qualified Data.List.NonEmpty as NonEmpty
 
@@ -150,6 +150,40 @@ validateWhitespace ann ws =
   then syntaxErrors [_UnexpectedNewline # ann]
   else pure ws
 
+validateComprehensionSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => Comprehension v a
+  -> ValidateSyntax e (Comprehension (Nub (Syntax ': v)) a)
+validateComprehensionSyntax (Comprehension a b c d) =
+  Comprehension a <$>
+  validateExprSyntax b <*>
+  validateCompForSyntax c <*>
+  traverse (bitraverse validateCompForSyntax validateCompIfSyntax) d
+  where
+    validateCompForSyntax
+      :: ( AsSyntaxError e v a
+        , Member Indentation v
+        )
+      => CompFor v a
+      -> ValidateSyntax e (CompFor (Nub (Syntax ': v)) a)
+    validateCompForSyntax (CompFor a b c d e) =
+      (\c' -> CompFor a b c' d) <$>
+      (if canAssignTo c
+        then validateExprSyntax c
+        else syntaxErrors [_CannotAssignTo # (a, c)]) <*>
+      validateExprSyntax e
+
+    validateCompIfSyntax
+      :: ( AsSyntaxError e v a
+        , Member Indentation v
+        )
+      => CompIf v a
+      -> ValidateSyntax e (CompIf (Nub (Syntax ': v)) a)
+    validateCompIfSyntax (CompIf a b c) =
+      CompIf a b <$> validateExprSyntax c
+
 validateExprSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
@@ -163,28 +197,36 @@ validateExprSyntax (Not a ws e) =
 validateExprSyntax (Parens a ws1 e ws2) =
   Parens a ws1 <$>
   localSyntaxContext (\c -> c { _inParens = True }) (validateExprSyntax e) <*>
-  pure ws2
+  validateWhitespace a ws2
 validateExprSyntax (Bool a b ws) = pure $ Bool a b ws
 validateExprSyntax (Negate a ws expr) = Negate a ws <$> validateExprSyntax expr
 validateExprSyntax (String a prefix strType b ws) =
-  pure $ String a prefix strType b ws
+  String a prefix strType b <$> validateWhitespace a ws
 validateExprSyntax (Int a n ws) = pure $ Int a n ws
 validateExprSyntax (Ident a name) = Ident a <$> validateIdent name
 validateExprSyntax (List a ws1 exprs ws2) =
   List a ws1 <$>
-  traverseOf (traverse.traverse) validateExprSyntax exprs <*>
-  pure ws2
+  localSyntaxContext
+    (\c -> c { _inParens = True })
+    (traverseOf (traverse.traverse) validateExprSyntax exprs) <*>
+  validateWhitespace a ws2
+validateExprSyntax (ListComp a ws1 comp ws2) =
+  ListComp a ws1 <$>
+  localSyntaxContext
+    (\c -> c { _inParens = True })
+    (validateComprehensionSyntax comp) <*>
+  validateWhitespace a ws2
 validateExprSyntax (Deref a expr ws1 name) =
   Deref a <$>
   validateExprSyntax expr <*>
-  pure ws1 <*>
+  validateWhitespace a ws1 <*>
   validateIdent name
 validateExprSyntax (Call a expr ws args ws2) =
   Call a <$>
   validateExprSyntax expr <*>
-  pure ws <*>
+  validateWhitespace a ws <*>
   localSyntaxContext (\c -> c { _inParens = True }) (validateArgsSyntax args) <*>
-  pure ws2
+  validateWhitespace a ws2
 validateExprSyntax (None a ws) = pure $ None a ws
 validateExprSyntax (BinOp a e1 op e2) =
   BinOp a <$>
@@ -194,7 +236,7 @@ validateExprSyntax (BinOp a e1 op e2) =
 validateExprSyntax (Tuple a b ws d) =
   Tuple a <$>
   validateExprSyntax b <*>
-  pure ws <*>
+  validateWhitespace a ws <*>
   traverseOf (traverse.traverse) validateExprSyntax d
 
 validateBlockSyntax
@@ -341,7 +383,7 @@ validateImportAs v (ImportAs x a b) =
   traverse
     (\(c, d) ->
        (,) <$>
-       (validateWhitespace x (NonEmpty.toList c) $> c) <*>
+       (c <$ validateWhitespace x (NonEmpty.toList c)) <*>
        validateIdent d)
     b
 
@@ -396,7 +438,7 @@ validateSmallStatementSyntax (Assign a lvalue ws2 rvalue) =
     let
       assigns =
         if isJust (_inFunction sctxt)
-        then lvalue ^.. unvalidated.cosmos._Ident._2.identValue
+        then lvalue ^.. unvalidated.assignTargets.identValue
         else []
     in
       (Assign a <$>
@@ -476,7 +518,7 @@ validateArgsSyntax
      )
   => f (Arg v a)
   -> ValidateSyntax e (f (Arg (Nub (Syntax ': v)) a))
-validateArgsSyntax e = go [] False False (toList e) $> fmap coerce e
+validateArgsSyntax e = fmap coerce e <$ go [] False False (toList e)
   where
     go
       :: (AsSyntaxError e v a, Member Indentation v)
@@ -529,7 +571,7 @@ validateParamsSyntax
      )
   => CommaSep (Param v a)
   -> ValidateSyntax e (CommaSep (Param (Nub (Syntax ': v)) a))
-validateParamsSyntax e = go [] False (toList e) $> coerce e
+validateParamsSyntax e = coerce e <$ go [] False (toList e)
   where
     go _ _ [] = pure []
     go names False (PositionalParam a name : params)

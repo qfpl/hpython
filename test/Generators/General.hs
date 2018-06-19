@@ -8,6 +8,7 @@ import Control.Lens.Fold
 import Control.Lens.Getter
 import Control.Lens.Iso (from)
 import Control.Lens.Wrapped
+import Control.Monad (replicateM)
 import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty(..))
 
@@ -121,6 +122,37 @@ genBlock =
           b <- Gen.resize n'' (go indent)
           pure . Block $ NonEmpty.cons s1 (unBlock b)
 
+genCompFor :: MonadGen m => m (CompFor '[] ())
+genCompFor =
+  Gen.sized $ \n -> do
+    s1 <- Gen.integral (Range.constant 0 . max 0 $ n-1)
+    s2 <- Gen.integral (Range.constant 0 $ s1)
+    CompFor () <$>
+      genWhitespaces <*>
+      Gen.resize s1 genExpr <*>
+      genWhitespaces <*>
+      Gen.resize s2 genExpr
+
+genCompIf :: MonadGen m => m (CompIf '[] ())
+genCompIf =
+  CompIf () <$>
+  genWhitespaces <*>
+  Gen.scale (max 0 . subtract 1) genExpr
+
+genComprehension :: MonadGen m => m (Comprehension '[] ())
+genComprehension =
+  Gen.sized $ \n -> do
+    s1 <- Gen.integral (Range.constant 0 . max 0 $ n-2)
+    s2 <- Gen.integral (Range.constant 0 . max 0 $ s1-1)
+    s3 <- Gen.integral (Range.constant 0 $ s2)
+    s4 <- Gen.integral (Range.constant 0 10)
+    Comprehension () <$>
+      Gen.resize s1 genExpr <*>
+      Gen.resize s2 genCompFor <*>
+      replicateM (unSize s4)
+        (Gen.resize (s3 `div` s4) $
+         Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
+
 -- | This is necessary to prevent generating exponentials that will take forever to evaluate
 -- when python does constant folding
 genExpr :: MonadGen m => m (Expr '[] ())
@@ -146,6 +178,10 @@ genExpr' isExp = Gen.sized $ \n ->
       [ List () <$>
         genWhitespaces <*>
         Gen.maybe (genSizedCommaSep1' genExpr) <*>
+        genWhitespaces
+      , ListComp () <$>
+        genWhitespaces <*>
+        genComprehension <*>
         genWhitespaces
       , Gen.subtermM
           genExpr

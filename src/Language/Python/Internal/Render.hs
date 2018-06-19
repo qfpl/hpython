@@ -13,6 +13,7 @@ module Language.Python.Internal.Render
   , renderIdent, renderComment, renderModuleName, renderDot, renderRelativeModuleName
   , renderImportAs, renderImportTargets, renderSmallStatement, renderCompoundStatement
   , renderBlock, renderIndent, renderIndents, renderExceptAs, renderArg, renderParam
+  , renderCompFor, renderCompIf, renderComprehension
   , renderBinOp
   )
 where
@@ -20,6 +21,7 @@ where
 import Control.Lens.Getter (view)
 import Control.Lens.Wrapped (_Wrapped)
 import Control.Lens.Plated (transform)
+import Data.Bifoldable (bifoldMap)
 import Data.Char (ord)
 import Data.Foldable (toList)
 import Data.Maybe (maybe)
@@ -280,6 +282,27 @@ renderIdent (MkIdent _ a b) = TkIdent a () `cons` foldMap renderWhitespace b
 renderComment :: Comment -> PyToken ()
 renderComment (Comment s) = TkComment s ()
 
+renderCompFor :: CompFor v a -> RenderOutput
+renderCompFor (CompFor _ ws1 ex1 ws2 ex2) =
+  TkFor () `cons`
+  foldMap renderWhitespace ws1 <>
+  renderExpr ex1 <>
+  singleton (TkIn ()) <>
+  foldMap renderWhitespace ws2 <>
+  bracketTuple ex2
+
+renderCompIf :: CompIf v a -> RenderOutput
+renderCompIf (CompIf _ ws ex) =
+  TkIf () `cons`
+  foldMap renderWhitespace ws <>
+  bracketTuple ex
+
+renderComprehension :: Comprehension v a -> RenderOutput
+renderComprehension (Comprehension _ expr cf cs) =
+  bracketTuple expr <>
+  renderCompFor cf <>
+  foldMap (bifoldMap renderCompFor renderCompIf) cs
+
 renderExpr :: Expr v a -> RenderOutput
 renderExpr (Not _ ws e) =
   TkNot () `cons`
@@ -316,6 +339,11 @@ renderExpr (List _ ws1 exprs ws2) =
   foldMap
     (renderCommaSep1' bracketTuple)
     exprs <>
+  singleton (TkRightBracket ()) <> foldMap renderWhitespace ws2
+renderExpr (ListComp _ ws1 comp ws2) =
+  TkLeftBracket () `cons`
+  foldMap renderWhitespace ws1 <>
+  renderComprehension comp <>
   singleton (TkRightBracket ()) <> foldMap renderWhitespace ws2
 renderExpr (Call _ expr ws args ws2) =
   (case expr of

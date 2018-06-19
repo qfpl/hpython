@@ -15,8 +15,12 @@ import Control.Lens.Prism (_Just)
 import Control.Lens.Setter ((.~))
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (Traversal)
+import Data.Bifunctor (bimap)
+import Data.Bifoldable (bifoldMap)
+import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
 import Data.Function ((&))
+import Data.Monoid ((<>))
 import Data.String (IsString(..))
 import GHC.Generics (Generic)
 
@@ -87,8 +91,48 @@ data StringType
   | LongDouble
   deriving (Eq, Show)
 
+data Comprehension (v :: [*]) a
+  -- ^ <expr> <comp_for> (comp_for | comp_if)*
+  = Comprehension a (Expr v a) (CompFor v a) [Either (CompFor v a) (CompIf v a)]
+  deriving (Eq, Show)
+
+instance Functor (Comprehension v) where
+  fmap f (Comprehension a b c d) =
+    Comprehension (f a) (fmap f b) (fmap f c) (fmap (bimap (fmap f) (fmap f)) d)
+
+instance Foldable (Comprehension v) where
+  foldMap f (Comprehension a b c d) =
+    f a <> foldMap f b <> foldMap f c <> foldMap (bifoldMap (foldMap f) (foldMap f)) d
+
+instance Traversable (Comprehension v) where
+  traverse f (Comprehension a b c d) =
+    Comprehension <$>
+    f a <*>
+    traverse f b <*>
+    traverse f c <*>
+    traverse (bitraverse (traverse f) (traverse f)) d
+
+data CompIf (v :: [*]) a
+  -- ^ 'if' <any_spaces> <expr>
+  = CompIf a [Whitespace] (Expr v a)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+data CompFor (v :: [*]) a
+  -- ^ 'for' <any_spaces> <targets> 'in' <any_spaces> <expr>
+  = CompFor a [Whitespace] (Expr v a) [Whitespace] (Expr v a)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
 data Expr (v :: [*]) a
-  = List
+  = ListComp
+  { _exprAnnotation :: a
+  -- [ spaces
+  , _unsafeListCompWhitespaceLeft :: [Whitespace]
+  -- comprehension
+  , _unsafeListCompValue :: Comprehension v a
+  -- ] spaces
+  , _unsafeListCompWhitespaceRight :: [Whitespace]
+  }
+  | List
   { _exprAnnotation :: a
   -- [ spaces
   , _unsafeListWhitespaceLeft :: [Whitespace]
@@ -186,6 +230,7 @@ instance HasTrailingWhitespace (Expr v a) where
       (\case
           None _ ws -> ws
           List _ _ _ ws -> ws
+          ListComp _ _ _ ws -> ws
           Deref _ _ _ a -> a ^. getting trailingWhitespace
           Call _ _ _ _ ws -> ws
           BinOp _ _ _ e -> e ^. getting trailingWhitespace
@@ -202,6 +247,7 @@ instance HasTrailingWhitespace (Expr v a) where
         case e of
           None a _ -> None a ws
           List a b c _ -> List a b (coerce c) ws
+          ListComp a b c _ -> ListComp a b (coerce c) ws
           Deref a b c d -> Deref a (coerce b) c (d & trailingWhitespace .~ ws)
           Call a b c d _ -> Call a (coerce b) c (coerce d) ws
           BinOp a b c e -> BinOp a (coerce b) c (e & trailingWhitespace .~ ws)

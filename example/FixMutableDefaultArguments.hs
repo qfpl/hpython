@@ -44,6 +44,7 @@ fixMutableDefaultArguments input = do
     isMutable Bool{} = False
     isMutable String{} = False
     isMutable List{} = True
+    isMutable ListComp{} = True
     isMutable Deref{} = True
     isMutable Call{} = True
     isMutable BinOp{} = True

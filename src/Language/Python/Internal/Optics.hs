@@ -7,7 +7,7 @@ import Control.Lens.Fold (Fold)
 import Control.Lens.Getter (Getter, to)
 import Control.Lens.Setter ((.~))
 import Control.Lens.TH (makeLenses)
-import Control.Lens.Traversal (Traversal', failing)
+import Control.Lens.Traversal (Traversal, Traversal', failing)
 import Control.Lens.Tuple (_3, _5)
 import Control.Lens.Prism (Prism, _Right, _Left, prism)
 import Control.Lens.Wrapped (_Wrapped)
@@ -221,3 +221,24 @@ instance HasNewlines Statement where
 
 instance HasNewlines Module where
   _Newlines = _Wrapped.traverse.failing (_Left._3.traverse) (_Right._Newlines)
+
+assignTargets :: Traversal (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
+assignTargets f e =
+  case e of
+    List a b c d -> (\c' -> List a b c' d) <$> (traverse.traverse.assignTargets) f c
+    Parens a b c d -> (\c' -> Parens a b c' d) <$> assignTargets f c
+    Ident a b -> Ident a <$> f b
+    Tuple a b c d ->
+      (\b' d' -> Tuple a b' c d') <$>
+      assignTargets f b <*>
+      (traverse.traverse.assignTargets) f d
+    ListComp{} -> pure $ coerce e
+    Deref{} -> pure $ coerce e
+    Call{} -> pure $ coerce e
+    None{} -> pure $ coerce e
+    BinOp{} -> pure $ coerce e
+    Negate{} -> pure $ coerce e
+    Int{} -> pure $ coerce e
+    Bool{} -> pure $ coerce e
+    String{} -> pure $ coerce e
+    Not{} -> pure $ coerce e

@@ -11,6 +11,7 @@ import Control.Monad.Except (ExceptT(..), runExceptT, throwError)
 import Control.Monad.State
   (StateT(..), get, put, evalStateT, runStateT)
 import Control.Monad.Writer.Strict (Writer, runWriter, writer, tell)
+import Data.Bifunctor (first)
 import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.Functor (($>))
@@ -349,14 +350,48 @@ expr ws = orTest
       exprList anySpace <*>
       fmap snd (token space $ TkRightParen ())
 
+    commaExpr = do
+      c <- optional $ snd <$> comma anySpace
+      case c of
+        Nothing -> pure ([], Nothing)
+        Just c' -> do
+          e <- optional $ expr anySpace
+          case e of
+            Nothing -> pure ([], Just c')
+            Just e' -> first ((c', e') :) <$> commaExpr
+
+    compIf =
+      (\(tk, s) -> CompIf (pyTokenAnn tk) s) <$>
+      token anySpace (TkIf ()) <*>
+      expr anySpace
+
+    compFor =
+      (\(tk, s) -> CompFor (pyTokenAnn tk) s) <$>
+      token anySpace (TkFor ()) <*>
+      exprList anySpace <*>
+      (snd <$> token anySpace (TkIn ())) <*>
+      expr anySpace
+
+    list = do
+      (tk, s) <- token ws $ TkLeftBracket ()
+      ex <- optional $ expr ws
+      (case ex of
+        Nothing -> pure $ List (pyTokenAnn tk) s Nothing
+        Just ex' -> do
+          val <-
+            Left <$> compFor <!>
+            Right <$> commaExpr
+          case val of
+            Left cf ->
+              ListComp (pyTokenAnn tk) s <$>
+              (Comprehension (ex' ^. exprAnnotation)ex' cf <$>
+               many (Left <$> compFor <!> Right <$> compIf))
+            Right (cs, mws) ->
+              pure $ List (pyTokenAnn tk) s (Just $ (ex', cs, mws) ^. _CommaSep1')) <*>
+        (snd <$> token ws (TkRightBracket()))
+
     atom =
-      (\(tk, s) -> List (pyTokenAnn tk) s) <$>
-      token ws (TkLeftBracket ()) <*>
-      optional (commaSep1' ws $ expr ws) <*>
-      (snd <$> token ws (TkRightBracket()))
-
-      <!>
-
+      list <!>
       bool ws <!>
       integer ws <!>
       string ws <!>

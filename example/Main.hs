@@ -19,24 +19,24 @@ section a = do
 main = do
   section $ do
     putStrLn "Before\n"
-    putStrLn $ renderModule everything
+    putStrLn $ showModule everything
 
   section $ do
     putStrLn "Spaced\n"
     putStrLn .
-      renderModule $
+      showModule $
       everything & _Statements %~ indentSpaces 2
 
   section $ do
     putStrLn "Tabbed\n"
     putStrLn .
-      renderModule $
+      showModule $
       everything & _Statements %~ indentTabs
 
   section $ do
     putStrLn "Refactored\n"
     putStrLn .
-      renderModule .
+      showModule .
       rewriteOn _Statements fixMutableDefaultArguments .
       rewriteOn _Statements optimizeTailRecursion $
       everything

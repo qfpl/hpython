@@ -3,6 +3,7 @@
 module Language.Python.Internal.Syntax.CommaSep where
 
 import Control.Lens.Getter ((^.))
+import Control.Lens.Iso (Iso, iso)
 import Control.Lens.Lens (lens)
 import Control.Lens.Setter ((.~))
 import Data.Coerce (coerce)
@@ -75,6 +76,24 @@ data CommaSep1' a
   = CommaSepOne1' a (Maybe [Whitespace])
   | CommaSepMany1' a [Whitespace] (CommaSep1' a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
+
+_CommaSep1'
+  :: Iso
+       (a, [([Whitespace], a)], Maybe [Whitespace])
+       (b, [([Whitespace], b)], Maybe [Whitespace])
+       (CommaSep1' a)
+       (CommaSep1' b)
+_CommaSep1' = iso toCs fromCs
+  where
+    toCs (a, [], b) = CommaSepOne1' a b
+    toCs (a, (b, c) : bs, d) = CommaSepMany1' a b $ toCs (c, bs, d)
+
+    fromCs (CommaSepOne1' a b) = (a, [], b)
+    fromCs (CommaSepMany1' a b c) =
+      let
+        (d, e, f) = fromCs c
+      in
+        (a, (b, d) : e, f)
 
 listToCommaSep1' :: [a] -> Maybe (CommaSep1' a)
 listToCommaSep1' [] = Nothing

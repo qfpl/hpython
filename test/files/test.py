@@ -12,3 +12,5 @@ def boo(a, *b, c=1, **d):
 
 def bar(a=1, *b):
     f(a=1, *b)
+
+a = [b for c in d if e == f]

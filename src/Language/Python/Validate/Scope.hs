@@ -5,27 +5,27 @@
 {-# language RankNTypes #-}
 module Language.Python.Validate.Scope where
 
-import Control.Arrow
-import Control.Applicative
-import Control.Lens.Fold
-import Control.Lens.Getter
-import Control.Lens.Lens
-import Control.Lens.Plated
-import Control.Lens.Prism
-import Control.Lens.Review
-import Control.Lens.Setter
-import Control.Lens.TH
-import Control.Lens.Tuple
-import Control.Lens.Traversal
-import Control.Lens.Wrapped
-import Control.Monad.State
-import Data.Coerce
-import Data.Functor (($>))
-import Data.Functor.Compose
-import Data.String
-import Data.Type.Set
+import Control.Arrow ((&&&))
+import Control.Applicative ((<|>))
+import Control.Lens.Fold ((^..), toListOf, folded)
+import Control.Lens.Getter ((^.), to, getting, use)
+import Control.Lens.Lens (Lens')
+import Control.Lens.Plated (cosmos)
+import Control.Lens.Prism (_Right, _Just)
+import Control.Lens.Review ((#))
+import Control.Lens.Setter ((%~), (.~), Setter', mapped, over)
+import Control.Lens.TH (makeLenses)
+import Control.Lens.Tuple (_2, _5)
+import Control.Lens.Traversal (traverseOf)
+import Control.Lens.Wrapped (_Wrapped)
+import Control.Monad.State (State, modify, evalState)
+import Data.Bitraversable (bitraverse)
+import Data.Coerce (coerce)
+import Data.Functor.Compose (Compose(..))
+import Data.String (fromString)
+import Data.Type.Set (Nub)
 import Data.Trie (Trie)
-import Data.Validate
+import Data.Validate (Validate(..))
 
 import qualified Data.Trie as Trie
 
@@ -219,12 +219,12 @@ validateCompoundStatementScope (For idnts a b c d e f g h i) =
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty) $
     For idnts a b <$>
-    (traverse
+    (coerce c <$
+     traverse
        (\s ->
           inScope (s ^. identValue) `bindValidateScope` \res ->
           maybe (pure ()) (\_ -> scopeErrors [_BadShadowing # coerce s]) res)
-       (c ^.. unvalidated.cosmos._Ident._2) $>
-       coerce c) <*>
+       (c ^.. unvalidated.cosmos._Ident._2)) <*>
     pure d <*>
     validateExprScope e <*>
     pure f <*> pure g <*>
@@ -258,9 +258,11 @@ validateSmallStatementScope (Return a ws e) = Return a ws <$> validateExprScope 
 validateSmallStatementScope (Expr a e) = Expr a <$> validateExprScope e
 validateSmallStatementScope (Assign a l ws2 r) =
   let
-    ls = l ^.. unvalidated.cosmos._Ident._2.to (_identAnnotation &&& _identValue)
+    ls = l ^.. unvalidated.assignTargets.to (_identAnnotation &&& _identValue)
   in
-  (Assign a (coerce l) ws2 <$> validateExprScope r) <*
+  (\l' -> Assign a l' ws2) <$>
+  validateAssignExprScope l <*>
+  validateExprScope r <*
   extendScope scLocalScope ls <*
   extendScope scImmediateScope ls
 validateSmallStatementScope (Global a _ _) = scopeErrors [_FoundGlobal # a]
@@ -330,6 +332,69 @@ validateBlockScope
 validateBlockScope (Block b) =
   Block <$> traverseOf (traverse._Right) validateStatementScope b
 
+validateComprehensionScope
+  :: AsScopeError e v a
+  => Comprehension v a
+  -> ValidateScope a e (Comprehension (Nub (Scope ': v)) a)
+validateComprehensionScope (Comprehension a b c d) =
+  locallyOver scGlobalScope id $
+    (\c' d' b' -> Comprehension a b' c' d') <$>
+    validateCompForScope c <*>
+    traverse (bitraverse validateCompForScope validateCompIfScope) d <*>
+    validateExprScope b
+  where
+    validateCompForScope
+      :: AsScopeError e v a
+      => CompFor v a
+      -> ValidateScope a e (CompFor (Nub (Scope ': v)) a)
+    validateCompForScope (CompFor a b c d e) =
+      (\c' -> CompFor a b c' d) <$>
+      validateAssignExprScope c <*>
+      validateExprScope e <*
+      extendScope
+        scGlobalScope
+        (c ^.. unvalidated.assignTargets.to (_identAnnotation &&& _identValue))
+
+    validateCompIfScope
+      :: AsScopeError e v a
+      => CompIf v a
+      -> ValidateScope a e (CompIf (Nub (Scope ': v)) a)
+    validateCompIfScope (CompIf a b c) =
+      CompIf a b <$> validateExprScope c
+
+validateAssignExprScope
+  :: AsScopeError e v a
+  => Expr v a
+  -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
+validateAssignExprScope (List a ws1 es ws2) =
+  List a ws1 <$>
+  traverseOf (traverse.traverse) validateAssignExprScope es <*>
+  pure ws2
+validateAssignExprScope (Deref a e ws1 r) =
+  Deref a <$>
+  validateExprScope e <*>
+  pure ws1 <*>
+  validateIdentScope r
+validateAssignExprScope (Parens a ws1 e ws2) =
+  Parens a ws1 <$>
+  validateAssignExprScope e <*>
+  pure ws2
+validateAssignExprScope (Tuple a b ws d) =
+  Tuple a <$>
+  validateAssignExprScope b <*>
+  pure ws <*>
+  traverseOf (traverse.traverse) validateAssignExprScope d
+validateAssignExprScope e@Not{} = pure $ coerce e
+validateAssignExprScope e@ListComp{} = pure $ coerce e
+validateAssignExprScope e@Call{} = pure $ coerce e
+validateAssignExprScope e@Negate{} = pure $ coerce e
+validateAssignExprScope e@BinOp{} = pure $ coerce e
+validateAssignExprScope e@Ident{} = pure $ coerce e
+validateAssignExprScope e@None{} = pure $ coerce e
+validateAssignExprScope e@Int{} = pure $ coerce e
+validateAssignExprScope e@Bool{} = pure $ coerce e
+validateAssignExprScope e@String{} = pure $ coerce e
+
 validateExprScope
   :: AsScopeError e v a
   => Expr v a
@@ -338,6 +403,10 @@ validateExprScope (Not a ws e) = Not a ws <$> validateExprScope e
 validateExprScope (List a ws1 es ws2) =
   List a ws1 <$>
   traverseOf (traverse.traverse) validateExprScope es <*>
+  pure ws2
+validateExprScope (ListComp a ws1 comp ws2) =
+  ListComp a ws1 <$>
+  validateComprehensionScope comp <*>
   pure ws2
 validateExprScope (Deref a e ws1 r) =
   Deref a <$>

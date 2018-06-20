@@ -302,6 +302,19 @@ genComprehension =
 genExpr :: MonadGen m => m (Expr '[] ())
 genExpr = genExpr' False
 
+genStringLiterals :: MonadGen m => m (Expr '[] ())
+genStringLiterals = do
+  n <- Gen.integral (Range.constant 1 5)
+  b <- Gen.bool_
+  String () <$> go b n
+  where
+    go True 1 = pure <$> genStringLiteral
+    go False 1 = pure <$> genBytesLiteral
+    go b n =
+      NonEmpty.cons <$>
+      (if b then genStringLiteral else genBytesLiteral) <*>
+      go b (n-1)
+
 genExpr' :: MonadGen m => Bool -> m (Expr '[] ())
 genExpr' isExp = Gen.sized $ \n ->
   if n <= 1
@@ -310,23 +323,13 @@ genExpr' isExp = Gen.sized $ \n ->
     [ genBool
     , if isExp then genSmallInt else genInt
     , Ident () <$> genIdent
-    , String () <$>
-      Gen.maybe genStringPrefix <*>
-      genQuoteType <*>
-      genStringType <*>
-      genString <*>
-      genWhitespaces
-    , Bytes () <$>
-      genBytesPrefix <*>
-      genQuoteType <*>
-      genStringType <*>
-      genString <*>
-      genWhitespaces
+    , genStringLiterals
     ]
   else
     Gen.resize (n-1) .
     Gen.choice $
       [ genList genExpr
+      , genStringLiterals
       , ListComp () <$> genWhitespaces <*> genComprehension <*> genWhitespaces
       , genDeref
       , genParens (genExpr' isExp)

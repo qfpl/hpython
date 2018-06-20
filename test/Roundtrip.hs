@@ -6,7 +6,9 @@ import Control.Monad.IO.Class (liftIO)
 import Data.String (fromString)
 import Data.Validate (Validate(..))
 import Hedgehog
-  ((===), Group(..), Property, annotateShow, failure, property, withTests)
+  ( (===), Group(..), Property, annotateShow, failure, property
+  , withTests, withShrinks
+  )
 import System.FilePath ((</>))
 import Text.Trifecta (Caret)
 
@@ -24,7 +26,7 @@ import Helpers (doToPython)
 roundtripTests :: Group
 roundtripTests =
   Group "Roundtrip tests" $
-  (\name -> (fromString name, withTests 1 $ doRoundtrip name)) <$>
+  (\name -> (fromString name, withTests 1 . withShrinks 1 $ doRoundtrip name)) <$>
   [ "weird.py"
   , "django.py"
   , "test.py"

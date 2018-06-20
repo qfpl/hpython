@@ -20,6 +20,7 @@ import Data.Bifoldable (bifoldMap)
 import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
 import Data.Function ((&))
+import Data.List.NonEmpty (NonEmpty)
 import Data.Monoid ((<>))
 import Data.String (IsString(..))
 import GHC.Generics (Generic)
@@ -98,6 +99,35 @@ data CompFor (v :: [*]) a
   -- ^ 'for' <any_spaces> <targets> 'in' <any_spaces> <expr>
   = CompFor a [Whitespace] (Expr v a) [Whitespace] (Expr v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
+
+data StringLiteral a
+  = StringLiteral
+  { _stringLiteralAnn :: a
+  , _unsafeStringLiteralPrefix :: Maybe StringPrefix
+  , _stringLiteralQuoteType :: QuoteType
+  , _stringLiteralType :: StringType
+  , _stringLiteralValue :: String
+  , _stringLiteralWhitespace :: [Whitespace]
+  }
+  | BytesLiteral
+  { _stringLiteralAnn :: a
+  , _unsafeBytesLiteralPrefix :: BytesPrefix
+  , _stringLiteralQuoteType :: QuoteType
+  , _stringLiteralType :: StringType
+  , _stringLiteralValue :: String
+  , _stringLiteralWhitespace :: [Whitespace]
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasTrailingWhitespace (StringLiteral a) where
+  trailingWhitespace =
+    lens
+      (\case
+          StringLiteral _ _ _ _ _ ws -> ws
+          BytesLiteral _ _ _ _ _ ws -> ws)
+      (\s ws -> case s of
+          StringLiteral a b c d e _ -> StringLiteral a b c d e ws
+          BytesLiteral a b c d e _ -> BytesLiteral a b c d e ws)
 
 data Expr (v :: [*]) a
   = ListComp
@@ -191,19 +221,7 @@ data Expr (v :: [*]) a
   }
   | String
   { _exprAnnotation :: a
-  , _unsafeStringPrefix :: Maybe StringPrefix
-  , _unsafeQuoteType :: QuoteType
-  , _unsafeStringType :: StringType
-  , _unsafeStringValue :: String
-  , _unsafeStringWhitespace :: [Whitespace]
-  }
-  | Bytes
-  { _exprAnnotation :: a
-  , _unsafeBytesPrefix :: BytesPrefix
-  , _unsafeQuoteType :: QuoteType
-  , _unsafeStringType :: StringType
-  , _unsafeBytesValue :: String
-  , _unsafeBytesWhitespace :: [Whitespace]
+  , _unsafeStringLiteralValue :: NonEmpty (StringLiteral a)
   }
   | Tuple
   { _exprAnnotation :: a
@@ -237,8 +255,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Ident _ a -> a ^. getting trailingWhitespace
           Int _ _ ws -> ws
           Bool _ _ ws -> ws
-          String _ _ _ _ _ ws -> ws
-          Bytes _ _ _ _ _ ws -> ws
+          String _ v -> v ^. trailingWhitespace
           Not _ _ e -> e ^. getting trailingWhitespace
           Tuple _ _ ws Nothing -> ws
           Tuple _ _ _ (Just cs) -> cs ^. getting trailingWhitespace)
@@ -256,8 +273,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Ident a b -> Ident a (b & trailingWhitespace .~ ws)
           Int a b _ -> Int a b ws
           Bool a b _ -> Bool a b ws
-          String a b c d e _ -> String a b c d e ws
-          Bytes a b c d e _ -> Bytes a b c d e ws
+          String a v -> String a (v & trailingWhitespace .~ ws)
           Not a b c -> Not a b (c & trailingWhitespace .~ ws)
           Tuple a e _ Nothing -> Tuple a (coerce e) ws Nothing
           Tuple a b ws (Just cs) -> Tuple a (coerce b) ws (Just $ cs & trailingWhitespace .~ ws))

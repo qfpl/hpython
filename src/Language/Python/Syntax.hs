@@ -168,10 +168,10 @@ or_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
 or_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolOr () [Space])
 
 str_ :: String -> Expr '[] ()
-str_ s = String () Nothing DoubleQuote ShortString s []
+str_ s = String () . pure $ StringLiteral () Nothing DoubleQuote ShortString s []
 
 longStr_ :: String -> Expr '[] ()
-longStr_ s = String () Nothing DoubleQuote LongString s []
+longStr_ s = String () . pure $ StringLiteral () Nothing DoubleQuote LongString s []
 
 (.=) :: Expr '[] () -> Expr '[] () -> Statement '[] ()
 (.=) a b =

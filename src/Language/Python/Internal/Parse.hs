@@ -229,17 +229,18 @@ integer ws = do
     _ -> Parser . throwError $ ExpectedInteger curTk
 
 stringOrBytes :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
-stringOrBytes ws = do
-  curTk <- currentToken
-  (case curTk of
-    TkString sp qt st val ann ->
-      Parser (tell $ Consumed True) $>
-      String ann sp qt st val
-    TkBytes sp qt st val ann ->
-      Parser (tell $ Consumed True) $>
-      Bytes ann sp qt st val
-    _ -> Parser . throwError $ ExpectedStringOrBytes curTk) <*>
-    many ws
+stringOrBytes ws =
+  fmap (\vs -> String (_stringLiteralAnn $ NonEmpty.head vs) vs) . some1 $ do
+    curTk <- currentToken
+    (case curTk of
+       TkString sp qt st val ann ->
+         Parser (tell $ Consumed True) $>
+         StringLiteral ann sp qt st val
+       TkBytes sp qt st val ann ->
+         Parser (tell $ Consumed True) $>
+         BytesLiteral ann sp qt st val
+       _ -> Parser . throwError $ ExpectedStringOrBytes curTk) <*>
+     many ws
 
 between :: Parser ann left -> Parser ann right -> Parser ann a -> Parser ann a
 between left right pa = left *> pa <* right

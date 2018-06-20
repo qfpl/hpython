@@ -167,17 +167,7 @@ genExpr' isExp = Gen.sized $ \n ->
     , if isExp then genSmallInt else genInt
     , Ident () <$> genIdent
     , String () <$>
-      Gen.maybe genStringPrefix <*>
-      genQuoteType <*>
-      genStringType <*>
-      genString <*>
-      genWhitespaces
-    , Bytes () <$>
-      genBytesPrefix <*>
-      genQuoteType <*>
-      genStringType <*>
-      genString <*>
-      genWhitespaces
+      Gen.nonEmpty (Range.constant 1 5) (Gen.choice [genStringLiteral, genBytesLiteral])
     ]
   else
     Gen.resize (n-1) $

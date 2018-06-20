@@ -184,6 +184,17 @@ validateComprehensionSyntax (Comprehension a b c d) =
     validateCompIfSyntax (CompIf a b c) =
       CompIf a b <$> validateExprSyntax c
 
+validateStringLiteralSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => StringLiteral a
+  -> ValidateSyntax e (StringLiteral a)
+validateStringLiteralSyntax (StringLiteral a b c d e f) =
+  StringLiteral a b c d e <$> validateWhitespace a f
+validateStringLiteralSyntax (BytesLiteral a b c d e f) =
+  BytesLiteral a b c d e <$> validateWhitespace a f
+
 validateExprSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
@@ -204,10 +215,14 @@ validateExprSyntax (Parens a ws1 e ws2) =
   validateWhitespace a ws2
 validateExprSyntax (Bool a b ws) = pure $ Bool a b ws
 validateExprSyntax (Negate a ws expr) = Negate a ws <$> validateExprSyntax expr
-validateExprSyntax (String a prefix qt strType b ws) =
-  String a prefix qt strType b <$> validateWhitespace a ws
-validateExprSyntax (Bytes a prefix qt strType b ws) =
-  Bytes a prefix qt strType b <$> validateWhitespace a ws
+validateExprSyntax (String a strLits) =
+  if
+    all (\case; StringLiteral{} -> True; _ -> False) strLits ||
+    all (\case; BytesLiteral{} -> True; _ -> False) strLits
+  then
+    String a <$> traverse validateStringLiteralSyntax strLits
+  else
+    syntaxErrors [_Can'tJoinStringAndBytes # a]
 validateExprSyntax (Int a n ws) = pure $ Int a n ws
 validateExprSyntax (Ident a name) = Ident a <$> validateIdent name
 validateExprSyntax (List a ws1 exprs ws2) =

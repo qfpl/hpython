@@ -14,13 +14,18 @@ where
 
 import Control.Lens.Iso (Iso', iso, from)
 import Control.Lens.Getter (view)
-import Control.Lens.Lens (Lens')
+import Control.Lens.Lens (Lens', lens)
+import Control.Lens.Setter ((.~))
 import Control.Lens.TH (makeLenses)
 import Data.Foldable (toList)
+import Data.Function ((&))
 import Data.FingerTree (FingerTree, Measured(..), fromList)
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Monoid (Monoid, Endo(..), Dual(..))
 import Data.Semigroup (Semigroup)
 import GHC.Exts (IsList(..))
+
+import qualified Data.List.NonEmpty as NonEmpty
 
 data Newline
   = CR
@@ -37,6 +42,15 @@ data Whitespace
 
 class HasTrailingWhitespace s where
   trailingWhitespace :: Lens' s [Whitespace]
+
+instance HasTrailingWhitespace a => HasTrailingWhitespace (NonEmpty a) where
+  trailingWhitespace =
+    lens
+      (view trailingWhitespace . NonEmpty.last)
+      (\(x :| xs) ws ->
+         case xs of
+           [] -> (x & trailingWhitespace .~ ws) :| xs
+           x' : xs' -> NonEmpty.cons x $ (x' :| xs') & trailingWhitespace .~ ws)
 
 newtype IndentLevel
   = IndentLevel

@@ -263,3 +263,21 @@ genAugAssign =
     ] <*>
   pure () <*>
   genWhitespaces
+
+genStringLiteral :: MonadGen m => m (StringLiteral ())
+genStringLiteral =
+  StringLiteral () <$>
+  Gen.maybe genStringPrefix <*>
+  genQuoteType <*>
+  genStringType <*>
+  genString <*>
+  genWhitespaces
+
+genBytesLiteral :: MonadGen m => m (StringLiteral ())
+genBytesLiteral =
+  BytesLiteral () <$>
+  genBytesPrefix <*>
+  genQuoteType <*>
+  genStringType <*>
+  genString <*>
+  genWhitespaces

@@ -322,6 +322,14 @@ renderComprehension (Comprehension _ expr cf cs) =
   renderCompFor cf <>
   foldMap (bifoldMap renderCompFor renderCompIf) cs
 
+renderStringLiteral :: StringLiteral a -> RenderOutput
+renderStringLiteral (StringLiteral _ a b c d e) =
+  TkString a b c d () `cons`
+  foldMap renderWhitespace e
+renderStringLiteral (BytesLiteral _ a b c d e) =
+  TkBytes a b c d () `cons`
+  foldMap renderWhitespace e
+
 renderExpr :: Expr v a -> RenderOutput
 renderExpr (Subscript _ a b c d) =
   (case a of
@@ -353,12 +361,7 @@ renderExpr (Negate _ ws expr) =
     BinOp _ _ Exp{} _ -> renderExpr expr
     BinOp{} -> bracket $ renderExpr expr
     _ -> renderExpr expr
-renderExpr (String _ prefix qt strType b ws) =
-  TkString prefix qt strType b () `cons`
-  foldMap renderWhitespace ws
-renderExpr (Bytes _ prefix qt strType b ws) =
-  TkBytes prefix qt strType b () `cons`
-  foldMap renderWhitespace ws
+renderExpr (String _ vs) = foldMap renderStringLiteral vs
 renderExpr (Int _ n ws) = TkInt n () `cons` foldMap renderWhitespace ws
 renderExpr (Ident _ name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) =

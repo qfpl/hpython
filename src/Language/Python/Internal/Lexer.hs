@@ -119,6 +119,7 @@ parseToken =
     (\p -> try $ p <* notFollowedBy (satisfy isIdentifierStart))
     [ TkIf <$ string "if"
     , TkElse <$ string "else"
+    , TkElif <$ string "elif"
     , TkWhile <$ string "while"
     , TkDef <$ string "def"
     , TkReturn <$ string "return"

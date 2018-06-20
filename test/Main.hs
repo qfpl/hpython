@@ -179,6 +179,7 @@ statement_printparseprint_print =
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
             py <- doToPython statement $ showStatement res'
+            annotateShow py
             showStatement (res' ^. unvalidated) ===
               showStatement (py $> ())
 

@@ -521,7 +521,7 @@ renderCompoundStatement (If idnt _ ws1 expr ws3 nl body elifs body') =
     (\(idnt, ws4, ex, ws5, nl2, body'') ->
         renderIndents idnt <>
         singleton (TkElif ()) <> foldMap renderWhitespace ws4 <>
-        renderExpr ex <>
+        bracketTuple ex <>
         singleton (TkColon ()) <> foldMap renderWhitespace ws5 <>
         singleton (renderNewline nl2) <>
         renderBlock body'')

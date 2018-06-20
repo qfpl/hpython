@@ -480,12 +480,27 @@ genCompoundStatement =
           genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure a <*>
           genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
     , Gen.sized $ \n -> do
-        n' <- Gen.integral (Range.constant 1 (n-1))
-        n'' <- Gen.integral (Range.constant 0 (n-n'))
+        n' <- Gen.integral (Range.constant 1 (n-2))
+        n'' <- Gen.integral (Range.constant 1 . max 1 $ n-n'-1)
+        n''' <- Gen.integral (Range.constant 1 . max 1 $ n-n'-n'')
+        csz <- Gen.integral (Range.constant 1 n''')
         a <- Gen.resize n' genExpr
-        b <- Gen.resize (n - n') (localState genBlock)
+        b <- Gen.resize n'' (localState genBlock)
         c <-
-          if n - n' - n'' == 0
+          Gen.list (Range.singleton (unSize $ n''' `div` csz)) .
+          Gen.resize n''' .
+          Gen.sized $ \n -> do
+            n' <- Gen.integral (Range.constant 1 . max 1 $ n-1)
+            n'' <- Gen.integral (Range.constant 1 . max 1 $ n-n')
+            (,,,,,) <$>
+              use currentIndentation <*>
+              genWhitespaces <*>
+              Gen.resize n' genExpr <*>
+              genWhitespaces <*>
+              genNewline <*>
+              Gen.resize n'' (localState genBlock)
+        d <-
+          if n - n' - n'' - n''' == 0
           then pure Nothing
           else
             fmap Just $
@@ -494,12 +509,15 @@ genCompoundStatement =
             genWhitespaces <*>
             genWhitespaces <*>
             genNewline <*>
-            Gen.resize (n - n' - n'') (localState genBlock)
+            Gen.resize (n - n' - n'' - n''') (localState genBlock)
         If <$>
           use currentIndentation <*>
           pure () <*>
           fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
-          genWhitespaces <*> genNewline <*> pure b <*> pure c
+          genWhitespaces <*> genNewline <*>
+          pure b <*>
+          pure c <*>
+          pure d
     , Gen.sized $ \n -> do
         n' <- Gen.integral (Range.constant 1 (n-1))
         a <- Gen.resize n' genExpr
@@ -627,7 +645,7 @@ genStatement =
       Gen.maybe genWhitespaces <*>
       fmap Just genNewline
   else
-    Gen.scale (subtract 1) $
+    Gen.scale (max 0 . subtract 1) $
     Gen.choice
     [ CompoundStatement <$> localState genCompoundStatement
     , Gen.sized $ \n -> do

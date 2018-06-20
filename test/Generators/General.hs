@@ -288,12 +288,27 @@ genCompoundStatement =
           genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure a <*>
           genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
     , Gen.sized $ \n -> do
-        n' <- Gen.integral (Range.constant 1 (n-1))
-        n'' <- Gen.integral (Range.constant 0 (n-n'))
+        n' <- Gen.integral (Range.constant 1 (n-2))
+        n'' <- Gen.integral (Range.constant 1 . max 1 $ n-n'-1)
+        n''' <- Gen.integral (Range.constant 1 . max 1 $ n-n'-n'')
+        csz <- Gen.integral (Range.constant 1 n''')
         a <- Gen.resize n' genExpr
-        b <- Gen.resize (n - n') genBlock
+        b <- Gen.resize n'' genBlock
         c <-
-          if n - n' - n'' == 0
+          Gen.list (Range.singleton (unSize $ n''' `div` csz)) .
+          Gen.resize n''' .
+          Gen.sized $ \n -> do
+            n' <- Gen.integral (Range.constant 1 . max 1 $ n-1)
+            n'' <- Gen.integral (Range.constant 1 . max 1 $ n-n')
+            (,,,,,) <$>
+              genIndents <*>
+              genWhitespaces <*>
+              Gen.resize n' genExpr <*>
+              genWhitespaces <*>
+              genNewline <*>
+              Gen.resize n'' genBlock
+        d <-
+          if n - n' - n'' - n''' == 0
           then pure Nothing
           else
             fmap Just $
@@ -302,10 +317,13 @@ genCompoundStatement =
             genWhitespaces <*>
             genWhitespaces <*>
             genNewline <*>
-            Gen.resize (n - n' - n'') genBlock
+            Gen.resize (n - n' - n'' - n''') genBlock
         If <$> genIndents <*>
           pure () <*> genWhitespaces <*> pure a <*>
-          genWhitespaces <*> genNewline <*> pure b <*> pure c
+          genWhitespaces <*> genNewline <*>
+          pure b <*>
+          pure c <*>
+          pure d
     , Gen.sized $ \n -> do
         n' <- Gen.integral (Range.constant 1 (n-1))
         a <- Gen.resize n' genExpr
@@ -430,7 +448,7 @@ genStatement =
     Gen.maybe genWhitespaces <*>
     (Gen.maybe genNewline)
   else
-    Gen.scale (subtract 1) $
+    Gen.scale (max 0 . subtract 1) $
     Gen.choice
     [ Gen.sized $ \n -> do
         n' <- Gen.integral (Range.constant 1 n)

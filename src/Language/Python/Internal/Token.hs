@@ -11,6 +11,7 @@ import Language.Python.Internal.Syntax.Strings
 data PyToken a
   = TkIf a
   | TkElse a
+  | TkElif a
   | TkWhile a
   | TkDef a
   | TkReturn a
@@ -121,6 +122,7 @@ pyTokenAnn tk =
     TkMinus a -> a
     TkIf a -> a
     TkElse a -> a
+    TkElif a -> a
     TkWhile a -> a
     TkInt _ a -> a
     TkFloat _ _ a -> a

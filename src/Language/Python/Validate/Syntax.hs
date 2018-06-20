@@ -297,13 +297,19 @@ validateCompoundStatementSyntax (Fundef idnts a ws1 name ws2 params ws3 ws4 nl b
                 Just paramIdents
             })
          (validateBlockSyntax body))
-validateCompoundStatementSyntax (If idnts a ws1 expr ws3 nl body body') =
+validateCompoundStatementSyntax (If idnts a ws1 expr ws3 nl body elifs body') =
   If idnts a <$>
   validateWhitespace a ws1 <*>
   validateExprSyntax expr <*>
   validateWhitespace a ws3 <*>
   pure nl <*>
   validateBlockSyntax body <*>
+  traverse
+    (\(a, b, c, d, e, f) ->
+       (\c' -> (,,,,,) a b c' d e) <$>
+       validateExprSyntax c <*>
+       validateBlockSyntax f)
+    elifs <*>
   traverseOf (traverse._5) validateBlockSyntax body'
 validateCompoundStatementSyntax (While idnts a ws1 expr ws3 nl body) =
   While idnts a <$>

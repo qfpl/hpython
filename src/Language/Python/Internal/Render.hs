@@ -100,6 +100,7 @@ showToken t =
   case t of
     TkIf{} -> "if"
     TkElse{} -> "else"
+    TkElif{} -> "elif"
     TkWhile{} -> "while"
     TkDef{} -> "def"
     TkReturn{} -> "return"
@@ -509,15 +510,23 @@ renderCompoundStatement (Fundef idnt _ ws1 name ws2 params ws3 ws4 nl body) =
   foldMap renderWhitespace ws3 <> singleton (TkColon ()) <> foldMap renderWhitespace ws4 <>
   singleton (renderNewline nl) <>
   renderBlock body
-renderCompoundStatement (If idnt _ ws1 expr ws3 nl body body') =
+renderCompoundStatement (If idnt _ ws1 expr ws3 nl body elifs body') =
   renderIndents idnt <>
   singleton (TkIf ()) <> foldMap renderWhitespace ws1 <>
   bracketTuple expr <>
   singleton (TkColon ()) <> foldMap renderWhitespace ws3 <>
   singleton (renderNewline nl) <>
   renderBlock body <>
-  maybe
-    mempty
+  foldMap
+    (\(idnt, ws4, ex, ws5, nl2, body'') ->
+        renderIndents idnt <>
+        singleton (TkElif ()) <> foldMap renderWhitespace ws4 <>
+        renderExpr ex <>
+        singleton (TkColon ()) <> foldMap renderWhitespace ws5 <>
+        singleton (renderNewline nl2) <>
+        renderBlock body'')
+    elifs <>
+  foldMap
     (\(idnt, ws4, ws5, nl2, body'') ->
         renderIndents idnt <>
         singleton (TkElse ()) <> foldMap renderWhitespace ws4 <>

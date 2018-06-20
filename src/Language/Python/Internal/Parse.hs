@@ -727,6 +727,12 @@ compoundStatement =
       token space (TkIf ()) <*>
       expr space <*>
       (snd <$> colon space) `withSuite`
+      many
+        ((,,,,,) <$>
+         indents <*>
+         (snd <$> token space (TkElif ())) <*>
+         expr space <*>
+         (snd <$> colon space) `thenSuite` ()) <*>
       optional
         ((,,,,) <$>
          indents <*>

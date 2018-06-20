@@ -122,13 +122,6 @@ toBlock sts =
   over (_Indents.indentsValue) (replicate 4 Space ^. from indentWhitespaces :) <$>
   sts
 
-if_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
-if_ e sts =
-  CompoundStatement $
-  If (Indents [] ()) () [Space] e [] LF
-    (toBlock sts)
-    Nothing
-
 while_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 while_ e sts =
   CompoundStatement $
@@ -136,12 +129,33 @@ while_ e sts =
     [] LF
     (toBlock sts)
 
-ifElse_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> NonEmpty (Statement '[] ()) -> Statement '[] ()
-ifElse_ e sts sts' =
+ifElifsElse_
+  :: Expr '[] ()
+  -> NonEmpty (Statement '[] ())
+  -> [(Expr '[] (), NonEmpty (Statement '[] ()))]
+  -> NonEmpty (Statement '[] ())
+  -> Statement '[] ()
+ifElifsElse_ e sts elifs sts' =
   CompoundStatement $
   If (Indents [] ()) () [Space] e [] LF
     (toBlock sts)
+    ((\(a, b) -> (Indents [] (), [Space], a, [], LF, toBlock b)) <$> elifs)
     (Just (Indents [] (), [], [], LF, toBlock sts'))
+
+if_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
+if_ e sts =
+  CompoundStatement $
+  If (Indents [] ()) () [Space] e [] LF
+    (toBlock sts)
+    []
+    Nothing
+
+ifElse_
+  :: Expr '[] ()
+  -> NonEmpty (Statement '[] ())
+  -> NonEmpty (Statement '[] ())
+  -> Statement '[] ()
+ifElse_ e sts = ifElifsElse_ e sts []
 
 var_ :: String -> Expr '[] ()
 var_ s = Ident () (MkIdent () s [])

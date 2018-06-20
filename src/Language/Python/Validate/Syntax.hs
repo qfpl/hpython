@@ -204,8 +204,10 @@ validateExprSyntax (Parens a ws1 e ws2) =
   validateWhitespace a ws2
 validateExprSyntax (Bool a b ws) = pure $ Bool a b ws
 validateExprSyntax (Negate a ws expr) = Negate a ws <$> validateExprSyntax expr
-validateExprSyntax (String a prefix strType b ws) =
-  String a prefix strType b <$> validateWhitespace a ws
+validateExprSyntax (String a prefix qt strType b ws) =
+  String a prefix qt strType b <$> validateWhitespace a ws
+validateExprSyntax (Bytes a prefix qt strType b ws) =
+  Bytes a prefix qt strType b <$> validateWhitespace a ws
 validateExprSyntax (Int a n ws) = pure $ Int a n ws
 validateExprSyntax (Ident a name) = Ident a <$> validateIdent name
 validateExprSyntax (List a ws1 exprs ws2) =

@@ -32,6 +32,7 @@ library
                      , Language.Python.Internal.Syntax.Module
                      , Language.Python.Internal.Syntax.ModuleNames
                      , Language.Python.Internal.Syntax.Statement
+                     , Language.Python.Internal.Syntax.Strings
                      , Language.Python.Internal.Syntax.Whitespace
                      , Language.Python.Validate.Scope
                      , Language.Python.Validate.Scope.Error

@@ -312,6 +312,13 @@ genExpr' isExp = Gen.sized $ \n ->
     , Ident () <$> genIdent
     , String () <$>
       Gen.maybe genStringPrefix <*>
+      genQuoteType <*>
+      genStringType <*>
+      genString <*>
+      genWhitespaces
+    , Bytes () <$>
+      genBytesPrefix <*>
+      genQuoteType <*>
       genStringType <*>
       genString <*>
       genWhitespaces

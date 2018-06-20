@@ -8,7 +8,7 @@ module Language.Python.Internal.Render
   , RenderOutput, showRenderOutput, singleton, cons
   , renderModule, renderStatement, renderExpr
     -- * Miscellany
-  , showQuoteType, showStringPrefix, showToken
+  , showQuoteType, showStringPrefix, showBytesPrefix, showToken
   , bracket, renderWhitespace, renderCommaSep, renderCommaSep1, renderCommaSep1'
   , renderIdent, renderComment, renderModuleName, renderDot, renderRelativeModuleName
   , renderImportAs, renderImportTargets, renderSmallStatement, renderCompoundStatement
@@ -28,7 +28,7 @@ import Data.Maybe (maybe)
 import Data.Semigroup (Semigroup(..))
 
 import Language.Python.Internal.Syntax
-import Language.Python.Internal.Token (PyToken(..), QuoteType(..))
+import Language.Python.Internal.Token (PyToken(..))
 
 newtype RenderOutput
   = RenderOutput
@@ -74,6 +74,10 @@ showStringPrefix sp =
     Prefix_R -> "R"
     Prefix_u -> "u"
     Prefix_U -> "U"
+
+showBytesPrefix :: BytesPrefix -> String
+showBytesPrefix sp =
+  case sp of
     Prefix_b -> "b"
     Prefix_B -> "B"
     Prefix_br -> "br"
@@ -125,19 +129,21 @@ showToken t =
     TkInt i _ -> show i
     TkFloat i i' _ -> show i <> foldMap (("." <>) . show) i'
     TkIdent s _ -> s
-    TkShortString sp qt s _ ->
+    TkString sp qt st s _ ->
       let
-        quote = showQuoteType qt
+        quote =
+          showQuoteType qt >>= (case st of; LongString -> replicate 3; ShortString -> pure)
       in
         foldMap showStringPrefix sp <>
         quote <>
         foldMap renderChar s <>
         quote
-    TkLongString sp qt s _ ->
+    TkBytes sp qt st s _ ->
       let
-        quote = showQuoteType qt >>= replicate 3
+        quote =
+          showQuoteType qt >>= (case st of; LongString -> replicate 3; ShortString -> pure)
       in
-        foldMap showStringPrefix sp <>
+        showBytesPrefix sp <>
         quote <>
         foldMap renderChar s <>
         quote
@@ -347,12 +353,11 @@ renderExpr (Negate _ ws expr) =
     BinOp _ _ Exp{} _ -> renderExpr expr
     BinOp{} -> bracket $ renderExpr expr
     _ -> renderExpr expr
-renderExpr (String _ prefix strType b ws) =
-  (case strType of
-      ShortSingle -> TkShortString prefix SingleQuote b ()
-      ShortDouble -> TkShortString prefix DoubleQuote b ()
-      LongSingle -> TkLongString prefix SingleQuote b ()
-      LongDouble -> TkLongString prefix DoubleQuote b ()) `cons`
+renderExpr (String _ prefix qt strType b ws) =
+  TkString prefix qt strType b () `cons`
+  foldMap renderWhitespace ws
+renderExpr (Bytes _ prefix qt strType b ws) =
+  TkBytes prefix qt strType b () `cons`
   foldMap renderWhitespace ws
 renderExpr (Int _ n ws) = TkInt n () `cons` foldMap renderWhitespace ws
 renderExpr (Ident _ name) = renderIdent name

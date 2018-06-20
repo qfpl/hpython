@@ -27,6 +27,7 @@ import GHC.Generics (Generic)
 import Language.Python.Internal.Syntax.BinOp
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Ident
+import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Syntax.Whitespace
 
 -- | 'Traversal' over all the expressions in a term
@@ -66,30 +67,6 @@ instance HasExprs Arg where
   _Exprs f (PositionalArg a expr) = PositionalArg a <$> f expr
   _Exprs f (StarArg a ws expr) = StarArg a ws <$> f expr
   _Exprs f (DoubleStarArg a ws expr) = StarArg a ws <$> f expr
-
-data StringPrefix
-  = Prefix_r
-  | Prefix_R
-  | Prefix_u
-  | Prefix_U
-  | Prefix_b
-  | Prefix_B
-  | Prefix_br
-  | Prefix_Br
-  | Prefix_bR
-  | Prefix_BR
-  | Prefix_rb
-  | Prefix_rB
-  | Prefix_Rb
-  | Prefix_RB
-  deriving (Eq, Show)
-
-data StringType
-  = ShortSingle
-  | ShortDouble
-  | LongSingle
-  | LongDouble
-  deriving (Eq, Show)
 
 data Comprehension (v :: [*]) a
   -- ^ <expr> <comp_for> (comp_for | comp_if)*
@@ -215,9 +192,18 @@ data Expr (v :: [*]) a
   | String
   { _exprAnnotation :: a
   , _unsafeStringPrefix :: Maybe StringPrefix
+  , _unsafeQuoteType :: QuoteType
   , _unsafeStringType :: StringType
   , _unsafeStringValue :: String
   , _unsafeStringWhitespace :: [Whitespace]
+  }
+  | Bytes
+  { _exprAnnotation :: a
+  , _unsafeBytesPrefix :: BytesPrefix
+  , _unsafeQuoteType :: QuoteType
+  , _unsafeStringType :: StringType
+  , _unsafeBytesValue :: String
+  , _unsafeBytesWhitespace :: [Whitespace]
   }
   | Tuple
   { _exprAnnotation :: a
@@ -251,7 +237,8 @@ instance HasTrailingWhitespace (Expr v a) where
           Ident _ a -> a ^. getting trailingWhitespace
           Int _ _ ws -> ws
           Bool _ _ ws -> ws
-          String _ _ _ _ ws -> ws
+          String _ _ _ _ _ ws -> ws
+          Bytes _ _ _ _ _ ws -> ws
           Not _ _ e -> e ^. getting trailingWhitespace
           Tuple _ _ ws Nothing -> ws
           Tuple _ _ _ (Just cs) -> cs ^. getting trailingWhitespace)
@@ -269,7 +256,8 @@ instance HasTrailingWhitespace (Expr v a) where
           Ident a b -> Ident a (b & trailingWhitespace .~ ws)
           Int a b _ -> Int a b ws
           Bool a b _ -> Bool a b ws
-          String d a b c _ -> String d a b c ws
+          String a b c d e _ -> String a b c d e ws
+          Bytes a b c d e _ -> Bytes a b c d e ws
           Not a b c -> Not a b (c & trailingWhitespace .~ ws)
           Tuple a e _ Nothing -> Tuple a (coerce e) ws Nothing
           Tuple a b ws (Just cs) -> Tuple a (coerce b) ws (Just $ cs & trailingWhitespace .~ ws))

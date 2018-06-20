@@ -402,6 +402,7 @@ validateAssignExprScope e@None{} = pure $ coerce e
 validateAssignExprScope e@Int{} = pure $ coerce e
 validateAssignExprScope e@Bool{} = pure $ coerce e
 validateAssignExprScope e@String{} = pure $ coerce e
+validateAssignExprScope e@Bytes{} = pure $ coerce e
 
 validateExprScope
   :: AsScopeError e v a
@@ -455,6 +456,7 @@ validateExprScope e@None{} = pure $ coerce e
 validateExprScope e@Int{} = pure $ coerce e
 validateExprScope e@Bool{} = pure $ coerce e
 validateExprScope e@String{} = pure $ coerce e
+validateExprScope e@Bytes{} = pure $ coerce e
 
 validateModuleScope
   :: AsScopeError e v a

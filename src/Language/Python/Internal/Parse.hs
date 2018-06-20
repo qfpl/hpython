@@ -39,7 +39,7 @@ data ParseError ann
   | ExpectedIdentifier { peGot :: PyToken ann }
   | ExpectedContinued { peGot :: PyToken ann }
   | ExpectedNewline { peGot :: PyToken ann }
-  | ExpectedString { peGot :: PyToken ann }
+  | ExpectedStringOrBytes { peGot :: PyToken ann }
   | ExpectedInteger { peGot :: PyToken ann }
   | ExpectedComment { peGot :: PyToken ann }
   | ExpectedToken { peExpected :: PyToken (), peGot :: PyToken ann }
@@ -228,25 +228,17 @@ integer ws = do
       Int ann n <$> many ws
     _ -> Parser . throwError $ ExpectedInteger curTk
 
-string :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
-string ws = do
+stringOrBytes :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+stringOrBytes ws = do
   curTk <- currentToken
   (case curTk of
-    TkShortString sp qt val ann ->
+    TkString sp qt st val ann ->
       Parser (tell $ Consumed True) $>
-      String ann sp
-      (case qt of
-         SingleQuote -> ShortSingle
-         DoubleQuote -> ShortDouble)
-      val
-    TkLongString sp qt val ann ->
+      String ann sp qt st val
+    TkBytes sp qt st val ann ->
       Parser (tell $ Consumed True) $>
-      String ann sp
-      (case qt of
-         SingleQuote -> LongSingle
-         DoubleQuote -> LongDouble)
-      val
-    _ -> Parser . throwError $ ExpectedString curTk) <*>
+      Bytes ann sp qt st val
+    _ -> Parser . throwError $ ExpectedStringOrBytes curTk) <*>
     many ws
 
 between :: Parser ann left -> Parser ann right -> Parser ann a -> Parser ann a
@@ -417,7 +409,7 @@ orExpr ws = xorExpr
       list <!>
       bool ws <!>
       integer ws <!>
-      string ws <!>
+      stringOrBytes ws <!>
       (\a -> Ident (_identAnnotation a) a) <$> identifier ws <!>
       parens
 

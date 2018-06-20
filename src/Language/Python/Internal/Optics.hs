@@ -242,4 +242,5 @@ assignTargets f e =
     Int{} -> pure $ coerce e
     Bool{} -> pure $ coerce e
     String{} -> pure $ coerce e
+    Bytes{} -> pure $ coerce e
     Not{} -> pure $ coerce e

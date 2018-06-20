@@ -29,7 +29,10 @@ genNewline :: MonadGen m => m Newline
 genNewline = Gen.element [LF, CR, CRLF]
 
 genStringType :: MonadGen m => m StringType
-genStringType = Gen.element [ShortSingle, ShortDouble, LongSingle, LongDouble]
+genStringType = Gen.element [ShortString, LongString]
+
+genQuoteType :: MonadGen m => m QuoteType
+genQuoteType = Gen.element [SingleQuote, DoubleQuote]
 
 genAnyWhitespace :: MonadGen m => m Whitespace
 genAnyWhitespace = Gen.sized $ \n ->
@@ -74,7 +77,12 @@ genStringPrefix =
     , Prefix_R
     , Prefix_u
     , Prefix_U
-    , Prefix_b
+    ]
+
+genBytesPrefix :: MonadGen m => m BytesPrefix
+genBytesPrefix =
+  Gen.element
+    [ Prefix_b
     , Prefix_B
     , Prefix_br
     , Prefix_Br

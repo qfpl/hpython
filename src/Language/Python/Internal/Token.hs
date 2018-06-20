@@ -4,12 +4,9 @@ module Language.Python.Internal.Token where
 
 import Data.Deriving (deriveEq1)
 
-import Language.Python.Internal.Syntax (StringPrefix(..))
-import Language.Python.Internal.Syntax.Whitespace
-  ( Newline(..) )
-
-data QuoteType = SingleQuote | DoubleQuote
-  deriving (Eq, Show)
+import Language.Python.Internal.Syntax.Whitespace (Newline(..))
+import Language.Python.Internal.Syntax.Strings
+  (StringPrefix(..), BytesPrefix(..), QuoteType(..), StringType(..))
 
 data PyToken a
   = TkIf a
@@ -43,8 +40,8 @@ data PyToken a
   | TkInt Integer a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
-  | TkShortString (Maybe StringPrefix) QuoteType String a
-  | TkLongString (Maybe StringPrefix) QuoteType String a
+  | TkString (Maybe StringPrefix) QuoteType StringType String a
+  | TkBytes BytesPrefix QuoteType StringType String a
   | TkSpace a
   | TkTab a
   | TkNewline Newline a
@@ -128,8 +125,8 @@ pyTokenAnn tk =
     TkInt _ a -> a
     TkFloat _ _ a -> a
     TkIdent _ a -> a
-    TkShortString _ _ _ a -> a
-    TkLongString _ _ _ a -> a
+    TkString _ _ _ _ a -> a
+    TkBytes _ _ _ _ a -> a
     TkSpace a -> a
     TkTab a -> a
     TkNewline _ a -> a

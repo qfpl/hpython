@@ -195,6 +195,17 @@ validateStringLiteralSyntax (StringLiteral a b c d e f) =
 validateStringLiteralSyntax (BytesLiteral a b c d e f) =
   BytesLiteral a b c d e <$> validateWhitespace a f
 
+validateDictItemSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => DictItem v a
+  -> ValidateSyntax e (DictItem (Nub (Syntax ': v)) a)
+validateDictItemSyntax (DictItem a b c d) =
+  (\b' -> DictItem a b' c) <$>
+  validateExprSyntax b <*>
+  validateExprSyntax d
+
 validateExprSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
@@ -259,6 +270,18 @@ validateExprSyntax (Tuple a b ws d) =
   validateExprSyntax b <*>
   validateWhitespace a ws <*>
   traverseOf (traverse.traverse) validateExprSyntax d
+validateExprSyntax (Dict a b c d) =
+  Dict a b <$>
+  localSyntaxContext
+    (\c -> c { _inParens = True})
+    (traverseOf (traverse.traverse) validateDictItemSyntax c) <*>
+  validateWhitespace a d
+validateExprSyntax (Set a b c d) =
+  Set a b <$>
+  localSyntaxContext
+    (\c -> c { _inParens = True})
+    (traverse validateExprSyntax c) <*>
+  validateWhitespace a d
 
 validateBlockSyntax
   :: ( AsSyntaxError e v a

@@ -127,6 +127,11 @@ genExpr' isExp =
       genWhitespaces <*>
       Gen.maybe (genSizedCommaSep1' genExpr) <*>
       genWhitespaces
+    , Dict () <$>
+      genWhitespaces <*>
+      sizedMaybe (genSizedCommaSep1' $ genDictItem genExpr) <*>
+      genWhitespaces
+    , Set () <$> genWhitespaces <*> genSizedCommaSep1' genExpr <*> genWhitespaces
     , ListComp () <$>
       genWhitespaces <*>
       genComprehension <*>

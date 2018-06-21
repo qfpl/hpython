@@ -281,3 +281,10 @@ genBytesLiteral =
   genStringType <*>
   genString <*>
   genWhitespaces
+
+genDictItem :: MonadGen m => m (Expr v ()) -> m (DictItem v ())
+genDictItem ge =
+  DictItem () <$>
+  ge <*>
+  genAnyWhitespaces <*>
+  ge

@@ -408,6 +408,17 @@ validateAssignExprScope e@None{} = pure $ coerce e
 validateAssignExprScope e@Int{} = pure $ coerce e
 validateAssignExprScope e@Bool{} = pure $ coerce e
 validateAssignExprScope e@String{} = pure $ coerce e
+validateAssignExprScope e@Dict{} = pure $ coerce e
+validateAssignExprScope e@Set{} = pure $ coerce e
+
+validateDictItemScope
+  :: AsScopeError e v a
+  => DictItem v a
+  -> ValidateScope a e (DictItem (Nub (Scope ': v)) a)
+validateDictItemScope (DictItem a b c d) =
+  (\b' -> DictItem a b' c) <$>
+  validateExprScope b <*>
+  validateExprScope d
 
 validateExprScope
   :: AsScopeError e v a
@@ -461,6 +472,10 @@ validateExprScope e@None{} = pure $ coerce e
 validateExprScope e@Int{} = pure $ coerce e
 validateExprScope e@Bool{} = pure $ coerce e
 validateExprScope e@String{} = pure $ coerce e
+validateExprScope (Dict a b c d) =
+  (\c' -> Dict a b c' d) <$> traverseOf (traverse.traverse) validateDictItemScope c
+validateExprScope (Set a b c d) =
+  (\c' -> Set a b c' d) <$> traverse validateExprScope c
 
 validateModuleScope
   :: AsScopeError e v a

@@ -323,6 +323,13 @@ renderComprehension (Comprehension _ expr cf cs) =
   renderCompFor cf <>
   foldMap (bifoldMap renderCompFor renderCompIf) cs
 
+renderDictItem :: DictItem v a -> RenderOutput
+renderDictItem (DictItem _ a b c) =
+  bracketTuple a <>
+  singleton (TkColon ()) <>
+  foldMap renderWhitespace b <>
+  bracketTuple c
+
 renderStringLiteral :: StringLiteral a -> RenderOutput
 renderStringLiteral (StringLiteral _ a b c d e) =
   TkString a b c d () `cons`
@@ -406,6 +413,18 @@ renderExpr (Tuple _ a ws c) =
   foldMap
     (renderCommaSep1' bracketTuple)
     c
+renderExpr (Dict _ a b c) =
+  TkLeftBrace () `cons`
+  foldMap renderWhitespace a <>
+  foldMap (renderCommaSep1' renderDictItem) b <>
+  singleton (TkRightBrace ()) <>
+  foldMap renderWhitespace c
+renderExpr (Set _ a b c) =
+  TkLeftBrace () `cons`
+  foldMap renderWhitespace a <>
+  renderCommaSep1' bracketTuple b <>
+  singleton (TkRightBrace ()) <>
+  foldMap renderWhitespace c
 
 renderModuleName :: ModuleName v a -> RenderOutput
 renderModuleName (ModuleNameOne _ s) = renderIdent s

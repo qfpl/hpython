@@ -252,3 +252,5 @@ assignTargets f e =
     Bool{} -> pure $ coerce e
     String{} -> pure $ coerce e
     Not{} -> pure $ coerce e
+    Dict{} -> pure $ coerce e
+    Set{} -> pure $ coerce e

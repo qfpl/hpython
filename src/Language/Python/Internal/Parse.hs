@@ -1,6 +1,5 @@
 {-# language DataKinds #-}
 {-# language FlexibleContexts #-}
-{-# language LambdaCase #-}
 {-# language GeneralizedNewtypeDeriving #-}
 module Language.Python.Internal.Parse where
 
@@ -366,15 +365,15 @@ orExpr ws = xorExpr
       exprList anySpace <*>
       fmap snd (token space $ TkRightParen ())
 
-    commaExpr = do
+    commaX x = do
       c <- optional $ snd <$> comma anySpace
       case c of
         Nothing -> pure ([], Nothing)
         Just c' -> do
-          e <- optional $ expr anySpace
+          e <- optional x
           case e of
             Nothing -> pure ([], Just c')
-            Just e' -> first ((c', e') :) <$> commaExpr
+            Just e' -> first ((c', e') :) <$> commaX x
 
     compIf =
       (\(tk, s) -> CompIf (pyTokenAnn tk) s) <$>
@@ -396,7 +395,7 @@ orExpr ws = xorExpr
         Just ex' -> do
           val <-
             Left <$> compFor <!>
-            Right <$> commaExpr
+            Right <$> commaX (expr anySpace)
           case val of
             Left cf ->
               ListComp (pyTokenAnn tk) s <$>
@@ -406,7 +405,36 @@ orExpr ws = xorExpr
               pure $ List (pyTokenAnn tk) s (Just $ (ex', cs, mws) ^. _CommaSep1')) <*>
         (snd <$> token ws (TkRightBracket()))
 
+    dictItem =
+      (\a -> DictItem (a ^. exprAnnotation) a) <$>
+      expr anySpace <*>
+      (snd <$> colon anySpace) <*>
+      expr anySpace
+
+    dictOrSet = do
+      (a, ws1) <- token anySpace (TkLeftBrace ())
+      let ann = pyTokenAnn a
+      maybeExpr <- optional $ expr anySpace
+      (case maybeExpr of
+         Nothing -> pure $ Dict ann ws1 Nothing
+         Just ex -> do
+           maybeColon <- optional $ snd <$> token anySpace (TkColon ())
+           case maybeColon of
+             Nothing ->
+               (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$>
+               commaX (expr anySpace)
+             Just clws ->
+               let
+                 firstDictItem = DictItem (ex ^. exprAnnotation) ex clws
+               in
+                 (\ex2 (rest, final) ->
+                    Dict ann ws1 (Just $ (firstDictItem ex2, rest, final) ^. _CommaSep1')) <$>
+                 expr anySpace <*>
+                 commaX dictItem) <*>
+         (snd <$> token ws (TkRightBrace ()))
+
     atom =
+      dictOrSet <!>
       list <!>
       bool ws <!>
       integer ws <!>

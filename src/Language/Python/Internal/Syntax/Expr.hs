@@ -129,6 +129,20 @@ instance HasTrailingWhitespace (StringLiteral a) where
           StringLiteral a b c d e _ -> StringLiteral a b c d e ws
           BytesLiteral a b c d e _ -> BytesLiteral a b c d e ws)
 
+data DictItem (v :: [*]) a
+  = DictItem
+  { _dictItemAnn :: a
+  , _dictItemKey :: Expr v a
+  , _dictItemWhitespace :: [Whitespace]
+  , _dictItemvalue :: Expr v a
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasTrailingWhitespace (DictItem v a) where
+  trailingWhitespace =
+    lens
+      (\(DictItem _ _ _ a) -> a ^. trailingWhitespace)
+      (\(DictItem a b c d) ws -> DictItem a b c (d & trailingWhitespace .~ ws))
+
 data Expr (v :: [*]) a
   = ListComp
   { _exprAnnotation :: a
@@ -147,6 +161,18 @@ data Expr (v :: [*]) a
   , _unsafeListValues :: Maybe (CommaSep1' (Expr v a))
   -- ] spaces
   , _unsafeListWhitespaceRight :: [Whitespace]
+  }
+  | Dict
+  { _exprAnnotation :: a
+  , _unsafeDictWhitespaceLeft :: [Whitespace]
+  , _unsafeDictValues :: Maybe (CommaSep1' (DictItem v a))
+  , _unsafeDictWhitespaceRight :: [Whitespace]
+  }
+  | Set
+  { _exprAnnotation :: a
+  , _unsafeSetWhitespaceLeft :: [Whitespace]
+  , _unsafeSetValues :: CommaSep1' (Expr v a)
+  , _unsafeSetWhitespaceRight :: [Whitespace]
   }
   | Deref
   { _exprAnnotation :: a
@@ -258,7 +284,9 @@ instance HasTrailingWhitespace (Expr v a) where
           String _ v -> v ^. trailingWhitespace
           Not _ _ e -> e ^. getting trailingWhitespace
           Tuple _ _ ws Nothing -> ws
-          Tuple _ _ _ (Just cs) -> cs ^. getting trailingWhitespace)
+          Tuple _ _ _ (Just cs) -> cs ^. getting trailingWhitespace
+          Dict _ _ _ ws -> ws
+          Set _ _ _ ws -> ws)
       (\e ws ->
         case e of
           None a _ -> None a ws
@@ -276,7 +304,9 @@ instance HasTrailingWhitespace (Expr v a) where
           String a v -> String a (v & trailingWhitespace .~ ws)
           Not a b c -> Not a b (c & trailingWhitespace .~ ws)
           Tuple a e _ Nothing -> Tuple a (coerce e) ws Nothing
-          Tuple a b ws (Just cs) -> Tuple a (coerce b) ws (Just $ cs & trailingWhitespace .~ ws))
+          Tuple a b ws (Just cs) -> Tuple a (coerce b) ws (Just $ cs & trailingWhitespace .~ ws)
+          Dict a b c _ -> Dict a b c ws
+          Set a b c _ -> Set a b c ws)
 
 instance IsString (Expr '[] ()) where
   fromString s = Ident () (MkIdent () s [])

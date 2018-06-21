@@ -287,6 +287,11 @@ genExpr' isExp =
     [ genList genExpr
     , genStringLiterals
     , ListComp () <$> genWhitespaces <*> genComprehension <*> genWhitespaces
+    , Dict () <$>
+      genAnyWhitespaces <*>
+      sizedMaybe (genSizedCommaSep1' $ genDictItem genExpr) <*>
+      genWhitespaces
+    , Set () <$> genAnyWhitespaces <*> genSizedCommaSep1' genExpr <*> genWhitespaces
     , genDeref
     , genParens (genExpr' isExp)
     , sized2M

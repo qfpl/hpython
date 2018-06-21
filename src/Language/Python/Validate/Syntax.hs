@@ -184,12 +184,38 @@ validateComprehensionSyntax (Comprehension a b c d) =
     validateCompIfSyntax (CompIf a b c) =
       CompIf a b <$> validateExprSyntax c
 
+validateStringLiteralSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => StringLiteral a
+  -> ValidateSyntax e (StringLiteral a)
+validateStringLiteralSyntax (StringLiteral a b c d e f) =
+  StringLiteral a b c d e <$> validateWhitespace a f
+validateStringLiteralSyntax (BytesLiteral a b c d e f) =
+  BytesLiteral a b c d e <$> validateWhitespace a f
+
+validateDictItemSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => DictItem v a
+  -> ValidateSyntax e (DictItem (Nub (Syntax ': v)) a)
+validateDictItemSyntax (DictItem a b c d) =
+  (\b' -> DictItem a b' c) <$>
+  validateExprSyntax b <*>
+  validateExprSyntax d
+
 validateExprSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
      )
   => Expr v a
   -> ValidateSyntax e (Expr (Nub (Syntax ': v)) a)
+validateExprSyntax (Subscript a b c d e) =
+  (\b' d' -> Subscript a b' c d' e) <$>
+  validateExprSyntax b <*>
+  validateExprSyntax d
 validateExprSyntax (Not a ws e) =
   Not a <$>
   validateWhitespace a ws <*>
@@ -200,8 +226,14 @@ validateExprSyntax (Parens a ws1 e ws2) =
   validateWhitespace a ws2
 validateExprSyntax (Bool a b ws) = pure $ Bool a b ws
 validateExprSyntax (Negate a ws expr) = Negate a ws <$> validateExprSyntax expr
-validateExprSyntax (String a prefix strType b ws) =
-  String a prefix strType b <$> validateWhitespace a ws
+validateExprSyntax (String a strLits) =
+  if
+    all (\case; StringLiteral{} -> True; _ -> False) strLits ||
+    all (\case; BytesLiteral{} -> True; _ -> False) strLits
+  then
+    String a <$> traverse validateStringLiteralSyntax strLits
+  else
+    syntaxErrors [_Can'tJoinStringAndBytes # a]
 validateExprSyntax (Int a n ws) = pure $ Int a n ws
 validateExprSyntax (Ident a name) = Ident a <$> validateIdent name
 validateExprSyntax (List a ws1 exprs ws2) =
@@ -238,6 +270,18 @@ validateExprSyntax (Tuple a b ws d) =
   validateExprSyntax b <*>
   validateWhitespace a ws <*>
   traverseOf (traverse.traverse) validateExprSyntax d
+validateExprSyntax (Dict a b c d) =
+  Dict a b <$>
+  localSyntaxContext
+    (\c -> c { _inParens = True})
+    (traverseOf (traverse.traverse) validateDictItemSyntax c) <*>
+  validateWhitespace a d
+validateExprSyntax (Set a b c d) =
+  Set a b <$>
+  localSyntaxContext
+    (\c -> c { _inParens = True})
+    (traverse validateExprSyntax c) <*>
+  validateWhitespace a d
 
 validateBlockSyntax
   :: ( AsSyntaxError e v a
@@ -276,13 +320,19 @@ validateCompoundStatementSyntax (Fundef idnts a ws1 name ws2 params ws3 ws4 nl b
                 Just paramIdents
             })
          (validateBlockSyntax body))
-validateCompoundStatementSyntax (If idnts a ws1 expr ws3 nl body body') =
+validateCompoundStatementSyntax (If idnts a ws1 expr ws3 nl body elifs body') =
   If idnts a <$>
   validateWhitespace a ws1 <*>
   validateExprSyntax expr <*>
   validateWhitespace a ws3 <*>
   pure nl <*>
   validateBlockSyntax body <*>
+  traverse
+    (\(a, b, c, d, e, f) ->
+       (\c' -> (,,,,,) a b c' d e) <$>
+       validateExprSyntax c <*>
+       validateBlockSyntax f)
+    elifs <*>
   traverseOf (traverse._5) validateBlockSyntax body'
 validateCompoundStatementSyntax (While idnts a ws1 expr ws3 nl body) =
   While idnts a <$>
@@ -448,6 +498,17 @@ validateSmallStatementSyntax (Assign a lvalue ws2 rvalue) =
       pure ws2 <*>
       validateExprSyntax rvalue) <*
       modifyNonlocals (assigns ++)
+validateSmallStatementSyntax (AugAssign a lvalue aa rvalue) =
+  AugAssign a <$>
+  (if canAssignTo lvalue
+    then case lvalue of
+      Ident{} -> validateExprSyntax lvalue
+      Deref{} -> validateExprSyntax lvalue
+      Subscript{} -> validateExprSyntax lvalue
+      _ -> syntaxErrors [_CannotAugAssignTo # (a, lvalue)]
+    else syntaxErrors [_CannotAssignTo # (a, lvalue)]) <*>
+  pure aa <*>
+  validateExprSyntax rvalue
 validateSmallStatementSyntax p@Pass{} = pure $ coerce p
 validateSmallStatementSyntax (Break a) =
   syntaxContext `bindValidateSyntax` \sctxt ->

@@ -1,6 +1,5 @@
 {-# language DataKinds #-}
 {-# language FlexibleContexts #-}
-{-# language LambdaCase #-}
 {-# language GeneralizedNewtypeDeriving #-}
 module Language.Python.Internal.Parse where
 
@@ -39,7 +38,7 @@ data ParseError ann
   | ExpectedIdentifier { peGot :: PyToken ann }
   | ExpectedContinued { peGot :: PyToken ann }
   | ExpectedNewline { peGot :: PyToken ann }
-  | ExpectedString { peGot :: PyToken ann }
+  | ExpectedStringOrBytes { peGot :: PyToken ann }
   | ExpectedInteger { peGot :: PyToken ann }
   | ExpectedComment { peGot :: PyToken ann }
   | ExpectedToken { peExpected :: PyToken (), peGot :: PyToken ann }
@@ -228,26 +227,19 @@ integer ws = do
       Int ann n <$> many ws
     _ -> Parser . throwError $ ExpectedInteger curTk
 
-string :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
-string ws = do
-  curTk <- currentToken
-  (case curTk of
-    TkShortString sp qt val ann ->
-      Parser (tell $ Consumed True) $>
-      String ann sp
-      (case qt of
-         SingleQuote -> ShortSingle
-         DoubleQuote -> ShortDouble)
-      val
-    TkLongString sp qt val ann ->
-      Parser (tell $ Consumed True) $>
-      String ann sp
-      (case qt of
-         SingleQuote -> LongSingle
-         DoubleQuote -> LongDouble)
-      val
-    _ -> Parser . throwError $ ExpectedString curTk) <*>
-    many ws
+stringOrBytes :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+stringOrBytes ws =
+  fmap (\vs -> String (_stringLiteralAnn $ NonEmpty.head vs) vs) . some1 $ do
+    curTk <- currentToken
+    (case curTk of
+       TkString sp qt st val ann ->
+         Parser (tell $ Consumed True) $>
+         StringLiteral ann sp qt st val
+       TkBytes sp qt st val ann ->
+         Parser (tell $ Consumed True) $>
+         BytesLiteral ann sp qt st val
+       _ -> Parser . throwError $ ExpectedStringOrBytes curTk) <*>
+     many ws
 
 between :: Parser ann left -> Parser ann right -> Parser ann a -> Parser ann a
 between left right pa = left *> pa <* right
@@ -272,17 +264,27 @@ exprList ws =
      (snd <$> comma ws) <*>
      optional (commaSep1' ws $ expr ws))
 
+orExprList :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+orExprList ws =
+  (\a -> maybe a (uncurry $ Tuple (_exprAnnotation a) a)) <$>
+  orExpr ws <*>
+  optional
+    ((,) <$>
+     (snd <$> comma ws) <*>
+     optional (commaSep1' ws $ orExpr ws))
+
+binOp :: Parser ann (BinOp ann) -> Parser ann (Expr '[] ann) -> Parser ann (Expr '[] ann)
+binOp op tm =
+  (\t ts ->
+      case ts of
+        [] -> t
+        _ -> foldl (\tm (o, val) -> BinOp (tm ^. exprAnnotation) tm o val) t ts) <$>
+  tm <*>
+  many ((,) <$> op <*> tm)
+
 expr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 expr ws = orTest
   where
-    binOp op tm =
-      (\t ts ->
-          case ts of
-            [] -> t
-            _ -> foldl (\tm (o, val) -> BinOp (tm ^. exprAnnotation) tm o val) t ts) <$>
-     tm <*>
-     many ((,) <$> op <*> tm)
-
     orOp = (\(tk, ws) -> BoolOr (pyTokenAnn tk) ws) <$> token ws (TkOr ())
     orTest = binOp orOp andTest
 
@@ -294,17 +296,23 @@ expr ws = orTest
       comparison
 
     compOp =
-      (\(tk, ws) -> Is (pyTokenAnn tk) ws) <$> token ws (TkIs ()) <!>
+      (\(tk, ws) -> maybe (Is (pyTokenAnn tk) ws) (IsNot (pyTokenAnn tk) ws)) <$>
+      token ws (TkIs ()) <*> optional (snd <$> token ws (TkNot ())) <!>
+      (\(tk, ws) -> NotIn (pyTokenAnn tk) ws) <$>
+      token ws (TkNot ()) <*>
+      (snd <$> token ws (TkIn ())) <!>
+      (\(tk, ws) -> In (pyTokenAnn tk) ws) <$> token ws (TkIn ()) <!>
       (\(tk, ws) -> Equals (pyTokenAnn tk) ws) <$> token ws (TkDoubleEq ()) <!>
       (\(tk, ws) -> Lt (pyTokenAnn tk) ws) <$> token ws (TkLt ()) <!>
       (\(tk, ws) -> LtEquals (pyTokenAnn tk) ws) <$> token ws (TkLte ()) <!>
       (\(tk, ws) -> Gt (pyTokenAnn tk) ws) <$> token ws (TkGt ()) <!>
       (\(tk, ws) -> GtEquals (pyTokenAnn tk) ws) <$> token ws (TkGte ()) <!>
       (\(tk, ws) -> NotEquals (pyTokenAnn tk) ws) <$> token ws (TkBangEq ())
-    comparison = binOp compOp orExpr
+    comparison = binOp compOp $ orExpr ws
 
-    orExpr = xorExpr
-
+orExpr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+orExpr ws = xorExpr
+  where
     xorExpr = andExpr
 
     andExpr = shiftExpr
@@ -342,6 +350,13 @@ expr ws = orTest
       commaSep anySpace arg <*>
       (snd <$> token anySpace (TkRightParen ()))
 
+      <!>
+
+      (\a b c d -> Subscript (_exprAnnotation d) d a b c) <$>
+      (snd <$> token anySpace (TkLeftBracket ())) <*>
+      exprList ws <*>
+      (snd <$> token anySpace (TkRightBracket ()))
+
     atomExpr = foldl' (&) <$> atom <*> many trailer
 
     parens =
@@ -350,15 +365,15 @@ expr ws = orTest
       exprList anySpace <*>
       fmap snd (token space $ TkRightParen ())
 
-    commaExpr = do
+    commaX x = do
       c <- optional $ snd <$> comma anySpace
       case c of
         Nothing -> pure ([], Nothing)
         Just c' -> do
-          e <- optional $ expr anySpace
+          e <- optional x
           case e of
             Nothing -> pure ([], Just c')
-            Just e' -> first ((c', e') :) <$> commaExpr
+            Just e' -> first ((c', e') :) <$> commaX x
 
     compIf =
       (\(tk, s) -> CompIf (pyTokenAnn tk) s) <$>
@@ -368,7 +383,7 @@ expr ws = orTest
     compFor =
       (\(tk, s) -> CompFor (pyTokenAnn tk) s) <$>
       token anySpace (TkFor ()) <*>
-      exprList anySpace <*>
+      orExprList anySpace <*>
       (snd <$> token anySpace (TkIn ())) <*>
       expr anySpace
 
@@ -380,7 +395,7 @@ expr ws = orTest
         Just ex' -> do
           val <-
             Left <$> compFor <!>
-            Right <$> commaExpr
+            Right <$> commaX (expr anySpace)
           case val of
             Left cf ->
               ListComp (pyTokenAnn tk) s <$>
@@ -390,11 +405,40 @@ expr ws = orTest
               pure $ List (pyTokenAnn tk) s (Just $ (ex', cs, mws) ^. _CommaSep1')) <*>
         (snd <$> token ws (TkRightBracket()))
 
+    dictItem =
+      (\a -> DictItem (a ^. exprAnnotation) a) <$>
+      expr anySpace <*>
+      (snd <$> colon anySpace) <*>
+      expr anySpace
+
+    dictOrSet = do
+      (a, ws1) <- token anySpace (TkLeftBrace ())
+      let ann = pyTokenAnn a
+      maybeExpr <- optional $ expr anySpace
+      (case maybeExpr of
+         Nothing -> pure $ Dict ann ws1 Nothing
+         Just ex -> do
+           maybeColon <- optional $ snd <$> token anySpace (TkColon ())
+           case maybeColon of
+             Nothing ->
+               (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$>
+               commaX (expr anySpace)
+             Just clws ->
+               let
+                 firstDictItem = DictItem (ex ^. exprAnnotation) ex clws
+               in
+                 (\ex2 (rest, final) ->
+                    Dict ann ws1 (Just $ (firstDictItem ex2, rest, final) ^. _CommaSep1')) <$>
+                 expr anySpace <*>
+                 commaX dictItem) <*>
+         (snd <$> token ws (TkRightBrace ()))
+
     atom =
+      dictOrSet <!>
       list <!>
       bool ws <!>
       integer ws <!>
-      string ws <!>
+      stringOrBytes ws <!>
       (\a -> Ident (_identAnnotation a) a) <$> identifier ws <!>
       parens
 
@@ -419,10 +463,36 @@ smallStatement =
     breakSt = Break . pyTokenAnn <$> tokenEq (TkBreak ())
     continueSt = Continue . pyTokenAnn <$> tokenEq (TkContinue ())
 
+    augAssign =
+      (\(tk, s) -> PlusEq (pyTokenAnn tk) s) <$> token space (TkPlusEq ()) <!>
+      (\(tk, s) -> MinusEq (pyTokenAnn tk) s) <$> token space (TkMinusEq ()) <!>
+      (\(tk, s) -> AtEq (pyTokenAnn tk) s) <$> token space (TkAtEq ()) <!>
+      (\(tk, s) -> StarEq (pyTokenAnn tk) s) <$> token space (TkStarEq ()) <!>
+      (\(tk, s) -> SlashEq (pyTokenAnn tk) s) <$> token space (TkSlashEq ()) <!>
+      (\(tk, s) -> PercentEq (pyTokenAnn tk) s) <$> token space (TkPercentEq ()) <!>
+      (\(tk, s) -> AmphersandEq (pyTokenAnn tk) s) <$> token space (TkAmphersandEq ()) <!>
+      (\(tk, s) -> PipeEq (pyTokenAnn tk) s) <$> token space (TkPipeEq ()) <!>
+      (\(tk, s) -> CaretEq (pyTokenAnn tk) s) <$> token space (TkCaretEq ()) <!>
+      (\(tk, s) -> ShiftLeftEq (pyTokenAnn tk) s) <$> token space (TkShiftLeftEq ()) <!>
+      (\(tk, s) -> ShiftRightEq (pyTokenAnn tk) s) <$> token space (TkShiftRightEq ()) <!>
+      (\(tk, s) -> DoubleStarEq (pyTokenAnn tk) s) <$> token space (TkDoubleStarEq ()) <!>
+      (\(tk, s) -> DoubleSlashEq (pyTokenAnn tk) s) <$> token space (TkDoubleSlashEq ())
+
     exprOrAssignSt =
-      (\a -> maybe (Expr (_exprAnnotation a) a) (uncurry $ Assign (_exprAnnotation a) a)) <$>
+      (\a ->
+         maybe
+           (Expr (_exprAnnotation a) a)
+           (\(x, y) ->
+              either
+                (\z -> Assign (_exprAnnotation a) a z y)
+                (\z -> AugAssign (_exprAnnotation a) a z y)
+                x)) <$>
       exprList space <*>
-      optional ((,) <$> (snd <$> token space (TkEq ())) <*> exprList space)
+      optional
+        ((,) <$>
+         (Left . snd <$> token space (TkEq ()) <!>
+          Right <$> augAssign) <*>
+         exprList space)
 
     globalSt =
       (\(tk, s) -> Global (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
@@ -685,6 +755,12 @@ compoundStatement =
       token space (TkIf ()) <*>
       expr space <*>
       (snd <$> colon space) `withSuite`
+      many
+        ((,,,,,) <$>
+         indents <*>
+         (snd <$> token space (TkElif ())) <*>
+         expr space <*>
+         (snd <$> colon space) `thenSuite` ()) <*>
       optional
         ((,,,,) <$>
          indents <*>
@@ -754,7 +830,7 @@ compoundStatement =
       (\a (tk, s) -> For a (pyTokenAnn tk) s) <$>
       indents <*>
       token space (TkFor ()) <*>
-      exprList space <*>
+      orExprList space <*>
       (snd <$> token space (TkIn ())) <*>
       exprList space <*>
       (snd <$> colon space) `withSuite`

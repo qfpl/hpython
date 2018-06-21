@@ -15,7 +15,6 @@ import Data.Bifunctor (first)
 import Data.Char (chr, isAscii)
 import Data.FingerTree (FingerTree, Measured(..))
 import Data.Foldable (asum)
-import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Monoid (Sum(..))
 import Data.Semigroup ((<>))
@@ -31,27 +30,34 @@ import qualified Data.FingerTree as FingerTree
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Text.Trifecta as Trifecta
 
-import Language.Python.Internal.Syntax (StringPrefix(..), isIdentifierStart, isIdentifierChar)
-import Language.Python.Internal.Syntax.Whitespace
-  ( Newline(..), Whitespace(..), Indent(..), indentWhitespaces
-  , getIndentLevel, indentLevel
-  , absoluteIndentLevel
-  )
-import Language.Python.Internal.Token (PyToken(..), QuoteType(..), pyTokenAnn)
+import Language.Python.Internal.Syntax
+import Language.Python.Internal.Token (PyToken(..), pyTokenAnn)
 
 parseNewline :: CharParsing m => m Newline
 parseNewline =
-  char '\n' $> LF <|>
-  char '\r' *> (char '\n' $> CRLF <|> pure CR)
+  LF <$ char '\n' <|>
+  char '\r' *> (CRLF <$ char '\n' <|> pure CR)
 
-stringPrefix :: CharParsing m => m StringPrefix
-stringPrefix =
-  (char 'r' *> (char 'b' $> Prefix_rb <|> char 'B' $> Prefix_rB <|> pure Prefix_r)) <|>
-  (char 'R' *> (char 'b' $> Prefix_Rb <|> char 'B' $> Prefix_RB <|> pure Prefix_R)) <|>
-  (char 'b' *> (char 'r' $> Prefix_br <|> char 'R' $> Prefix_bR <|> pure Prefix_b)) <|>
-  (char 'B' *> (char 'r' $> Prefix_Br <|> char 'R' $> Prefix_BR <|> pure Prefix_B)) <|>
-  (char 'u' $> Prefix_u) <|>
-  (char 'U' $> Prefix_U)
+stringOrBytesPrefix :: CharParsing m => m (Either StringPrefix BytesPrefix)
+stringOrBytesPrefix =
+  (char 'r' *>
+   (Right Prefix_rb <$ char 'b' <|>
+    Right Prefix_rB <$ char 'B' <|>
+    pure (Left Prefix_r))) <|>
+  (char 'R' *>
+   (Right Prefix_Rb <$ char 'b' <|>
+    Right Prefix_RB <$ char 'B' <|>
+    pure (Left Prefix_R))) <|>
+  (char 'b' *>
+   (Right Prefix_br <$ char 'r' <|>
+    Right Prefix_bR <$ char 'R' <|>
+    pure (Right Prefix_b))) <|>
+  (char 'B' *>
+   (Right Prefix_Br <$ char 'r' <|>
+    Right Prefix_BR <$ char 'R' <|>
+    pure (Right Prefix_B))) <|>
+  (Left Prefix_u <$ char 'u') <|>
+  (Left Prefix_U <$ char 'U')
 
 hexDigitInt :: Char -> Int
 hexDigitInt c =
@@ -88,13 +94,13 @@ stringChar = (char '\\' *> (escapeChar <|> hexChar)) <|> other
       [ char '\\'
       , char '\''
       , char '"'
-      , char 'a' $> '\a'
-      , char 'b' $> '\b'
-      , char 'f' $> '\f'
-      , char 'n' $> '\n'
-      , char 'r' $> '\r'
-      , char 't' $> '\t'
-      , char 'v' $> '\v'
+      , '\a' <$ char 'a'
+      , '\b' <$ char 'b'
+      , '\f' <$ char 'f'
+      , '\n' <$ char 'n'
+      , '\r' <$ char 'r'
+      , '\t' <$ char 't'
+      , '\v' <$ char 'v'
       ]
 
     hexChar =
@@ -111,78 +117,123 @@ parseToken =
   asum @[] $
     fmap
     (\p -> try $ p <* notFollowedBy (satisfy isIdentifierStart))
-    [ string "if" $> TkIf
-    , string "else" $> TkElse
-    , string "while" $> TkWhile
-    , string "def" $> TkDef
-    , string "return" $> TkReturn
-    , string "pass" $> TkPass
-    , string "break" $> TkBreak
-    , string "continue" $> TkContinue
-    , string "True" $> TkTrue
-    , string "False" $> TkFalse
-    , string "or" $> TkOr
-    , string "and" $> TkAnd
-    , string "is" $> TkIs
-    , string "not" $> TkNot
-    , string "global" $> TkGlobal
-    , string "del" $> TkDel
-    , string "import" $> TkImport
-    , string "from" $> TkFrom
-    , string "as" $> TkAs
-    , string "raise" $> TkRaise
-    , string "try" $> TkTry
-    , string "except" $> TkExcept
-    , string "finally" $> TkFinally
-    , string "class" $> TkClass
-    , string "for" $> TkFor
-    , string "in" $> TkIn
+    [ TkIf <$ string "if"
+    , TkElse <$ string "else"
+    , TkElif <$ string "elif"
+    , TkWhile <$ string "while"
+    , TkDef <$ string "def"
+    , TkReturn <$ string "return"
+    , TkPass <$ string "pass"
+    , TkBreak <$ string "break"
+    , TkContinue <$ string "continue"
+    , TkTrue <$ string "True"
+    , TkFalse <$ string "False"
+    , TkOr <$ string "or"
+    , TkAnd <$ string "and"
+    , TkIs <$ string "is"
+    , TkNot <$ string "not"
+    , TkGlobal <$ string "global"
+    , TkDel <$ string "del"
+    , TkImport <$ string "import"
+    , TkFrom <$ string "from"
+    , TkAs <$ string "as"
+    , TkRaise <$ string "raise"
+    , TkTry <$ string "try"
+    , TkExcept <$ string "except"
+    , TkFinally <$ string "finally"
+    , TkClass <$ string "class"
+    , TkFor <$ string "for"
+    , TkIn <$ string "in"
     ] <>
     [ (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
         fmap read (some digit) <*>
         optional (char '.' *> optional (read <$> some digit))
-    , char ' ' $> TkSpace
-    , char '\t' $> TkTab
+    , TkSpace <$ char ' '
+    , TkTab <$ char '\t'
     , TkNewline <$> parseNewline
-    , char '[' $> TkLeftBracket
-    , char ']' $> TkRightBracket
-    , char '(' $> TkLeftParen
-    , char ')' $> TkRightParen
-    , char '{' $> TkLeftBrace
-    , char '}' $> TkRightBrace
-    , char '<' *> (char '=' $> TkLte <|> char '<' $> TkShiftLeft <|> pure TkLt)
-    , char '=' *> (char '=' $> TkDoubleEq <|> pure TkEq)
-    , char '>' *> (char '=' $> TkGte <|> char '>' $> TkShiftRight <|> pure TkGt)
-    , char '*' *> (char '*' $> TkDoubleStar <|> pure TkStar)
-    , char '/' *> (char '/' $> TkDoubleSlash <|> pure TkSlash)
-    , string "!=" $> TkBangEq
-    , char '+' $> TkPlus
-    , char '-' $> TkMinus
-    , char '%' $> TkPercent
-    , char '\\' $> TkContinued <*> parseNewline
-    , char ':' $> TkColon
-    , char ';' $> TkSemicolon
+    , TkLeftBracket <$ char '['
+    , TkRightBracket <$ char ']'
+    , TkLeftParen <$ char '('
+    , TkRightParen <$ char ')'
+    , TkLeftBrace <$ char '{'
+    , TkRightBrace <$ char '}'
+    , char '<' *>
+      (TkLte <$ char '=' <|>
+       char '<' *> (TkShiftLeftEq <$ char '=' <|> pure TkShiftLeft) <|>
+       pure TkLt)
+    , char '=' *> (TkDoubleEq <$ char '=' <|> pure TkEq)
+    , char '>' *>
+      (TkGte <$ char '=' <|>
+       char '>' *> (TkShiftRightEq <$ char '=' <|> pure TkShiftRight) <|>
+       pure TkGt)
+    , char '*' *>
+      (char '*' *> (TkDoubleStarEq <$ char '=' <|> pure TkDoubleStar) <|>
+       TkStarEq <$ char '=' <|>
+       pure TkStar)
+    , char '/' *>
+      (char '/' *> (TkDoubleSlashEq <$ char '=' <|> pure TkDoubleSlash) <|>
+       TkSlashEq <$ char '=' <|>
+       pure TkSlash)
+    , TkBangEq <$ string "!="
+    , TkCaretEq <$ string "^="
+    , TkPipeEq <$ string "|="
+    , TkAtEq <$ string "@="
+    , TkAmphersandEq <$ string "&="
+    , char '+' *> (TkPlusEq <$ char '=' <|> pure TkPlus)
+    , char '-' *> (TkMinusEq <$ char '=' <|> pure TkMinus)
+    , char '%' *> (TkPercentEq <$ char '=' <|> pure TkPercent)
+    , TkContinued <$ char '\\' <*> parseNewline
+    , TkColon <$ char ':'
+    , TkSemicolon <$ char ';'
     , do
-        sp <- optional . try $ stringPrefix <* lookAhead (char '"')
-        char '"' *>
-          (string "\"\"" $>
-           TkLongString sp DoubleQuote <*>
-           manyTill stringChar (string "\"\"\"")
-           <|>
-           TkShortString sp DoubleQuote <$> manyTill stringChar (char '"'))
+        sp <- optional . try $ stringOrBytesPrefix <* lookAhead (char '"')
+        char '"'
+        case sp of
+          Nothing ->
+            TkString Nothing DoubleQuote LongString <$
+            string "\"\"" <*>
+            manyTill stringChar (string "\"\"\"")
+            <|>
+            TkString Nothing DoubleQuote ShortString <$> manyTill stringChar (char '"')
+          Just (Left prefix) ->
+            TkString (Just prefix) DoubleQuote LongString <$
+            string "\"\"" <*>
+            manyTill stringChar (string "\"\"\"")
+            <|>
+            TkString (Just prefix) DoubleQuote ShortString <$> manyTill stringChar (char '"')
+          Just (Right prefix) ->
+            TkBytes prefix DoubleQuote LongString <$
+            string "\"\"" <*>
+            manyTill stringChar (string "\"\"\"")
+            <|>
+            TkBytes prefix DoubleQuote ShortString <$> manyTill stringChar (char '"')
     , do
-        sp <- optional . try $ stringPrefix <* lookAhead (char '\'')
-        char '\'' *>
-          (string "''" $>
-           TkLongString sp SingleQuote <*>
-           manyTill stringChar (string "'''")
-           <|>
-           TkShortString sp SingleQuote <$> manyTill stringChar (char '\''))
+        sp <- optional . try $ stringOrBytesPrefix <* lookAhead (char '\'')
+        char '\''
+        case sp of
+          Nothing ->
+            TkString Nothing SingleQuote LongString <$
+            string "''" <*>
+            manyTill stringChar (string "'''")
+            <|>
+            TkString Nothing SingleQuote ShortString <$> manyTill stringChar (char '\'')
+          Just (Left prefix) ->
+            TkString (Just prefix) SingleQuote LongString <$
+            string "''" <*>
+            manyTill stringChar (string "'''")
+            <|>
+            TkString (Just prefix) SingleQuote ShortString <$> manyTill stringChar (char '\'')
+          Just (Right prefix) ->
+            TkBytes prefix SingleQuote LongString <$
+            string "''" <*>
+            manyTill stringChar (string "'''")
+            <|>
+            TkBytes prefix SingleQuote ShortString <$> manyTill stringChar (char '\'')
     , TkComment <$
       char '#' <*>
       many (noneOf "\r\n")
-    , char ',' $> TkComma
-    , char '.' $> TkDot
+    , TkComma <$ char ','
+    , TkDot <$ char '.'
     , fmap TkIdent $
       (:) <$>
       satisfy isIdentifierStart <*>

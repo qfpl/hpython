@@ -31,6 +31,7 @@ lexerParserTests =
   , ("Test full trip 11", test_fulltrip_11)
   , ("Test full trip 12", test_fulltrip_12)
   , ("Test full trip 13", test_fulltrip_13)
+  , ("Test full trip 14", test_fulltrip_14)
   ]
 
 test_fulltrip_1 :: Property
@@ -296,6 +297,29 @@ test_fulltrip_13 =
         , " pass"
         , " pass"
         ]
+
+    tks <- doTokenize str
+    annotateShow $! tks
+
+    let lls = logicalLines tks
+    annotateShow $! lls
+
+    ils <- doIndentation lls
+    annotateShow $! ils
+
+    nst <- doNested ils
+    annotateShow $! nst
+
+    a <- doParse module_ nst
+    annotateShow $! a
+
+    showModule a === str
+
+test_fulltrip_14 :: Property
+test_fulltrip_14 =
+  withTests 1 . property $ do
+    let
+      str = "\"asdf\" \"asdf\""
 
     tks <- doTokenize str
     annotateShow $! tks

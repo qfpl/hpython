@@ -20,6 +20,7 @@ import Data.Bifoldable (bifoldMap)
 import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
 import Data.Function ((&))
+import Data.List.NonEmpty (NonEmpty)
 import Data.Monoid ((<>))
 import Data.String (IsString(..))
 import GHC.Generics (Generic)
@@ -27,6 +28,7 @@ import GHC.Generics (Generic)
 import Language.Python.Internal.Syntax.BinOp
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Ident
+import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Syntax.Whitespace
 
 -- | 'Traversal' over all the expressions in a term
@@ -67,30 +69,6 @@ instance HasExprs Arg where
   _Exprs f (StarArg a ws expr) = StarArg a ws <$> f expr
   _Exprs f (DoubleStarArg a ws expr) = StarArg a ws <$> f expr
 
-data StringPrefix
-  = Prefix_r
-  | Prefix_R
-  | Prefix_u
-  | Prefix_U
-  | Prefix_b
-  | Prefix_B
-  | Prefix_br
-  | Prefix_Br
-  | Prefix_bR
-  | Prefix_BR
-  | Prefix_rb
-  | Prefix_rB
-  | Prefix_Rb
-  | Prefix_RB
-  deriving (Eq, Show)
-
-data StringType
-  = ShortSingle
-  | ShortDouble
-  | LongSingle
-  | LongDouble
-  deriving (Eq, Show)
-
 data Comprehension (v :: [*]) a
   -- ^ <expr> <comp_for> (comp_for | comp_if)*
   = Comprehension a (Expr v a) (CompFor v a) [Either (CompFor v a) (CompIf v a)]
@@ -122,6 +100,49 @@ data CompFor (v :: [*]) a
   = CompFor a [Whitespace] (Expr v a) [Whitespace] (Expr v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+data StringLiteral a
+  = StringLiteral
+  { _stringLiteralAnn :: a
+  , _unsafeStringLiteralPrefix :: Maybe StringPrefix
+  , _stringLiteralQuoteType :: QuoteType
+  , _stringLiteralType :: StringType
+  , _stringLiteralValue :: String
+  , _stringLiteralWhitespace :: [Whitespace]
+  }
+  | BytesLiteral
+  { _stringLiteralAnn :: a
+  , _unsafeBytesLiteralPrefix :: BytesPrefix
+  , _stringLiteralQuoteType :: QuoteType
+  , _stringLiteralType :: StringType
+  , _stringLiteralValue :: String
+  , _stringLiteralWhitespace :: [Whitespace]
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasTrailingWhitespace (StringLiteral a) where
+  trailingWhitespace =
+    lens
+      (\case
+          StringLiteral _ _ _ _ _ ws -> ws
+          BytesLiteral _ _ _ _ _ ws -> ws)
+      (\s ws -> case s of
+          StringLiteral a b c d e _ -> StringLiteral a b c d e ws
+          BytesLiteral a b c d e _ -> BytesLiteral a b c d e ws)
+
+data DictItem (v :: [*]) a
+  = DictItem
+  { _dictItemAnn :: a
+  , _dictItemKey :: Expr v a
+  , _dictItemWhitespace :: [Whitespace]
+  , _dictItemvalue :: Expr v a
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasTrailingWhitespace (DictItem v a) where
+  trailingWhitespace =
+    lens
+      (\(DictItem _ _ _ a) -> a ^. trailingWhitespace)
+      (\(DictItem a b c d) ws -> DictItem a b c (d & trailingWhitespace .~ ws))
+
 data Expr (v :: [*]) a
   = ListComp
   { _exprAnnotation :: a
@@ -141,6 +162,18 @@ data Expr (v :: [*]) a
   -- ] spaces
   , _unsafeListWhitespaceRight :: [Whitespace]
   }
+  | Dict
+  { _exprAnnotation :: a
+  , _unsafeDictWhitespaceLeft :: [Whitespace]
+  , _unsafeDictValues :: Maybe (CommaSep1' (DictItem v a))
+  , _unsafeDictWhitespaceRight :: [Whitespace]
+  }
+  | Set
+  { _exprAnnotation :: a
+  , _unsafeSetWhitespaceLeft :: [Whitespace]
+  , _unsafeSetValues :: CommaSep1' (Expr v a)
+  , _unsafeSetWhitespaceRight :: [Whitespace]
+  }
   | Deref
   { _exprAnnotation :: a
   -- expr
@@ -149,6 +182,17 @@ data Expr (v :: [*]) a
   , _unsafeDerefWhitespaceLeft :: [Whitespace]
   -- ident
   , _unsafeDerefValueRight :: Ident v a
+  }
+  | Subscript
+  { _exprAnnotation :: a
+  -- expr
+  , _unsafeSubscriptValueLeft :: Expr v a
+  -- [ spaces
+  , _unsafeSubscriptWhitespaceLeft :: [Whitespace]
+  -- expr
+  , _unsafeSubscriptValueRight :: Expr v a
+  -- ] spaces
+  , _unsafeSubscriptWhitespaceRight :: [Whitespace]
   }
   | Call
   { _exprAnnotation :: a
@@ -203,10 +247,7 @@ data Expr (v :: [*]) a
   }
   | String
   { _exprAnnotation :: a
-  , _unsafeStringPrefix :: Maybe StringPrefix
-  , _unsafeStringType :: StringType
-  , _unsafeStringValue :: String
-  , _unsafeStringWhitespace :: [Whitespace]
+  , _unsafeStringLiteralValue :: NonEmpty (StringLiteral a)
   }
   | Tuple
   { _exprAnnotation :: a
@@ -232,6 +273,7 @@ instance HasTrailingWhitespace (Expr v a) where
           List _ _ _ ws -> ws
           ListComp _ _ _ ws -> ws
           Deref _ _ _ a -> a ^. getting trailingWhitespace
+          Subscript _ _ _ _ ws -> ws
           Call _ _ _ _ ws -> ws
           BinOp _ _ _ e -> e ^. getting trailingWhitespace
           Negate _ _ e -> e ^. getting trailingWhitespace
@@ -239,16 +281,19 @@ instance HasTrailingWhitespace (Expr v a) where
           Ident _ a -> a ^. getting trailingWhitespace
           Int _ _ ws -> ws
           Bool _ _ ws -> ws
-          String _ _ _ _ ws -> ws
+          String _ v -> v ^. trailingWhitespace
           Not _ _ e -> e ^. getting trailingWhitespace
           Tuple _ _ ws Nothing -> ws
-          Tuple _ _ _ (Just cs) -> cs ^. getting trailingWhitespace)
+          Tuple _ _ _ (Just cs) -> cs ^. getting trailingWhitespace
+          Dict _ _ _ ws -> ws
+          Set _ _ _ ws -> ws)
       (\e ws ->
         case e of
           None a _ -> None a ws
           List a b c _ -> List a b (coerce c) ws
           ListComp a b c _ -> ListComp a b (coerce c) ws
           Deref a b c d -> Deref a (coerce b) c (d & trailingWhitespace .~ ws)
+          Subscript a b c d _ -> Subscript a (coerce b) c d ws
           Call a b c d _ -> Call a (coerce b) c (coerce d) ws
           BinOp a b c e -> BinOp a (coerce b) c (e & trailingWhitespace .~ ws)
           Negate a b c -> Negate a b (c & trailingWhitespace .~ ws)
@@ -256,10 +301,12 @@ instance HasTrailingWhitespace (Expr v a) where
           Ident a b -> Ident a (b & trailingWhitespace .~ ws)
           Int a b _ -> Int a b ws
           Bool a b _ -> Bool a b ws
-          String d a b c _ -> String d a b c ws
+          String a v -> String a (v & trailingWhitespace .~ ws)
           Not a b c -> Not a b (c & trailingWhitespace .~ ws)
           Tuple a e _ Nothing -> Tuple a (coerce e) ws Nothing
-          Tuple a b ws (Just cs) -> Tuple a (coerce b) ws (Just $ cs & trailingWhitespace .~ ws))
+          Tuple a b ws (Just cs) -> Tuple a (coerce b) ws (Just $ cs & trailingWhitespace .~ ws)
+          Dict a b c _ -> Dict a b c ws
+          Set a b c _ -> Set a b c ws)
 
 instance IsString (Expr '[] ()) where
   fromString s = Ident () (MkIdent () s [])
@@ -297,6 +344,8 @@ shouldBracketLeft op left =
       case (left, op) of
         (Negate{}, Exp{}) -> True
         (Tuple{}, _) -> True
+        (Not{}, BoolAnd{}) -> False
+        (Not{}, BoolOr{}) -> False
         (Not{}, _) -> True
         _ -> maybe False (\p -> p < entry ^. opPrec) (lEntry ^? _Just.opPrec)
   in
@@ -320,6 +369,8 @@ shouldBracketRight op right =
     rightf' =
       case (op, right) of
         (_, Tuple{}) -> True
+        (BoolAnd{}, Not{}) -> False
+        (BoolOr{}, Not{}) -> False
         (_, Not{}) -> True
         _ -> maybe False (\p -> p < entry ^. opPrec) (rEntry ^? _Just.opPrec)
   in

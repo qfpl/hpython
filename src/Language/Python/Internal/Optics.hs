@@ -121,10 +121,16 @@ instance HasIndents CompoundStatement where
         (\idnt' i' -> Fundef idnt' a b c d e f g h i') <$>
         fun idnt <*>
         _Indents fun i
-      If idnt a b c d e f g ->
-        (\idnt' f' g' -> If idnt' a b c d e f' g') <$>
+      If idnt a b c d e f elifs g ->
+        (\idnt' -> If idnt' a b c d e) <$>
         fun idnt <*>
         _Indents fun f <*>
+        traverse
+          (\(idnt, a, b, c, d, e) ->
+             (\idnt' e' -> (idnt', a, b, c, d, e')) <$>
+             fun idnt <*>
+             _Indents fun e)
+          elifs <*>
         traverse
           (\(idnt, a, b, c, d) ->
              (\idnt' d' -> (idnt', a, b, c, d')) <$>
@@ -191,12 +197,15 @@ instance HasNewlines CompoundStatement where
     case s of
       Fundef idnt ann ws1 name ws2 params ws3 ws4 nl block ->
         Fundef idnt ann ws1 name ws2 params ws3 ws4 <$> fun nl <*> _Newlines fun block
-      If idnt ann ws1 cond ws3 nl block els ->
+      If idnt ann ws1 cond ws3 nl block elifs els ->
         If idnt ann ws1 cond ws3 <$>
         fun nl <*>
         _Newlines fun block <*>
         traverse
-          (\(idnt, a, b, c, d) -> (,,,,) idnt a b <$> fun nl <*> _Newlines fun block)
+          (\(idnt, a, b, c, d, e) -> (,,,,,) idnt a b c <$> fun d <*> _Newlines fun e)
+          elifs <*>
+        traverse
+          (\(idnt, a, b, c, d) -> (,,,,) idnt a b <$> fun c <*> _Newlines fun d)
           els
       While idnt ann ws1 cond ws3 nl block ->
         While idnt ann ws1 cond ws3 <$> fun nl <*> _Newlines fun block
@@ -234,6 +243,7 @@ assignTargets f e =
       (traverse.traverse.assignTargets) f d
     ListComp{} -> pure $ coerce e
     Deref{} -> pure $ coerce e
+    Subscript{} -> pure $ coerce e
     Call{} -> pure $ coerce e
     None{} -> pure $ coerce e
     BinOp{} -> pure $ coerce e
@@ -242,3 +252,5 @@ assignTargets f e =
     Bool{} -> pure $ coerce e
     String{} -> pure $ coerce e
     Not{} -> pure $ coerce e
+    Dict{} -> pure $ coerce e
+    Set{} -> pure $ coerce e

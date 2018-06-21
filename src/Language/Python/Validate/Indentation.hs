@@ -162,12 +162,21 @@ validateCompoundStatementIndentation (Fundef idnt a ws1 name ws2 params ws3 ws4 
   validateParamsIndentation params <*
   setNextIndent GreaterThan (idnt ^. indentsValue) <*>
   validateBlockIndentation body
-validateCompoundStatementIndentation (If idnt a ws1 expr ws3 nl body body1) =
-  (\idnt' expr' body' body1' -> If idnt' a ws1 expr' ws3 nl body' body1') <$>
+validateCompoundStatementIndentation (If idnt a ws1 expr ws3 nl body elifs body1) =
+  (\idnt' expr' -> If idnt' a ws1 expr' ws3 nl) <$>
   checkIndent idnt <*>
   validateExprIndentation expr <*
   setNextIndent GreaterThan (idnt ^. indentsValue) <*>
   validateBlockIndentation body <*>
+  traverse
+    (\(idnt2, a, b, c, d, e) ->
+       (\idnt2' b' -> (,,,,,) idnt2' a b' c d) <$
+       setNextIndent EqualTo (idnt ^. indentsValue) <*>
+       checkIndent idnt2 <*
+       setNextIndent GreaterThan (idnt ^. indentsValue) <*>
+       validateExprIndentation b <*>
+       validateBlockIndentation e)
+    elifs <*>
   traverse
     (\(idnt2, a, b, c, d) ->
        (\idnt2' -> (,,,,) idnt2' a b c) <$

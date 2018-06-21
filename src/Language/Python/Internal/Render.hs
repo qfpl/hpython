@@ -8,7 +8,7 @@ module Language.Python.Internal.Render
   , RenderOutput, showRenderOutput, singleton, cons
   , renderModule, renderStatement, renderExpr
     -- * Miscellany
-  , showQuoteType, showStringPrefix, showToken
+  , showQuoteType, showStringPrefix, showBytesPrefix, showToken
   , bracket, renderWhitespace, renderCommaSep, renderCommaSep1, renderCommaSep1'
   , renderIdent, renderComment, renderModuleName, renderDot, renderRelativeModuleName
   , renderImportAs, renderImportTargets, renderSmallStatement, renderCompoundStatement
@@ -28,7 +28,7 @@ import Data.Maybe (maybe)
 import Data.Semigroup (Semigroup(..))
 
 import Language.Python.Internal.Syntax
-import Language.Python.Internal.Token (PyToken(..), QuoteType(..))
+import Language.Python.Internal.Token (PyToken(..))
 
 newtype RenderOutput
   = RenderOutput
@@ -74,6 +74,10 @@ showStringPrefix sp =
     Prefix_R -> "R"
     Prefix_u -> "u"
     Prefix_U -> "U"
+
+showBytesPrefix :: BytesPrefix -> String
+showBytesPrefix sp =
+  case sp of
     Prefix_b -> "b"
     Prefix_B -> "B"
     Prefix_br -> "br"
@@ -96,6 +100,7 @@ showToken t =
   case t of
     TkIf{} -> "if"
     TkElse{} -> "else"
+    TkElif{} -> "elif"
     TkWhile{} -> "while"
     TkDef{} -> "def"
     TkReturn{} -> "return"
@@ -125,19 +130,21 @@ showToken t =
     TkInt i _ -> show i
     TkFloat i i' _ -> show i <> foldMap (("." <>) . show) i'
     TkIdent s _ -> s
-    TkShortString sp qt s _ ->
+    TkString sp qt st s _ ->
       let
-        quote = showQuoteType qt
+        quote =
+          showQuoteType qt >>= (case st of; LongString -> replicate 3; ShortString -> pure)
       in
         foldMap showStringPrefix sp <>
         quote <>
         foldMap renderChar s <>
         quote
-    TkLongString sp qt s _ ->
+    TkBytes sp qt st s _ ->
       let
-        quote = showQuoteType qt >>= replicate 3
+        quote =
+          showQuoteType qt >>= (case st of; LongString -> replicate 3; ShortString -> pure)
       in
-        foldMap showStringPrefix sp <>
+        showBytesPrefix sp <>
         quote <>
         foldMap renderChar s <>
         quote
@@ -181,6 +188,19 @@ showToken t =
     TkPercent{} -> "%"
     TkShiftLeft{} -> "<<"
     TkShiftRight{} -> ">>"
+    TkPlusEq{} -> "+="
+    TkMinusEq{} -> "-="
+    TkStarEq{} -> "*="
+    TkAtEq{} -> "@="
+    TkSlashEq{} -> "/="
+    TkPercentEq{} -> "%="
+    TkAmphersandEq{} -> "&="
+    TkPipeEq{} -> "|="
+    TkCaretEq{} -> "^="
+    TkShiftLeftEq{} -> "<<="
+    TkShiftRightEq{} -> ">>="
+    TkDoubleStarEq{} -> "**="
+    TkDoubleSlashEq{} -> "//="
 
 bracket :: RenderOutput -> RenderOutput
 bracket a = TkLeftParen () `cons` a <> singleton (TkRightParen ())
@@ -303,7 +323,32 @@ renderComprehension (Comprehension _ expr cf cs) =
   renderCompFor cf <>
   foldMap (bifoldMap renderCompFor renderCompIf) cs
 
+renderDictItem :: DictItem v a -> RenderOutput
+renderDictItem (DictItem _ a b c) =
+  bracketTuple a <>
+  singleton (TkColon ()) <>
+  foldMap renderWhitespace b <>
+  bracketTuple c
+
+renderStringLiteral :: StringLiteral a -> RenderOutput
+renderStringLiteral (StringLiteral _ a b c d e) =
+  TkString a b c d () `cons`
+  foldMap renderWhitespace e
+renderStringLiteral (BytesLiteral _ a b c d e) =
+  TkBytes a b c d () `cons`
+  foldMap renderWhitespace e
+
 renderExpr :: Expr v a -> RenderOutput
+renderExpr (Subscript _ a b c d) =
+  (case a of
+     BinOp{} -> bracket $ renderExpr a
+     Not{} -> bracket $ renderExpr a
+     _ -> bracketTuple a) <>
+  singleton (TkLeftBracket ()) <>
+  foldMap renderWhitespace b <>
+  renderExpr c <>
+  singleton (TkRightBracket ()) <>
+  foldMap renderWhitespace d
 renderExpr (Not _ ws e) =
   TkNot () `cons`
   foldMap renderWhitespace ws <>
@@ -324,13 +369,7 @@ renderExpr (Negate _ ws expr) =
     BinOp _ _ Exp{} _ -> renderExpr expr
     BinOp{} -> bracket $ renderExpr expr
     _ -> renderExpr expr
-renderExpr (String _ prefix strType b ws) =
-  (case strType of
-      ShortSingle -> TkShortString prefix SingleQuote b ()
-      ShortDouble -> TkShortString prefix DoubleQuote b ()
-      LongSingle -> TkLongString prefix SingleQuote b ()
-      LongDouble -> TkLongString prefix DoubleQuote b ()) `cons`
-  foldMap renderWhitespace ws
+renderExpr (String _ vs) = foldMap renderStringLiteral vs
 renderExpr (Int _ n ws) = TkInt n () `cons` foldMap renderWhitespace ws
 renderExpr (Ident _ name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) =
@@ -374,6 +413,18 @@ renderExpr (Tuple _ a ws c) =
   foldMap
     (renderCommaSep1' bracketTuple)
     c
+renderExpr (Dict _ a b c) =
+  TkLeftBrace () `cons`
+  foldMap renderWhitespace a <>
+  foldMap (renderCommaSep1' renderDictItem) b <>
+  singleton (TkRightBrace ()) <>
+  foldMap renderWhitespace c
+renderExpr (Set _ a b c) =
+  TkLeftBrace () `cons`
+  foldMap renderWhitespace a <>
+  renderCommaSep1' bracketTuple b <>
+  singleton (TkRightBrace ()) <>
+  foldMap renderWhitespace c
 
 renderModuleName :: ModuleName v a -> RenderOutput
 renderModuleName (ModuleNameOne _ s) = renderIdent s
@@ -404,6 +455,23 @@ renderImportTargets (ImportSomeParens _ ws1 ts ws2) =
     (foldMap renderWhitespace ws1 <> renderCommaSep1' (renderImportAs renderIdent) ts) <>
   foldMap renderWhitespace ws2
 
+renderAugAssign :: AugAssign a -> RenderOutput
+renderAugAssign aa =
+  case aa of
+    PlusEq{} -> singleton $ TkPlusEq ()
+    MinusEq{} -> singleton $ TkMinusEq ()
+    StarEq{} -> singleton $ TkStarEq ()
+    AtEq{} -> singleton $ TkAtEq ()
+    SlashEq{} -> singleton $ TkSlashEq ()
+    PercentEq{} -> singleton $ TkPercentEq ()
+    AmphersandEq{} -> singleton $ TkAmphersandEq ()
+    PipeEq{} -> singleton $ TkPipeEq ()
+    CaretEq{} -> singleton $ TkCaretEq ()
+    ShiftLeftEq{} -> singleton $ TkShiftLeftEq ()
+    ShiftRightEq{} -> singleton $ TkShiftRightEq ()
+    DoubleStarEq{} -> singleton $ TkDoubleStarEq ()
+    DoubleSlashEq{} -> singleton $ TkDoubleSlashEq ()
+
 renderSmallStatement :: SmallStatement v a -> RenderOutput
 renderSmallStatement (Raise _ ws x) =
   TkRaise () `cons` foldMap renderWhitespace ws <>
@@ -422,6 +490,8 @@ renderSmallStatement (Expr _ expr) = renderExpr expr
 renderSmallStatement (Assign _ lvalue ws2 rvalue) =
   renderExpr lvalue <> singleton (TkEq ()) <>
   foldMap renderWhitespace ws2 <> renderExpr rvalue
+renderSmallStatement (AugAssign _ lvalue as rvalue) =
+  renderExpr lvalue <> renderAugAssign as <> renderExpr rvalue
 renderSmallStatement (Pass _) = singleton $ TkPass ()
 renderSmallStatement (Continue _) = singleton $ TkContinue ()
 renderSmallStatement (Break _) = singleton $ TkBreak ()
@@ -459,15 +529,23 @@ renderCompoundStatement (Fundef idnt _ ws1 name ws2 params ws3 ws4 nl body) =
   foldMap renderWhitespace ws3 <> singleton (TkColon ()) <> foldMap renderWhitespace ws4 <>
   singleton (renderNewline nl) <>
   renderBlock body
-renderCompoundStatement (If idnt _ ws1 expr ws3 nl body body') =
+renderCompoundStatement (If idnt _ ws1 expr ws3 nl body elifs body') =
   renderIndents idnt <>
   singleton (TkIf ()) <> foldMap renderWhitespace ws1 <>
   bracketTuple expr <>
   singleton (TkColon ()) <> foldMap renderWhitespace ws3 <>
   singleton (renderNewline nl) <>
   renderBlock body <>
-  maybe
-    mempty
+  foldMap
+    (\(idnt, ws4, ex, ws5, nl2, body'') ->
+        renderIndents idnt <>
+        singleton (TkElif ()) <> foldMap renderWhitespace ws4 <>
+        bracketTuple ex <>
+        singleton (TkColon ()) <> foldMap renderWhitespace ws5 <>
+        singleton (renderNewline nl2) <>
+        renderBlock body'')
+    elifs <>
+  foldMap
     (\(idnt, ws4, ws5, nl2, body'') ->
         renderIndents idnt <>
         singleton (TkElse ()) <> foldMap renderWhitespace ws4 <>
@@ -603,6 +681,17 @@ renderParam (KeywordParam _ name ws2 expr) =
 
 renderBinOp :: BinOp a -> RenderOutput
 renderBinOp (Is _ ws) = TkIs () `cons` foldMap renderWhitespace ws
+renderBinOp (IsNot _ ws1 ws2) =
+  TkIs () `cons`
+  foldMap renderWhitespace ws1 <>
+  singleton (TkNot ()) <>
+  foldMap renderWhitespace ws2
+renderBinOp (In _ ws) = TkIn () `cons` foldMap renderWhitespace ws
+renderBinOp (NotIn _ ws1 ws2) =
+  TkNot () `cons`
+  foldMap renderWhitespace ws1 <>
+  singleton (TkIn ()) <>
+  foldMap renderWhitespace ws2
 renderBinOp (Plus _ ws) = TkPlus () `cons` foldMap renderWhitespace ws
 renderBinOp (Minus _ ws) = TkMinus () `cons` foldMap renderWhitespace ws
 renderBinOp (Multiply _ ws) = TkStar () `cons` foldMap renderWhitespace ws

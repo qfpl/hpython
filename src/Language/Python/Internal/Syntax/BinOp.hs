@@ -14,6 +14,9 @@ import Language.Python.Internal.Syntax.Whitespace
 
 data BinOp a
   = Is a [Whitespace]
+  | IsNot a [Whitespace] [Whitespace]
+  | In a [Whitespace]
+  | NotIn a [Whitespace] [Whitespace]
   | Minus a [Whitespace]
   | Exp a [Whitespace]
   | BoolAnd a [Whitespace]
@@ -35,6 +38,9 @@ instance HasTrailingWhitespace (BinOp a) where
     lens
       (\case
          Is _ a -> a
+         IsNot _ _ a -> a
+         In _ a -> a
+         NotIn _ _ a -> a
          Minus _ a -> a
          Exp _ a -> a
          BoolAnd _ a -> a
@@ -52,6 +58,9 @@ instance HasTrailingWhitespace (BinOp a) where
       (\op ws ->
          case op of
            Is a _ -> Is a ws
+           IsNot a b _ -> IsNot a b ws
+           In a _ -> In a ws
+           NotIn a b _ -> NotIn a b ws
            Minus a _ -> Minus a ws
            Exp a _ -> Exp a ws
            BoolAnd a _ -> BoolAnd a ws
@@ -82,6 +91,9 @@ operatorTable =
   [ entry BoolOr 4 L
   , entry BoolAnd 5 L
   , entry Is 10 L
+  , entry1 IsNot 10 L
+  , entry In 10 L
+  , entry1 NotIn 10 L
   , entry Equals 10 L
   , entry Lt 10 L
   , entry LtEquals 10 L
@@ -97,6 +109,7 @@ operatorTable =
   ]
   where
     entry a = OpEntry (a () [])
+    entry1 a = OpEntry (a () [] [])
 
 sameOperator :: BinOp a -> BinOp a' -> Bool
 sameOperator op op' =
@@ -104,6 +117,9 @@ sameOperator op op' =
     (BoolOr{}, BoolOr{}) -> True
     (BoolAnd{}, BoolAnd{}) -> True
     (Is{}, Is{}) -> True
+    (IsNot{}, IsNot{}) -> True
+    (In{}, In{}) -> True
+    (NotIn{}, NotIn{}) -> True
     (Equals{}, Equals{}) -> True
     (Lt{}, Lt{}) -> True
     (LtEquals{}, LtEquals{}) -> True

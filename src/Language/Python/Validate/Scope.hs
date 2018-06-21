@@ -162,7 +162,7 @@ validateCompoundStatementScope (Fundef idnts a ws1 name ws2 params ws3 ws4 nl bo
        (validateBlockScope body)) <*
   extendScope scLocalScope [(_identAnnotation &&& _identValue) name] <*
   extendScope scImmediateScope [(_identAnnotation &&& _identValue) name]
-validateCompoundStatementScope (If idnts a ws1 e ws3 nl b melse) =
+validateCompoundStatementScope (If idnts a ws1 e ws3 nl b elifs melse) =
   scopeContext scLocalScope `bindValidateScope` (\ls ->
   scopeContext scImmediateScope `bindValidateScope` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
@@ -172,6 +172,12 @@ validateCompoundStatementScope (If idnts a ws1 e ws3 nl b melse) =
      pure ws3 <*>
      pure nl <*>
      validateBlockScope b <*>
+     traverse
+       (\(a, b, c, d, e, f) ->
+          (\c' -> (,,,,,) a b c' d e) <$>
+          validateExprScope c <*>
+          validateBlockScope f)
+       elifs <*>
      traverseOf (traverse._5) validateBlockScope melse)))
 validateCompoundStatementScope (While idnts a ws1 e ws3 nl b) =
   scopeContext scLocalScope `bindValidateScope` (\ls ->
@@ -265,6 +271,10 @@ validateSmallStatementScope (Assign a l ws2 r) =
   validateExprScope r <*
   extendScope scLocalScope ls <*
   extendScope scImmediateScope ls
+validateSmallStatementScope (AugAssign a l aa r) =
+  (\l' -> AugAssign a l' aa) <$>
+  validateExprScope l <*>
+  validateExprScope r
 validateSmallStatementScope (Global a _ _) = scopeErrors [_FoundGlobal # a]
 validateSmallStatementScope (Nonlocal a _ _) = scopeErrors [_FoundNonlocal # a]
 validateSmallStatementScope (Del a ws cs) =
@@ -366,6 +376,10 @@ validateAssignExprScope
   :: AsScopeError e v a
   => Expr v a
   -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
+validateAssignExprScope (Subscript a e1 ws1 e2 ws2) =
+  (\e1' e2' -> Subscript a e1' ws1 e2' ws2) <$>
+  validateAssignExprScope e1 <*>
+  validateExprScope e2
 validateAssignExprScope (List a ws1 es ws2) =
   List a ws1 <$>
   traverseOf (traverse.traverse) validateAssignExprScope es <*>
@@ -394,11 +408,26 @@ validateAssignExprScope e@None{} = pure $ coerce e
 validateAssignExprScope e@Int{} = pure $ coerce e
 validateAssignExprScope e@Bool{} = pure $ coerce e
 validateAssignExprScope e@String{} = pure $ coerce e
+validateAssignExprScope e@Dict{} = pure $ coerce e
+validateAssignExprScope e@Set{} = pure $ coerce e
+
+validateDictItemScope
+  :: AsScopeError e v a
+  => DictItem v a
+  -> ValidateScope a e (DictItem (Nub (Scope ': v)) a)
+validateDictItemScope (DictItem a b c d) =
+  (\b' -> DictItem a b' c) <$>
+  validateExprScope b <*>
+  validateExprScope d
 
 validateExprScope
   :: AsScopeError e v a
   => Expr v a
   -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
+validateExprScope (Subscript a b c d e) =
+  (\b' d' -> Subscript a b' c d' e) <$>
+  validateExprScope b <*>
+  validateExprScope d
 validateExprScope (Not a ws e) = Not a ws <$> validateExprScope e
 validateExprScope (List a ws1 es ws2) =
   List a ws1 <$>
@@ -443,6 +472,10 @@ validateExprScope e@None{} = pure $ coerce e
 validateExprScope e@Int{} = pure $ coerce e
 validateExprScope e@Bool{} = pure $ coerce e
 validateExprScope e@String{} = pure $ coerce e
+validateExprScope (Dict a b c d) =
+  (\c' -> Dict a b c' d) <$> traverseOf (traverse.traverse) validateDictItemScope c
+validateExprScope (Set a b c d) =
+  (\c' -> Set a b c' d) <$> traverse validateExprScope c
 
 validateModuleScope
   :: AsScopeError e v a

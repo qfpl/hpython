@@ -29,7 +29,10 @@ genNewline :: MonadGen m => m Newline
 genNewline = Gen.element [LF, CR, CRLF]
 
 genStringType :: MonadGen m => m StringType
-genStringType = Gen.element [ShortSingle, ShortDouble, LongSingle, LongDouble]
+genStringType = Gen.element [ShortString, LongString]
+
+genQuoteType :: MonadGen m => m QuoteType
+genQuoteType = Gen.element [SingleQuote, DoubleQuote]
 
 genAnyWhitespace :: MonadGen m => m Whitespace
 genAnyWhitespace = Gen.sized $ \n ->
@@ -74,7 +77,12 @@ genStringPrefix =
     , Prefix_R
     , Prefix_u
     , Prefix_U
-    , Prefix_b
+    ]
+
+genBytesPrefix :: MonadGen m => m BytesPrefix
+genBytesPrefix =
+  Gen.element
+    [ Prefix_b
     , Prefix_B
     , Prefix_br
     , Prefix_Br
@@ -235,3 +243,48 @@ genSizedCommaSep1' ma = Gen.sized $ \n ->
             (Gen.resize (n - n') $ genSizedCommaSep1' ma)
             (\b -> CommaSepMany1' a <$> genWhitespaces <*> pure b)
       ]
+
+genAugAssign :: MonadGen m => m (AugAssign ())
+genAugAssign =
+  Gen.element
+    [ PlusEq
+    , MinusEq
+    , StarEq
+    , AtEq
+    , SlashEq
+    , PercentEq
+    , AmphersandEq
+    , PipeEq
+    , CaretEq
+    , ShiftLeftEq
+    , ShiftRightEq
+    , DoubleStarEq
+    , DoubleSlashEq
+    ] <*>
+  pure () <*>
+  genWhitespaces
+
+genStringLiteral :: MonadGen m => m (StringLiteral ())
+genStringLiteral =
+  StringLiteral () <$>
+  Gen.maybe genStringPrefix <*>
+  genQuoteType <*>
+  genStringType <*>
+  genString <*>
+  genWhitespaces
+
+genBytesLiteral :: MonadGen m => m (StringLiteral ())
+genBytesLiteral =
+  BytesLiteral () <$>
+  genBytesPrefix <*>
+  genQuoteType <*>
+  genStringType <*>
+  genString <*>
+  genWhitespaces
+
+genDictItem :: MonadGen m => m (Expr v ()) -> m (DictItem v ())
+genDictItem ge =
+  DictItem () <$>
+  ge <*>
+  genAnyWhitespaces <*>
+  ge

@@ -86,9 +86,10 @@ class HasBlocks s where
 instance HasBlocks CompoundStatement where
   _Blocks f (Fundef idnt a ws1 name ws2 params ws3 ws4 nl b) =
     Fundef idnt a ws1 (coerce name) ws2 (coerce params) ws3 ws4 nl <$> coerce (f b)
-  _Blocks f (If idnt a ws1 e1 ws3 nl b b') =
+  _Blocks f (If idnt a ws1 e1 ws3 nl b elifs b') =
     If idnt a ws1 (coerce e1) ws3 nl <$>
     coerce (f b) <*>
+    traverseOf (traverse._6) f (coerce elifs) <*>
     traverseOf (traverse._5) (coerce . f) b'
   _Blocks f (While idnt a ws1 e1 ws3 nl b) =
     While idnt a ws1 (coerce e1) ws3 nl <$> coerce (f b)
@@ -135,9 +136,10 @@ instance Plated (Statement '[] a) where
     case s of
       Fundef idnt a ws1 b ws2 c ws3 ws4 nl sts ->
         Fundef idnt a ws1 b ws2 c ws3 ws4 nl <$> _Statements fun sts
-      If idnt a ws1 b ws3 nl sts sts' ->
+      If idnt a ws1 b ws3 nl sts elifs sts' ->
         If idnt a ws1 b ws3 nl <$>
         _Statements fun sts <*>
+        (traverse._6._Statements) fun elifs <*>
         (traverse._5._Statements) fun sts'
       While idnt a ws1 b ws3 nl sts ->
         While idnt a ws1 b ws3 nl <$> _Statements fun sts
@@ -209,10 +211,70 @@ instance HasTrailingWhitespace (ImportTargets v a) where
            ImportSome a cs -> ImportSome a (cs & trailingWhitespace .~ ws)
            ImportSomeParens x a b _ -> ImportSomeParens x a b ws)
 
+data AugAssign a
+  = PlusEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | MinusEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | StarEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | AtEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | SlashEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | PercentEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | AmphersandEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | PipeEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | CaretEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | ShiftLeftEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | ShiftRightEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | DoubleStarEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  | DoubleSlashEq
+  { _augAssignAnn :: a
+  , _augAssignWhitespace :: [Whitespace]
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasTrailingWhitespace (AugAssign a) where
+  trailingWhitespace =
+    lens _augAssignWhitespace (\a b -> a { _augAssignWhitespace = b })
+
 data SmallStatement (v :: [*]) a
   = Return a [Whitespace] (Expr v a)
   | Expr a (Expr v a)
   | Assign a (Expr v a) [Whitespace] (Expr v a)
+  | AugAssign a (Expr v a) (AugAssign a) (Expr v a)
   | Pass a
   | Break a
   | Continue a
@@ -245,6 +307,7 @@ instance HasExprs SmallStatement where
   _Exprs f (Return a ws e) = Return a ws <$> f e
   _Exprs f (Expr a e) = Expr a <$> f e
   _Exprs f (Assign a e1 ws2 e2) = Assign a <$> f e1 <*> pure ws2 <*> f e2
+  _Exprs f (AugAssign a e1 as e2) = AugAssign a <$> f e1 <*> pure as <*> f e2
   _Exprs _ p@Pass{} = pure $ coerce p
   _Exprs _ p@Break{} = pure $ coerce p
   _Exprs _ p@Continue{} = pure $ coerce p
@@ -280,9 +343,12 @@ data CompoundStatement (v :: [*]) a
       (Indents a) a
       [Whitespace] (Expr v a) [Whitespace] Newline
       (Block v a)
+      [(Indents a, [Whitespace], Expr v a, [Whitespace], Newline, Block v a)]
       (Maybe (Indents a, [Whitespace], [Whitespace], Newline, Block v a))
   -- ^ 'if' <spaces> <expr> ':' <spaces> <newline>
   --   <block>
+  --   ('elif' <spaces> <expr> ':' <spaces> <newline> <block>)*
+  --   ['else' <spaces> ':' <spaces> <newline> <block>]
   | While
       (Indents a) a
       [Whitespace] (Expr v a) [Whitespace] Newline
@@ -315,7 +381,8 @@ data CompoundStatement (v :: [*]) a
   | ClassDef
       (Indents a) a
       (NonEmpty Whitespace) (Ident v a)
-      (Maybe ([Whitespace], Maybe (CommaSep1 (Arg v a)), [Whitespace])) [Whitespace] Newline
+      (Maybe ([Whitespace], Maybe (CommaSep1 (Arg v a)), [Whitespace]))
+      [Whitespace] Newline
       (Block v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -333,13 +400,16 @@ instance HasExprs CompoundStatement where
     pure ws4 <*>
     pure nl <*>
     _Exprs f sts
-  _Exprs f (If idnt a ws1 e ws3 nl sts sts') =
+  _Exprs fun (If idnt a ws1 e ws3 nl sts elifs sts') =
     If idnt a ws1 <$>
-    f e <*>
+    fun e <*>
     pure ws3 <*>
     pure nl <*>
-    _Exprs f sts <*>
-    (traverse._5._Exprs) f sts'
+    _Exprs fun sts <*>
+    traverse
+      (\(a, b, c, d, e, f) -> (\c' -> (,,,,,) a b c' d e) <$> fun c <*> _Exprs fun f)
+      elifs <*>
+    (traverse._5._Exprs) fun sts'
   _Exprs f (While idnt a ws1 e ws3 nl sts) =
     While idnt a ws1 <$>
     f e <*>

@@ -3,6 +3,7 @@
 {-# language TemplateHaskell, TypeFamilies, FlexibleInstances, MultiParamTypeClasses #-}
 {-# language FlexibleContexts #-}
 {-# language RankNTypes #-}
+{-# language LambdaCase #-}
 module Language.Python.Validate.Scope where
 
 import Control.Arrow ((&&&))
@@ -21,6 +22,7 @@ import Control.Lens.Wrapped (_Wrapped)
 import Control.Monad.State (State, modify, evalState)
 import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
+import Data.Foldable (traverse_)
 import Data.Functor.Compose (Compose(..))
 import Data.String (fromString)
 import Data.Type.Set (Nub)
@@ -278,8 +280,9 @@ validateSmallStatementScope (AugAssign a l aa r) =
 validateSmallStatementScope (Global a _ _) = scopeErrors [_FoundGlobal # a]
 validateSmallStatementScope (Nonlocal a _ _) = scopeErrors [_FoundNonlocal # a]
 validateSmallStatementScope (Del a ws cs) =
-  scopeErrors [_FoundDel # a] <*>
-  traverse validateIdentScope cs
+  Del a ws <$
+  traverse_ (\case; Ident ann _-> scopeErrors [_DeletedIdent # ann]; _ -> pure ()) cs <*>
+  traverse validateExprScope cs
 validateSmallStatementScope s@Pass{} = pure $ coerce s
 validateSmallStatementScope s@Break{} = pure $ coerce s
 validateSmallStatementScope s@Continue{} = pure $ coerce s

@@ -9,7 +9,7 @@ import Language.Python.Internal.Syntax
 data ScopeError (v :: [*]) a
   = FoundNonlocal a
   | FoundGlobal a
-  | FoundDel a
+  | DeletedIdent a
   | FoundDynamic a (Ident v a)
   | NotInScope (Ident v a)
   | BadShadowing (Ident v a)

@@ -532,8 +532,16 @@ renderSmallStatement (Global _ ws ids) =
   TkGlobal () `cons` foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
 renderSmallStatement (Nonlocal _ ws ids) =
   TkNonlocal () `cons` foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
-renderSmallStatement (Del _ ws ids) =
-  TkDel () `cons` foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
+renderSmallStatement (Del _ ws vals) =
+  TkDel () `cons`
+  foldMap renderWhitespace ws <>
+  renderCommaSep1'
+    (\a -> case a of
+        BinOp _ _ BoolAnd{} _ -> bracket $ renderExpr a
+        BinOp _ _ BoolOr{} _ -> bracket $ renderExpr a
+        Not{} -> bracket $ renderExpr a
+        _ -> bracketTupleGenerator a)
+    vals
 renderSmallStatement (Import _ ws ns) =
   TkImport () `cons` foldMap renderWhitespace ws <>
   renderCommaSep1 (renderImportAs renderModuleName) ns

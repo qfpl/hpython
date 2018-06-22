@@ -549,7 +549,7 @@ validateSmallStatementSyntax (Nonlocal a ws ids) =
         [] -> Nonlocal a ws <$> traverse validateIdent ids
         bad -> syntaxErrors [_ParametersNonlocal # (a, bad)]
 validateSmallStatementSyntax (Del a ws ids) =
-  Del a ws <$> traverse validateIdent ids
+  Del a ws <$> traverse validateExprSyntax ids
 validateSmallStatementSyntax (Import a ws mns) =
   Import a ws <$> traverse (pure . coerce) mns
 validateSmallStatementSyntax (From a ws1 mn ws2 ts) =

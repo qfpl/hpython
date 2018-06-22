@@ -280,7 +280,7 @@ data SmallStatement (v :: [*]) a
   | Continue a
   | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
-  | Del a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
+  | Del a (NonEmpty Whitespace) (CommaSep1' (Expr v a))
   | Import
       a
       (NonEmpty Whitespace)

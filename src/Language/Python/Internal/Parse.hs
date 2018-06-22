@@ -553,7 +553,7 @@ smallStatement =
     delSt =
       (\(tk, s) -> Del (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
       token space (TkDel ()) <*>
-      commaSep1 space (identifier space)
+      commaSep1' space (orExpr space)
 
     raiseSt =
       (\(tk, s) -> Raise (pyTokenAnn tk) s) <$>

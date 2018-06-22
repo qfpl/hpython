@@ -200,7 +200,7 @@ genSmallStatement =
         genSizedCommaSep1 genIdent
     , Del () <$>
       genWhitespaces1 <*>
-      genSizedCommaSep1 genIdent
+      genSizedCommaSep1' genExpr
     , Nonlocal () <$>
       genWhitespaces1 <*>
       genSizedCommaSep1 genIdent

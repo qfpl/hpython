@@ -37,7 +37,14 @@ def_ name params block =
     (toBlock block)
 
 call_ :: Expr '[] () -> [Arg '[] ()] -> Expr '[] ()
-call_ expr args = Call () expr [] (listToCommaSep args) []
+call_ expr args =
+  Call ()
+    expr
+    []
+    (case args of
+      [] -> Nothing
+      a:as -> Just $ (a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1')
+    []
 
 return_ :: Expr '[] () -> Statement '[] ()
 return_ e = SmallStatements (Indents [] ()) (Return () [Space] e) [] Nothing (Just LF)

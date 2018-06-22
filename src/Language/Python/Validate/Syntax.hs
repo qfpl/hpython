@@ -271,7 +271,7 @@ validateExprSyntax (Call a expr ws args ws2) =
   Call a <$>
   validateExprSyntax expr <*>
   validateWhitespace a ws <*>
-  localSyntaxContext (\c -> c { _inParens = True }) (validateArgsSyntax args) <*>
+  localSyntaxContext (\c -> c { _inParens = True }) (traverse validateArgsSyntax args) <*>
   validateWhitespace a ws2
 validateExprSyntax (None a ws) = pure $ None a ws
 validateExprSyntax (BinOp a e1 op e2) =
@@ -588,11 +588,9 @@ canAssignTo _ = True
 validateArgsSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
-     , Functor f
-     , Foldable f
      )
-  => f (Arg v a)
-  -> ValidateSyntax e (f (Arg (Nub (Syntax ': v)) a))
+  => CommaSep1' (Arg v a)
+  -> ValidateSyntax e (CommaSep1' (Arg (Nub (Syntax ': v)) a))
 validateArgsSyntax e = fmap coerce e <$ go [] False False (toList e)
   where
     go

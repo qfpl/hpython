@@ -381,7 +381,7 @@ data CompoundStatement (v :: [*]) a
   | ClassDef
       (Indents a) a
       (NonEmpty Whitespace) (Ident v a)
-      (Maybe ([Whitespace], Maybe (CommaSep1 (Arg v a)), [Whitespace]))
+      (Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace]))
       [Whitespace] Newline
       (Block v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)

@@ -272,7 +272,7 @@ data Expr (v :: [*]) a
   -- ( spaces
   , _unsafeCallWhitespaceLeft :: [Whitespace]
   -- exprs
-  , _unsafeCallArguments :: CommaSep (Arg v a)
+  , _unsafeCallArguments :: Maybe (CommaSep1' (Arg v a))
   -- ) spaces
   , _unsafeCallWhitespaceRight :: [Whitespace]
   }

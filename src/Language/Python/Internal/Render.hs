@@ -421,7 +421,7 @@ renderExpr (Call _ expr ws args ws2) =
      Not{} -> bracket $ renderExpr expr
      Generator{} -> bracket $ renderExpr expr
      _ -> bracketGenerator expr) <>
-  bracket (foldMap renderWhitespace ws <> renderArgs args) <>
+  bracket (foldMap renderWhitespace ws <> foldMap renderArgs args) <>
   foldMap renderWhitespace ws2
 renderExpr (Deref _ expr ws name) =
   (case expr of
@@ -657,7 +657,7 @@ renderCompoundStatement (ClassDef idnt _ a b c d e f) =
     (\(x, y, z) ->
       bracket
         (foldMap renderWhitespace x <>
-         foldMap (renderCommaSep1 (renderArg bracketTupleGenerator)) y) <>
+         foldMap renderArgs y) <>
       foldMap renderWhitespace z)
     c <>
   singleton (TkColon ()) <> foldMap renderWhitespace d <>
@@ -688,9 +688,9 @@ renderExceptAs (ExceptAs _ e f) =
   bracketTupleGenerator e <>
   foldMap (\(a, b) -> TkAs () `cons` foldMap renderWhitespace a <> renderIdent b) f
 
-renderArgs :: CommaSep (Arg v a) -> RenderOutput
-renderArgs (CommaSepOne a) = renderArg bracketTuple a
-renderArgs e = renderCommaSep (renderArg bracketTupleGenerator) e
+renderArgs :: CommaSep1' (Arg v a) -> RenderOutput
+renderArgs (CommaSepOne1' a Nothing) = renderArg bracketTuple a
+renderArgs e = renderCommaSep1' (renderArg bracketTupleGenerator) e
 
 renderArg :: (Expr v a -> RenderOutput) -> Arg v a -> RenderOutput
 renderArg re (PositionalArg _ expr) = re expr

@@ -148,19 +148,14 @@ genKeywordArg =
     ]
     []
 
-genArgs :: MonadGen m => m (CommaSep (Arg '[] ()))
+genArgs :: MonadGen m => m (CommaSep1' (Arg '[] ()))
 genArgs =
-  sized2
-    appendCommaSep
-    (genSizedCommaSep genPositionalArg)
-    (genSizedCommaSep genKeywordArg)
-
-genArgs1 :: MonadGen m => m (CommaSep1 (Arg '[] ()))
-genArgs1 =
-  sized2
-    (<>)
-    (genSizedCommaSep1 genPositionalArg)
-    (genSizedCommaSep1 genKeywordArg)
+  sized4
+    (\a b c d -> (a, b <> c, d) ^. _CommaSep1')
+    genPositionalArg
+    (sizedList $ (,) <$> genWhitespaces <*> genPositionalArg)
+    (sizedList $ (,) <$> genWhitespaces <*> genKeywordArg)
+    (Gen.maybe genWhitespaces)
 
 genPositionalParams :: MonadGen m => m (CommaSep (Param '[] ()))
 genPositionalParams =
@@ -308,7 +303,7 @@ genExpr' isExp =
     , sized2M
         (\a b -> (\ws1 -> Call () a ws1 b) <$> genWhitespaces <*> genWhitespaces)
         genExpr
-        genArgs
+        (sizedMaybe genArgs)
     , genSubscript
     , sizedBind genExpr $ \e1 ->
       sizedBind genOp $ \op ->
@@ -526,7 +521,7 @@ genCompoundStatement =
         (sizedMaybe $
          (,,) <$>
          genWhitespaces <*>
-         sizedMaybe genArgs1 <*>
+         sizedMaybe genArgs <*>
          genWhitespaces)
         genBlock
     , sized4M

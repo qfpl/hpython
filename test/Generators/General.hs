@@ -162,7 +162,7 @@ genExpr' isExp =
            genWhitespaces <*>
            genWhitespaces)
         genExpr
-        (genSizedCommaSep $ genArg genExpr)
+        (sizedMaybe . genSizedCommaSep1' $ genArg genExpr)
     , sized2M
         (\a b ->
            (\ws1 ws2 -> Subscript () a ws1 b ws2) <$>
@@ -294,7 +294,7 @@ genCompoundStatement =
            ClassDef <$> genIndents <*> pure () <*> genWhitespaces1 <*> genIdent <*>
            Gen.maybe ((,,) <$> genWhitespaces <*> pure a <*> genWhitespaces) <*>
            genWhitespaces <*> genNewline <*> pure b)
-        (sizedMaybe $ genSizedCommaSep1 $ genArg genExpr)
+        (sizedMaybe $ genSizedCommaSep1' $ genArg genExpr)
         genBlock
     , sized4M
         (\a b c d ->

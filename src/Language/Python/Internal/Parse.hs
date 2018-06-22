@@ -420,7 +420,7 @@ orExpr ws = xorExpr
 
       (\a b c d -> Call (_exprAnnotation d) d a b c) <$>
       (snd <$> token anySpace (TkLeftParen ())) <*>
-      commaSep anySpace arg <*>
+      optional (commaSep1' anySpace arg) <*>
       (snd <$> token anySpace (TkRightParen ()))
 
       <!>
@@ -873,7 +873,7 @@ compoundStatement =
       optional
         ((,,) <$>
          (snd <$> token anySpace (TkLeftParen ())) <*>
-         optional (commaSep1 anySpace arg) <*>
+         optional (commaSep1' anySpace arg) <*>
          (snd <$> token space (TkRightParen ()))) <*>
       (snd <$> colon space) `thenSuite` ()
 

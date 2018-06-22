@@ -461,7 +461,7 @@ validateExprScope (Call a e ws1 as ws2) =
   Call a <$>
   validateExprScope e <*>
   pure ws1 <*>
-  traverse validateArgScope as <*>
+  traverseOf (traverse.traverse) validateArgScope as <*>
   pure ws2
 validateExprScope (BinOp a l op r) =
   BinOp a <$>

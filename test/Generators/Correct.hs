@@ -225,12 +225,10 @@ genParens genExpr' = Parens () <$> genWhitespaces <*> genExpr' <*> genWhitespace
 
 genDeref :: MonadGen m => m (Expr '[] ())
 genDeref =
-  Gen.subtermM
-    genExpr
-    (\a ->
-        Deref () a <$>
-        genWhitespaces <*>
-        genIdent)
+  Deref () <$>
+  genExpr <*>
+  genWhitespaces <*>
+  genIdent
 
 genCompFor :: MonadGen m => m (CompFor '[] ())
 genCompFor =
@@ -319,6 +317,7 @@ genExpr' isExp =
         BinOp () (e1 & trailingWhitespace .~ [Space]) (op & trailingWhitespace .~ [Space]) e2
     , genTuple genExpr
     , Not () <$> (NonEmpty.toList <$> genWhitespaces1) <*> genExpr
+    , Negate () <$> genWhitespaces <*> genExpr
     ]
 
 genSubscript :: MonadGen m => m (Expr '[] ())

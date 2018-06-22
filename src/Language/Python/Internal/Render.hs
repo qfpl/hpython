@@ -393,9 +393,11 @@ renderExpr (Negate _ ws expr) =
   TkMinus () `cons`
   foldMap renderWhitespace ws <>
   case expr of
-    BinOp _ _ Exp{} _ -> bracketGenerator expr
+    BinOp _ _ Exp{} _ -> bracketTupleGenerator expr
     BinOp{} -> bracket $ renderExpr expr
-    _ -> bracketGenerator expr
+    Deref _ Int{} _ _ -> bracket $ renderExpr expr
+    Not{} -> bracket $ renderExpr expr
+    _ -> bracketTupleGenerator expr
 renderExpr (String _ vs) = foldMap renderStringLiteral vs
 renderExpr (Int _ n ws) = TkInt n () `cons` foldMap renderWhitespace ws
 renderExpr (Ident _ name) = renderIdent name
@@ -423,12 +425,13 @@ renderExpr (Call _ expr ws args ws2) =
   foldMap renderWhitespace ws2
 renderExpr (Deref _ expr ws name) =
   (case expr of
-    Int{} -> bracket $ renderExpr expr
-    BinOp{} -> bracket $ renderExpr expr
-    Tuple{} -> bracket $ renderExpr expr
-    Not{} -> bracket $ renderExpr expr
-    Generator{} -> bracket $ renderExpr expr
-    _ -> bracketGenerator expr) <>
+     Int{} -> bracket $ renderExpr expr
+     BinOp{} -> bracket $ renderExpr expr
+     Tuple{} -> bracket $ renderExpr expr
+     Not{} -> bracket $ renderExpr expr
+     Generator{} -> bracket $ renderExpr expr
+     Negate{} -> bracket $ renderExpr expr
+     _ -> bracketGenerator expr) <>
   singleton (TkDot ()) <>
   foldMap renderWhitespace ws <>
   renderIdent name

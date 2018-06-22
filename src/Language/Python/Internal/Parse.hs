@@ -384,7 +384,9 @@ orExpr ws = xorExpr
       (\(tk, ws) -> Percent (pyTokenAnn tk) ws) <$> token ws (TkPercent ())
     term = binOp termOp factor
 
-    factor = power
+    factor =
+      (\(tk, s) -> Negate (pyTokenAnn tk) s) <$> token ws (TkMinus ()) <*> factor <!>
+      power
 
     powerOp = (\(tk, ws) -> Exp (pyTokenAnn tk) ws) <$> token ws (TkDoubleStar ())
     power =

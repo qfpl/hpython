@@ -179,6 +179,7 @@ genExpr' isExp =
         (\a -> Parens () <$> genWhitespaces <*> pure a <*> genWhitespaces)
     , genTuple genExpr
     , Not () <$> genWhitespaces <*> genExpr
+    , Negate () <$> genWhitespaces <*> genExpr
     ]
 
 genSmallStatement :: MonadGen m => m (SmallStatement '[] ())

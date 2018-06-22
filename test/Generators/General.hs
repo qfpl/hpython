@@ -136,6 +136,7 @@ genExpr' isExp =
       genWhitespaces <*>
       genComprehension <*>
       genWhitespaces
+    , Generator () <$> genComprehension
     , Gen.subtermM
         genExpr
         (\a ->

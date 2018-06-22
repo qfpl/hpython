@@ -254,3 +254,4 @@ assignTargets f e =
     Not{} -> pure $ coerce e
     Dict{} -> pure $ coerce e
     Set{} -> pure $ coerce e
+    Generator{} -> pure $ coerce e

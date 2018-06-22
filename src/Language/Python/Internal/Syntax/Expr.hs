@@ -7,14 +7,15 @@
 {-# language ExistentialQuantification #-}
 module Language.Python.Internal.Syntax.Expr where
 
-import Control.Lens.Fold ((^?))
+import Control.Lens.Cons (_last)
+import Control.Lens.Fold ((^?), (^?!))
 import Control.Lens.Getter ((^.), getting)
 import Control.Lens.Lens (Lens, lens)
 import Control.Lens.Plated (Plated(..), gplate)
-import Control.Lens.Prism (_Just)
+import Control.Lens.Prism (_Just, _Left, _Right)
 import Control.Lens.Setter ((.~))
 import Control.Lens.TH (makeLenses)
-import Control.Lens.Traversal (Traversal)
+import Control.Lens.Traversal (Traversal, failing)
 import Data.Bifunctor (bimap)
 import Data.Bifoldable (bifoldMap)
 import Data.Bitraversable (bitraverse)
@@ -74,6 +75,21 @@ data Comprehension (v :: [*]) a
   = Comprehension a (Expr v a) (CompFor v a) [Either (CompFor v a) (CompIf v a)]
   deriving (Eq, Show)
 
+instance HasTrailingWhitespace (Comprehension v a) where
+  trailingWhitespace =
+    lens
+      (\(Comprehension _ _ a b) ->
+         case b of
+           [] -> a ^. trailingWhitespace
+           _ -> b ^?! _last.failing (_Left.trailingWhitespace) (_Right.trailingWhitespace))
+      (\(Comprehension a b c d) ws ->
+         case d of
+           [] -> Comprehension a b (c & trailingWhitespace .~ ws) d
+           _ ->
+             Comprehension a b c
+               (d &
+                _last.failing (_Left.trailingWhitespace) (_Right.trailingWhitespace) .~ ws))
+
 instance Functor (Comprehension v) where
   fmap f (Comprehension a b c d) =
     Comprehension (f a) (fmap f b) (fmap f c) (fmap (bimap (fmap f) (fmap f)) d)
@@ -95,10 +111,22 @@ data CompIf (v :: [*]) a
   = CompIf a [Whitespace] (Expr v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+instance HasTrailingWhitespace (CompIf v a) where
+  trailingWhitespace =
+    lens
+      (\(CompIf _ _ a) -> a ^. trailingWhitespace)
+      (\(CompIf a b c) ws -> CompIf a b $ c & trailingWhitespace .~ ws)
+
 data CompFor (v :: [*]) a
   -- ^ 'for' <any_spaces> <targets> 'in' <any_spaces> <expr>
   = CompFor a [Whitespace] (Expr v a) [Whitespace] (Expr v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasTrailingWhitespace (CompFor v a) where
+  trailingWhitespace =
+    lens
+      (\(CompFor _ _ _ _ a) -> a ^. trailingWhitespace)
+      (\(CompFor a b c d e) ws -> CompFor a b c d $ e & trailingWhitespace .~ ws)
 
 data StringLiteral a
   = StringLiteral
@@ -263,6 +291,10 @@ data Expr (v :: [*]) a
   , _unsafeNotWhitespace :: [Whitespace]
   , _unsafeNotValue :: Expr v a
   }
+  | Generator
+  { _exprAnnotation :: a
+  , _generatorValue :: Comprehension v a
+  }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 instance HasTrailingWhitespace (Expr v a) where
@@ -272,21 +304,22 @@ instance HasTrailingWhitespace (Expr v a) where
           None _ ws -> ws
           List _ _ _ ws -> ws
           ListComp _ _ _ ws -> ws
-          Deref _ _ _ a -> a ^. getting trailingWhitespace
+          Deref _ _ _ a -> a ^. trailingWhitespace
           Subscript _ _ _ _ ws -> ws
           Call _ _ _ _ ws -> ws
-          BinOp _ _ _ e -> e ^. getting trailingWhitespace
-          Negate _ _ e -> e ^. getting trailingWhitespace
+          BinOp _ _ _ e -> e ^. trailingWhitespace
+          Negate _ _ e -> e ^. trailingWhitespace
           Parens _ _ _ ws -> ws
           Ident _ a -> a ^. getting trailingWhitespace
           Int _ _ ws -> ws
           Bool _ _ ws -> ws
           String _ v -> v ^. trailingWhitespace
-          Not _ _ e -> e ^. getting trailingWhitespace
+          Not _ _ e -> e ^. trailingWhitespace
           Tuple _ _ ws Nothing -> ws
-          Tuple _ _ _ (Just cs) -> cs ^. getting trailingWhitespace
+          Tuple _ _ _ (Just cs) -> cs ^. trailingWhitespace
           Dict _ _ _ ws -> ws
-          Set _ _ _ ws -> ws)
+          Set _ _ _ ws -> ws
+          Generator  _ a -> a ^. trailingWhitespace)
       (\e ws ->
         case e of
           None a _ -> None a ws
@@ -304,9 +337,11 @@ instance HasTrailingWhitespace (Expr v a) where
           String a v -> String a (v & trailingWhitespace .~ ws)
           Not a b c -> Not a b (c & trailingWhitespace .~ ws)
           Tuple a e _ Nothing -> Tuple a (coerce e) ws Nothing
-          Tuple a b ws (Just cs) -> Tuple a (coerce b) ws (Just $ cs & trailingWhitespace .~ ws)
+          Tuple a b ws (Just cs) ->
+            Tuple a (coerce b) ws (Just $ cs & trailingWhitespace .~ ws)
           Dict a b c _ -> Dict a b c ws
-          Set a b c _ -> Set a b c ws)
+          Set a b c _ -> Set a b c ws
+          Generator a b -> Generator a $ b & trailingWhitespace .~ ws)
 
 instance IsString (Expr '[] ()) where
   fromString s = Ident () (MkIdent () s [])

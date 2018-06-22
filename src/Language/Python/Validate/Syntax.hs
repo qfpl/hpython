@@ -248,6 +248,7 @@ validateExprSyntax (ListComp a ws1 comp ws2) =
     (\c -> c { _inParens = True })
     (validateComprehensionSyntax comp) <*>
   validateWhitespace a ws2
+validateExprSyntax (Generator a comp) = Generator a <$> validateComprehensionSyntax comp
 validateExprSyntax (Deref a expr ws1 name) =
   Deref a <$>
   validateExprSyntax expr <*>

@@ -264,6 +264,60 @@ exprList ws =
      (snd <$> comma ws) <*>
      optional (commaSep1' ws $ expr ws))
 
+compIf :: Parser ann (CompIf '[] ann)
+compIf =
+  (\(tk, s) -> CompIf (pyTokenAnn tk) s) <$>
+  token anySpace (TkIf ()) <*>
+  expr anySpace
+
+compFor :: Parser ann (CompFor '[] ann)
+compFor =
+  (\(tk, s) -> CompFor (pyTokenAnn tk) s) <$>
+  token anySpace (TkFor ()) <*>
+  orExprList anySpace <*>
+  (snd <$> token anySpace (TkIn ())) <*>
+  expr anySpace
+
+-- | (',' x)* [',']
+commaSepRest :: Parser ann b -> Parser ann ([([Whitespace], b)], Maybe [Whitespace])
+commaSepRest x = do
+  c <- optional $ snd <$> comma anySpace
+  case c of
+    Nothing -> pure ([], Nothing)
+    Just c' -> do
+      e <- optional x
+      case e of
+        Nothing -> pure ([], Just c')
+        Just e' -> first ((c', e') :) <$> commaSepRest x
+
+exprComp :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+exprComp ws =
+  (\ex a ->
+     case a of
+       Nothing -> ex
+       Just (cf, rest) ->
+         Generator (ex ^. exprAnnotation) $
+         Comprehension (ex ^. exprAnnotation) ex cf rest) <$>
+  expr ws <*>
+  optional ((,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf))
+
+exprListComp :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+exprListComp ws = do
+  ex <- expr ws
+  val <-
+    Left <$> compFor <!>
+    Right <$> commaSepRest (expr anySpace)
+  case val of
+    Left cf ->
+      Generator (ex ^. exprAnnotation) .
+      Comprehension (ex ^. exprAnnotation) ex cf <$>
+      many (Left <$> compFor <!> Right <$> compIf)
+    Right ([], Nothing) -> pure ex
+    Right ([], Just ws) ->
+      pure $ Tuple (ex ^. exprAnnotation) ex ws Nothing
+    Right ((ws, ex') : cs, mws) ->
+      pure $ Tuple (ex ^. exprAnnotation) ex ws . Just $ (ex', cs, mws) ^. _CommaSep1'
+
 orExprList :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 orExprList ws =
   (\a -> maybe a (uncurry $ Tuple (_exprAnnotation a) a)) <$>
@@ -359,33 +413,11 @@ orExpr ws = xorExpr
 
     atomExpr = foldl' (&) <$> atom <*> many trailer
 
-    parens =
-      (\(a, b) c d -> Parens (pyTokenAnn a) b c d) <$>
-      token anySpace (TkLeftParen ()) <*>
-      exprList anySpace <*>
-      fmap snd (token space $ TkRightParen ())
-
-    commaX x = do
-      c <- optional $ snd <$> comma anySpace
-      case c of
-        Nothing -> pure ([], Nothing)
-        Just c' -> do
-          e <- optional x
-          case e of
-            Nothing -> pure ([], Just c')
-            Just e' -> first ((c', e') :) <$> commaX x
-
-    compIf =
-      (\(tk, s) -> CompIf (pyTokenAnn tk) s) <$>
-      token anySpace (TkIf ()) <*>
-      expr anySpace
-
-    compFor =
-      (\(tk, s) -> CompFor (pyTokenAnn tk) s) <$>
-      token anySpace (TkFor ()) <*>
-      orExprList anySpace <*>
-      (snd <$> token anySpace (TkIn ())) <*>
-      expr anySpace
+    parens = do
+      (tk, s) <- token ws $ TkLeftParen ()
+      ex <- exprListComp anySpace
+      Parens (pyTokenAnn tk) s ex <$> 
+        (snd <$> token ws (TkRightParen ()))
 
     list = do
       (tk, s) <- token ws $ TkLeftBracket ()
@@ -395,7 +427,7 @@ orExpr ws = xorExpr
         Just ex' -> do
           val <-
             Left <$> compFor <!>
-            Right <$> commaX (expr anySpace)
+            Right <$> commaSepRest (expr anySpace)
           case val of
             Left cf ->
               ListComp (pyTokenAnn tk) s <$>
@@ -422,7 +454,7 @@ orExpr ws = xorExpr
            case maybeColon of
              Nothing ->
                (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$>
-               commaX (expr anySpace)
+               commaSepRest (expr anySpace)
              Just clws ->
                let
                  firstDictItem = DictItem (ex ^. exprAnnotation) ex clws
@@ -430,7 +462,7 @@ orExpr ws = xorExpr
                  (\ex2 (rest, final) ->
                     Dict ann ws1 (Just $ (firstDictItem ex2, rest, final) ^. _CommaSep1')) <$>
                  expr anySpace <*>
-                 commaX dictItem) <*>
+                 commaSepRest dictItem) <*>
          (snd <$> token ws (TkRightBrace ()))
 
     atom =
@@ -707,7 +739,7 @@ param =
 arg :: Parser ann (Arg '[] ann)
 arg =
   (do
-      e <- expr anySpace
+      e <- exprComp anySpace
       case e of
         Ident _ ident -> do
           eqSpaces <- optional $ snd <$> token anySpace (TkEq ())

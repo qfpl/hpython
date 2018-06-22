@@ -410,6 +410,7 @@ validateAssignExprScope e@Bool{} = pure $ coerce e
 validateAssignExprScope e@String{} = pure $ coerce e
 validateAssignExprScope e@Dict{} = pure $ coerce e
 validateAssignExprScope e@Set{} = pure $ coerce e
+validateAssignExprScope e@Generator{} = pure $ coerce e
 
 validateDictItemScope
   :: AsScopeError e v a
@@ -437,6 +438,9 @@ validateExprScope (ListComp a ws1 comp ws2) =
   ListComp a ws1 <$>
   validateComprehensionScope comp <*>
   pure ws2
+validateExprScope (Generator a comp) =
+  Generator a <$>
+  validateComprehensionScope comp
 validateExprScope (Deref a e ws1 r) =
   Deref a <$>
   validateExprScope e <*>

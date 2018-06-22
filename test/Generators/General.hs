@@ -109,6 +109,18 @@ genComprehension =
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
+genSubscript :: MonadGen m => m (Subscript '[] ())
+genSubscript =
+  sizedRecursive
+    [ SubscriptExpr <$> genExpr
+    , sized3M
+        (\a b c -> (\ws -> SubscriptSlice a ws b c) <$> genWhitespaces)
+        (sizedMaybe genExpr)
+        (sizedMaybe genExpr)
+        (sizedMaybe $ (,) <$> genWhitespaces <*> sizedMaybe genExpr)
+    ]
+    []
+
 -- | This is necessary to prevent generating exponentials that will take forever to evaluate
 -- when python does constant folding
 genExpr :: MonadGen m => m (Expr '[] ())
@@ -157,7 +169,7 @@ genExpr' isExp =
            genWhitespaces <*>
            genWhitespaces)
         genExpr
-        genExpr
+        (genSizedCommaSep1' genSubscript)
     , sizedBind genExpr $ \a -> do
         op <- genOp
         sizedBind (genExpr' $ case op of; Exp{} -> True; _ -> False) $ \b ->

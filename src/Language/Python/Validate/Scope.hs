@@ -379,7 +379,7 @@ validateAssignExprScope
 validateAssignExprScope (Subscript a e1 ws1 e2 ws2) =
   (\e1' e2' -> Subscript a e1' ws1 e2' ws2) <$>
   validateAssignExprScope e1 <*>
-  validateExprScope e2
+  traverse validateSubscriptScope e2
 validateAssignExprScope (List a ws1 es ws2) =
   List a ws1 <$>
   traverseOf (traverse.traverse) validateAssignExprScope es <*>
@@ -421,6 +421,17 @@ validateDictItemScope (DictItem a b c d) =
   validateExprScope b <*>
   validateExprScope d
 
+validateSubscriptScope
+  :: AsScopeError e v a
+  => Subscript v a
+  -> ValidateScope a e (Subscript (Nub (Scope ': v)) a)
+validateSubscriptScope (SubscriptExpr e) = SubscriptExpr <$> validateExprScope e
+validateSubscriptScope (SubscriptSlice a b c d) =
+  (\a' -> SubscriptSlice a' b) <$>
+  traverse validateExprScope a <*>
+  traverse validateExprScope c <*>
+  traverseOf (traverse._2.traverse) validateExprScope d
+
 validateExprScope
   :: AsScopeError e v a
   => Expr v a
@@ -428,7 +439,7 @@ validateExprScope
 validateExprScope (Subscript a b c d e) =
   (\b' d' -> Subscript a b' c d' e) <$>
   validateExprScope b <*>
-  validateExprScope d
+  traverse validateSubscriptScope d
 validateExprScope (Not a ws e) = Not a ws <$> validateExprScope e
 validateExprScope (List a ws1 es ws2) =
   List a ws1 <$>

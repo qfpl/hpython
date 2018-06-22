@@ -13,8 +13,7 @@ module Language.Python.Internal.Render
   , renderIdent, renderComment, renderModuleName, renderDot, renderRelativeModuleName
   , renderImportAs, renderImportTargets, renderSmallStatement, renderCompoundStatement
   , renderBlock, renderIndent, renderIndents, renderExceptAs, renderArg, renderParam
-  , renderCompFor, renderCompIf, renderComprehension
-  , renderBinOp
+  , renderCompFor, renderCompIf, renderComprehension, renderBinOp, renderSubscript
   )
 where
 
@@ -351,6 +350,19 @@ renderStringLiteral (BytesLiteral _ a b c d e) =
   TkBytes a b c d () `cons`
   foldMap renderWhitespace e
 
+renderSubscript :: Subscript v a -> RenderOutput
+renderSubscript (SubscriptExpr a) = bracketTupleGenerator a
+renderSubscript (SubscriptSlice a b c d) =
+  foldMap bracketTupleGenerator a <>
+  singleton (TkColon ()) <>
+  foldMap renderWhitespace b <>
+  foldMap bracketTupleGenerator c <>
+  foldMap
+    (bifoldMap
+      (cons (TkColon ()) . foldMap renderWhitespace)
+      (foldMap bracketTupleGenerator))
+    d
+
 renderExpr :: Expr v a -> RenderOutput
 renderExpr (Subscript _ a b c d) =
   (case a of
@@ -361,7 +373,7 @@ renderExpr (Subscript _ a b c d) =
      _ -> bracketTupleGenerator a) <>
   singleton (TkLeftBracket ()) <>
   foldMap renderWhitespace b <>
-  bracketGenerator c <>
+  renderCommaSep1' renderSubscript c <>
   singleton (TkRightBracket ()) <>
   foldMap renderWhitespace d
 renderExpr (Not _ ws e) =

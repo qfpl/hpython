@@ -206,6 +206,19 @@ validateDictItemSyntax (DictItem a b c d) =
   validateExprSyntax b <*>
   validateExprSyntax d
 
+validateSubscriptSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => Subscript v a
+  -> ValidateSyntax e (Subscript (Nub (Syntax ': v)) a)
+validateSubscriptSyntax (SubscriptExpr e) = SubscriptExpr <$> validateExprSyntax e
+validateSubscriptSyntax (SubscriptSlice a b c d) =
+  (\a' -> SubscriptSlice a' b) <$>
+  traverse validateExprSyntax a <*>
+  traverse validateExprSyntax c <*>
+  traverseOf (traverse._2.traverse) validateExprSyntax d
+
 validateExprSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
@@ -215,7 +228,7 @@ validateExprSyntax
 validateExprSyntax (Subscript a b c d e) =
   (\b' d' -> Subscript a b' c d' e) <$>
   validateExprSyntax b <*>
-  validateExprSyntax d
+  traverse validateSubscriptSyntax d
 validateExprSyntax (Not a ws e) =
   Not a <$>
   validateWhitespace a ws <*>

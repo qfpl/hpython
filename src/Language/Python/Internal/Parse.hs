@@ -392,6 +392,23 @@ orExpr ws = xorExpr
       atomExpr <*>
       optional ((,) <$> powerOp <*> factor)
 
+    subscript = do
+      mex <- optional $ expr anySpace
+      case mex of
+        Nothing ->
+          SubscriptSlice Nothing <$>
+          (snd <$> colon anySpace) <*>
+          optional (expr anySpace) <*>
+          optional ((,) <$> (snd <$> colon anySpace) <*> optional (expr anySpace))
+        Just ex -> do
+          mws <- optional $ snd <$> colon anySpace
+          case mws of
+            Nothing -> pure $ SubscriptExpr ex
+            Just ws ->
+              SubscriptSlice (Just ex) ws <$>
+              optional (expr anySpace) <*>
+              optional ((,) <$> (snd <$> colon anySpace) <*> optional (expr anySpace))
+
     trailer =
       (\a b c -> Deref (_exprAnnotation c) c a b) <$>
       (snd <$> token ws (TkDot ())) <*>
@@ -408,7 +425,7 @@ orExpr ws = xorExpr
 
       (\a b c d -> Subscript (_exprAnnotation d) d a b c) <$>
       (snd <$> token anySpace (TkLeftBracket ())) <*>
-      exprList ws <*>
+      commaSep1' anySpace subscript <*>
       (snd <$> token anySpace (TkRightBracket ()))
 
     atomExpr = foldl' (&) <$> atom <*> many trailer

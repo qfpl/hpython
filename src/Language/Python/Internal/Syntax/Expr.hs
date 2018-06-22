@@ -171,6 +171,49 @@ instance HasTrailingWhitespace (DictItem v a) where
       (\(DictItem _ _ _ a) -> a ^. trailingWhitespace)
       (\(DictItem a b c d) ws -> DictItem a b c (d & trailingWhitespace .~ ws))
 
+data Subscript (v :: [*]) a
+  = SubscriptExpr (Expr v a)
+  | SubscriptSlice
+      -- [expr]
+      (Maybe (Expr v a))
+      -- ':' <spaces>
+      [Whitespace]
+      -- [expr]
+      (Maybe (Expr v a))
+      -- [':' [expr]]
+      (Maybe ([Whitespace], Maybe (Expr v a)))
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasTrailingWhitespace (Subscript v a) where
+  trailingWhitespace =
+    lens
+      (\case
+          SubscriptExpr e -> e ^. trailingWhitespace
+          SubscriptSlice _ b c d ->
+            case d of
+              Nothing ->
+                case c of
+                  Nothing -> b
+                  Just e -> e ^. trailingWhitespace
+              Just (e, f) ->
+                case f of
+                  Nothing -> e
+                  Just g -> g ^. trailingWhitespace)
+      (\x ws ->
+         case x of
+          SubscriptExpr e -> SubscriptExpr $ e & trailingWhitespace .~ ws
+          SubscriptSlice a b c d ->
+            (\(b', c', d') -> SubscriptSlice a b' c' d') $
+            case d of
+              Nothing ->
+                case c of
+                  Nothing -> (ws, c, d)
+                  Just e -> (b, Just $ e & trailingWhitespace .~ ws, d)
+              Just (e, f) ->
+                case f of
+                  Nothing -> (b, c, Just (ws, f))
+                  Just g -> (b, c, Just (e, Just $ g & trailingWhitespace .~ ws)))
+
 data Expr (v :: [*]) a
   = ListComp
   { _exprAnnotation :: a
@@ -218,7 +261,7 @@ data Expr (v :: [*]) a
   -- [ spaces
   , _unsafeSubscriptWhitespaceLeft :: [Whitespace]
   -- expr
-  , _unsafeSubscriptValueRight :: Expr v a
+  , _unsafeSubscriptValueRight :: CommaSep1' (Subscript v a)
   -- ] spaces
   , _unsafeSubscriptWhitespaceRight :: [Whitespace]
   }

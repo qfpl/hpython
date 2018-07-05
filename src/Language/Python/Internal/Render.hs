@@ -537,8 +537,7 @@ renderSmallStatement (Del _ ws vals) =
   foldMap renderWhitespace ws <>
   renderCommaSep1'
     (\a -> case a of
-        BinOp _ _ BoolAnd{} _ -> bracket $ renderExpr a
-        BinOp _ _ BoolOr{} _ -> bracket $ renderExpr a
+        BinOp{} -> bracket $ renderExpr a
         Not{} -> bracket $ renderExpr a
         _ -> bracketTupleGenerator a)
     vals

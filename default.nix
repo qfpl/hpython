@@ -17,6 +17,7 @@ let
          semigroupoids = self.semigroupoids_5_2_2;
          adjunctions = self.adjunctions_4_4;
          lens = self.lens_4_16;
+         deriving-compat = self.deriving-compat_0_4_1;
        };
      };
 

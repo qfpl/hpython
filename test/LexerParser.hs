@@ -11,7 +11,7 @@ import Language.Python.Internal.Render
 import Language.Python.Internal.Syntax.Whitespace
 import Language.Python.Internal.Token
 
-import Helpers (doToPython, doParse, doNested, doTokenize, doIndentation)
+import Helpers (doToPython, doParse, doParse', doNested, doTokenize, doIndentation)
 
 lexerParserTests :: Group
 lexerParserTests =
@@ -177,7 +177,7 @@ test_fulltrip_9 =
     nst <- doNested ils
     annotateShow nst
 
-    a <- doParse module_ nst
+    a <- doParse' module_ nst
     annotateShow a
 
     showModule a === str
@@ -213,7 +213,7 @@ test_fulltrip_10 =
     nst <- doNested ils
     annotateShow $! nst
 
-    a <- doParse module_ nst
+    a <- doParse' module_ nst
     annotateShow $! a
 
     showModule a === str
@@ -244,7 +244,7 @@ test_fulltrip_11 =
     nst <- doNested ils
     annotateShow $! nst
 
-    a <- doParse module_ nst
+    a <- doParse' module_ nst
     annotateShow $! a
 
     showModule a === str
@@ -276,7 +276,7 @@ test_fulltrip_12 =
     nst <- doNested ils
     annotateShow $! nst
 
-    a <- doParse module_ nst
+    a <- doParse' module_ nst
     annotateShow $! a
 
     showModule a === str
@@ -310,7 +310,7 @@ test_fulltrip_13 =
     nst <- doNested ils
     annotateShow $! nst
 
-    a <- doParse module_ nst
+    a <- doParse' module_ nst
     annotateShow $! a
 
     showModule a === str
@@ -333,7 +333,7 @@ test_fulltrip_14 =
     nst <- doNested ils
     annotateShow $! nst
 
-    a <- doParse module_ nst
+    a <- doParse' module_ nst
     annotateShow $! a
 
     showModule a === str
@@ -368,7 +368,7 @@ test_parse_1 =
 
     nested <- doNested line
 
-    res <- doParse (parseSpace <!> parseTab) nested
+    res <- doParse () (parseSpace <!> parseTab) nested
     case res of
       Tab -> success
       _ -> annotateShow res *> failure
@@ -389,4 +389,4 @@ test_parse_2 =
 
     nested <- doNested line
 
-    () <$ doParse (Alt.many space) nested
+    () <$ doParse () (Alt.many space) nested

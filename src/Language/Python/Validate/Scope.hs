@@ -414,6 +414,7 @@ validateAssignExprScope e@String{} = pure $ coerce e
 validateAssignExprScope e@Dict{} = pure $ coerce e
 validateAssignExprScope e@Set{} = pure $ coerce e
 validateAssignExprScope e@Generator{} = pure $ coerce e
+validateAssignExprScope e@Ternary{} = pure $ coerce e
 
 validateDictItemScope
   :: AsScopeError e v a
@@ -439,6 +440,11 @@ validateExprScope
   :: AsScopeError e v a
   => Expr v a
   -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
+validateExprScope (Ternary a b c d e f) =
+  (\b' d' f' -> Ternary a b' c d' e f') <$>
+  validateExprScope b <*>
+  validateExprScope d <*>
+  validateExprScope f
 validateExprScope (Subscript a b c d e) =
   (\b' d' -> Subscript a b' c d' e) <$>
   validateExprScope b <*>

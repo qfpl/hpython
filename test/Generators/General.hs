@@ -180,6 +180,14 @@ genExpr' isExp =
     , genTuple genExpr
     , Not () <$> genWhitespaces <*> genExpr
     , Negate () <$> genWhitespaces <*> genExpr
+    , sized3M
+        (\a b c ->
+           (\ws1 ws2 -> Ternary () a ws1 b ws2 c) <$>
+           genWhitespaces <*>
+           genWhitespaces)
+        genExpr
+        genExpr
+        genExpr
     ]
 
 genSmallStatement :: MonadGen m => m (SmallStatement '[] ())

@@ -319,7 +319,7 @@ test_fulltrip_14 :: Property
 test_fulltrip_14 =
   withTests 1 . property $ do
     let
-      str = "\"asdf\" \"asdf\""
+      str = "not ((False for a in False) if False else False or False)"
 
     tks <- doTokenize str
     annotateShow $! tks

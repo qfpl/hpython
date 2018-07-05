@@ -53,7 +53,7 @@ showRenderOutput =
       \case
         a : b : rest
           | isIdentifierChar (last $ showToken a)
-          , isIdentifierStart (head $ showToken b)
+          , isIdentifierChar (head $ showToken b)
           -> a : TkSpace () : b : rest
         a -> a
 
@@ -321,13 +321,17 @@ renderCompFor (CompFor _ ws1 ex1 ws2 ex2) =
   bracketGenerator ex1 <>
   singleton (TkIn ()) <>
   foldMap renderWhitespace ws2 <>
-  bracketTupleGenerator ex2
+  case ex2 of
+    Ternary{} -> bracket $ renderExpr ex2
+    _ -> bracketTupleGenerator ex2
 
 renderCompIf :: CompIf v a -> RenderOutput
 renderCompIf (CompIf _ ws ex) =
   TkIf () `cons`
   foldMap renderWhitespace ws <>
-  bracketTupleGenerator ex
+  case ex of
+    Ternary{} -> bracket $ renderExpr ex
+    _ -> bracketTupleGenerator ex
 
 renderComprehension :: Comprehension v a -> RenderOutput
 renderComprehension (Comprehension _ expr cf cs) =
@@ -364,12 +368,21 @@ renderSubscript (SubscriptSlice a b c d) =
     d
 
 renderExpr :: Expr v a -> RenderOutput
+renderExpr (Ternary _ a b c d e) =
+  (case a of
+     Generator{} -> bracket $ renderExpr a
+     _ -> bracketTupleGenerator a) <>
+  singleton (TkIf ()) <> foldMap renderWhitespace b <>
+  (case c of
+     Ternary{} -> bracket $ renderExpr c
+     _ -> bracketTupleGenerator c) <>
+  singleton (TkElse ()) <> foldMap renderWhitespace d <>
+  bracketTupleGenerator e
 renderExpr (Subscript _ a b c d) =
   (case a of
      BinOp{} -> bracket $ renderExpr a
      Not{} -> bracket $ renderExpr a
-     Tuple{} -> bracket $ renderExpr a
-     Generator{} -> bracket $ renderExpr a
+     Ternary{} -> bracket $ renderExpr a
      _ -> bracketTupleGenerator a) <>
   singleton (TkLeftBracket ()) <>
   foldMap renderWhitespace b <>
@@ -382,6 +395,7 @@ renderExpr (Not _ ws e) =
   case e of
     BinOp _ _ BoolAnd{} _ -> bracket $ renderExpr e
     BinOp _ _ BoolOr{} _ -> bracket $ renderExpr e
+    Ternary{} -> bracket $ renderExpr e
     _ -> bracketTupleGenerator e
 renderExpr (Parens _ ws1 e ws2) =
   bracket (foldMap renderWhitespace ws1 <> renderExpr e) <>
@@ -397,6 +411,7 @@ renderExpr (Negate _ ws expr) =
     BinOp{} -> bracket $ renderExpr expr
     Deref _ Int{} _ _ -> bracket $ renderExpr expr
     Not{} -> bracket $ renderExpr expr
+    Ternary{} -> bracket $ renderExpr expr
     _ -> bracketTupleGenerator expr
 renderExpr (String _ vs) = foldMap renderStringLiteral vs
 renderExpr (Int _ n ws) = TkInt n () `cons` foldMap renderWhitespace ws
@@ -419,7 +434,7 @@ renderExpr (Call _ expr ws args ws2) =
      BinOp{} -> bracket $ renderExpr expr
      Tuple{} -> bracket $ renderExpr expr
      Not{} -> bracket $ renderExpr expr
-     Generator{} -> bracket $ renderExpr expr
+     Ternary{} -> bracket $ renderExpr expr
      _ -> bracketGenerator expr) <>
   bracket (foldMap renderWhitespace ws <> foldMap renderArgs args) <>
   foldMap renderWhitespace ws2
@@ -429,8 +444,8 @@ renderExpr (Deref _ expr ws name) =
      BinOp{} -> bracket $ renderExpr expr
      Tuple{} -> bracket $ renderExpr expr
      Not{} -> bracket $ renderExpr expr
-     Generator{} -> bracket $ renderExpr expr
      Negate{} -> bracket $ renderExpr expr
+     Ternary{} -> bracket $ renderExpr expr
      _ -> bracketGenerator expr) <>
   singleton (TkDot ()) <>
   foldMap renderWhitespace ws <>
@@ -539,6 +554,7 @@ renderSmallStatement (Del _ ws vals) =
     (\a -> case a of
         BinOp{} -> bracket $ renderExpr a
         Not{} -> bracket $ renderExpr a
+        Ternary{} -> bracket $ renderExpr a
         _ -> bracketTupleGenerator a)
     vals
 renderSmallStatement (Import _ ws ns) =

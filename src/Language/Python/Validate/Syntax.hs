@@ -225,6 +225,11 @@ validateExprSyntax
      )
   => Expr v a
   -> ValidateSyntax e (Expr (Nub (Syntax ': v)) a)
+validateExprSyntax (Ternary a b c d e f) =
+  (\b' d' f' -> Ternary a b' c d' e f') <$>
+  validateExprSyntax b <*>
+  validateExprSyntax d <*>
+  validateExprSyntax f
 validateExprSyntax (Subscript a b c d e) =
   (\b' d' -> Subscript a b' c d' e) <$>
   validateExprSyntax b <*>

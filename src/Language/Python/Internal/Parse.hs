@@ -293,7 +293,7 @@ compIf :: Parser ann (CompIf '[] ann)
 compIf =
   (\(tk, s) -> CompIf (pyTokenAnn tk) s) <$>
   token anySpace (TkIf ()) <*>
-  expr anySpace
+  orTest anySpace
 
 compFor :: Parser ann (CompFor '[] ann)
 compFor =
@@ -301,7 +301,7 @@ compFor =
   token anySpace (TkFor ()) <*>
   orExprList anySpace <*>
   (snd <$> token anySpace (TkIn ())) <*>
-  expr anySpace
+  orTest anySpace
 
 -- | (',' x)* [',']
 commaSepRest :: Parser ann b -> Parser ann ([([Whitespace], b)], Maybe [Whitespace])
@@ -361,11 +361,10 @@ binOp op tm =
   tm <*>
   many ((,) <$> op <*> tm)
 
-expr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
-expr ws = orTest
+orTest :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+orTest ws = binOp orOp andTest
   where
     orOp = (\(tk, ws) -> BoolOr (pyTokenAnn tk) ws) <$> token ws (TkOr ())
-    orTest = binOp orOp andTest
 
     andOp = (\(tk, ws) -> BoolAnd (pyTokenAnn tk) ws) <$> token ws (TkAnd ())
     andTest = binOp andOp notTest
@@ -388,6 +387,17 @@ expr ws = orTest
       (\(tk, ws) -> GtEquals (pyTokenAnn tk) ws) <$> token ws (TkGte ()) <!>
       (\(tk, ws) -> NotEquals (pyTokenAnn tk) ws) <$> token ws (TkBangEq ())
     comparison = binOp compOp $ orExpr ws
+
+expr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+expr ws =
+  (\a -> maybe a (\(b, c, d, e) -> Ternary (a ^. exprAnnotation) a b c d e)) <$>
+  orTest ws <*>
+  optional
+    ((,,,) <$>
+     (snd <$> token ws (TkIf ())) <*>
+     orTest ws <*>
+     (snd <$> token ws (TkElse ())) <*>
+     expr ws)
 
 orExpr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 orExpr ws = xorExpr

@@ -215,7 +215,20 @@ instance HasTrailingWhitespace (Subscript v a) where
                   Just g -> (b, c, Just (e, Just $ g & trailingWhitespace .~ ws)))
 
 data Expr (v :: [*]) a
-  = ListComp
+  = Ternary
+  { _exprAnnotation :: a
+  -- expr
+  , _unsafeTernaryValue :: Expr v a
+  -- 'if' spaces
+  , _unsafeListCompWhitespaceIf :: [Whitespace]
+  -- expr
+  , _unsafeTernaryCond :: Expr v a
+  -- 'else' spaces
+  , _unsafeListCompWhitespaceElse :: [Whitespace]
+  -- expr
+  , _unsafeTernaryElse :: Expr v a
+  }
+  | ListComp
   { _exprAnnotation :: a
   -- [ spaces
   , _unsafeListCompWhitespaceLeft :: [Whitespace]
@@ -344,6 +357,7 @@ instance HasTrailingWhitespace (Expr v a) where
   trailingWhitespace =
     lens
       (\case
+          Ternary _ _ _ _ _ e -> e ^. trailingWhitespace
           None _ ws -> ws
           List _ _ _ ws -> ws
           ListComp _ _ _ ws -> ws
@@ -365,6 +379,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Generator  _ a -> a ^. trailingWhitespace)
       (\e ws ->
         case e of
+          Ternary a b c d e f -> Ternary a b c d e (f & trailingWhitespace .~ ws)
           None a _ -> None a ws
           List a b c _ -> List a b (coerce c) ws
           ListComp a b c _ -> ListComp a b (coerce c) ws

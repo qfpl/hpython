@@ -215,7 +215,18 @@ instance HasTrailingWhitespace (Subscript v a) where
                   Just g -> (b, c, Just (e, Just $ g & trailingWhitespace .~ ws)))
 
 data Expr (v :: [*]) a
-  = Ternary
+  = Yield
+  { _exprAnnotation :: a
+  , _unsafeYieldWhitespace :: [Whitespace]
+  , _unsafeYieldValue :: Maybe (Expr v a)
+  }
+  | YieldFrom
+  { _exprAnnotation :: a
+  , _unsafeYieldWhitespace :: [Whitespace]
+  , _unsafeFromWhitespace :: [Whitespace]
+  , _unsafeYieldFromValue :: Expr v a
+  }
+  | Ternary
   { _exprAnnotation :: a
   -- expr
   , _unsafeTernaryValue :: Expr v a
@@ -357,6 +368,9 @@ instance HasTrailingWhitespace (Expr v a) where
   trailingWhitespace =
     lens
       (\case
+          Yield _ ws Nothing -> ws
+          Yield _ _ (Just e) -> e ^. trailingWhitespace
+          YieldFrom _ _ _ e -> e ^. trailingWhitespace
           Ternary _ _ _ _ _ e -> e ^. trailingWhitespace
           None _ ws -> ws
           List _ _ _ ws -> ws
@@ -379,6 +393,9 @@ instance HasTrailingWhitespace (Expr v a) where
           Generator  _ a -> a ^. trailingWhitespace)
       (\e ws ->
         case e of
+          Yield a _ Nothing -> Yield a ws Nothing
+          Yield a b (Just c) -> Yield a b (Just $ c & trailingWhitespace .~ ws)
+          YieldFrom a b c d -> YieldFrom a b c (d & trailingWhitespace .~ ws)
           Ternary a b c d e f -> Ternary a b c d e (f & trailingWhitespace .~ ws)
           None a _ -> None a ws
           List a b c _ -> List a b (coerce c) ws

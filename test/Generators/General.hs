@@ -188,6 +188,8 @@ genExpr' isExp =
         genExpr
         genExpr
         genExpr
+    , Yield () <$> genWhitespaces <*> sizedMaybe genExpr
+    , YieldFrom () <$> genWhitespaces <*> genWhitespaces <*> genExpr
     ]
 
 genSmallStatement :: MonadGen m => m (SmallStatement '[] ())

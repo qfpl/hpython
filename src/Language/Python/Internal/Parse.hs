@@ -388,6 +388,13 @@ orTest ws = binOp orOp andTest
       (\(tk, ws) -> NotEquals (pyTokenAnn tk) ws) <$> token ws (TkBangEq ())
     comparison = binOp compOp $ orExpr ws
 
+yieldExpr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+yieldExpr ws =
+  (\(tk, s) -> either (uncurry $ YieldFrom (pyTokenAnn tk) s) (Yield (pyTokenAnn tk) s)) <$>
+  token ws (TkYield ()) <*>
+  (fmap Left ((,) <$> (snd <$> token ws (TkFrom ())) <*> expr ws) <!>
+   (Right <$> optional (exprList ws)))
+
 expr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 expr ws =
   (\a -> maybe a (\(b, c, d, e) -> Ternary (a ^. exprAnnotation) a b c d e)) <$>
@@ -469,7 +476,7 @@ orExpr ws = xorExpr
 
     parens = do
       (tk, s) <- token ws $ TkLeftParen ()
-      ex <- exprListComp anySpace
+      ex <- yieldExpr ws <!> exprListComp anySpace
       Parens (pyTokenAnn tk) s ex <$> 
         (snd <$> token ws (TkRightParen ()))
 
@@ -538,8 +545,11 @@ smallStatement =
   delSt <!>
   importSt <!>
   raiseSt <!>
-  exprOrAssignSt
+  exprOrAssignSt <!>
+  yieldSt
   where
+    yieldSt = (\a -> Expr (a ^. exprAnnotation) a) <$> yieldExpr space
+
     returnSt =
       (\(tkReturn, retSpaces) -> Return (pyTokenAnn tkReturn) retSpaces) <$>
       token space (TkReturn ()) <*>

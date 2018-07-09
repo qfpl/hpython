@@ -144,6 +144,7 @@ parseToken =
     , TkClass <$ string "class"
     , TkFor <$ string "for"
     , TkIn <$ string "in"
+    , TkYield <$ string "yield"
     ] <>
     [ (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
         fmap read (some digit) <*>

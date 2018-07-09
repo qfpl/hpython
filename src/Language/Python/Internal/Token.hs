@@ -38,6 +38,7 @@ data PyToken a
   | TkClass a
   | TkFor a
   | TkIn a
+  | TkYield a
   | TkInt Integer a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
@@ -118,6 +119,7 @@ pyTokenAnn tk =
     TkClass a -> a
     TkFor a -> a
     TkIn a -> a
+    TkYield a -> a
     TkPlus a -> a
     TkMinus a -> a
     TkIf a -> a

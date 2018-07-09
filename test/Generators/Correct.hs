@@ -132,7 +132,7 @@ genBlock = doIndent *> go <* doDedent
       sizedBind (sizedList genLine) $ \sts ->
       Block . foldr NonEmpty.cons (st :| sts) <$> sizedList genLine
 
-genPositionalArg :: MonadGen m => m (Arg '[] ())
+genPositionalArg :: (MonadGen m, MonadState GenState m) => m (Arg '[] ())
 genPositionalArg =
   sizedRecursive
     [ PositionalArg () <$> genExpr
@@ -140,7 +140,7 @@ genPositionalArg =
     ]
     []
 
-genKeywordArg :: MonadGen m => m (Arg '[] ())
+genKeywordArg :: (MonadGen m, MonadState GenState m) => m (Arg '[] ())
 genKeywordArg =
   sizedRecursive
     [ KeywordArg () <$> genIdent <*> genWhitespaces <*> genExpr
@@ -148,7 +148,7 @@ genKeywordArg =
     ]
     []
 
-genArgs :: MonadGen m => m (CommaSep1' (Arg '[] ()))
+genArgs :: (MonadGen m, MonadState GenState m) => m (CommaSep1' (Arg '[] ()))
 genArgs =
   sized4
     (\a b c d -> (a, b <> c, d) ^. _CommaSep1')
@@ -167,7 +167,7 @@ genPositionalParams =
       i <- Gen.filter ((`notElem` seen) . _identValue) genIdent
       (i :) <$> go (_identValue i : seen) (n-1)
 
-genKeywordParam :: MonadGen m => [String] -> m (Param '[] ())
+genKeywordParam :: (MonadGen m, MonadState GenState m) => [String] -> m (Param '[] ())
 genKeywordParam positionals =
   Gen.scale (max 0 . subtract 1) $
   KeywordParam () <$>
@@ -189,7 +189,7 @@ genDoubleStarParam positionals =
   genWhitespaces <*>
   Gen.filter (\i -> _identValue i `notElem` positionals) genIdent
 
-genParams :: MonadGen m => m (CommaSep (Param '[] ()))
+genParams :: (MonadGen m, MonadState GenState m) => m (CommaSep (Param '[] ()))
 genParams =
   sizedBind genPositionalParams $ \pparams ->
   let pparamNames = pparams ^.. folded.paramName.identValue in
@@ -218,14 +218,14 @@ genList genExpr' =
 genParens :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
 genParens genExpr' = Parens () <$> genWhitespaces <*> genExpr' <*> genWhitespaces
 
-genDeref :: MonadGen m => m (Expr '[] ())
+genDeref :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genDeref =
   Deref () <$>
   genExpr <*>
   genWhitespaces <*>
   genIdent
 
-genCompFor :: MonadGen m => m (CompFor '[] ())
+genCompFor :: (MonadGen m, MonadState GenState m) => m (CompFor '[] ())
 genCompFor =
   sized2M
     (\a b ->
@@ -235,7 +235,7 @@ genCompFor =
     genAssignable
     (Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
 
-genCompIf :: MonadGen m => m (CompIf '[] ())
+genCompIf :: (MonadGen m, MonadState GenState m) => m (CompIf '[] ())
 genCompIf =
   CompIf () <$>
   genWhitespaces <*>
@@ -243,7 +243,7 @@ genCompIf =
     [ Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr ]
     []
 
-genComprehension :: MonadGen m => m (Comprehension '[] ())
+genComprehension :: (MonadGen m, MonadState GenState m) => m (Comprehension '[] ())
 genComprehension =
   sized3
     (Comprehension ())
@@ -251,7 +251,7 @@ genComprehension =
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
-genSubscriptItem :: MonadGen m => m (Subscript '[] ())
+genSubscriptItem :: (MonadGen m, MonadState GenState m) => m (Subscript '[] ())
 genSubscriptItem =
   sizedRecursive
     [ SubscriptExpr <$> genExpr
@@ -265,7 +265,7 @@ genSubscriptItem =
 
 -- | This is necessary to prevent generating exponentials that will take forever to evaluate
 -- when python does constant folding
-genExpr :: MonadGen m => m (Expr '[] ())
+genExpr :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genExpr = genExpr' False
 
 genStringLiterals :: MonadGen m => m (Expr '[] ())
@@ -281,56 +281,64 @@ genStringLiterals = do
       (if b then genStringLiteral else genBytesLiteral) <*>
       go b (n-1)
 
-genExpr' :: MonadGen m => Bool -> m (Expr '[] ())
-genExpr' isExp =
+genExpr' :: (MonadGen m, MonadState GenState m) => Bool -> m (Expr '[] ())
+genExpr' isExp = do
+  isInFunction <- isJust <$> gets _inFunction
   sizedRecursive
     [ genBool
     , if isExp then genSmallInt else genInt
     , Ident () <$> genIdent
     , genStringLiterals
     ]
-    [ genList genExpr
-    , genStringLiterals
-    , ListComp () <$> genWhitespaces <*> genComprehension <*> genWhitespaces
-    , Generator () <$> genComprehension
-    , Dict () <$>
-      genAnyWhitespaces <*>
-      sizedMaybe (genSizedCommaSep1' $ genDictItem genExpr) <*>
-      genWhitespaces
-    , Set () <$> genAnyWhitespaces <*> genSizedCommaSep1' genExpr <*> genWhitespaces
-    , genDeref
-    , genParens (genExpr' isExp)
-    , sized2M
-        (\a b -> (\ws1 -> Call () a ws1 b) <$> genWhitespaces <*> genWhitespaces)
-        genExpr
-        (sizedMaybe genArgs)
-    , genSubscript
-    , sizedBind genExpr $ \e1 ->
-      sizedBind genOp $ \op ->
-      sizedBind (genExpr' $ case op of; Exp{} -> True; _ -> False) $ \e2 ->
-        pure $
-        BinOp () (e1 & trailingWhitespace .~ [Space]) (op & trailingWhitespace .~ [Space]) e2
-    , genTuple genExpr
-    , Not () <$> (NonEmpty.toList <$> genWhitespaces1) <*> genExpr
-    , Negate () <$> genWhitespaces <*> genExpr
-    , sized3M
-        (\a b c ->
-           (\ws1 ws2 -> Ternary () a ws1 b ws2 c) <$>
-           genWhitespaces <*>
-           genWhitespaces)
-        genExpr
-        genExpr
-        genExpr
-    ]
+    ([ genList genExpr
+     , genStringLiterals
+     , ListComp () <$> genWhitespaces <*> genComprehension <*> genWhitespaces
+     , Generator () <$> genComprehension
+     , Dict () <$>
+       genAnyWhitespaces <*>
+       sizedMaybe (genSizedCommaSep1' $ genDictItem genExpr) <*>
+       genWhitespaces
+     , Set () <$> genAnyWhitespaces <*> genSizedCommaSep1' genExpr <*> genWhitespaces
+     , genDeref
+     , genParens (genExpr' isExp)
+     , sized2M
+         (\a b -> (\ws1 -> Call () a ws1 b) <$> genWhitespaces <*> genWhitespaces)
+         genExpr
+         (sizedMaybe genArgs)
+     , genSubscript
+     , sizedBind genExpr $ \e1 ->
+       sizedBind genOp $ \op ->
+       sizedBind (genExpr' $ case op of; Exp{} -> True; _ -> False) $ \e2 ->
+         pure $
+         BinOp () (e1 & trailingWhitespace .~ [Space]) (op & trailingWhitespace .~ [Space]) e2
+     , genTuple genExpr
+     , Not () <$> (NonEmpty.toList <$> genWhitespaces1) <*> genExpr
+     , Negate () <$> genWhitespaces <*> genExpr
+     , sized3M
+         (\a b c ->
+            (\ws1 ws2 -> Ternary () a ws1 b ws2 c) <$>
+            genWhitespaces <*>
+            genWhitespaces)
+         genExpr
+         genExpr
+         genExpr
+     ] ++
+     [ Yield () <$> (NonEmpty.toList <$> genWhitespaces1) <*> sizedMaybe genExpr | isInFunction ] ++
+     [ YieldFrom () <$>
+       (NonEmpty.toList <$> genWhitespaces1) <*>
+       (NonEmpty.toList <$> genWhitespaces1) <*>
+       genExpr
+     | isInFunction
+     ])
 
-genSubscript :: MonadGen m => m (Expr '[] ())
+genSubscript :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genSubscript =
   sized2M
     (\a b -> (\ws1 -> Subscript () a ws1 b) <$> genWhitespaces <*> genWhitespaces)
     genExpr
     (genSizedCommaSep1' genSubscriptItem)
 
-genAssignable :: MonadGen m => m (Expr '[] ())
+genAssignable :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genAssignable =
   sizedRecursive
     [ Ident () <$> genIdent
@@ -342,7 +350,7 @@ genAssignable =
     , genSubscript
     ]
 
-genAugAssignable :: MonadGen m => m (Expr '[] ())
+genAugAssignable :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genAugAssignable =
   sizedRecursive
     [ Ident () <$> genIdent ]

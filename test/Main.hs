@@ -133,7 +133,7 @@ syntax_module path =
 correct_syntax_expr :: FilePath -> Property
 correct_syntax_expr path =
   property $ do
-    ex <- forAll Correct.genExpr
+    ex <- forAll $ evalStateT Correct.genExpr Correct.initialGenState
     case validateExprIndentation' ex of
       Failure errs -> annotateShow errs *> failure
       Success res ->
@@ -156,7 +156,7 @@ correct_syntax_statement path =
 expr_printparseprint_print :: Property
 expr_printparseprint_print =
   property $ do
-    ex <- forAll Correct.genExpr
+    ex <- forAll $ evalStateT Correct.genExpr Correct.initialGenState
     annotate (showExpr ex)
     case validateExprIndentation' ex of
       Failure errs -> annotateShow errs *> failure

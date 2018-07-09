@@ -26,6 +26,7 @@ data SyntaxError (v :: [*]) a
   | ParametersNonlocal a [String]
   | NoBindingNonlocal (Ident v a)
   | Can'tJoinStringAndBytes a
+  | YieldOutsideFunction a
   deriving (Eq, Show)
 
 makeClassyPrisms ''SyntaxError

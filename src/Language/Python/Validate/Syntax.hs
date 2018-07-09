@@ -225,6 +225,23 @@ validateExprSyntax
      )
   => Expr v a
   -> ValidateSyntax e (Expr (Nub (Syntax ': v)) a)
+validateExprSyntax (Yield a b c) =
+  Yield a <$>
+  validateWhitespace a b <*
+  (syntaxContext `bindValidateSyntax` \ctxt ->
+      case _inFunction ctxt of
+        Nothing -> syntaxErrors [_YieldOutsideFunction # a]
+        Just{} -> pure ()) <*>
+  traverse validateExprSyntax c
+validateExprSyntax (YieldFrom a b c d) =
+  YieldFrom a <$>
+  validateWhitespace a b <*>
+  validateWhitespace a c <*
+  (syntaxContext `bindValidateSyntax` \ctxt ->
+      case _inFunction ctxt of
+        Nothing -> syntaxErrors [_YieldOutsideFunction # a]
+        Just{} -> pure ()) <*>
+  validateExprSyntax d
 validateExprSyntax (Ternary a b c d e f) =
   (\b' d' f' -> Ternary a b' c d' e f') <$>
   validateExprSyntax b <*>

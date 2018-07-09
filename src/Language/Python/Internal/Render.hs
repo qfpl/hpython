@@ -55,6 +55,8 @@ showRenderOutput =
           | isIdentifierChar (last $ showToken a)
           , isIdentifierChar (head $ showToken b)
           -> a : TkSpace () : b : rest
+        a@(TkString _ qt _ _ _) : b@(TkString _ qt' _ _ _) : rest
+          | qt == qt' -> a : TkSpace () : b : rest
         a -> a
 
     correctNewlines =
@@ -126,6 +128,7 @@ showToken t =
     TkClass{} -> "class"
     TkFor{} -> "for"
     TkIn{} -> "in"
+    TkYield{} -> "yield"
     TkInt i _ -> show i
     TkFloat i i' _ -> show i <> foldMap (("." <>) . show) i'
     TkIdent s _ -> s
@@ -314,6 +317,10 @@ renderIdent (MkIdent _ a b) = TkIdent a () `cons` foldMap renderWhitespace b
 renderComment :: Comment -> PyToken ()
 renderComment (Comment s) = TkComment s ()
 
+bracketTernary :: (Expr v a -> RenderOutput) -> Expr v a -> RenderOutput
+bracketTernary _ e@Ternary{} = bracket $ renderExpr e
+bracketTernary f e = f e
+
 renderCompFor :: CompFor v a -> RenderOutput
 renderCompFor (CompFor _ ws1 ex1 ws2 ex2) =
   TkFor () `cons`
@@ -321,17 +328,13 @@ renderCompFor (CompFor _ ws1 ex1 ws2 ex2) =
   bracketGenerator ex1 <>
   singleton (TkIn ()) <>
   foldMap renderWhitespace ws2 <>
-  case ex2 of
-    Ternary{} -> bracket $ renderExpr ex2
-    _ -> bracketTupleGenerator ex2
+  bracketTernary bracketTupleGenerator ex2
 
 renderCompIf :: CompIf v a -> RenderOutput
 renderCompIf (CompIf _ ws ex) =
   TkIf () `cons`
   foldMap renderWhitespace ws <>
-  case ex of
-    Ternary{} -> bracket $ renderExpr ex
-    _ -> bracketTupleGenerator ex
+  bracketTernary bracketTupleGenerator ex
 
 renderComprehension :: Comprehension v a -> RenderOutput
 renderComprehension (Comprehension _ expr cf cs) =
@@ -367,15 +370,28 @@ renderSubscript (SubscriptSlice a b c d) =
       (foldMap bracketTupleGenerator))
     d
 
+renderYield :: (Expr v a -> RenderOutput) -> Expr v a -> RenderOutput
+renderYield re (Yield _ a b) =
+  singleton (TkYield ()) <>
+  foldMap renderWhitespace a <>
+  foldMap re b
+renderYield re (YieldFrom _ a b c) =
+  singleton (TkYield ()) <>
+  foldMap renderWhitespace a <>
+  singleton (TkFrom ()) <>
+  foldMap renderWhitespace b <>
+  re c
+renderYield re e = re e
+
 renderExpr :: Expr v a -> RenderOutput
+renderExpr e@Yield{} = bracket $ renderYield renderExpr e
+renderExpr e@YieldFrom{} = bracket $ renderYield renderExpr e
 renderExpr (Ternary _ a b c d e) =
   (case a of
      Generator{} -> bracket $ renderExpr a
      _ -> bracketTupleGenerator a) <>
   singleton (TkIf ()) <> foldMap renderWhitespace b <>
-  (case c of
-     Ternary{} -> bracket $ renderExpr c
-     _ -> bracketTupleGenerator c) <>
+  bracketTernary bracketTupleGenerator c <>
   singleton (TkElse ()) <> foldMap renderWhitespace d <>
   bracketTupleGenerator e
 renderExpr (Subscript _ a b c d) =
@@ -398,7 +414,7 @@ renderExpr (Not _ ws e) =
     Ternary{} -> bracket $ renderExpr e
     _ -> bracketTupleGenerator e
 renderExpr (Parens _ ws1 e ws2) =
-  bracket (foldMap renderWhitespace ws1 <> renderExpr e) <>
+  bracket (foldMap renderWhitespace ws1 <> renderYield renderExpr e) <>
   foldMap renderWhitespace ws2
 renderExpr (Bool _ b ws) =
   (if b then TkTrue () else TkFalse ()) `cons`
@@ -452,9 +468,9 @@ renderExpr (Deref _ expr ws name) =
   renderIdent name
 renderExpr (None _ ws) = TkNone () `cons` foldMap renderWhitespace ws
 renderExpr (BinOp _ e1 op e2) =
-  (if shouldBracketLeft op e1 then bracket else id) (bracketGenerator e1) <>
+  (if shouldBracketLeft op e1 then bracket else id) (bracketTernary bracketGenerator e1) <>
   renderBinOp op <>
-  (if shouldBracketRight op e2 then bracket else id) (bracketGenerator e2)
+  (if shouldBracketRight op e2 then bracket else id) (bracketTernary bracketGenerator e2)
 renderExpr (Tuple _ a ws c) =
   bracketTupleGenerator a <> singleton (TkComma ()) <> foldMap renderWhitespace ws <>
   foldMap
@@ -534,10 +550,10 @@ renderSmallStatement (Raise _ ws x) =
     x
 renderSmallStatement (Return _ ws expr) =
   TkReturn () `cons` foldMap renderWhitespace ws <> bracketGenerator expr
-renderSmallStatement (Expr _ expr) = bracketGenerator expr
+renderSmallStatement (Expr _ expr) = renderYield bracketGenerator expr
 renderSmallStatement (Assign _ lvalue ws2 rvalue) =
   renderExpr lvalue <> singleton (TkEq ()) <>
-  foldMap renderWhitespace ws2 <> bracketGenerator rvalue
+  foldMap renderWhitespace ws2 <> renderYield bracketGenerator rvalue
 renderSmallStatement (AugAssign _ lvalue as rvalue) =
   renderExpr lvalue <> renderAugAssign as <> bracketGenerator rvalue
 renderSmallStatement (Pass _) = singleton $ TkPass ()

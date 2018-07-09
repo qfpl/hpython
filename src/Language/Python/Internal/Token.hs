@@ -13,6 +13,7 @@ data PyToken a
   | TkElse a
   | TkElif a
   | TkWhile a
+  | TkAssert a
   | TkDef a
   | TkReturn a
   | TkPass a
@@ -126,6 +127,7 @@ pyTokenAnn tk =
     TkElse a -> a
     TkElif a -> a
     TkWhile a -> a
+    TkAssert a -> a
     TkInt _ a -> a
     TkFloat _ _ a -> a
     TkIdent _ a -> a

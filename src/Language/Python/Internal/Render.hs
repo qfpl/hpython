@@ -103,6 +103,7 @@ showToken t =
     TkElse{} -> "else"
     TkElif{} -> "elif"
     TkWhile{} -> "while"
+    TkAssert{} -> "assert"
     TkDef{} -> "def"
     TkReturn{} -> "return"
     TkPass{} -> "pass"
@@ -537,6 +538,13 @@ renderAugAssign aa =
     DoubleSlashEq{} -> singleton $ TkDoubleSlashEq ()
 
 renderSmallStatement :: SmallStatement v a -> RenderOutput
+renderSmallStatement (Assert a b c d) =
+  TkAssert () `cons`
+  foldMap renderWhitespace b <>
+  bracketTupleGenerator c <>
+  foldMap
+    (\(a, b) -> TkComma () `cons` foldMap renderWhitespace a <> bracketTupleGenerator b)
+    d
 renderSmallStatement (Raise _ ws x) =
   TkRaise () `cons` foldMap renderWhitespace ws <>
   foldMap

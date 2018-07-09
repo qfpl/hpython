@@ -396,6 +396,10 @@ genSmallStatement = do
          ((,) <$>
            set (mapped.trailingWhitespace) [Space] genExpr <*>
            Gen.maybe ((,) <$> fmap NonEmpty.toList genWhitespaces1 <*> genExpr))
+    , sized2M
+        (\a b -> (\ws -> Assert () ws a b) <$> genWhitespaces)
+        genExpr
+        (sizedMaybe ((,) <$> genWhitespaces <*> genExpr))
      ] ++
      [ do
          nonlocals <- use currentNonlocals

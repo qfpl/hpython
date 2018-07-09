@@ -228,6 +228,10 @@ genSmallStatement =
     , Raise () <$>
       genWhitespaces <*>
       sizedMaybe ((,) <$> genExpr <*> Gen.maybe ((,) <$> genWhitespaces <*> genExpr))
+    , sized2M
+        (\a b -> (\ws -> Assert () ws a b) <$> genWhitespaces)
+        genExpr
+        (sizedMaybe ((,) <$> genWhitespaces <*> genExpr))
     ]
 
 genCompoundStatement

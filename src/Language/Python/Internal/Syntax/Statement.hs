@@ -294,11 +294,16 @@ data SmallStatement (v :: [*]) a
   | Raise a
       [Whitespace]
       (Maybe (Expr v a, Maybe ([Whitespace], Expr v a)))
+  | Assert a
+      [Whitespace]
+      (Expr v a)
+      (Maybe ([Whitespace], Expr v a))
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 instance Plated (SmallStatement '[] a) where; plate = gplate
 
 instance HasExprs SmallStatement where
+  _Exprs f (Assert a b c d) = Assert a b <$> f c <*> traverseOf (traverse._2) f d
   _Exprs f (Raise a ws x) =
     Raise a ws <$>
     traverse

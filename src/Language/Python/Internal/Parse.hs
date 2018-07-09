@@ -546,8 +546,15 @@ smallStatement =
   importSt <!>
   raiseSt <!>
   exprOrAssignSt <!>
-  yieldSt
+  yieldSt <!>
+  assertSt
   where
+    assertSt =
+      (\(tk, s) -> Assert (pyTokenAnn tk) s) <$>
+      token space (TkAssert ()) <*>
+      expr space <*>
+      optional ((,) <$> (snd <$> comma space) <*> expr space)
+
     yieldSt = (\a -> Expr (a ^. exprAnnotation) a) <$> yieldExpr space
 
     returnSt =

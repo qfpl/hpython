@@ -494,6 +494,11 @@ validateSmallStatementSyntax
      )
   => SmallStatement v a
   -> ValidateSyntax e (SmallStatement (Nub (Syntax ': v)) a)
+validateSmallStatementSyntax (Assert a b c d) =
+  Assert a <$>
+  validateWhitespace a b <*>
+  validateExprSyntax c <*>
+  traverseOf (traverse._2) validateExprSyntax d
 validateSmallStatementSyntax (Raise a ws f) =
   Raise a <$>
   validateWhitespace a ws <*>

@@ -121,6 +121,7 @@ parseToken =
     , TkElse <$ string "else"
     , TkElif <$ string "elif"
     , TkWhile <$ string "while"
+    , TkAssert <$ string "assert"
     , TkDef <$ string "def"
     , TkReturn <$ string "return"
     , TkPass <$ string "pass"

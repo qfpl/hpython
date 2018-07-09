@@ -47,7 +47,7 @@ call_ expr args =
     []
 
 return_ :: Expr '[] () -> Statement '[] ()
-return_ e = SmallStatements (Indents [] ()) (Return () [Space] e) [] Nothing (Just LF)
+return_ e = SmallStatements (Indents [] ()) (Return () [Space] $ Just e) [] Nothing (Just LF)
 
 expr_ :: Expr '[] () -> Statement '[] ()
 expr_ e = SmallStatements (Indents [] ()) (Expr () e) [] Nothing (Just LF)

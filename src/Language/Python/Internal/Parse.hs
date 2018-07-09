@@ -553,7 +553,7 @@ smallStatement =
     returnSt =
       (\(tkReturn, retSpaces) -> Return (pyTokenAnn tkReturn) retSpaces) <$>
       token space (TkReturn ()) <*>
-      exprList space
+      optional (exprList space)
 
     passSt = Pass . pyTokenAnn <$> tokenEq (TkPass ())
     breakSt = Break . pyTokenAnn <$> tokenEq (TkBreak ())

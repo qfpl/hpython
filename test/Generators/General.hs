@@ -216,7 +216,7 @@ genSmallStatement =
       genSizedCommaSep1 genIdent
     , Return () <$>
       genWhitespaces <*>
-      genExpr
+      sizedMaybe genExpr
     , Import () <$>
       genWhitespaces1 <*>
       genSizedCommaSep1 (genImportAs genModuleName genIdent)

@@ -262,7 +262,7 @@ validateSmallStatementScope (Raise a ws f) =
        validateExprScope b <*>
        traverseOf (traverse._2) validateExprScope c)
     f
-validateSmallStatementScope (Return a ws e) = Return a ws <$> validateExprScope e
+validateSmallStatementScope (Return a ws e) = Return a ws <$> traverse validateExprScope e
 validateSmallStatementScope (Expr a e) = Expr a <$> validateExprScope e
 validateSmallStatementScope (Assign a l ws2 r) =
   let

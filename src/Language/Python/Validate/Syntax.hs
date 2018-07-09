@@ -514,7 +514,7 @@ validateSmallStatementSyntax (Return a ws expr) =
       Just{} ->
         Return a <$>
         validateWhitespace a ws <*>
-        validateExprSyntax expr
+        traverse validateExprSyntax expr
       _ -> syntaxErrors [_ReturnOutsideFunction # a]
 validateSmallStatementSyntax (Expr a expr) =
   Expr a <$>

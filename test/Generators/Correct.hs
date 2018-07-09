@@ -406,7 +406,7 @@ genSmallStatement = do
      ] ++
      [ Return () <$>
        fmap NonEmpty.toList genWhitespaces1 <*>
-       genExpr
+       sizedMaybe genExpr
      | isJust (_inFunction ctxt)
      ])
 

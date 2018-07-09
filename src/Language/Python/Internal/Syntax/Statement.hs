@@ -271,7 +271,7 @@ instance HasTrailingWhitespace (AugAssign a) where
     lens _augAssignWhitespace (\a b -> a { _augAssignWhitespace = b })
 
 data SmallStatement (v :: [*]) a
-  = Return a [Whitespace] (Expr v a)
+  = Return a [Whitespace] (Maybe (Expr v a))
   | Expr a (Expr v a)
   | Assign a (Expr v a) [Whitespace] (Expr v a)
   | AugAssign a (Expr v a) (AugAssign a) (Expr v a)
@@ -304,7 +304,7 @@ instance HasExprs SmallStatement where
     traverse
       (\(b, c) -> (,) <$> f b <*> traverseOf (traverse._2) f c)
       x
-  _Exprs f (Return a ws e) = Return a ws <$> f e
+  _Exprs f (Return a ws e) = Return a ws <$> traverse f e
   _Exprs f (Expr a e) = Expr a <$> f e
   _Exprs f (Assign a e1 ws2 e2) = Assign a <$> f e1 <*> pure ws2 <*> f e2
   _Exprs f (AugAssign a e1 as e2) = AugAssign a <$> f e1 <*> pure as <*> f e2

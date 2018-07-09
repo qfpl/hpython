@@ -549,7 +549,7 @@ renderSmallStatement (Raise _ ws x) =
          c)
     x
 renderSmallStatement (Return _ ws expr) =
-  TkReturn () `cons` foldMap renderWhitespace ws <> bracketGenerator expr
+  TkReturn () `cons` foldMap renderWhitespace ws <> foldMap bracketGenerator expr
 renderSmallStatement (Expr _ expr) = renderYield bracketGenerator expr
 renderSmallStatement (Assign _ lvalue ws2 rvalue) =
   renderExpr lvalue <> singleton (TkEq ()) <>

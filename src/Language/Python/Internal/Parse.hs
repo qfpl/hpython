@@ -242,6 +242,9 @@ bool ws =
        s) <$>
   (token ws (TkTrue ()) <!> token ws (TkFalse ()))
 
+none :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+none ws = (\(tk, s) -> None (pyTokenAnn tk) s) <$> token ws (TkNone ())
+
 integer :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 integer ws = do
   curTk <- currentToken
@@ -530,6 +533,7 @@ orExpr ws = xorExpr
       dictOrSet <!>
       list <!>
       bool ws <!>
+      none ws <!>
       integer ws <!>
       stringOrBytes ws <!>
       (\a -> Ident (_identAnnotation a) a) <$> identifier ws <!>

@@ -129,6 +129,7 @@ parseToken =
     , TkContinue <$ string "continue"
     , TkTrue <$ string "True"
     , TkFalse <$ string "False"
+    , TkNone <$ string "None"
     , TkOr <$ string "or"
     , TkAnd <$ string "and"
     , TkIs <$ string "is"

@@ -15,7 +15,8 @@ import Control.Lens.Fold ((^..), (^?), folded, toListOf)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Prism (_Right)
 import Control.Lens.Review ((#))
-import Control.Lens.TH (makeWrapped)
+import Control.Lens.Setter ((.~))
+import Control.Lens.TH (makeLenses, makeWrapped)
 import Control.Lens.Tuple (_2, _3)
 import Control.Lens.Traversal (traverseOf)
 import Control.Lens.Wrapped (_Wrapped)
@@ -55,6 +56,7 @@ data SyntaxContext
   , _inFunction :: Maybe [String]
   , _inParens :: Bool
   }
+makeLenses ''SyntaxContext
 
 newtype ValidateSyntax e a
   = ValidateSyntax
@@ -257,7 +259,7 @@ validateExprSyntax (Not a ws e) =
   validateExprSyntax e
 validateExprSyntax (Parens a ws1 e ws2) =
   Parens a ws1 <$>
-  localSyntaxContext (\c -> c { _inParens = True }) (validateExprSyntax e) <*>
+  localSyntaxContext (inParens .~ True) (validateExprSyntax e) <*>
   validateWhitespace a ws2
 validateExprSyntax (Bool a b ws) = pure $ Bool a b ws
 validateExprSyntax (Negate a ws expr) = Negate a ws <$> validateExprSyntax expr
@@ -274,13 +276,13 @@ validateExprSyntax (Ident a name) = Ident a <$> validateIdent name
 validateExprSyntax (List a ws1 exprs ws2) =
   List a ws1 <$>
   localSyntaxContext
-    (\c -> c { _inParens = True })
+    (inParens .~ True)
     (traverseOf (traverse.traverse) validateExprSyntax exprs) <*>
   validateWhitespace a ws2
 validateExprSyntax (ListComp a ws1 comp ws2) =
   ListComp a ws1 <$>
   localSyntaxContext
-    (\c -> c { _inParens = True })
+    (inParens .~ True)
     (validateComprehensionSyntax comp) <*>
   validateWhitespace a ws2
 validateExprSyntax (Generator a comp) = Generator a <$> validateComprehensionSyntax comp
@@ -292,8 +294,8 @@ validateExprSyntax (Deref a expr ws1 name) =
 validateExprSyntax (Call a expr ws args ws2) =
   Call a <$>
   validateExprSyntax expr <*>
-  validateWhitespace a ws <*>
-  localSyntaxContext (\c -> c { _inParens = True }) (traverse validateArgsSyntax args) <*>
+  localSyntaxContext (inParens .~ True) (validateWhitespace a ws) <*>
+  localSyntaxContext (inParens .~ True) (traverse validateArgsSyntax args) <*>
   validateWhitespace a ws2
 validateExprSyntax (None a ws) = pure $ None a ws
 validateExprSyntax (BinOp a e1 op e2) =
@@ -309,13 +311,13 @@ validateExprSyntax (Tuple a b ws d) =
 validateExprSyntax (Dict a b c d) =
   Dict a b <$>
   localSyntaxContext
-    (\c -> c { _inParens = True})
+    (inParens .~ True)
     (traverseOf (traverse.traverse) validateDictItemSyntax c) <*>
   validateWhitespace a d
 validateExprSyntax (Set a b c d) =
   Set a b <$>
   localSyntaxContext
-    (\c -> c { _inParens = True})
+    (inParens .~ True)
     (traverse validateExprSyntax c) <*>
   validateWhitespace a d
 
@@ -437,7 +439,7 @@ validateCompoundStatementSyntax (ClassDef idnts a b c d g) =
        (,,) <$>
        validateWhitespace a x <*>
        traverse
-         (localSyntaxContext (\ctxt -> ctxt { _inParens = True}) . validateArgsSyntax)
+         (localSyntaxContext (inParens .~ True) . validateArgsSyntax)
          y <*>
        validateWhitespace a z)
     d <*>
@@ -482,7 +484,7 @@ validateImportTargets (ImportSome a cs) =
   ImportSome a <$> traverse (validateImportAs validateIdent) cs
 validateImportTargets (ImportSomeParens a ws1 cs ws2) =
   localSyntaxContext
-    (\c -> c { _inParens = True })
+    (inParens .~ True)
     (ImportSomeParens a <$>
      validateWhitespace a ws1 <*>
      traverse (validateImportAs validateIdent) cs) <*>

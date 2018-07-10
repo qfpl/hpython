@@ -32,9 +32,7 @@ def_ name params block =
     []
     (listToCommaSep params)
     []
-    []
-    LF
-    (toBlock block)
+    (Suite () [] Nothing LF $ toBlock block)
 
 call_ :: Expr '[] () -> [Arg '[] ()] -> Expr '[] ()
 call_ expr args =
@@ -133,8 +131,7 @@ while_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 while_ e sts =
   CompoundStatement $
   While (Indents [] ()) () [Space] e
-    [] LF
-    (toBlock sts)
+    (Suite () [] Nothing LF $ toBlock sts)
 
 ifElifsElse_
   :: Expr '[] ()
@@ -144,16 +141,16 @@ ifElifsElse_
   -> Statement '[] ()
 ifElifsElse_ e sts elifs sts' =
   CompoundStatement $
-  If (Indents [] ()) () [Space] e [] LF
-    (toBlock sts)
-    ((\(a, b) -> (Indents [] (), [Space], a, [], LF, toBlock b)) <$> elifs)
-    (Just (Indents [] (), [], [], LF, toBlock sts'))
+  If (Indents [] ()) () [Space] e
+    (Suite () [] Nothing LF $ toBlock sts)
+    ((\(a, b) -> (Indents [] (), [Space], a, Suite () [] Nothing LF $ toBlock b)) <$> elifs)
+    (Just (Indents [] (), [], Suite () [] Nothing LF $ toBlock sts'))
 
 if_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 if_ e sts =
   CompoundStatement $
-  If (Indents [] ()) () [Space] e [] LF
-    (toBlock sts)
+  If (Indents [] ()) () [Space] e
+    (Suite () [] Nothing LF $ toBlock sts)
     []
     Nothing
 
@@ -208,13 +205,13 @@ forElse_
   -> Statement '[] ()
 forElse_ val vals block els =
   CompoundStatement $
-  For (Indents [] ()) () [Space] (val & trailingWhitespace .~ [Space]) [Space] vals [] LF
-    (toBlock block)
-    (Just (Indents [] (), [], [], LF, toBlock els))
+  For (Indents [] ()) () [Space] (val & trailingWhitespace .~ [Space]) [Space] vals
+    (Suite () [] Nothing LF $ toBlock block)
+    (Just (Indents [] (), [], Suite () [] Nothing LF $ toBlock els))
 
 for_ :: Expr '[] () -> Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 for_ val vals block =
   CompoundStatement $
-  For (Indents [] ()) () [Space] (val & trailingWhitespace .~ [Space]) [Space] vals [] LF
-    (toBlock block)
+  For (Indents [] ()) () [Space] (val & trailingWhitespace .~ [Space]) [Space] vals
+    (Suite () [] Nothing LF $ toBlock block)
     Nothing

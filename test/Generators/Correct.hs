@@ -433,41 +433,36 @@ genCompoundStatement =
                     Just paramIdents
                 , _currentNonlocals = _willBeNonlocals ctxt <> _currentNonlocals ctxt
                 })
-            genBlock) $
+            (genSuite genBlock)) $
         \b ->
       Fundef <$>
         use currentIndentation <*> pure () <*>
         genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure a <*>
-        genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b
+        genWhitespaces <*> pure b
     , sized4M
         (\a b c d -> 
            If <$>
              use currentIndentation <*>
              pure () <*>
              fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
-             genWhitespaces <*> genNewline <*>
              pure b <*> pure c <*> pure d)
         genExpr
-        (localState genBlock)
+        (localState $ genSuite genBlock)
         (sizedList $
          sized2M
            (\a b ->
-            (,,,,,) <$>
+            (,,,) <$>
               use currentIndentation <*>
               genWhitespaces <*>
               pure a <*>
-              genWhitespaces <*>
-              genNewline <*>
               pure b)
             genExpr
-            (localState genBlock))
+            (localState $ genSuite genBlock))
         (sizedMaybe $
-         sizedBind (localState genBlock) $ \a ->
-          (,,,,) <$>
+         sizedBind (localState $ genSuite genBlock) $ \a ->
+          (,,) <$>
           use currentIndentation <*>
           genWhitespaces <*>
-          genWhitespaces <*>
-          genNewline <*>
           pure a)
     , sized2M
         (\a b ->
@@ -475,91 +470,83 @@ genCompoundStatement =
           use currentIndentation <*>
           pure () <*>
           fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
-          genWhitespaces <*> genNewline <*> pure b)
+          pure b)
         genExpr
-        (localState $ (inLoop .= True) *> genBlock)
+        (localState $ (inLoop .= True) *> genSuite genBlock)
     , sized4M
         (\a b e1 e2 ->
           TryExcept <$>
           use currentIndentation <*>
           pure () <*>
-          genWhitespaces <*> genWhitespaces <*> genNewline <*>
+          genWhitespaces <*>
           pure a <*>
           pure b <*>
           pure e1 <*>
           pure e2)
-        genBlock
+        (genSuite genBlock)
         (sizedNonEmpty $
          sized2M
            (\a b -> 
-            (,,,,,) <$>
+            (,,,) <$>
             use currentIndentation <*>
             (NonEmpty.toList <$> genWhitespaces1) <*>
             (ExceptAs ()
               (a & trailingWhitespace .~ [Space]) <$>
               Gen.maybe ((,) <$> (NonEmpty.toList <$> genWhitespaces1) <*> genIdent)) <*>
-            genWhitespaces <*>
-            genNewline <*>
             pure b)
            genExpr
-           genBlock)
+           (genSuite genBlock))
         (sizedMaybe $
-         sizedBind genBlock $ \a ->
-         (,,,,) <$>
+         sizedBind (genSuite genBlock) $ \a ->
+         (,,) <$>
          use currentIndentation <*>
          (NonEmpty.toList <$> genWhitespaces1) <*>
-         genWhitespaces <*>
-         genNewline <*>
          pure a)
         (sizedMaybe $
-         sizedBind genBlock $ \a ->
-         (,,,,) <$>
+         sizedBind (genSuite genBlock) $ \a ->
+         (,,) <$>
          use currentIndentation <*>
          (NonEmpty.toList <$> genWhitespaces1) <*>
-         genWhitespaces <*>
-         genNewline <*>
          pure a)
     , sized2M
         (\a b ->
            TryFinally <$>
            use currentIndentation <*> pure () <*>
-           (NonEmpty.toList <$> genWhitespaces1) <*> genWhitespaces <*> genNewline <*>
+           (NonEmpty.toList <$> genWhitespaces1) <*>
            pure a <*>
            use currentIndentation <*>
-           (NonEmpty.toList <$> genWhitespaces1) <*> genWhitespaces <*> genNewline <*>
+           (NonEmpty.toList <$> genWhitespaces1) <*>
            pure b)
-        genBlock
-        genBlock
+        (genSuite genBlock)
+        (genSuite genBlock)
     , sized2M
         (\a b ->
            ClassDef <$>
            use currentIndentation <*> pure () <*>
            genWhitespaces1 <*> genIdent <*>
            pure a <*>
-           genWhitespaces <*> genNewline <*>
            pure b)
         (sizedMaybe $
          (,,) <$>
          genWhitespaces <*>
          sizedMaybe genArgs <*>
          genWhitespaces)
-        genBlock
+        (genSuite genBlock)
     , sized4M
         (\a b c d ->
            For <$> use currentIndentation <*> pure () <*>
            (NonEmpty.toList <$> genWhitespaces1) <*> pure a <*>
            (NonEmpty.toList <$> genWhitespaces1) <*> pure b <*>
-           genWhitespaces <*> genNewline <*>
            pure c <*>
            pure d)
         genAssignable
         genExpr
-        genBlock
+        (genSuite genBlock)
         (sizedMaybe $
-         (,,,,) <$>
+         (,,) <$>
          use currentIndentation <*>
-         (NonEmpty.toList <$> genWhitespaces1) <*> genWhitespaces <*> genNewline <*>
-         genBlock)
+         (NonEmpty.toList <$> genWhitespaces1) <*>
+         (genSuite genBlock))
     ]
     []
 

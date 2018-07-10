@@ -16,7 +16,7 @@ import Control.Lens.Getter ((^.))
 import Control.Lens.Prism (_Right)
 import Control.Lens.Review ((#))
 import Control.Lens.TH (makeWrapped)
-import Control.Lens.Tuple (_2, _5)
+import Control.Lens.Tuple (_2, _3)
 import Control.Lens.Traversal (traverseOf)
 import Control.Lens.Wrapped (_Wrapped)
 import Control.Monad (when)
@@ -327,13 +327,26 @@ validateBlockSyntax
   -> ValidateSyntax e (Block (Nub (Syntax ': v)) a)
 validateBlockSyntax = traverseOf (_Wrapped.traverse._Right) validateStatementSyntax
 
+validateSuiteSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => Suite v a
+  -> ValidateSyntax e (Suite (Nub (Syntax ': v)) a)
+validateSuiteSyntax (Suite a b c d e) =
+  Suite a <$>
+  validateWhitespace a b <*>
+  pure c <*>
+  pure d <*>
+  validateBlockSyntax e
+
 validateCompoundStatementSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
      )
   => CompoundStatement v a
   -> ValidateSyntax e (CompoundStatement (Nub (Syntax ': v)) a)
-validateCompoundStatementSyntax (Fundef idnts a ws1 name ws2 params ws3 ws4 nl body) =
+validateCompoundStatementSyntax (Fundef idnts a ws1 name ws2 params ws3 body) =
   let
     paramIdents = params ^.. folded.unvalidated.paramName.identValue
   in
@@ -342,8 +355,6 @@ validateCompoundStatementSyntax (Fundef idnts a ws1 name ws2 params ws3 ws4 nl b
     pure ws2 <*>
     validateParamsSyntax params <*>
     pure ws3 <*>
-    pure ws4 <*>
-    pure nl <*>
     localNonlocals id
       (localSyntaxContext
          (\ctxt ->
@@ -355,62 +366,54 @@ validateCompoundStatementSyntax (Fundef idnts a ws1 name ws2 params ws3 ws4 nl b
                   (_inFunction ctxt) <|>
                 Just paramIdents
             })
-         (validateBlockSyntax body))
-validateCompoundStatementSyntax (If idnts a ws1 expr ws3 nl body elifs body') =
+         (validateSuiteSyntax body))
+validateCompoundStatementSyntax (If idnts a ws1 expr body elifs body') =
   If idnts a <$>
   validateWhitespace a ws1 <*>
   validateExprSyntax expr <*>
-  validateWhitespace a ws3 <*>
-  pure nl <*>
-  validateBlockSyntax body <*>
+  validateSuiteSyntax body <*>
   traverse
-    (\(a, b, c, d, e, f) ->
-       (\c' -> (,,,,,) a b c' d e) <$>
+    (\(a, b, c, d) ->
+       (\c' -> (,,,) a b c') <$>
        validateExprSyntax c <*>
-       validateBlockSyntax f)
+       validateSuiteSyntax d)
     elifs <*>
-  traverseOf (traverse._5) validateBlockSyntax body'
-validateCompoundStatementSyntax (While idnts a ws1 expr ws3 nl body) =
+  traverseOf (traverse._3) validateSuiteSyntax body'
+validateCompoundStatementSyntax (While idnts a ws1 expr body) =
   While idnts a <$>
   validateWhitespace a ws1 <*>
   validateExprSyntax expr <*>
-  validateWhitespace a ws3 <*>
-  pure nl <*>
-  localSyntaxContext (\ctxt -> ctxt { _inLoop = True}) (validateBlockSyntax body)
-validateCompoundStatementSyntax (TryExcept idnts a b c d e f k l) =
+  localSyntaxContext (\ctxt -> ctxt { _inLoop = True}) (validateSuiteSyntax body)
+validateCompoundStatementSyntax (TryExcept idnts a b e f k l) =
   TryExcept idnts a <$>
   validateWhitespace a b <*>
-  validateWhitespace a c <*>
-  pure d <*>
-  validateBlockSyntax e <*>
+  validateSuiteSyntax e <*>
   traverse
-    (\(idnts, f, g, h, i, j) ->
-       (,,,,,) idnts <$>
+    (\(idnts, f, g, j) ->
+       (,,,) idnts <$>
        validateWhitespace a f <*>
        validateExceptAsSyntax g <*>
-       validateWhitespace a h <*>
-       pure i <*>
-       validateBlockSyntax j)
+       validateSuiteSyntax j)
     f <*>
   traverse
-    (\(idnts, x, y, z, w) ->
-       (,,,,) idnts <$>
-       validateWhitespace a x <*> validateWhitespace a y <*>
-       pure z <*> validateBlockSyntax w)
+    (\(idnts, x, w) ->
+       (,,) idnts <$>
+       validateWhitespace a x <*>
+       validateSuiteSyntax w)
     k <*>
   traverse
-    (\(idnts, x, y, z, w) ->
-       (,,,,) idnts <$>
-       validateWhitespace a x <*> validateWhitespace a y <*>
-       pure z <*> validateBlockSyntax w)
+    (\(idnts, x, w) ->
+       (,,) idnts <$>
+       validateWhitespace a x <*>
+       validateSuiteSyntax w)
     l
-validateCompoundStatementSyntax (TryFinally idnts a b c d e idnts2 f g h i) =
+validateCompoundStatementSyntax (TryFinally idnts a b e idnts2 f i) =
   TryFinally idnts a <$>
-  validateWhitespace a b <*> validateWhitespace a c <*> pure d <*>
-  validateBlockSyntax e <*> pure idnts2 <*>
-  validateWhitespace a f <*> validateWhitespace a g <*> pure h <*>
-  validateBlockSyntax i
-validateCompoundStatementSyntax (For idnts a b c d e f g h i) =
+  validateWhitespace a b <*>
+  validateSuiteSyntax e <*> pure idnts2 <*>
+  validateWhitespace a f <*>
+  validateSuiteSyntax i
+validateCompoundStatementSyntax (For idnts a b c d e h i) =
   For idnts a <$>
   validateWhitespace a b <*>
   (if canAssignTo c
@@ -418,18 +421,14 @@ validateCompoundStatementSyntax (For idnts a b c d e f g h i) =
    else syntaxErrors [_CannotAssignTo # (a, c)]) <*>
   validateWhitespace a d <*>
   validateExprSyntax e <*>
-  validateWhitespace a f <*>
-  pure g <*>
-  localSyntaxContext (\c -> c { _inLoop = True }) (validateBlockSyntax h) <*>
+  localSyntaxContext (\c -> c { _inLoop = True }) (validateSuiteSyntax h) <*>
   traverse
-    (\(idnts, x, y, z, w) ->
-       (,,,,) idnts <$>
+    (\(idnts, x, w) ->
+       (,,) idnts <$>
        validateWhitespace a x <*>
-       validateWhitespace a y <*>
-       pure z <*>
-       validateBlockSyntax w)
+       validateSuiteSyntax w)
     i
-validateCompoundStatementSyntax (ClassDef idnts a b c d e f g) =
+validateCompoundStatementSyntax (ClassDef idnts a b c d g) =
   ClassDef idnts a <$>
   validateWhitespace a b <*>
   validateIdent c <*>
@@ -442,8 +441,7 @@ validateCompoundStatementSyntax (ClassDef idnts a b c d e f g) =
          y <*>
        validateWhitespace a z)
     d <*>
-  validateWhitespace a e <*> pure f <*>
-  validateBlockSyntax g
+  validateSuiteSyntax g
 
 validateExceptAsSyntax
   :: ( AsSyntaxError e v a
@@ -483,9 +481,11 @@ validateImportTargets (ImportAll a ws) = ImportAll a <$> validateWhitespace a ws
 validateImportTargets (ImportSome a cs) =
   ImportSome a <$> traverse (validateImportAs validateIdent) cs
 validateImportTargets (ImportSomeParens a ws1 cs ws2) =
-  ImportSomeParens a <$>
-  validateWhitespace a ws1 <*>
-  traverse (validateImportAs validateIdent) cs <*>
+  localSyntaxContext
+    (\c -> c { _inParens = True })
+    (ImportSomeParens a <$>
+     validateWhitespace a ws1 <*>
+     traverse (validateImportAs validateIdent) cs) <*>
   validateWhitespace a ws2
 
 validateSmallStatementSyntax

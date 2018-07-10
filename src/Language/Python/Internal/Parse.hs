@@ -720,29 +720,17 @@ comment = do
       Parser (consumed ann) $> Comment str
     _ -> Parser . throwError $ ExpectedComment curTk
 
-withSuite
-  :: Parser ann (Newline -> Block '[] ann -> r -> r')
-  -> Parser ann r
-  -> Parser ann r'
-withSuite p p'  = fmap uncurry p <*> suite <*> p'
-infixl 4 `withSuite`
-
-thenSuite
-  :: Parser ann (Newline -> Block '[] ann -> r)
-  -> ()
-  -> Parser ann r
-thenSuite p _  = fmap uncurry p <*> suite
-infixl 4 `thenSuite`
-
-suite :: Parser ann (Newline, Block '[] ann)
-suite = do
-  (,) <$>
-    eol <*>
-    fmap Block
-      (flip (foldr NonEmpty.cons) <$>
-       commentOrIndent <*>
-       some1 line) <*
-    dedent
+suite :: Parser ann (Suite '[] ann)
+suite =
+  (\(tk, s) -> Suite (pyTokenAnn tk) s) <$>
+  colon space <*>
+  optional comment <*>
+  eol <*>
+  fmap Block
+    (flip (foldr NonEmpty.cons) <$>
+      commentOrIndent <*>
+      some1 line) <*
+  dedent
   where
     commentOrEmpty =
       (,,) <$>
@@ -850,32 +838,32 @@ compoundStatement =
       fmap snd (token anySpace $ TkLeftParen ()) <*>
       commaSep anySpace param <*>
       fmap snd (token space $ TkRightParen ()) <*>
-      fmap snd (colon space) `thenSuite` ()
+      suite
 
     ifSt =
       (\a (tk, s) -> If a (pyTokenAnn tk) s) <$>
       indents <*>
       token space (TkIf ()) <*>
       expr space <*>
-      (snd <$> colon space) `withSuite`
+      suite <*>
       many
-        ((,,,,,) <$>
+        ((,,,) <$>
          indents <*>
          (snd <$> token space (TkElif ())) <*>
          expr space <*>
-         (snd <$> colon space) `thenSuite` ()) <*>
+         suite) <*>
       optional
-        ((,,,,) <$>
+        ((,,) <$>
          indents <*>
          (snd <$> token space (TkElse ())) <*>
-         (snd <$> colon space) `thenSuite` ())
+         suite)
 
     whileSt =
       (\a (tk, s) -> While a (pyTokenAnn tk) s) <$>
       indents <*>
       token space (TkWhile ()) <*>
       expr space <*>
-      (snd <$> colon space) `thenSuite` ()
+      suite
 
     exceptAs =
       (\a -> ExceptAs (_exprAnnotation a) a) <$>
@@ -883,39 +871,39 @@ compoundStatement =
       optional ((,) <$> (snd <$> token space (TkAs())) <*> identifier space)
 
     trySt =
-      (\i (tk, s) a b c d ->
+      (\i (tk, s) a d ->
          case d of
-           Left (e, f, g, h, j) -> TryFinally i (pyTokenAnn tk) s a b c e f g h j
-           Right (e, f, g) -> TryExcept i (pyTokenAnn tk) s a b c e f g) <$>
+           Left (e, f, g) -> TryFinally i (pyTokenAnn tk) s a e f g
+           Right (e, f, g) -> TryExcept i (pyTokenAnn tk) s a e f g) <$>
       indents <*>
       token space (TkTry ()) <*>
-      (snd <$> colon space) `withSuite`
+      suite <*>
       (fmap Left
-         ((,,,,) <$>
+         ((,,) <$>
           indents <*>
           (snd <$> token space (TkFinally ())) <*>
-          (snd <$> colon space) `thenSuite` ())
+          suite)
 
         <!>
 
         fmap Right
           ((,,) <$>
            some1
-             ((,,,,,) <$>
+             ((,,,) <$>
               indents <*>
               (snd <$> token space (TkExcept ())) <*>
               exceptAs <*>
-              (snd <$> colon space) `thenSuite` ()) <*>
+              suite) <*>
            optional
-             ((,,,,) <$>
+             ((,,) <$>
               indents <*>
               (snd <$> token space (TkElse ())) <*>
-              (snd <$> colon space) `thenSuite` ()) <*>
+              suite) <*>
            optional
-             ((,,,,) <$>
+             ((,,) <$>
               indents <*>
               (snd <$> token space (TkFinally ())) <*>
-              (snd <$> colon space) `thenSuite` ())))
+              suite)))
 
     classSt =
       (\a (tk, s) -> ClassDef a (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
@@ -927,7 +915,7 @@ compoundStatement =
          (snd <$> token anySpace (TkLeftParen ())) <*>
          optional (commaSep1' anySpace arg) <*>
          (snd <$> token space (TkRightParen ()))) <*>
-      (snd <$> colon space) `thenSuite` ()
+      suite
 
     forSt =
       (\a (tk, s) -> For a (pyTokenAnn tk) s) <$>
@@ -936,12 +924,12 @@ compoundStatement =
       orExprList space <*>
       (snd <$> token space (TkIn ())) <*>
       exprList space <*>
-      (snd <$> colon space) `withSuite`
+      suite <*>
       optional
-        ((,,,,) <$>
+        ((,,) <$>
          indents <*>
          (snd <$> token space (TkElse ())) <*>
-         (snd <$> colon space) `thenSuite` ())
+         suite)
 
 module_ :: Parser ann (Module '[] ann)
 module_ =

@@ -125,6 +125,16 @@ validateBlockIndentation (Block (b :| bs)) =
         [] -> (:| []) <$> validated
         r : rs -> NonEmpty.cons <$> validated <*> go True r rs
 
+validateSuiteIndentation
+  :: AsIndentationError e v a
+  => Indents a
+  -> Suite v a
+  -> ValidateIndentation e (Suite (Nub (Indentation ': v)) a)
+validateSuiteIndentation idnt (Suite ann a b c d) =
+  Suite ann a b c <$
+  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
+  validateBlockIndentation d
+
 validateExprIndentation
   :: AsIndentationError e v a
   => Expr v a
@@ -156,103 +166,91 @@ validateCompoundStatementIndentation
   :: AsIndentationError e v a
   => CompoundStatement v a
   -> ValidateIndentation e (CompoundStatement (Nub (Indentation ': v)) a)
-validateCompoundStatementIndentation (Fundef idnt a ws1 name ws2 params ws3 ws4 nl body) =
-  (\idnt' params' body' -> Fundef idnt' a ws1 (coerce name) ws2 params' ws3 ws4 nl body') <$>
+validateCompoundStatementIndentation (Fundef idnt a ws1 name ws2 params ws3 s) =
+  (\idnt' params' -> Fundef idnt' a ws1 (coerce name) ws2 params' ws3) <$>
   checkIndent idnt <*>
-  validateParamsIndentation params <*
-  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
-  validateBlockIndentation body
-validateCompoundStatementIndentation (If idnt a ws1 expr ws3 nl body elifs body1) =
-  (\idnt' expr' -> If idnt' a ws1 expr' ws3 nl) <$>
+  validateParamsIndentation params <*>
+  validateSuiteIndentation idnt s
+validateCompoundStatementIndentation (If idnt a ws1 expr s elifs body1) =
+  (\idnt' -> If idnt' a ws1) <$>
   checkIndent idnt <*>
-  validateExprIndentation expr <*
-  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
-  validateBlockIndentation body <*>
+  validateExprIndentation expr <*>
+  validateSuiteIndentation idnt s <*>
   traverse
-    (\(idnt2, a, b, c, d, e) ->
-       (\idnt2' b' -> (,,,,,) idnt2' a b' c d) <$
+    (\(idnt2, a, b, c) ->
+       (,,,) <$
        setNextIndent EqualTo (idnt ^. indentsValue) <*>
-       checkIndent idnt2 <*
-       setNextIndent GreaterThan (idnt ^. indentsValue) <*>
+       checkIndent idnt2 <*>
+       pure a <*>
        validateExprIndentation b <*>
-       validateBlockIndentation e)
+       validateSuiteIndentation idnt c)
     elifs <*>
   traverse
-    (\(idnt2, a, b, c, d) ->
-       (\idnt2' -> (,,,,) idnt2' a b c) <$
+    (\(idnt2, a, b) ->
+       (,,) <$
        setNextIndent EqualTo (idnt ^. indentsValue) <*>
-       checkIndent idnt2 <*
-       setNextIndent GreaterThan (idnt ^. indentsValue) <*>
-       validateBlockIndentation d)
+       checkIndent idnt2 <*>
+       pure a <*>
+       validateSuiteIndentation idnt b)
     body1
-validateCompoundStatementIndentation (While idnt a ws1 expr ws3 nl body) =
-  (\idnt' expr' body' -> While idnt' a ws1 expr' ws3 nl body') <$>
+validateCompoundStatementIndentation (While idnt a ws1 expr s) =
+  (\idnt' expr' -> While idnt' a ws1 expr') <$>
   checkIndent idnt <*>
-  validateExprIndentation expr <*
-  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
-  validateBlockIndentation body
-validateCompoundStatementIndentation (TryExcept idnt a b c d e f k l) =
-  (\idnt' -> TryExcept idnt' a b c d) <$>
-  checkIndent idnt <*
-  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
-  validateBlockIndentation e <*>
+  validateExprIndentation expr <*>
+  validateSuiteIndentation idnt s
+validateCompoundStatementIndentation (TryExcept idnt a b c d e f) =
+  (\idnt' -> TryExcept idnt' a b) <$>
+  checkIndent idnt <*>
+  validateSuiteIndentation idnt c <*>
   traverse
-    (\(a, b, c, d, e, f) ->
-       (\a' c' -> (,,,,,) a' b c' d e) <$
+    (\(a, b, c, d) ->
+       (\a' -> (,,,) a' b) <$
        setNextIndent EqualTo (idnt ^. indentsValue) <*>
        checkIndent a <*>
-       validateExceptAsIndentation c <*
-       setNextIndent GreaterThan (idnt ^. indentsValue) <*>
-       validateBlockIndentation f)
-    f <*
+       validateExceptAsIndentation c <*>
+       validateSuiteIndentation idnt d)
+    d <*
   setNextIndent EqualTo (idnt ^. indentsValue) <*>
   traverse
-    (\(idnt2, a, b, c, d) ->
-       (\idnt2' -> (,,,,) idnt2' a b c) <$
+    (\(idnt2, a, b) ->
+       (\idnt2' -> (,,) idnt2' a) <$
        setNextIndent EqualTo (idnt ^. indentsValue) <*>
-       checkIndent idnt2 <*
-       setNextIndent GreaterThan (idnt ^. indentsValue) <*>
-       validateBlockIndentation d)
-    k <*
+       checkIndent idnt2 <*>
+       validateSuiteIndentation idnt b)
+    e <*
   setNextIndent EqualTo (idnt ^. indentsValue) <*>
   traverse
-    (\(idnt2, a, b, c, d) ->
-       (\idnt2' -> (,,,,) idnt2' a b c) <$
+    (\(idnt2, a, b) ->
+       (\idnt2' -> (,,) idnt2' a) <$
        setNextIndent EqualTo (idnt ^. indentsValue) <*>
-       checkIndent idnt2 <*
-       setNextIndent GreaterThan (idnt ^. indentsValue) <*>
-       validateBlockIndentation d)
-    l
-validateCompoundStatementIndentation (TryFinally idnt a b c d e idnt2 f g h i) =
-  (\idnt' e' idnt2' -> TryFinally idnt' a b c d e' idnt2' f g h) <$>
-  checkIndent idnt <*
-  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
-  validateBlockIndentation e <*
+       checkIndent idnt2 <*>
+       validateSuiteIndentation idnt b)
+    f
+validateCompoundStatementIndentation (TryFinally idnt a b c idnt2 d e) =
+  (\idnt' c' idnt2' -> TryFinally idnt' a b c' idnt2' d) <$>
+  checkIndent idnt <*>
+  validateSuiteIndentation idnt c <*
   setNextIndent EqualTo (idnt ^. indentsValue) <*>
-  checkIndent idnt2 <*
-  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
-  validateBlockIndentation i
-validateCompoundStatementIndentation (For idnt a b c d e f g h i) =
-  (\idnt' c' e' -> For idnt' a b c' d e' f g) <$>
+  checkIndent idnt2 <*>
+  validateSuiteIndentation idnt e
+validateCompoundStatementIndentation (For idnt a b c d e h i) =
+  (\idnt' c' -> For idnt' a b c' d) <$>
   checkIndent idnt <*>
   validateExprIndentation c <*>
-  validateExprIndentation e <*
-  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
-  validateBlockIndentation h <*
+  validateExprIndentation e <*>
+  validateSuiteIndentation idnt h <*
   setNextIndent EqualTo (idnt ^. indentsValue) <*>
   traverse
-    (\(idnt2, a, b, c, d) ->
-       (\idnt2' -> (,,,,) idnt2' a b c) <$
+    (\(idnt2, a, b) ->
+       (\idnt2' -> (,,) idnt2' a) <$
        setNextIndent EqualTo (idnt ^. indentsValue) <*>
-       checkIndent idnt2 <*
-       setNextIndent GreaterThan (idnt ^. indentsValue) <*>
-       validateBlockIndentation d)
+       checkIndent idnt2 <*>
+       validateSuiteIndentation idnt b)
     i
-validateCompoundStatementIndentation (ClassDef idnt a b c d e f g) =
-  (\idnt' -> ClassDef idnt' a b (coerce c) (coerce d) e f) <$>
-  checkIndent idnt <*
-  setNextIndent GreaterThan (idnt ^. indentsValue) <*>
-  validateBlockIndentation g
+validateCompoundStatementIndentation (ClassDef idnt a b c d e) =
+  (\idnt' -> ClassDef idnt' a b (coerce c) (coerce d)) <$>
+  checkIndent idnt <*>
+  validateSuiteIndentation idnt e
 
 validateStatementIndentation
   :: AsIndentationError e v a

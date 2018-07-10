@@ -16,7 +16,7 @@ import Control.Lens.Prism (_Right, _Just)
 import Control.Lens.Review ((#))
 import Control.Lens.Setter ((%~), (.~), Setter', mapped, over)
 import Control.Lens.TH (makeLenses)
-import Control.Lens.Tuple (_2, _5)
+import Control.Lens.Tuple (_2, _3)
 import Control.Lens.Traversal (traverseOf)
 import Control.Lens.Wrapped (_Wrapped)
 import Control.Monad.State (State, modify, evalState)
@@ -145,83 +145,81 @@ validateExceptAsScope (ExceptAs ann e f) =
   validateExprScope e <*>
   pure (over (mapped._2) coerce f)
 
+validateSuiteScope
+  :: AsScopeError e v a
+  => Suite v a
+  -> ValidateScope a e (Suite (Nub (Scope ': v)) a)
+validateSuiteScope (Suite ann a b c d) = Suite ann a b c <$> validateBlockScope d
+
 validateCompoundStatementScope
   :: AsScopeError e v a
   => CompoundStatement v a
   -> ValidateScope a e (CompoundStatement (Nub (Scope ': v)) a)
-validateCompoundStatementScope (Fundef idnts a ws1 name ws2 params ws3 ws4 nl body) =
+validateCompoundStatementScope (Fundef idnts a ws1 name ws2 params ws3 s) =
   (locallyOver scLocalScope (const Trie.empty) $
    locallyOver scImmediateScope (const Trie.empty) $
      Fundef idnts a ws1 (coerce name) ws2 <$>
      traverse validateParamScope params <*>
      pure ws3 <*>
-     pure ws4 <*>
-     pure nl <*>
      locallyExtendOver
        scGlobalScope
        ((_identAnnotation &&& _identValue) name :
          toListOf (folded.getting paramName.to (_identAnnotation &&& _identValue)) params)
-       (validateBlockScope body)) <*
+       (validateSuiteScope s)) <*
   extendScope scLocalScope [(_identAnnotation &&& _identValue) name] <*
   extendScope scImmediateScope [(_identAnnotation &&& _identValue) name]
-validateCompoundStatementScope (If idnts a ws1 e ws3 nl b elifs melse) =
+validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
   scopeContext scLocalScope `bindValidateScope` (\ls ->
   scopeContext scImmediateScope `bindValidateScope` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty)
     (If idnts a ws1 <$>
      validateExprScope e <*>
-     pure ws3 <*>
-     pure nl <*>
-     validateBlockScope b <*>
+     validateSuiteScope b <*>
      traverse
-       (\(a, b, c, d, e, f) ->
-          (\c' -> (,,,,,) a b c' d e) <$>
+       (\(a, b, c, d) ->
+          (\c' -> (,,,) a b c') <$>
           validateExprScope c <*>
-          validateBlockScope f)
+          validateSuiteScope d)
        elifs <*>
-     traverseOf (traverse._5) validateBlockScope melse)))
-validateCompoundStatementScope (While idnts a ws1 e ws3 nl b) =
+     traverseOf (traverse._3) validateSuiteScope melse)))
+validateCompoundStatementScope (While idnts a ws1 e b) =
   scopeContext scLocalScope `bindValidateScope` (\ls ->
   scopeContext scImmediateScope `bindValidateScope` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty)
     (While idnts a ws1 <$>
      validateExprScope e <*>
-     pure ws3 <*>
-     pure nl <*>
-     validateBlockScope b)))
-validateCompoundStatementScope (TryExcept idnts a b c d e f k l) =
+     validateSuiteScope b)))
+validateCompoundStatementScope (TryExcept idnts a b e f k l) =
   scopeContext scLocalScope `bindValidateScope` (\ls ->
   scopeContext scImmediateScope `bindValidateScope` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty)
-    (TryExcept idnts a b c d <$>
-     validateBlockScope e <*>
+    (TryExcept idnts a b <$>
+     validateSuiteScope e <*>
      traverse
-       (\(idnts, ws, g, h, i, j) ->
-          (,,,,,) idnts ws <$>
+       (\(idnts, ws, g, h) ->
+          (,,,) idnts ws <$>
           validateExceptAsScope g <*>
-          pure h <*>
-          pure i <*>
           locallyExtendOver
             scGlobalScope
             (toListOf (exceptAsName._Just._2.to (_identAnnotation &&& _identValue)) g)
-            (validateBlockScope j))
+            (validateSuiteScope h))
        f <*>
-     traverseOf (traverse._5) validateBlockScope k <*>
-     traverseOf (traverse._5) validateBlockScope l)))
-validateCompoundStatementScope (TryFinally idnts a b c d e idnts2 f g h i) =
+     traverseOf (traverse._3) validateSuiteScope k <*>
+     traverseOf (traverse._3) validateSuiteScope l)))
+validateCompoundStatementScope (TryFinally idnts a b e idnts2 f i) =
   scopeContext scLocalScope `bindValidateScope` (\ls ->
   scopeContext scImmediateScope `bindValidateScope` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty)
-    (TryFinally idnts a b c d <$>
-     validateBlockScope e <*>
+    (TryFinally idnts a b <$>
+     validateSuiteScope e <*>
      pure idnts2 <*>
-     pure f <*> pure g <*> pure h <*>
-     validateBlockScope i)))
-validateCompoundStatementScope (For idnts a b c d e f g h i) =
+     pure f <*>
+     validateSuiteScope i)))
+validateCompoundStatementScope (For idnts a b c d e h i) =
   scopeContext scLocalScope `bindValidateScope` (\ls ->
   scopeContext scImmediateScope `bindValidateScope` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
@@ -235,19 +233,17 @@ validateCompoundStatementScope (For idnts a b c d e f g h i) =
        (c ^.. unvalidated.cosmos._Ident._2)) <*>
     pure d <*>
     validateExprScope e <*>
-    pure f <*> pure g <*>
     (let
        ls = c ^.. unvalidated.cosmos._Ident._2.to (_identAnnotation &&& _identValue)
      in
        extendScope scLocalScope ls *>
        extendScope scImmediateScope ls *>
-       validateBlockScope h) <*>
-    traverseOf (traverse._5) validateBlockScope i))
-validateCompoundStatementScope (ClassDef idnts a b c d e f g) =
+       validateSuiteScope h) <*>
+    traverseOf (traverse._3) validateSuiteScope i))
+validateCompoundStatementScope (ClassDef idnts a b c d g) =
   ClassDef idnts a b (coerce c) <$>
   traverseOf (traverse._2.traverse.traverse) validateArgScope d <*>
-  pure e <*> pure f <*>
-  validateBlockScope g <*
+  validateSuiteScope g <*
   extendScope scImmediateScope [c ^. to (_identAnnotation &&& _identValue)]
 
 validateSmallStatementScope

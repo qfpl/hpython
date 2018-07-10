@@ -601,102 +601,84 @@ renderBlock =
         renderStatement) .
   view _Wrapped
 
+renderSuite :: Suite v a -> RenderOutput
+renderSuite (Suite _ a b c d) =
+  TkColon () `cons`
+  foldMap renderWhitespace a <>
+  foldMap (singleton . renderComment) b <>
+  singleton (renderNewline c) <>
+  renderBlock d
+
 renderCompoundStatement :: CompoundStatement v a -> RenderOutput
-renderCompoundStatement (Fundef idnt _ ws1 name ws2 params ws3 ws4 nl body) =
+renderCompoundStatement (Fundef idnt _ ws1 name ws2 params ws3 s) =
   renderIndents idnt <>
   singleton (TkDef ()) <> foldMap renderWhitespace ws1 <> renderIdent name <>
   bracket (foldMap renderWhitespace ws2 <> renderCommaSep renderParam params) <>
-  foldMap renderWhitespace ws3 <> singleton (TkColon ()) <> foldMap renderWhitespace ws4 <>
-  singleton (renderNewline nl) <>
-  renderBlock body
-renderCompoundStatement (If idnt _ ws1 expr ws3 nl body elifs body') =
+  foldMap renderWhitespace ws3 <> renderSuite s
+renderCompoundStatement (If idnt _ ws1 expr s elifs body') =
   renderIndents idnt <>
   singleton (TkIf ()) <> foldMap renderWhitespace ws1 <>
   bracketTupleGenerator expr <>
-  singleton (TkColon ()) <> foldMap renderWhitespace ws3 <>
-  singleton (renderNewline nl) <>
-  renderBlock body <>
+  renderSuite s <>
   foldMap
-    (\(idnt, ws4, ex, ws5, nl2, body'') ->
+    (\(idnt, ws4, ex, s) ->
         renderIndents idnt <>
         singleton (TkElif ()) <> foldMap renderWhitespace ws4 <>
         bracketTupleGenerator ex <>
-        singleton (TkColon ()) <> foldMap renderWhitespace ws5 <>
-        singleton (renderNewline nl2) <>
-        renderBlock body'')
+        renderSuite s)
     elifs <>
   foldMap
-    (\(idnt, ws4, ws5, nl2, body'') ->
+    (\(idnt, ws4, s) ->
         renderIndents idnt <>
         singleton (TkElse ()) <> foldMap renderWhitespace ws4 <>
-        singleton (TkColon ()) <> foldMap renderWhitespace ws5 <>
-        singleton (renderNewline nl2) <>
-        renderBlock body'')
+        renderSuite s)
     body'
-renderCompoundStatement (While idnt _ ws1 expr ws3 nl body) =
+renderCompoundStatement (While idnt _ ws1 expr s) =
   renderIndents idnt <>
   singleton (TkWhile ()) <> foldMap renderWhitespace ws1 <> bracketTupleGenerator expr <>
-  singleton (TkColon ()) <> foldMap renderWhitespace ws3 <>
-  singleton (renderNewline nl) <>
-  renderBlock body
-renderCompoundStatement (TryExcept idnt _ a b c d e f g) =
+  renderSuite s
+renderCompoundStatement (TryExcept idnt _ a s e f g) =
   renderIndents idnt <>
   singleton (TkTry ()) <> foldMap renderWhitespace a <>
-  singleton (TkColon ()) <> foldMap renderWhitespace b <>
-  singleton (renderNewline c) <>
-  renderBlock d <>
+  renderSuite s <>
   foldMap
-    (\(idnt, ws1, eas, ws2, nl, bl) ->
+    (\(idnt, ws1, eas, s) ->
        renderIndents idnt <>
        singleton (TkExcept ()) <> foldMap renderWhitespace ws1 <>
        renderExceptAs eas <>
-       singleton (TkColon ()) <> foldMap renderWhitespace ws2 <>
-       singleton (renderNewline nl) <>
-       renderBlock bl)
+       renderSuite s)
     e <>
   foldMap
-    (\(idnt, ws1, ws2, nl, bl) ->
+    (\(idnt, ws1, s) ->
        renderIndents idnt <>
        singleton (TkElse ()) <> foldMap renderWhitespace ws1 <>
-       singleton (TkColon ()) <> foldMap renderWhitespace ws2 <>
-       singleton (renderNewline nl) <>
-       renderBlock bl)
+       renderSuite s)
     f <>
   foldMap
-    (\(idnt, ws1, ws2, nl, bl) ->
+    (\(idnt, ws1, s) ->
        renderIndents idnt <>
        singleton (TkFinally ()) <> foldMap renderWhitespace ws1 <>
-       singleton (TkColon ()) <> foldMap renderWhitespace ws2 <>
-       singleton (renderNewline nl) <>
-       renderBlock bl)
+       renderSuite s)
     g
-renderCompoundStatement (TryFinally idnt _ a b c d idnt2 e f g h) =
+renderCompoundStatement (TryFinally idnt _ a s idnt2 e s') =
   renderIndents idnt <>
   singleton (TkTry ()) <> foldMap renderWhitespace a <>
-  singleton (TkColon ()) <> foldMap renderWhitespace b <>
-  singleton (renderNewline c) <>
-  renderBlock d <>
+  renderSuite s <>
   renderIndents idnt2 <>
   singleton (TkFinally ()) <> foldMap renderWhitespace e <>
-  singleton (TkColon ()) <> foldMap renderWhitespace f <>
-  singleton (renderNewline g) <>
-  renderBlock h
-renderCompoundStatement (For idnt _ a b c d e f g h) =
+  renderSuite s'
+renderCompoundStatement (For idnt _ a b c d s h) =
   renderIndents idnt <>
   singleton (TkFor ()) <> foldMap renderWhitespace a <> bracketGenerator b <>
   singleton (TkIn ()) <> foldMap renderWhitespace c <> bracketGenerator d <>
-  singleton (TkColon ()) <> foldMap renderWhitespace e <>
-  singleton (renderNewline f) <>
-  renderBlock g <>
+  renderSuite s <>
   foldMap
-    (\(idnt, x, y, z, w) ->
+    (\(idnt, x, s) ->
         renderIndents idnt <>
         singleton (TkElse ()) <> foldMap renderWhitespace x <>
-        singleton (TkColon ()) <> foldMap renderWhitespace y <>
-        singleton (renderNewline z) <>
-        renderBlock w)
+        renderSuite s)
     h
-renderCompoundStatement (ClassDef idnt _ a b c d e f) =
+renderCompoundStatement (ClassDef idnt _ a b c s) =
   renderIndents idnt <>
   singleton (TkClass ()) <> foldMap renderWhitespace a <>
   renderIdent b <>
@@ -707,9 +689,7 @@ renderCompoundStatement (ClassDef idnt _ a b c d e f) =
          foldMap renderArgs y) <>
       foldMap renderWhitespace z)
     c <>
-  singleton (TkColon ()) <> foldMap renderWhitespace d <>
-  singleton (renderNewline e) <>
-  renderBlock f
+  renderSuite s
 
 renderIndent :: Indent -> RenderOutput
 renderIndent (MkIndent ws) = foldMap renderWhitespace $ toList ws

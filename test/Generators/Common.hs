@@ -17,6 +17,14 @@ whitespaceSize Tab = 1
 whitespaceSize (Continued _ ws) = 1 + sum (fmap whitespaceSize ws)
 whitespaceSize (Newline _) = 1
 
+genSuite :: MonadGen m => m (Block '[] ()) -> m (Suite '[] ())
+genSuite gb =
+  Suite () <$>
+  genWhitespaces <*>
+  Gen.maybe genComment <*>
+  genNewline <*>
+  gb
+
 genSmallInt :: MonadGen m => m (Expr '[] ())
 genSmallInt =
   Int () <$>

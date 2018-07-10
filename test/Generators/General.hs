@@ -243,84 +243,76 @@ genCompoundStatement =
         (\a b ->
            Fundef <$> genIndents <*> pure () <*>
            genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure a <*>
-           genWhitespaces <*> genWhitespaces <*> genNewline <*> pure b)
+           genWhitespaces <*> pure b)
         (genSizedCommaSep $ genParam genExpr)
-        genBlock
+        (genSuite genBlock)
     , sized4M
         (\a b c d ->
-           If <$> genIndents <*> pure () <*>
-           genWhitespaces <*> pure a <*> genWhitespaces <*> genNewline <*>
-           pure b <*> pure c <*> pure d)
+           If <$> genIndents <*> pure () <*> genWhitespaces <*>
+           pure a <*> pure b <*> pure c <*> pure d)
         genExpr
-        genBlock
+        (genSuite genBlock)
         (sizedList $
          sized2M
-           (\a b ->
-              (,,,,,) <$>
-              genIndents <*> genWhitespaces <*> pure a <*>
-              genWhitespaces <*> genNewline <*> pure b)
+           (\a b -> (,,,) <$> genIndents <*> genWhitespaces <*> pure a <*> pure b)
            genExpr
-           genBlock)
+           (genSuite genBlock))
         (sizedMaybe $
-         (,,,,) <$>
-         genIndents <*> genWhitespaces <*> genWhitespaces <*> genNewline <*> genBlock)
+         (,,) <$>
+         genIndents <*> genWhitespaces <*> genSuite genBlock)
     , sized2M
-        (\a b ->
-           While <$>
-           genIndents <*>
-           pure () <*> genWhitespaces <*> pure a <*>
-           genWhitespaces <*> genNewline <*> pure b)
+        (\a b -> While <$> genIndents <*> pure () <*> genWhitespaces <*> pure a <*> pure b)
         genExpr
-        genBlock
+        (genSuite genBlock)
     , sized4M
         (\a b c d ->
-           TryExcept <$> genIndents <*> pure () <*> genWhitespaces <*> genWhitespaces <*>
-           genNewline <*> pure a <*> pure b <*> pure c <*> pure d)
-        genBlock
+           TryExcept <$> genIndents <*> pure () <*> genWhitespaces <*>
+           pure a <*> pure b <*> pure c <*> pure d)
+        (genSuite genBlock)
         (sizedNonEmpty $
          sized2M
            (\a b ->
-              (,,,,,) <$> genIndents <*> genWhitespaces <*>
+              (,,,) <$> genIndents <*> genWhitespaces <*>
               (ExceptAs () <$> pure a <*> Gen.maybe ((,) <$> genWhitespaces <*> genIdent)) <*>
-              genWhitespaces <*> genNewline <*> pure b)
+              pure b)
            genExpr
-           genBlock)
+           (genSuite genBlock))
         (sizedMaybe $
-         (,,,,) <$> genIndents <*> genWhitespaces <*> genWhitespaces <*>
-         genNewline <*> genBlock)
+         (,,) <$> genIndents <*> genWhitespaces <*>
+         genSuite genBlock)
         (sizedMaybe $
-         (,,,,) <$> genIndents <*> genWhitespaces <*> genWhitespaces <*>
-         genNewline <*> genBlock)
+         (,,) <$> genIndents <*> genWhitespaces <*>
+         genSuite genBlock)
     , sized2M
         (\a b -> 
            TryFinally <$>
            genIndents <*>
            pure () <*>
-           genWhitespaces <*> genWhitespaces <*> genNewline <*>
+           genWhitespaces <*>
            pure a <*>
            genIndents <*>
-           genWhitespaces <*> genWhitespaces <*> genNewline <*>
+           genWhitespaces <*>
            pure b)
-        genBlock
-        genBlock
+        (genSuite genBlock)
+        (genSuite genBlock)
     , sized2M
         (\a b ->
            ClassDef <$> genIndents <*> pure () <*> genWhitespaces1 <*> genIdent <*>
            Gen.maybe ((,,) <$> genWhitespaces <*> pure a <*> genWhitespaces) <*>
-           genWhitespaces <*> genNewline <*> pure b)
+           pure b)
         (sizedMaybe $ genSizedCommaSep1' $ genArg genExpr)
-        genBlock
+        (genSuite genBlock)
     , sized4M
         (\a b c d ->
            For <$> genIndents <*> pure () <*> genWhitespaces <*> pure a <*>
-           genWhitespaces <*> pure b <*> genWhitespaces <*> genNewline <*>
+           genWhitespaces <*> pure b <*>
            pure c <*> pure d)
         genExpr
         genExpr
-        genBlock
+        (genSuite genBlock)
         (sizedMaybe $
-         (,,,,) <$>
-         genIndents <*> genWhitespaces <*> genWhitespaces <*> genNewline <*> genBlock)
+         (,,) <$>
+         genIndents <*> genWhitespaces <*> genSuite genBlock)
     ]
     []
 

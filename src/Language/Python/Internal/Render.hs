@@ -278,6 +278,7 @@ renderPyChars qt st = go
                  then '\\' : (case b of; '\\' : _ -> '\\' : b; _ -> b)
                  else '\\' : '\\' : b
                )
+             Char_lit c -> (True, c : b)
              _ -> (True, go [a] <> b))
         (False, [])
 
@@ -293,6 +294,7 @@ renderPyChars qt st = go
                  then '\\' : (case b of; '\\' : _ -> '\\' : b; _ -> b)
                  else '\\' : '\\' : b
                )
+             Char_lit c -> (True, c : b)
              _ -> (True, go [a] <> b))
         (False, [])
 
@@ -307,6 +309,7 @@ renderPyChars qt st = go
                , if bl
                  then '\\' : (case b of; '\\' : _ -> '\\' : b; _ -> b)
                  else '\\' : '\\' : b)
+             Char_lit c -> (True, c : b)
              _ -> (True, go [a] <> b))
         (False, [])
 
@@ -321,6 +324,7 @@ renderPyChars qt st = go
                , if bl
                  then '\\' : (case b of; '\\' : _ -> '\\' : b; _ -> b)
                  else '\\' : '\\' : b)
+             Char_lit c -> (True, c : b)
              _ -> (True, go [a] <> b))
         (False, [])
 
@@ -377,19 +381,19 @@ renderPyChars qt st = go
             (SingleQuote, ShortString) ->
               case c of
                 '\'' -> '\\' : '\'' : go cs
-                _ -> c : endSingleQuotesShort cs
+                _ -> endSingleQuotesShort s
             (SingleQuote, LongString) ->
               case c of
                 '\'' -> '\\' : '\'' : go cs
-                _ -> c : endSingleQuotesLong (transform escapeTripleSingleQuotes cs)
+                _ -> endSingleQuotesLong (transform escapeTripleSingleQuotes s)
             (DoubleQuote, ShortString) ->
               case c of
                 '"' -> '\\' : '"' : go cs
-                _ -> c : endDoubleQuotesShort cs
+                _ -> endDoubleQuotesShort s
             (DoubleQuote, LongString) ->
               case c of
                 '"' -> '\\' : '"' : go cs
-                _ -> c : endDoubleQuotesLong (transform escapeTripleDoubleQuotes cs)
+                _ -> endDoubleQuotesLong (transform escapeTripleDoubleQuotes s)
 
 renderWhitespace :: Whitespace -> RenderOutput
 renderWhitespace Space = singleton $ TkSpace ()

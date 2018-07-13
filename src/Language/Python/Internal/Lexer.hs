@@ -87,7 +87,10 @@ hexToInt =
   foldr (\a (sz, val) -> (sz+1, hexDigitInt a * 16 ^ sz + val)) (0, 0)
 
 stringChar :: (CharParsing m, Monad m) => m PyChar
-stringChar = (char '\\' *> (escapeChar <|> unicodeChar <|> octChar <|> hexChar)) <|> other
+stringChar =
+  (char '\\' *>
+   (escapeChar <|> unicodeChar <|> octChar <|> hexChar <|> pure (Char_lit '\\'))) <|>
+  other
   where
     other = Char_lit <$> anyChar
     escapeChar =

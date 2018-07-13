@@ -560,6 +560,10 @@ genStatement
   :: (HasCallStack, MonadGen m, MonadState GenState m)
   => m (Statement '[] ())
 genStatement =
+  Gen.shrink
+    (\case
+        SmallStatements a b c d e -> (\c' -> SmallStatements a b c' d e) <$> Shrink.list c
+        _ -> []) $
   sizedRecursive
     [ sizedBind (localState genSmallStatement) $ \st ->
       sizedBind (sizedList $ (,) <$> genWhitespaces <*> localState genSmallStatement) $ \sts ->

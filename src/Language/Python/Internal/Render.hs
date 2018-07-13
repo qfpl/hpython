@@ -132,7 +132,7 @@ showToken t =
     TkFor{} -> "for"
     TkIn{} -> "in"
     TkYield{} -> "yield"
-    TkInt i _ -> show i
+    TkInt i _ -> renderIntLiteral i
     TkFloat i i' _ -> show i <> foldMap (("." <>) . show) i'
     TkIdent s _ -> s
     TkString sp qt st s _ ->
@@ -471,6 +471,13 @@ renderDictItem (DictItem _ a b c) =
   singleton (TkColon ()) <>
   foldMap renderWhitespace b <>
   bracketTupleGenerator c
+
+renderIntLiteral :: IntLiteral a -> RenderOutput
+renderIntLiteral (IntLiteralDec _ n) = _
+renderIntLiteral (BinLiteralDec _ b n) = _
+renderIntLiteral (OctLiteralDec _ b n) = _
+renderIntLiteral (DecLiteralDec _ b n) = _
+renderIntLiteral (HexLiteralDec _ b n) = _
 
 renderStringLiteral :: StringLiteral a -> RenderOutput
 renderStringLiteral (StringLiteral _ a b c d e) =

@@ -4,9 +4,10 @@ module Language.Python.Internal.Token where
 
 import Data.Deriving (deriveEq1)
 
-import Language.Python.Internal.Syntax.Whitespace (Newline(..))
+import Language.Python.Internal.Syntax.Numbers (IntLiteral(..))
 import Language.Python.Internal.Syntax.Strings
   (StringPrefix(..), BytesPrefix(..), QuoteType(..), StringType(..), PyChar(..))
+import Language.Python.Internal.Syntax.Whitespace (Newline(..))
 
 data PyToken a
   = TkIf a
@@ -40,7 +41,7 @@ data PyToken a
   | TkFor a
   | TkIn a
   | TkYield a
-  | TkInt Integer a
+  | TkInt (IntLiteral a) a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
   | TkString (Maybe StringPrefix) QuoteType StringType [PyChar] a

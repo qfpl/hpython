@@ -31,6 +31,7 @@ library
                      , Language.Python.Internal.Syntax.Ident
                      , Language.Python.Internal.Syntax.Module
                      , Language.Python.Internal.Syntax.ModuleNames
+                     , Language.Python.Internal.Syntax.Numbers
                      , Language.Python.Internal.Syntax.Statement
                      , Language.Python.Internal.Syntax.Strings
                      , Language.Python.Internal.Syntax.Whitespace

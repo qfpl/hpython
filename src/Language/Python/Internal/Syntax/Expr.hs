@@ -20,6 +20,7 @@ import Data.Bifunctor (bimap)
 import Data.Bifoldable (bifoldMap)
 import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
+import Data.Digit.Integral (integralDecDigits)
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty)
 import Data.Monoid ((<>))
@@ -29,6 +30,7 @@ import GHC.Generics (Generic)
 import Language.Python.Internal.Syntax.BinOp
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Ident
+import Language.Python.Internal.Syntax.Numbers
 import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Syntax.Whitespace
 
@@ -332,7 +334,7 @@ data Expr (v :: [*]) a
   }
   | Int
   { _exprAnnotation :: a
-  , _unsafeIntValue :: Integer
+  , _unsafeIntValue :: IntLiteral a
   , _unsafeIntWhitespace :: [Whitespace]
   }
   | Bool
@@ -422,8 +424,12 @@ instance IsString (Expr '[] ()) where
   fromString s = Ident () (MkIdent () s [])
 
 instance Num (Expr '[] ()) where
-  fromInteger n = Int () n []
+  fromInteger n
+    | n >= 0 = Int () (IntLiteralDec () $ integralDecDigits n ^?! _Right) []
+    | otherwise = Negate () [] $ Int () (IntLiteralDec () $ integralDecDigits (-n) ^?! _Right) []
+
   negate = Negate () []
+
   (+) a = BinOp () (a & trailingWhitespace .~ [Space]) (Plus () [Space])
   (*) a = BinOp () (a & trailingWhitespace .~ [Space]) (Multiply () [Space])
   (-) a = BinOp () (a & trailingWhitespace .~ [Space]) (Minus () [Space])

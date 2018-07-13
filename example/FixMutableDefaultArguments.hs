@@ -57,6 +57,6 @@ fixMutableDefaultArguments input = do
     isMutable Set{} = True
     isMutable Subscript{} = True
     isMutable Generator{} = True
-    isMutable (Ternary _ _ _ a _ b) = isMutable a && isMutable b
+    isMutable (Ternary _ _ _ a _ b) = isMutable a || isMutable b
     isMutable (Parens _ _ a _) = isMutable a
     isMutable (Tuple _ a _ as) = isMutable a || any (any isMutable) as

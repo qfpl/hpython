@@ -26,6 +26,7 @@ instance Validated Statement where
 instance Validated Block where
 instance Validated Ident where
 instance Validated Param where
+instance Validated Suite where
 
 data KeywordParam v a
   = MkKeywordParam

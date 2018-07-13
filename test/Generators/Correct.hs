@@ -14,6 +14,8 @@ import Control.Lens.Setter
 import Control.Lens.Tuple
 import Control.Lens.TH
 import Control.Monad.State
+import Data.Digit.HeXaDeCiMaL
+import Data.Digit.Enum
 import Data.Function
 import Data.List
 import Data.List.NonEmpty (NonEmpty(..))
@@ -22,6 +24,7 @@ import Data.Semigroup ((<>))
 import Hedgehog
 
 import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Internal.Shrink as Shrink
 import qualified Hedgehog.Range as Range
 import qualified Data.List.NonEmpty as NonEmpty
 
@@ -115,7 +118,10 @@ genInt :: MonadGen m => m (Expr '[] ())
 genInt = Int () <$> Gen.integral (Range.constant 0 (2^32)) <*> genWhitespaces
 
 genBlock :: (MonadGen m, MonadState GenState m) => m (Block '[] ())
-genBlock = doIndent *> go <* doDedent
+genBlock =
+  doIndent *>
+  Gen.shrink (\(Block (a :| as)) -> Block . (a :|) <$> Shrink.list as) go <*
+  doDedent
   where
     genLine =
       Gen.choice
@@ -274,11 +280,11 @@ genStringLiterals = do
   b <- Gen.bool_
   String () <$> go b n
   where
-    go True 1 = pure <$> genStringLiteral
-    go False 1 = pure <$> genBytesLiteral
+    go True 1 = pure <$> genStringLiteral genPyChar
+    go False 1 = pure <$> genBytesLiteral genPyChar
     go b n =
       NonEmpty.cons <$>
-      (if b then genStringLiteral else genBytesLiteral) <*>
+      (if b then genStringLiteral genPyChar else genBytesLiteral genPyChar) <*>
       go b (n-1)
 
 genExpr' :: (MonadGen m, MonadState GenState m) => Bool -> m (Expr '[] ())
@@ -570,3 +576,37 @@ genImportAs me genIdent =
     (ImportAs ())
     (set (mapped.trailingWhitespace) [Space] me)
     (sizedMaybe $ (,) <$> genWhitespaces1 <*> genIdent)
+
+genPyChar :: MonadGen m => m PyChar
+genPyChar =
+  Gen.choice
+  [ pure Char_newline
+  , Char_octal <$> Gen.element enumOctal <*> Gen.element enumOctal
+  , Char_hex <$> genHexDigit <*> genHexDigit
+  , Char_uni16 <$>
+    genHexDigit <*>
+    genHexDigit <*>
+    genHexDigit <*>
+    genHexDigit
+  , do
+      a <- genHexDigit
+      b <- case a of
+        HeXDigit1 -> pure HeXDigit0
+        _ -> genHexDigit
+      Char_uni32 HeXDigit0 HeXDigit0 a b <$>
+        genHexDigit <*>
+        genHexDigit <*>
+        genHexDigit <*>
+        genHexDigit
+  , pure Char_esc_bslash
+  , pure Char_esc_singlequote
+  , pure Char_esc_doublequote
+  , pure Char_esc_a
+  , pure Char_esc_b
+  , pure Char_esc_f
+  , pure Char_esc_n
+  , pure Char_esc_r
+  , pure Char_esc_t
+  , pure Char_esc_v
+  , Char_lit <$> Gen.filter (/='\0') Gen.latin1
+  ]

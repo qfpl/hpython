@@ -16,7 +16,7 @@ import Language.Python.Syntax
 
 fixMutableDefaultArguments :: Statement '[] () -> Maybe (Statement '[] ())
 fixMutableDefaultArguments input = do
-  (idnts, _, _, name, _, params, _, _, _, body) <- input ^? _Fundef
+  (idnts, _, _, name, _, params, _, suite) <- input ^? _Fundef
 
   let paramsList = toList params
   _ <- paramsList ^? folded._KeywordParam.filtered (isMutable._kpExpr)
@@ -36,7 +36,7 @@ fixMutableDefaultArguments input = do
   pure $
     over (_Indents.indentsValue) (idnts ^. indentsValue <>) $
     def_ name newparams
-    (NonEmpty.fromList $ conditionalAssignments <> (body ^.. _Statements.noIndents))
+    (NonEmpty.fromList $ conditionalAssignments <> (suite ^.. _Statements.noIndents))
   where
     isMutable :: Expr v a -> Bool
     isMutable None{} = False
@@ -50,6 +50,13 @@ fixMutableDefaultArguments input = do
     isMutable BinOp{} = True
     isMutable Negate{} = True
     isMutable Not{} = True
+    isMutable Dict{} = True
     isMutable Ident{} = True
+    isMutable Yield{} = True
+    isMutable YieldFrom{} = True
+    isMutable Set{} = True
+    isMutable Subscript{} = True
+    isMutable Generator{} = True
+    isMutable (Ternary _ _ _ a _ b) = isMutable a && isMutable b
     isMutable (Parens _ _ a _) = isMutable a
     isMutable (Tuple _ a _ as) = isMutable a || any (any isMutable) as

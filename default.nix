@@ -18,14 +18,12 @@ let
          adjunctions = self.adjunctions_4_4;
          lens = self.lens_4_16;
          deriving-compat = self.deriving-compat_0_4_1;
+         type-level-sets = self.callPackage ./nix/type-level-sets.nix {};
+         digit = self.callPackage ./nix/digit.nix {};
        };
      };
 
-  type-level-sets = haskellPackages.callPackage ./nix/type-level-sets.nix {};
-
-  drv = haskellPackages.callPackage f {
-    inherit type-level-sets;
-  };
+  drv = haskellPackages.callPackage f {};
 
 in
 

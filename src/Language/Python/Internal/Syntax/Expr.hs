@@ -134,7 +134,7 @@ data StringLiteral a
   , _unsafeStringLiteralPrefix :: Maybe StringPrefix
   , _stringLiteralQuoteType :: QuoteType
   , _stringLiteralType :: StringType
-  , _stringLiteralValue :: String
+  , _stringLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }
   | BytesLiteral
@@ -142,7 +142,7 @@ data StringLiteral a
   , _unsafeBytesLiteralPrefix :: BytesPrefix
   , _stringLiteralQuoteType :: QuoteType
   , _stringLiteralType :: StringType
-  , _stringLiteralValue :: String
+  , _stringLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
@@ -447,7 +447,7 @@ shouldBracketLeft op left =
 
     leftf =
       case entry ^. opAssoc of
-        R | Just R <- lEntry ^? _Just.opAssoc -> True
+        R | Just (OpEntry _ prec R) <- lEntry -> prec <= entry ^. opPrec
         _ -> False
 
     leftf' =
@@ -473,7 +473,7 @@ shouldBracketRight op right =
 
     rightf =
       case entry ^. opAssoc of
-        L | Just L <- rEntry ^? _Just.opAssoc -> True
+        L | Just (OpEntry _ prec L) <- rEntry -> prec <= entry ^. opPrec
         _ -> False
 
     rightf' =

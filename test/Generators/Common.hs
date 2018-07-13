@@ -1,11 +1,11 @@
 {-# language DataKinds #-}
-{-# language LambdaCase #-}
 module Generators.Common where
 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
+import Data.Digit.HeXaDeCiMaL
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
@@ -31,8 +31,8 @@ genSmallInt =
   Gen.integral (Range.constant 0 100) <*>
   genWhitespaces
 
-genString :: MonadGen m => m String
-genString = Gen.list (Range.constant 0 50) (Gen.filter (/='\0') Gen.latin1)
+genString :: MonadGen m => m PyChar -> m [PyChar]
+genString = Gen.list (Range.constant 0 50)
 
 genNewline :: MonadGen m => m Newline
 genNewline = Gen.element [LF, CR, CRLF]
@@ -273,22 +273,22 @@ genAugAssign =
   pure () <*>
   genWhitespaces
 
-genStringLiteral :: MonadGen m => m (StringLiteral ())
-genStringLiteral =
+genStringLiteral :: MonadGen m => m PyChar -> m (StringLiteral ())
+genStringLiteral gChar =
   StringLiteral () <$>
   Gen.maybe genStringPrefix <*>
   genQuoteType <*>
   genStringType <*>
-  genString <*>
+  genString gChar <*>
   genWhitespaces
 
-genBytesLiteral :: MonadGen m => m (StringLiteral ())
-genBytesLiteral =
+genBytesLiteral :: MonadGen m => m PyChar -> m (StringLiteral ())
+genBytesLiteral gChar =
   BytesLiteral () <$>
   genBytesPrefix <*>
   genQuoteType <*>
   genStringType <*>
-  genString <*>
+  genString gChar <*>
   genWhitespaces
 
 genDictItem :: MonadGen m => m (Expr v ()) -> m (DictItem v ())
@@ -297,3 +297,30 @@ genDictItem ge =
   ge <*>
   genAnyWhitespaces <*>
   ge
+
+genHexDigit :: MonadGen m => m HeXDigit
+genHexDigit =
+  Gen.element
+  [ HeXDigit0
+  , HeXDigit1
+  , HeXDigit2
+  , HeXDigit3
+  , HeXDigit4
+  , HeXDigit5
+  , HeXDigit6
+  , HeXDigit7
+  , HeXDigit8
+  , HeXDigit9
+  , HeXDigita
+  , HeXDigitA
+  , HeXDigitb
+  , HeXDigitB
+  , HeXDigitc
+  , HeXDigitC
+  , HeXDigitd
+  , HeXDigitD
+  , HeXDigite
+  , HeXDigitE
+  , HeXDigitf
+  , HeXDigitF
+  ]

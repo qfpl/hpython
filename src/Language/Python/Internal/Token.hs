@@ -6,7 +6,7 @@ import Data.Deriving (deriveEq1)
 
 import Language.Python.Internal.Syntax.Whitespace (Newline(..))
 import Language.Python.Internal.Syntax.Strings
-  (StringPrefix(..), BytesPrefix(..), QuoteType(..), StringType(..))
+  (StringPrefix(..), BytesPrefix(..), QuoteType(..), StringType(..), PyChar(..))
 
 data PyToken a
   = TkIf a
@@ -43,8 +43,8 @@ data PyToken a
   | TkInt Integer a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
-  | TkString (Maybe StringPrefix) QuoteType StringType String a
-  | TkBytes BytesPrefix QuoteType StringType String a
+  | TkString (Maybe StringPrefix) QuoteType StringType [PyChar] a
+  | TkBytes BytesPrefix QuoteType StringType [PyChar] a
   | TkSpace a
   | TkTab a
   | TkNewline Newline a

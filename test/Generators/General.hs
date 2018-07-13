@@ -1,10 +1,10 @@
 {-# language DataKinds, TypeFamilies #-}
-{-# language LambdaCase #-}
 module Generators.General where
 
 import Control.Applicative
 import Control.Lens.Getter
 import Control.Lens.Iso (from)
+import Data.Digit.Enum
 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -126,6 +126,39 @@ genSubscript =
 genExpr :: MonadGen m => m (Expr '[] ())
 genExpr = genExpr' False
 
+genPyChar :: MonadGen m => m PyChar
+genPyChar =
+  Gen.choice
+  [ pure Char_newline
+  , Char_octal <$> Gen.element enumOctal <*> Gen.element enumOctal
+  , Char_hex <$> genHexDigit <*> genHexDigit
+  , Char_uni16 <$>
+      genHexDigit <*>
+      genHexDigit <*>
+      genHexDigit <*>
+      genHexDigit
+  , Char_uni32 <$>
+      genHexDigit <*>
+      genHexDigit <*>
+      genHexDigit <*>
+      genHexDigit <*>
+      genHexDigit <*>
+      genHexDigit <*>
+      genHexDigit <*>
+      genHexDigit
+  , pure Char_esc_bslash
+  , pure Char_esc_singlequote
+  , pure Char_esc_doublequote
+  , pure Char_esc_a
+  , pure Char_esc_b
+  , pure Char_esc_f
+  , pure Char_esc_n
+  , pure Char_esc_r
+  , pure Char_esc_t
+  , pure Char_esc_v
+  , Char_lit <$> Gen.latin1
+  ]
+
 genExpr' :: MonadGen m => Bool -> m (Expr '[] ())
 genExpr' isExp =
   sizedRecursive
@@ -133,7 +166,9 @@ genExpr' isExp =
     , if isExp then genSmallInt else genInt
     , Ident () <$> genIdent
     , String () <$>
-      Gen.nonEmpty (Range.constant 1 5) (Gen.choice [genStringLiteral, genBytesLiteral])
+      Gen.nonEmpty
+        (Range.constant 1 5)
+        (Gen.choice [genStringLiteral genPyChar, genBytesLiteral genPyChar])
     ]
     [ List () <$>
       genWhitespaces <*>

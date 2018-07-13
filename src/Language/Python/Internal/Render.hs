@@ -14,14 +14,16 @@ module Language.Python.Internal.Render
   , renderImportAs, renderImportTargets, renderSmallStatement, renderCompoundStatement
   , renderBlock, renderIndent, renderIndents, renderExceptAs, renderArg, renderParam
   , renderCompFor, renderCompIf, renderComprehension, renderBinOp, renderSubscript
+  , renderPyChars
   )
 where
 
 import Control.Lens.Getter (view)
 import Control.Lens.Wrapped (_Wrapped)
 import Control.Lens.Plated (transform)
+import Control.Lens.Review ((#))
 import Data.Bifoldable (bifoldMap)
-import Data.Char (ord)
+import Data.Digit.Char (charHeXaDeCiMaL, charOctal)
 import Data.Foldable (toList)
 import Data.Maybe (maybe)
 import Data.Semigroup (Semigroup(..))
@@ -140,7 +142,7 @@ showToken t =
       in
         foldMap showStringPrefix sp <>
         quote <>
-        foldMap renderChar s <>
+        renderPyChars qt st s <>
         quote
     TkBytes sp qt st s _ ->
       let
@@ -149,7 +151,7 @@ showToken t =
       in
         showBytesPrefix sp <>
         quote <>
-        foldMap renderChar s <>
+        renderPyChars qt st s <>
         quote
     TkSpace{} -> " "
     TkTab{} -> "\t"
@@ -261,20 +263,133 @@ intToHex n = go n []
     go 15 = (++"F")
     go b = let (q, r) = quotRem b 16 in go r . go q
 
-renderChar :: Char -> String
-renderChar c
-  | Just c' <- lookup c escapeChars = ['\\', c']
-  | otherwise =
-      let
-        shown = show c
-      in
-        case shown of
-          '\'' : '\\' : _ ->
-            let
-              hex = intToHex (ord c)
-            in
-              "\\U" ++ replicate (8 - length hex) '0' ++ hex
-          _ -> [c]
+renderPyChars :: QuoteType -> StringType -> [PyChar] -> String
+renderPyChars qt st = go
+  where
+    endSingleQuotesShort =
+      snd .
+      foldr
+        (\a (bl, b) ->
+           case a of
+             Char_lit '\'' -> (bl, '\\' : '\'' : b)
+             Char_lit '\\' ->
+               ( bl
+               , if bl
+                 then '\\' : (case b of; '\\' : _ -> '\\' : b; _ -> b)
+                 else '\\' : '\\' : b
+               )
+             _ -> (True, go [a] <> b))
+        (False, [])
+
+    endSingleQuotesLong =
+      snd .
+      foldr
+        (\a (bl, b) ->
+           case a of
+             Char_lit '\'' -> (bl, if bl then '\'' : b else '\\' : '\'' : b)
+             Char_lit '\\' ->
+               ( bl
+               , if bl
+                 then '\\' : (case b of; '\\' : _ -> '\\' : b; _ -> b)
+                 else '\\' : '\\' : b
+               )
+             _ -> (True, go [a] <> b))
+        (False, [])
+
+    endDoubleQuotesShort =
+      snd .
+      foldr
+        (\a (bl, b) ->
+           case a of
+             Char_lit '\"' -> (bl, '\\' : '\"' : b)
+             Char_lit '\\' ->
+               ( bl
+               , if bl
+                 then '\\' : (case b of; '\\' : _ -> '\\' : b; _ -> b)
+                 else '\\' : '\\' : b)
+             _ -> (True, go [a] <> b))
+        (False, [])
+
+    endDoubleQuotesLong =
+      snd .
+      foldr
+        (\a (bl, b) ->
+           case a of
+             Char_lit '\"' -> (bl, if bl then '\"' : b else '\\' : '\"' : b)
+             Char_lit '\\' ->
+               ( bl
+               , if bl
+                 then '\\' : (case b of; '\\' : _ -> '\\' : b; _ -> b)
+                 else '\\' : '\\' : b)
+             _ -> (True, go [a] <> b))
+        (False, [])
+
+    escapeTripleDoubleQuotes (Char_lit '"' : Char_lit '"' : Char_lit '"' : cs) =
+      Char_esc_doublequote : Char_esc_doublequote : Char_esc_doublequote : cs
+    escapeTripleDoubleQuotes cs = cs
+
+    escapeTripleSingleQuotes (Char_lit '\'' : Char_lit '\'' : Char_lit '\'' : cs) =
+      Char_esc_singlequote : Char_esc_singlequote : Char_esc_singlequote : cs
+    escapeTripleSingleQuotes cs = cs
+
+    go s =
+      case s of
+        [] -> ""
+        Char_newline : cs -> "\\newline" <> go cs
+        Char_octal a b : cs ->
+          "\\o" <>
+          [charOctal # a, charOctal # b] <>
+          go cs
+        Char_hex a b : cs ->
+          "\\x" <> [charHeXaDeCiMaL # a, charHeXaDeCiMaL # b] <> go cs
+        Char_uni16 a b c d : cs ->
+          "\\u" <>
+          [ charHeXaDeCiMaL # a
+          , charHeXaDeCiMaL # b
+          , charHeXaDeCiMaL # c
+          , charHeXaDeCiMaL # d
+          ] <>
+          go cs
+        Char_uni32 a b c d e f g h : cs ->
+          "\\u" <>
+          [ charHeXaDeCiMaL # a
+          , charHeXaDeCiMaL # b
+          , charHeXaDeCiMaL # c
+          , charHeXaDeCiMaL # d
+          , charHeXaDeCiMaL # e
+          , charHeXaDeCiMaL # f
+          , charHeXaDeCiMaL # g
+          , charHeXaDeCiMaL # h
+          ] <>
+          go cs
+        Char_esc_bslash : cs -> '\\' : '\\' : go cs
+        Char_esc_singlequote : cs -> '\\' : '\'' : go cs
+        Char_esc_doublequote : cs -> '\\' : '"' : go cs
+        Char_esc_a : cs -> '\\' : 'a' : go cs
+        Char_esc_b : cs -> '\\' : 'b' : go cs
+        Char_esc_f : cs -> '\\' : 'f' : go cs
+        Char_esc_n : cs -> '\\' : 'n' : go cs
+        Char_esc_r : cs -> '\\' : 'r' : go cs
+        Char_esc_t : cs -> '\\' : 't' : go cs
+        Char_esc_v : cs -> '\\' : 'v' : go cs
+        Char_lit c : cs ->
+          case (qt, st) of
+            (SingleQuote, ShortString) ->
+              case c of
+                '\'' -> '\\' : '\'' : go cs
+                _ -> c : endSingleQuotesShort cs
+            (SingleQuote, LongString) ->
+              case c of
+                '\'' -> '\\' : '\'' : go cs
+                _ -> c : endSingleQuotesLong (transform escapeTripleSingleQuotes cs)
+            (DoubleQuote, ShortString) ->
+              case c of
+                '"' -> '\\' : '"' : go cs
+                _ -> c : endDoubleQuotesShort cs
+            (DoubleQuote, LongString) ->
+              case c of
+                '"' -> '\\' : '"' : go cs
+                _ -> c : endDoubleQuotesLong (transform escapeTripleDoubleQuotes cs)
 
 renderWhitespace :: Whitespace -> RenderOutput
 renderWhitespace Space = singleton $ TkSpace ()
@@ -522,20 +637,21 @@ renderImportTargets (ImportSomeParens _ ws1 ts ws2) =
 
 renderAugAssign :: AugAssign a -> RenderOutput
 renderAugAssign aa =
-  case aa of
-    PlusEq{} -> singleton $ TkPlusEq ()
-    MinusEq{} -> singleton $ TkMinusEq ()
-    StarEq{} -> singleton $ TkStarEq ()
-    AtEq{} -> singleton $ TkAtEq ()
-    SlashEq{} -> singleton $ TkSlashEq ()
-    PercentEq{} -> singleton $ TkPercentEq ()
-    AmphersandEq{} -> singleton $ TkAmphersandEq ()
-    PipeEq{} -> singleton $ TkPipeEq ()
-    CaretEq{} -> singleton $ TkCaretEq ()
-    ShiftLeftEq{} -> singleton $ TkShiftLeftEq ()
-    ShiftRightEq{} -> singleton $ TkShiftRightEq ()
-    DoubleStarEq{} -> singleton $ TkDoubleStarEq ()
-    DoubleSlashEq{} -> singleton $ TkDoubleSlashEq ()
+  (case aa of
+     PlusEq{} -> TkPlusEq ()
+     MinusEq{} -> TkMinusEq ()
+     StarEq{} -> TkStarEq ()
+     AtEq{} -> TkAtEq ()
+     SlashEq{} -> TkSlashEq ()
+     PercentEq{} -> TkPercentEq ()
+     AmphersandEq{} -> TkAmphersandEq ()
+     PipeEq{} -> TkPipeEq ()
+     CaretEq{} -> TkCaretEq ()
+     ShiftLeftEq{} -> TkShiftLeftEq ()
+     ShiftRightEq{} -> TkShiftRightEq ()
+     DoubleStarEq{} -> TkDoubleStarEq ()
+     DoubleSlashEq{} -> TkDoubleSlashEq ()) `cons`
+  foldMap renderWhitespace (_augAssignWhitespace aa)
 
 renderSmallStatement :: SmallStatement v a -> RenderOutput
 renderSmallStatement (Assert a b c d) =

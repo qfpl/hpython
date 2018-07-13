@@ -41,6 +41,7 @@ library
                      , Language.Python.Validate.Indentation
                      , Language.Python.Validate.Indentation.Error
   build-depends:       base >=4.9 && <4.11
+                     , digit >=0.6
                      , lens
                      , type-level-sets >=0.8.6.0
                      , parsers
@@ -88,6 +89,7 @@ test-suite hpython-tests
   hs-source-dirs:      test
   build-depends:       base >=4.9 && <4.11
                      , directory
+                     , digit >=0.6
                      , filepath
                      , hpython
                      , hedgehog

@@ -32,6 +32,7 @@ lexerParserTests =
   , ("Test full trip 12", test_fulltrip_12)
   , ("Test full trip 13", test_fulltrip_13)
   , ("Test full trip 14", test_fulltrip_14)
+  , ("Test full trip 15", test_fulltrip_15)
   ]
 
 test_fulltrip_1 :: Property
@@ -320,6 +321,29 @@ test_fulltrip_14 =
   withTests 1 . property $ do
     let
       str = "not ((False for a in False) if False else False or False)"
+
+    tks <- doTokenize str
+    annotateShow $! tks
+
+    let lls = logicalLines tks
+    annotateShow $! lls
+
+    ils <- doIndentation lls
+    annotateShow $! ils
+
+    nst <- doNested ils
+    annotateShow $! nst
+
+    a <- doParse' module_ nst
+    annotateShow $! a
+
+    showModule a === str
+
+test_fulltrip_15 :: Property
+test_fulltrip_15 =
+  withTests 1 . property $ do
+    let
+      str = "a and b == c == d"
 
     tks <- doTokenize str
     annotateShow $! tks

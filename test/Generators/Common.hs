@@ -262,7 +262,7 @@ genAugAssign =
     , AtEq
     , SlashEq
     , PercentEq
-    , AmphersandEq
+    , AmpersandEq
     , PipeEq
     , CaretEq
     , ShiftLeftEq

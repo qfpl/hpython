@@ -244,7 +244,7 @@ data AugAssign a
   { _augAssignAnn :: a
   , _augAssignWhitespace :: [Whitespace]
   }
-  | AmphersandEq
+  | AmpersandEq
   { _augAssignAnn :: a
   , _augAssignWhitespace :: [Whitespace]
   }

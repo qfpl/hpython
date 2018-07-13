@@ -82,19 +82,25 @@ data PyToken a
   | TkAtEq a
   | TkSlashEq a
   | TkPercentEq a
-  | TkAmphersandEq a
+  | TkAmpersandEq a
   | TkPipeEq a
   | TkCaretEq a
   | TkShiftLeftEq a
   | TkShiftRightEq a
   | TkDoubleStarEq a
   | TkDoubleSlashEq a
+  | TkPipe a
+  | TkCaret a
+  | TkAmpersand a
   deriving (Eq, Show, Functor)
 deriveEq1 ''PyToken
 
 pyTokenAnn :: PyToken a -> a
 pyTokenAnn tk =
   case tk of
+    TkPipe a -> a
+    TkCaret a -> a
+    TkAmpersand a -> a
     TkDef a -> a
     TkReturn a -> a
     TkPass a -> a
@@ -168,7 +174,7 @@ pyTokenAnn tk =
     TkAtEq a -> a
     TkSlashEq a -> a
     TkPercentEq a -> a
-    TkAmphersandEq a -> a
+    TkAmpersandEq a -> a
     TkPipeEq a -> a
     TkCaretEq a -> a
     TkShiftLeftEq a -> a

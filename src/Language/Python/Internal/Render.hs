@@ -199,9 +199,12 @@ showToken t =
     TkAtEq{} -> "@="
     TkSlashEq{} -> "/="
     TkPercentEq{} -> "%="
-    TkAmphersandEq{} -> "&="
+    TkAmpersandEq{} -> "&="
     TkPipeEq{} -> "|="
     TkCaretEq{} -> "^="
+    TkAmpersand{} -> "&"
+    TkPipe{} -> "|"
+    TkCaret{} -> "^"
     TkShiftLeftEq{} -> "<<="
     TkShiftRightEq{} -> ">>="
     TkDoubleStarEq{} -> "**="
@@ -648,7 +651,7 @@ renderAugAssign aa =
      AtEq{} -> TkAtEq ()
      SlashEq{} -> TkSlashEq ()
      PercentEq{} -> TkPercentEq ()
-     AmphersandEq{} -> TkAmphersandEq ()
+     AmpersandEq{} -> TkAmpersandEq ()
      PipeEq{} -> TkPipeEq ()
      CaretEq{} -> TkCaretEq ()
      ShiftLeftEq{} -> TkShiftLeftEq ()
@@ -892,6 +895,11 @@ renderBinOp (Gt _ ws) = TkGt () `cons` foldMap renderWhitespace ws
 renderBinOp (GtEquals _ ws) = TkGte () `cons` foldMap renderWhitespace ws
 renderBinOp (NotEquals _ ws) = TkBangEq () `cons` foldMap renderWhitespace ws
 renderBinOp (Percent _ ws) = TkPercent () `cons` foldMap renderWhitespace ws
+renderBinOp (BitOr _ ws) = TkPipe () `cons` foldMap renderWhitespace ws
+renderBinOp (BitXor _ ws) = TkCaret () `cons` foldMap renderWhitespace ws
+renderBinOp (BitAnd _ ws) = TkAmpersand () `cons` foldMap renderWhitespace ws
+renderBinOp (ShiftLeft _ ws) = TkShiftLeft () `cons` foldMap renderWhitespace ws
+renderBinOp (ShiftRight _ ws) = TkShiftRight () `cons` foldMap renderWhitespace ws
 
 renderIndents :: Indents a -> RenderOutput
 renderIndents (Indents is _) = foldMap renderIndent is

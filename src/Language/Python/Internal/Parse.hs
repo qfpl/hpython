@@ -410,13 +410,26 @@ expr ws =
      expr ws)
 
 orExpr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
-orExpr ws = xorExpr
+orExpr ws =
+  binOp
+    ((\(tk, ws) -> BitOr (pyTokenAnn tk) ws) <$> token ws (TkPipe ()))
+    xorExpr
   where
-    xorExpr = andExpr
+    xorExpr =
+      binOp
+        ((\(tk, ws) -> BitXor (pyTokenAnn tk) ws) <$> token ws (TkCaret ()))
+        andExpr
 
-    andExpr = shiftExpr
+    andExpr =
+      binOp
+        ((\(tk, ws) -> BitAnd (pyTokenAnn tk) ws) <$> token ws (TkAmpersand ()))
+        shiftExpr
 
-    shiftExpr = arithExpr
+    shiftExpr =
+      binOp
+        ((\(tk, ws) -> ShiftLeft (pyTokenAnn tk) ws) <$> token ws (TkShiftLeft ()) <!>
+         (\(tk, ws) -> ShiftRight (pyTokenAnn tk) ws) <$> token ws (TkShiftRight ()))
+        arithExpr
 
     arithOp =
       (\(tk, ws) -> Plus (pyTokenAnn tk) ws) <$> token ws (TkPlus ()) <!>
@@ -577,7 +590,7 @@ smallStatement =
       (\(tk, s) -> StarEq (pyTokenAnn tk) s) <$> token space (TkStarEq ()) <!>
       (\(tk, s) -> SlashEq (pyTokenAnn tk) s) <$> token space (TkSlashEq ()) <!>
       (\(tk, s) -> PercentEq (pyTokenAnn tk) s) <$> token space (TkPercentEq ()) <!>
-      (\(tk, s) -> AmphersandEq (pyTokenAnn tk) s) <$> token space (TkAmphersandEq ()) <!>
+      (\(tk, s) -> AmpersandEq (pyTokenAnn tk) s) <$> token space (TkAmpersandEq ()) <!>
       (\(tk, s) -> PipeEq (pyTokenAnn tk) s) <$> token space (TkPipeEq ()) <!>
       (\(tk, s) -> CaretEq (pyTokenAnn tk) s) <$> token space (TkCaretEq ()) <!>
       (\(tk, s) -> ShiftLeftEq (pyTokenAnn tk) s) <$> token space (TkShiftLeftEq ()) <!>

@@ -186,10 +186,10 @@ parseToken =
        TkSlashEq <$ char '=' <|>
        pure TkSlash)
     , TkBangEq <$ string "!="
-    , TkCaretEq <$ string "^="
-    , TkPipeEq <$ string "|="
+    , char '^' *> (TkCaretEq <$ char '=' <|> pure TkCaret)
+    , char '|' *> (TkPipeEq <$ char '=' <|> pure TkPipe)
+    , char '&' *> (TkAmpersandEq <$ char '=' <|> pure TkAmpersand)
     , TkAtEq <$ string "@="
-    , TkAmphersandEq <$ string "&="
     , char '+' *> (TkPlusEq <$ char '=' <|> pure TkPlus)
     , char '-' *> (TkMinusEq <$ char '=' <|> pure TkMinus)
     , char '%' *> (TkPercentEq <$ char '=' <|> pure TkPercent)

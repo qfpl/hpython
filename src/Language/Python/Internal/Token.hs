@@ -6,13 +6,14 @@ import Data.Deriving (deriveEq1)
 
 import Language.Python.Internal.Syntax.Whitespace (Newline(..))
 import Language.Python.Internal.Syntax.Strings
-  (StringPrefix(..), BytesPrefix(..), QuoteType(..), StringType(..))
+  (StringPrefix(..), BytesPrefix(..), QuoteType(..), StringType(..), PyChar(..))
 
 data PyToken a
   = TkIf a
   | TkElse a
   | TkElif a
   | TkWhile a
+  | TkAssert a
   | TkDef a
   | TkReturn a
   | TkPass a
@@ -38,11 +39,12 @@ data PyToken a
   | TkClass a
   | TkFor a
   | TkIn a
+  | TkYield a
   | TkInt Integer a
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
-  | TkString (Maybe StringPrefix) QuoteType StringType String a
-  | TkBytes BytesPrefix QuoteType StringType String a
+  | TkString (Maybe StringPrefix) QuoteType StringType [PyChar] a
+  | TkBytes BytesPrefix QuoteType StringType [PyChar] a
   | TkSpace a
   | TkTab a
   | TkNewline Newline a
@@ -80,19 +82,25 @@ data PyToken a
   | TkAtEq a
   | TkSlashEq a
   | TkPercentEq a
-  | TkAmphersandEq a
+  | TkAmpersandEq a
   | TkPipeEq a
   | TkCaretEq a
   | TkShiftLeftEq a
   | TkShiftRightEq a
   | TkDoubleStarEq a
   | TkDoubleSlashEq a
+  | TkPipe a
+  | TkCaret a
+  | TkAmpersand a
   deriving (Eq, Show, Functor)
 deriveEq1 ''PyToken
 
 pyTokenAnn :: PyToken a -> a
 pyTokenAnn tk =
   case tk of
+    TkPipe a -> a
+    TkCaret a -> a
+    TkAmpersand a -> a
     TkDef a -> a
     TkReturn a -> a
     TkPass a -> a
@@ -118,12 +126,14 @@ pyTokenAnn tk =
     TkClass a -> a
     TkFor a -> a
     TkIn a -> a
+    TkYield a -> a
     TkPlus a -> a
     TkMinus a -> a
     TkIf a -> a
     TkElse a -> a
     TkElif a -> a
     TkWhile a -> a
+    TkAssert a -> a
     TkInt _ a -> a
     TkFloat _ _ a -> a
     TkIdent _ a -> a
@@ -164,7 +174,7 @@ pyTokenAnn tk =
     TkAtEq a -> a
     TkSlashEq a -> a
     TkPercentEq a -> a
-    TkAmphersandEq a -> a
+    TkAmpersandEq a -> a
     TkPipeEq a -> a
     TkCaretEq a -> a
     TkShiftLeftEq a -> a

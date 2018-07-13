@@ -31,6 +31,11 @@ data BinOp a
   | Divide a [Whitespace]
   | Percent a [Whitespace]
   | Plus a [Whitespace]
+  | BitOr a [Whitespace]
+  | BitXor a [Whitespace]
+  | BitAnd a [Whitespace]
+  | ShiftLeft a [Whitespace]
+  | ShiftRight a [Whitespace]
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasTrailingWhitespace (BinOp a) where
@@ -54,6 +59,11 @@ instance HasTrailingWhitespace (BinOp a) where
          Gt _ a -> a
          GtEquals _ a -> a
          NotEquals _ a -> a
+         BitOr _ a -> a
+         BitXor _ a -> a
+         BitAnd _ a -> a
+         ShiftLeft _ a -> a
+         ShiftRight _ a -> a
          Percent _ a -> a)
       (\op ws ->
          case op of
@@ -74,6 +84,11 @@ instance HasTrailingWhitespace (BinOp a) where
            Gt a _ -> Gt a ws
            GtEquals a _ -> GtEquals a ws
            NotEquals a _ -> NotEquals a ws
+           BitOr a _ -> BitOr a ws
+           BitAnd a _ -> BitAnd a ws
+           BitXor a _ -> BitXor a ws
+           ShiftLeft a _ -> ShiftLeft a ws
+           ShiftRight a _ -> ShiftRight a ws
            Percent a _ -> Equals a ws)
 
 data Assoc = L | R deriving (Eq, Show)
@@ -100,6 +115,11 @@ operatorTable =
   , entry Gt 10 L
   , entry GtEquals 10 L
   , entry NotEquals 10 L
+  , entry BitOr 14 L
+  , entry BitXor 15 L
+  , entry BitAnd 16 L
+  , entry ShiftLeft 17 L
+  , entry ShiftRight 17 L
   , entry Minus 20 L
   , entry Plus 20 L
   , entry Multiply 25 L
@@ -132,6 +152,11 @@ sameOperator op op' =
     (Divide{}, Divide{}) -> True
     (Exp{}, Exp{}) -> True
     (Percent{}, Percent{}) -> True
+    (BitOr{}, BitOr{}) -> True
+    (BitXor{}, BitXor{}) -> True
+    (BitAnd{}, BitAnd{}) -> True
+    (ShiftLeft{}, ShiftLeft{}) -> True
+    (ShiftRight{}, ShiftRight{}) -> True
     _ -> False
 
 lookupOpEntry :: BinOp a -> [OpEntry] -> OpEntry

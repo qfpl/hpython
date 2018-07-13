@@ -32,15 +32,20 @@ def_ name params block =
     []
     (listToCommaSep params)
     []
-    []
-    LF
-    (toBlock block)
+    (Suite () [] Nothing LF $ toBlock block)
 
 call_ :: Expr '[] () -> [Arg '[] ()] -> Expr '[] ()
-call_ expr args = Call () expr [] (listToCommaSep args) []
+call_ expr args =
+  Call ()
+    expr
+    []
+    (case args of
+      [] -> Nothing
+      a:as -> Just $ (a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1')
+    []
 
 return_ :: Expr '[] () -> Statement '[] ()
-return_ e = SmallStatements (Indents [] ()) (Return () [Space] e) [] Nothing (Just LF)
+return_ e = SmallStatements (Indents [] ()) (Return () [Space] $ Just e) [] Nothing (Just LF)
 
 expr_ :: Expr '[] () -> Statement '[] ()
 expr_ e = SmallStatements (Indents [] ()) (Expr () e) [] Nothing (Just LF)
@@ -126,8 +131,7 @@ while_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 while_ e sts =
   CompoundStatement $
   While (Indents [] ()) () [Space] e
-    [] LF
-    (toBlock sts)
+    (Suite () [] Nothing LF $ toBlock sts)
 
 ifElifsElse_
   :: Expr '[] ()
@@ -137,16 +141,16 @@ ifElifsElse_
   -> Statement '[] ()
 ifElifsElse_ e sts elifs sts' =
   CompoundStatement $
-  If (Indents [] ()) () [Space] e [] LF
-    (toBlock sts)
-    ((\(a, b) -> (Indents [] (), [Space], a, [], LF, toBlock b)) <$> elifs)
-    (Just (Indents [] (), [], [], LF, toBlock sts'))
+  If (Indents [] ()) () [Space] e
+    (Suite () [] Nothing LF $ toBlock sts)
+    ((\(a, b) -> (Indents [] (), [Space], a, Suite () [] Nothing LF $ toBlock b)) <$> elifs)
+    (Just (Indents [] (), [], Suite () [] Nothing LF $ toBlock sts'))
 
 if_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 if_ e sts =
   CompoundStatement $
-  If (Indents [] ()) () [Space] e [] LF
-    (toBlock sts)
+  If (Indents [] ()) () [Space] e
+    (Suite () [] Nothing LF $ toBlock sts)
     []
     Nothing
 
@@ -182,10 +186,14 @@ or_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
 or_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolOr () [Space])
 
 str_ :: String -> Expr '[] ()
-str_ s = String () . pure $ StringLiteral () Nothing DoubleQuote ShortString s []
+str_ s =
+  String () . pure $
+  StringLiteral () Nothing DoubleQuote ShortString (Char_lit <$> s) []
 
 longStr_ :: String -> Expr '[] ()
-longStr_ s = String () . pure $ StringLiteral () Nothing DoubleQuote LongString s []
+longStr_ s =
+  String () . pure $
+  StringLiteral () Nothing DoubleQuote LongString (Char_lit <$> s) []
 
 (.=) :: Expr '[] () -> Expr '[] () -> Statement '[] ()
 (.=) a b =
@@ -201,13 +209,13 @@ forElse_
   -> Statement '[] ()
 forElse_ val vals block els =
   CompoundStatement $
-  For (Indents [] ()) () [Space] (val & trailingWhitespace .~ [Space]) [Space] vals [] LF
-    (toBlock block)
-    (Just (Indents [] (), [], [], LF, toBlock els))
+  For (Indents [] ()) () [Space] (val & trailingWhitespace .~ [Space]) [Space] vals
+    (Suite () [] Nothing LF $ toBlock block)
+    (Just (Indents [] (), [], Suite () [] Nothing LF $ toBlock els))
 
 for_ :: Expr '[] () -> Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 for_ val vals block =
   CompoundStatement $
-  For (Indents [] ()) () [Space] (val & trailingWhitespace .~ [Space]) [Space] vals [] LF
-    (toBlock block)
+  For (Indents [] ()) () [Space] (val & trailingWhitespace .~ [Space]) [Space] vals
+    (Suite () [] Nothing LF $ toBlock block)
     Nothing

@@ -12,7 +12,8 @@ import Control.Monad (when, replicateM)
 import Control.Monad.Except (throwError)
 import Control.Monad.State (StateT, evalStateT, get, modify, put)
 import Data.Bifunctor (first)
-import Data.Char (chr, isAscii)
+import Data.Digit.HeXaDeCiMaL (parseHeXaDeCiMaL)
+import Data.Digit.Octal (parseOctal)
 import Data.FingerTree (FingerTree, Measured(..))
 import Data.Foldable (asum)
 import Data.List.NonEmpty (NonEmpty(..))
@@ -22,8 +23,8 @@ import Data.Sequence ((!?), (|>), Seq)
 import Text.Parser.LookAhead (LookAheadParsing, lookAhead)
 import Text.Trifecta
   ( CharParsing, DeltaParsing, Caret, Careted(..), char, careted, noneOf
-  , digit, string, manyTill, parseString, unexpected, oneOf, satisfy, try
-  , notFollowedBy
+  , digit, string, manyTill, parseString, satisfy, try
+  , notFollowedBy, anyChar
   )
 
 import qualified Data.FingerTree as FingerTree
@@ -85,31 +86,38 @@ hexToInt =
   (snd $!) .
   foldr (\a (sz, val) -> (sz+1, hexDigitInt a * 16 ^ sz + val)) (0, 0)
 
-stringChar :: (CharParsing m, Monad m) => m Char
-stringChar = (char '\\' *> (escapeChar <|> hexChar)) <|> other
+stringChar :: (CharParsing m, Monad m) => m PyChar
+stringChar =
+  (char '\\' *>
+   (escapeChar <|> unicodeChar <|> octChar <|> hexChar <|> pure (Char_lit '\\'))) <|>
+  other
   where
-    other = satisfy isAscii
+    other = Char_lit <$> anyChar
     escapeChar =
       asum @[]
-      [ char '\\'
-      , char '\''
-      , char '"'
-      , '\a' <$ char 'a'
-      , '\b' <$ char 'b'
-      , '\f' <$ char 'f'
-      , '\n' <$ char 'n'
-      , '\r' <$ char 'r'
-      , '\t' <$ char 't'
-      , '\v' <$ char 'v'
+      [ Char_esc_bslash <$ char '\\'
+      , Char_esc_singlequote <$ char '\''
+      , Char_esc_doublequote <$ char '"'
+      , Char_esc_a <$ char 'a'
+      , Char_esc_b <$ char 'b'
+      , Char_esc_f <$ char 'f'
+      , char 'n' *> (Char_newline <$ string "ewline" <|> pure Char_esc_n)
+      , Char_esc_r <$ char 'r'
+      , Char_esc_t <$ char 't'
+      , Char_esc_v <$ char 'v'
       ]
 
-    hexChar =
+    unicodeChar =
       char 'U' *>
-      (hexToInt <$> replicateM 8 (oneOf "0123456789ABCDEF") >>=
-       \a ->
-         if a <= 0x10FFFF
-         then pure (chr a)
-         else unexpected $ "value: " <> show a <> " outside unicode range")
+      ((\[a, b, c, d, e, f, g, h] -> Char_uni32 a b c d e f g h) <$>
+       replicateM 8 parseHeXaDeCiMaL)
+      <|>
+      char 'u' *>
+      ((\[a, b, c, d] -> Char_uni16 a b c d) <$>
+       replicateM 4 parseHeXaDeCiMaL)
+
+    hexChar = Char_hex <$ char 'x' <*> parseHeXaDeCiMaL <*> parseHeXaDeCiMaL
+    octChar = Char_octal <$ char 'o' <*> parseOctal <*> parseOctal
 
 parseToken :: (DeltaParsing m, LookAheadParsing m) => m (PyToken Caret)
 parseToken =
@@ -121,6 +129,7 @@ parseToken =
     , TkElse <$ string "else"
     , TkElif <$ string "elif"
     , TkWhile <$ string "while"
+    , TkAssert <$ string "assert"
     , TkDef <$ string "def"
     , TkReturn <$ string "return"
     , TkPass <$ string "pass"
@@ -128,6 +137,7 @@ parseToken =
     , TkContinue <$ string "continue"
     , TkTrue <$ string "True"
     , TkFalse <$ string "False"
+    , TkNone <$ string "None"
     , TkOr <$ string "or"
     , TkAnd <$ string "and"
     , TkIs <$ string "is"
@@ -144,6 +154,7 @@ parseToken =
     , TkClass <$ string "class"
     , TkFor <$ string "for"
     , TkIn <$ string "in"
+    , TkYield <$ string "yield"
     ] <>
     [ (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
         fmap read (some digit) <*>
@@ -175,10 +186,10 @@ parseToken =
        TkSlashEq <$ char '=' <|>
        pure TkSlash)
     , TkBangEq <$ string "!="
-    , TkCaretEq <$ string "^="
-    , TkPipeEq <$ string "|="
+    , char '^' *> (TkCaretEq <$ char '=' <|> pure TkCaret)
+    , char '|' *> (TkPipeEq <$ char '=' <|> pure TkPipe)
+    , char '&' *> (TkAmpersandEq <$ char '=' <|> pure TkAmpersand)
     , TkAtEq <$ string "@="
-    , TkAmphersandEq <$ string "&="
     , char '+' *> (TkPlusEq <$ char '=' <|> pure TkPlus)
     , char '-' *> (TkMinusEq <$ char '=' <|> pure TkMinus)
     , char '%' *> (TkPercentEq <$ char '=' <|> pure TkPercent)

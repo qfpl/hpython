@@ -445,6 +445,17 @@ validateCompoundStatementSyntax (ClassDef idnts a b c d g) =
        validateWhitespace a z)
     d <*>
   validateSuiteSyntax g
+validateCompoundStatementSyntax (With a b c d e) =
+  With a b c <$>
+  traverse
+    (\(WithItem a b c) ->
+        WithItem a <$>
+        validateExprSyntax b <*>
+        traverse
+          (\(ws, b) -> (,) <$> validateWhitespace a ws <*> validateExprSyntax b)
+          c)
+    d <*>
+  validateSuiteSyntax e
 
 validateExceptAsSyntax
   :: ( AsSyntaxError e v a

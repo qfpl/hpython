@@ -155,6 +155,7 @@ parseToken =
     , TkExcept <$ string "except"
     , TkFinally <$ string "finally"
     , TkClass <$ string "class"
+    , TkWith <$ string "with"
     , TkFor <$ string "for"
     , TkIn <$ string "in"
     , TkYield <$ string "yield"

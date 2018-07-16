@@ -537,6 +537,16 @@ genCompoundStatement =
          sizedMaybe genArgs <*>
          genWhitespaces)
         (genSuite genBlock)
+    , sized2M
+        (\a b ->
+           With <$> use currentIndentation <*> pure () <*>
+           (NonEmpty.toList <$> genWhitespaces1) <*>
+           pure a <*> pure b)
+        (genSizedCommaSep1 $
+         WithItem () <$>
+         genExpr <*>
+         sizedMaybe ((,) <$> genWhitespaces <*> genAssignable))
+        (genSuite genBlock)
     , sized4M
         (\a b c d ->
            For <$> use currentIndentation <*> pure () <*>

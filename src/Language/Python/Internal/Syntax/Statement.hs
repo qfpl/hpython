@@ -114,6 +114,7 @@ instance HasBlocks CompoundStatement where
     (traverse._3._Blocks) fun g
   _Blocks fun (ClassDef idnt a b c d e) =
     ClassDef idnt a b (coerce c) (coerce d) <$> _Blocks fun e
+  _Blocks fun (With a b c d e) = With a b c (coerce d) <$> _Blocks fun e
 
 instance HasStatements Block where
   _Statements = _Wrapped.traverse._Right
@@ -165,6 +166,7 @@ instance Plated (Statement '[] a) where
         (traverse._3._Statements) fun g
       ClassDef idnt a b c d e ->
         ClassDef idnt a b c d <$> _Statements fun e
+      With a b c d e -> With a b c (coerce d) <$> _Statements fun e
 
 instance HasExprs Statement where
   _Exprs f (SmallStatements idnt s ss a b) =
@@ -346,6 +348,14 @@ data Suite v a
       (Block v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+data WithItem v a
+  = WithItem
+  { _withItemAnn :: a
+  , _withItemValue :: Expr v a
+  , _withItemBinder :: Maybe ([Whitespace], Expr v a)
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
 data CompoundStatement (v :: [*]) a
   -- ^ 'def' <spaces> <ident> '(' <spaces> stuff ')' <spaces> ':' <spaces> <newline>
   --   <block>
@@ -401,6 +411,10 @@ data CompoundStatement (v :: [*]) a
       (NonEmpty Whitespace) (Ident v a)
       (Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace]))
       (Suite v a)
+  -- ^ 'with' <spaces> with_item (',' <spaces> with_item)* ':' <spaces> <newline> <block>
+  | With
+      (Indents a) a
+      [Whitespace] (CommaSep1 (WithItem v a)) (Suite v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasExprs ExceptAs where
@@ -411,6 +425,9 @@ instance HasExprs Block where
 
 instance HasExprs Suite where
   _Exprs f (Suite a b c d e) = Suite a b c d <$> _Exprs f e
+
+instance HasExprs WithItem where
+  _Exprs f (WithItem a b c) = WithItem a <$> f b <*> traverseOf (traverse._2) f c
 
 instance HasExprs CompoundStatement where
   _Exprs f (Fundef idnt a ws1 name ws2 params ws3 s) =
@@ -444,6 +461,7 @@ instance HasExprs CompoundStatement where
     ClassDef idnt a b (coerce c) <$>
     (traverse._2.traverse.traverse._Exprs) fun d <*>
     _Exprs fun e
+  _Exprs fun (With a b c d e) = With a b c <$> traverseOf (traverse._Exprs) fun d <*> _Exprs fun e
 
 makeWrapped ''Block
 makeLenses ''ExceptAs

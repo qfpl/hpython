@@ -38,6 +38,7 @@ data PyToken a
   | TkExcept a
   | TkFinally a
   | TkClass a
+  | TkWith a
   | TkFor a
   | TkIn a
   | TkYield a
@@ -125,6 +126,7 @@ pyTokenAnn tk =
     TkExcept a -> a
     TkFinally a -> a
     TkClass a -> a
+    TkWith a -> a
     TkFor a -> a
     TkIn a -> a
     TkYield a -> a

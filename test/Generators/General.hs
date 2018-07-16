@@ -345,6 +345,13 @@ genCompoundStatement =
         (sizedMaybe $
          (,,) <$>
          genIndents <*> genWhitespaces <*> genSuite genBlock)
+    , sized2M
+        (\a b -> With <$> genIndents <*> pure () <*> genWhitespaces <*> pure a <*> pure b)
+        (genSizedCommaSep1 $
+         WithItem () <$>
+         genExpr <*>
+         sizedMaybe ((,) <$> genWhitespaces <*> genExpr))
+        (genSuite genBlock)
     ]
     []
 

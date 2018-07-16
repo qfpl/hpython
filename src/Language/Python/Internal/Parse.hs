@@ -842,6 +842,7 @@ compoundStatement =
   whileSt <!>
   trySt <!>
   classSt <!>
+  withSt <!>
   forSt
   where
     fundef =
@@ -929,6 +930,17 @@ compoundStatement =
          (snd <$> token anySpace (TkLeftParen ())) <*>
          optional (commaSep1' anySpace arg) <*>
          (snd <$> token space (TkRightParen ()))) <*>
+      suite
+
+    withSt =
+      (\a (tk, s) -> With a (pyTokenAnn tk) s) <$>
+      indents <*>
+      token space (TkWith ()) <*>
+      commaSep1
+        space
+        ((\a -> WithItem (a ^. exprAnnotation) a) <$>
+         expr space <*>
+         optional ((,) <$> (snd <$> token space (TkAs ())) <*> orExpr space)) <*>
       suite
 
     forSt =

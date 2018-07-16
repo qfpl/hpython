@@ -248,6 +248,23 @@ validateCompoundStatementScope (ClassDef idnts a b c d g) =
   traverseOf (traverse._2.traverse.traverse) validateArgScope d <*>
   validateSuiteScope g <*
   extendScope scImmediateScope [c ^. to (_identAnnotation &&& _identValue)]
+validateCompoundStatementScope (With a b c d e) =
+  let
+    names =
+      d ^..
+      folded.unvalidated.to _withItemBinder.folded._2.
+      assignTargets.to (_identAnnotation &&& _identValue)
+  in
+    With a b c <$>
+    traverse
+      (\(WithItem a b c) ->
+         WithItem a <$>
+         validateExprScope b <*>
+         traverseOf (traverse._2) validateAssignExprScope c)
+      d <*
+    extendScope scLocalScope names <*
+    extendScope scImmediateScope names <*>
+    validateSuiteScope e
 
 validateSmallStatementScope
   :: AsScopeError e v a

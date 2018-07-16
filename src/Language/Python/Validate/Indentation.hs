@@ -251,6 +251,10 @@ validateCompoundStatementIndentation (ClassDef idnt a b c d e) =
   (\idnt' -> ClassDef idnt' a b (coerce c) (coerce d)) <$>
   checkIndent idnt <*>
   validateSuiteIndentation idnt e
+validateCompoundStatementIndentation (With idnt a b c d) =
+  (\idnt' -> With idnt' a b (coerce c)) <$>
+  checkIndent idnt <*>
+  validateSuiteIndentation idnt d
 
 validateStatementIndentation
   :: AsIndentationError e v a

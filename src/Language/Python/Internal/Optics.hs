@@ -27,6 +27,7 @@ instance Validated Block where
 instance Validated Ident where
 instance Validated Param where
 instance Validated Suite where
+instance Validated WithItem where
 
 data KeywordParam v a
   = MkKeywordParam
@@ -185,6 +186,10 @@ instance HasIndents CompoundStatement where
         (\idnt' -> ClassDef idnt' a b c d) <$>
         fun idnt <*>
         _Indents fun e
+      With a b c d e ->
+        (\a' -> With a' b c d) <$>
+        fun a <*>
+        _Indents fun e
 
 class HasNewlines s where
   _Newlines :: Traversal' (s v a) Newline
@@ -221,6 +226,7 @@ instance HasNewlines CompoundStatement where
         For idnt a b c d e <$> _Newlines fun f <*> (traverse._3._Newlines) fun g
       ClassDef idnt a b c d e ->
         ClassDef idnt a b (coerce c) (coerce d) <$> _Newlines fun e
+      With a b c d e -> With a b c (coerce d) <$> _Newlines fun e
 
 instance HasNewlines Statement where
   _Newlines f (CompoundStatement c) =

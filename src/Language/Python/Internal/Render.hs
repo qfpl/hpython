@@ -131,6 +131,7 @@ showToken t =
     TkExcept{} -> "except"
     TkFinally{} -> "finally"
     TkClass{} -> "class"
+    TkWith{} -> "with"
     TkFor{} -> "for"
     TkIn{} -> "in"
     TkYield{} -> "yield"
@@ -829,6 +830,21 @@ renderCompoundStatement (ClassDef idnt _ a b c s) =
       foldMap renderWhitespace z)
     c <>
   renderSuite s
+renderCompoundStatement (With idnt _ a b s) =
+  renderIndents idnt <>
+  singleton (TkWith ()) <> foldMap renderWhitespace a <>
+  renderCommaSep1 renderWithItem b <>
+  renderSuite s
+
+renderWithItem :: WithItem v a -> RenderOutput
+renderWithItem (WithItem _ a b) =
+  bracketTupleGenerator a <>
+  foldMap
+    (\(c, d) -> 
+       singleton (TkAs ()) <>
+       foldMap renderWhitespace c <>
+       bracketTupleGenerator d)
+    b
 
 renderIndent :: Indent -> RenderOutput
 renderIndent (MkIndent ws) = foldMap renderWhitespace $ toList ws

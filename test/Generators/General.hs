@@ -33,9 +33,6 @@ genArg genExpr =
     ]
     []
 
-genInt :: MonadGen m => m (Expr '[] ())
-genInt = Int () <$> Gen.integral (Range.constant (-2^32) (2^32)) <*> genWhitespaces
-
 genIdent :: MonadGen m => m (Ident '[] ())
 genIdent =
   MkIdent () <$>

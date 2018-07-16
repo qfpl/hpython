@@ -9,6 +9,7 @@ module Language.Python.Internal.Syntax
   , module Language.Python.Internal.Syntax.Ident
   , module Language.Python.Internal.Syntax.Module
   , module Language.Python.Internal.Syntax.ModuleNames
+  , module Language.Python.Internal.Syntax.Numbers
   , module Language.Python.Internal.Syntax.Statement
   , module Language.Python.Internal.Syntax.Strings
   , module Language.Python.Internal.Syntax.Whitespace
@@ -28,6 +29,7 @@ import Language.Python.Internal.Syntax.Expr
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Module
 import Language.Python.Internal.Syntax.ModuleNames
+import Language.Python.Internal.Syntax.Numbers
 import Language.Python.Internal.Syntax.Statement
 import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Syntax.Whitespace

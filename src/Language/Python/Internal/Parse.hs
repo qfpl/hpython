@@ -249,7 +249,8 @@ integer :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 integer ws = do
   curTk <- currentToken
   case curTk of
-    TkInt n ann -> do
+    TkInt n -> do
+      let ann = _intLiteralAnn n
       Parser $ consumed ann
       Int ann n <$> many ws
     _ -> Parser . throwError $ ExpectedInteger curTk

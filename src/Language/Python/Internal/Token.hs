@@ -41,7 +41,7 @@ data PyToken a
   | TkFor a
   | TkIn a
   | TkYield a
-  | TkInt (IntLiteral a) a
+  | TkInt (IntLiteral a)
   | TkFloat Integer (Maybe Integer) a
   | TkIdent String a
   | TkString (Maybe StringPrefix) QuoteType StringType [PyChar] a
@@ -135,7 +135,7 @@ pyTokenAnn tk =
     TkElif a -> a
     TkWhile a -> a
     TkAssert a -> a
-    TkInt _ a -> a
+    TkInt a -> _intLiteralAnn a
     TkFloat _ _ a -> a
     TkIdent _ a -> a
     TkString _ _ _ _ a -> a

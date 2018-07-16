@@ -114,9 +114,6 @@ genImportTargets =
     genWhitespaces
   ]
 
-genInt :: MonadGen m => m (Expr '[] ())
-genInt = Int () <$> Gen.integral (Range.constant 0 (2^32)) <*> genWhitespaces
-
 genBlock :: (MonadGen m, MonadState GenState m) => m (Block '[] ())
 genBlock =
   doIndent *>

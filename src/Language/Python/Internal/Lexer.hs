@@ -12,11 +12,14 @@ import Control.Monad (when, replicateM)
 import Control.Monad.Except (throwError)
 import Control.Monad.State (StateT, evalStateT, get, modify, put)
 import Data.Bifunctor (first)
+import Data.Digit.Binary (parseBinary)
+import Data.Digit.D0 (parse0)
+import Data.Digit.Decimal (DecDigit(..), parseDecimal, parseDecimalNoZero)
 import Data.Digit.HeXaDeCiMaL (parseHeXaDeCiMaL)
 import Data.Digit.Octal (parseOctal)
 import Data.FingerTree (FingerTree, Measured(..))
 import Data.Foldable (asum)
-import Data.List.NonEmpty (NonEmpty(..))
+import Data.List.NonEmpty (NonEmpty(..), some1)
 import Data.Monoid (Sum(..))
 import Data.Semigroup ((<>))
 import Data.Sequence ((!?), (|>), Seq)
@@ -156,9 +159,25 @@ parseToken =
     , TkIn <$ string "in"
     , TkYield <$ string "yield"
     ] <>
-    [ (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
-        fmap read (some digit) <*>
-        optional (char '.' *> optional (read <$> some digit))
+    [ do
+        zero <- optional (char '0')
+        case zero of
+          Nothing ->
+            fmap (\a b -> TkInt (IntLiteralDec b a)) $
+            (:|) <$> parseDecimalNoZero <*> many parseDecimal
+          Just{} ->
+            (do
+                xX <- True <$ char 'X' <|> False <$ char 'x'
+                (\a b -> TkInt (IntLiteralHex b xX a)) <$> some1 parseHeXaDeCiMaL) <|>
+            (do
+                bB <- True <$ char 'B' <|> False <$ char 'b'
+                (\a b -> TkInt (IntLiteralBin b bB a)) <$> some1 parseBinary) <|>
+            (do
+                oO <- True <$ char 'O' <|> False <$ char 'o'
+                (\a b -> TkInt (IntLiteralOct b oO a)) <$> some1 parseOctal) <|>
+            ((\a b -> TkInt $ IntLiteralDec b (DecDigit0 :| a)) <$> some parse0 <|>
+             TkFloat 0 <$ char '.' <*> optional (read <$> some digit) <|>
+             pure (\b -> TkInt (IntLiteralDec b (DecDigit0 :| []))))
     , TkSpace <$ char ' '
     , TkTab <$ char '\t'
     , TkNewline <$> parseNewline

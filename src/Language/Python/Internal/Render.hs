@@ -23,10 +23,12 @@ import Control.Lens.Wrapped (_Wrapped)
 import Control.Lens.Plated (transform)
 import Control.Lens.Review ((#))
 import Data.Bifoldable (bifoldMap)
-import Data.Digit.Char (charHeXaDeCiMaL, charOctal)
+import Data.Digit.Char (charHeXaDeCiMaL, charOctal, charBinary, charDecimal)
 import Data.Foldable (toList)
 import Data.Maybe (maybe)
 import Data.Semigroup (Semigroup(..))
+
+import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax
 import Language.Python.Internal.Token (PyToken(..))
@@ -132,7 +134,7 @@ showToken t =
     TkFor{} -> "for"
     TkIn{} -> "in"
     TkYield{} -> "yield"
-    TkInt i _ -> renderIntLiteral i
+    TkInt i -> renderIntLiteral i
     TkFloat i i' _ -> show i <> foldMap (("." <>) . show) i'
     TkIdent s _ -> s
     TkString sp qt st s _ ->
@@ -472,12 +474,14 @@ renderDictItem (DictItem _ a b c) =
   foldMap renderWhitespace b <>
   bracketTupleGenerator c
 
-renderIntLiteral :: IntLiteral a -> RenderOutput
-renderIntLiteral (IntLiteralDec _ n) = _
-renderIntLiteral (BinLiteralDec _ b n) = _
-renderIntLiteral (OctLiteralDec _ b n) = _
-renderIntLiteral (DecLiteralDec _ b n) = _
-renderIntLiteral (HexLiteralDec _ b n) = _
+renderIntLiteral :: IntLiteral a -> String
+renderIntLiteral (IntLiteralDec _ n) = (charDecimal #) <$> NonEmpty.toList n
+renderIntLiteral (IntLiteralBin _ b n) =
+  (if b then 'B' else 'b') : fmap (charBinary #) (NonEmpty.toList n)
+renderIntLiteral (IntLiteralOct _ b n) =
+  (if b then 'O' else 'o') : fmap (charOctal #) (NonEmpty.toList n)
+renderIntLiteral (IntLiteralHex _ b n) =
+  (if b then 'H' else 'h') : fmap (charHeXaDeCiMaL #) (NonEmpty.toList n)
 
 renderStringLiteral :: StringLiteral a -> RenderOutput
 renderStringLiteral (StringLiteral _ a b c d e) =
@@ -560,7 +564,7 @@ renderExpr (Negate _ ws expr) =
     Ternary{} -> bracket $ renderExpr expr
     _ -> bracketTupleGenerator expr
 renderExpr (String _ vs) = foldMap renderStringLiteral vs
-renderExpr (Int _ n ws) = TkInt n () `cons` foldMap renderWhitespace ws
+renderExpr (Int a n ws) = TkInt (() <$ n) `cons` foldMap renderWhitespace ws
 renderExpr (Ident _ name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) =
   TkLeftBracket () `cons`
@@ -576,7 +580,7 @@ renderExpr (ListComp _ ws1 comp ws2) =
   singleton (TkRightBracket ()) <> foldMap renderWhitespace ws2
 renderExpr (Call _ expr ws args ws2) =
   (case expr of
-     Int _ n _ | n < 0 -> bracket $ renderExpr expr
+     Negate{} -> bracket $ renderExpr expr
      BinOp{} -> bracket $ renderExpr expr
      Tuple{} -> bracket $ renderExpr expr
      Not{} -> bracket $ renderExpr expr

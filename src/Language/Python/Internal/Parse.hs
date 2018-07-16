@@ -762,14 +762,24 @@ comment = do
 
 suite :: Parser ann (Suite '[] ann)
 suite =
-  (\(tk, s) -> Suite (pyTokenAnn tk) s) <$>
+  (\(tk, s) ->
+     either
+       (uncurry $ SuiteOne (pyTokenAnn tk) s)
+       (uncurry $ SuiteMany (pyTokenAnn tk) s)) <$>
   colon space <*>
-  eol <*>
-  fmap Block
-    (flip (foldr NonEmpty.cons) <$>
-      commentOrIndent <*>
-      some1 line) <*
-  dedent
+  ((fmap Left $
+    (,) <$>
+    smallStatement <*>
+    (Right <$> try eol <!> Left <$> optional comment <* eof))
+    <!>
+   (fmap Right $
+    (,) <$>
+    eol <*>
+    fmap Block
+      (flip (foldr NonEmpty.cons) <$>
+        commentOrIndent <*>
+        some1 line) <*
+    dedent))
   where
     commentOrEmpty =
       (,) <$>

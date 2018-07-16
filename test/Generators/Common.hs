@@ -21,12 +21,21 @@ whitespaceSize Tab = 1
 whitespaceSize (Continued _ ws) = 1 + sum (fmap whitespaceSize ws)
 whitespaceSize (Newline _) = 1
 
-genSuite :: MonadGen m => m (Block '[] ()) -> m (Suite '[] ())
-genSuite gb =
-  Suite () <$>
-  genWhitespaces <*>
-  genNewline <*>
-  gb
+genSuite :: MonadGen m => m (SmallStatement '[] ()) -> m (Block '[] ()) -> m (Suite '[] ())
+genSuite gss gb =
+  Gen.choice
+  [ SuiteMany () <$>
+    genWhitespaces <*>
+    genNewline <*>
+    gb
+  , SuiteOne () <$>
+    genWhitespaces <*>
+    gss <*>
+    Gen.choice
+      [ Left <$> Gen.maybe genComment
+      , Right <$> genNewline
+      ]
+  ]
 
 integralHeXaDeCiMaL'
   :: (MonadGen m, Integral a)
@@ -96,6 +105,14 @@ genInt = do
 genString :: MonadGen m => m PyChar -> m [PyChar]
 genString = Gen.list (Range.constant 0 50)
 
+genNewline' :: MonadGen m => m Newline
+genNewline' =
+  Gen.element
+    [ LF Nothing
+    , CR Nothing
+    , CRLF Nothing
+    ]
+
 genNewline :: MonadGen m => m Newline
 genNewline =
   Gen.choice
@@ -124,7 +141,7 @@ genAnyWhitespace = Gen.sized $ \n ->
             n' <- Gen.integral (Range.constant 1 (n-1))
             Gen.resize n' $
               Continued <$>
-              genNewline <*>
+              genNewline' <*>
               genSizedWhitespace genAnyWhitespace
         ]
 
@@ -142,7 +159,7 @@ genNormalWhitespace = Gen.sized $ \n ->
             n' <- Gen.integral (Range.constant 1 (n-1))
             Gen.resize n' $
               Continued <$>
-              genNewline <*>
+              genNewline' <*>
               genSizedWhitespace genNormalWhitespace
         ]
 
@@ -195,7 +212,7 @@ genWhitespaces = do
       Gen.choice
       [ (Space :) <$> go (n-1)
       , (Tab :) <$> go (n-1)
-      , Gen.shrink (\_ -> [[Space]]) . fmap pure $ Continued <$> genNewline <*> go (n-1)
+      , Gen.shrink (\_ -> [[Space]]) . fmap pure $ Continued <$> genNewline' <*> go (n-1)
       ]
 
 genAnyWhitespaces :: MonadGen m => m [Whitespace]
@@ -208,7 +225,7 @@ genAnyWhitespaces = do
       Gen.choice
       [ (Space :) <$> go (n-1)
       , (Tab :) <$> go (n-1)
-      , Gen.shrink (\_ -> [[Space]]) . fmap pure $ Continued <$> genNewline <*> go (n-1)
+      , Gen.shrink (\_ -> [[Space]]) . fmap pure $ Continued <$> genNewline' <*> go (n-1)
       , (:) <$> (Newline <$> genNewline) <*> go (n-1)
       ]
 
@@ -221,7 +238,7 @@ genAnyWhitespaces1 = do
       Gen.choice
       [ pure $ pure Space
       , pure $ pure Tab
-      , fmap pure $ Continued <$> genNewline <*> pure []
+      , fmap pure $ Continued <$> genNewline' <*> pure []
       , fmap pure $ Newline <$> genNewline
       ]
     go n =
@@ -230,7 +247,7 @@ genAnyWhitespaces1 = do
       , (Tab `NonEmpty.cons`) <$> go (n-1)
       , fmap pure $
         Continued <$>
-        genNewline <*>
+        genNewline' <*>
         ((:) <$>
          Gen.choice
            [ pure Space
@@ -250,7 +267,7 @@ genWhitespaces1 = do
       Gen.choice
       [ (Space :) <$> go (n-1)
       , (Tab :) <$> go (n-1)
-      , fmap pure $ Continued <$> genNewline <*> go (n-1)
+      , fmap pure $ Continued <$> genNewline' <*> go (n-1)
       ]
 
 genNone :: MonadGen m => m (Expr '[] ())

@@ -754,11 +754,19 @@ renderBlock =
   view _Wrapped
 
 renderSuite :: Suite v a -> RenderOutput
-renderSuite (Suite _ a c d) =
+renderSuite (SuiteMany _ a c d) =
   TkColon () `cons`
   foldMap renderWhitespace a <>
   singleton (renderNewline c) <>
   renderBlock d
+renderSuite (SuiteOne _ a c d) =
+  TkColon () `cons`
+  foldMap renderWhitespace a <>
+  renderSmallStatement c <>
+  either
+    (foldMap (\a -> singleton $ TkComment (renderComment a) ()))
+    (singleton . renderNewline)
+    d
 
 renderCompoundStatement :: CompoundStatement v a -> RenderOutput
 renderCompoundStatement (Fundef idnt _ ws1 name ws2 params ws3 s) =

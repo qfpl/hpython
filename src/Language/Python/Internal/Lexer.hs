@@ -5,7 +5,7 @@
 {-# language GeneralizedNewtypeDeriving #-}
 module Language.Python.Internal.Lexer where
 
-import Control.Applicative ((<**>), (<|>), some, many, optional)
+import Control.Applicative ((<|>), some, many, optional)
 import Control.Lens.Iso (from)
 import Control.Lens.Getter ((^.))
 import Control.Monad (when, replicateM)
@@ -39,8 +39,22 @@ import Language.Python.Internal.Token (PyToken(..), pyTokenAnn)
 
 parseNewline :: CharParsing m => m Newline
 parseNewline =
-  optional (Comment <$ char '#' <*> many (noneOf "\r\n")) <**>
-  (LF <$ char '\n' <|> char '\r' *> (CRLF <$ char '\n' <|> pure CR))
+  LF Nothing <$ char '\n' <|> char '\r' *>
+  (CRLF Nothing <$ char '\n' <|> pure (CR Nothing))
+
+parseCommentNewline :: (CharParsing m, Monad m) => m (Caret -> PyToken Caret)
+parseCommentNewline = do
+  n <- optional (char '#' *> many (noneOf "\r\n"))
+  case n of
+    Nothing ->
+      TkNewline <$>
+      (LF Nothing <$ char '\n' <|> char '\r' *>
+       (CRLF Nothing <$ char '\n' <|> pure (CR Nothing)))
+    Just c ->
+      fmap TkNewline
+      ((LF (Just $ Comment c) <$ char '\n' <|> char '\r' *>
+       (CRLF (Just $ Comment c) <$ char '\n' <|> pure (CR . Just $ Comment c)))) <|>
+      pure (TkComment c)
 
 stringOrBytesPrefix :: CharParsing m => m (Either StringPrefix BytesPrefix)
 stringOrBytesPrefix =
@@ -182,7 +196,6 @@ parseToken =
              pure (\b -> TkInt (IntLiteralDec b (DecDigit0 :| []))))
     , TkSpace <$ char ' '
     , TkTab <$ char '\t'
-    , TkNewline <$> parseNewline
     , TkLeftBracket <$ char '['
     , TkRightBracket <$ char ']'
     , TkLeftParen <$ char '('
@@ -261,9 +274,7 @@ parseToken =
             manyTill stringChar (string "'''")
             <|>
             TkBytes prefix SingleQuote ShortString <$> manyTill stringChar (char '\'')
-    , TkComment <$
-      char '#' <*>
-      many (noneOf "\r\n")
+    , parseCommentNewline
     , TkComma <$ char ','
     , TkDot <$ char '.'
     , fmap TkIdent $

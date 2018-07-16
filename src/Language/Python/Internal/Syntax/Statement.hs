@@ -45,7 +45,8 @@ class HasBlocks s where
   _Blocks :: Traversal (s v a) (s '[] a) (Block v a) (Block '[] a)
 
 instance HasBlocks Suite where
-  _Blocks f (Suite a b c e) = Suite a b c <$> f e
+  _Blocks f (SuiteOne a b c d) = pure $ SuiteOne a b (coerce c) d
+  _Blocks f (SuiteMany a b c e) = SuiteMany a b c <$> f e
 
 instance HasBlocks CompoundStatement where
   _Blocks f (Fundef idnt a ws1 name ws2 params ws3 s) =
@@ -81,7 +82,8 @@ instance HasStatements Block where
   _Statements = _Wrapped.traverse._Right
 
 instance HasStatements Suite where
-  _Statements f (Suite a b c e) = Suite a b c <$> _Statements f e
+  _Statements f (SuiteOne a b c d) = pure $ SuiteOne a b (coerce c) d
+  _Statements f (SuiteMany a b c e) = SuiteMany a b c <$> _Statements f e
 
 data Statement (v :: [*]) a
   = SmallStatements
@@ -302,7 +304,9 @@ data ExceptAs v a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Suite v a
-  = Suite a
+  -- ':' <space> smallstatement
+  = SuiteOne a [Whitespace] (SmallStatement v a) (Either (Maybe Comment) Newline)
+  | SuiteMany a
       -- ':' <spaces> [comment] <newline>
       [Whitespace] Newline
       -- <block>
@@ -385,7 +389,8 @@ instance HasExprs Block where
   _Exprs = _Wrapped.traverse._Right._Exprs
 
 instance HasExprs Suite where
-  _Exprs f (Suite a b c e) = Suite a b c <$> _Exprs f e
+  _Exprs f (SuiteOne a b c d) = SuiteOne a b <$> _Exprs f c <*> pure d
+  _Exprs f (SuiteMany a b c e) = SuiteMany a b c <$> _Exprs f e
 
 instance HasExprs WithItem where
   _Exprs f (WithItem a b c) = WithItem a <$> f b <*> traverseOf (traverse._2) f c

@@ -151,7 +151,15 @@ validateWhitespace ann ws =
   then pure ws
   else if any (\case; Newline{} -> True; _ -> False) ws
   then syntaxErrors [_UnexpectedNewline # ann]
+  else if continuedBad ws
+  then syntaxErrors [_CommentAfterBackslash # ann]
   else pure ws
+  where
+    continuedBad :: Foldable f => f Whitespace -> Bool
+    continuedBad =
+      any $ \case
+        Continued a ws -> isJust (_commentBefore a) || continuedBad ws
+        _ -> False
 
 validateComprehensionSyntax
   :: ( AsSyntaxError e v a
@@ -342,11 +350,16 @@ validateSuiteSyntax
      )
   => Suite v a
   -> ValidateSyntax e (Suite (Nub (Syntax ': v)) a)
-validateSuiteSyntax (Suite a b c e) =
-  Suite a <$>
+validateSuiteSyntax (SuiteMany a b c e) =
+  SuiteMany a <$>
   validateWhitespace a b <*>
   pure c <*>
   validateBlockSyntax e
+validateSuiteSyntax (SuiteOne a b c d) =
+  SuiteOne a <$>
+  validateWhitespace a b <*>
+  validateSmallStatementSyntax c <*>
+  pure d
 
 validateCompoundStatementSyntax
   :: ( AsSyntaxError e v a

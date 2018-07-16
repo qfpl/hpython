@@ -130,10 +130,11 @@ validateSuiteIndentation
   => Indents a
   -> Suite v a
   -> ValidateIndentation e (Suite (Nub (Indentation ': v)) a)
-validateSuiteIndentation idnt (Suite ann a c d) =
-  Suite ann a c <$
+validateSuiteIndentation idnt (SuiteMany ann a c d) =
+  SuiteMany ann a c <$
   setNextIndent GreaterThan (idnt ^. indentsValue) <*>
   validateBlockIndentation d
+validateSuiteIndentation idnt (SuiteOne ann a c d) = pure $ SuiteOne ann a (coerce c) d
 
 validateExprIndentation
   :: AsIndentationError e v a

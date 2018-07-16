@@ -32,7 +32,7 @@ def_ name params block =
     []
     (listToCommaSep params)
     []
-    (Suite () [] (LF Nothing) $ toBlock block)
+    (SuiteMany () [] (LF Nothing) $ toBlock block)
 
 call_ :: Expr '[] () -> [Arg '[] ()] -> Expr '[] ()
 call_ expr args =
@@ -132,7 +132,7 @@ while_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 while_ e sts =
   CompoundStatement $
   While (Indents [] ()) () [Space] e
-    (Suite () [] (LF Nothing) $ toBlock sts)
+    (SuiteMany () [] (LF Nothing) $ toBlock sts)
 
 ifElifsElse_
   :: Expr '[] ()
@@ -143,15 +143,15 @@ ifElifsElse_
 ifElifsElse_ e sts elifs sts' =
   CompoundStatement $
   If (Indents [] ()) () [Space] e
-    (Suite () [] (LF Nothing) $ toBlock sts)
-    ((\(a, b) -> (Indents [] (), [Space], a, Suite () [] (LF Nothing) $ toBlock b)) <$> elifs)
-    (Just (Indents [] (), [], Suite () [] (LF Nothing) $ toBlock sts'))
+    (SuiteMany () [] (LF Nothing) $ toBlock sts)
+    ((\(a, b) -> (Indents [] (), [Space], a, SuiteMany () [] (LF Nothing) $ toBlock b)) <$> elifs)
+    (Just (Indents [] (), [], SuiteMany () [] (LF Nothing) $ toBlock sts'))
 
 if_ :: Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 if_ e sts =
   CompoundStatement $
   If (Indents [] ()) () [Space] e
-    (Suite () [] (LF Nothing) $ toBlock sts)
+    (SuiteMany () [] (LF Nothing) $ toBlock sts)
     []
     Nothing
 
@@ -214,12 +214,12 @@ forElse_
 forElse_ val vals block els =
   CompoundStatement $
   For (Indents [] ()) () [Space] (val & trailingWhitespace .~ [Space]) [Space] vals
-    (Suite () [] (LF Nothing) $ toBlock block)
-    (Just (Indents [] (), [], Suite () [] (LF Nothing) $ toBlock els))
+    (SuiteMany () [] (LF Nothing) $ toBlock block)
+    (Just (Indents [] (), [], SuiteMany () [] (LF Nothing) $ toBlock els))
 
 for_ :: Expr '[] () -> Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 for_ val vals block =
   CompoundStatement $
   For (Indents [] ()) () [Space] (val & trailingWhitespace .~ [Space]) [Space] vals
-    (Suite () [] (LF Nothing) $ toBlock block)
+    (SuiteMany () [] (LF Nothing) $ toBlock block)
     Nothing

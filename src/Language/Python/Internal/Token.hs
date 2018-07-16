@@ -30,6 +30,7 @@ data PyToken a
   | TkGlobal a
   | TkNonlocal a
   | TkDel a
+  | TkLambda a
   | TkImport a
   | TkFrom a
   | TkAs a
@@ -118,6 +119,7 @@ pyTokenAnn tk =
     TkGlobal a -> a
     TkNonlocal a -> a
     TkDel a -> a
+    TkLambda a -> a
     TkImport a -> a
     TkFrom a -> a
     TkAs a -> a

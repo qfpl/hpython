@@ -222,6 +222,14 @@ genExpr' isExp =
         genExpr
     , Yield () <$> genWhitespaces <*> sizedMaybe genExpr
     , YieldFrom () <$> genWhitespaces <*> genWhitespaces <*> genExpr
+    , Gen.subtermM
+        genExpr
+        (\a ->
+           Lambda () <$>
+           genWhitespaces <*>
+           genSizedCommaSep (genParam genExpr) <*>
+           genWhitespaces <*>
+           pure a)
     ]
 
 genSmallStatement :: MonadGen m => m (SmallStatement '[] ())

@@ -123,6 +123,7 @@ showToken t =
     TkGlobal{} -> "global"
     TkNonlocal{} -> "nonlocal"
     TkDel{} -> "del"
+    TkLambda{} -> "lambda"
     TkImport{} -> "import"
     TkFrom{} -> "from"
     TkAs{} -> "as"
@@ -443,9 +444,10 @@ renderIdent (MkIdent _ a b) = TkIdent a () `cons` foldMap renderWhitespace b
 renderComment :: Comment -> String
 renderComment (Comment s) = s
 
-bracketTernary :: (Expr v a -> RenderOutput) -> Expr v a -> RenderOutput
-bracketTernary _ e@Ternary{} = bracket $ renderExpr e
-bracketTernary f e = f e
+bracketTernaryLambda :: (Expr v a -> RenderOutput) -> Expr v a -> RenderOutput
+bracketTernaryLambda _ e@Ternary{} = bracket $ renderExpr e
+bracketTernaryLambda _ e@Lambda{} = bracket $ renderExpr e
+bracketTernaryLambda f e = f e
 
 renderCompFor :: CompFor v a -> RenderOutput
 renderCompFor (CompFor _ ws1 ex1 ws2 ex2) =
@@ -454,13 +456,13 @@ renderCompFor (CompFor _ ws1 ex1 ws2 ex2) =
   bracketGenerator ex1 <>
   singleton (TkIn ()) <>
   foldMap renderWhitespace ws2 <>
-  bracketTernary bracketTupleGenerator ex2
+  bracketTernaryLambda bracketTupleGenerator ex2
 
 renderCompIf :: CompIf v a -> RenderOutput
 renderCompIf (CompIf _ ws ex) =
   TkIf () `cons`
   foldMap renderWhitespace ws <>
-  bracketTernary bracketTupleGenerator ex
+  bracketTernaryLambda bracketTupleGenerator ex
 
 renderComprehension :: Comprehension v a -> RenderOutput
 renderComprehension (Comprehension _ expr cf cs) =
@@ -519,6 +521,11 @@ renderYield re (YieldFrom _ a b c) =
 renderYield re e = re e
 
 renderExpr :: Expr v a -> RenderOutput
+renderExpr (Lambda _ a b c d) =
+  TkLambda () `cons`
+  renderCommaSep renderParam b <>
+  singleton (TkColon ()) <> foldMap renderWhitespace c <>
+  bracketTupleGenerator d
 renderExpr e@Yield{} = bracket $ renderYield renderExpr e
 renderExpr e@YieldFrom{} = bracket $ renderYield renderExpr e
 renderExpr (Ternary _ a b c d e) =
@@ -526,7 +533,7 @@ renderExpr (Ternary _ a b c d e) =
      Generator{} -> bracket $ renderExpr a
      _ -> bracketTupleGenerator a) <>
   singleton (TkIf ()) <> foldMap renderWhitespace b <>
-  bracketTernary bracketTupleGenerator c <>
+  bracketTernaryLambda bracketTupleGenerator c <>
   singleton (TkElse ()) <> foldMap renderWhitespace d <>
   bracketTupleGenerator e
 renderExpr (Subscript _ a b c d) =
@@ -534,6 +541,7 @@ renderExpr (Subscript _ a b c d) =
      BinOp{} -> bracket $ renderExpr a
      Not{} -> bracket $ renderExpr a
      Ternary{} -> bracket $ renderExpr a
+     Lambda{} -> bracket $ renderExpr a
      _ -> bracketTupleGenerator a) <>
   singleton (TkLeftBracket ()) <>
   foldMap renderWhitespace b <>
@@ -547,6 +555,7 @@ renderExpr (Not _ ws e) =
     BinOp _ _ BoolAnd{} _ -> bracket $ renderExpr e
     BinOp _ _ BoolOr{} _ -> bracket $ renderExpr e
     Ternary{} -> bracket $ renderExpr e
+    Lambda{} -> bracket $ renderExpr e
     _ -> bracketTupleGenerator e
 renderExpr (Parens _ ws1 e ws2) =
   bracket (foldMap renderWhitespace ws1 <> renderYield renderExpr e) <>
@@ -563,6 +572,7 @@ renderExpr (Negate _ ws expr) =
     Deref _ Int{} _ _ -> bracket $ renderExpr expr
     Not{} -> bracket $ renderExpr expr
     Ternary{} -> bracket $ renderExpr expr
+    Lambda{} -> bracket $ renderExpr expr
     _ -> bracketTupleGenerator expr
 renderExpr (String _ vs) = foldMap renderStringLiteral vs
 renderExpr (Int a n ws) = TkInt (() <$ n) `cons` foldMap renderWhitespace ws
@@ -586,6 +596,7 @@ renderExpr (Call _ expr ws args ws2) =
      Tuple{} -> bracket $ renderExpr expr
      Not{} -> bracket $ renderExpr expr
      Ternary{} -> bracket $ renderExpr expr
+     Lambda{} -> bracket $ renderExpr expr
      _ -> bracketGenerator expr) <>
   bracket (foldMap renderWhitespace ws <> foldMap renderArgs args) <>
   foldMap renderWhitespace ws2
@@ -597,15 +608,16 @@ renderExpr (Deref _ expr ws name) =
      Not{} -> bracket $ renderExpr expr
      Negate{} -> bracket $ renderExpr expr
      Ternary{} -> bracket $ renderExpr expr
+     Lambda{} -> bracket $ renderExpr expr
      _ -> bracketGenerator expr) <>
   singleton (TkDot ()) <>
   foldMap renderWhitespace ws <>
   renderIdent name
 renderExpr (None _ ws) = TkNone () `cons` foldMap renderWhitespace ws
 renderExpr (BinOp _ e1 op e2) =
-  (if shouldBracketLeft op e1 then bracket else id) (bracketTernary bracketGenerator e1) <>
+  (if shouldBracketLeft op e1 then bracket else id) (bracketTernaryLambda bracketGenerator e1) <>
   renderBinOp op <>
-  (if shouldBracketRight op e2 then bracket else id) (bracketTernary bracketGenerator e2)
+  (if shouldBracketRight op e2 then bracket else id) (bracketTernaryLambda bracketGenerator e2)
 renderExpr (Tuple _ a ws c) =
   bracketTupleGenerator a <> singleton (TkComma ()) <> foldMap renderWhitespace ws <>
   foldMap
@@ -719,6 +731,7 @@ renderSmallStatement (Del _ ws vals) =
         BinOp{} -> bracket $ renderExpr a
         Not{} -> bracket $ renderExpr a
         Ternary{} -> bracket $ renderExpr a
+        Lambda{} -> bracket $ renderExpr a
         _ -> bracketTupleGenerator a)
     vals
 renderSmallStatement (Import _ ws ns) =

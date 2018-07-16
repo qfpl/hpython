@@ -302,7 +302,7 @@ compIf :: Parser ann (CompIf '[] ann)
 compIf =
   (\(tk, s) -> CompIf (pyTokenAnn tk) s) <$>
   token anySpace (TkIf ()) <*>
-  orTest anySpace
+  exprNoCond anySpace
 
 compFor :: Parser ann (CompFor '[] ann)
 compFor =
@@ -404,6 +404,25 @@ yieldExpr ws =
   (fmap Left ((,) <$> (snd <$> token ws (TkFrom ())) <*> expr ws) <!>
    (Right <$> optional (exprList ws)))
 
+lambda :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+lambda ws =
+  (\(tk, s) -> Lambda (pyTokenAnn tk) s) <$>
+  token ws (TkLambda ()) <*>
+  commaSep ws param <*>
+  (snd <$> token ws (TkColon ())) <*>
+  expr ws
+
+lambdaNoCond :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+lambdaNoCond ws =
+  (\(tk, s) -> Lambda (pyTokenAnn tk) s) <$>
+  token ws (TkLambda ()) <*>
+  commaSep ws param <*>
+  (snd <$> token ws (TkColon ())) <*>
+  exprNoCond ws
+
+exprNoCond :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+exprNoCond ws = orTest ws <!> lambdaNoCond ws
+
 expr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 expr ws =
   (\a -> maybe a (\(b, c, d, e) -> Ternary (a ^. exprAnnotation) a b c d e)) <$>
@@ -414,6 +433,8 @@ expr ws =
      orTest ws <*>
      (snd <$> token ws (TkElse ())) <*>
      expr ws)
+  <!>
+  lambda ws
 
 orExpr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 orExpr ws =

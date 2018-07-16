@@ -228,6 +228,12 @@ validateExprSyntax
      )
   => Expr v a
   -> ValidateSyntax e (Expr (Nub (Syntax ': v)) a)
+validateExprSyntax (Lambda a b c d e) =
+  Lambda a <$>
+  validateWhitespace a b <*>
+  validateParamsSyntax c <*>
+  validateWhitespace a d <*>
+  validateExprSyntax e
 validateExprSyntax (Yield a b c) =
   Yield a <$>
   validateWhitespace a b <*

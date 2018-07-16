@@ -325,6 +325,14 @@ genExpr' isExp = do
          genExpr
          genExpr
          genExpr
+     , Gen.subtermM
+         genExpr
+         (\a ->
+            Lambda () <$>
+           (NonEmpty.toList <$> genWhitespaces1) <*>
+           genParams <*>
+           genWhitespaces <*>
+           pure a)
      ] ++
      [ Yield () <$> (NonEmpty.toList <$> genWhitespaces1) <*> sizedMaybe genExpr | isInFunction ] ++
      [ YieldFrom () <$>

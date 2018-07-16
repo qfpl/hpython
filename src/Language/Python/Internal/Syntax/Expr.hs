@@ -10,7 +10,7 @@ module Language.Python.Internal.Syntax.Expr where
 import Control.Lens.Cons (_last)
 import Control.Lens.Fold ((^?), (^?!))
 import Control.Lens.Getter ((^.), getting)
-import Control.Lens.Lens (Lens, lens)
+import Control.Lens.Lens (Lens, Lens', lens)
 import Control.Lens.Plated (Plated(..), gplate)
 import Control.Lens.Prism (_Just, _Left, _Right)
 import Control.Lens.Setter ((.~))
@@ -37,6 +37,45 @@ import Language.Python.Internal.Syntax.Whitespace
 -- | 'Traversal' over all the expressions in a term
 class HasExprs s where
   _Exprs :: Traversal (s v a) (s '[] a) (Expr v a) (Expr '[] a)
+
+data Param (v :: [*]) a
+  = PositionalParam
+  { _paramAnn :: a
+  , _paramName :: Ident v a
+  }
+  | KeywordParam
+  { _paramAnn :: a
+  , _paramName :: Ident v a
+  -- = spaces
+  , _unsafeKeywordParamWhitespaceRight :: [Whitespace]
+  , _unsafeKeywordParamExpr :: Expr v a
+  }
+  | StarParam
+  { _paramAnn :: a
+  -- '*' spaces
+  , _unsafeStarParamWhitespace :: [Whitespace]
+  , _paramName :: Ident v a
+  }
+  | DoubleStarParam
+  { _paramAnn :: a
+  -- '**' spaces
+  , _unsafeDoubleStarParamWhitespace :: [Whitespace]
+  , _paramName :: Ident v a
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+paramAnn :: Lens' (Param v a) a
+paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
+
+paramName :: Lens (Param v a) (Param '[] a) (Ident v a) (Ident v a)
+paramName = lens _paramName (\s a -> coerce $ s { _paramName = a})
+
+instance HasExprs Param where
+  _Exprs f (KeywordParam a name ws2 expr) =
+    KeywordParam a (coerce name) <$> pure ws2 <*> f expr
+  _Exprs _ p@PositionalParam{} = pure $ coerce p
+  _Exprs _ p@StarParam{} = pure $ coerce p
+  _Exprs _ p@DoubleStarParam{} = pure $ coerce p
 
 data Arg (v :: [*]) a
   = PositionalArg
@@ -217,7 +256,14 @@ instance HasTrailingWhitespace (Subscript v a) where
                   Just g -> (b, c, Just (e, Just $ g & trailingWhitespace .~ ws)))
 
 data Expr (v :: [*]) a
-  = Yield
+  = Lambda
+  { _exprAnnotation :: a
+  , _unsafeLambdaWhitespace :: [Whitespace]
+  , _unsafeLambdaArgs :: CommaSep (Param v a)
+  , _unsafeLambdaColon :: [Whitespace]
+  , _unsafeLambdaBody :: Expr v a
+  }
+  | Yield
   { _exprAnnotation :: a
   , _unsafeYieldWhitespace :: [Whitespace]
   , _unsafeYieldValue :: Maybe (Expr v a)
@@ -370,6 +416,7 @@ instance HasTrailingWhitespace (Expr v a) where
   trailingWhitespace =
     lens
       (\case
+          Lambda _ _ _ _ a -> a ^. trailingWhitespace
           Yield _ ws Nothing -> ws
           Yield _ _ (Just e) -> e ^. trailingWhitespace
           YieldFrom _ _ _ e -> e ^. trailingWhitespace
@@ -395,6 +442,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Generator  _ a -> a ^. trailingWhitespace)
       (\e ws ->
         case e of
+          Lambda a b c d f -> Lambda a b c d (f & trailingWhitespace .~ ws)
           Yield a _ Nothing -> Yield a ws Nothing
           Yield a b (Just c) -> Yield a b (Just $ c & trailingWhitespace .~ ws)
           YieldFrom a b c d -> YieldFrom a b c (d & trailingWhitespace .~ ws)

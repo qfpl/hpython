@@ -425,6 +425,7 @@ validateAssignExprScope (Tuple a b ws d) =
   validateAssignExprScope b <*>
   pure ws <*>
   traverseOf (traverse.traverse) validateAssignExprScope d
+validateAssignExprScope e@Lambda{} = pure $ coerce e
 validateAssignExprScope e@Yield{} = pure $ coerce e
 validateAssignExprScope e@YieldFrom{} = pure $ coerce e
 validateAssignExprScope e@Not{} = pure $ coerce e
@@ -466,6 +467,11 @@ validateExprScope
   :: AsScopeError e v a
   => Expr v a
   -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
+validateExprScope (Lambda a b c d e) =
+  Lambda a b <$>
+  traverse validateParamScope c <*>
+  pure d <*>
+  validateExprScope e
 validateExprScope (Yield a b c) =
   Yield a b <$> traverse validateExprScope c
 validateExprScope (YieldFrom a b c d) =

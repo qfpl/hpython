@@ -147,6 +147,7 @@ parseToken =
     , TkNot <$ string "not"
     , TkGlobal <$ string "global"
     , TkDel <$ string "del"
+    , TkLambda <$ string "lambda"
     , TkImport <$ string "import"
     , TkFrom <$ string "from"
     , TkAs <$ string "as"

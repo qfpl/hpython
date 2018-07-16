@@ -8,7 +8,7 @@
 module Language.Python.Internal.Syntax.Statement where
 
 import Control.Lens.Getter ((^.), getting)
-import Control.Lens.Lens (Lens, Lens', lens)
+import Control.Lens.Lens (lens)
 import Control.Lens.Plated (Plated(..), gplate)
 import Control.Lens.Prism (_Just, _Right)
 import Control.Lens.Setter ((.~), over, mapped)
@@ -31,45 +31,6 @@ import Language.Python.Internal.Syntax.Whitespace
 -- | 'Traversal' over all the statements in a term
 class HasStatements s where
   _Statements :: Traversal (s v a) (s '[] a) (Statement v a) (Statement '[] a)
-
-data Param (v :: [*]) a
-  = PositionalParam
-  { _paramAnn :: a
-  , _paramName :: Ident v a
-  }
-  | KeywordParam
-  { _paramAnn :: a
-  , _paramName :: Ident v a
-  -- = spaces
-  , _unsafeKeywordParamWhitespaceRight :: [Whitespace]
-  , _unsafeKeywordParamExpr :: Expr v a
-  }
-  | StarParam
-  { _paramAnn :: a
-  -- '*' spaces
-  , _unsafeStarParamWhitespace :: [Whitespace]
-  , _paramName :: Ident v a
-  }
-  | DoubleStarParam
-  { _paramAnn :: a
-  -- '**' spaces
-  , _unsafeDoubleStarParamWhitespace :: [Whitespace]
-  , _paramName :: Ident v a
-  }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-
-paramAnn :: Lens' (Param v a) a
-paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
-
-paramName :: Lens (Param v a) (Param '[] a) (Ident v a) (Ident v a)
-paramName = lens _paramName (\s a -> coerce $ s { _paramName = a})
-
-instance HasExprs Param where
-  _Exprs f (KeywordParam a name ws2 expr) =
-    KeywordParam a (coerce name) <$> pure ws2 <*> f expr
-  _Exprs _ p@PositionalParam{} = pure $ coerce p
-  _Exprs _ p@StarParam{} = pure $ coerce p
-  _Exprs _ p@DoubleStarParam{} = pure $ coerce p
 
 newtype Block v a
   = Block

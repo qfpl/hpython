@@ -229,10 +229,10 @@ genSmallStatement =
   sizedRecursive
     (pure <$> [Pass (), Break (), Continue ()])
     [ Expr () <$> genExpr
-    , sized2M
-        (\a b -> (\ws1 -> Assign () a ws1 b) <$> genWhitespaces)
+    , sized2
+        (Assign ())
         genExpr
-        genExpr
+        (sizedNonEmpty ((,) <$> genWhitespaces <*> genExpr))
     , sized2M
         (\a b -> (\aa -> AugAssign () a aa b) <$> genAugAssign)
         genExpr

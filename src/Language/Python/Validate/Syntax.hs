@@ -10,7 +10,7 @@
 module Language.Python.Validate.Syntax where
 
 import Control.Applicative ((<|>), liftA2)
-import Control.Lens.Cons (_Cons)
+import Control.Lens.Cons (_Cons, snoc)
 import Control.Lens.Fold ((^..), (^?), folded, toListOf)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Prism (_Right)
@@ -29,6 +29,7 @@ import Data.Foldable (toList, traverse_)
 import Data.Bitraversable (bitraverse)
 import Data.Functor.Compose (Compose(..))
 import Data.List (intersect, union)
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (isJust)
 import Data.Semigroup (Semigroup(..))
 import Data.Type.Set (Nub, Member)
@@ -526,20 +527,31 @@ validateSmallStatementSyntax (Return a ws expr) =
 validateSmallStatementSyntax (Expr a expr) =
   Expr a <$>
   validateExprSyntax expr
-validateSmallStatementSyntax (Assign a lvalue ws2 rvalue) =
+validateSmallStatementSyntax (Assign a lvalue rs) =
   syntaxContext `bindValidateSyntax` \sctxt ->
     let
       assigns =
         if isJust (_inFunction sctxt)
-        then lvalue ^.. unvalidated.assignTargets.identValue
+        then
+          (lvalue : (snd <$> NonEmpty.init rs)) ^..
+          folded.unvalidated.assignTargets.identValue
         else []
     in
-      (Assign a <$>
+      Assign a <$>
       (if canAssignTo lvalue
         then validateExprSyntax lvalue
         else syntaxErrors [_CannotAssignTo # (a, lvalue)]) <*>
-      pure ws2 <*>
-      validateExprSyntax rvalue) <*
+      ((\a b -> case a of; [] -> pure b; a : as -> a :| (snoc as b)) <$>
+       traverse
+         (\(ws, b) ->
+            (,) <$>
+            validateWhitespace a ws <*>
+            (if canAssignTo b
+              then validateExprSyntax lvalue
+              else syntaxErrors [_CannotAssignTo # (a, b)]))
+         (NonEmpty.init rs) <*>
+       (\(ws, b) -> (,) <$> validateWhitespace a ws <*> validateExprSyntax b)
+         (NonEmpty.last rs)) <*
       modifyNonlocals (assigns ++)
 validateSmallStatementSyntax (AugAssign a lvalue aa rvalue) =
   AugAssign a <$>

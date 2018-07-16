@@ -5,6 +5,7 @@
 module Generators.Correct where
 
 import Control.Applicative
+import Control.Lens.Cons (snoc)
 import Control.Lens.Fold
 import Control.Lens.Getter
 import Control.Lens.Iso (from)
@@ -370,11 +371,12 @@ genSmallStatement = do
   sizedRecursive
     (fmap pure $ [Pass ()] <> [Break () | _inLoop ctxt] <> [Continue () | _inLoop ctxt])
     ([ Expr () <$> genExpr
-     , sizedBind genAssignable $ \a -> do
+     , sizedBind (sizedNonEmpty $ (,) <$> genWhitespaces <*> genAssignable) $ \a -> do
          isInFunction <- use inFunction
          when (isJust isInFunction) $
-           willBeNonlocals %= ((a ^.. cosmos._Ident._2.identValue) ++)
-         sizedBind genExpr $ \b -> Assign () a <$> genWhitespaces <*> pure b
+           willBeNonlocals %= ((a ^.. folded._2.cosmos._Ident._2.identValue) ++)
+         sizedBind ((,) <$> genWhitespaces <*> genExpr) $ \b ->
+           pure $ Assign () (snd $ NonEmpty.head a) (NonEmpty.fromList $ snoc (NonEmpty.tail a) b)
      , sized2M
          (\a b -> AugAssign () a <$> genAugAssign <*> pure b)
          genAugAssignable

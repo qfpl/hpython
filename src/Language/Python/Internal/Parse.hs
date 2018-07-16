@@ -603,17 +603,13 @@ smallStatement =
       (\a ->
          maybe
            (Expr (_exprAnnotation a) a)
-           (\(x, y) ->
-              either
-                (\z -> Assign (_exprAnnotation a) a z y)
-                (\z -> AugAssign (_exprAnnotation a) a z y)
-                x)) <$>
+           (either
+              (Assign (_exprAnnotation a) a)
+              (uncurry $ AugAssign (_exprAnnotation a) a))) <$>
       exprList space <*>
       optional
-        ((,) <$>
-         (Left . snd <$> token space (TkEq ()) <!>
-          Right <$> augAssign) <*>
-         exprList space)
+        (Left <$> some1 ((,) <$> (snd <$> token space (TkEq ())) <*> exprList space) <!>
+         Right <$> ((,) <$> augAssign <*> exprList space))
 
     globalSt =
       (\(tk, s) -> Global (pyTokenAnn tk) $ NonEmpty.fromList s) <$>

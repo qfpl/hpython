@@ -8,6 +8,7 @@ module Language.Python.Validate.Scope where
 
 import Control.Arrow ((&&&))
 import Control.Applicative ((<|>))
+import Control.Lens.Cons (snoc)
 import Control.Lens.Fold ((^..), toListOf, folded)
 import Control.Lens.Getter ((^.), to, getting, use)
 import Control.Lens.Lens (Lens')
@@ -24,11 +25,13 @@ import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
 import Data.Foldable (traverse_)
 import Data.Functor.Compose (Compose(..))
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.String (fromString)
 import Data.Type.Set (Nub)
 import Data.Trie (Trie)
 import Data.Validate (Validate(..))
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Trie as Trie
 
 import Language.Python.Internal.Optics
@@ -264,13 +267,17 @@ validateSmallStatementScope (Raise a ws f) =
     f
 validateSmallStatementScope (Return a ws e) = Return a ws <$> traverse validateExprScope e
 validateSmallStatementScope (Expr a e) = Expr a <$> validateExprScope e
-validateSmallStatementScope (Assign a l ws2 r) =
+validateSmallStatementScope (Assign a l rs) =
   let
-    ls = l ^.. unvalidated.assignTargets.to (_identAnnotation &&& _identValue)
+    ls =
+      (l : (snd <$> NonEmpty.init rs)) ^..
+      folded.unvalidated.assignTargets.to (_identAnnotation &&& _identValue)
   in
-  (\l' -> Assign a l' ws2) <$>
+  Assign a <$>
   validateAssignExprScope l <*>
-  validateExprScope r <*
+  ((\a b -> case a of; [] -> b :| []; a : as -> a :| snoc as b) <$>
+   traverseOf (traverse._2) validateAssignExprScope (NonEmpty.init rs) <*>
+   (\(ws, b) -> (,) ws <$> validateExprScope b) (NonEmpty.last rs)) <*
   extendScope scLocalScope ls <*
   extendScope scImmediateScope ls
 validateSmallStatementScope (AugAssign a l aa r) =

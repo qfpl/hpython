@@ -199,7 +199,7 @@ longStr_ s =
 (.=) a b =
   SmallStatements
     (Indents [] ())
-    (Assign () (a & trailingWhitespace .~ [Space]) [Space] b) [] Nothing (Just LF)
+    (Assign () (a & trailingWhitespace .~ [Space]) $ pure ([Space], b)) [] Nothing (Just LF)
 
 forElse_
   :: Expr '[] ()

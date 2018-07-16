@@ -693,9 +693,14 @@ renderSmallStatement (Raise _ ws x) =
 renderSmallStatement (Return _ ws expr) =
   TkReturn () `cons` foldMap renderWhitespace ws <> foldMap bracketGenerator expr
 renderSmallStatement (Expr _ expr) = renderYield bracketGenerator expr
-renderSmallStatement (Assign _ lvalue ws2 rvalue) =
-  renderExpr lvalue <> singleton (TkEq ()) <>
-  foldMap renderWhitespace ws2 <> renderYield bracketGenerator rvalue
+renderSmallStatement (Assign _ lvalue rvalues) =
+  renderExpr lvalue <>
+  foldMap
+    (\(ws2, rvalue) ->
+       TkEq () `cons`
+       foldMap renderWhitespace ws2 <>
+       renderYield bracketGenerator rvalue)
+    rvalues
 renderSmallStatement (AugAssign _ lvalue as rvalue) =
   renderExpr lvalue <> renderAugAssign as <> bracketGenerator rvalue
 renderSmallStatement (Pass _) = singleton $ TkPass ()

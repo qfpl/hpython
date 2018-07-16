@@ -28,6 +28,7 @@ roundtripTests =
   Group "Roundtrip tests" $
   (\name -> (fromString name, withTests 1 . withShrinks 1 $ doRoundtrip name)) <$>
   [ "weird.py"
+  , "weird2.py"
   , "django.py"
   , "test.py"
   , "ansible.py"
@@ -44,4 +45,4 @@ doRoundtrip name =
       Success res ->
         case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
           Failure errs' -> annotateShow (errs' :: [SyntaxError '[Indentation] Caret]) *> failure
-          Success _ -> showModule py === file
+          Success _ -> lines (showModule py) === lines file

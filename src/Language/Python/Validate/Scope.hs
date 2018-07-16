@@ -319,11 +319,12 @@ validateStatementScope
   -> ValidateScope a e (Statement (Nub (Scope ': v)) a)
 validateStatementScope (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementScope c
-validateStatementScope (SmallStatements idnts s ss sc nl) =
+validateStatementScope (SmallStatements idnts s ss sc cmt nl) =
   SmallStatements idnts <$>
   validateSmallStatementScope s <*>
   traverseOf (traverse._2) validateSmallStatementScope ss <*>
   pure sc <*>
+  pure cmt <*>
   pure nl
 
 validateIdentScope

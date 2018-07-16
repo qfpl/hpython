@@ -478,11 +478,11 @@ renderDictItem (DictItem _ a b c) =
 renderIntLiteral :: IntLiteral a -> String
 renderIntLiteral (IntLiteralDec _ n) = (charDecimal #) <$> NonEmpty.toList n
 renderIntLiteral (IntLiteralBin _ b n) =
-  (if b then 'B' else 'b') : fmap (charBinary #) (NonEmpty.toList n)
+  '0' : (if b then 'B' else 'b') : fmap (charBinary #) (NonEmpty.toList n)
 renderIntLiteral (IntLiteralOct _ b n) =
-  (if b then 'O' else 'o') : fmap (charOctal #) (NonEmpty.toList n)
+  '0' : (if b then 'O' else 'o') : fmap (charOctal #) (NonEmpty.toList n)
 renderIntLiteral (IntLiteralHex _ b n) =
-  (if b then 'H' else 'h') : fmap (charHeXaDeCiMaL #) (NonEmpty.toList n)
+  '0' : (if b then 'X' else 'x') : fmap (charHeXaDeCiMaL #) (NonEmpty.toList n)
 
 renderStringLiteral :: StringLiteral a -> RenderOutput
 renderStringLiteral (StringLiteral _ a b c d e) =
@@ -851,7 +851,7 @@ renderIndent (MkIndent ws) = foldMap renderWhitespace $ toList ws
 
 renderStatement :: Statement v a -> RenderOutput
 renderStatement (CompoundStatement c) = renderCompoundStatement c
-renderStatement (SmallStatements idnts s ss sc nl) =
+renderStatement (SmallStatements idnts s ss sc cmt nl) =
   renderIndents idnts <>
   renderSmallStatement s <>
   foldMap
@@ -863,6 +863,7 @@ renderStatement (SmallStatements idnts s ss sc nl) =
   foldMap
     (\b -> TkSemicolon () `cons` foldMap renderWhitespace b)
     sc <>
+  foldMap (singleton . renderComment) cmt <>
   foldMap (singleton . renderNewline) nl
 
 renderExceptAs :: ExceptAs v a -> RenderOutput

@@ -706,6 +706,7 @@ statement =
   (\d (a, b, c) -> SmallStatements d a b c) <$>
   indents <*>
   sepBy1' smallStatement (snd <$> semicolon space) <*>
+  optional comment <*>
   (Just <$> eol <!> Nothing <$ eof)
 
   <!>

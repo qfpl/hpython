@@ -45,10 +45,11 @@ call_ expr args =
     []
 
 return_ :: Expr '[] () -> Statement '[] ()
-return_ e = SmallStatements (Indents [] ()) (Return () [Space] $ Just e) [] Nothing (Just LF)
+return_ e =
+  SmallStatements (Indents [] ()) (Return () [Space] $ Just e) [] Nothing Nothing (Just LF)
 
 expr_ :: Expr '[] () -> Statement '[] ()
-expr_ e = SmallStatements (Indents [] ()) (Expr () e) [] Nothing (Just LF)
+expr_ e = SmallStatements (Indents [] ()) (Expr () e) [] Nothing Nothing (Just LF)
 
 list_ :: [Expr '[] ()] -> Expr '[] ()
 list_ es = List () [] (listToCommaSep1' es) []
@@ -168,10 +169,10 @@ none_ :: Expr '[] ()
 none_ = None () []
 
 pass_ :: Statement '[] ()
-pass_ = SmallStatements (Indents [] ()) (Pass ()) [] Nothing (Just LF)
+pass_ = SmallStatements (Indents [] ()) (Pass ()) [] Nothing Nothing (Just LF)
 
 break_ :: Statement '[] ()
-break_ = SmallStatements (Indents [] ()) (Break ()) [] Nothing (Just LF)
+break_ = SmallStatements (Indents [] ()) (Break ()) [] Nothing Nothing (Just LF)
 
 true_ :: Expr '[] ()
 true_ = Bool () True []
@@ -199,7 +200,11 @@ longStr_ s =
 (.=) a b =
   SmallStatements
     (Indents [] ())
-    (Assign () (a & trailingWhitespace .~ [Space]) $ pure ([Space], b)) [] Nothing (Just LF)
+    (Assign () (a & trailingWhitespace .~ [Space]) $ pure ([Space], b))
+    []
+    Nothing
+    Nothing
+    (Just LF)
 
 forElse_
   :: Expr '[] ()

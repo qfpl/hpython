@@ -107,8 +107,8 @@ class HasIndents s where
   _Indents :: Traversal' (s '[] a) (Indents a)
 
 instance HasIndents Statement where
-  _Indents f (SmallStatements idnt a b c d) =
-    (\idnt' -> SmallStatements idnt' a b c d) <$> f idnt
+  _Indents f (SmallStatements idnt a b c d e) =
+    (\idnt' -> SmallStatements idnt' a b c d e) <$> f idnt
   _Indents f (CompoundStatement c) = CompoundStatement <$> _Indents f c
 
 instance HasIndents Block where
@@ -231,8 +231,8 @@ instance HasNewlines CompoundStatement where
 instance HasNewlines Statement where
   _Newlines f (CompoundStatement c) =
     CompoundStatement <$> _Newlines f c
-  _Newlines f (SmallStatements idnts s ss sc nl) =
-    SmallStatements idnts s ss sc <$> traverse f nl
+  _Newlines f (SmallStatements idnts s ss sc cmt nl) =
+    SmallStatements idnts s ss sc cmt <$> traverse f nl
 
 instance HasNewlines Module where
   _Newlines = _Wrapped.traverse.failing (_Left._3.traverse) (_Right._Newlines)

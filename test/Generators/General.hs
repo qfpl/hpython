@@ -363,6 +363,7 @@ genStatement =
       (\a -> SmallStatements a st sts) <$>
       genIndents <*>
       Gen.maybe genWhitespaces <*>
+      Gen.maybe genComment <*>
       Gen.maybe genNewline
     ]
     [ CompoundStatement <$> genCompoundStatement ]

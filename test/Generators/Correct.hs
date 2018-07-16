@@ -571,14 +571,15 @@ genStatement
 genStatement =
   Gen.shrink
     (\case
-        SmallStatements a b c d e -> (\c' -> SmallStatements a b c' d e) <$> Shrink.list c
+        SmallStatements a b c d e f -> (\c' -> SmallStatements a b c' d e f) <$> Shrink.list c
         _ -> []) $
   sizedRecursive
     [ sizedBind (localState genSmallStatement) $ \st ->
       sizedBind (sizedList $ (,) <$> genWhitespaces <*> localState genSmallStatement) $ \sts ->
-      (\a b c -> SmallStatements a st sts b (Just c)) <$>
+      (\a b c -> SmallStatements a st sts b c . Just) <$>
       use currentIndentation <*>
       Gen.maybe genWhitespaces <*>
+      Gen.maybe genComment <*>
       genNewline
     ]
     [ CompoundStatement <$> localState genCompoundStatement ]

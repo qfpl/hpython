@@ -38,12 +38,14 @@ append_to =
             [])
          []
          Nothing
+         Nothing
          (Just LF)
      , Right $
        SmallStatements
          (Indents [replicate 4 Space ^. from indentWhitespaces] ())
          (Return () [Space] (Just $ Ident () "to"))
          []
+         Nothing
          Nothing
          (Just LF)
      ])

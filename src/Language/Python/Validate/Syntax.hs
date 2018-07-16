@@ -617,11 +617,12 @@ validateStatementSyntax
   -> ValidateSyntax e (Statement (Nub (Syntax ': v)) a)
 validateStatementSyntax (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementSyntax c
-validateStatementSyntax (SmallStatements idnts s ss sc nl) =
+validateStatementSyntax (SmallStatements idnts s ss sc cmt nl) =
   SmallStatements idnts <$>
   validateSmallStatementSyntax s <*>
   traverseOf (traverse._2) validateSmallStatementSyntax ss <*>
   pure sc <*>
+  pure cmt <*>
   pure nl
 
 canAssignTo :: Expr v a -> Bool

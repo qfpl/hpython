@@ -128,6 +128,7 @@ data Statement (v :: [*]) a
       (SmallStatement v a)
       [([Whitespace], SmallStatement v a)]
       (Maybe [Whitespace])
+      (Maybe Comment)
       (Maybe Newline)
   | CompoundStatement
       (CompoundStatement v a)
@@ -135,8 +136,8 @@ data Statement (v :: [*]) a
 
 instance HasBlocks Statement where
   _Blocks f (CompoundStatement c) = CompoundStatement <$> _Blocks f c
-  _Blocks _ (SmallStatements idnt a b c d) =
-    pure $ SmallStatements idnt (coerce a) (over (mapped._2) coerce b) c d
+  _Blocks _ (SmallStatements idnt a b c d e) =
+    pure $ SmallStatements idnt (coerce a) (over (mapped._2) coerce b) c d e
 
 instance Plated (Statement '[] a) where
   plate _ s@SmallStatements{} = pure s
@@ -169,12 +170,13 @@ instance Plated (Statement '[] a) where
       With a b c d e -> With a b c (coerce d) <$> _Statements fun e
 
 instance HasExprs Statement where
-  _Exprs f (SmallStatements idnt s ss a b) =
+  _Exprs f (SmallStatements idnt s ss a b c) =
     SmallStatements idnt <$>
     _Exprs f s <*>
     (traverse._2._Exprs) f ss <*>
     pure a <*>
-    pure b
+    pure b <*>
+    pure c
   _Exprs f (CompoundStatement c) = CompoundStatement <$> _Exprs f c
 
 data ImportAs e v a

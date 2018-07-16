@@ -149,7 +149,7 @@ validateWhitespace ann ws =
   syntaxContext `bindValidateSyntax` \ctxt ->
   if _inParens ctxt
   then pure ws
-  else if any (\case; Newline _ -> True; _ -> False) ws
+  else if any (\case; Newline{} -> True; _ -> False) ws
   then syntaxErrors [_UnexpectedNewline # ann]
   else pure ws
 
@@ -336,11 +336,10 @@ validateSuiteSyntax
      )
   => Suite v a
   -> ValidateSyntax e (Suite (Nub (Syntax ': v)) a)
-validateSuiteSyntax (Suite a b c d e) =
+validateSuiteSyntax (Suite a b c e) =
   Suite a <$>
   validateWhitespace a b <*>
   pure c <*>
-  pure d <*>
   validateBlockSyntax e
 
 validateCompoundStatementSyntax
@@ -617,12 +616,11 @@ validateStatementSyntax
   -> ValidateSyntax e (Statement (Nub (Syntax ': v)) a)
 validateStatementSyntax (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementSyntax c
-validateStatementSyntax (SmallStatements idnts s ss sc cmt nl) =
+validateStatementSyntax (SmallStatements idnts s ss sc nl) =
   SmallStatements idnts <$>
   validateSmallStatementSyntax s <*>
   traverseOf (traverse._2) validateSmallStatementSyntax ss <*>
   pure sc <*>
-  pure cmt <*>
   pure nl
 
 canAssignTo :: Expr v a -> Bool

@@ -27,10 +27,12 @@ import GHC.Exts (IsList(..))
 
 import qualified Data.List.NonEmpty as NonEmpty
 
+import Language.Python.Internal.Syntax.Comment
+
 data Newline
-  = CR
-  | LF
-  | CRLF
+  = CR { _commentBefore :: Maybe Comment }
+  | LF { _commentBefore :: Maybe Comment }
+  | CRLF { _commentBefore :: Maybe Comment }
   deriving (Eq, Show)
 
 data Whitespace

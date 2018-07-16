@@ -152,7 +152,7 @@ validateSuiteScope
   :: AsScopeError e v a
   => Suite v a
   -> ValidateScope a e (Suite (Nub (Scope ': v)) a)
-validateSuiteScope (Suite ann a b c d) = Suite ann a b c <$> validateBlockScope d
+validateSuiteScope (Suite ann a b d) = Suite ann a b <$> validateBlockScope d
 
 validateCompoundStatementScope
   :: AsScopeError e v a
@@ -319,12 +319,11 @@ validateStatementScope
   -> ValidateScope a e (Statement (Nub (Scope ': v)) a)
 validateStatementScope (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementScope c
-validateStatementScope (SmallStatements idnts s ss sc cmt nl) =
+validateStatementScope (SmallStatements idnts s ss sc nl) =
   SmallStatements idnts <$>
   validateSmallStatementScope s <*>
   traverseOf (traverse._2) validateSmallStatementScope ss <*>
   pure sc <*>
-  pure cmt <*>
   pure nl
 
 validateIdentScope

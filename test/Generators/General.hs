@@ -79,7 +79,7 @@ genBlock =
   sizedNonEmpty $
   Gen.choice
     [ Right <$> genStatement
-    , fmap Left $ (,,) <$> genWhitespaces <*> Gen.maybe genComment <*> genNewline
+    , fmap Left $ (,) <$> genWhitespaces <*> genNewline
     ]
 
 genCompFor :: MonadGen m => m (CompFor '[] ())
@@ -363,8 +363,7 @@ genStatement =
       (\a -> SmallStatements a st sts) <$>
       genIndents <*>
       Gen.maybe genWhitespaces <*>
-      Gen.maybe genComment <*>
-      Gen.maybe genNewline
+      Gen.choice [ Left <$> Gen.maybe genComment, Right <$> genNewline ]
     ]
     [ CompoundStatement <$> genCompoundStatement ]
 

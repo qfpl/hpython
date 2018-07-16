@@ -5,7 +5,7 @@
 {-# language GeneralizedNewtypeDeriving #-}
 module Language.Python.Internal.Lexer where
 
-import Control.Applicative ((<|>), some, many, optional)
+import Control.Applicative ((<**>), (<|>), some, many, optional)
 import Control.Lens.Iso (from)
 import Control.Lens.Getter ((^.))
 import Control.Monad (when, replicateM)
@@ -39,8 +39,8 @@ import Language.Python.Internal.Token (PyToken(..), pyTokenAnn)
 
 parseNewline :: CharParsing m => m Newline
 parseNewline =
-  LF <$ char '\n' <|>
-  char '\r' *> (CRLF <$ char '\n' <|> pure CR)
+  optional (Comment <$ char '#' <*> many (noneOf "\r\n")) <**>
+  (LF <$ char '\n' <|> char '\r' *> (CRLF <$ char '\n' <|> pure CR))
 
 stringOrBytesPrefix :: CharParsing m => m (Either StringPrefix BytesPrefix)
 stringOrBytesPrefix =

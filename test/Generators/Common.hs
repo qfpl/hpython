@@ -25,7 +25,6 @@ genSuite :: MonadGen m => m (Block '[] ()) -> m (Suite '[] ())
 genSuite gb =
   Suite () <$>
   genWhitespaces <*>
-  Gen.maybe genComment <*>
   genNewline <*>
   gb
 
@@ -98,7 +97,12 @@ genString :: MonadGen m => m PyChar -> m [PyChar]
 genString = Gen.list (Range.constant 0 50)
 
 genNewline :: MonadGen m => m Newline
-genNewline = Gen.element [LF, CR, CRLF]
+genNewline =
+  Gen.choice
+    [ LF <$> Gen.maybe genComment
+    , CR <$> Gen.maybe genComment
+    , CRLF <$> Gen.maybe genComment
+    ]
 
 genStringType :: MonadGen m => m StringType
 genStringType = Gen.element [ShortString, LongString]

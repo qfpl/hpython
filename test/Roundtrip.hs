@@ -33,6 +33,7 @@ roundtripTests =
   , "test.py"
   , "ansible.py"
   , "comments.py"
+  , "pypy.py"
   ]
 
 doRoundtrip :: String -> Property

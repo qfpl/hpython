@@ -107,15 +107,15 @@ class HasIndents s where
   _Indents :: Traversal' (s '[] a) (Indents a)
 
 instance HasIndents Statement where
-  _Indents f (SmallStatements idnt a b c d e) =
-    (\idnt' -> SmallStatements idnt' a b c d e) <$> f idnt
+  _Indents f (SmallStatements idnt a b c e) =
+    (\idnt' -> SmallStatements idnt' a b c e) <$> f idnt
   _Indents f (CompoundStatement c) = CompoundStatement <$> _Indents f c
 
 instance HasIndents Block where
   _Indents = _Statements._Indents
 
 instance HasIndents Suite where
-  _Indents f (Suite a b c d e) = Suite a b c d <$> _Indents f e
+  _Indents f (Suite a b c e) = Suite a b c <$> _Indents f e
 
 instance HasIndents CompoundStatement where
   _Indents fun s =
@@ -200,7 +200,7 @@ instance HasNewlines Block where
     (traverse._Right._Newlines) f b
 
 instance HasNewlines Suite where
-  _Newlines f (Suite a b c d e) = Suite a b c <$> f d <*> _Newlines f e
+  _Newlines f (Suite a b d e) = Suite a b <$> f d <*> _Newlines f e
 
 instance HasNewlines CompoundStatement where
   _Newlines fun s =
@@ -231,8 +231,8 @@ instance HasNewlines CompoundStatement where
 instance HasNewlines Statement where
   _Newlines f (CompoundStatement c) =
     CompoundStatement <$> _Newlines f c
-  _Newlines f (SmallStatements idnts s ss sc cmt nl) =
-    SmallStatements idnts s ss sc cmt <$> traverse f nl
+  _Newlines f (SmallStatements idnts s ss sc nl) =
+    SmallStatements idnts s ss sc <$> traverse f nl
 
 instance HasNewlines Module where
   _Newlines = _Wrapped.traverse.failing (_Left._3.traverse) (_Right._Newlines)

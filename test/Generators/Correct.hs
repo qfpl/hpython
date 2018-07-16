@@ -125,9 +125,8 @@ genBlock =
       Gen.choice
         [ Right <$> genStatement
         , fmap Left $
-          (,,) <$>
+          (,) <$>
           genWhitespaces <*>
-          Gen.maybe genComment <*>
           genNewline
         ]
 
@@ -571,15 +570,14 @@ genStatement
 genStatement =
   Gen.shrink
     (\case
-        SmallStatements a b c d e f -> (\c' -> SmallStatements a b c' d e f) <$> Shrink.list c
+        SmallStatements a b c e f -> (\c' -> SmallStatements a b c' e f) <$> Shrink.list c
         _ -> []) $
   sizedRecursive
     [ sizedBind (localState genSmallStatement) $ \st ->
       sizedBind (sizedList $ (,) <$> genWhitespaces <*> localState genSmallStatement) $ \sts ->
-      (\a b c -> SmallStatements a st sts b c . Just) <$>
+      (\a c -> SmallStatements a st sts c . Right) <$>
       use currentIndentation <*>
       Gen.maybe genWhitespaces <*>
-      Gen.maybe genComment <*>
       genNewline
     ]
     [ CompoundStatement <$> localState genCompoundStatement ]

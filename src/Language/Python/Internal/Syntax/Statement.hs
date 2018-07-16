@@ -76,7 +76,7 @@ newtype Block v a
   { unBlock
     :: NonEmpty
          (Either
-            ([Whitespace], Maybe Comment, Newline)
+            ([Whitespace], Newline)
             (Statement v a))
   } deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -84,7 +84,7 @@ class HasBlocks s where
   _Blocks :: Traversal (s v a) (s '[] a) (Block v a) (Block '[] a)
 
 instance HasBlocks Suite where
-  _Blocks f (Suite a b c d e) = Suite a b c d <$> f e
+  _Blocks f (Suite a b c e) = Suite a b c <$> f e
 
 instance HasBlocks CompoundStatement where
   _Blocks f (Fundef idnt a ws1 name ws2 params ws3 s) =
@@ -120,7 +120,7 @@ instance HasStatements Block where
   _Statements = _Wrapped.traverse._Right
 
 instance HasStatements Suite where
-  _Statements f (Suite a b c d e) = Suite a b c d <$> _Statements f e
+  _Statements f (Suite a b c e) = Suite a b c <$> _Statements f e
 
 data Statement (v :: [*]) a
   = SmallStatements
@@ -128,16 +128,15 @@ data Statement (v :: [*]) a
       (SmallStatement v a)
       [([Whitespace], SmallStatement v a)]
       (Maybe [Whitespace])
-      (Maybe Comment)
-      (Maybe Newline)
+      (Either (Maybe Comment) Newline)
   | CompoundStatement
       (CompoundStatement v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasBlocks Statement where
   _Blocks f (CompoundStatement c) = CompoundStatement <$> _Blocks f c
-  _Blocks _ (SmallStatements idnt a b c d e) =
-    pure $ SmallStatements idnt (coerce a) (over (mapped._2) coerce b) c d e
+  _Blocks _ (SmallStatements idnt a b c d) =
+    pure $ SmallStatements idnt (coerce a) (over (mapped._2) coerce b) c d
 
 instance Plated (Statement '[] a) where
   plate _ s@SmallStatements{} = pure s
@@ -170,12 +169,11 @@ instance Plated (Statement '[] a) where
       With a b c d e -> With a b c (coerce d) <$> _Statements fun e
 
 instance HasExprs Statement where
-  _Exprs f (SmallStatements idnt s ss a b c) =
+  _Exprs f (SmallStatements idnt s ss a c) =
     SmallStatements idnt <$>
     _Exprs f s <*>
     (traverse._2._Exprs) f ss <*>
     pure a <*>
-    pure b <*>
     pure c
   _Exprs f (CompoundStatement c) = CompoundStatement <$> _Exprs f c
 
@@ -345,7 +343,7 @@ data ExceptAs v a
 data Suite v a
   = Suite a
       -- ':' <spaces> [comment] <newline>
-      [Whitespace] (Maybe Comment) Newline
+      [Whitespace] Newline
       -- <block>
       (Block v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
@@ -426,7 +424,7 @@ instance HasExprs Block where
   _Exprs = _Wrapped.traverse._Right._Exprs
 
 instance HasExprs Suite where
-  _Exprs f (Suite a b c d e) = Suite a b c d <$> _Exprs f e
+  _Exprs f (Suite a b c e) = Suite a b c <$> _Exprs f e
 
 instance HasExprs WithItem where
   _Exprs f (WithItem a b c) = WithItem a <$> f b <*> traverseOf (traverse._2) f c

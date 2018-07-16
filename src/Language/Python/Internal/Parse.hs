@@ -9,7 +9,7 @@ import Control.Lens.Getter ((^.), use)
 import Control.Lens.Setter (assign)
 import Control.Lens.TH (makeLenses)
 import Control.Monad (unless)
-import Control.Monad.Except (ExceptT(..), runExceptT, throwError)
+import Control.Monad.Except (ExceptT(..), runExceptT, throwError, catchError)
 import Control.Monad.State
   (MonadState, StateT(..), get, put, evalStateT, runStateT)
 import Control.Monad.Writer.Strict (MonadWriter, Writer, runWriter, writer, tell)
@@ -95,6 +95,11 @@ runParser :: ann -> Parser ann a -> Nested ann -> Either (ParseError ann) a
 runParser initial (Parser p) input =
   fst . runWriter . runExceptT $
   evalStateT p (ParserState initial (pure . toList $ unNested input))
+
+try :: Parser ann a -> Parser ann a
+try (Parser p) = Parser $ do
+  s <- get
+  catchError p (\e -> put s *> tell (Consumed False) *> throwError e)
 
 currentToken :: Parser ann (PyToken ann)
 currentToken = Parser $ do
@@ -487,19 +492,19 @@ orExpr ws =
       (\a b c d -> Subscript (_exprAnnotation d) d a b c) <$>
       (snd <$> token anySpace (TkLeftBracket ())) <*>
       commaSep1' anySpace subscript <*>
-      (snd <$> token anySpace (TkRightBracket ()))
+      (snd <$> token ws (TkRightBracket ()))
 
     atomExpr = foldl' (&) <$> atom <*> many trailer
 
     parens = do
-      (tk, s) <- token ws $ TkLeftParen ()
-      ex <- yieldExpr ws <!> exprListComp anySpace
+      (tk, s) <- token anySpace $ TkLeftParen ()
+      ex <- yieldExpr anySpace <!> exprListComp anySpace
       Parens (pyTokenAnn tk) s ex <$> 
         (snd <$> token ws (TkRightParen ()))
 
     list = do
-      (tk, s) <- token ws $ TkLeftBracket ()
-      ex <- optional $ expr ws
+      (tk, s) <- token anySpace $ TkLeftBracket ()
+      ex <- optional $ expr anySpace
       (case ex of
         Nothing -> pure $ List (pyTokenAnn tk) s Nothing
         Just ex' -> do
@@ -706,8 +711,7 @@ statement =
   (\d (a, b, c) -> SmallStatements d a b c) <$>
   indents <*>
   sepBy1' smallStatement (snd <$> semicolon space) <*>
-  optional comment <*>
-  (Just <$> eol <!> Nothing <$ eof)
+  (Right <$> try eol <!> Left <$> optional comment <* eof)
 
   <!>
 
@@ -739,7 +743,6 @@ suite :: Parser ann (Suite '[] ann)
 suite =
   (\(tk, s) -> Suite (pyTokenAnn tk) s) <$>
   colon space <*>
-  optional comment <*>
   eol <*>
   fmap Block
     (flip (foldr NonEmpty.cons) <$>
@@ -748,9 +751,8 @@ suite =
   dedent
   where
     commentOrEmpty =
-      (,,) <$>
+      (,) <$>
       (foldOf (indentsValue.folded.indentWhitespaces) <$> indents) <*>
-      optional comment <*>
       eol
 
     commentOrIndent = many (Left <$> commentOrEmpty) <* indent

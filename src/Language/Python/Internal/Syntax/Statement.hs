@@ -305,7 +305,7 @@ data ExceptAs v a
 
 data Suite v a
   -- ':' <space> smallstatement
-  = SuiteOne a [Whitespace] (SmallStatement v a) (Either (Maybe Comment) Newline)
+  = SuiteOne a [Whitespace] (SmallStatement v a) Newline
   | SuiteMany a
       -- ':' <spaces> [comment] <newline>
       [Whitespace] Newline

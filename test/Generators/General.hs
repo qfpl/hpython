@@ -161,6 +161,7 @@ genExpr' isExp =
   sizedRecursive
     [ genBool
     , if isExp then genSmallInt else genInt
+    , if isExp then genSmallFloat else genFloat
     , Ident () <$> genIdent
     , String () <$>
       Gen.nonEmpty

@@ -8,9 +8,11 @@ import qualified Hedgehog.Range as Range
 import Control.Lens.Fold ((^?!))
 import Control.Lens.Prism (_Right)
 import Control.Monad ((<=<))
+import Data.Digit.Enum (enumDecimal)
 import Data.Digit.HeXaDeCiMaL
 import Data.Digit.Integral
 import Data.List.NonEmpty (NonEmpty(..))
+import Data.These (These(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax
@@ -31,10 +33,7 @@ genSuite gss gb =
   , SuiteOne () <$>
     genWhitespaces <*>
     gss <*>
-    Gen.choice
-      [ Left <$> Gen.maybe genComment
-      , Right <$> genNewline
-      ]
+    genNewline
   ]
 
 integralHeXaDeCiMaL'
@@ -101,6 +100,56 @@ genInt = do
       , IntLiteralHex () <$> Gen.bool <*> ((^?! _Right) <$> integralHeXDigits n')
       ] <*>
     genWhitespaces
+
+genSmallFloat :: MonadGen m => m (Expr '[] ())
+genSmallFloat =
+  Float () <$>
+  Gen.choice
+    [ FloatLiteralFull () <$>
+      genDecs <*>
+      Gen.maybe
+        (Gen.choice
+           [ This <$> genDecs
+           , That <$> floatExponent
+           , These <$> genDecs <*> floatExponent
+           ])
+    , FloatLiteralPoint () <$>
+      genDecs <*>
+      Gen.maybe floatExponent
+    ] <*>
+  genWhitespaces
+  where
+    genDecs = Gen.nonEmpty (Range.constant 1 3) (Gen.element enumDecimal)
+    floatExponent =
+      FloatExponent <$>
+      Gen.bool <*>
+      Gen.maybe (Gen.element [Pos, Neg]) <*>
+      genDecs
+
+genFloat :: MonadGen m => m (Expr '[] ())
+genFloat =
+  Float () <$>
+  Gen.choice
+    [ FloatLiteralFull () <$>
+      genDecs <*>
+      Gen.maybe
+        (Gen.choice
+           [ This <$> genDecs
+           , That <$> floatExponent
+           , These <$> genDecs <*> floatExponent
+           ])
+    , FloatLiteralPoint () <$>
+      genDecs <*>
+      Gen.maybe floatExponent
+    ] <*>
+  genWhitespaces
+  where
+    genDecs = Gen.nonEmpty (Range.constant 1 10) (Gen.element enumDecimal)
+    floatExponent =
+      FloatExponent <$>
+      Gen.bool <*>
+      Gen.maybe (Gen.element [Pos, Neg]) <*>
+      genDecs
 
 genString :: MonadGen m => m PyChar -> m [PyChar]
 genString = Gen.list (Range.constant 0 50)

@@ -5,7 +5,7 @@
 {-# language GeneralizedNewtypeDeriving #-}
 module Language.Python.Internal.Lexer where
 
-import Control.Applicative ((<|>), some, many, optional)
+import Control.Applicative ((<|>), many, optional)
 import Control.Lens.Iso (from)
 import Control.Lens.Getter ((^.))
 import Control.Monad (when, replicateM)
@@ -14,7 +14,7 @@ import Control.Monad.State (StateT, evalStateT, get, modify, put)
 import Data.Bifunctor (first)
 import Data.Digit.Binary (parseBinary)
 import Data.Digit.D0 (parse0)
-import Data.Digit.Decimal (DecDigit(..), parseDecimal, parseDecimalNoZero)
+import Data.Digit.Decimal (parseDecimal, parseDecimalNoZero)
 import Data.Digit.HeXaDeCiMaL (parseHeXaDeCiMaL)
 import Data.Digit.Octal (parseOctal)
 import Data.FingerTree (FingerTree, Measured(..))
@@ -23,6 +23,7 @@ import Data.List.NonEmpty (NonEmpty(..), some1)
 import Data.Monoid (Sum(..))
 import Data.Semigroup ((<>))
 import Data.Sequence ((!?), (|>), Seq)
+import Data.These (These(..))
 import Text.Parser.LookAhead (LookAheadParsing, lookAhead)
 import Text.Trifecta
   ( CharParsing, DeltaParsing, Caret, Careted(..), char, careted, noneOf
@@ -136,6 +137,68 @@ stringChar =
     hexChar = Char_hex <$ char 'x' <*> parseHeXaDeCiMaL <*> parseHeXaDeCiMaL
     octChar = Char_octal <$ char 'o' <*> parseOctal <*> parseOctal
 
+number :: DeltaParsing m => m (a -> PyToken a)
+number = do
+  zero <- optional parse0
+  case zero of
+    Nothing -> do
+      nn <- optional $ (:|) <$> parseDecimalNoZero <*> many parseDecimal
+      case nn of
+        Just n -> do
+          point <- optional $ char '.'
+          case point of
+            Nothing -> do
+              e <- optional floatExp
+              case e of
+                Nothing -> pure (\a -> TkInt (IntLiteralDec a n))
+                Just e' -> pure (\a -> TkFloat (FloatLiteralFull a n (Just (That e'))))
+            Just p -> do
+              a <- optional $ some1 parseDecimal
+              b <- optional floatExp
+              pure $ \ann ->
+                TkFloat . FloatLiteralFull ann n $
+                case (a, b) of
+                  (Nothing, Nothing) -> Nothing
+                  (Just x, Nothing) -> Just $ This x
+                  (Nothing, Just x) -> Just $ That x
+                  (Just x, Just y) -> Just $ These x y
+        Nothing -> do
+          a <- try $ char '.' *> some1 parseDecimal
+          b <- optional floatExp
+          pure $ \ann -> TkFloat $ FloatLiteralPoint ann a b
+    Just z ->
+      (do
+          xX <- True <$ char 'X' <|> False <$ char 'x'
+          (\a b -> TkInt (IntLiteralHex b xX a)) <$> some1 parseHeXaDeCiMaL) <|>
+      (do
+          bB <- True <$ char 'B' <|> False <$ char 'b'
+          (\a b -> TkInt (IntLiteralBin b bB a)) <$> some1 parseBinary) <|>
+      (do
+          oO <- True <$ char 'O' <|> False <$ char 'o'
+          (\a b -> TkInt (IntLiteralOct b oO a)) <$> some1 parseOctal) <|>
+      (try $ do
+         n <- many parse0 <* notFollowedBy (char '.' <|> digit)
+         pure (\a -> TkInt (IntLiteralDec a (z :| n)))) <|>
+      do
+        n' <- many parseDecimal
+        let n = z :| n'
+        char '.'
+        a <- optional $ some1 parseDecimal
+        b <- optional floatExp
+        pure $ \ann ->
+          TkFloat . FloatLiteralFull ann n $
+          case (a, b) of
+            (Nothing, Nothing) -> Nothing
+            (Just x, Nothing) -> Just $ This x
+            (Nothing, Just x) -> Just $ That x
+            (Just x, Just y) -> Just $ These x y
+  where
+    floatExp =
+      FloatExponent <$>
+      (True <$ char 'E' <|> False <$ char 'e') <*>
+      optional (Pos <$ char '+' <|> Neg <$ char '-') <*>
+      some1 parseDecimal
+
 parseToken :: (DeltaParsing m, LookAheadParsing m) => m (PyToken Caret)
 parseToken =
   fmap (\(f :^ sp) -> f sp) . careted $
@@ -175,25 +238,7 @@ parseToken =
     , TkIn <$ string "in"
     , TkYield <$ string "yield"
     ] <>
-    [ do
-        zero <- optional (char '0')
-        case zero of
-          Nothing ->
-            fmap (\a b -> TkInt (IntLiteralDec b a)) $
-            (:|) <$> parseDecimalNoZero <*> many parseDecimal
-          Just{} ->
-            (do
-                xX <- True <$ char 'X' <|> False <$ char 'x'
-                (\a b -> TkInt (IntLiteralHex b xX a)) <$> some1 parseHeXaDeCiMaL) <|>
-            (do
-                bB <- True <$ char 'B' <|> False <$ char 'b'
-                (\a b -> TkInt (IntLiteralBin b bB a)) <$> some1 parseBinary) <|>
-            (do
-                oO <- True <$ char 'O' <|> False <$ char 'o'
-                (\a b -> TkInt (IntLiteralOct b oO a)) <$> some1 parseOctal) <|>
-            ((\a b -> TkInt $ IntLiteralDec b (DecDigit0 :| a)) <$> some parse0 <|>
-             TkFloat 0 <$ char '.' <*> optional (read <$> some digit) <|>
-             pure (\b -> TkInt (IntLiteralDec b (DecDigit0 :| []))))
+    [ number
     , TkSpace <$ char ' '
     , TkTab <$ char '\t'
     , TkLeftBracket <$ char '['

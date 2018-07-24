@@ -8,6 +8,7 @@ import Data.Digit.Octal (OctDigit)
 import Data.Digit.Decimal (DecDigit)
 import Data.Digit.HeXaDeCiMaL (HeXDigit)
 import Data.List.NonEmpty (NonEmpty)
+import Data.These (These)
 
 data IntLiteral a
   = IntLiteralDec
@@ -31,3 +32,25 @@ data IntLiteral a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 deriveEq1 ''IntLiteral
+
+data Sign = Pos | Neg deriving (Eq, Show)
+
+data FloatExponent = FloatExponent Bool (Maybe Sign) (NonEmpty DecDigit)
+  deriving (Eq, Show)
+
+data FloatLiteral a
+  = FloatLiteralFull
+  { _floatLiteralAnn :: a
+  , _floatLiteralFullLeft :: NonEmpty DecDigit
+  , _floatLiteralFullRight
+      :: Maybe (These (NonEmpty DecDigit) FloatExponent)
+  }
+  | FloatLiteralPoint
+  { _floatLiteralAnn :: a
+  -- . [0-9]+
+  , _floatLiteralPointRight :: NonEmpty DecDigit
+  -- [ 'e' ['-' | '+'] [0-9]+ ]
+  , _floatLiteralPointExponent :: Maybe FloatExponent
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+deriveEq1 ''FloatLiteral

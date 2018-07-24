@@ -13,6 +13,7 @@ let
      else pkgs.haskell.packages.${compiler}).override {
        overrides = self: super: {
          free = self.free_5_0_1;
+         keys = self.keys_3_12;
          kan-extensions = self.kan-extensions_5_1;
          semigroupoids = self.semigroupoids_5_2_2;
          adjunctions = self.adjunctions_4_4;

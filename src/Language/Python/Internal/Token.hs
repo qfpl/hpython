@@ -4,7 +4,7 @@ module Language.Python.Internal.Token where
 
 import Data.Deriving (deriveEq1)
 
-import Language.Python.Internal.Syntax.Numbers (IntLiteral(..))
+import Language.Python.Internal.Syntax.Numbers (IntLiteral(..), FloatLiteral(..))
 import Language.Python.Internal.Syntax.Strings
   (StringPrefix(..), BytesPrefix(..), QuoteType(..), StringType(..), PyChar(..))
 import Language.Python.Internal.Syntax.Whitespace (Newline(..))
@@ -44,7 +44,7 @@ data PyToken a
   | TkIn a
   | TkYield a
   | TkInt (IntLiteral a)
-  | TkFloat Integer (Maybe Integer) a
+  | TkFloat (FloatLiteral a)
   | TkIdent String a
   | TkString (Maybe StringPrefix) QuoteType StringType [PyChar] a
   | TkBytes BytesPrefix QuoteType StringType [PyChar] a
@@ -140,7 +140,7 @@ pyTokenAnn tk =
     TkWhile a -> a
     TkAssert a -> a
     TkInt a -> _intLiteralAnn a
-    TkFloat _ _ a -> a
+    TkFloat a -> _floatLiteralAnn a
     TkIdent _ a -> a
     TkString _ _ _ _ a -> a
     TkBytes _ _ _ _ a -> a

@@ -261,6 +261,7 @@ assignTargets f e =
     BinOp{} -> pure $ coerce e
     Negate{} -> pure $ coerce e
     Int{} -> pure $ coerce e
+    Float{} -> pure $ coerce e
     Bool{} -> pure $ coerce e
     String{} -> pure $ coerce e
     Not{} -> pure $ coerce e

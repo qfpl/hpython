@@ -27,6 +27,7 @@ import Data.Digit.Char (charHeXaDeCiMaL, charOctal, charBinary, charDecimal)
 import Data.Foldable (toList)
 import Data.Maybe (maybe)
 import Data.Semigroup (Semigroup(..))
+import Data.These (These(..))
 
 import qualified Data.List.NonEmpty as NonEmpty
 
@@ -61,6 +62,8 @@ showRenderOutput =
           -> a : TkSpace () : b : rest
         a@(TkString _ qt _ _ _) : b@(TkString _ qt' _ _ _) : rest
           | qt == qt' -> a : TkSpace () : b : rest
+        a@(TkFloat (FloatLiteralFull _ _ Nothing)) : b : rest
+          | isIdentifierChar (head $ showToken b) -> a : TkSpace () : b : rest
         a -> a
 
     correctNewlines =
@@ -137,7 +140,7 @@ showToken t =
     TkIn{} -> "in"
     TkYield{} -> "yield"
     TkInt i -> renderIntLiteral i
-    TkFloat i i' _ -> show i <> foldMap (("." <>) . show) i'
+    TkFloat i -> renderFloatLiteral i
     TkIdent s _ -> s
     TkString sp qt st s _ ->
       let
@@ -486,6 +489,29 @@ renderIntLiteral (IntLiteralOct _ b n) =
 renderIntLiteral (IntLiteralHex _ b n) =
   '0' : (if b then 'X' else 'x') : fmap (charHeXaDeCiMaL #) (NonEmpty.toList n)
 
+renderFloatExponent :: FloatExponent -> String
+renderFloatExponent (FloatExponent e s ds) =
+  (if e then 'E' else 'e') :
+  foldMap (\case; Pos -> "+"; Neg -> "-") s <>
+  fmap (charDecimal #) (NonEmpty.toList ds)
+
+renderFloatLiteral :: FloatLiteral a -> String
+renderFloatLiteral (FloatLiteralFull _ a b) =
+  fmap (charDecimal #) (NonEmpty.toList a) <>
+  "." <>
+  foldMap
+    (\case
+       This x -> (charDecimal #) <$> NonEmpty.toList x
+       That x -> renderFloatExponent x
+       These x y ->
+         fmap (charDecimal #) (NonEmpty.toList x) <>
+         renderFloatExponent y)
+    b
+renderFloatLiteral (FloatLiteralPoint _ a b) =
+  '.' :
+  (fmap (charDecimal #) (NonEmpty.toList a) <>
+   foldMap renderFloatExponent b)
+
 renderStringLiteral :: StringLiteral a -> RenderOutput
 renderStringLiteral (StringLiteral _ a b c d e) =
   TkString a b c d () `cons`
@@ -576,6 +602,7 @@ renderExpr (Negate _ ws expr) =
     _ -> bracketTupleGenerator expr
 renderExpr (String _ vs) = foldMap renderStringLiteral vs
 renderExpr (Int a n ws) = TkInt (() <$ n) `cons` foldMap renderWhitespace ws
+renderExpr (Float a n ws) = TkFloat (() <$ n) `cons` foldMap renderWhitespace ws
 renderExpr (Ident _ name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) =
   TkLeftBracket () `cons`
@@ -763,10 +790,7 @@ renderSuite (SuiteOne _ a c d) =
   TkColon () `cons`
   foldMap renderWhitespace a <>
   renderSmallStatement c <>
-  either
-    (foldMap (\a -> singleton $ TkComment (renderComment a) ()))
-    (singleton . renderNewline)
-    d
+  singleton (renderNewline d)
 
 renderCompoundStatement :: CompoundStatement v a -> RenderOutput
 renderCompoundStatement (Fundef idnt _ ws1 name ws2 params ws3 s) =

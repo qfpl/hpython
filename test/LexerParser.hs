@@ -343,7 +343,7 @@ test_fulltrip_15 :: Property
 test_fulltrip_15 =
   withTests 1 . property $ do
     let
-      str = "a and b == c == d"
+      str = "01."
 
     tks <- doTokenize str
     annotateShow $! tks

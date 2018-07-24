@@ -290,6 +290,7 @@ genExpr' isExp = do
   sizedRecursive
     [ genBool
     , if isExp then genSmallInt else genInt
+    , if isExp then genSmallFloat else genFloat
     , Ident () <$> genIdent
     , genStringLiterals
     ]
@@ -334,7 +335,11 @@ genExpr' isExp = do
            genWhitespaces <*>
            pure a)
      ] ++
-     [ Yield () <$> (NonEmpty.toList <$> genWhitespaces1) <*> sizedMaybe genExpr | isInFunction ] ++
+     [ Yield () <$>
+       (NonEmpty.toList <$> genWhitespaces1) <*>
+       sizedMaybe genExpr
+     | isInFunction
+     ] ++
      [ YieldFrom () <$>
        (NonEmpty.toList <$> genWhitespaces1) <*>
        (NonEmpty.toList <$> genWhitespaces1) <*>

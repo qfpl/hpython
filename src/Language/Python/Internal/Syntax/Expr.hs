@@ -383,6 +383,11 @@ data Expr (v :: [*]) a
   , _unsafeIntValue :: IntLiteral a
   , _unsafeIntWhitespace :: [Whitespace]
   }
+  | Float
+  { _exprAnnotation :: a
+  , _unsafeFloatValue :: FloatLiteral a
+  , _unsafeFloatWhitespace :: [Whitespace]
+  }
   | Bool
   { _exprAnnotation :: a
   , _unsafeBoolValue :: Bool
@@ -432,6 +437,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Parens _ _ _ ws -> ws
           Ident _ a -> a ^. getting trailingWhitespace
           Int _ _ ws -> ws
+          Float _ _ ws -> ws
           Bool _ _ ws -> ws
           String _ v -> v ^. trailingWhitespace
           Not _ _ e -> e ^. trailingWhitespace
@@ -458,6 +464,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Parens a b c _ -> Parens a b (coerce c) ws
           Ident a b -> Ident a (b & trailingWhitespace .~ ws)
           Int a b _ -> Int a b ws
+          Float a b _ -> Float a b ws
           Bool a b _ -> Bool a b ws
           String a v -> String a (v & trailingWhitespace .~ ws)
           Not a b c -> Not a b (c & trailingWhitespace .~ ws)

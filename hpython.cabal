@@ -47,12 +47,13 @@ library
                      , type-level-sets >=0.8.6.0
                      , parsers
                      , trifecta
+                     , fingertree >=0.1 && <0.2
                      , mtl
                      , bytestring-trie >=0.2
                      , containers >=0.5 && <0.6
                      , deriving-compat >=0.4 && <0.5
                      , semigroupoids >=5.2.2 && <5.3
-                     , fingertree >=0.1 && <0.2
+                     , these >=0.7.4 && <0.7.5
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -O2
@@ -100,6 +101,7 @@ test-suite hpython-tests
                      , semigroupoids >=5.2.2 && <5.3
                      , transformers
                      , trifecta
+                     , these >=0.7.4 && <0.7.5
   default-language:    Haskell2010
   ghc-options:         -O2
                        -Wincomplete-patterns

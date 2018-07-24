@@ -237,11 +237,24 @@ validateExprSyntax
   => Expr v a
   -> ValidateSyntax e (Expr (Nub (Syntax ': v)) a)
 validateExprSyntax (Lambda a b c d e) =
-  Lambda a <$>
-  validateWhitespace a b <*>
-  validateParamsSyntax c <*>
-  validateWhitespace a d <*>
-  validateExprSyntax e
+  let
+    paramIdents = c ^.. folded.unvalidated.paramName.identValue
+  in
+    Lambda a <$>
+    validateWhitespace a b <*>
+    validateParamsSyntax c <*>
+    validateWhitespace a d <*>
+    localSyntaxContext
+      (\ctxt ->
+          ctxt
+          { _inLoop = False
+          , _inFunction =
+              fmap
+                (`union` paramIdents)
+                (_inFunction ctxt) <|>
+              Just paramIdents
+          })
+      (validateExprSyntax e)
 validateExprSyntax (Yield a b c) =
   Yield a <$>
   validateWhitespace a b <*
@@ -287,6 +300,7 @@ validateExprSyntax (String a strLits) =
   else
     syntaxErrors [_Can'tJoinStringAndBytes # a]
 validateExprSyntax (Int a n ws) = pure $ Int a n ws
+validateExprSyntax (Float a n ws) = pure $ Float a n ws
 validateExprSyntax (Ident a name) = Ident a <$> validateIdent name
 validateExprSyntax (List a ws1 exprs ws2) =
   List a ws1 <$>

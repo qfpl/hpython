@@ -44,6 +44,7 @@ data ParseError ann
   | ExpectedNewline { peGot :: PyToken ann }
   | ExpectedStringOrBytes { peGot :: PyToken ann }
   | ExpectedInteger { peGot :: PyToken ann }
+  | ExpectedFloat { peGot :: PyToken ann }
   | ExpectedComment { peGot :: PyToken ann }
   | ExpectedToken { peExpected :: PyToken (), peGot :: PyToken ann }
   | ExpectedEndOfLine { peGotTokens :: [PyToken ann] }
@@ -259,6 +260,16 @@ integer ws = do
       Parser $ consumed ann
       Int ann n <$> many ws
     _ -> Parser . throwError $ ExpectedInteger curTk
+
+float :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+float ws = do
+  curTk <- currentToken
+  case curTk of
+    TkFloat n -> do
+      let ann = _floatLiteralAnn n
+      Parser $ consumed ann
+      Float ann n <$> many ws
+    _ -> Parser . throwError $ ExpectedFloat curTk
 
 stringOrBytes :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 stringOrBytes ws =
@@ -575,6 +586,7 @@ orExpr ws =
       bool ws <!>
       none ws <!>
       integer ws <!>
+      float ws <!>
       stringOrBytes ws <!>
       (\a -> Ident (_identAnnotation a) a) <$> identifier ws <!>
       parens
@@ -770,7 +782,7 @@ suite =
   ((fmap Left $
     (,) <$>
     smallStatement <*>
-    (Right <$> try eol <!> Left <$> optional comment <* eof))
+    eol)
     <!>
    (fmap Right $
     (,) <$>

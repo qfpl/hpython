@@ -3,6 +3,7 @@
 {-# language TypeApplications #-}
 {-# language MultiParamTypeClasses #-}
 {-# language GeneralizedNewtypeDeriving #-}
+{-# language LambdaCase #-}
 module Language.Python.Internal.Lexer where
 
 import Control.Applicative ((<|>), many, optional)
@@ -144,54 +145,52 @@ number = do
     Nothing -> do
       nn <- optional $ (:|) <$> parseDecimalNoZero <*> many parseDecimal
       case nn of
-        Just n -> do
-          point <- optional $ char '.'
-          case point of
-            Nothing -> do
-              e <- optional floatExp
-              case e of
-                Nothing -> pure (\a -> TkInt (IntLiteralDec a n))
-                Just e' -> pure (\a -> TkFloat (FloatLiteralFull a n (Just (That e'))))
-            Just p -> do
-              a <- optional $ some1 parseDecimal
-              b <- optional floatExp
-              pure $ \ann ->
-                TkFloat . FloatLiteralFull ann n $
-                case (a, b) of
-                  (Nothing, Nothing) -> Nothing
-                  (Just x, Nothing) -> Just $ This x
-                  (Nothing, Just x) -> Just $ That x
-                  (Just x, Just y) -> Just $ These x y
-        Nothing -> do
-          a <- try $ char '.' *> some1 parseDecimal
-          b <- optional floatExp
-          pure $ \ann -> TkFloat $ FloatLiteralPoint ann a b
+        Just n ->
+          (\x ann -> case x of
+             Nothing -> TkInt $ IntLiteralDec ann n
+             Just (Left e) -> TkFloat $ FloatLiteralFull ann n (Just (That e))
+             Just (Right (a, b)) ->
+               TkFloat . FloatLiteralFull ann n $
+               case (a, b) of
+                 (Nothing, Nothing) -> Nothing
+                 (Just x, Nothing) -> Just $ This x
+                 (Nothing, Just x) -> Just $ That x
+                 (Just x, Just y) -> Just $ These x y) <$>
+          optional
+            (char '.' *>
+             (Left <$> floatExp <|>
+              fmap Right ((,) <$> optional (some1 parseDecimal) <*> optional floatExp)))
+        Nothing ->
+          (\a b ann -> TkFloat $ FloatLiteralPoint ann a b) <$>
+          -- try is necessary here to prevent the intercepting of dereference tokens
+          try (char '.' *> some1 parseDecimal) <*>
+          optional floatExp
     Just z ->
-      (do
-          xX <- True <$ char 'X' <|> False <$ char 'x'
-          (\a b -> TkInt (IntLiteralHex b xX a)) <$> some1 parseHeXaDeCiMaL) <|>
-      (do
-          bB <- True <$ char 'B' <|> False <$ char 'b'
-          (\a b -> TkInt (IntLiteralBin b bB a)) <$> some1 parseBinary) <|>
-      (do
-          oO <- True <$ char 'O' <|> False <$ char 'o'
-          (\a b -> TkInt (IntLiteralOct b oO a)) <$> some1 parseOctal) <|>
-      (try $ do
-         n <- many parse0 <* notFollowedBy (char '.' <|> digit)
-         pure (\a -> TkInt (IntLiteralDec a (z :| n)))) <|>
-      do
-        n' <- many parseDecimal
-        let n = z :| n'
-        char '.'
-        a <- optional $ some1 parseDecimal
-        b <- optional floatExp
-        pure $ \ann ->
-          TkFloat . FloatLiteralFull ann n $
-          case (a, b) of
-            (Nothing, Nothing) -> Nothing
-            (Just x, Nothing) -> Just $ This x
-            (Nothing, Just x) -> Just $ That x
-            (Just x, Just y) -> Just $ These x y
+      (\xX a b -> TkInt (IntLiteralHex b xX a)) <$>
+      (True <$ char 'X' <|> False <$ char 'x') <*>
+      some1 parseHeXaDeCiMaL
+      <|>
+      (\bB a b -> TkInt (IntLiteralBin b bB a)) <$>
+      (True <$ char 'B' <|> False <$ char 'b') <*>
+      some1 parseBinary
+      <|>
+      (\oO a b -> TkInt (IntLiteralOct b oO a)) <$>
+      (True <$ char 'O' <|> False <$ char 'o') <*>
+      some1 parseOctal
+      <|>
+      (\n a -> TkInt (IntLiteralDec a (z :| n))) <$>
+      try (many parse0 <* notFollowedBy (char '.' <|> digit))
+      <|>
+      (\n' a b ann ->
+        TkFloat . FloatLiteralFull ann (z :| n') $
+        case (a, b) of
+          (Nothing, Nothing) -> Nothing
+          (Just x, Nothing) -> Just $ This x
+          (Nothing, Just x) -> Just $ That x
+          (Just x, Just y) -> Just $ These x y) <$>
+      many parseDecimal <* char '.' <*>
+      optional (some1 parseDecimal) <*>
+      optional floatExp
   where
     floatExp =
       FloatExponent <$>

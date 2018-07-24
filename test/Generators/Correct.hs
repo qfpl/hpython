@@ -326,14 +326,27 @@ genExpr' isExp = do
          genExpr
          genExpr
          genExpr
-     , Gen.subtermM
-         genExpr
-         (\a ->
+     , sizedBind genParams $ \a ->
+       let paramIdents = a ^.. folded.paramName.identValue in
+       Gen.subtermM
+         (localState $ do
+            (modify $ \ctxt ->
+               ctxt
+               { _inLoop = False
+               , _inFunction =
+                   fmap
+                     (\b -> union b paramIdents)
+                     (_inFunction ctxt) <|>
+                   Just paramIdents
+               , _currentNonlocals = _willBeNonlocals ctxt <> _currentNonlocals ctxt
+               })
+            genExpr)
+         (\b ->
             Lambda () <$>
-           (NonEmpty.toList <$> genWhitespaces1) <*>
-           genParams <*>
-           genWhitespaces <*>
-           pure a)
+            (NonEmpty.toList <$> genWhitespaces1) <*>
+            pure a <*>
+            genWhitespaces <*>
+            pure b)
      ] ++
      [ Yield () <$>
        (NonEmpty.toList <$> genWhitespaces1) <*>

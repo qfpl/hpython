@@ -553,7 +553,7 @@ renderExpr (Lambda _ a b c d) =
   singleton (TkColon ()) <> foldMap renderWhitespace c <>
   bracketTupleGenerator d
 renderExpr e@Yield{} = bracket $ renderYield renderExpr e
-renderExpr e@YieldFrom{} = bracket $ renderYield renderExpr e
+renderExpr e@YieldFrom{} = bracket $ renderYield bracketTupleGenerator e
 renderExpr (Ternary _ a b c d e) =
   (case a of
      Generator{} -> bracket $ renderExpr a
@@ -960,6 +960,8 @@ renderBinOp (Plus _ ws) = TkPlus () `cons` foldMap renderWhitespace ws
 renderBinOp (Minus _ ws) = TkMinus () `cons` foldMap renderWhitespace ws
 renderBinOp (Multiply _ ws) = TkStar () `cons` foldMap renderWhitespace ws
 renderBinOp (Divide _ ws) = TkSlash () `cons` foldMap renderWhitespace ws
+renderBinOp (FloorDivide _ ws) =
+  TkDoubleSlash () `cons` foldMap renderWhitespace ws
 renderBinOp (Exp _ ws) = TkDoubleStar () `cons` foldMap renderWhitespace ws
 renderBinOp (BoolAnd _ ws) = TkAnd () `cons` foldMap renderWhitespace ws
 renderBinOp (BoolOr _ ws) = TkOr () `cons` foldMap renderWhitespace ws

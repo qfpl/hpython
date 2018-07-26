@@ -24,11 +24,13 @@ import Control.Lens.Plated (transform)
 import Control.Lens.Review ((#))
 import Data.Bifoldable (bifoldMap)
 import Data.Digit.Char (charHeXaDeCiMaL, charOctal, charBinary, charDecimal)
+import Data.DList (DList)
 import Data.Foldable (toList)
 import Data.Maybe (maybe)
 import Data.Semigroup (Semigroup(..))
 import Data.These (These(..))
 
+import qualified Data.DList as DList
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax
@@ -36,14 +38,14 @@ import Language.Python.Internal.Token (PyToken(..))
 
 newtype RenderOutput
   = RenderOutput
-  { unRenderOutput :: [PyToken ()]
+  { unRenderOutput :: DList (PyToken ())
   } deriving (Eq, Show, Semigroup, Monoid)
 
 singleton :: PyToken () -> RenderOutput
-singleton a = RenderOutput [a]
+singleton a = RenderOutput $ DList.singleton a
 
 cons :: PyToken () -> RenderOutput -> RenderOutput
-cons a (RenderOutput b) = RenderOutput $ a : b
+cons a (RenderOutput b) = RenderOutput $ DList.cons a b
 infixr 5 `cons`
 
 showRenderOutput :: RenderOutput -> String
@@ -51,6 +53,7 @@ showRenderOutput =
   foldMap showToken .
   correctSpaces .
   correctNewlines .
+  DList.toList .
   unRenderOutput
   where
     correctSpaces =

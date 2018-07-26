@@ -1,6 +1,6 @@
 { mkDerivation, base, bytestring-trie, containers, deriving-compat
-, digit, directory, filepath, fingertree, hedgehog, lens, mtl
-, parsers, process, semigroupoids, stdenv, these, transformers
+, digit, directory, dlist, filepath, fingertree, hedgehog, lens
+, mtl, parsers, process, semigroupoids, stdenv, these, transformers
 , trifecta, type-level-sets
 }:
 mkDerivation {
@@ -10,8 +10,9 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    base bytestring-trie containers deriving-compat digit fingertree
-    lens mtl parsers semigroupoids these trifecta type-level-sets
+    base bytestring-trie containers deriving-compat digit dlist
+    fingertree lens mtl parsers semigroupoids these trifecta
+    type-level-sets
   ];
   executableHaskellDepends = [ base lens ];
   testHaskellDepends = [

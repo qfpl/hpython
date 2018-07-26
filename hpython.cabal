@@ -34,6 +34,7 @@ library
                      , Language.Python.Internal.Syntax.Numbers
                      , Language.Python.Internal.Syntax.Statement
                      , Language.Python.Internal.Syntax.Strings
+                     , Language.Python.Internal.Syntax.UnOp
                      , Language.Python.Internal.Syntax.Whitespace
                      , Language.Python.Validate.Scope
                      , Language.Python.Validate.Scope.Error

@@ -444,7 +444,7 @@ validateAssignExprScope e@YieldFrom{} = pure $ coerce e
 validateAssignExprScope e@Not{} = pure $ coerce e
 validateAssignExprScope e@ListComp{} = pure $ coerce e
 validateAssignExprScope e@Call{} = pure $ coerce e
-validateAssignExprScope e@Negate{} = pure $ coerce e
+validateAssignExprScope e@UnOp{} = pure $ coerce e
 validateAssignExprScope e@BinOp{} = pure $ coerce e
 validateAssignExprScope e@Ident{} = pure $ coerce e
 validateAssignExprScope e@None{} = pure $ coerce e
@@ -527,8 +527,8 @@ validateExprScope (BinOp a l op r) =
   validateExprScope l <*>
   pure op <*>
   validateExprScope r
-validateExprScope (Negate a ws e) =
-  Negate a ws <$>
+validateExprScope (UnOp a op e) =
+  UnOp a op <$>
   validateExprScope e
 validateExprScope (Parens a ws1 e ws2) =
   Parens a ws1 <$>

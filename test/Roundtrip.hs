@@ -2,13 +2,12 @@
 {-# language DataKinds #-}
 module Roundtrip (roundtripTests) where
 
-import Data.Foldable (traverse_)
 import Control.Monad.IO.Class (liftIO)
 import Data.String (fromString)
 import Data.Validate (Validate(..))
 import Hedgehog
   ( (===), Group(..), Property, annotateShow, failure, property
-  , withTests, withShrinks, success
+  , withTests, withShrinks
   )
 import System.FilePath ((</>))
 import Text.Trifecta (Caret)
@@ -48,6 +47,4 @@ doRoundtrip name =
       Success res ->
         case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
           Failure errs' -> annotateShow (errs' :: [SyntaxError '[Indentation] Caret]) *> failure
-          Success _ ->
-            -- lines (showModule py) === lines file
-            traverse_ (\(a, b) -> if a == b then success else a === b) $ zip (lines $ showModule py) (lines file)
+          Success _ -> showModule py === file

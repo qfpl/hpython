@@ -212,7 +212,7 @@ genExpr' isExp =
         (\a -> Parens () <$> genWhitespaces <*> pure a <*> genWhitespaces)
     , genTuple genExpr
     , Not () <$> genWhitespaces <*> genExpr
-    , Negate () <$> genWhitespaces <*> genExpr
+    , UnOp () <$> genUnOp <*> genExpr
     , sized3M
         (\a b c ->
            (\ws1 ws2 -> Ternary () a ws1 b ws2 c) <$>

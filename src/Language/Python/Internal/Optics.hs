@@ -276,7 +276,7 @@ assignTargets f e =
     Call{} -> pure $ coerce e
     None{} -> pure $ coerce e
     BinOp{} -> pure $ coerce e
-    Negate{} -> pure $ coerce e
+    UnOp{} -> pure $ coerce e
     Int{} -> pure $ coerce e
     Float{} -> pure $ coerce e
     Bool{} -> pure $ coerce e

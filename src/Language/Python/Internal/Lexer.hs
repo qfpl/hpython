@@ -271,6 +271,7 @@ parseToken =
     , char '+' *> (TkPlusEq <$ char '=' <|> pure TkPlus)
     , char '-' *> (TkMinusEq <$ char '=' <|> pure TkMinus)
     , char '%' *> (TkPercentEq <$ char '=' <|> pure TkPercent)
+    , TkTilde <$ char '~'
     , TkContinued <$ char '\\' <*> parseNewline
     , TkColon <$ char ':'
     , TkSemicolon <$ char ';'

@@ -317,7 +317,7 @@ genExpr' isExp = do
          BinOp () (e1 & trailingWhitespace .~ [Space]) (op & trailingWhitespace .~ [Space]) e2
      , genTuple genExpr
      , Not () <$> (NonEmpty.toList <$> genWhitespaces1) <*> genExpr
-     , Negate () <$> genWhitespaces <*> genExpr
+     , UnOp () <$> genUnOp <*> genExpr
      , sized3M
          (\a b c ->
             (\ws1 ws2 -> Ternary () a ws1 b ws2 c) <$>

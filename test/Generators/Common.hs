@@ -36,6 +36,11 @@ genSuite gss gb =
     genNewline
   ]
 
+genUnOp :: MonadGen m => m (UnOp ())
+genUnOp =
+  Gen.element [Negate (), Positive (), Complement ()] <*>
+  genWhitespaces
+
 integralHeXaDeCiMaL'
   :: (MonadGen m, Integral a)
   => a
@@ -89,7 +94,7 @@ genInt :: MonadGen m => m (Expr '[] ())
 genInt = do
   n <- Gen.integral (Range.constant (-2^32) (2^32))
   let
-    f = if n < 0 then (\a -> Negate () <$> genWhitespaces <*> a) else id
+    f = if n < 0 then (\a -> UnOp () <$> (Negate () <$> genWhitespaces) <*> a) else id
     n' = if n < 0 then -n - 1 else n
   f $
     Int () <$>

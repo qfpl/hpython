@@ -32,6 +32,7 @@ import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Numbers
 import Language.Python.Internal.Syntax.Strings
+import Language.Python.Internal.Syntax.UnOp
 import Language.Python.Internal.Syntax.Whitespace
 
 -- | 'Traversal' over all the expressions in a term
@@ -358,12 +359,10 @@ data Expr (v :: [*]) a
   , _unsafeBinOpOp :: BinOp a
   , _unsafeBinOpExprRight :: Expr v a
   }
-  | Negate
+  | UnOp
   { _exprAnnotation :: a
-  -- - spaces
-  , _unsafeNegateWhitespace :: [Whitespace]
-  -- expr
-  , _unsafeNegateValue :: Expr v a
+  , _unsafeUnOpOp :: UnOp a
+  , _unsafeUnOpValue :: Expr v a
   }
   | Parens
   { _exprAnnotation :: a
@@ -433,7 +432,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Subscript _ _ _ _ ws -> ws
           Call _ _ _ _ ws -> ws
           BinOp _ _ _ e -> e ^. trailingWhitespace
-          Negate _ _ e -> e ^. trailingWhitespace
+          UnOp _ _ e -> e ^. trailingWhitespace
           Parens _ _ _ ws -> ws
           Ident _ a -> a ^. getting trailingWhitespace
           Int _ _ ws -> ws
@@ -460,7 +459,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Subscript a b c d _ -> Subscript a (coerce b) c d ws
           Call a b c d _ -> Call a (coerce b) c (coerce d) ws
           BinOp a b c e -> BinOp a (coerce b) c (e & trailingWhitespace .~ ws)
-          Negate a b c -> Negate a b (c & trailingWhitespace .~ ws)
+          UnOp a b c -> UnOp a b (c & trailingWhitespace .~ ws)
           Parens a b c _ -> Parens a b (coerce c) ws
           Ident a b -> Ident a (b & trailingWhitespace .~ ws)
           Int a b _ -> Int a b ws
@@ -481,9 +480,13 @@ instance IsString (Expr '[] ()) where
 instance Num (Expr '[] ()) where
   fromInteger n
     | n >= 0 = Int () (IntLiteralDec () $ integralDecDigits n ^?! _Right) []
-    | otherwise = Negate () [] $ Int () (IntLiteralDec () $ integralDecDigits (-n) ^?! _Right) []
+    | otherwise =
+        UnOp
+          ()
+          (Negate () [])
+          (Int () (IntLiteralDec () $ integralDecDigits (-n) ^?! _Right) [])
 
-  negate = Negate () []
+  negate = UnOp () (Negate () [])
 
   (+) a = BinOp () (a & trailingWhitespace .~ [Space]) (Plus () [Space])
   (*) a = BinOp () (a & trailingWhitespace .~ [Space]) (Multiply () [Space])
@@ -513,7 +516,7 @@ shouldBracketLeft op left =
 
     leftf' =
       case (left, op) of
-        (Negate{}, Exp{}) -> True
+        (UnOp{}, Exp{}) -> True
         (Tuple{}, _) -> True
         (Not{}, BoolAnd{}) -> False
         (Not{}, BoolOr{}) -> False

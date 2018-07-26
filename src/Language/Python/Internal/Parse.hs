@@ -483,7 +483,15 @@ orExpr ws =
     term = binOp termOp factor
 
     factor =
-      (\(tk, s) -> Negate (pyTokenAnn tk) s) <$> token ws (TkMinus ()) <*> factor <!>
+      ((\(tk, s) -> let ann = pyTokenAnn tk in UnOp ann (Negate ann s)) <$>
+       token ws (TkMinus ())
+       <!>
+       (\(tk, s) -> let ann = pyTokenAnn tk in UnOp ann (Positive ann s)) <$>
+       token ws (TkPlus ())
+       <!>
+       (\(tk, s) -> let ann = pyTokenAnn tk in UnOp ann (Complement ann s)) <$>
+       token ws (TkTilde ())) <*> factor
+      <!>
       power
 
     powerOp = (\(tk, ws) -> Exp (pyTokenAnn tk) ws) <$> token ws (TkDoubleStar ())

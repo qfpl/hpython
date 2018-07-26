@@ -12,6 +12,7 @@ module Language.Python.Internal.Syntax
   , module Language.Python.Internal.Syntax.Numbers
   , module Language.Python.Internal.Syntax.Statement
   , module Language.Python.Internal.Syntax.Strings
+  , module Language.Python.Internal.Syntax.UnOp
   , module Language.Python.Internal.Syntax.Whitespace
   )
 where
@@ -32,6 +33,7 @@ import Language.Python.Internal.Syntax.ModuleNames
 import Language.Python.Internal.Syntax.Numbers
 import Language.Python.Internal.Syntax.Statement
 import Language.Python.Internal.Syntax.Strings
+import Language.Python.Internal.Syntax.UnOp
 import Language.Python.Internal.Syntax.Whitespace
 
 reservedWords :: [String]

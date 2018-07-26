@@ -71,6 +71,7 @@ data PyToken a
   | TkDot a
   | TkPlus a
   | TkMinus a
+  | TkTilde a
   | TkComment String a
   | TkStar a
   | TkDoubleStar a
@@ -135,6 +136,7 @@ pyTokenAnn tk =
     TkYield a -> a
     TkPlus a -> a
     TkMinus a -> a
+    TkTilde a -> a
     TkIf a -> a
     TkElse a -> a
     TkElif a -> a

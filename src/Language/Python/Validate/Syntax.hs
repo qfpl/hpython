@@ -290,7 +290,7 @@ validateExprSyntax (Parens a ws1 e ws2) =
   localSyntaxContext (inParens .~ True) (validateExprSyntax e) <*>
   validateWhitespace a ws2
 validateExprSyntax (Bool a b ws) = pure $ Bool a b ws
-validateExprSyntax (Negate a ws expr) = Negate a ws <$> validateExprSyntax expr
+validateExprSyntax (UnOp a op expr) = UnOp a op <$> validateExprSyntax expr
 validateExprSyntax (String a strLits) =
   if
     all (\case; StringLiteral{} -> True; _ -> False) strLits ||
@@ -680,7 +680,7 @@ validateStatementSyntax (SmallStatements idnts s ss sc nl) =
 
 canAssignTo :: Expr v a -> Bool
 canAssignTo None{} = False
-canAssignTo Negate{} = False
+canAssignTo UnOp{} = False
 canAssignTo Int{} = False
 canAssignTo Call{} = False
 canAssignTo BinOp{} = False

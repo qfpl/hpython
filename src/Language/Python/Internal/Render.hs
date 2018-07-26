@@ -13,8 +13,8 @@ module Language.Python.Internal.Render
   , renderIdent, renderComment, renderModuleName, renderDot, renderRelativeModuleName
   , renderImportAs, renderImportTargets, renderSmallStatement, renderCompoundStatement
   , renderBlock, renderIndent, renderIndents, renderExceptAs, renderArg, renderParam
-  , renderCompFor, renderCompIf, renderComprehension, renderBinOp, renderSubscript
-  , renderPyChars
+  , renderCompFor, renderCompIf, renderComprehension, renderBinOp, renderUnOp
+  , renderSubscript, renderPyChars
   )
 where
 
@@ -192,6 +192,7 @@ showToken t =
     TkDot{} -> "."
     TkPlus{} -> "+"
     TkMinus{} -> "-"
+    TkTilde{} -> "~"
     TkComment s _ -> "#" <> s
     TkStar{} -> "*"
     TkDoubleStar{} -> "**"
@@ -591,9 +592,8 @@ renderExpr (Parens _ ws1 e ws2) =
 renderExpr (Bool _ b ws) =
   (if b then TkTrue () else TkFalse ()) `cons`
   foldMap renderWhitespace ws
-renderExpr (Negate _ ws expr) =
-  TkMinus () `cons`
-  foldMap renderWhitespace ws <>
+renderExpr (UnOp _ op expr) =
+  renderUnOp op <>
   case expr of
     BinOp _ _ Exp{} _ -> bracketTupleGenerator expr
     BinOp{} -> bracket $ renderExpr expr
@@ -620,7 +620,7 @@ renderExpr (ListComp _ ws1 comp ws2) =
   singleton (TkRightBracket ()) <> foldMap renderWhitespace ws2
 renderExpr (Call _ expr ws args ws2) =
   (case expr of
-     Negate{} -> bracket $ renderExpr expr
+     UnOp{} -> bracket $ renderExpr expr
      BinOp{} -> bracket $ renderExpr expr
      Tuple{} -> bracket $ renderExpr expr
      Not{} -> bracket $ renderExpr expr
@@ -635,7 +635,7 @@ renderExpr (Deref _ expr ws name) =
      BinOp{} -> bracket $ renderExpr expr
      Tuple{} -> bracket $ renderExpr expr
      Not{} -> bracket $ renderExpr expr
-     Negate{} -> bracket $ renderExpr expr
+     UnOp{} -> bracket $ renderExpr expr
      Ternary{} -> bracket $ renderExpr expr
      Lambda{} -> bracket $ renderExpr expr
      _ -> bracketGenerator expr) <>
@@ -954,6 +954,11 @@ renderParam (DoubleStarParam _ ws name) =
 renderParam (KeywordParam _ name ws2 expr) =
   renderIdent name <> singleton (TkEq ()) <>
   foldMap renderWhitespace ws2 <> bracketTupleGenerator expr
+
+renderUnOp :: UnOp a -> RenderOutput
+renderUnOp (Negate _ ws) = singleton (TkMinus ()) <> foldMap renderWhitespace ws
+renderUnOp (Positive _ ws) = singleton (TkPlus ()) <> foldMap renderWhitespace ws
+renderUnOp (Complement _ ws) = singleton (TkTilde ()) <> foldMap renderWhitespace ws
 
 renderBinOp :: BinOp a -> RenderOutput
 renderBinOp (Is _ ws) = TkIs () `cons` foldMap renderWhitespace ws

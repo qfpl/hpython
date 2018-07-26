@@ -156,14 +156,24 @@ validateSuiteScope (SuiteMany ann a b d) = SuiteMany ann a b <$> validateBlockSc
 validateSuiteScope (SuiteOne ann a b d) =
   SuiteOne ann a <$> validateSmallStatementScope b <*> pure d
 
+validateDecoratorScope
+  :: AsScopeError e v a
+  => Decorator v a
+  -> ValidateScope a e (Decorator (Nub (Scope ': v)) a)
+validateDecoratorScope (Decorator a b c d e) =
+  Decorator a b c <$>
+  validateExprScope d <*>
+  pure e
+
 validateCompoundStatementScope
   :: AsScopeError e v a
   => CompoundStatement v a
   -> ValidateScope a e (CompoundStatement (Nub (Scope ': v)) a)
-validateCompoundStatementScope (Fundef idnts a ws1 name ws2 params ws3 s) =
+validateCompoundStatementScope (Fundef a decos idnts ws1 name ws2 params ws3 s) =
   (locallyOver scLocalScope (const Trie.empty) $
    locallyOver scImmediateScope (const Trie.empty) $
-     Fundef idnts a ws1 (coerce name) ws2 <$>
+     (\decos' -> Fundef a decos' idnts ws1 (coerce name) ws2) <$>
+     traverse validateDecoratorScope decos <*>
      traverse validateParamScope params <*>
      pure ws3 <*>
      locallyExtendOver
@@ -245,8 +255,9 @@ validateCompoundStatementScope (For idnts a b c d e h i) =
        extendScope scImmediateScope ls *>
        validateSuiteScope h) <*>
     traverseOf (traverse._3) validateSuiteScope i))
-validateCompoundStatementScope (ClassDef idnts a b c d g) =
-  ClassDef idnts a b (coerce c) <$>
+validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
+  (\decos' -> ClassDef a decos' idnts b (coerce c)) <$>
+  traverse validateDecoratorScope decos <*>
   traverseOf (traverse._2.traverse.traverse) validateArgScope d <*>
   validateSuiteScope g <*
   extendScope scImmediateScope [c ^. to (_identAnnotation &&& _identValue)]

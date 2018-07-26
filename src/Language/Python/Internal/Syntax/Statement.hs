@@ -49,8 +49,8 @@ instance HasBlocks Suite where
   _Blocks f (SuiteMany a b c e) = SuiteMany a b c <$> f e
 
 instance HasBlocks CompoundStatement where
-  _Blocks f (Fundef idnt a ws1 name ws2 params ws3 s) =
-    Fundef idnt a ws1 (coerce name) ws2 (coerce params) ws3 <$> _Blocks f s
+  _Blocks f (Fundef a decos idnt ws1 name ws2 params ws3 s) =
+    Fundef a (coerce decos) idnt ws1 (coerce name) ws2 (coerce params) ws3 <$> _Blocks f s
   _Blocks f (If idnt a ws1 e1 s elifs b') =
     If idnt a ws1 (coerce e1) <$>
     _Blocks f s <*>
@@ -74,8 +74,8 @@ instance HasBlocks CompoundStatement where
     For idnt a b (coerce c) d (coerce e) <$>
     _Blocks fun f <*>
     (traverse._3._Blocks) fun g
-  _Blocks fun (ClassDef idnt a b c d e) =
-    ClassDef idnt a b (coerce c) (coerce d) <$> _Blocks fun e
+  _Blocks fun (ClassDef a decos idnt b c d e) =
+    ClassDef a (coerce decos) idnt b (coerce c) (coerce d) <$> _Blocks fun e
   _Blocks fun (With a b c d e) = With a b c (coerce d) <$> _Blocks fun e
 
 instance HasStatements Block where
@@ -106,8 +106,8 @@ instance Plated (Statement '[] a) where
   plate fun (CompoundStatement s) =
     CompoundStatement <$>
     case s of
-      Fundef idnt a ws1 b ws2 c ws3 s ->
-        Fundef idnt a ws1 b ws2 c ws3 <$> _Statements fun s
+      Fundef idnt a decos ws1 b ws2 c ws3 s ->
+        Fundef idnt a decos ws1 b ws2 c ws3 <$> _Statements fun s
       If idnt a ws1 b s elifs sts' ->
         If idnt a ws1 b <$>
         _Statements fun s <*>
@@ -127,8 +127,8 @@ instance Plated (Statement '[] a) where
         For idnt a b c d e <$>
         _Statements fun f <*>
         (traverse._3._Statements) fun g
-      ClassDef idnt a b c d e ->
-        ClassDef idnt a b c d <$> _Statements fun e
+      ClassDef idnt a decos b c d e ->
+        ClassDef idnt a decos b c d <$> _Statements fun e
       With a b c d e -> With a b c (coerce d) <$> _Statements fun e
 
 instance HasExprs Statement where
@@ -321,11 +321,22 @@ data WithItem v a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+data Decorator v a
+  = Decorator
+  { _decoratorAnn :: a
+  , _decoratorIndents :: Indents a
+  , _decoratorWhitespaceLeft :: [Whitespace]
+  , _decoratorExpr :: Expr v a
+  , _decoratorNewline :: Newline
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
 data CompoundStatement (v :: [*]) a
   -- ^ 'def' <spaces> <ident> '(' <spaces> stuff ')' <spaces> ':' <spaces> <newline>
   --   <block>
-  = Fundef
-      (Indents a) a
+  = Fundef a
+      [Decorator v a]
+      (Indents a)
       (NonEmpty Whitespace) (Ident v a)
       [Whitespace] (CommaSep (Param v a))
       [Whitespace]
@@ -371,8 +382,9 @@ data CompoundStatement (v :: [*]) a
       (Maybe (Indents a, [Whitespace], Suite v a))
   -- ^ 'class' <spaces> ident [ '(' <spaces> [ args ] ')' <spaces>] ':' <spaces> <newline>
   --   <block>
-  | ClassDef
-      (Indents a) a
+  | ClassDef a
+      [Decorator v a]
+      (Indents a)
       (NonEmpty Whitespace) (Ident v a)
       (Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace]))
       (Suite v a)
@@ -395,9 +407,19 @@ instance HasExprs Suite where
 instance HasExprs WithItem where
   _Exprs f (WithItem a b c) = WithItem a <$> f b <*> traverseOf (traverse._2) f c
 
+instance HasExprs Decorator where
+  _Exprs fun (Decorator a b c d e) =
+    Decorator a b c <$>
+    _Exprs fun d <*> pure e
+
 instance HasExprs CompoundStatement where
-  _Exprs f (Fundef idnt a ws1 name ws2 params ws3 s) =
-    Fundef idnt a ws1 (coerce name) ws2 <$>
+  _Exprs f (Fundef a decos idnt ws1 name ws2 params ws3 s) =
+    Fundef a <$>
+    traverse (_Exprs f) decos <*>
+    pure idnt <*>
+    pure ws1 <*>
+    pure (coerce name) <*>
+    pure ws2 <*>
     (traverse._Exprs) f params <*>
     pure ws3 <*>
     _Exprs f s
@@ -423,8 +445,12 @@ instance HasExprs CompoundStatement where
     For idnt a b <$> fun c <*> pure d <*> fun e <*>
     _Exprs fun f <*>
     (traverse._3._Exprs) fun g
-  _Exprs fun (ClassDef idnt a b c d e) =
-    ClassDef idnt a b (coerce c) <$>
+  _Exprs fun (ClassDef a decos idnt b c d e) =
+    ClassDef a <$>
+    traverse (_Exprs fun) decos <*>
+    pure idnt <*>
+    pure b <*>
+    pure (coerce c) <*>
     (traverse._2.traverse.traverse._Exprs) fun d <*>
     _Exprs fun e
   _Exprs fun (With a b c d e) = With a b c <$> traverseOf (traverse._Exprs) fun d <*> _Exprs fun e

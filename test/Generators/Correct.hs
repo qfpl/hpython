@@ -444,6 +444,32 @@ genSmallStatement = do
      | isJust (_inFunction ctxt)
      ])
 
+genDecorator :: (MonadGen m, MonadState GenState m) => m (Decorator '[] ())
+genDecorator =
+  Decorator () <$>
+  use currentIndentation <*>
+  genWhitespaces <*>
+  genDecoratorValue <*>
+  genNewline
+  where
+    genDecoratorValue =
+      Gen.choice
+      [ Ident () <$> genIdent
+      , sized2M
+         (\a b -> (\ws1 -> Call () a ws1 b) <$> genWhitespaces <*> genWhitespaces)
+         genDerefs
+         (sizedMaybe genArgs)
+      ]
+
+    genDerefs =
+      sizedRecursive
+      [ Ident () <$> genIdent ]
+      [ Deref () <$>
+        genDerefs <*>
+        genWhitespaces <*>
+        genIdent
+      ]
+
 genCompoundStatement
   :: (HasCallStack, MonadGen m, MonadState GenState m)
   => m (CompoundStatement '[] ())
@@ -465,8 +491,9 @@ genCompoundStatement =
                 })
             (genSuite genSmallStatement genBlock)) $
         \b ->
-      Fundef <$>
-        use currentIndentation <*> pure () <*>
+      sizedBind (sizedList genDecorator) $ \c ->
+      Fundef () c <$>
+        use currentIndentation <*>
         genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure a <*>
         genWhitespaces <*> pure b
     , sized4M
@@ -549,13 +576,14 @@ genCompoundStatement =
            pure b)
         (genSuite genSmallStatement genBlock)
         (genSuite genSmallStatement genBlock)
-    , sized2M
-        (\a b ->
-           ClassDef <$>
-           use currentIndentation <*> pure () <*>
+    , sized3M
+        (\a b c ->
+           ClassDef () a <$>
+           use currentIndentation <*>
            genWhitespaces1 <*> genIdent <*>
-           pure a <*>
-           pure b)
+           pure b <*>
+           pure c)
+        (sizedList genDecorator)
         (sizedMaybe $
          (,,) <$>
          genWhitespaces <*>

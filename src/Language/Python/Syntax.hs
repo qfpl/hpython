@@ -26,7 +26,9 @@ instance HasKeyword (Arg '[] ()) where; k_ a = KeywordArg () a []
 def_ :: Ident '[] () -> [Param '[] ()] -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 def_ name params block =
   CompoundStatement $
-  Fundef (Indents [] ()) ()
+  Fundef ()
+    []
+    (Indents [] ())
     [Space]
     name
     []

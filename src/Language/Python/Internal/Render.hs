@@ -204,6 +204,7 @@ showToken t =
     TkMinusEq{} -> "-="
     TkStarEq{} -> "*="
     TkAtEq{} -> "@="
+    TkAt{} -> "@"
     TkSlashEq{} -> "/="
     TkPercentEq{} -> "%="
     TkAmpersandEq{} -> "&="
@@ -549,6 +550,7 @@ renderYield re e = re e
 renderExpr :: Expr v a -> RenderOutput
 renderExpr (Lambda _ a b c d) =
   TkLambda () `cons`
+  foldMap renderWhitespace a <>
   renderCommaSep renderParam b <>
   singleton (TkColon ()) <> foldMap renderWhitespace c <>
   bracketTupleGenerator d
@@ -792,8 +794,17 @@ renderSuite (SuiteOne _ a c d) =
   renderSmallStatement c <>
   singleton (renderNewline d)
 
+renderDecorator :: Decorator v a -> RenderOutput
+renderDecorator (Decorator _ a b c d) =
+  renderIndents a <>
+  singleton (TkAt ()) <>
+  foldMap renderWhitespace b <>
+  renderExpr c <>
+  singleton (renderNewline d)
+
 renderCompoundStatement :: CompoundStatement v a -> RenderOutput
-renderCompoundStatement (Fundef idnt _ ws1 name ws2 params ws3 s) =
+renderCompoundStatement (Fundef _ decos idnt ws1 name ws2 params ws3 s) =
+  foldMap renderDecorator decos <>
   renderIndents idnt <>
   singleton (TkDef ()) <> foldMap renderWhitespace ws1 <> renderIdent name <>
   bracket (foldMap renderWhitespace ws2 <> renderCommaSep renderParam params) <>
@@ -861,7 +872,8 @@ renderCompoundStatement (For idnt _ a b c d s h) =
         singleton (TkElse ()) <> foldMap renderWhitespace x <>
         renderSuite s)
     h
-renderCompoundStatement (ClassDef idnt _ a b c s) =
+renderCompoundStatement (ClassDef _ decos idnt a b c s) =
+  foldMap renderDecorator decos <>
   renderIndents idnt <>
   singleton (TkClass ()) <> foldMap renderWhitespace a <>
   renderIdent b <>

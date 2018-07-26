@@ -83,6 +83,7 @@ data PyToken a
   | TkMinusEq a
   | TkStarEq a
   | TkAtEq a
+  | TkAt a
   | TkSlashEq a
   | TkPercentEq a
   | TkAmpersandEq a
@@ -177,6 +178,7 @@ pyTokenAnn tk =
     TkMinusEq a -> a
     TkStarEq a -> a
     TkAtEq a -> a
+    TkAt a -> a
     TkSlashEq a -> a
     TkPercentEq a -> a
     TkAmpersandEq a -> a

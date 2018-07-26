@@ -4,6 +4,7 @@
 {-# language TemplateHaskell #-}
 module Language.Python.Internal.Parse where
 
+import Control.Applicative (liftA2)
 import Control.Lens.Fold (foldOf, folded)
 import Control.Lens.Getter ((^.), use)
 import Control.Lens.Setter (assign)
@@ -882,18 +883,60 @@ arg =
   token anySpace (TkDoubleStar ()) <*>
   expr anySpace
 
+decoratorValue :: Parser ann (Expr '[] ann)
+decoratorValue = do
+  id1 <- identifier space
+  ids <- many ((,) <$> (snd <$> token space (TkDot ())) <*> identifier space)
+  args <-
+    optional $
+    (,,) <$>
+    (snd <$> token anySpace (TkLeftParen ())) <*>
+    optional (commaSep1' anySpace arg) <*>
+    (snd <$> token space (TkRightParen ()))
+  let
+    derefs =
+      foldl
+        (\b (ws, a) -> Deref (b ^. exprAnnotation) b ws a)
+        (Ident (_identAnnotation id1) id1)
+        ids
+  pure $
+    case args of
+      Nothing -> derefs
+      Just (l, x, r) -> Call (derefs ^. exprAnnotation) derefs l x r
+
+decorator :: Parser ann (Decorator '[] ann)
+decorator =
+  (\i (tk, spcs) -> Decorator (pyTokenAnn tk) i spcs) <$>
+  indents <*>
+  token space (TkAt ()) <*>
+  decoratorValue <*>
+  eol
+
 compoundStatement :: Parser ann (CompoundStatement '[] ann)
 compoundStatement =
-  fundef <!>
   ifSt <!>
   whileSt <!>
   trySt <!>
-  classSt <!>
+  decorated <!>
   withSt <!>
   forSt
   where
-    fundef =
-      (\a (tkDef, defSpaces) -> Fundef a (pyTokenAnn tkDef) (NonEmpty.fromList defSpaces)) <$>
+    decorated = many decorator >>= liftA2 (<!>) fundef classSt
+
+    classSt d =
+      (\a (tk, s) -> ClassDef (pyTokenAnn tk) d a $ NonEmpty.fromList s) <$>
+      indents <*>
+      token space (TkClass ()) <*>
+      identifier space <*>
+      optional
+        ((,,) <$>
+         (snd <$> token anySpace (TkLeftParen ())) <*>
+         optional (commaSep1' anySpace arg) <*>
+         (snd <$> token space (TkRightParen ()))) <*>
+      suite
+
+    fundef d =
+      (\a (tkDef, defSpaces) -> Fundef (pyTokenAnn tkDef) d a (NonEmpty.fromList defSpaces)) <$>
       indents <*>
       token space (TkDef ()) <*>
       identifier space <*>
@@ -966,18 +1009,6 @@ compoundStatement =
               indents <*>
               (snd <$> token space (TkFinally ())) <*>
               suite)))
-
-    classSt =
-      (\a (tk, s) -> ClassDef a (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
-      indents <*>
-      token space (TkClass ()) <*>
-      identifier space <*>
-      optional
-        ((,,) <$>
-         (snd <$> token anySpace (TkLeftParen ())) <*>
-         optional (commaSep1' anySpace arg) <*>
-         (snd <$> token space (TkRightParen ()))) <*>
-      suite
 
     withSt =
       (\a (tk, s) -> With a (pyTokenAnn tk) s) <$>

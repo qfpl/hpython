@@ -157,7 +157,7 @@ expr_printparseprint_print :: Property
 expr_printparseprint_print =
   property $ do
     ex <- forAll $ evalStateT Correct.genExpr Correct.initialGenState
-    annotate (showExpr ex)
+    -- annotate (showExpr ex)
     case validateExprIndentation' ex of
       Failure errs -> annotateShow errs *> failure
       Success res ->
@@ -171,7 +171,7 @@ statement_printparseprint_print :: Property
 statement_printparseprint_print =
   property $ do
     st <- forAll $ evalStateT Correct.genStatement Correct.initialGenState
-    annotate $ showStatement st
+    -- annotate $ showStatement st
     case validateStatementIndentation' st of
       Failure errs -> annotateShow errs *> failure
       Success res ->

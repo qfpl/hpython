@@ -375,17 +375,38 @@ validateSuiteSyntax (SuiteOne a b c d) =
   validateSmallStatementSyntax c <*>
   pure d
 
+validateDecoratorSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => Decorator v a
+  -> ValidateSyntax e (Decorator (Nub (Syntax ': v)) a)
+validateDecoratorSyntax (Decorator a b c d e) =
+  Decorator a b <$>
+  validateWhitespace a c <*>
+  isDecoratorValue d <*>
+  pure e
+  where
+    isDecoratorValue e@Ident{} = pure $ coerce e
+    isDecoratorValue e@(Call _ a _ _ _) | someDerefs a = pure $ coerce e
+      where
+        someDerefs Ident{} = True
+        someDerefs (Deref _ a _ _) = someDerefs a
+        someDerefs _ = False
+    isDecoratorValue _ = syntaxErrors [_MalformedDecorator # a]
+
 validateCompoundStatementSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
      )
   => CompoundStatement v a
   -> ValidateSyntax e (CompoundStatement (Nub (Syntax ': v)) a)
-validateCompoundStatementSyntax (Fundef idnts a ws1 name ws2 params ws3 body) =
+validateCompoundStatementSyntax (Fundef a decos idnts ws1 name ws2 params ws3 body) =
   let
     paramIdents = params ^.. folded.unvalidated.paramName.identValue
   in
-    Fundef idnts a ws1 <$>
+    (\decos' -> Fundef a decos' idnts ws1) <$>
+    traverse validateDecoratorSyntax decos <*>
     validateIdent name <*>
     pure ws2 <*>
     validateParamsSyntax params <*>
@@ -463,8 +484,9 @@ validateCompoundStatementSyntax (For idnts a b c d e h i) =
        validateWhitespace a x <*>
        validateSuiteSyntax w)
     i
-validateCompoundStatementSyntax (ClassDef idnts a b c d g) =
-  ClassDef idnts a <$>
+validateCompoundStatementSyntax (ClassDef a decos idnts b c d g) =
+  (\decos' -> ClassDef a decos' idnts) <$>
+  traverse validateDecoratorSyntax decos <*>
   validateWhitespace a b <*>
   validateIdent c <*>
   traverse

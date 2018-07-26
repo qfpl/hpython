@@ -68,7 +68,6 @@ parseCheckPrint name = do
         Failure errs' ->
           print (errs' :: [SyntaxError '[Indentation] Trifecta.Caret]) *> exitFailure
         Success _ -> pure $! rnf (showModule py)
-          
 
 main :: IO ()
 main =

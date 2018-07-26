@@ -1,6 +1,7 @@
 {-# language GeneralizedNewtypeDeriving, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language LambdaCase #-}
+{-# language OverloadedStrings #-}
 module Language.Python.Internal.Render
   ( -- * Common Functions
     showModule, showStatement, showExpr
@@ -28,10 +29,14 @@ import Data.DList (DList)
 import Data.Foldable (toList)
 import Data.Maybe (maybe)
 import Data.Semigroup (Semigroup(..))
+import Data.Text (Text)
 import Data.These (These(..))
 
 import qualified Data.DList as DList
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Text as Text
+import qualified Data.Text.Lazy as Lazy
+import qualified Data.Text.Lazy.Builder as Builder
 
 import Language.Python.Internal.Syntax
 import Language.Python.Internal.Token (PyToken(..))
@@ -48,9 +53,10 @@ cons :: PyToken () -> RenderOutput -> RenderOutput
 cons a (RenderOutput b) = RenderOutput $ DList.cons a b
 infixr 5 `cons`
 
-showRenderOutput :: RenderOutput -> String
+showRenderOutput :: RenderOutput -> Lazy.Text
 showRenderOutput =
-  foldMap showToken .
+  Builder.toLazyText .
+  foldMap (Builder.fromText . showToken) .
   correctSpaces .
   correctNewlines .
   DList.toList .
@@ -60,13 +66,13 @@ showRenderOutput =
       transform $
       \case
         a : b : rest
-          | isIdentifierChar (last $ showToken a)
-          , isIdentifierChar (head $ showToken b)
+          | isIdentifierChar (Text.last $ showToken a)
+          , isIdentifierChar (Text.head $ showToken b)
           -> a : TkSpace () : b : rest
         a@(TkString _ qt _ _ _) : b@(TkString _ qt' _ _ _) : rest
           | qt == qt' -> a : TkSpace () : b : rest
         a@(TkFloat (FloatLiteralFull _ _ Nothing)) : b : rest
-          | isIdentifierChar (head $ showToken b) -> a : TkSpace () : b : rest
+          | isIdentifierChar (Text.head $ showToken b) -> a : TkSpace () : b : rest
         a -> a
 
     correctNewlines =
@@ -78,7 +84,7 @@ showRenderOutput =
           TkContinued (CRLF cmt) () : TkNewline (LF cmt') () : rest
         a -> a
 
-showStringPrefix :: StringPrefix -> String
+showStringPrefix :: StringPrefix -> Text
 showStringPrefix sp =
   case sp of
     Prefix_r -> "r"
@@ -86,7 +92,7 @@ showStringPrefix sp =
     Prefix_u -> "u"
     Prefix_U -> "U"
 
-showBytesPrefix :: BytesPrefix -> String
+showBytesPrefix :: BytesPrefix -> Text
 showBytesPrefix sp =
   case sp of
     Prefix_b -> "b"
@@ -100,13 +106,13 @@ showBytesPrefix sp =
     Prefix_Rb -> "Rb"
     Prefix_RB -> "RB"
 
-showQuoteType :: QuoteType -> String
+showQuoteType :: QuoteType -> Char
 showQuoteType qt =
   case qt of
-    DoubleQuote -> "\""
-    SingleQuote -> "\'"
+    DoubleQuote -> '\"'
+    SingleQuote -> '\''
 
-showToken :: PyToken a -> String
+showToken :: PyToken a -> Text
 showToken t =
   case t of
     TkIf{} -> "if"
@@ -144,11 +150,12 @@ showToken t =
     TkYield{} -> "yield"
     TkInt i -> renderIntLiteral i
     TkFloat i -> renderFloatLiteral i
-    TkIdent s _ -> s
+    TkIdent s _ -> Text.pack s
     TkString sp qt st s _ ->
       let
         quote =
-          showQuoteType qt >>= (case st of; LongString -> replicate 3; ShortString -> pure)
+          Text.pack $
+          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
       in
         foldMap showStringPrefix sp <>
         quote <>
@@ -157,7 +164,8 @@ showToken t =
     TkBytes sp qt st s _ ->
       let
         quote =
-          showQuoteType qt >>= (case st of; LongString -> replicate 3; ShortString -> pure)
+          Text.pack $
+          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
       in
         showBytesPrefix sp <>
         quote <>
@@ -196,7 +204,7 @@ showToken t =
     TkPlus{} -> "+"
     TkMinus{} -> "-"
     TkTilde{} -> "~"
-    TkComment s _ -> "#" <> s
+    TkComment s _ -> "#" <> Text.pack s
     TkStar{} -> "*"
     TkDoubleStar{} -> "**"
     TkSlash{} -> "/"
@@ -257,8 +265,8 @@ escapeChars =
   , ('\v', 'v')
   ]
 
-intToHex :: Int -> String
-intToHex n = go n []
+intToHex :: Int -> Text
+intToHex n = Text.pack $ go n []
   where
     go 0 = (++"0")
     go 1 = (++"1")
@@ -278,8 +286,8 @@ intToHex n = go n []
     go 15 = (++"F")
     go b = let (q, r) = quotRem b 16 in go r . go q
 
-renderPyChars :: QuoteType -> StringType -> [PyChar] -> String
-renderPyChars qt st = go
+renderPyChars :: QuoteType -> StringType -> [PyChar] -> Text
+renderPyChars qt st = Text.pack . go
   where
     endSingleQuotesShort =
       snd .
@@ -449,8 +457,8 @@ renderCommaSep1' f (CommaSepMany1' a ws2 c) =
 renderIdent :: Ident v a -> RenderOutput
 renderIdent (MkIdent _ a b) = TkIdent a () `cons` foldMap renderWhitespace b
 
-renderComment :: Comment -> String
-renderComment (Comment s) = s
+renderComment :: Comment -> Text
+renderComment (Comment s) = Text.pack s
 
 bracketTernaryLambda :: (Expr v a -> RenderOutput) -> Expr v a -> RenderOutput
 bracketTernaryLambda _ e@Ternary{} = bracket $ renderExpr e
@@ -485,37 +493,41 @@ renderDictItem (DictItem _ a b c) =
   foldMap renderWhitespace b <>
   bracketTupleGenerator c
 
-renderIntLiteral :: IntLiteral a -> String
-renderIntLiteral (IntLiteralDec _ n) = (charDecimal #) <$> NonEmpty.toList n
+renderIntLiteral :: IntLiteral a -> Text
+renderIntLiteral (IntLiteralDec _ n) =
+  Text.pack $
+  (charDecimal #) <$> NonEmpty.toList n
 renderIntLiteral (IntLiteralBin _ b n) =
+  Text.pack $
   '0' : (if b then 'B' else 'b') : fmap (charBinary #) (NonEmpty.toList n)
 renderIntLiteral (IntLiteralOct _ b n) =
+  Text.pack $
   '0' : (if b then 'O' else 'o') : fmap (charOctal #) (NonEmpty.toList n)
 renderIntLiteral (IntLiteralHex _ b n) =
+  Text.pack $
   '0' : (if b then 'X' else 'x') : fmap (charHeXaDeCiMaL #) (NonEmpty.toList n)
 
-renderFloatExponent :: FloatExponent -> String
+renderFloatExponent :: FloatExponent -> Text
 renderFloatExponent (FloatExponent e s ds) =
+  Text.pack $
   (if e then 'E' else 'e') :
   foldMap (\case; Pos -> "+"; Neg -> "-") s <>
   fmap (charDecimal #) (NonEmpty.toList ds)
 
-renderFloatLiteral :: FloatLiteral a -> String
+renderFloatLiteral :: FloatLiteral a -> Text
 renderFloatLiteral (FloatLiteralFull _ a b) =
-  fmap (charDecimal #) (NonEmpty.toList a) <>
-  "." <>
+  Text.pack (fmap (charDecimal #) (NonEmpty.toList a)) <>
   foldMap
     (\case
-       This x -> (charDecimal #) <$> NonEmpty.toList x
-       That x -> renderFloatExponent x
+       This x -> Text.pack $ '.' : fmap (charDecimal #) (NonEmpty.toList x)
+       That x -> Text.cons '.' $ renderFloatExponent x
        These x y ->
-         fmap (charDecimal #) (NonEmpty.toList x) <>
+         Text.pack ('.' : fmap (charDecimal #) (NonEmpty.toList x)) <>
          renderFloatExponent y)
     b
 renderFloatLiteral (FloatLiteralPoint _ a b) =
-  '.' :
-  (fmap (charDecimal #) (NonEmpty.toList a) <>
-   foldMap renderFloatExponent b)
+  Text.pack ('.' : fmap (charDecimal #) (NonEmpty.toList a)) <>
+  foldMap renderFloatExponent b
 
 renderStringLiteral :: StringLiteral a -> RenderOutput
 renderStringLiteral (StringLiteral _ a b c d e) =
@@ -1007,16 +1019,16 @@ renderModule (Module ms) =
     (either
        (\(a, b, c) ->
           renderIndents a <>
-          maybe mempty (\a -> singleton $ TkComment (renderComment a) ()) b <>
+          maybe mempty (\a -> singleton $ TkComment (Text.unpack $ renderComment a) ()) b <>
           maybe mempty (singleton . renderNewline) c)
        renderStatement)
     ms
 
-showModule :: Module v a -> String
+showModule :: Module v a -> Lazy.Text
 showModule = showRenderOutput . renderModule
 
-showStatement :: Statement v a -> String
+showStatement :: Statement v a -> Lazy.Text
 showStatement = showRenderOutput . renderStatement
 
-showExpr :: Expr v a -> String
+showExpr :: Expr v a -> Lazy.Text
 showExpr = showRenderOutput . bracketGenerator

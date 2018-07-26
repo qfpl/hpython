@@ -1,7 +1,7 @@
-{ mkDerivation, base, bytestring-trie, containers, deriving-compat
-, digit, directory, dlist, filepath, fingertree, hedgehog, lens
-, mtl, parsers, process, semigroupoids, stdenv, these, transformers
-, trifecta, type-level-sets
+{ mkDerivation, base, bytestring-trie, containers, criterion
+, deepseq, deriving-compat, digit, directory, dlist, filepath
+, fingertree, hedgehog, lens, mtl, parsers, process, semigroupoids
+, stdenv, these, transformers, trifecta, type-level-sets
 }:
 mkDerivation {
   pname = "hpython";
@@ -14,7 +14,9 @@ mkDerivation {
     fingertree lens mtl parsers semigroupoids these trifecta
     type-level-sets
   ];
-  executableHaskellDepends = [ base lens ];
+  executableHaskellDepends = [
+    base criterion deepseq lens trifecta
+  ];
   testHaskellDepends = [
     base digit directory filepath hedgehog lens mtl process
     semigroupoids these transformers trifecta

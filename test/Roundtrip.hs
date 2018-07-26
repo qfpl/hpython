@@ -2,12 +2,13 @@
 {-# language DataKinds #-}
 module Roundtrip (roundtripTests) where
 
+import Data.Foldable (traverse_)
 import Control.Monad.IO.Class (liftIO)
 import Data.String (fromString)
 import Data.Validate (Validate(..))
 import Hedgehog
   ( (===), Group(..), Property, annotateShow, failure, property
-  , withTests, withShrinks
+  , withTests, withShrinks, success
   )
 import System.FilePath ((</>))
 import Text.Trifecta (Caret)
@@ -34,6 +35,7 @@ roundtripTests =
   , "ansible.py"
   , "comments.py"
   , "pypy.py"
+  , "pypy2.py"
   ]
 
 doRoundtrip :: String -> Property
@@ -46,4 +48,6 @@ doRoundtrip name =
       Success res ->
         case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
           Failure errs' -> annotateShow (errs' :: [SyntaxError '[Indentation] Caret]) *> failure
-          Success _ -> lines (showModule py) === lines file
+          Success _ ->
+            -- lines (showModule py) === lines file
+            traverse_ (\(a, b) -> if a == b then success else a === b) $ zip (lines $ showModule py) (lines file)

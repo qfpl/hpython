@@ -328,7 +328,7 @@ parseToken =
     ]
 
 tokenize :: String -> Trifecta.Result [PyToken Caret]
-tokenize = parseString (many parseToken) mempty
+tokenize = parseString (many parseToken <* Trifecta.eof) mempty
 
 data LogicalLine a
   = LogicalLine

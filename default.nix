@@ -21,6 +21,7 @@ let
          deriving-compat = self.deriving-compat_0_4_1;
          type-level-sets = self.callPackage ./nix/type-level-sets.nix {};
          digit = self.callPackage ./nix/digit.nix {};
+         parsers-megaparsec = self.callPackage ./nix/parsers-megaparsec.nix {};
        };
      };
 

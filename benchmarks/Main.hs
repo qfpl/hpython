@@ -5,9 +5,13 @@ import Criterion.Main
 
 import Control.Monad ((<=<))
 import Control.DeepSeq (rnf)
-import System.Exit (exitFailure)
-
 import Data.Validate (Validate(..))
+import System.Exit (exitFailure)
+import Text.Megaparsec (SourcePos, initialPos)
+
+import qualified Data.Text.Lazy as Lazy
+import qualified Data.Text.Lazy.IO as LazyText
+
 import Language.Python.Internal.Parse
 import Language.Python.Internal.Render (showModule)
 import Language.Python.Internal.Lexer
@@ -18,14 +22,12 @@ import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Syntax.Error
 
-import qualified Text.Trifecta as Trifecta
-
-doTokenize :: String -> IO [PyToken Trifecta.Caret]
+doTokenize :: Lazy.Text -> IO [PyToken SourcePos]
 doTokenize str = do
   let res = tokenize str
   case res of
-    Trifecta.Failure err -> print err *> exitFailure
-    Trifecta.Success a -> pure a
+    Left err -> print err *> exitFailure
+    Right a -> pure a
 
 doIndentation :: Show a => [LogicalLine a] -> IO [IndentedLine a]
 doIndentation lls = do
@@ -48,9 +50,9 @@ doParse initial pa input = do
     Left err -> print err *> exitFailure
     Right a -> pure a
 
-doToPython :: Parser Trifecta.Caret a -> String -> IO a
+doToPython :: Parser SourcePos a -> Lazy.Text -> IO a
 doToPython pa =
-  doParse (Trifecta.Caret mempty mempty) pa <=<
+  doParse (initialPos "test") pa <=<
   doNested <=<
   doIndentation <=<
   pure . logicalLines <=<
@@ -58,21 +60,21 @@ doToPython pa =
 
 tokensOnly :: String -> IO ()
 tokensOnly name = do
-  file <- readFile name
+  file <- LazyText.readFile name
   py <- doTokenize file
   pure $! seq (last py) ()
 
-parseCheckPrint :: String -> IO ()
+parseCheckPrint :: FilePath -> IO ()
 parseCheckPrint name = do
-  file <- readFile name
+  file <- LazyText.readFile name
   py <- doToPython module_ file
   case runValidateIndentation $ validateModuleIndentation py of
     Failure errs ->
-      print (errs :: [IndentationError '[] Trifecta.Caret]) *> exitFailure
+      print (errs :: [IndentationError '[] SourcePos]) *> exitFailure
     Success res ->
       case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
         Failure errs' ->
-          print (errs' :: [SyntaxError '[Indentation] Trifecta.Caret]) *> exitFailure
+          print (errs' :: [SyntaxError '[Indentation] SourcePos]) *> exitFailure
         Success _ -> pure $! rnf (showModule py)
 
 main :: IO ()

@@ -1,12 +1,13 @@
 {-# language BangPatterns #-}
-{-# language OverloadedLists #-}
 {-# language TypeApplications #-}
 {-# language MultiParamTypeClasses #-}
 {-# language GeneralizedNewtypeDeriving #-}
-{-# language LambdaCase #-}
+{-# language FlexibleContexts #-}
+{-# language TypeFamilies #-}
+{-# language OverloadedStrings #-}
 module Language.Python.Internal.Lexer where
 
-import Control.Applicative ((<|>), many, optional)
+import Control.Applicative ((<**>), (<|>), many, optional)
 import Control.Lens.Iso (from)
 import Control.Lens.Getter ((^.))
 import Control.Monad (when, replicateM)
@@ -25,15 +26,16 @@ import Data.Monoid (Sum(..))
 import Data.Semigroup ((<>))
 import Data.Sequence ((!?), (|>), Seq)
 import Data.These (These(..))
-import Text.Trifecta
-  ( CharParsing, DeltaParsing, Caret, Careted(..), char, careted, noneOf
-  , digit, string, manyTill, parseString, satisfy, try
-  , notFollowedBy, anyChar
-  )
+import Data.Void (Void)
+import Text.Megaparsec
+  (MonadParsec, SourcePos, ParseError, parse, parseErrorPretty, getPosition)
+import Text.Megaparsec.Parsers
 
 import qualified Data.FingerTree as FingerTree
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Text.Trifecta as Trifecta
+import qualified Data.Sequence as Sequence
+import qualified Data.Text.Lazy as Lazy
+import qualified Text.Megaparsec as Parsec
 
 import Language.Python.Internal.Syntax
 import Language.Python.Internal.Token (PyToken(..), pyTokenAnn)
@@ -43,7 +45,7 @@ parseNewline =
   LF Nothing <$ char '\n' <|> char '\r' *>
   (CRLF Nothing <$ char '\n' <|> pure (CR Nothing))
 
-parseCommentNewline :: (CharParsing m, Monad m) => m (Caret -> PyToken Caret)
+parseCommentNewline :: (CharParsing m, Monad m) => m (SourcePos -> PyToken SourcePos)
 parseCommentNewline = do
   n <- optional (char '#' *> many (noneOf "\r\n"))
   case n of
@@ -104,7 +106,7 @@ hexToInt =
   (snd $!) .
   foldr (\a (sz, val) -> (sz+1, hexDigitInt a * 16 ^ sz + val)) (0, 0)
 
-stringChar :: (CharParsing m, Monad m) => m PyChar
+stringChar :: CharParsing m => m PyChar
 stringChar =
   (char '\\' *>
    (escapeChar <|> unicodeChar <|> octChar <|> hexChar <|> pure (Char_lit '\\'))) <|>
@@ -137,7 +139,7 @@ stringChar =
     hexChar = Char_hex <$ char 'x' <*> parseHeXaDeCiMaL <*> parseHeXaDeCiMaL
     octChar = Char_octal <$ char 'o' <*> parseOctal <*> parseOctal
 
-number :: DeltaParsing m => m (a -> PyToken a)
+number :: (CharParsing m, Monad m) => m (a -> PyToken a)
 number = do
   zero <- optional parse0
   case zero of
@@ -197,10 +199,12 @@ number = do
       optional (Pos <$ char '+' <|> Neg <$ char '-') <*>
       some1 parseDecimal
 
-parseToken :: DeltaParsing m => m (PyToken Caret)
+parseToken
+  :: (Monad m, CharParsing m, MonadParsec e s m)
+  => m (PyToken SourcePos)
 parseToken =
-  fmap (\(f :^ sp) -> f sp) . careted $
-  asum @[] $
+  (<**>) getPosition .
+  asum $
     fmap
     (\p -> try $ p <* notFollowedBy (satisfy isIdentifierStart))
     [ TkIf <$ string "if"
@@ -325,8 +329,10 @@ parseToken =
       many (satisfy isIdentifierChar)
     ]
 
-tokenize :: String -> Trifecta.Result [PyToken Caret]
-tokenize = parseString (many parseToken <* Trifecta.eof) mempty
+tokenize :: Lazy.Text -> Either String [PyToken SourcePos]
+tokenize =
+  first (parseErrorPretty :: ParseError Char Void -> String) .
+  parse (unParsecT $ many parseToken <* Parsec.eof) "test"
 
 data LogicalLine a
   = LogicalLine
@@ -537,9 +543,9 @@ nested = fmap Nested . go FingerTree.empty []
       -> Either
            IndentationError
            (Seq (Either (Nested a) (Line a)))
-    go leaps [] [] = pure []
+    go leaps [] [] = pure mempty
     go leaps (a : as) [] = foldr (\_ _ -> Left ExpectedDedent) (pure a) as
-    go leaps ctxt (Indent n a : is) = go (leaps FingerTree.|> Summed n) ([] : ctxt) is
+    go leaps ctxt (Indent n a : is) = go (leaps FingerTree.|> Summed n) (mempty : ctxt) is
     go leaps [] (Dedent : is) = Left UnexpectedDedent
     go leaps (a : as) (Dedent : is) =
       case FingerTree.viewr leaps of
@@ -547,6 +553,6 @@ nested = fmap Nested . go FingerTree.empty []
         leaps' FingerTree.:> _ ->
           case as of
             x : xs -> go leaps' ((x |> Left (Nested a)) : xs) is
-            [] -> go leaps' [[Left (Nested a)]] is
-    go leaps [] (IndentedLine ll : is) = go leaps [[Right $ logicalToLine leaps ll]] is
+            [] -> go leaps' [Sequence.singleton $ Left (Nested a)] is
+    go leaps [] (IndentedLine ll : is) = go leaps [Sequence.singleton (Right $ logicalToLine leaps ll)] is
     go leaps (a : as) (IndentedLine ll : is) = go leaps ((a |> Right (logicalToLine leaps ll)) : as) is

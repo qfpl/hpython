@@ -10,9 +10,9 @@ import Hedgehog
   , withTests, withShrinks
   )
 import System.FilePath ((</>))
-import Text.Trifecta (Caret)
+import Text.Megaparsec (SourcePos)
 
-import qualified Data.Text.Lazy as Lazy
+import qualified Data.Text.Lazy.IO as LazyText
 
 import Language.Python.Internal.Parse (module_)
 import Language.Python.Internal.Render (showModule)
@@ -39,14 +39,14 @@ roundtripTests =
   , "pypy2.py"
   ]
 
-doRoundtrip :: String -> Property
+doRoundtrip :: FilePath -> Property
 doRoundtrip name =
   property $ do
-    file <- liftIO . readFile $ "test/files" </> name
+    file <- liftIO . LazyText.readFile $ "test/files" </> name
     py <- doToPython module_ file
     case runValidateIndentation $ validateModuleIndentation py of
-      Failure errs -> annotateShow (errs :: [IndentationError '[] Caret]) *> failure
+      Failure errs -> annotateShow (errs :: [IndentationError '[] SourcePos]) *> failure
       Success res ->
         case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
-          Failure errs' -> annotateShow (errs' :: [SyntaxError '[Indentation] Caret]) *> failure
-          Success _ -> showModule py === Lazy.pack file
+          Failure errs' -> annotateShow (errs' :: [SyntaxError '[Indentation] SourcePos]) *> failure
+          Success _ -> showModule py === file

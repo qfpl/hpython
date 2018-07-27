@@ -42,21 +42,21 @@ test_fulltrip_1 =
   withTests 1 . property $ do
     let str = "def a(x, y=2, *z, **w):\n   return 2 + 3"
     a <- doToPython statement str
-    showStatement a === Lazy.pack str
+    showStatement a === str
 
 test_fulltrip_2 :: Property
 test_fulltrip_2 =
   withTests 1 . property $ do
     let str = "(   1\n       *\n  3\n    )"
     a <- doToPython (expr space) str
-    showExpr a === Lazy.pack str
+    showExpr a === str
 
 test_fulltrip_3 :: Property
 test_fulltrip_3 =
   withTests 1 . property $ do
     let str = "pass;"
     a <- doToPython statement str
-    showStatement a === Lazy.pack str
+    showStatement a === str
 
 test_fulltrip_4 :: Property
 test_fulltrip_4 =
@@ -77,7 +77,7 @@ test_fulltrip_4 =
     annotateShow nst
 
     a <- doToPython statement str
-    showStatement a === Lazy.pack str
+    showStatement a === str
 
 test_fulltrip_5 :: Property
 test_fulltrip_5 =
@@ -98,7 +98,7 @@ test_fulltrip_5 =
     annotateShow nst
 
     a <- doToPython statement str
-    showStatement a === Lazy.pack str
+    showStatement a === str
 
 test_fulltrip_6 :: Property
 test_fulltrip_6 =
@@ -119,7 +119,7 @@ test_fulltrip_6 =
     annotateShow nst
 
     a <- doToPython module_ str
-    showModule a === Lazy.pack str
+    showModule a === str
 
 test_fulltrip_7 :: Property
 test_fulltrip_7 =
@@ -139,7 +139,7 @@ test_fulltrip_7 =
     annotateShow nst
 
     a <- doToPython module_ str
-    showModule a === Lazy.pack str
+    showModule a === str
 
 test_fulltrip_8 :: Property
 test_fulltrip_8 =
@@ -159,7 +159,7 @@ test_fulltrip_8 =
     annotateShow nst
 
     a <- doToPython module_ str
-    showModule a === Lazy.pack str
+    showModule a === str
 
 test_fulltrip_9 :: Property
 test_fulltrip_9 =
@@ -183,14 +183,14 @@ test_fulltrip_9 =
     a <- doParse' module_ nst
     annotateShow a
 
-    showModule a === Lazy.pack str
+    showModule a === str
 
 test_fulltrip_10 :: Property
 test_fulltrip_10 =
   withTests 1 . property $ do
     let
       str =
-        unlines
+        Lazy.unlines
         [ "from blah import  boo"
         , "import baz   as wop"
         , ""
@@ -219,14 +219,14 @@ test_fulltrip_10 =
     a <- doParse' module_ nst
     annotateShow $! a
 
-    showModule a === Lazy.pack str
+    showModule a === str
 
 test_fulltrip_11 :: Property
 test_fulltrip_11 =
   withTests 1 . property $ do
     let
       str =
-        unlines
+        Lazy.unlines
         [ "if False:"
         , " pass"
         , " pass"
@@ -250,14 +250,14 @@ test_fulltrip_11 =
     a <- doParse' module_ nst
     annotateShow $! a
 
-    showModule a === Lazy.pack str
+    showModule a === str
 
 test_fulltrip_12 :: Property
 test_fulltrip_12 =
   withTests 1 . property $ do
     let
       str =
-        unlines
+        Lazy.unlines
         [ "try:"
         , " \tpass"
         , " \tdef a():"
@@ -282,14 +282,14 @@ test_fulltrip_12 =
     a <- doParse' module_ nst
     annotateShow $! a
 
-    showModule a === Lazy.pack str
+    showModule a === str
 
 test_fulltrip_13 :: Property
 test_fulltrip_13 =
   withTests 1 . property $ do
     let
       str =
-        unlines
+        Lazy.unlines
         [ "if []:"
         , " False"
         , " def a():"
@@ -316,7 +316,7 @@ test_fulltrip_13 =
     a <- doParse' module_ nst
     annotateShow $! a
 
-    showModule a === Lazy.pack str
+    showModule a === str
 
 test_fulltrip_14 :: Property
 test_fulltrip_14 =
@@ -339,7 +339,7 @@ test_fulltrip_14 =
     a <- doParse' module_ nst
     annotateShow $! a
 
-    showModule a === Lazy.pack str
+    showModule a === str
 
 test_fulltrip_15 :: Property
 test_fulltrip_15 =
@@ -362,7 +362,7 @@ test_fulltrip_15 =
     a <- doParse' module_ nst
     annotateShow $! a
 
-    showModule a === Lazy.pack str
+    showModule a === str
 
 test_fulltrip_16 :: Property
 test_fulltrip_16 =
@@ -385,7 +385,7 @@ test_fulltrip_16 =
     a <- doParse' module_ nst
     annotateShow $! a
 
-    showModule a === Lazy.pack str
+    showModule a === str
 
 parseTab :: Parser ann Whitespace
 parseTab = do

@@ -23,13 +23,13 @@ import Control.Monad.IO.Class
 import Control.Monad.State
 import Data.Functor
 import Data.List
+import Data.Text (Text)
 import Data.Validate
 import System.Directory
 import System.Exit
 import System.Process
 
-import qualified Data.Text.Lazy as Lazy
-import qualified Data.Text.Lazy.IO as LazyText
+import qualified Data.Text.IO as StrictText
 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -66,9 +66,9 @@ validateModuleIndentation'
   -> Validate [IndentationError '[] a] (Module '[Indentation] a)
 validateModuleIndentation' = runValidateIndentation . validateModuleIndentation
 
-runPython3 :: (MonadTest m, MonadIO m) => FilePath -> Bool -> Lazy.Text -> m ()
+runPython3 :: (MonadTest m, MonadIO m) => FilePath -> Bool -> Text -> m ()
 runPython3 path shouldSucceed str = do
-  () <- liftIO $ LazyText.writeFile path str
+  () <- liftIO $ StrictText.writeFile path str
   (ec, sto, ste) <- liftIO $ readProcessWithExitCode "python3" ["-m", "py_compile", path] ""
   annotateShow shouldSucceed
   annotateShow ec
@@ -160,7 +160,7 @@ expr_printparseprint_print :: Property
 expr_printparseprint_print =
   property $ do
     ex <- forAll $ evalStateT Correct.genExpr Correct.initialGenState
-    -- annotate (showExpr ex)
+    annotateShow $ showExpr ex
     case validateExprIndentation' ex of
       Failure errs -> annotateShow errs *> failure
       Success res ->
@@ -174,7 +174,7 @@ statement_printparseprint_print :: Property
 statement_printparseprint_print =
   property $ do
     st <- forAll $ evalStateT Correct.genStatement Correct.initialGenState
-    -- annotate $ showStatement st
+    annotateShow $ showStatement st
     case validateStatementIndentation' st of
       Failure errs -> annotateShow errs *> failure
       Success res ->

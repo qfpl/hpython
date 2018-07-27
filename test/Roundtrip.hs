@@ -12,7 +12,7 @@ import Hedgehog
 import System.FilePath ((</>))
 import Text.Megaparsec (SourcePos)
 
-import qualified Data.Text.Lazy.IO as LazyText
+import qualified Data.Text.IO as StrictText
 
 import Language.Python.Internal.Parse (module_)
 import Language.Python.Internal.Render (showModule)
@@ -42,7 +42,7 @@ roundtripTests =
 doRoundtrip :: FilePath -> Property
 doRoundtrip name =
   property $ do
-    file <- liftIO . LazyText.readFile $ "test/files" </> name
+    file <- liftIO . StrictText.readFile $ "test/files" </> name
     py <- doToPython module_ file
     case runValidateIndentation $ validateModuleIndentation py of
       Failure errs -> annotateShow (errs :: [IndentationError '[] SourcePos]) *> failure

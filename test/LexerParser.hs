@@ -2,7 +2,7 @@
 module LexerParser (lexerParserTests) where
 
 import Data.Functor.Alt ((<!>))
-import qualified Data.Text.Lazy as Lazy
+import qualified Data.Text as Text
 import qualified Data.Functor.Alt as Alt (many)
 import Hedgehog
 
@@ -190,7 +190,7 @@ test_fulltrip_10 =
   withTests 1 . property $ do
     let
       str =
-        Lazy.unlines
+        Text.unlines
         [ "from blah import  boo"
         , "import baz   as wop"
         , ""
@@ -226,7 +226,7 @@ test_fulltrip_11 =
   withTests 1 . property $ do
     let
       str =
-        Lazy.unlines
+        Text.unlines
         [ "if False:"
         , " pass"
         , " pass"
@@ -257,7 +257,7 @@ test_fulltrip_12 =
   withTests 1 . property $ do
     let
       str =
-        Lazy.unlines
+        Text.unlines
         [ "try:"
         , " \tpass"
         , " \tdef a():"
@@ -289,7 +289,7 @@ test_fulltrip_13 =
   withTests 1 . property $ do
     let
       str =
-        Lazy.unlines
+        Text.unlines
         [ "if []:"
         , " False"
         , " def a():"

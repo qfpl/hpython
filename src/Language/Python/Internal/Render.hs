@@ -516,13 +516,13 @@ renderFloatExponent (FloatExponent e s ds) =
 
 renderFloatLiteral :: FloatLiteral a -> Text
 renderFloatLiteral (FloatLiteralFull _ a b) =
-  Text.pack (fmap (charDecimal #) (NonEmpty.toList a)) <>
+  Text.pack (fmap (charDecimal #) (NonEmpty.toList a) <> ".") <>
   foldMap
     (\case
-       This x -> Text.pack $ '.' : fmap (charDecimal #) (NonEmpty.toList x)
-       That x -> Text.cons '.' $ renderFloatExponent x
+       This x -> Text.pack $ fmap (charDecimal #) (NonEmpty.toList x)
+       That x -> renderFloatExponent x
        These x y ->
-         Text.pack ('.' : fmap (charDecimal #) (NonEmpty.toList x)) <>
+         Text.pack (fmap (charDecimal #) (NonEmpty.toList x)) <>
          renderFloatExponent y)
     b
 renderFloatLiteral (FloatLiteralPoint _ a b) =

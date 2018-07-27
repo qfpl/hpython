@@ -56,6 +56,12 @@ doToPython pa =
   pure . logicalLines <=<
   doTokenize
 
+tokensOnly :: String -> IO ()
+tokensOnly name = do
+  file <- readFile name
+  py <- doTokenize file
+  pure $! seq (last py) ()
+
 parseCheckPrint :: String -> IO ()
 parseCheckPrint name = do
   file <- readFile name
@@ -72,5 +78,6 @@ parseCheckPrint name = do
 main :: IO ()
 main =
   defaultMain
-  [ bench "9000 lines of correct python" $ nfIO (parseCheckPrint "./benchmarks/pypy.py")
+  [ bench "9000 lines of correct python tokens" $ nfIO (tokensOnly "./benchmarks/pypy.py")
+  , bench "9000 lines of correct python" $ nfIO (parseCheckPrint "./benchmarks/pypy.py")
   ]

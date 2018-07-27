@@ -19,7 +19,7 @@ mkDerivation {
   ];
   testHaskellDepends = [
     base digit directory filepath hedgehog lens mtl process
-    semigroupoids these transformers trifecta
+    semigroupoids text these transformers trifecta
   ];
   license = stdenv.lib.licenses.bsd3;
 }

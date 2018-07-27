@@ -2,6 +2,7 @@
 module LexerParser (lexerParserTests) where
 
 import Data.Functor.Alt ((<!>))
+import qualified Data.Text.Lazy as Lazy
 import qualified Data.Functor.Alt as Alt (many)
 import Hedgehog
 
@@ -41,21 +42,21 @@ test_fulltrip_1 =
   withTests 1 . property $ do
     let str = "def a(x, y=2, *z, **w):\n   return 2 + 3"
     a <- doToPython statement str
-    showStatement a === str
+    showStatement a === Lazy.pack str
 
 test_fulltrip_2 :: Property
 test_fulltrip_2 =
   withTests 1 . property $ do
     let str = "(   1\n       *\n  3\n    )"
     a <- doToPython (expr space) str
-    showExpr a === str
+    showExpr a === Lazy.pack str
 
 test_fulltrip_3 :: Property
 test_fulltrip_3 =
   withTests 1 . property $ do
     let str = "pass;"
     a <- doToPython statement str
-    showStatement a === str
+    showStatement a === Lazy.pack str
 
 test_fulltrip_4 :: Property
 test_fulltrip_4 =
@@ -76,7 +77,7 @@ test_fulltrip_4 =
     annotateShow nst
 
     a <- doToPython statement str
-    showStatement a === str
+    showStatement a === Lazy.pack str
 
 test_fulltrip_5 :: Property
 test_fulltrip_5 =
@@ -97,7 +98,7 @@ test_fulltrip_5 =
     annotateShow nst
 
     a <- doToPython statement str
-    showStatement a === str
+    showStatement a === Lazy.pack str
 
 test_fulltrip_6 :: Property
 test_fulltrip_6 =
@@ -118,7 +119,7 @@ test_fulltrip_6 =
     annotateShow nst
 
     a <- doToPython module_ str
-    showModule a === str
+    showModule a === Lazy.pack str
 
 test_fulltrip_7 :: Property
 test_fulltrip_7 =
@@ -138,7 +139,7 @@ test_fulltrip_7 =
     annotateShow nst
 
     a <- doToPython module_ str
-    showModule a === str
+    showModule a === Lazy.pack str
 
 test_fulltrip_8 :: Property
 test_fulltrip_8 =
@@ -158,7 +159,7 @@ test_fulltrip_8 =
     annotateShow nst
 
     a <- doToPython module_ str
-    showModule a === str
+    showModule a === Lazy.pack str
 
 test_fulltrip_9 :: Property
 test_fulltrip_9 =
@@ -182,7 +183,7 @@ test_fulltrip_9 =
     a <- doParse' module_ nst
     annotateShow a
 
-    showModule a === str
+    showModule a === Lazy.pack str
 
 test_fulltrip_10 :: Property
 test_fulltrip_10 =
@@ -218,7 +219,7 @@ test_fulltrip_10 =
     a <- doParse' module_ nst
     annotateShow $! a
 
-    showModule a === str
+    showModule a === Lazy.pack str
 
 test_fulltrip_11 :: Property
 test_fulltrip_11 =
@@ -249,7 +250,7 @@ test_fulltrip_11 =
     a <- doParse' module_ nst
     annotateShow $! a
 
-    showModule a === str
+    showModule a === Lazy.pack str
 
 test_fulltrip_12 :: Property
 test_fulltrip_12 =
@@ -281,7 +282,7 @@ test_fulltrip_12 =
     a <- doParse' module_ nst
     annotateShow $! a
 
-    showModule a === str
+    showModule a === Lazy.pack str
 
 test_fulltrip_13 :: Property
 test_fulltrip_13 =
@@ -315,7 +316,7 @@ test_fulltrip_13 =
     a <- doParse' module_ nst
     annotateShow $! a
 
-    showModule a === str
+    showModule a === Lazy.pack str
 
 test_fulltrip_14 :: Property
 test_fulltrip_14 =
@@ -338,7 +339,7 @@ test_fulltrip_14 =
     a <- doParse' module_ nst
     annotateShow $! a
 
-    showModule a === str
+    showModule a === Lazy.pack str
 
 test_fulltrip_15 :: Property
 test_fulltrip_15 =
@@ -361,7 +362,7 @@ test_fulltrip_15 =
     a <- doParse' module_ nst
     annotateShow $! a
 
-    showModule a === str
+    showModule a === Lazy.pack str
 
 test_fulltrip_16 :: Property
 test_fulltrip_16 =
@@ -384,7 +385,7 @@ test_fulltrip_16 =
     a <- doParse' module_ nst
     annotateShow $! a
 
-    showModule a === str
+    showModule a === Lazy.pack str
 
 parseTab :: Parser ann Whitespace
 parseTab = do

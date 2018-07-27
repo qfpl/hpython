@@ -113,6 +113,7 @@ test-suite hpython-tests
                      , mtl
                      , process
                      , semigroupoids >=5.2.2 && <5.3
+                     , text >=1.2 && <1.3
                      , transformers
                      , trifecta
                      , these >=0.7.4 && <0.7.5

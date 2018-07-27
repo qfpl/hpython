@@ -6,8 +6,8 @@ mkDerivation {
   version = "0.1.0.0";
   src = fetchgit {
     url = "https://github.com/qfpl/parsers-megaparsec";
-    sha256 = "0y1xh8y85bp3n43fhaf0qa7kzyr90sgqzvc2rbrqy8ri5gjf5g06";
-    rev = "1a96321f38d0a7b8e4331f63cba0383e6170cf4f";
+    sha256 = "0c7i3z9mmpj46856im99g4fh6jkqhf16pf8x9wfxb5v40dm1flcx";
+    rev = "f449676caa64293535ea155f9f3b86f83eefe332";
   };
   libraryHaskellDepends = [ base megaparsec mtl parsers text ];
   description = "`parsers` instances for Megaparsec";

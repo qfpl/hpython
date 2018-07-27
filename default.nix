@@ -1,4 +1,4 @@
-{ nixpkgs ? import <nixpkgs> {}, compiler ? "default" }:
+{ nixpkgs ? import <nixpkgs> {}, compiler ? "default", profiling ? false }:
 
 let
 
@@ -6,12 +6,14 @@ let
 
   f = import ./hpython.nix;
 
-
   haskellPackages =
-    (if compiler == "default"
-     then pkgs.haskellPackages
-     else pkgs.haskell.packages.${compiler}).override {
+    (
+     (if compiler == "default"
+      then pkgs.haskellPackages
+      else pkgs.haskell.packages.${compiler})).override {
        overrides = self: super: {
+         mkDerivation = expr:
+           super.mkDerivation (expr // { enableLibraryProfiling = profiling; });
          free = self.free_5_0_1;
          keys = self.keys_3_12;
          kan-extensions = self.kan-extensions_5_1;

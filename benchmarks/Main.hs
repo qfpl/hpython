@@ -1,4 +1,5 @@
 {-# language DataKinds #-}
+{-# options_ghc -ddump-to-file -ddump-simpl  #-}
 module Main where
 
 import Criterion.Main

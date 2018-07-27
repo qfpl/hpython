@@ -21,6 +21,7 @@ import Data.Digit.HeXaDeCiMaL (parseHeXaDeCiMaL)
 import Data.Digit.Octal (parseOctal)
 import Data.FingerTree (FingerTree, Measured(..))
 import Data.Foldable (asum)
+import Data.Functor.Identity (Identity)
 import Data.List.NonEmpty (NonEmpty(..), some1)
 import Data.Monoid (Sum(..))
 import Data.Semigroup ((<>))
@@ -28,7 +29,7 @@ import Data.Sequence ((!?), (|>), Seq)
 import Data.These (These(..))
 import Data.Void (Void)
 import Text.Megaparsec
-  (MonadParsec, SourcePos, ParseError, parse, parseErrorPretty, getPosition)
+  (MonadParsec, SourcePos, parse, parseErrorPretty, getPosition)
 import Text.Megaparsec.Parsers
 
 import qualified Data.FingerTree as FingerTree
@@ -47,7 +48,7 @@ parseNewline =
 
 parseCommentNewline :: (CharParsing m, Monad m) => m (SourcePos -> PyToken SourcePos)
 parseCommentNewline = do
-  n <- optional (char '#' *> many (noneOf "\r\n"))
+  n <- optional (char '#' *> many (satisfy (`notElem` ['\r', '\n'])))
   case n of
     Nothing ->
       TkNewline <$>
@@ -121,7 +122,7 @@ stringChar =
       , Char_esc_a <$ char 'a'
       , Char_esc_b <$ char 'b'
       , Char_esc_f <$ char 'f'
-      , char 'n' *> (Char_newline <$ string "ewline" <|> pure Char_esc_n)
+      , char 'n' *> (Char_newline <$ text "ewline" <|> pure Char_esc_n)
       , Char_esc_r <$ char 'r'
       , Char_esc_t <$ char 't'
       , Char_esc_v <$ char 'v'
@@ -199,6 +200,7 @@ number = do
       optional (Pos <$ char '+' <|> Neg <$ char '-') <*>
       some1 parseDecimal
 
+{-# inline parseToken #-}
 parseToken
   :: (Monad m, CharParsing m, MonadParsec e s m)
   => m (PyToken SourcePos)
@@ -207,38 +209,38 @@ parseToken =
   asum $
     fmap
     (\p -> try $ p <* notFollowedBy (satisfy isIdentifierStart))
-    [ TkIf <$ string "if"
-    , TkElse <$ string "else"
-    , TkElif <$ string "elif"
-    , TkWhile <$ string "while"
-    , TkAssert <$ string "assert"
-    , TkDef <$ string "def"
-    , TkReturn <$ string "return"
-    , TkPass <$ string "pass"
-    , TkBreak <$ string "break"
-    , TkContinue <$ string "continue"
-    , TkTrue <$ string "True"
-    , TkFalse <$ string "False"
-    , TkNone <$ string "None"
-    , TkOr <$ string "or"
-    , TkAnd <$ string "and"
-    , TkIs <$ string "is"
-    , TkNot <$ string "not"
-    , TkGlobal <$ string "global"
-    , TkDel <$ string "del"
-    , TkLambda <$ string "lambda"
-    , TkImport <$ string "import"
-    , TkFrom <$ string "from"
-    , TkAs <$ string "as"
-    , TkRaise <$ string "raise"
-    , TkTry <$ string "try"
-    , TkExcept <$ string "except"
-    , TkFinally <$ string "finally"
-    , TkClass <$ string "class"
-    , TkWith <$ string "with"
-    , TkFor <$ string "for"
-    , TkIn <$ string "in"
-    , TkYield <$ string "yield"
+    [ TkIf <$ text "if"
+    , TkElse <$ text "else"
+    , TkElif <$ text "elif"
+    , TkWhile <$ text "while"
+    , TkAssert <$ text "assert"
+    , TkDef <$ text "def"
+    , TkReturn <$ text "return"
+    , TkPass <$ text "pass"
+    , TkBreak <$ text "break"
+    , TkContinue <$ text "continue"
+    , TkTrue <$ text "True"
+    , TkFalse <$ text "False"
+    , TkNone <$ text "None"
+    , TkOr <$ text "or"
+    , TkAnd <$ text "and"
+    , TkIs <$ text "is"
+    , TkNot <$ text "not"
+    , TkGlobal <$ text "global"
+    , TkDel <$ text "del"
+    , TkLambda <$ text "lambda"
+    , TkImport <$ text "import"
+    , TkFrom <$ text "from"
+    , TkAs <$ text "as"
+    , TkRaise <$ text "raise"
+    , TkTry <$ text "try"
+    , TkExcept <$ text "except"
+    , TkFinally <$ text "finally"
+    , TkClass <$ text "class"
+    , TkWith <$ text "with"
+    , TkFor <$ text "for"
+    , TkIn <$ text "in"
+    , TkYield <$ text "yield"
     ] <>
     [ number
     , TkSpace <$ char ' '
@@ -266,7 +268,7 @@ parseToken =
       (char '/' *> (TkDoubleSlashEq <$ char '=' <|> pure TkDoubleSlash) <|>
        TkSlashEq <$ char '=' <|>
        pure TkSlash)
-    , TkBangEq <$ string "!="
+    , TkBangEq <$ text "!="
     , char '^' *> (TkCaretEq <$ char '=' <|> pure TkCaret)
     , char '|' *> (TkPipeEq <$ char '=' <|> pure TkPipe)
     , char '&' *> (TkAmpersandEq <$ char '=' <|> pure TkAmpersand)
@@ -278,25 +280,28 @@ parseToken =
     , TkContinued <$ char '\\' <*> parseNewline
     , TkColon <$ char ':'
     , TkSemicolon <$ char ';'
+    , parseCommentNewline
+    , TkComma <$ char ','
+    , TkDot <$ char '.'
     , do
         sp <- try $ optional stringOrBytesPrefix <* char '"'
         case sp of
           Nothing ->
             TkString Nothing DoubleQuote LongString <$
-            string "\"\"" <*>
-            manyTill stringChar (string "\"\"\"")
+            text "\"\"" <*>
+            manyTill stringChar (text "\"\"\"")
             <|>
             TkString Nothing DoubleQuote ShortString <$> manyTill stringChar (char '"')
           Just (Left prefix) ->
             TkString (Just prefix) DoubleQuote LongString <$
-            string "\"\"" <*>
-            manyTill stringChar (string "\"\"\"")
+            text "\"\"" <*>
+            manyTill stringChar (text "\"\"\"")
             <|>
             TkString (Just prefix) DoubleQuote ShortString <$> manyTill stringChar (char '"')
           Just (Right prefix) ->
             TkBytes prefix DoubleQuote LongString <$
-            string "\"\"" <*>
-            manyTill stringChar (string "\"\"\"")
+            text "\"\"" <*>
+            manyTill stringChar (text "\"\"\"")
             <|>
             TkBytes prefix DoubleQuote ShortString <$> manyTill stringChar (char '"')
     , do
@@ -304,25 +309,22 @@ parseToken =
         case sp of
           Nothing ->
             TkString Nothing SingleQuote LongString <$
-            string "''" <*>
-            manyTill stringChar (string "'''")
+            text "''" <*>
+            manyTill stringChar (text "'''")
             <|>
             TkString Nothing SingleQuote ShortString <$> manyTill stringChar (char '\'')
           Just (Left prefix) ->
             TkString (Just prefix) SingleQuote LongString <$
-            string "''" <*>
-            manyTill stringChar (string "'''")
+            text "''" <*>
+            manyTill stringChar (text "'''")
             <|>
             TkString (Just prefix) SingleQuote ShortString <$> manyTill stringChar (char '\'')
           Just (Right prefix) ->
             TkBytes prefix SingleQuote LongString <$
-            string "''" <*>
-            manyTill stringChar (string "'''")
+            text "''" <*>
+            manyTill stringChar (text "'''")
             <|>
             TkBytes prefix SingleQuote ShortString <$> manyTill stringChar (char '\'')
-    , parseCommentNewline
-    , TkComma <$ char ','
-    , TkDot <$ char '.'
     , fmap TkIdent $
       (:) <$>
       satisfy isIdentifierStart <*>
@@ -330,9 +332,10 @@ parseToken =
     ]
 
 tokenize :: Lazy.Text -> Either String [PyToken SourcePos]
-tokenize =
-  first (parseErrorPretty :: ParseError Char Void -> String) .
-  parse (unParsecT $ many parseToken <* Parsec.eof) "test"
+tokenize = first parseErrorPretty . parse (unParsecT tokens) "test"
+  where
+    tokens :: ParsecT Void Lazy.Text Identity [PyToken SourcePos]
+    tokens = many parseToken <* Parsec.eof
 
 data LogicalLine a
   = LogicalLine

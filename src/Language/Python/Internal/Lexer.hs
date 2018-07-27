@@ -25,7 +25,6 @@ import Data.Monoid (Sum(..))
 import Data.Semigroup ((<>))
 import Data.Sequence ((!?), (|>), Seq)
 import Data.These (These(..))
-import Text.Parser.LookAhead (LookAheadParsing, lookAhead)
 import Text.Trifecta
   ( CharParsing, DeltaParsing, Caret, Careted(..), char, careted, noneOf
   , digit, string, manyTill, parseString, satisfy, try
@@ -198,7 +197,7 @@ number = do
       optional (Pos <$ char '+' <|> Neg <$ char '-') <*>
       some1 parseDecimal
 
-parseToken :: (DeltaParsing m, LookAheadParsing m) => m (PyToken Caret)
+parseToken :: DeltaParsing m => m (PyToken Caret)
 parseToken =
   fmap (\(f :^ sp) -> f sp) . careted $
   asum @[] $
@@ -276,8 +275,7 @@ parseToken =
     , TkColon <$ char ':'
     , TkSemicolon <$ char ';'
     , do
-        sp <- optional . try $ stringOrBytesPrefix <* lookAhead (char '"')
-        char '"'
+        sp <- try $ optional stringOrBytesPrefix <* char '"'
         case sp of
           Nothing ->
             TkString Nothing DoubleQuote LongString <$
@@ -298,8 +296,7 @@ parseToken =
             <|>
             TkBytes prefix DoubleQuote ShortString <$> manyTill stringChar (char '"')
     , do
-        sp <- optional . try $ stringOrBytesPrefix <* lookAhead (char '\'')
-        char '\''
+        sp <- try $ optional stringOrBytesPrefix <* char '\''
         case sp of
           Nothing ->
             TkString Nothing SingleQuote LongString <$

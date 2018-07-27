@@ -35,7 +35,7 @@ import Text.Megaparsec.Parsers
 import qualified Data.FingerTree as FingerTree
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Sequence as Sequence
-import qualified Data.Text.Lazy as Lazy
+import qualified Data.Text as Text
 import qualified Text.Megaparsec as Parsec
 
 import Language.Python.Internal.Syntax
@@ -331,10 +331,10 @@ parseToken =
       many (satisfy isIdentifierChar)
     ]
 
-tokenize :: Lazy.Text -> Either String [PyToken SourcePos]
+tokenize :: Text.Text -> Either String [PyToken SourcePos]
 tokenize = first parseErrorPretty . parse (unParsecT tokens) "test"
   where
-    tokens :: ParsecT Void Lazy.Text Identity [PyToken SourcePos]
+    tokens :: ParsecT Void Text.Text Identity [PyToken SourcePos]
     tokens = many parseToken <* Parsec.eof
 
 data LogicalLine a

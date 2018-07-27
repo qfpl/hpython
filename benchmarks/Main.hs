@@ -10,8 +10,8 @@ import Data.Validate (Validate(..))
 import System.Exit (exitFailure)
 import Text.Megaparsec (SourcePos, initialPos)
 
-import qualified Data.Text.Lazy as Lazy
-import qualified Data.Text.Lazy.IO as LazyText
+import qualified Data.Text as Text
+import qualified Data.Text.IO as StrictText
 
 import Language.Python.Internal.Parse
 import Language.Python.Internal.Render (showModule)
@@ -23,7 +23,7 @@ import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Syntax.Error
 
-doTokenize :: Lazy.Text -> IO [PyToken SourcePos]
+doTokenize :: Text.Text -> IO [PyToken SourcePos]
 doTokenize str = do
   let res = tokenize str
   case res of
@@ -51,7 +51,7 @@ doParse initial pa input = do
     Left err -> print err *> exitFailure
     Right a -> pure a
 
-doToPython :: Parser SourcePos a -> Lazy.Text -> IO a
+doToPython :: Parser SourcePos a -> Text.Text -> IO a
 doToPython pa =
   doParse (initialPos "test") pa <=<
   doNested <=<
@@ -61,13 +61,13 @@ doToPython pa =
 
 tokensOnly :: String -> IO ()
 tokensOnly name = do
-  file <- LazyText.readFile name
+  file <- StrictText.readFile name
   py <- doTokenize file
   pure $! seq (last py) ()
 
 parseCheckPrint :: FilePath -> IO ()
 parseCheckPrint name = do
-  file <- LazyText.readFile name
+  file <- StrictText.readFile name
   py <- doToPython module_ file
   case runValidateIndentation $ validateModuleIndentation py of
     Failure errs ->

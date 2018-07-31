@@ -16,7 +16,7 @@ mkDerivation {
     semigroupoids text these type-level-sets
   ];
   executableHaskellDepends = [
-    base criterion deepseq lens megaparsec
+    base criterion deepseq lens megaparsec text
   ];
   testHaskellDepends = [
     base digit directory filepath hedgehog lens megaparsec mtl process

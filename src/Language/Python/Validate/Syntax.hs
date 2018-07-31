@@ -55,6 +55,7 @@ data SyntaxContext
   = SyntaxContext
   { _inLoop :: Bool
   , _inFunction :: Maybe [String]
+  , _inGenerator :: Bool
   , _inParens :: Bool
   }
 makeLenses ''SyntaxContext
@@ -119,6 +120,7 @@ initialSyntaxContext =
   SyntaxContext
   { _inLoop = False
   , _inFunction = Nothing
+  , _inGenerator = False
   , _inParens = False
   }
 
@@ -260,7 +262,9 @@ validateExprSyntax (Yield a b c) =
   validateWhitespace a b <*
   (syntaxContext `bindValidateSyntax` \ctxt ->
       case _inFunction ctxt of
-        Nothing -> syntaxErrors [_YieldOutsideFunction # a]
+        Nothing
+          | _inGenerator ctxt -> pure ()
+          | otherwise -> syntaxErrors [_YieldOutsideFunction # a]
         Just{} -> pure ()) <*>
   traverse validateExprSyntax c
 validateExprSyntax (YieldFrom a b c d) =
@@ -269,7 +273,9 @@ validateExprSyntax (YieldFrom a b c d) =
   validateWhitespace a c <*
   (syntaxContext `bindValidateSyntax` \ctxt ->
       case _inFunction ctxt of
-        Nothing -> syntaxErrors [_YieldOutsideFunction # a]
+        Nothing
+          | _inGenerator ctxt -> pure ()
+          | otherwise -> syntaxErrors [_YieldOutsideFunction # a]
         Just{} -> pure ()) <*>
   validateExprSyntax d
 validateExprSyntax (Ternary a b c d e f) =
@@ -314,7 +320,11 @@ validateExprSyntax (ListComp a ws1 comp ws2) =
     (inParens .~ True)
     (validateComprehensionSyntax comp) <*>
   validateWhitespace a ws2
-validateExprSyntax (Generator a comp) = Generator a <$> validateComprehensionSyntax comp
+validateExprSyntax (Generator a comp) =
+  Generator a <$>
+  localSyntaxContext
+    (\ctxt -> ctxt { _inGenerator = True })
+    (validateComprehensionSyntax comp)
 validateExprSyntax (Deref a expr ws1 name) =
   Deref a <$>
   validateExprSyntax expr <*>

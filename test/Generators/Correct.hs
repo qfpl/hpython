@@ -40,6 +40,7 @@ import Generators.Sized
 initialGenState =
   GenState
   { _inFunction = Nothing
+  , _inGenerator = False
   , _currentNonlocals = []
   , _willBeNonlocals = []
   , _inLoop = False
@@ -49,6 +50,7 @@ initialGenState =
 data GenState
   = GenState
   { _inFunction :: Maybe [String]
+  , _inGenerator :: Bool
   , _currentNonlocals :: [String]
   , _willBeNonlocals :: [String]
   , _inLoop :: Bool
@@ -287,6 +289,7 @@ genStringLiterals = do
 genExpr' :: (MonadGen m, MonadState GenState m) => Bool -> m (Expr '[] ())
 genExpr' isExp = do
   isInFunction <- isJust <$> gets _inFunction
+  isInGenerator <- gets _inGenerator
   sizedRecursive
     [ genBool
     , if isExp then genSmallInt else genInt
@@ -297,7 +300,8 @@ genExpr' isExp = do
     ([ genList genExpr
      , genStringLiterals
      , ListComp () <$> genWhitespaces <*> genComprehension <*> genWhitespaces
-     , Generator () <$> genComprehension
+     , Generator () <$>
+       localState (modify (\ctxt -> ctxt { _inGenerator = True }) *> genComprehension)
      , Dict () <$>
        genAnyWhitespaces <*>
        sizedMaybe (genSizedCommaSep1' $ genDictItem genExpr) <*>
@@ -351,13 +355,13 @@ genExpr' isExp = do
      [ Yield () <$>
        (NonEmpty.toList <$> genWhitespaces1) <*>
        sizedMaybe genExpr
-     | isInFunction
+     | isInFunction || isInGenerator
      ] ++
      [ YieldFrom () <$>
        (NonEmpty.toList <$> genWhitespaces1) <*>
        (NonEmpty.toList <$> genWhitespaces1) <*>
        genExpr
-     | isInFunction
+     | isInFunction || isInGenerator
      ])
 
 genSubscript :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())

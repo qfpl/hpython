@@ -2,16 +2,16 @@ module Helpers where
 
 import Control.Monad ((<=<))
 import Data.Text (Text)
-import Text.Megaparsec (SourcePos, initialPos)
 
 import Hedgehog
 
 import Language.Python.Internal.Lexer
-  (LogicalLine, IndentedLine, Nested, tokenize, logicalLines, indentation, nested)
+  (SrcInfo, LogicalLine, IndentedLine, Nested, tokenize, logicalLines, indentation, nested
+  , initialSrcInfo)
 import Language.Python.Internal.Parse (Parser, runParser)
 import Language.Python.Internal.Token (PyToken)
 
-doTokenize :: Monad m => Text -> PropertyT m [PyToken SourcePos]
+doTokenize :: Monad m => Text -> PropertyT m [PyToken SrcInfo]
 doTokenize str = do
   let res = tokenize str
   case res of
@@ -47,12 +47,12 @@ doParse initial pa input = do
       failure
     Right a -> pure a
 
-doParse' :: Monad m => Parser SourcePos a -> Nested SourcePos -> PropertyT m a
-doParse' = doParse $ initialPos "test"
+doParse' :: Monad m => Parser SrcInfo a -> Nested SrcInfo -> PropertyT m a
+doParse' = doParse $ initialSrcInfo "test"
 
-doToPython :: Monad m => Parser SourcePos a -> Text -> PropertyT m a
+doToPython :: Monad m => Parser SrcInfo a -> Text -> PropertyT m a
 doToPython pa =
-  doParse (initialPos "test") pa <=<
+  doParse (initialSrcInfo "test") pa <=<
   doNested <=<
   doIndentation <=<
   pure . logicalLines <=<

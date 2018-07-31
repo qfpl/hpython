@@ -10,10 +10,10 @@ import Hedgehog
   , withTests, withShrinks
   )
 import System.FilePath ((</>))
-import Text.Megaparsec (SourcePos)
 
 import qualified Data.Text.IO as StrictText
 
+import Language.Python.Internal.Lexer (SrcInfo)
 import Language.Python.Internal.Parse (module_)
 import Language.Python.Internal.Render (showModule)
 import Language.Python.Validate.Indentation
@@ -45,8 +45,8 @@ doRoundtrip name =
     file <- liftIO . StrictText.readFile $ "test/files" </> name
     py <- doToPython module_ file
     case runValidateIndentation $ validateModuleIndentation py of
-      Failure errs -> annotateShow (errs :: [IndentationError '[] SourcePos]) *> failure
+      Failure errs -> annotateShow (errs :: [IndentationError '[] SrcInfo]) *> failure
       Success res ->
         case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
-          Failure errs' -> annotateShow (errs' :: [SyntaxError '[Indentation] SourcePos]) *> failure
+          Failure errs' -> annotateShow (errs' :: [SyntaxError '[Indentation] SrcInfo]) *> failure
           Success _ -> showModule py === file

@@ -8,7 +8,6 @@ import Control.Monad ((<=<))
 import Control.DeepSeq (rnf)
 import Data.Validate (Validate(..))
 import System.Exit (exitFailure)
-import Text.Megaparsec (SourcePos, initialPos)
 
 import qualified Data.Text as Text
 import qualified Data.Text.IO as StrictText
@@ -16,14 +15,14 @@ import qualified Data.Text.IO as StrictText
 import Language.Python.Internal.Parse
 import Language.Python.Internal.Render (showModule)
 import Language.Python.Internal.Lexer
-  (Nested, IndentedLine, LogicalLine, logicalLines, nested, indentation, tokenize)
+  (SrcInfo, Nested, IndentedLine, LogicalLine, logicalLines, nested, indentation, tokenize, initialSrcInfo)
 import Language.Python.Internal.Token (PyToken)
 import Language.Python.Validate.Indentation
 import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Syntax.Error
 
-doTokenize :: Text.Text -> IO [PyToken SourcePos]
+doTokenize :: Text.Text -> IO [PyToken SrcInfo]
 doTokenize str = do
   let res = tokenize str
   case res of
@@ -51,9 +50,9 @@ doParse initial pa input = do
     Left err -> print err *> exitFailure
     Right a -> pure a
 
-doToPython :: Parser SourcePos a -> Text.Text -> IO a
+doToPython :: Parser SrcInfo a -> Text.Text -> IO a
 doToPython pa =
-  doParse (initialPos "test") pa <=<
+  doParse (initialSrcInfo "test") pa <=<
   doNested <=<
   doIndentation <=<
   pure . logicalLines <=<
@@ -71,11 +70,11 @@ parseCheckPrint name = do
   py <- doToPython module_ file
   case runValidateIndentation $ validateModuleIndentation py of
     Failure errs ->
-      print (errs :: [IndentationError '[] SourcePos]) *> exitFailure
+      print (errs :: [IndentationError '[] SrcInfo]) *> exitFailure
     Success res ->
       case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
         Failure errs' ->
-          print (errs' :: [SyntaxError '[Indentation] SourcePos]) *> exitFailure
+          print (errs' :: [SyntaxError '[Indentation] SrcInfo]) *> exitFailure
         Success _ -> pure $! rnf (showModule py)
 
 main :: IO ()

@@ -29,7 +29,7 @@ import Data.Sequence ((!?), (|>), Seq)
 import Data.These (These(..))
 import Data.Void (Void)
 import Text.Megaparsec
-  (MonadParsec, SourcePos, parse, parseErrorPretty, getPosition)
+  (MonadParsec, parse, parseErrorPretty, unPos)
 import Text.Megaparsec.Parsers
 
 import qualified Data.FingerTree as FingerTree
@@ -41,23 +41,46 @@ import qualified Text.Megaparsec as Parsec
 import Language.Python.Internal.Syntax
 import Language.Python.Internal.Token (PyToken(..), pyTokenAnn)
 
+data SrcInfo
+  = SrcInfo
+  { _srcInfoName :: FilePath
+  , _srcInfoLine :: !Int
+  , _srcInfoCol :: !Int
+  , _srcInfoOffset :: !Int
+  }
+  deriving (Eq, Show)
+
+initialSrcInfo :: FilePath -> SrcInfo
+initialSrcInfo fp =
+  SrcInfo
+  { _srcInfoName = fp
+  , _srcInfoLine = 0
+  , _srcInfoCol = 0
+  , _srcInfoOffset = 0
+  }
+
+{-# inline getSrcInfo #-}
+getSrcInfo :: MonadParsec e s m => m SrcInfo
+getSrcInfo =
+  (\(Parsec.SourcePos name l c) -> SrcInfo name (unPos l) (unPos c)) <$>
+  Parsec.getPosition <*>
+  Parsec.getTokensProcessed
+
 parseNewline :: CharParsing m => m Newline
 parseNewline =
   LF Nothing <$ char '\n' <|> char '\r' *>
   (CRLF Nothing <$ char '\n' <|> pure (CR Nothing))
 
-parseCommentNewline :: (CharParsing m, Monad m) => m (SourcePos -> PyToken SourcePos)
+parseCommentNewline :: (CharParsing m, Monad m) => m (SrcInfo -> PyToken SrcInfo)
 parseCommentNewline = do
   n <- optional (char '#' *> many (satisfy (`notElem` ['\r', '\n'])))
   case n of
-    Nothing ->
-      TkNewline <$>
-      (LF Nothing <$ char '\n' <|> char '\r' *>
-       (CRLF Nothing <$ char '\n' <|> pure (CR Nothing)))
+    Nothing -> TkNewline <$> (LF Nothing <$ char '\n' <|> char '\r' *> (CRLF Nothing <$ char '\n' <|> pure (CR Nothing)))
     Just c ->
-      fmap TkNewline
-      ((LF (Just $ Comment c) <$ char '\n' <|> char '\r' *>
-       (CRLF (Just $ Comment c) <$ char '\n' <|> pure (CR . Just $ Comment c)))) <|>
+      fmap
+        TkNewline
+        (LF (Just $ Comment c) <$ char '\n' <|>
+         char '\r' *> (CRLF (Just $ Comment c) <$ char '\n' <|> pure (CR . Just $ Comment c))) <|>
       pure (TkComment c)
 
 stringOrBytesPrefix :: CharParsing m => m (Either StringPrefix BytesPrefix)
@@ -80,32 +103,6 @@ stringOrBytesPrefix =
     pure (Right Prefix_B))) <|>
   (Left Prefix_u <$ char 'u') <|>
   (Left Prefix_U <$ char 'U')
-
-hexDigitInt :: Char -> Int
-hexDigitInt c =
-  case c of
-    '0' -> 0
-    '1' -> 1
-    '2' -> 2
-    '3' -> 3
-    '4' -> 4
-    '5' -> 5
-    '6' -> 6
-    '7' -> 7
-    '8' -> 8
-    '9' -> 9
-    'A' -> 10
-    'B' -> 11
-    'C' -> 12
-    'D' -> 13
-    'E' -> 14
-    'F' -> 15
-    _ -> error "impossible"
-
-hexToInt :: String -> Int
-hexToInt =
-  (snd $!) .
-  foldr (\a (sz, val) -> (sz+1, hexDigitInt a * 16 ^ sz + val)) (0, 0)
 
 stringChar :: CharParsing m => m PyChar
 stringChar =
@@ -203,9 +200,9 @@ number = do
 {-# inline parseToken #-}
 parseToken
   :: (Monad m, CharParsing m, MonadParsec e s m)
-  => m (PyToken SourcePos)
+  => m (PyToken SrcInfo)
 parseToken =
-  (<**>) getPosition .
+  (<**>) getSrcInfo .
   asum $
     fmap
     (\p -> try $ p <* notFollowedBy (satisfy isIdentifierStart))
@@ -331,10 +328,10 @@ parseToken =
       many (satisfy isIdentifierChar)
     ]
 
-tokenize :: Text.Text -> Either String [PyToken SourcePos]
+tokenize :: Text.Text -> Either String [PyToken SrcInfo]
 tokenize = first parseErrorPretty . parse (unParsecT tokens) "test"
   where
-    tokens :: ParsecT Void Text.Text Identity [PyToken SourcePos]
+    tokens :: ParsecT Void Text.Text Identity [PyToken SrcInfo]
     tokens = many parseToken <* Parsec.eof
 
 data LogicalLine a

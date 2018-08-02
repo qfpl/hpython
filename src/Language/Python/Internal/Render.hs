@@ -53,8 +53,9 @@ cons :: PyToken () -> RenderOutput -> RenderOutput
 cons a (RenderOutput b) = RenderOutput $ DList.cons a b
 infixr 5 `cons`
 
-showRenderOutput :: RenderOutput -> Lazy.Text
+showRenderOutput :: RenderOutput -> Text
 showRenderOutput =
+  Lazy.toStrict .
   Builder.toLazyText .
   foldMap (Builder.fromText . showToken) .
   correctSpaces .
@@ -1024,11 +1025,11 @@ renderModule (Module ms) =
        renderStatement)
     ms
 
-showModule :: Module v a -> Lazy.Text
+showModule :: Module v a -> Text
 showModule = showRenderOutput . renderModule
 
-showStatement :: Statement v a -> Lazy.Text
+showStatement :: Statement v a -> Text
 showStatement = showRenderOutput . renderStatement
 
-showExpr :: Expr v a -> Lazy.Text
+showExpr :: Expr v a -> Text
 showExpr = showRenderOutput . bracketGenerator

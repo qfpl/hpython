@@ -1,6 +1,7 @@
 {-# language DataKinds #-}
 {-# language MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 {-# language OverloadedLists #-}
+{-# language LambdaCase #-}
 module Language.Python.Syntax where
 
 import Data.Function ((&))
@@ -23,11 +24,16 @@ instance HasKeyword (Param '[] ()) where; k_ a = KeywordParam () a []
 instance HasPositional (Arg '[] ()) (Expr '[] ()) where; p_ = PositionalArg ()
 instance HasKeyword (Arg '[] ()) where; k_ a = KeywordArg () a []
 
-def_ :: Ident '[] () -> [Param '[] ()] -> NonEmpty (Statement '[] ()) -> Statement '[] ()
-def_ name params block =
+defD_
+  :: [Decorator '[] ()]
+  -> Ident '[] ()
+  -> [Param '[] ()]
+  -> NonEmpty (Statement '[] ())
+  -> Statement '[] ()
+defD_ ds name params block =
   CompoundStatement $
   Fundef ()
-    []
+    ds
     (Indents [] ())
     [Space]
     name
@@ -35,6 +41,9 @@ def_ name params block =
     (listToCommaSep params)
     []
     (SuiteMany () [] (LF Nothing) $ toBlock block)
+
+def_ :: Ident '[] () -> [Param '[] ()] -> NonEmpty (Statement '[] ()) -> Statement '[] ()
+def_ = defD_ []
 
 call_ :: Expr '[] () -> [Arg '[] ()] -> Expr '[] ()
 call_ expr args =

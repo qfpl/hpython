@@ -1,23 +1,24 @@
 module Helpers where
 
 import Control.Monad ((<=<))
-import qualified Text.Trifecta as Trifecta
+import Data.Text (Text)
 
 import Hedgehog
 
 import Language.Python.Internal.Lexer
-  (LogicalLine, IndentedLine, Nested, tokenize, logicalLines, indentation, nested)
+  (SrcInfo, LogicalLine, IndentedLine, Nested, tokenize, logicalLines, indentation, nested
+  , initialSrcInfo)
 import Language.Python.Internal.Parse (Parser, runParser)
 import Language.Python.Internal.Token (PyToken)
 
-doTokenize :: Monad m => String -> PropertyT m [PyToken Trifecta.Caret]
+doTokenize :: Monad m => Text -> PropertyT m [PyToken SrcInfo]
 doTokenize str = do
   let res = tokenize str
   case res of
-    Trifecta.Failure err -> do
+    Left err -> do
       annotateShow err
       failure
-    Trifecta.Success a -> pure a
+    Right a -> pure a
 
 doIndentation :: (Show a, Monad m) => [LogicalLine a] -> PropertyT m [IndentedLine a]
 doIndentation lls = do
@@ -46,12 +47,12 @@ doParse initial pa input = do
       failure
     Right a -> pure a
 
-doParse' :: Monad m => Parser Trifecta.Caret a -> Nested Trifecta.Caret -> PropertyT m a
-doParse' = doParse (Trifecta.Caret mempty mempty)
+doParse' :: Monad m => Parser SrcInfo a -> Nested SrcInfo -> PropertyT m a
+doParse' = doParse $ initialSrcInfo "test"
 
-doToPython :: Monad m => Parser Trifecta.Caret a -> String -> PropertyT m a
+doToPython :: Monad m => Parser SrcInfo a -> Text -> PropertyT m a
 doToPython pa =
-  doParse (Trifecta.Caret mempty mempty) pa <=<
+  doParse (initialSrcInfo "test") pa <=<
   doNested <=<
   doIndentation <=<
   pure . logicalLines <=<

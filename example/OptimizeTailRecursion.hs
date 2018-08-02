@@ -21,7 +21,7 @@ import Language.Python.Syntax
 
 optimizeTailRecursion :: Statement '[] () -> Maybe (Statement '[] ())
 optimizeTailRecursion st = do
-  (idnts, _, _, name, _, params, _, suite) <- st ^? _Fundef
+  (_, decos, idnts, _, name, _, params, _, suite) <- st ^? _Fundef
   bodyLast <- toListOf (unvalidated._Statements) suite ^? _last
 
   let
@@ -60,7 +60,7 @@ optimizeTailRecursion st = do
         CompoundStatement (If _ _ _ e sts [] sts') ->
           allOf _last (hasTC name) (sts ^.. _Statements) ||
           allOf _last (hasTC name) (sts' ^.. _Just._3._Statements)
-        SmallStatements _ s ss _ _ _ ->
+        SmallStatements _ s ss _ _ ->
           case last (s : fmap (^. _2) ss) of
             Return _ _ (Just e) -> isTailCall name e
             -- Return _ _ Nothing -> True
@@ -97,7 +97,7 @@ optimizeTailRecursion st = do
                           looped name params (toListOf _Statements sts'' ^?! _last))
                       ]
             _ -> [st]
-        SmallStatements idnts s ss sc cmt nl ->
+        SmallStatements idnts s ss sc cmtnl ->
           let
             initExps = foldr (\_ _ -> init ss) [] ss
             lastExp =
@@ -109,7 +109,7 @@ optimizeTailRecursion st = do
                   let
                     lss = last ss
                   in
-                    [SmallStatements idnts (first ^. _2) rest sc cmt nl]
+                    [SmallStatements idnts (first ^. _2) rest sc cmtnl]
           in
             case lastExp of
               Return _ _ e ->

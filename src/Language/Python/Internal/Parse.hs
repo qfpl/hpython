@@ -538,11 +538,14 @@ orExpr ws =
 
     atomExpr = foldl' (&) <$> atom <*> many trailer
 
-    parens = do
-      (tk, s) <- token anySpace $ TkLeftParen ()
-      ex <- yieldExpr anySpace <!> exprListComp anySpace
-      Parens (pyTokenAnn tk) s ex <$> 
-        (snd <$> token ws (TkRightParen ()))
+    parensOrUnit =
+      (\(tk, s) maybeEx sps ->
+       case maybeEx of
+         Nothing -> Unit (pyTokenAnn tk) s sps
+         Just ex -> Parens (pyTokenAnn tk) s ex sps) <$>
+      token anySpace (TkLeftParen ()) <*>
+      optional (yieldExpr anySpace <!> exprListComp anySpace) <*>
+      (snd <$> token ws (TkRightParen ()))
 
     list = do
       (tk, s) <- token anySpace $ TkLeftBracket ()
@@ -599,7 +602,7 @@ orExpr ws =
       float ws <!>
       stringOrBytes ws <!>
       (\a -> Ident (_identAnnotation a) a) <$> identifier ws <!>
-      parens
+      parensOrUnit
 
 smallStatement :: Parser ann (SmallStatement '[] ann)
 smallStatement =

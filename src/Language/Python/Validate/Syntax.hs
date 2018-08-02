@@ -238,6 +238,10 @@ validateExprSyntax
      )
   => Expr v a
   -> ValidateSyntax e (Expr (Nub (Syntax ': v)) a)
+validateExprSyntax (Unit a b c) =
+  Unit a <$>
+  localSyntaxContext (\ctxt -> ctxt { _inParens = True }) (validateWhitespace a b) <*>
+  validateWhitespace a c
 validateExprSyntax (Lambda a b c d e) =
   let
     paramIdents = c ^.. folded.unvalidated.paramName.identValue

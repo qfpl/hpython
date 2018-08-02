@@ -438,6 +438,7 @@ validateAssignExprScope (Tuple a b ws d) =
   validateAssignExprScope b <*>
   pure ws <*>
   traverseOf (traverse.traverse) validateAssignExprScope d
+validateAssignExprScope e@Unit{} = pure $ coerce e
 validateAssignExprScope e@Lambda{} = pure $ coerce e
 validateAssignExprScope e@Yield{} = pure $ coerce e
 validateAssignExprScope e@YieldFrom{} = pure $ coerce e
@@ -547,6 +548,7 @@ validateExprScope e@Int{} = pure $ coerce e
 validateExprScope e@Float{} = pure $ coerce e
 validateExprScope e@Bool{} = pure $ coerce e
 validateExprScope e@String{} = pure $ coerce e
+validateExprScope e@Unit{} = pure $ coerce e
 validateExprScope (Dict a b c d) =
   (\c' -> Dict a b c' d) <$> traverseOf (traverse.traverse) validateDictItemScope c
 validateExprScope (Set a b c d) =

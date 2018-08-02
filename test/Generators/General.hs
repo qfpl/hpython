@@ -159,7 +159,8 @@ genPyChar =
 genExpr' :: MonadGen m => Bool -> m (Expr '[] ())
 genExpr' isExp =
   sizedRecursive
-    [ genBool
+    [ genUnit
+    , genBool
     , if isExp then genSmallInt else genInt
     , if isExp then genSmallFloat else genFloat
     , Ident () <$> genIdent

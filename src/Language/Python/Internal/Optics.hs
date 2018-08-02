@@ -266,6 +266,7 @@ assignTargets f e =
       (\b' d' -> Tuple a b' c d') <$>
       assignTargets f b <*>
       (traverse.traverse.assignTargets) f d
+    Unit{} -> pure $ coerce e
     Lambda{} -> pure $ coerce e
     Yield{} -> pure $ coerce e
     YieldFrom{} -> pure $ coerce e

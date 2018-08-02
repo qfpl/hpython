@@ -32,6 +32,7 @@ roundtripTests =
   [ "weird.py"
   , "weird2.py"
   , "django.py"
+  , "django2.py"
   , "test.py"
   , "ansible.py"
   , "comments.py"

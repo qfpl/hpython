@@ -90,6 +90,9 @@ genSmallInt = do
     ] <*>
     genWhitespaces
 
+genUnit :: MonadGen m => m (Expr '[] ())
+genUnit = Unit () <$> genAnyWhitespaces <*> genWhitespaces
+
 genInt :: MonadGen m => m (Expr '[] ())
 genInt = do
   n <- Gen.integral (Range.constant (-2^32) (2^32))

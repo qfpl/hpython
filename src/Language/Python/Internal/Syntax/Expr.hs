@@ -257,7 +257,12 @@ instance HasTrailingWhitespace (Subscript v a) where
                   Just g -> (b, c, Just (e, Just $ g & trailingWhitespace .~ ws)))
 
 data Expr (v :: [*]) a
-  = Lambda
+  = Unit
+  { _exprAnnotation :: a
+  , _unsafeUnitWhitespaceInner :: [Whitespace]
+  , _unsafeUnitWhitespaceRight :: [Whitespace]
+  }
+  | Lambda
   { _exprAnnotation :: a
   , _unsafeLambdaWhitespace :: [Whitespace]
   , _unsafeLambdaArgs :: CommaSep (Param v a)
@@ -420,6 +425,7 @@ instance HasTrailingWhitespace (Expr v a) where
   trailingWhitespace =
     lens
       (\case
+          Unit _ _ a -> a
           Lambda _ _ _ _ a -> a ^. trailingWhitespace
           Yield _ ws Nothing -> ws
           Yield _ _ (Just e) -> e ^. trailingWhitespace
@@ -447,6 +453,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Generator  _ a -> a ^. trailingWhitespace)
       (\e ws ->
         case e of
+          Unit a b _ -> Unit a b ws
           Lambda a b c d f -> Lambda a b c d (f & trailingWhitespace .~ ws)
           Yield a _ Nothing -> Yield a ws Nothing
           Yield a b (Just c) -> Yield a b (Just $ c & trailingWhitespace .~ ws)

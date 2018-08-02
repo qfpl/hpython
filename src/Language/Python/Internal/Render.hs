@@ -565,6 +565,11 @@ renderYield re (YieldFrom _ a b c) =
 renderYield re e = re e
 
 renderExpr :: Expr v a -> RenderOutput
+renderExpr (Unit _ a b) =
+  TkLeftParen () `cons`
+  foldMap renderWhitespace a <>
+  singleton (TkRightParen ()) <>
+  foldMap renderWhitespace b
 renderExpr (Lambda _ a b c d) =
   TkLambda () `cons`
   foldMap renderWhitespace a <>

@@ -27,6 +27,7 @@ import Data.Validate
 import System.Directory
 import System.Exit
 import System.Process
+import qualified Data.Text.Lazy as Lazy
 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -83,7 +84,7 @@ syntax_expr :: FilePath -> Property
 syntax_expr path =
   property $ do
     ex <- forAll $ Gen.resize 300 General.genExpr
-    let rex = showExpr ex
+    let rex = Lazy.unpack $ showExpr ex
     shouldSucceed <-
       case validateExprIndentation' ex of
         Failure errs -> annotateShow errs $> False
@@ -102,7 +103,7 @@ syntax_statement :: FilePath -> Property
 syntax_statement path =
   property $ do
     st <- forAll $ Gen.resize 300 General.genStatement
-    let rst = showStatement st
+    let rst = Lazy.unpack $ showStatement st
     shouldSucceed <-
       case validateStatementIndentation' st of
         Failure errs -> annotateShow errs $> False
@@ -118,7 +119,7 @@ syntax_module :: FilePath -> Property
 syntax_module path =
   property $ do
     st <- forAll $ Gen.resize 300 General.genModule
-    let rst = showModule st
+    let rst = Lazy.unpack $ showModule st
     shouldSucceed <-
       case validateModuleIndentation' st of
         Failure errs -> annotateShow errs $> False
@@ -139,46 +140,46 @@ correct_syntax_expr path =
       Success res ->
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
-          Success res' -> runPython3 path True (showExpr ex)
+          Success res' -> runPython3 path True (Lazy.unpack $ showExpr ex)
 
 correct_syntax_statement :: FilePath -> Property
 correct_syntax_statement path =
   property $ do
     st <- forAll $ evalStateT Correct.genStatement Correct.initialGenState
-    annotate $ showStatement st
+    annotate . Lazy.unpack $ showStatement st
     case validateStatementIndentation' st of
       Failure errs -> annotateShow errs *> failure
       Success res ->
         case validateStatementSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
-          Success res' -> runPython3 path True $ showStatement st
+          Success res' -> runPython3 path True . Lazy.unpack $ showStatement st
 
 expr_printparseprint_print :: Property
 expr_printparseprint_print =
   property $ do
     ex <- forAll $ evalStateT Correct.genExpr Correct.initialGenState
-    annotate (showExpr ex)
+    -- annotate (showExpr ex)
     case validateExprIndentation' ex of
       Failure errs -> annotateShow errs *> failure
       Success res ->
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <- doToPython (expr space) (showExpr res')
+            py <- doToPython (expr space) (Lazy.unpack $ showExpr res')
             showExpr (res' ^. unvalidated) === showExpr (res $> ())
 
 statement_printparseprint_print :: Property
 statement_printparseprint_print =
   property $ do
     st <- forAll $ evalStateT Correct.genStatement Correct.initialGenState
-    annotate $ showStatement st
+    -- annotate $ showStatement st
     case validateStatementIndentation' st of
       Failure errs -> annotateShow errs *> failure
       Success res ->
         case validateStatementSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <- doToPython statement $ showStatement res'
+            py <- doToPython statement . Lazy.unpack $ showStatement res'
             annotateShow py
             showStatement (res' ^. unvalidated) ===
               showStatement (py $> ())

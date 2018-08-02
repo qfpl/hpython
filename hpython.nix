@@ -1,7 +1,7 @@
-{ mkDerivation, base, bytestring-trie, containers, deriving-compat
-, digit, directory, filepath, fingertree, hedgehog, lens, mtl, parsers
-, process, semigroupoids, stdenv, transformers, trifecta
-, type-level-sets
+{ mkDerivation, base, bytestring-trie, containers, criterion
+, deepseq, deriving-compat, digit, directory, dlist, filepath
+, fingertree, hedgehog, lens, mtl, parsers, process, semigroupoids
+, stdenv, text, these, transformers, trifecta, type-level-sets
 }:
 mkDerivation {
   pname = "hpython";
@@ -10,13 +10,16 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    base bytestring-trie containers deriving-compat digit fingertree lens mtl
-    parsers semigroupoids trifecta type-level-sets
+    base bytestring-trie containers deriving-compat digit dlist
+    fingertree lens mtl parsers semigroupoids text these trifecta
+    type-level-sets
   ];
-  executableHaskellDepends = [ base lens ];
+  executableHaskellDepends = [
+    base criterion deepseq lens trifecta
+  ];
   testHaskellDepends = [
-    base directory digit filepath hedgehog lens mtl process semigroupoids
-    transformers trifecta
+    base digit directory filepath hedgehog lens mtl process
+    semigroupoids text these transformers trifecta
   ];
   license = stdenv.lib.licenses.bsd3;
 }

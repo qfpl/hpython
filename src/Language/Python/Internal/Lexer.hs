@@ -3,24 +3,28 @@
 {-# language TypeApplications #-}
 {-# language MultiParamTypeClasses #-}
 {-# language GeneralizedNewtypeDeriving #-}
+{-# language LambdaCase #-}
 module Language.Python.Internal.Lexer where
 
-import Control.Applicative ((<|>), some, many, optional)
+import Control.Applicative ((<|>), many, optional)
 import Control.Lens.Iso (from)
 import Control.Lens.Getter ((^.))
 import Control.Monad (when, replicateM)
 import Control.Monad.Except (throwError)
 import Control.Monad.State (StateT, evalStateT, get, modify, put)
 import Data.Bifunctor (first)
+import Data.Digit.Binary (parseBinary)
+import Data.Digit.D0 (parse0)
+import Data.Digit.Decimal (parseDecimal, parseDecimalNoZero)
 import Data.Digit.HeXaDeCiMaL (parseHeXaDeCiMaL)
 import Data.Digit.Octal (parseOctal)
 import Data.FingerTree (FingerTree, Measured(..))
 import Data.Foldable (asum)
-import Data.List.NonEmpty (NonEmpty(..))
+import Data.List.NonEmpty (NonEmpty(..), some1)
 import Data.Monoid (Sum(..))
 import Data.Semigroup ((<>))
 import Data.Sequence ((!?), (|>), Seq)
-import Text.Parser.LookAhead (LookAheadParsing, lookAhead)
+import Data.These (These(..))
 import Text.Trifecta
   ( CharParsing, DeltaParsing, Caret, Careted(..), char, careted, noneOf
   , digit, string, manyTill, parseString, satisfy, try
@@ -36,8 +40,22 @@ import Language.Python.Internal.Token (PyToken(..), pyTokenAnn)
 
 parseNewline :: CharParsing m => m Newline
 parseNewline =
-  LF <$ char '\n' <|>
-  char '\r' *> (CRLF <$ char '\n' <|> pure CR)
+  LF Nothing <$ char '\n' <|> char '\r' *>
+  (CRLF Nothing <$ char '\n' <|> pure (CR Nothing))
+
+parseCommentNewline :: (CharParsing m, Monad m) => m (Caret -> PyToken Caret)
+parseCommentNewline = do
+  n <- optional (char '#' *> many (noneOf "\r\n"))
+  case n of
+    Nothing ->
+      TkNewline <$>
+      (LF Nothing <$ char '\n' <|> char '\r' *>
+       (CRLF Nothing <$ char '\n' <|> pure (CR Nothing)))
+    Just c ->
+      fmap TkNewline
+      ((LF (Just $ Comment c) <$ char '\n' <|> char '\r' *>
+       (CRLF (Just $ Comment c) <$ char '\n' <|> pure (CR . Just $ Comment c)))) <|>
+      pure (TkComment c)
 
 stringOrBytesPrefix :: CharParsing m => m (Either StringPrefix BytesPrefix)
 stringOrBytesPrefix =
@@ -119,7 +137,67 @@ stringChar =
     hexChar = Char_hex <$ char 'x' <*> parseHeXaDeCiMaL <*> parseHeXaDeCiMaL
     octChar = Char_octal <$ char 'o' <*> parseOctal <*> parseOctal
 
-parseToken :: (DeltaParsing m, LookAheadParsing m) => m (PyToken Caret)
+number :: DeltaParsing m => m (a -> PyToken a)
+number = do
+  zero <- optional parse0
+  case zero of
+    Nothing -> do
+      nn <- optional $ (:|) <$> parseDecimalNoZero <*> many parseDecimal
+      case nn of
+        Just n ->
+          (\x ann -> case x of
+             Nothing -> TkInt $ IntLiteralDec ann n
+             Just (Left e) -> TkFloat $ FloatLiteralFull ann n (Just (That e))
+             Just (Right (a, b)) ->
+               TkFloat . FloatLiteralFull ann n $
+               case (a, b) of
+                 (Nothing, Nothing) -> Nothing
+                 (Just x, Nothing) -> Just $ This x
+                 (Nothing, Just x) -> Just $ That x
+                 (Just x, Just y) -> Just $ These x y) <$>
+          optional
+            (char '.' *>
+             (Left <$> floatExp <|>
+              fmap Right ((,) <$> optional (some1 parseDecimal) <*> optional floatExp)))
+        Nothing ->
+          (\a b ann -> TkFloat $ FloatLiteralPoint ann a b) <$>
+          -- try is necessary here to prevent the intercepting of dereference tokens
+          try (char '.' *> some1 parseDecimal) <*>
+          optional floatExp
+    Just z ->
+      (\xX a b -> TkInt (IntLiteralHex b xX a)) <$>
+      (True <$ char 'X' <|> False <$ char 'x') <*>
+      some1 parseHeXaDeCiMaL
+      <|>
+      (\bB a b -> TkInt (IntLiteralBin b bB a)) <$>
+      (True <$ char 'B' <|> False <$ char 'b') <*>
+      some1 parseBinary
+      <|>
+      (\oO a b -> TkInt (IntLiteralOct b oO a)) <$>
+      (True <$ char 'O' <|> False <$ char 'o') <*>
+      some1 parseOctal
+      <|>
+      (\n a -> TkInt (IntLiteralDec a (z :| n))) <$>
+      try (many parse0 <* notFollowedBy (char '.' <|> digit))
+      <|>
+      (\n' a b ann ->
+        TkFloat . FloatLiteralFull ann (z :| n') $
+        case (a, b) of
+          (Nothing, Nothing) -> Nothing
+          (Just x, Nothing) -> Just $ This x
+          (Nothing, Just x) -> Just $ That x
+          (Just x, Just y) -> Just $ These x y) <$>
+      many parseDecimal <* char '.' <*>
+      optional (some1 parseDecimal) <*>
+      optional floatExp
+  where
+    floatExp =
+      FloatExponent <$>
+      (True <$ char 'E' <|> False <$ char 'e') <*>
+      optional (Pos <$ char '+' <|> Neg <$ char '-') <*>
+      some1 parseDecimal
+
+parseToken :: DeltaParsing m => m (PyToken Caret)
 parseToken =
   fmap (\(f :^ sp) -> f sp) . careted $
   asum @[] $
@@ -144,6 +222,7 @@ parseToken =
     , TkNot <$ string "not"
     , TkGlobal <$ string "global"
     , TkDel <$ string "del"
+    , TkLambda <$ string "lambda"
     , TkImport <$ string "import"
     , TkFrom <$ string "from"
     , TkAs <$ string "as"
@@ -152,16 +231,14 @@ parseToken =
     , TkExcept <$ string "except"
     , TkFinally <$ string "finally"
     , TkClass <$ string "class"
+    , TkWith <$ string "with"
     , TkFor <$ string "for"
     , TkIn <$ string "in"
     , TkYield <$ string "yield"
     ] <>
-    [ (\a b -> maybe (TkInt a) (TkFloat a) b) <$>
-        fmap read (some digit) <*>
-        optional (char '.' *> optional (read <$> some digit))
+    [ number
     , TkSpace <$ char ' '
     , TkTab <$ char '\t'
-    , TkNewline <$> parseNewline
     , TkLeftBracket <$ char '['
     , TkRightBracket <$ char ']'
     , TkLeftParen <$ char '('
@@ -189,16 +266,16 @@ parseToken =
     , char '^' *> (TkCaretEq <$ char '=' <|> pure TkCaret)
     , char '|' *> (TkPipeEq <$ char '=' <|> pure TkPipe)
     , char '&' *> (TkAmpersandEq <$ char '=' <|> pure TkAmpersand)
-    , TkAtEq <$ string "@="
+    , char '@' *> (TkAtEq <$ char '=' <|> pure TkAt)
     , char '+' *> (TkPlusEq <$ char '=' <|> pure TkPlus)
     , char '-' *> (TkMinusEq <$ char '=' <|> pure TkMinus)
     , char '%' *> (TkPercentEq <$ char '=' <|> pure TkPercent)
+    , TkTilde <$ char '~'
     , TkContinued <$ char '\\' <*> parseNewline
     , TkColon <$ char ':'
     , TkSemicolon <$ char ';'
     , do
-        sp <- optional . try $ stringOrBytesPrefix <* lookAhead (char '"')
-        char '"'
+        sp <- try $ optional stringOrBytesPrefix <* char '"'
         case sp of
           Nothing ->
             TkString Nothing DoubleQuote LongString <$
@@ -219,8 +296,7 @@ parseToken =
             <|>
             TkBytes prefix DoubleQuote ShortString <$> manyTill stringChar (char '"')
     , do
-        sp <- optional . try $ stringOrBytesPrefix <* lookAhead (char '\'')
-        char '\''
+        sp <- try $ optional stringOrBytesPrefix <* char '\''
         case sp of
           Nothing ->
             TkString Nothing SingleQuote LongString <$
@@ -240,9 +316,7 @@ parseToken =
             manyTill stringChar (string "'''")
             <|>
             TkBytes prefix SingleQuote ShortString <$> manyTill stringChar (char '\'')
-    , TkComment <$
-      char '#' <*>
-      many (noneOf "\r\n")
+    , parseCommentNewline
     , TkComma <$ char ','
     , TkDot <$ char '.'
     , fmap TkIdent $
@@ -252,7 +326,7 @@ parseToken =
     ]
 
 tokenize :: String -> Trifecta.Result [PyToken Caret]
-tokenize = parseString (many parseToken) mempty
+tokenize = parseString (many parseToken <* Trifecta.eof) mempty
 
 data LogicalLine a
   = LogicalLine

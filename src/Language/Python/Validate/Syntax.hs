@@ -10,7 +10,7 @@
 module Language.Python.Validate.Syntax where
 
 import Control.Applicative ((<|>), liftA2)
-import Control.Lens.Cons (_Cons)
+import Control.Lens.Cons (_Cons, snoc)
 import Control.Lens.Fold ((^..), (^?), folded, toListOf)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Prism (_Right)
@@ -29,6 +29,7 @@ import Data.Foldable (toList, traverse_)
 import Data.Bitraversable (bitraverse)
 import Data.Functor.Compose (Compose(..))
 import Data.List (intersect, union)
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (isJust)
 import Data.Semigroup (Semigroup(..))
 import Data.Type.Set (Nub, Member)
@@ -148,9 +149,17 @@ validateWhitespace ann ws =
   syntaxContext `bindValidateSyntax` \ctxt ->
   if _inParens ctxt
   then pure ws
-  else if any (\case; Newline _ -> True; _ -> False) ws
+  else if any (\case; Newline{} -> True; _ -> False) ws
   then syntaxErrors [_UnexpectedNewline # ann]
+  else if continuedBad ws
+  then syntaxErrors [_CommentAfterBackslash # ann]
   else pure ws
+  where
+    continuedBad :: Foldable f => f Whitespace -> Bool
+    continuedBad =
+      any $ \case
+        Continued a ws -> isJust (_commentBefore a) || continuedBad ws
+        _ -> False
 
 validateComprehensionSyntax
   :: ( AsSyntaxError e v a
@@ -227,6 +236,25 @@ validateExprSyntax
      )
   => Expr v a
   -> ValidateSyntax e (Expr (Nub (Syntax ': v)) a)
+validateExprSyntax (Lambda a b c d e) =
+  let
+    paramIdents = c ^.. folded.unvalidated.paramName.identValue
+  in
+    Lambda a <$>
+    validateWhitespace a b <*>
+    validateParamsSyntax c <*>
+    validateWhitespace a d <*>
+    localSyntaxContext
+      (\ctxt ->
+          ctxt
+          { _inLoop = False
+          , _inFunction =
+              fmap
+                (`union` paramIdents)
+                (_inFunction ctxt) <|>
+              Just paramIdents
+          })
+      (validateExprSyntax e)
 validateExprSyntax (Yield a b c) =
   Yield a <$>
   validateWhitespace a b <*
@@ -262,7 +290,7 @@ validateExprSyntax (Parens a ws1 e ws2) =
   localSyntaxContext (inParens .~ True) (validateExprSyntax e) <*>
   validateWhitespace a ws2
 validateExprSyntax (Bool a b ws) = pure $ Bool a b ws
-validateExprSyntax (Negate a ws expr) = Negate a ws <$> validateExprSyntax expr
+validateExprSyntax (UnOp a op expr) = UnOp a op <$> validateExprSyntax expr
 validateExprSyntax (String a strLits) =
   if
     all (\case; StringLiteral{} -> True; _ -> False) strLits ||
@@ -272,6 +300,7 @@ validateExprSyntax (String a strLits) =
   else
     syntaxErrors [_Can'tJoinStringAndBytes # a]
 validateExprSyntax (Int a n ws) = pure $ Int a n ws
+validateExprSyntax (Float a n ws) = pure $ Float a n ws
 validateExprSyntax (Ident a name) = Ident a <$> validateIdent name
 validateExprSyntax (List a ws1 exprs ws2) =
   List a ws1 <$>
@@ -335,12 +364,36 @@ validateSuiteSyntax
      )
   => Suite v a
   -> ValidateSyntax e (Suite (Nub (Syntax ': v)) a)
-validateSuiteSyntax (Suite a b c d e) =
-  Suite a <$>
+validateSuiteSyntax (SuiteMany a b c e) =
+  SuiteMany a <$>
   validateWhitespace a b <*>
   pure c <*>
-  pure d <*>
   validateBlockSyntax e
+validateSuiteSyntax (SuiteOne a b c d) =
+  SuiteOne a <$>
+  validateWhitespace a b <*>
+  validateSmallStatementSyntax c <*>
+  pure d
+
+validateDecoratorSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => Decorator v a
+  -> ValidateSyntax e (Decorator (Nub (Syntax ': v)) a)
+validateDecoratorSyntax (Decorator a b c d e) =
+  Decorator a b <$>
+  validateWhitespace a c <*>
+  isDecoratorValue d <*>
+  pure e
+  where
+    isDecoratorValue e@Ident{} = pure $ coerce e
+    isDecoratorValue e@(Call _ a _ _ _) | someDerefs a = pure $ coerce e
+      where
+        someDerefs Ident{} = True
+        someDerefs (Deref _ a _ _) = someDerefs a
+        someDerefs _ = False
+    isDecoratorValue _ = syntaxErrors [_MalformedDecorator # a]
 
 validateCompoundStatementSyntax
   :: ( AsSyntaxError e v a
@@ -348,11 +401,12 @@ validateCompoundStatementSyntax
      )
   => CompoundStatement v a
   -> ValidateSyntax e (CompoundStatement (Nub (Syntax ': v)) a)
-validateCompoundStatementSyntax (Fundef idnts a ws1 name ws2 params ws3 body) =
+validateCompoundStatementSyntax (Fundef a decos idnts ws1 name ws2 params ws3 body) =
   let
     paramIdents = params ^.. folded.unvalidated.paramName.identValue
   in
-    Fundef idnts a ws1 <$>
+    (\decos' -> Fundef a decos' idnts ws1) <$>
+    traverse validateDecoratorSyntax decos <*>
     validateIdent name <*>
     pure ws2 <*>
     validateParamsSyntax params <*>
@@ -430,8 +484,9 @@ validateCompoundStatementSyntax (For idnts a b c d e h i) =
        validateWhitespace a x <*>
        validateSuiteSyntax w)
     i
-validateCompoundStatementSyntax (ClassDef idnts a b c d g) =
-  ClassDef idnts a <$>
+validateCompoundStatementSyntax (ClassDef a decos idnts b c d g) =
+  (\decos' -> ClassDef a decos' idnts) <$>
+  traverse validateDecoratorSyntax decos <*>
   validateWhitespace a b <*>
   validateIdent c <*>
   traverse
@@ -444,6 +499,17 @@ validateCompoundStatementSyntax (ClassDef idnts a b c d g) =
        validateWhitespace a z)
     d <*>
   validateSuiteSyntax g
+validateCompoundStatementSyntax (With a b c d e) =
+  With a b c <$>
+  traverse
+    (\(WithItem a b c) ->
+        WithItem a <$>
+        validateExprSyntax b <*>
+        traverse
+          (\(ws, b) -> (,) <$> validateWhitespace a ws <*> validateExprSyntax b)
+          c)
+    d <*>
+  validateSuiteSyntax e
 
 validateExceptAsSyntax
   :: ( AsSyntaxError e v a
@@ -526,20 +592,31 @@ validateSmallStatementSyntax (Return a ws expr) =
 validateSmallStatementSyntax (Expr a expr) =
   Expr a <$>
   validateExprSyntax expr
-validateSmallStatementSyntax (Assign a lvalue ws2 rvalue) =
+validateSmallStatementSyntax (Assign a lvalue rs) =
   syntaxContext `bindValidateSyntax` \sctxt ->
     let
       assigns =
         if isJust (_inFunction sctxt)
-        then lvalue ^.. unvalidated.assignTargets.identValue
+        then
+          (lvalue : (snd <$> NonEmpty.init rs)) ^..
+          folded.unvalidated.assignTargets.identValue
         else []
     in
-      (Assign a <$>
+      Assign a <$>
       (if canAssignTo lvalue
         then validateExprSyntax lvalue
         else syntaxErrors [_CannotAssignTo # (a, lvalue)]) <*>
-      pure ws2 <*>
-      validateExprSyntax rvalue) <*
+      ((\a b -> case a of; [] -> pure b; a : as -> a :| (snoc as b)) <$>
+       traverse
+         (\(ws, b) ->
+            (,) <$>
+            validateWhitespace a ws <*>
+            (if canAssignTo b
+              then validateExprSyntax lvalue
+              else syntaxErrors [_CannotAssignTo # (a, b)]))
+         (NonEmpty.init rs) <*>
+       (\(ws, b) -> (,) <$> validateWhitespace a ws <*> validateExprSyntax b)
+         (NonEmpty.last rs)) <*
       modifyNonlocals (assigns ++)
 validateSmallStatementSyntax (AugAssign a lvalue aa rvalue) =
   AugAssign a <$>
@@ -603,7 +680,7 @@ validateStatementSyntax (SmallStatements idnts s ss sc nl) =
 
 canAssignTo :: Expr v a -> Bool
 canAssignTo None{} = False
-canAssignTo Negate{} = False
+canAssignTo UnOp{} = False
 canAssignTo Int{} = False
 canAssignTo Call{} = False
 canAssignTo BinOp{} = False

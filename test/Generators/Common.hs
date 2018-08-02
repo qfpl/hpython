@@ -5,8 +5,14 @@ import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
+import Control.Lens.Fold ((^?!))
+import Control.Lens.Prism (_Right)
+import Control.Monad ((<=<))
+import Data.Digit.Enum (enumDecimal)
 import Data.Digit.HeXaDeCiMaL
+import Data.Digit.Integral
 import Data.List.NonEmpty (NonEmpty(..))
+import Data.These (These(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax
@@ -17,25 +23,157 @@ whitespaceSize Tab = 1
 whitespaceSize (Continued _ ws) = 1 + sum (fmap whitespaceSize ws)
 whitespaceSize (Newline _) = 1
 
-genSuite :: MonadGen m => m (Block '[] ()) -> m (Suite '[] ())
-genSuite gb =
-  Suite () <$>
-  genWhitespaces <*>
-  Gen.maybe genComment <*>
-  genNewline <*>
-  gb
+genSuite :: MonadGen m => m (SmallStatement '[] ()) -> m (Block '[] ()) -> m (Suite '[] ())
+genSuite gss gb =
+  Gen.choice
+  [ SuiteMany () <$>
+    genWhitespaces <*>
+    genNewline <*>
+    gb
+  , SuiteOne () <$>
+    genWhitespaces <*>
+    gss <*>
+    genNewline
+  ]
+
+genUnOp :: MonadGen m => m (UnOp ())
+genUnOp =
+  Gen.element [Negate (), Positive (), Complement ()] <*>
+  genWhitespaces
+
+integralHeXaDeCiMaL'
+  :: (MonadGen m, Integral a)
+  => a
+  -> m HeXDigit
+integralHeXaDeCiMaL' 0 = pure HeXDigit0
+integralHeXaDeCiMaL' 1 = pure HeXDigit1
+integralHeXaDeCiMaL' 2 = pure HeXDigit2
+integralHeXaDeCiMaL' 3 = pure HeXDigit3
+integralHeXaDeCiMaL' 4 = pure HeXDigit4
+integralHeXaDeCiMaL' 5 = pure HeXDigit5
+integralHeXaDeCiMaL' 6 = pure HeXDigit6
+integralHeXaDeCiMaL' 7 = pure HeXDigit7
+integralHeXaDeCiMaL' 8 = pure HeXDigit8
+integralHeXaDeCiMaL' 9 = pure HeXDigit9
+integralHeXaDeCiMaL' 10 = Gen.element [ HeXDigita, HeXDigitA ]
+integralHeXaDeCiMaL' 11 = Gen.element [ HeXDigitb, HeXDigitB ]
+integralHeXaDeCiMaL' 12 = Gen.element [ HeXDigitc, HeXDigitC ]
+integralHeXaDeCiMaL' 13 = Gen.element [ HeXDigitd, HeXDigitD ]
+integralHeXaDeCiMaL' 14 = Gen.element [ HeXDigite, HeXDigitE ]
+integralHeXaDeCiMaL' 15 = Gen.element [ HeXDigitf, HeXDigitF ]
+integralHeXaDeCiMaL' _ = Gen.discard
+
+integralHeXDigits
+  :: (MonadGen m, Integral a)
+  => a
+  -> m (Either (NonEmpty HeXDigit) (NonEmpty HeXDigit))
+integralHeXDigits n =
+  if n >= 0
+  then Right . NonEmpty.fromList <$> go n []
+  else Left . NonEmpty.fromList <$> go (-n - 1) []
+  where
+    go k =
+      let
+        (q, r) = quotRem k 16
+      in
+        (if q == 0 then pure else go q) <=< (\rest -> (: rest) <$> integralHeXaDeCiMaL' r)
 
 genSmallInt :: MonadGen m => m (Expr '[] ())
-genSmallInt =
+genSmallInt = do
+  n <- Gen.integral (Range.constant 0 100)
   Int () <$>
-  Gen.integral (Range.constant 0 100) <*>
+    Gen.choice
+    [ pure $ IntLiteralDec () (integralDecDigits n ^?! _Right)
+    , IntLiteralBin () <$> Gen.bool <*> pure (integralBinDigits n ^?! _Right)
+    , IntLiteralOct () <$> Gen.bool <*> pure (integralOctDigits n ^?! _Right)
+    , IntLiteralHex () <$> Gen.bool <*> ((^?! _Right) <$> integralHeXDigits n)
+    ] <*>
+    genWhitespaces
+
+genInt :: MonadGen m => m (Expr '[] ())
+genInt = do
+  n <- Gen.integral (Range.constant (-2^32) (2^32))
+  let
+    f = if n < 0 then (\a -> UnOp () <$> (Negate () <$> genWhitespaces) <*> a) else id
+    n' = if n < 0 then -n - 1 else n
+  f $
+    Int () <$>
+    Gen.choice
+      [ pure $ IntLiteralDec () (integralDecDigits n' ^?! _Right)
+      , IntLiteralBin () <$> Gen.bool <*> pure (integralBinDigits n' ^?! _Right)
+      , IntLiteralOct () <$> Gen.bool <*> pure (integralOctDigits n' ^?! _Right)
+      , IntLiteralHex () <$> Gen.bool <*> ((^?! _Right) <$> integralHeXDigits n')
+      ] <*>
+    genWhitespaces
+
+genSmallFloat :: MonadGen m => m (Expr '[] ())
+genSmallFloat =
+  Float () <$>
+  Gen.choice
+    [ FloatLiteralFull () <$>
+      genDecs <*>
+      Gen.maybe
+        (Gen.choice
+           [ This <$> genDecs
+           , That <$> floatExponent
+           , These <$> genDecs <*> floatExponent
+           ])
+    , FloatLiteralPoint () <$>
+      genDecs <*>
+      Gen.maybe floatExponent
+    ] <*>
   genWhitespaces
+  where
+    genDecs = Gen.nonEmpty (Range.constant 1 3) (Gen.element enumDecimal)
+    floatExponent =
+      FloatExponent <$>
+      Gen.bool <*>
+      Gen.maybe (Gen.element [Pos, Neg]) <*>
+      genDecs
+
+genFloat :: MonadGen m => m (Expr '[] ())
+genFloat =
+  Float () <$>
+  Gen.choice
+    [ FloatLiteralFull () <$>
+      genDecs <*>
+      Gen.maybe
+        (Gen.choice
+           [ This <$> genDecs
+           , That <$> floatExponent
+           , These <$> genDecs <*> floatExponent
+           ])
+    , FloatLiteralPoint () <$>
+      genDecs <*>
+      Gen.maybe floatExponent
+    ] <*>
+  genWhitespaces
+  where
+    genDecs = Gen.nonEmpty (Range.constant 1 10) (Gen.element enumDecimal)
+    floatExponent =
+      FloatExponent <$>
+      Gen.bool <*>
+      Gen.maybe (Gen.element [Pos, Neg]) <*>
+      genDecs
 
 genString :: MonadGen m => m PyChar -> m [PyChar]
 genString = Gen.list (Range.constant 0 50)
 
+genNewline' :: MonadGen m => m Newline
+genNewline' =
+  Gen.element
+    [ LF Nothing
+    , CR Nothing
+    , CRLF Nothing
+    ]
+
 genNewline :: MonadGen m => m Newline
-genNewline = Gen.element [LF, CR, CRLF]
+genNewline =
+  Gen.choice
+    [ LF <$> Gen.maybe genComment
+    , CR <$> Gen.maybe genComment
+    , CRLF <$> Gen.maybe genComment
+    ]
 
 genStringType :: MonadGen m => m StringType
 genStringType = Gen.element [ShortString, LongString]
@@ -57,7 +195,7 @@ genAnyWhitespace = Gen.sized $ \n ->
             n' <- Gen.integral (Range.constant 1 (n-1))
             Gen.resize n' $
               Continued <$>
-              genNewline <*>
+              genNewline' <*>
               genSizedWhitespace genAnyWhitespace
         ]
 
@@ -75,7 +213,7 @@ genNormalWhitespace = Gen.sized $ \n ->
             n' <- Gen.integral (Range.constant 1 (n-1))
             Gen.resize n' $
               Continued <$>
-              genNewline <*>
+              genNewline' <*>
               genSizedWhitespace genNormalWhitespace
         ]
 
@@ -128,7 +266,7 @@ genWhitespaces = do
       Gen.choice
       [ (Space :) <$> go (n-1)
       , (Tab :) <$> go (n-1)
-      , Gen.shrink (\_ -> [[Space]]) . fmap pure $ Continued <$> genNewline <*> go (n-1)
+      , Gen.shrink (\_ -> [[Space]]) . fmap pure $ Continued <$> genNewline' <*> go (n-1)
       ]
 
 genAnyWhitespaces :: MonadGen m => m [Whitespace]
@@ -141,7 +279,7 @@ genAnyWhitespaces = do
       Gen.choice
       [ (Space :) <$> go (n-1)
       , (Tab :) <$> go (n-1)
-      , Gen.shrink (\_ -> [[Space]]) . fmap pure $ Continued <$> genNewline <*> go (n-1)
+      , Gen.shrink (\_ -> [[Space]]) . fmap pure $ Continued <$> genNewline' <*> go (n-1)
       , (:) <$> (Newline <$> genNewline) <*> go (n-1)
       ]
 
@@ -154,7 +292,7 @@ genAnyWhitespaces1 = do
       Gen.choice
       [ pure $ pure Space
       , pure $ pure Tab
-      , fmap pure $ Continued <$> genNewline <*> pure []
+      , fmap pure $ Continued <$> genNewline' <*> pure []
       , fmap pure $ Newline <$> genNewline
       ]
     go n =
@@ -163,7 +301,7 @@ genAnyWhitespaces1 = do
       , (Tab `NonEmpty.cons`) <$> go (n-1)
       , fmap pure $
         Continued <$>
-        genNewline <*>
+        genNewline' <*>
         ((:) <$>
          Gen.choice
            [ pure Space
@@ -183,7 +321,7 @@ genWhitespaces1 = do
       Gen.choice
       [ (Space :) <$> go (n-1)
       , (Tab :) <$> go (n-1)
-      , fmap pure $ Continued <$> genNewline <*> go (n-1)
+      , fmap pure $ Continued <$> genNewline' <*> go (n-1)
       ]
 
 genNone :: MonadGen m => m (Expr '[] ())

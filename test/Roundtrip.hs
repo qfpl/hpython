@@ -12,6 +12,8 @@ import Hedgehog
 import System.FilePath ((</>))
 import Text.Trifecta (Caret)
 
+import qualified Data.Text.Lazy as Lazy
+
 import Language.Python.Internal.Parse (module_)
 import Language.Python.Internal.Render (showModule)
 import Language.Python.Validate.Indentation
@@ -28,10 +30,13 @@ roundtripTests =
   Group "Roundtrip tests" $
   (\name -> (fromString name, withTests 1 . withShrinks 1 $ doRoundtrip name)) <$>
   [ "weird.py"
+  , "weird2.py"
   , "django.py"
   , "test.py"
   , "ansible.py"
   , "comments.py"
+  , "pypy.py"
+  , "pypy2.py"
   ]
 
 doRoundtrip :: String -> Property
@@ -44,4 +49,4 @@ doRoundtrip name =
       Success res ->
         case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
           Failure errs' -> annotateShow (errs' :: [SyntaxError '[Indentation] Caret]) *> failure
-          Success _ -> showModule py === file
+          Success _ -> showModule py === Lazy.pack file

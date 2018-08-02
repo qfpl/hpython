@@ -27,6 +27,7 @@ instance Validated Block where
 instance Validated Ident where
 instance Validated Param where
 instance Validated Suite where
+instance Validated WithItem where
 
 data KeywordParam v a
   = MkKeywordParam
@@ -54,24 +55,26 @@ _Fundef
   :: Prism
        (Statement v a)
        (Statement '[] a)
-       ( Indents a
-       , a
+       ( a
+       , [Decorator v a]
+       , Indents a
        , NonEmpty Whitespace, Ident v a
        , [Whitespace], CommaSep (Param v a)
        , [Whitespace], Suite v a
        )
-       ( Indents a
-       , a
+       ( a
+       , [Decorator '[] a]
+       , Indents a
        , NonEmpty Whitespace, Ident '[] a
        , [Whitespace], CommaSep (Param '[] a)
        , [Whitespace], Suite '[] a
        )
 _Fundef =
   prism
-    (\(idnt, a, b, c, d, e, f, g) -> CompoundStatement (Fundef idnt a b c d e f g))
+    (\(idnt, a, b, c, d, e, f, g, h) -> CompoundStatement (Fundef idnt a b c d e f g h))
     (\case
-        (coerce -> CompoundStatement (Fundef idnt a b c d e f g)) ->
-          Right (idnt, a, b, c, d, e, f, g)
+        (coerce -> CompoundStatement (Fundef idnt a b c d e f g h)) ->
+          Right (idnt, a, b, c, d, e, f, g, h)
         (coerce -> a) -> Left a)
 
 _Call
@@ -106,21 +109,28 @@ class HasIndents s where
   _Indents :: Traversal' (s '[] a) (Indents a)
 
 instance HasIndents Statement where
-  _Indents f (SmallStatements idnt a b c d) =
-    (\idnt' -> SmallStatements idnt' a b c d) <$> f idnt
+  _Indents f (SmallStatements idnt a b c e) =
+    (\idnt' -> SmallStatements idnt' a b c e) <$> f idnt
   _Indents f (CompoundStatement c) = CompoundStatement <$> _Indents f c
 
 instance HasIndents Block where
   _Indents = _Statements._Indents
 
 instance HasIndents Suite where
-  _Indents f (Suite a b c d e) = Suite a b c d <$> _Indents f e
+  _Indents f (SuiteOne a b c d) = pure $ SuiteOne a b c d
+  _Indents f (SuiteMany a b c e) = SuiteMany a b c <$> _Indents f e
+
+instance HasIndents Decorator where
+  _Indents fun (Decorator a b c d e) =
+    (\b' -> Decorator a b' c d e) <$>
+    fun b
 
 instance HasIndents CompoundStatement where
   _Indents fun s =
     case s of
-      Fundef idnt a b c d e f g ->
-        (\idnt' -> Fundef idnt' a b c d e f) <$>
+      Fundef a decos idnt b c d e f g ->
+        (\decos' idnt' -> Fundef a decos' idnt' b c d e f) <$>
+        traverse (_Indents fun) decos <*>
         fun idnt <*>
         _Indents fun g
       If idnt a b c d elifs e ->
@@ -181,9 +191,14 @@ instance HasIndents CompoundStatement where
              fun idnt <*>
              _Indents fun b)
           g
-      ClassDef idnt a b c d e ->
-        (\idnt' -> ClassDef idnt' a b c d) <$>
+      ClassDef a decos idnt b c d e ->
+        (\decos' idnt' -> ClassDef a decos' idnt' b c d) <$>
+        traverse (_Indents fun) decos <*>
         fun idnt <*>
+        _Indents fun e
+      With a b c d e ->
+        (\a' -> With a' b c d) <$>
+        fun a <*>
         _Indents fun e
 
 class HasNewlines s where
@@ -195,13 +210,20 @@ instance HasNewlines Block where
     (traverse._Right._Newlines) f b
 
 instance HasNewlines Suite where
-  _Newlines f (Suite a b c d e) = Suite a b c <$> f d <*> _Newlines f e
+  _Newlines f (SuiteOne a b d e) = pure $ SuiteOne a b d e
+  _Newlines f (SuiteMany a b d e) = SuiteMany a b <$> f d <*> _Newlines f e
+
+instance HasNewlines Decorator where
+  _Newlines fun (Decorator a b c d e) =
+    Decorator a b c d <$> fun e
 
 instance HasNewlines CompoundStatement where
   _Newlines fun s =
     case s of
-      Fundef idnt ann ws1 name ws2 params ws3 s ->
-        Fundef idnt ann ws1 name ws2 params ws3 <$> _Newlines fun s
+      Fundef ann decos idnt ws1 name ws2 params ws3 s ->
+        (\decos' -> Fundef ann decos' idnt ws1 name ws2 params ws3) <$>
+        traverse (_Newlines fun) decos <*>
+        _Newlines fun s
       If idnt ann ws1 cond s elifs els ->
         If idnt ann ws1 cond <$>
         _Newlines fun s <*>
@@ -219,8 +241,11 @@ instance HasNewlines CompoundStatement where
         pure f <*> _Newlines fun g
       For idnt a b c d e f g ->
         For idnt a b c d e <$> _Newlines fun f <*> (traverse._3._Newlines) fun g
-      ClassDef idnt a b c d e ->
-        ClassDef idnt a b (coerce c) (coerce d) <$> _Newlines fun e
+      ClassDef a decos idnt b c d e ->
+        (\decos' -> ClassDef a decos' idnt b (coerce c) (coerce d)) <$>
+        traverse (_Newlines fun) decos <*>
+        _Newlines fun e
+      With a b c d e -> With a b c (coerce d) <$> _Newlines fun e
 
 instance HasNewlines Statement where
   _Newlines f (CompoundStatement c) =
@@ -241,6 +266,7 @@ assignTargets f e =
       (\b' d' -> Tuple a b' c d') <$>
       assignTargets f b <*>
       (traverse.traverse.assignTargets) f d
+    Lambda{} -> pure $ coerce e
     Yield{} -> pure $ coerce e
     YieldFrom{} -> pure $ coerce e
     Ternary{} -> pure $ coerce e
@@ -250,8 +276,9 @@ assignTargets f e =
     Call{} -> pure $ coerce e
     None{} -> pure $ coerce e
     BinOp{} -> pure $ coerce e
-    Negate{} -> pure $ coerce e
+    UnOp{} -> pure $ coerce e
     Int{} -> pure $ coerce e
+    Float{} -> pure $ coerce e
     Bool{} -> pure $ coerce e
     String{} -> pure $ coerce e
     Not{} -> pure $ coerce e

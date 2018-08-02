@@ -130,10 +130,11 @@ validateSuiteIndentation
   => Indents a
   -> Suite v a
   -> ValidateIndentation e (Suite (Nub (Indentation ': v)) a)
-validateSuiteIndentation idnt (Suite ann a b c d) =
-  Suite ann a b c <$
+validateSuiteIndentation idnt (SuiteMany ann a c d) =
+  SuiteMany ann a c <$
   setNextIndent GreaterThan (idnt ^. indentsValue) <*>
   validateBlockIndentation d
+validateSuiteIndentation idnt (SuiteOne ann a c d) = pure $ SuiteOne ann a (coerce c) d
 
 validateExprIndentation
   :: AsIndentationError e v a
@@ -162,12 +163,24 @@ validateExceptAsIndentation (ExceptAs ann e f) =
   validateExprIndentation e <*>
   pure (over (traverse._2) coerce f)
 
+validateDecoratorIndentation
+  :: AsIndentationError e v a
+  => Decorator v a
+  -> ValidateIndentation e (Decorator (Nub (Indentation ': v)) a)
+validateDecoratorIndentation (Decorator a b c d e) =
+  Decorator a <$>
+  checkIndent b <*>
+  pure c <*>
+  pure (coerce d) <*>
+  pure e
+
 validateCompoundStatementIndentation
   :: AsIndentationError e v a
   => CompoundStatement v a
   -> ValidateIndentation e (CompoundStatement (Nub (Indentation ': v)) a)
-validateCompoundStatementIndentation (Fundef idnt a ws1 name ws2 params ws3 s) =
-  (\idnt' params' -> Fundef idnt' a ws1 (coerce name) ws2 params' ws3) <$>
+validateCompoundStatementIndentation (Fundef a decos idnt ws1 name ws2 params ws3 s) =
+  (\decos' idnt' params' -> Fundef a decos' idnt' ws1 (coerce name) ws2 params' ws3) <$>
+  traverse validateDecoratorIndentation decos <*>
   checkIndent idnt <*>
   validateParamsIndentation params <*>
   validateSuiteIndentation idnt s
@@ -247,10 +260,15 @@ validateCompoundStatementIndentation (For idnt a b c d e h i) =
        checkIndent idnt2 <*>
        validateSuiteIndentation idnt b)
     i
-validateCompoundStatementIndentation (ClassDef idnt a b c d e) =
-  (\idnt' -> ClassDef idnt' a b (coerce c) (coerce d)) <$>
+validateCompoundStatementIndentation (ClassDef a decos idnt b c d e) =
+  (\decos' idnt' -> ClassDef a decos' idnt'  b (coerce c) (coerce d)) <$>
+  traverse validateDecoratorIndentation decos <*>
   checkIndent idnt <*>
   validateSuiteIndentation idnt e
+validateCompoundStatementIndentation (With idnt a b c d) =
+  (\idnt' -> With idnt' a b (coerce c)) <$>
+  checkIndent idnt <*>
+  validateSuiteIndentation idnt d
 
 validateStatementIndentation
   :: AsIndentationError e v a

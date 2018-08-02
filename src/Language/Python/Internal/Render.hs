@@ -1,6 +1,7 @@
 {-# language GeneralizedNewtypeDeriving, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language LambdaCase #-}
+{-# language OverloadedStrings #-}
 module Language.Python.Internal.Render
   ( -- * Common Functions
     showModule, showStatement, showExpr
@@ -13,8 +14,8 @@ module Language.Python.Internal.Render
   , renderIdent, renderComment, renderModuleName, renderDot, renderRelativeModuleName
   , renderImportAs, renderImportTargets, renderSmallStatement, renderCompoundStatement
   , renderBlock, renderIndent, renderIndents, renderExceptAs, renderArg, renderParam
-  , renderCompFor, renderCompIf, renderComprehension, renderBinOp, renderSubscript
-  , renderPyChars
+  , renderCompFor, renderCompIf, renderComprehension, renderBinOp, renderUnOp
+  , renderSubscript, renderPyChars
   )
 where
 
@@ -23,54 +24,67 @@ import Control.Lens.Wrapped (_Wrapped)
 import Control.Lens.Plated (transform)
 import Control.Lens.Review ((#))
 import Data.Bifoldable (bifoldMap)
-import Data.Digit.Char (charHeXaDeCiMaL, charOctal)
+import Data.Digit.Char (charHeXaDeCiMaL, charOctal, charBinary, charDecimal)
+import Data.DList (DList)
 import Data.Foldable (toList)
 import Data.Maybe (maybe)
 import Data.Semigroup (Semigroup(..))
+import Data.Text (Text)
+import Data.These (These(..))
+
+import qualified Data.DList as DList
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Text as Text
+import qualified Data.Text.Lazy as Lazy
+import qualified Data.Text.Lazy.Builder as Builder
 
 import Language.Python.Internal.Syntax
 import Language.Python.Internal.Token (PyToken(..))
 
 newtype RenderOutput
   = RenderOutput
-  { unRenderOutput :: [PyToken ()]
+  { unRenderOutput :: DList (PyToken ())
   } deriving (Eq, Show, Semigroup, Monoid)
 
 singleton :: PyToken () -> RenderOutput
-singleton a = RenderOutput [a]
+singleton a = RenderOutput $ DList.singleton a
 
 cons :: PyToken () -> RenderOutput -> RenderOutput
-cons a (RenderOutput b) = RenderOutput $ a : b
+cons a (RenderOutput b) = RenderOutput $ DList.cons a b
 infixr 5 `cons`
 
-showRenderOutput :: RenderOutput -> String
+showRenderOutput :: RenderOutput -> Lazy.Text
 showRenderOutput =
-  foldMap showToken .
+  Builder.toLazyText .
+  foldMap (Builder.fromText . showToken) .
   correctSpaces .
   correctNewlines .
+  DList.toList .
   unRenderOutput
   where
     correctSpaces =
       transform $
       \case
         a : b : rest
-          | isIdentifierChar (last $ showToken a)
-          , isIdentifierChar (head $ showToken b)
+          | isIdentifierChar (Text.last $ showToken a)
+          , isIdentifierChar (Text.head $ showToken b)
           -> a : TkSpace () : b : rest
         a@(TkString _ qt _ _ _) : b@(TkString _ qt' _ _ _) : rest
           | qt == qt' -> a : TkSpace () : b : rest
+        a@(TkFloat (FloatLiteralFull _ _ Nothing)) : b : rest
+          | isIdentifierChar (Text.head $ showToken b) -> a : TkSpace () : b : rest
         a -> a
 
     correctNewlines =
       transform $
       \case
-        TkNewline CR () : TkNewline LF () : rest ->
-          TkNewline CRLF () : TkNewline LF () : rest
-        TkContinued CR () : TkNewline LF () : rest ->
-          TkContinued CRLF () : TkNewline LF () : rest
+        TkNewline (CR cmt) () : TkNewline (LF cmt') () : rest ->
+          TkNewline (CRLF cmt) () : TkNewline (LF cmt') () : rest
+        TkContinued (CR cmt) () : TkNewline (LF cmt') () : rest ->
+          TkContinued (CRLF cmt) () : TkNewline (LF cmt') () : rest
         a -> a
 
-showStringPrefix :: StringPrefix -> String
+showStringPrefix :: StringPrefix -> Text
 showStringPrefix sp =
   case sp of
     Prefix_r -> "r"
@@ -78,7 +92,7 @@ showStringPrefix sp =
     Prefix_u -> "u"
     Prefix_U -> "U"
 
-showBytesPrefix :: BytesPrefix -> String
+showBytesPrefix :: BytesPrefix -> Text
 showBytesPrefix sp =
   case sp of
     Prefix_b -> "b"
@@ -92,13 +106,13 @@ showBytesPrefix sp =
     Prefix_Rb -> "Rb"
     Prefix_RB -> "RB"
 
-showQuoteType :: QuoteType -> String
+showQuoteType :: QuoteType -> Char
 showQuoteType qt =
   case qt of
-    DoubleQuote -> "\""
-    SingleQuote -> "\'"
+    DoubleQuote -> '\"'
+    SingleQuote -> '\''
 
-showToken :: PyToken a -> String
+showToken :: PyToken a -> Text
 showToken t =
   case t of
     TkIf{} -> "if"
@@ -121,6 +135,7 @@ showToken t =
     TkGlobal{} -> "global"
     TkNonlocal{} -> "nonlocal"
     TkDel{} -> "del"
+    TkLambda{} -> "lambda"
     TkImport{} -> "import"
     TkFrom{} -> "from"
     TkAs{} -> "as"
@@ -129,16 +144,18 @@ showToken t =
     TkExcept{} -> "except"
     TkFinally{} -> "finally"
     TkClass{} -> "class"
+    TkWith{} -> "with"
     TkFor{} -> "for"
     TkIn{} -> "in"
     TkYield{} -> "yield"
-    TkInt i _ -> show i
-    TkFloat i i' _ -> show i <> foldMap (("." <>) . show) i'
-    TkIdent s _ -> s
+    TkInt i -> renderIntLiteral i
+    TkFloat i -> renderFloatLiteral i
+    TkIdent s _ -> Text.pack s
     TkString sp qt st s _ ->
       let
         quote =
-          showQuoteType qt >>= (case st of; LongString -> replicate 3; ShortString -> pure)
+          Text.pack $
+          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
       in
         foldMap showStringPrefix sp <>
         quote <>
@@ -147,7 +164,8 @@ showToken t =
     TkBytes sp qt st s _ ->
       let
         quote =
-          showQuoteType qt >>= (case st of; LongString -> replicate 3; ShortString -> pure)
+          Text.pack $
+          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
       in
         showBytesPrefix sp <>
         quote <>
@@ -157,9 +175,9 @@ showToken t =
     TkTab{} -> "\t"
     TkNewline nl _ ->
       case nl of
-        CR -> "\r"
-        LF -> "\n"
-        CRLF -> "\r\n"
+        CR cmt -> foldMap (("#" <>) . renderComment) cmt <> "\r"
+        LF cmt -> foldMap (("#" <>) . renderComment) cmt <> "\n"
+        CRLF cmt -> foldMap (("#" <>) . renderComment) cmt <> "\r\n"
     TkLeftBracket{} -> "["
     TkRightBracket{} -> "]"
     TkLeftParen{} -> "("
@@ -176,16 +194,17 @@ showToken t =
     TkContinued nl _ ->
       "\\" <>
       case nl of
-        CR -> "\r"
-        LF -> "\n"
-        CRLF -> "\r\n"
+        CR cmt -> foldMap (("#" <>) . renderComment) cmt <> "\r"
+        LF cmt -> foldMap (("#" <>) . renderComment) cmt <> "\n"
+        CRLF cmt -> foldMap (("#" <>) . renderComment) cmt <> "\r\n"
     TkColon{} -> ":"
     TkSemicolon{} -> ";"
     TkComma{} -> ","
     TkDot{} -> "."
     TkPlus{} -> "+"
     TkMinus{} -> "-"
-    TkComment s _ -> "#" <> s
+    TkTilde{} -> "~"
+    TkComment s _ -> "#" <> Text.pack s
     TkStar{} -> "*"
     TkDoubleStar{} -> "**"
     TkSlash{} -> "/"
@@ -197,6 +216,7 @@ showToken t =
     TkMinusEq{} -> "-="
     TkStarEq{} -> "*="
     TkAtEq{} -> "@="
+    TkAt{} -> "@"
     TkSlashEq{} -> "/="
     TkPercentEq{} -> "%="
     TkAmpersandEq{} -> "&="
@@ -245,8 +265,8 @@ escapeChars =
   , ('\v', 'v')
   ]
 
-intToHex :: Int -> String
-intToHex n = go n []
+intToHex :: Int -> Text
+intToHex n = Text.pack $ go n []
   where
     go 0 = (++"0")
     go 1 = (++"1")
@@ -266,8 +286,8 @@ intToHex n = go n []
     go 15 = (++"F")
     go b = let (q, r) = quotRem b 16 in go r . go q
 
-renderPyChars :: QuoteType -> StringType -> [PyChar] -> String
-renderPyChars qt st = go
+renderPyChars :: QuoteType -> StringType -> [PyChar] -> Text
+renderPyChars qt st = Text.pack . go
   where
     endSingleQuotesShort =
       snd .
@@ -437,12 +457,13 @@ renderCommaSep1' f (CommaSepMany1' a ws2 c) =
 renderIdent :: Ident v a -> RenderOutput
 renderIdent (MkIdent _ a b) = TkIdent a () `cons` foldMap renderWhitespace b
 
-renderComment :: Comment -> PyToken ()
-renderComment (Comment s) = TkComment s ()
+renderComment :: Comment -> Text
+renderComment (Comment s) = Text.pack s
 
-bracketTernary :: (Expr v a -> RenderOutput) -> Expr v a -> RenderOutput
-bracketTernary _ e@Ternary{} = bracket $ renderExpr e
-bracketTernary f e = f e
+bracketTernaryLambda :: (Expr v a -> RenderOutput) -> Expr v a -> RenderOutput
+bracketTernaryLambda _ e@Ternary{} = bracket $ renderExpr e
+bracketTernaryLambda _ e@Lambda{} = bracket $ renderExpr e
+bracketTernaryLambda f e = f e
 
 renderCompFor :: CompFor v a -> RenderOutput
 renderCompFor (CompFor _ ws1 ex1 ws2 ex2) =
@@ -451,13 +472,13 @@ renderCompFor (CompFor _ ws1 ex1 ws2 ex2) =
   bracketGenerator ex1 <>
   singleton (TkIn ()) <>
   foldMap renderWhitespace ws2 <>
-  bracketTernary bracketTupleGenerator ex2
+  bracketTernaryLambda bracketTupleGenerator ex2
 
 renderCompIf :: CompIf v a -> RenderOutput
 renderCompIf (CompIf _ ws ex) =
   TkIf () `cons`
   foldMap renderWhitespace ws <>
-  bracketTernary bracketTupleGenerator ex
+  bracketTernaryLambda bracketTupleGenerator ex
 
 renderComprehension :: Comprehension v a -> RenderOutput
 renderComprehension (Comprehension _ expr cf cs) =
@@ -471,6 +492,42 @@ renderDictItem (DictItem _ a b c) =
   singleton (TkColon ()) <>
   foldMap renderWhitespace b <>
   bracketTupleGenerator c
+
+renderIntLiteral :: IntLiteral a -> Text
+renderIntLiteral (IntLiteralDec _ n) =
+  Text.pack $
+  (charDecimal #) <$> NonEmpty.toList n
+renderIntLiteral (IntLiteralBin _ b n) =
+  Text.pack $
+  '0' : (if b then 'B' else 'b') : fmap (charBinary #) (NonEmpty.toList n)
+renderIntLiteral (IntLiteralOct _ b n) =
+  Text.pack $
+  '0' : (if b then 'O' else 'o') : fmap (charOctal #) (NonEmpty.toList n)
+renderIntLiteral (IntLiteralHex _ b n) =
+  Text.pack $
+  '0' : (if b then 'X' else 'x') : fmap (charHeXaDeCiMaL #) (NonEmpty.toList n)
+
+renderFloatExponent :: FloatExponent -> Text
+renderFloatExponent (FloatExponent e s ds) =
+  Text.pack $
+  (if e then 'E' else 'e') :
+  foldMap (\case; Pos -> "+"; Neg -> "-") s <>
+  fmap (charDecimal #) (NonEmpty.toList ds)
+
+renderFloatLiteral :: FloatLiteral a -> Text
+renderFloatLiteral (FloatLiteralFull _ a b) =
+  Text.pack (fmap (charDecimal #) (NonEmpty.toList a) <> ".") <>
+  foldMap
+    (\case
+       This x -> Text.pack $ fmap (charDecimal #) (NonEmpty.toList x)
+       That x -> renderFloatExponent x
+       These x y ->
+         Text.pack (fmap (charDecimal #) (NonEmpty.toList x)) <>
+         renderFloatExponent y)
+    b
+renderFloatLiteral (FloatLiteralPoint _ a b) =
+  Text.pack ('.' : fmap (charDecimal #) (NonEmpty.toList a)) <>
+  foldMap renderFloatExponent b
 
 renderStringLiteral :: StringLiteral a -> RenderOutput
 renderStringLiteral (StringLiteral _ a b c d e) =
@@ -507,14 +564,20 @@ renderYield re (YieldFrom _ a b c) =
 renderYield re e = re e
 
 renderExpr :: Expr v a -> RenderOutput
+renderExpr (Lambda _ a b c d) =
+  TkLambda () `cons`
+  foldMap renderWhitespace a <>
+  renderCommaSep renderParam b <>
+  singleton (TkColon ()) <> foldMap renderWhitespace c <>
+  bracketTupleGenerator d
 renderExpr e@Yield{} = bracket $ renderYield renderExpr e
-renderExpr e@YieldFrom{} = bracket $ renderYield renderExpr e
+renderExpr e@YieldFrom{} = bracket $ renderYield bracketTupleGenerator e
 renderExpr (Ternary _ a b c d e) =
   (case a of
      Generator{} -> bracket $ renderExpr a
      _ -> bracketTupleGenerator a) <>
   singleton (TkIf ()) <> foldMap renderWhitespace b <>
-  bracketTernary bracketTupleGenerator c <>
+  bracketTernaryLambda bracketTupleGenerator c <>
   singleton (TkElse ()) <> foldMap renderWhitespace d <>
   bracketTupleGenerator e
 renderExpr (Subscript _ a b c d) =
@@ -522,6 +585,7 @@ renderExpr (Subscript _ a b c d) =
      BinOp{} -> bracket $ renderExpr a
      Not{} -> bracket $ renderExpr a
      Ternary{} -> bracket $ renderExpr a
+     Lambda{} -> bracket $ renderExpr a
      _ -> bracketTupleGenerator a) <>
   singleton (TkLeftBracket ()) <>
   foldMap renderWhitespace b <>
@@ -535,6 +599,7 @@ renderExpr (Not _ ws e) =
     BinOp _ _ BoolAnd{} _ -> bracket $ renderExpr e
     BinOp _ _ BoolOr{} _ -> bracket $ renderExpr e
     Ternary{} -> bracket $ renderExpr e
+    Lambda{} -> bracket $ renderExpr e
     _ -> bracketTupleGenerator e
 renderExpr (Parens _ ws1 e ws2) =
   bracket (foldMap renderWhitespace ws1 <> renderYield renderExpr e) <>
@@ -542,18 +607,19 @@ renderExpr (Parens _ ws1 e ws2) =
 renderExpr (Bool _ b ws) =
   (if b then TkTrue () else TkFalse ()) `cons`
   foldMap renderWhitespace ws
-renderExpr (Negate _ ws expr) =
-  TkMinus () `cons`
-  foldMap renderWhitespace ws <>
+renderExpr (UnOp _ op expr) =
+  renderUnOp op <>
   case expr of
     BinOp _ _ Exp{} _ -> bracketTupleGenerator expr
     BinOp{} -> bracket $ renderExpr expr
     Deref _ Int{} _ _ -> bracket $ renderExpr expr
     Not{} -> bracket $ renderExpr expr
     Ternary{} -> bracket $ renderExpr expr
+    Lambda{} -> bracket $ renderExpr expr
     _ -> bracketTupleGenerator expr
 renderExpr (String _ vs) = foldMap renderStringLiteral vs
-renderExpr (Int _ n ws) = TkInt n () `cons` foldMap renderWhitespace ws
+renderExpr (Int a n ws) = TkInt (() <$ n) `cons` foldMap renderWhitespace ws
+renderExpr (Float a n ws) = TkFloat (() <$ n) `cons` foldMap renderWhitespace ws
 renderExpr (Ident _ name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) =
   TkLeftBracket () `cons`
@@ -569,11 +635,12 @@ renderExpr (ListComp _ ws1 comp ws2) =
   singleton (TkRightBracket ()) <> foldMap renderWhitespace ws2
 renderExpr (Call _ expr ws args ws2) =
   (case expr of
-     Int _ n _ | n < 0 -> bracket $ renderExpr expr
+     UnOp{} -> bracket $ renderExpr expr
      BinOp{} -> bracket $ renderExpr expr
      Tuple{} -> bracket $ renderExpr expr
      Not{} -> bracket $ renderExpr expr
      Ternary{} -> bracket $ renderExpr expr
+     Lambda{} -> bracket $ renderExpr expr
      _ -> bracketGenerator expr) <>
   bracket (foldMap renderWhitespace ws <> foldMap renderArgs args) <>
   foldMap renderWhitespace ws2
@@ -583,17 +650,18 @@ renderExpr (Deref _ expr ws name) =
      BinOp{} -> bracket $ renderExpr expr
      Tuple{} -> bracket $ renderExpr expr
      Not{} -> bracket $ renderExpr expr
-     Negate{} -> bracket $ renderExpr expr
+     UnOp{} -> bracket $ renderExpr expr
      Ternary{} -> bracket $ renderExpr expr
+     Lambda{} -> bracket $ renderExpr expr
      _ -> bracketGenerator expr) <>
   singleton (TkDot ()) <>
   foldMap renderWhitespace ws <>
   renderIdent name
 renderExpr (None _ ws) = TkNone () `cons` foldMap renderWhitespace ws
 renderExpr (BinOp _ e1 op e2) =
-  (if shouldBracketLeft op e1 then bracket else id) (bracketTernary bracketGenerator e1) <>
+  (if shouldBracketLeft op e1 then bracket else id) (bracketTernaryLambda bracketGenerator e1) <>
   renderBinOp op <>
-  (if shouldBracketRight op e2 then bracket else id) (bracketTernary bracketGenerator e2)
+  (if shouldBracketRight op e2 then bracket else id) (bracketTernaryLambda bracketGenerator e2)
 renderExpr (Tuple _ a ws c) =
   bracketTupleGenerator a <> singleton (TkComma ()) <> foldMap renderWhitespace ws <>
   foldMap
@@ -682,9 +750,14 @@ renderSmallStatement (Raise _ ws x) =
 renderSmallStatement (Return _ ws expr) =
   TkReturn () `cons` foldMap renderWhitespace ws <> foldMap bracketGenerator expr
 renderSmallStatement (Expr _ expr) = renderYield bracketGenerator expr
-renderSmallStatement (Assign _ lvalue ws2 rvalue) =
-  renderExpr lvalue <> singleton (TkEq ()) <>
-  foldMap renderWhitespace ws2 <> renderYield bracketGenerator rvalue
+renderSmallStatement (Assign _ lvalue rvalues) =
+  renderExpr lvalue <>
+  foldMap
+    (\(ws2, rvalue) ->
+       TkEq () `cons`
+       foldMap renderWhitespace ws2 <>
+       renderYield bracketGenerator rvalue)
+    rvalues
 renderSmallStatement (AugAssign _ lvalue as rvalue) =
   renderExpr lvalue <> renderAugAssign as <> bracketGenerator rvalue
 renderSmallStatement (Pass _) = singleton $ TkPass ()
@@ -702,6 +775,7 @@ renderSmallStatement (Del _ ws vals) =
         BinOp{} -> bracket $ renderExpr a
         Not{} -> bracket $ renderExpr a
         Ternary{} -> bracket $ renderExpr a
+        Lambda{} -> bracket $ renderExpr a
         _ -> bracketTupleGenerator a)
     vals
 renderSmallStatement (Import _ ws ns) =
@@ -717,23 +791,35 @@ renderBlock :: Block v a -> RenderOutput
 renderBlock =
   foldMap
     (either
-       (\(x, y, z) ->
+       (\(x, z) ->
           foldMap renderWhitespace x <>
-          maybe mempty (singleton . renderComment) y
-          <> singleton (renderNewline z))
+          singleton (renderNewline z))
         renderStatement) .
   view _Wrapped
 
 renderSuite :: Suite v a -> RenderOutput
-renderSuite (Suite _ a b c d) =
+renderSuite (SuiteMany _ a c d) =
   TkColon () `cons`
   foldMap renderWhitespace a <>
-  foldMap (singleton . renderComment) b <>
   singleton (renderNewline c) <>
   renderBlock d
+renderSuite (SuiteOne _ a c d) =
+  TkColon () `cons`
+  foldMap renderWhitespace a <>
+  renderSmallStatement c <>
+  singleton (renderNewline d)
+
+renderDecorator :: Decorator v a -> RenderOutput
+renderDecorator (Decorator _ a b c d) =
+  renderIndents a <>
+  singleton (TkAt ()) <>
+  foldMap renderWhitespace b <>
+  renderExpr c <>
+  singleton (renderNewline d)
 
 renderCompoundStatement :: CompoundStatement v a -> RenderOutput
-renderCompoundStatement (Fundef idnt _ ws1 name ws2 params ws3 s) =
+renderCompoundStatement (Fundef _ decos idnt ws1 name ws2 params ws3 s) =
+  foldMap renderDecorator decos <>
   renderIndents idnt <>
   singleton (TkDef ()) <> foldMap renderWhitespace ws1 <> renderIdent name <>
   bracket (foldMap renderWhitespace ws2 <> renderCommaSep renderParam params) <>
@@ -801,7 +887,8 @@ renderCompoundStatement (For idnt _ a b c d s h) =
         singleton (TkElse ()) <> foldMap renderWhitespace x <>
         renderSuite s)
     h
-renderCompoundStatement (ClassDef idnt _ a b c s) =
+renderCompoundStatement (ClassDef _ decos idnt a b c s) =
+  foldMap renderDecorator decos <>
   renderIndents idnt <>
   singleton (TkClass ()) <> foldMap renderWhitespace a <>
   renderIdent b <>
@@ -813,6 +900,21 @@ renderCompoundStatement (ClassDef idnt _ a b c s) =
       foldMap renderWhitespace z)
     c <>
   renderSuite s
+renderCompoundStatement (With idnt _ a b s) =
+  renderIndents idnt <>
+  singleton (TkWith ()) <> foldMap renderWhitespace a <>
+  renderCommaSep1 renderWithItem b <>
+  renderSuite s
+
+renderWithItem :: WithItem v a -> RenderOutput
+renderWithItem (WithItem _ a b) =
+  bracketTupleGenerator a <>
+  foldMap
+    (\(c, d) -> 
+       singleton (TkAs ()) <>
+       foldMap renderWhitespace c <>
+       bracketTupleGenerator d)
+    b
 
 renderIndent :: Indent -> RenderOutput
 renderIndent (MkIndent ws) = foldMap renderWhitespace $ toList ws
@@ -868,6 +970,11 @@ renderParam (KeywordParam _ name ws2 expr) =
   renderIdent name <> singleton (TkEq ()) <>
   foldMap renderWhitespace ws2 <> bracketTupleGenerator expr
 
+renderUnOp :: UnOp a -> RenderOutput
+renderUnOp (Negate _ ws) = singleton (TkMinus ()) <> foldMap renderWhitespace ws
+renderUnOp (Positive _ ws) = singleton (TkPlus ()) <> foldMap renderWhitespace ws
+renderUnOp (Complement _ ws) = singleton (TkTilde ()) <> foldMap renderWhitespace ws
+
 renderBinOp :: BinOp a -> RenderOutput
 renderBinOp (Is _ ws) = TkIs () `cons` foldMap renderWhitespace ws
 renderBinOp (IsNot _ ws1 ws2) =
@@ -885,6 +992,8 @@ renderBinOp (Plus _ ws) = TkPlus () `cons` foldMap renderWhitespace ws
 renderBinOp (Minus _ ws) = TkMinus () `cons` foldMap renderWhitespace ws
 renderBinOp (Multiply _ ws) = TkStar () `cons` foldMap renderWhitespace ws
 renderBinOp (Divide _ ws) = TkSlash () `cons` foldMap renderWhitespace ws
+renderBinOp (FloorDivide _ ws) =
+  TkDoubleSlash () `cons` foldMap renderWhitespace ws
 renderBinOp (Exp _ ws) = TkDoubleStar () `cons` foldMap renderWhitespace ws
 renderBinOp (BoolAnd _ ws) = TkAnd () `cons` foldMap renderWhitespace ws
 renderBinOp (BoolOr _ ws) = TkOr () `cons` foldMap renderWhitespace ws
@@ -910,16 +1019,16 @@ renderModule (Module ms) =
     (either
        (\(a, b, c) ->
           renderIndents a <>
-          maybe mempty (singleton . renderComment) b <>
+          maybe mempty (\a -> singleton $ TkComment (Text.unpack $ renderComment a) ()) b <>
           maybe mempty (singleton . renderNewline) c)
        renderStatement)
     ms
 
-showModule :: Module v a -> String
+showModule :: Module v a -> Lazy.Text
 showModule = showRenderOutput . renderModule
 
-showStatement :: Statement v a -> String
+showStatement :: Statement v a -> Lazy.Text
 showStatement = showRenderOutput . renderStatement
 
-showExpr :: Expr v a -> String
+showExpr :: Expr v a -> Lazy.Text
 showExpr = showRenderOutput . bracketGenerator

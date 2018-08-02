@@ -8,7 +8,7 @@
 module Language.Python.Internal.Syntax.Statement where
 
 import Control.Lens.Getter ((^.), getting)
-import Control.Lens.Lens (Lens, Lens', lens)
+import Control.Lens.Lens (lens)
 import Control.Lens.Plated (Plated(..), gplate)
 import Control.Lens.Prism (_Just, _Right)
 import Control.Lens.Setter ((.~), over, mapped)
@@ -32,51 +32,12 @@ import Language.Python.Internal.Syntax.Whitespace
 class HasStatements s where
   _Statements :: Traversal (s v a) (s '[] a) (Statement v a) (Statement '[] a)
 
-data Param (v :: [*]) a
-  = PositionalParam
-  { _paramAnn :: a
-  , _paramName :: Ident v a
-  }
-  | KeywordParam
-  { _paramAnn :: a
-  , _paramName :: Ident v a
-  -- = spaces
-  , _unsafeKeywordParamWhitespaceRight :: [Whitespace]
-  , _unsafeKeywordParamExpr :: Expr v a
-  }
-  | StarParam
-  { _paramAnn :: a
-  -- '*' spaces
-  , _unsafeStarParamWhitespace :: [Whitespace]
-  , _paramName :: Ident v a
-  }
-  | DoubleStarParam
-  { _paramAnn :: a
-  -- '**' spaces
-  , _unsafeDoubleStarParamWhitespace :: [Whitespace]
-  , _paramName :: Ident v a
-  }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-
-paramAnn :: Lens' (Param v a) a
-paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
-
-paramName :: Lens (Param v a) (Param '[] a) (Ident v a) (Ident v a)
-paramName = lens _paramName (\s a -> coerce $ s { _paramName = a})
-
-instance HasExprs Param where
-  _Exprs f (KeywordParam a name ws2 expr) =
-    KeywordParam a (coerce name) <$> pure ws2 <*> f expr
-  _Exprs _ p@PositionalParam{} = pure $ coerce p
-  _Exprs _ p@StarParam{} = pure $ coerce p
-  _Exprs _ p@DoubleStarParam{} = pure $ coerce p
-
 newtype Block v a
   = Block
   { unBlock
     :: NonEmpty
          (Either
-            ([Whitespace], Maybe Comment, Newline)
+            ([Whitespace], Newline)
             (Statement v a))
   } deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -84,11 +45,12 @@ class HasBlocks s where
   _Blocks :: Traversal (s v a) (s '[] a) (Block v a) (Block '[] a)
 
 instance HasBlocks Suite where
-  _Blocks f (Suite a b c d e) = Suite a b c d <$> f e
+  _Blocks f (SuiteOne a b c d) = pure $ SuiteOne a b (coerce c) d
+  _Blocks f (SuiteMany a b c e) = SuiteMany a b c <$> f e
 
 instance HasBlocks CompoundStatement where
-  _Blocks f (Fundef idnt a ws1 name ws2 params ws3 s) =
-    Fundef idnt a ws1 (coerce name) ws2 (coerce params) ws3 <$> _Blocks f s
+  _Blocks f (Fundef a decos idnt ws1 name ws2 params ws3 s) =
+    Fundef a (coerce decos) idnt ws1 (coerce name) ws2 (coerce params) ws3 <$> _Blocks f s
   _Blocks f (If idnt a ws1 e1 s elifs b') =
     If idnt a ws1 (coerce e1) <$>
     _Blocks f s <*>
@@ -112,14 +74,16 @@ instance HasBlocks CompoundStatement where
     For idnt a b (coerce c) d (coerce e) <$>
     _Blocks fun f <*>
     (traverse._3._Blocks) fun g
-  _Blocks fun (ClassDef idnt a b c d e) =
-    ClassDef idnt a b (coerce c) (coerce d) <$> _Blocks fun e
+  _Blocks fun (ClassDef a decos idnt b c d e) =
+    ClassDef a (coerce decos) idnt b (coerce c) (coerce d) <$> _Blocks fun e
+  _Blocks fun (With a b c d e) = With a b c (coerce d) <$> _Blocks fun e
 
 instance HasStatements Block where
   _Statements = _Wrapped.traverse._Right
 
 instance HasStatements Suite where
-  _Statements f (Suite a b c d e) = Suite a b c d <$> _Statements f e
+  _Statements f (SuiteOne a b c d) = pure $ SuiteOne a b (coerce c) d
+  _Statements f (SuiteMany a b c e) = SuiteMany a b c <$> _Statements f e
 
 data Statement (v :: [*]) a
   = SmallStatements
@@ -127,7 +91,7 @@ data Statement (v :: [*]) a
       (SmallStatement v a)
       [([Whitespace], SmallStatement v a)]
       (Maybe [Whitespace])
-      (Maybe Newline)
+      (Either (Maybe Comment) Newline)
   | CompoundStatement
       (CompoundStatement v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
@@ -142,8 +106,8 @@ instance Plated (Statement '[] a) where
   plate fun (CompoundStatement s) =
     CompoundStatement <$>
     case s of
-      Fundef idnt a ws1 b ws2 c ws3 s ->
-        Fundef idnt a ws1 b ws2 c ws3 <$> _Statements fun s
+      Fundef idnt a decos ws1 b ws2 c ws3 s ->
+        Fundef idnt a decos ws1 b ws2 c ws3 <$> _Statements fun s
       If idnt a ws1 b s elifs sts' ->
         If idnt a ws1 b <$>
         _Statements fun s <*>
@@ -163,16 +127,17 @@ instance Plated (Statement '[] a) where
         For idnt a b c d e <$>
         _Statements fun f <*>
         (traverse._3._Statements) fun g
-      ClassDef idnt a b c d e ->
-        ClassDef idnt a b c d <$> _Statements fun e
+      ClassDef idnt a decos b c d e ->
+        ClassDef idnt a decos b c d <$> _Statements fun e
+      With a b c d e -> With a b c (coerce d) <$> _Statements fun e
 
 instance HasExprs Statement where
-  _Exprs f (SmallStatements idnt s ss a b) =
+  _Exprs f (SmallStatements idnt s ss a c) =
     SmallStatements idnt <$>
     _Exprs f s <*>
     (traverse._2._Exprs) f ss <*>
     pure a <*>
-    pure b
+    pure c
   _Exprs f (CompoundStatement c) = CompoundStatement <$> _Exprs f c
 
 data ImportAs e v a
@@ -281,7 +246,7 @@ instance HasTrailingWhitespace (AugAssign a) where
 data SmallStatement (v :: [*]) a
   = Return a [Whitespace] (Maybe (Expr v a))
   | Expr a (Expr v a)
-  | Assign a (Expr v a) [Whitespace] (Expr v a)
+  | Assign a (Expr v a) (NonEmpty ([Whitespace], Expr v a))
   | AugAssign a (Expr v a) (AugAssign a) (Expr v a)
   | Pass a
   | Break a
@@ -319,7 +284,7 @@ instance HasExprs SmallStatement where
       x
   _Exprs f (Return a ws e) = Return a ws <$> traverse f e
   _Exprs f (Expr a e) = Expr a <$> f e
-  _Exprs f (Assign a e1 ws2 e2) = Assign a <$> f e1 <*> pure ws2 <*> f e2
+  _Exprs f (Assign a e1 es) = Assign a <$> f e1 <*> traverseOf (traverse._2) f es
   _Exprs f (AugAssign a e1 as e2) = AugAssign a <$> f e1 <*> pure as <*> f e2
   _Exprs _ p@Pass{} = pure $ coerce p
   _Exprs _ p@Break{} = pure $ coerce p
@@ -339,18 +304,39 @@ data ExceptAs v a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Suite v a
-  = Suite a
+  -- ':' <space> smallstatement
+  = SuiteOne a [Whitespace] (SmallStatement v a) Newline
+  | SuiteMany a
       -- ':' <spaces> [comment] <newline>
-      [Whitespace] (Maybe Comment) Newline
+      [Whitespace] Newline
       -- <block>
       (Block v a)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+data WithItem v a
+  = WithItem
+  { _withItemAnn :: a
+  , _withItemValue :: Expr v a
+  , _withItemBinder :: Maybe ([Whitespace], Expr v a)
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+data Decorator v a
+  = Decorator
+  { _decoratorAnn :: a
+  , _decoratorIndents :: Indents a
+  , _decoratorWhitespaceLeft :: [Whitespace]
+  , _decoratorExpr :: Expr v a
+  , _decoratorNewline :: Newline
+  }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data CompoundStatement (v :: [*]) a
   -- ^ 'def' <spaces> <ident> '(' <spaces> stuff ')' <spaces> ':' <spaces> <newline>
   --   <block>
-  = Fundef
-      (Indents a) a
+  = Fundef a
+      [Decorator v a]
+      (Indents a)
       (NonEmpty Whitespace) (Ident v a)
       [Whitespace] (CommaSep (Param v a))
       [Whitespace]
@@ -396,11 +382,16 @@ data CompoundStatement (v :: [*]) a
       (Maybe (Indents a, [Whitespace], Suite v a))
   -- ^ 'class' <spaces> ident [ '(' <spaces> [ args ] ')' <spaces>] ':' <spaces> <newline>
   --   <block>
-  | ClassDef
-      (Indents a) a
+  | ClassDef a
+      [Decorator v a]
+      (Indents a)
       (NonEmpty Whitespace) (Ident v a)
       (Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace]))
       (Suite v a)
+  -- ^ 'with' <spaces> with_item (',' <spaces> with_item)* ':' <spaces> <newline> <block>
+  | With
+      (Indents a) a
+      [Whitespace] (CommaSep1 (WithItem v a)) (Suite v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasExprs ExceptAs where
@@ -410,11 +401,25 @@ instance HasExprs Block where
   _Exprs = _Wrapped.traverse._Right._Exprs
 
 instance HasExprs Suite where
-  _Exprs f (Suite a b c d e) = Suite a b c d <$> _Exprs f e
+  _Exprs f (SuiteOne a b c d) = SuiteOne a b <$> _Exprs f c <*> pure d
+  _Exprs f (SuiteMany a b c e) = SuiteMany a b c <$> _Exprs f e
+
+instance HasExprs WithItem where
+  _Exprs f (WithItem a b c) = WithItem a <$> f b <*> traverseOf (traverse._2) f c
+
+instance HasExprs Decorator where
+  _Exprs fun (Decorator a b c d e) =
+    Decorator a b c <$>
+    _Exprs fun d <*> pure e
 
 instance HasExprs CompoundStatement where
-  _Exprs f (Fundef idnt a ws1 name ws2 params ws3 s) =
-    Fundef idnt a ws1 (coerce name) ws2 <$>
+  _Exprs f (Fundef a decos idnt ws1 name ws2 params ws3 s) =
+    Fundef a <$>
+    traverse (_Exprs f) decos <*>
+    pure idnt <*>
+    pure ws1 <*>
+    pure (coerce name) <*>
+    pure ws2 <*>
     (traverse._Exprs) f params <*>
     pure ws3 <*>
     _Exprs f s
@@ -440,10 +445,15 @@ instance HasExprs CompoundStatement where
     For idnt a b <$> fun c <*> pure d <*> fun e <*>
     _Exprs fun f <*>
     (traverse._3._Exprs) fun g
-  _Exprs fun (ClassDef idnt a b c d e) =
-    ClassDef idnt a b (coerce c) <$>
+  _Exprs fun (ClassDef a decos idnt b c d e) =
+    ClassDef a <$>
+    traverse (_Exprs fun) decos <*>
+    pure idnt <*>
+    pure b <*>
+    pure (coerce c) <*>
     (traverse._2.traverse.traverse._Exprs) fun d <*>
     _Exprs fun e
+  _Exprs fun (With a b c d e) = With a b c <$> traverseOf (traverse._Exprs) fun d <*> _Exprs fun e
 
 makeWrapped ''Block
 makeLenses ''ExceptAs

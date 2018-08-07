@@ -29,6 +29,8 @@ data SyntaxError (v :: [*]) a
   | YieldOutsideFunction a
   | CommentAfterBackslash a
   | MalformedDecorator a
+  | InvalidUnpacking a
+  | AmbiguousArg (Arg v a) (Arg v a)
   deriving (Eq, Show)
 
 makeClassyPrisms ''SyntaxError

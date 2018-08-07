@@ -355,13 +355,6 @@ genSizedCommaSep ma = Gen.sized $ \n ->
             (\b -> CommaSepMany a <$> genWhitespaces <*> pure b)
       ]
 
-genTuple :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
-genTuple expr =
-  Tuple () <$>
-  expr <*>
-  genWhitespaces <*>
-  Gen.maybe (genSizedCommaSep1' expr)
-
 genSizedCommaSep1 :: MonadGen m => m a -> m (CommaSep1 a)
 genSizedCommaSep1 ma = Gen.sized $ \n ->
   if n <= 1

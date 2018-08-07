@@ -565,6 +565,17 @@ renderYield re (YieldFrom _ a b c) =
 renderYield re e = re e
 
 renderExpr :: Expr v a -> RenderOutput
+renderExpr (Unpack _ a b) =
+  TkStar () `cons`
+  foldMap renderWhitespace a <>
+  case b of
+    BinOp _ _ BoolAnd{} _ -> bracket $ renderExpr b
+    BinOp _ _ BoolOr{} _ -> bracket $ renderExpr b
+    BinOp _ _ op _ | isComparison op -> bracket $ renderExpr b
+    Not{} -> bracket $ renderExpr b
+    Ternary{} -> bracket $ renderExpr b
+    Lambda{} -> bracket $ renderExpr b
+    _ -> bracketTupleGenerator b
 renderExpr (Unit _ a b) =
   TkLeftParen () `cons`
   foldMap renderWhitespace a <>
@@ -576,16 +587,21 @@ renderExpr (Lambda _ a b c d) =
   renderCommaSep renderParam b <>
   singleton (TkColon ()) <> foldMap renderWhitespace c <>
   bracketTupleGenerator d
-renderExpr e@Yield{} = bracket $ renderYield renderExpr e
+renderExpr e@Yield{} = bracket $ renderYield bracketTupleGenerator e
 renderExpr e@YieldFrom{} = bracket $ renderYield bracketTupleGenerator e
 renderExpr (Ternary _ a b c d e) =
   (case a of
      Generator{} -> bracket $ renderExpr a
+     Unpack{} -> bracket $ renderExpr a
      _ -> bracketTupleGenerator a) <>
   singleton (TkIf ()) <> foldMap renderWhitespace b <>
-  bracketTernaryLambda bracketTupleGenerator c <>
+  (case c of
+     Unpack{} -> bracket $ renderExpr c
+     _ -> bracketTernaryLambda bracketTupleGenerator c) <>
   singleton (TkElse ()) <> foldMap renderWhitespace d <>
-  bracketTupleGenerator e
+  (case e of
+     Unpack{} -> bracket $ renderExpr e
+     _ -> bracketTupleGenerator e)
 renderExpr (Subscript _ a b c d) =
   (case a of
      BinOp{} -> bracket $ renderExpr a
@@ -606,6 +622,7 @@ renderExpr (Not _ ws e) =
     BinOp _ _ BoolOr{} _ -> bracket $ renderExpr e
     Ternary{} -> bracket $ renderExpr e
     Lambda{} -> bracket $ renderExpr e
+    Unpack{} -> bracket $ renderExpr e
     _ -> bracketTupleGenerator e
 renderExpr (Parens _ ws1 e ws2) =
   bracket (foldMap renderWhitespace ws1 <> renderYield renderExpr e) <>
@@ -622,6 +639,7 @@ renderExpr (UnOp _ op expr) =
     Not{} -> bracket $ renderExpr expr
     Ternary{} -> bracket $ renderExpr expr
     Lambda{} -> bracket $ renderExpr expr
+    Unpack{} -> bracket $ renderExpr expr
     _ -> bracketTupleGenerator expr
 renderExpr (String _ vs) = foldMap renderStringLiteral vs
 renderExpr (Int a n ws) = TkInt (() <$ n) `cons` foldMap renderWhitespace ws
@@ -647,6 +665,7 @@ renderExpr (Call _ expr ws args ws2) =
      Not{} -> bracket $ renderExpr expr
      Ternary{} -> bracket $ renderExpr expr
      Lambda{} -> bracket $ renderExpr expr
+     Unpack{} -> bracket $ renderExpr expr
      _ -> bracketGenerator expr) <>
   bracket (foldMap renderWhitespace ws <> foldMap renderArgs args) <>
   foldMap renderWhitespace ws2
@@ -951,7 +970,10 @@ renderArgs (CommaSepOne1' a Nothing) = renderArg bracketTuple a
 renderArgs e = renderCommaSep1' (renderArg bracketTupleGenerator) e
 
 renderArg :: (Expr v a -> RenderOutput) -> Arg v a -> RenderOutput
-renderArg re (PositionalArg _ expr) = re expr
+renderArg re (PositionalArg _ expr) =
+  case expr of
+    Unpack{} -> bracket $ renderExpr expr
+    _ -> re expr
 renderArg re (KeywordArg _ name ws2 expr) =
   renderIdent name <> singleton (TkEq ()) <>
   foldMap renderWhitespace ws2 <>

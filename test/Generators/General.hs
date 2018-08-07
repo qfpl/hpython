@@ -15,6 +15,13 @@ import Language.Python.Internal.Syntax
 import Generators.Common
 import Generators.Sized
 
+genTuple :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
+genTuple expr =
+  Tuple () <$>
+  expr <*>
+  genWhitespaces <*>
+  Gen.maybe (genSizedCommaSep1' expr)
+
 genParam :: MonadGen m => m (Expr '[] ()) -> m (Param '[] ())
 genParam genExpr =
   sizedRecursive
@@ -169,7 +176,8 @@ genExpr' isExp =
         (Range.constant 1 5)
         (Gen.choice [genStringLiteral genPyChar, genBytesLiteral genPyChar])
     ]
-    [ List () <$>
+    [ Unpack () <$> genWhitespaces <*> genExpr
+    , List () <$>
       genWhitespaces <*>
       Gen.maybe (genSizedCommaSep1' genExpr) <*>
       genWhitespaces

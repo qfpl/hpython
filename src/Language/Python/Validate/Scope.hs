@@ -416,6 +416,9 @@ validateAssignExprScope
   :: AsScopeError e v a
   => Expr v a
   -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
+validateAssignExprScope (Unpack a ws1 e1) =
+  Unpack a ws1 <$>
+  validateAssignExprScope e1
 validateAssignExprScope (Subscript a e1 ws1 e2 ws2) =
   (\e1' e2' -> Subscript a e1' ws1 e2' ws2) <$>
   validateAssignExprScope e1 <*>
@@ -482,6 +485,8 @@ validateExprScope
   :: AsScopeError e v a
   => Expr v a
   -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
+validateExprScope (Unpack a b c) =
+  Unpack a b <$> validateExprScope c
 validateExprScope (Lambda a b c d e) =
   Lambda a b <$>
   traverse validateParamScope c <*>

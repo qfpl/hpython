@@ -257,7 +257,12 @@ instance HasTrailingWhitespace (Subscript v a) where
                   Just g -> (b, c, Just (e, Just $ g & trailingWhitespace .~ ws)))
 
 data Expr (v :: [*]) a
-  = Unit
+  = Unpack
+  { _exprAnnotation :: a
+  , _unsafeUnpackWhitespace :: [Whitespace]
+  , _unsafeUnpackValue :: Expr v a
+  }
+  | Unit
   { _exprAnnotation :: a
   , _unsafeUnitWhitespaceInner :: [Whitespace]
   , _unsafeUnitWhitespaceRight :: [Whitespace]
@@ -425,6 +430,7 @@ instance HasTrailingWhitespace (Expr v a) where
   trailingWhitespace =
     lens
       (\case
+          Unpack _ _ a -> a ^. trailingWhitespace
           Unit _ _ a -> a
           Lambda _ _ _ _ a -> a ^. trailingWhitespace
           Yield _ ws Nothing -> ws
@@ -453,6 +459,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Generator  _ a -> a ^. trailingWhitespace)
       (\e ws ->
         case e of
+          Unpack a b c -> Unpack a b (c & trailingWhitespace .~ ws)
           Unit a b _ -> Unit a b ws
           Lambda a b c d f -> Lambda a b c d (f & trailingWhitespace .~ ws)
           Yield a _ Nothing -> Yield a ws Nothing
@@ -528,6 +535,7 @@ shouldBracketLeft op left =
         (Not{}, BoolAnd{}) -> False
         (Not{}, BoolOr{}) -> False
         (Not{}, _) -> True
+        (Unpack{}, _) -> True
         _ -> maybe False (\p -> p < entry ^. opPrec) (lEntry ^? _Just.opPrec)
   in
     leftf || leftf'
@@ -553,6 +561,7 @@ shouldBracketRight op right =
         (BoolAnd{}, Not{}) -> False
         (BoolOr{}, Not{}) -> False
         (_, Not{}) -> True
+        (_, Unpack{}) -> True
         _ -> maybe False (\p -> p < entry ^. opPrec) (rEntry ^? _Just.opPrec)
   in
     rightf || rightf'

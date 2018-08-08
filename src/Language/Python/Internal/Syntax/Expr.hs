@@ -202,9 +202,14 @@ instance HasTrailingWhitespace (StringLiteral a) where
 data DictItem (v :: [*]) a
   = DictItem
   { _dictItemAnn :: a
-  , _dictItemKey :: Expr v a
-  , _dictItemWhitespace :: [Whitespace]
-  , _dictItemvalue :: Expr v a
+  , _unsafeDictItemKey :: Expr v a
+  , _unsafeDictItemWhitespace :: [Whitespace]
+  , _unsafeDictItemvalue :: Expr v a
+  }
+  | DictUnpack
+  { _dictItemAnn :: a
+  , _unsafeDictItemUnpackWhitespace :: [Whitespace]
+  , _unsafeDictItemUnpackValue :: Expr v a
   } deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasTrailingWhitespace (DictItem v a) where

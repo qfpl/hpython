@@ -493,6 +493,15 @@ renderDictItem (DictItem _ a b c) =
   singleton (TkColon ()) <>
   foldMap renderWhitespace b <>
   bracketTupleGenerator c
+renderDictItem (DictUnpack _ a b) =
+  TkDoubleStar () `cons`
+  foldMap renderWhitespace a <>
+  case b of
+    BinOp _ _ BoolAnd{} _ -> bracket $ renderExpr b
+    BinOp _ _ BoolOr{} _ -> bracket $ renderExpr b
+    BinOp _ _ op _ | isComparison op -> bracket $ renderExpr b
+    Not{} -> bracket $ renderExpr b
+    _ -> bracketTernaryLambda bracketTupleGenerator b
 
 renderIntLiteral :: IntLiteral a -> Text
 renderIntLiteral (IntLiteralDec _ n) =

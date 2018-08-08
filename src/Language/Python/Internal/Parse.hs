@@ -2,6 +2,7 @@
 {-# language FlexibleContexts #-}
 {-# language GeneralizedNewtypeDeriving #-}
 {-# language TemplateHaskell #-}
+{-# language LambdaCase #-}
 module Language.Python.Internal.Parse where
 
 import Control.Applicative (liftA2)
@@ -13,7 +14,7 @@ import Control.Monad (unless)
 import Control.Monad.Except (ExceptT(..), runExceptT, throwError, catchError)
 import Control.Monad.State
   (MonadState, StateT(..), get, put, evalStateT, runStateT)
-import Control.Monad.Writer.Strict (MonadWriter, Writer, runWriter, writer, tell)
+import Control.Monad.Writer.Strict (MonadWriter, Writer, runWriter, tell, writer)
 import Data.Bifunctor (first)
 import Data.Foldable (toList)
 import Data.Function ((&))
@@ -116,9 +117,9 @@ currentToken = Parser $ do
           case tks of
             [] -> throwError $ UnexpectedEndOfLine ann
             [tk] | Nothing <- nl -> do
-              assign parseContext $ case rest' of
-                [] -> rest
-                _ -> rest' : rest
+              case rest' of
+                [] -> assign parseContext rest
+                _ -> assign parseContext $ rest' : rest
               pure tk
             tk : rest'' ->
               assign parseContext ((Right (ll { lineLine = rest'' }) : rest') : rest) $> tk
@@ -365,22 +366,23 @@ exprComp ws =
   expr ws <*>
   optional ((,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf))
 
+
 exprListComp :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 exprListComp ws = do
   ex <- exprOrStar ws
-  val <-
-    Left <$> compFor <!>
-    Right <$> commaSepRest (exprOrStar anySpace)
-  case val of
-    Left cf ->
+  (\cf ->
       Generator (ex ^. exprAnnotation) .
-      Comprehension (ex ^. exprAnnotation) ex cf <$>
-      many (Left <$> compFor <!> Right <$> compIf)
-    Right ([], Nothing) -> pure ex
-    Right ([], Just ws) ->
-      pure $ Tuple (ex ^. exprAnnotation) ex ws Nothing
-    Right ((ws, ex') : cs, mws) ->
-      pure $ Tuple (ex ^. exprAnnotation) ex ws . Just $ (ex', cs, mws) ^. _CommaSep1'
+      Comprehension (ex ^. exprAnnotation) ex cf) <$>
+    compFor <*>
+    many (Left <$> compFor <!> Right <$> compIf)
+    <!>
+    (\case
+       ([], Nothing) -> ex
+       ([], Just ws) ->
+         Tuple (ex ^. exprAnnotation) ex ws Nothing
+       ((ws, ex') : cs, mws) ->
+         Tuple (ex ^. exprAnnotation) ex ws . Just $ (ex', cs, mws) ^. _CommaSep1') <$>
+    commaSepRest (exprOrStar anySpace)
 
 orExprOrStar :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
 orExprOrStar ws =
@@ -590,22 +592,30 @@ orExpr ws =
               pure $ List (pyTokenAnn tk) s (Just $ (ex', cs, mws) ^. _CommaSep1')) <*>
         (snd <$> token ws (TkRightBracket()))
 
+    doubleStarExpr ws =
+      (\(tk, sp) -> DictUnpack (pyTokenAnn tk) sp) <$>
+      token ws (TkDoubleStar ()) <*>
+      orExpr ws
+
     dictItem =
       (\a -> DictItem (a ^. exprAnnotation) a) <$>
       expr anySpace <*>
       (snd <$> colon anySpace) <*>
       expr anySpace
+      <!>
+      doubleStarExpr anySpace
 
     dictOrSet = do
       (a, ws1) <- token anySpace (TkLeftBrace ())
       let ann = pyTokenAnn a
-      maybeExpr <- optional $ Left <$> expr anySpace <!> Right <$> starExpr anySpace
+      maybeExpr <-
+        optional $
+          Left . Left <$> expr anySpace <!>
+          Left . Right <$> starExpr anySpace <!>
+          Right <$> doubleStarExpr anySpace
       (case maybeExpr of
          Nothing -> pure $ Dict ann ws1 Nothing
-         Just (Right ex) ->
-           (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$>
-           commaSepRest (exprOrStar anySpace)
-         Just (Left ex) -> do
+         Just (Left (Left ex)) -> do
            maybeColon <- optional $ snd <$> token anySpace (TkColon ())
            case maybeColon of
              Nothing ->
@@ -618,7 +628,14 @@ orExpr ws =
                  (\ex2 (rest, final) ->
                     Dict ann ws1 (Just $ (firstDictItem ex2, rest, final) ^. _CommaSep1')) <$>
                  expr anySpace <*>
-                 commaSepRest dictItem) <*>
+                 commaSepRest dictItem
+         Just (Left (Right ex)) ->
+           (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$>
+           commaSepRest (exprOrStar anySpace)
+         Just (Right ex) ->
+            (\(rest, final) ->
+              Dict ann ws1 (Just $ (ex, rest, final) ^. _CommaSep1')) <$>
+            commaSepRest dictItem) <*>
          (snd <$> token ws (TkRightBrace ()))
 
     atom =

@@ -221,6 +221,10 @@ validateDictItemSyntax (DictItem a b c d) =
   (\b' -> DictItem a b' c) <$>
   validateExprSyntax b <*>
   validateExprSyntax d
+validateDictItemSyntax (DictUnpack a b c) =
+  DictUnpack a <$>
+  validateWhitespace a b <*>
+  validateExprSyntax c
 
 validateSubscriptSyntax
   :: ( AsSyntaxError e v a

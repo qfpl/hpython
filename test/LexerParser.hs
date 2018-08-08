@@ -391,8 +391,7 @@ test_fulltrip_16 =
 test_fulltrip_17 :: Property
 test_fulltrip_17 =
   withTests 1 . property $ do
-    let
-      str = "[*()],"
+    let str = "f(**{**a, **b})"
 
     tks <- doTokenize str
     annotateShow $! tks

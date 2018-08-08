@@ -469,6 +469,8 @@ validateDictItemScope (DictItem a b c d) =
   (\b' -> DictItem a b' c) <$>
   validateExprScope b <*>
   validateExprScope d
+validateDictItemScope (DictUnpack a b c) =
+  DictUnpack a b <$> validateExprScope c
 
 validateSubscriptScope
   :: AsScopeError e v a

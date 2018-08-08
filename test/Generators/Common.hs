@@ -427,10 +427,15 @@ genBytesLiteral gChar =
 
 genDictItem :: MonadGen m => m (Expr v ()) -> m (DictItem v ())
 genDictItem ge =
-  DictItem () <$>
-  ge <*>
-  genAnyWhitespaces <*>
-  ge
+  Gen.choice
+  [ DictItem () <$>
+    ge <*>
+    genAnyWhitespaces <*>
+    ge
+  , DictUnpack () <$>
+    genAnyWhitespaces <*>
+    ge
+  ]
 
 genHexDigit :: MonadGen m => m HeXDigit
 genHexDigit =

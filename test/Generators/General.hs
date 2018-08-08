@@ -18,9 +18,9 @@ import Generators.Sized
 genTuple :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
 genTuple expr =
   Tuple () <$>
-  expr <*>
+  genTupleItem genWhitespaces expr <*>
   genWhitespaces <*>
-  Gen.maybe (genSizedCommaSep1' expr)
+  Gen.maybe (genSizedCommaSep1' $ genTupleItem genWhitespaces expr)
 
 genParam :: MonadGen m => m (Expr '[] ()) -> m (Param '[] ())
 genParam genExpr =
@@ -176,16 +176,18 @@ genExpr' isExp =
         (Range.constant 1 5)
         (Gen.choice [genStringLiteral genPyChar, genBytesLiteral genPyChar])
     ]
-    [ Unpack () <$> genWhitespaces <*> genExpr
-    , List () <$>
+    [ List () <$>
       genWhitespaces <*>
-      Gen.maybe (genSizedCommaSep1' genExpr) <*>
+      Gen.maybe (genSizedCommaSep1' $ genListItem genExpr) <*>
       genWhitespaces
     , Dict () <$>
       genWhitespaces <*>
       sizedMaybe (genSizedCommaSep1' $ genDictItem genExpr) <*>
       genWhitespaces
-    , Set () <$> genWhitespaces <*> genSizedCommaSep1' genExpr <*> genWhitespaces
+    , Set () <$>
+      genWhitespaces <*>
+      genSizedCommaSep1' (genSetItem genExpr) <*>
+      genWhitespaces
     , ListComp () <$>
       genWhitespaces <*>
       genComprehension <*>

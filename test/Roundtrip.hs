@@ -12,6 +12,7 @@ import Hedgehog
 import System.FilePath ((</>))
 
 import qualified Data.Text.IO as StrictText
+import qualified Data.Text as Strict
 
 import Language.Python.Internal.Lexer (SrcInfo)
 import Language.Python.Internal.Parse (module_)
@@ -50,4 +51,4 @@ doRoundtrip name =
       Success res ->
         case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
           Failure errs' -> annotateShow (errs' :: [SyntaxError '[Indentation] SrcInfo]) *> failure
-          Success _ -> showModule py === file
+          Success _ -> Strict.lines (showModule py) === Strict.lines file

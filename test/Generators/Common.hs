@@ -425,6 +425,36 @@ genBytesLiteral gChar =
   genString gChar <*>
   genWhitespaces
 
+genTupleItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (TupleItem v ())
+genTupleItem ws ge =
+  Gen.choice
+  [ TupleItem () <$>
+    ge
+  , TupleUnpack () <$>
+    ws <*>
+    ge
+  ]
+
+genListItem :: MonadGen m => m (Expr v ()) -> m (ListItem v ())
+genListItem ge =
+  Gen.choice
+  [ ListItem () <$>
+    ge
+  , ListUnpack () <$>
+    genAnyWhitespaces <*>
+    ge
+  ]
+
+genSetItem :: MonadGen m => m (Expr v ()) -> m (SetItem v ())
+genSetItem ge =
+  Gen.choice
+  [ SetItem () <$>
+    ge
+  , SetUnpack () <$>
+    genAnyWhitespaces <*>
+    ge
+  ]
+
 genDictItem :: MonadGen m => m (Expr v ()) -> m (DictItem v ())
 genDictItem ge =
   Gen.choice

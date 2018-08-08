@@ -259,14 +259,13 @@ instance HasNewlines Module where
 assignTargets :: Traversal (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
 assignTargets f e =
   case e of
-    Unpack a b c -> Unpack a b <$> assignTargets f c
-    List a b c d -> (\c' -> List a b c' d) <$> (traverse.traverse.assignTargets) f c
+    List a b c d -> (\c' -> List a b c' d) <$> (traverse.traverse._Exprs.assignTargets) f c
     Parens a b c d -> (\c' -> Parens a b c' d) <$> assignTargets f c
     Ident a b -> Ident a <$> f b
     Tuple a b c d ->
       (\b' d' -> Tuple a b' c d') <$>
-      assignTargets f b <*>
-      (traverse.traverse.assignTargets) f d
+      (_Exprs.assignTargets) f b <*>
+      (traverse.traverse._Exprs.assignTargets) f d
     Unit{} -> pure $ coerce e
     Lambda{} -> pure $ coerce e
     Yield{} -> pure $ coerce e

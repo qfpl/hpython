@@ -45,7 +45,6 @@ initialGenState =
   , _willBeNonlocals = []
   , _inLoop = False
   , _currentIndentation = Indents [] ()
-  , _inSequence = False
   }
 
 data GenState
@@ -56,7 +55,6 @@ data GenState
   , _willBeNonlocals :: [String]
   , _inLoop :: Bool
   , _currentIndentation :: Indents ()
-  , _inSequence :: Bool
   }
 makeLenses ''GenState
 
@@ -91,9 +89,9 @@ genIdent =
 genTuple :: (MonadGen m, MonadState GenState m) => m (Expr '[] ()) -> m (Expr '[] ())
 genTuple expr =
   Tuple () <$>
-  expr <*>
+  genTupleItem genWhitespaces expr <*>
   genWhitespaces <*>
-  Gen.maybe (localState $ modify (inSequence .~ True) *> genSizedCommaSep1' expr)
+  Gen.maybe (genSizedCommaSep1' $ genTupleItem genWhitespaces expr)
 
 genModuleName :: MonadGen m => m (ModuleName '[] ())
 genModuleName =
@@ -223,11 +221,11 @@ genList :: (MonadState GenState m, MonadGen m) => m (Expr '[] ()) -> m (Expr '[]
 genList genExpr' =
   Gen.shrink
     (\case
-        List _ _ (Just (CommaSepOne1' e _)) _ -> [e]
+        List _ _ (Just (CommaSepOne1' e _)) _ -> e ^.. _Exprs
         _ -> []) $
   List () <$>
   genWhitespaces <*>
-  Gen.maybe (localState $ modify (inSequence .~ True) *> genSizedCommaSep1' genExpr') <*>
+  Gen.maybe (genSizedCommaSep1' $ genListItem genExpr') <*>
   genWhitespaces
 
 genParens :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
@@ -260,8 +258,6 @@ genCompIf =
 
 genComprehension :: (MonadGen m, MonadState GenState m) => m (Comprehension '[] ())
 genComprehension =
-  localState $
-  modify (inSequence .~ False) *>
   sized3
     (Comprehension ())
     (Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
@@ -302,7 +298,6 @@ genExpr' :: (MonadGen m, MonadState GenState m) => Bool -> m (Expr '[] ())
 genExpr' isExp = do
   isInFunction <- isJust <$> gets _inFunction
   isInGenerator <- gets _inGenerator
-  isInSequence <- gets _inSequence
   sizedRecursive
     [ genUnit
     , genBool
@@ -316,21 +311,17 @@ genExpr' isExp = do
      , ListComp () <$> genWhitespaces <*> genComprehension <*> genWhitespaces
      , Generator () <$>
        localState (modify (\ctxt -> ctxt { _inGenerator = True }) *> genComprehension)
-     , localState $ do
-         modify (inSequence .~ False)
-         Dict () <$>
-           genAnyWhitespaces <*>
-           sizedMaybe (genSizedCommaSep1' $ genDictItem genExpr) <*>
-           genWhitespaces
+     , Dict () <$>
+       genAnyWhitespaces <*>
+       sizedMaybe (genSizedCommaSep1' $ genDictItem genExpr) <*>
+       genWhitespaces
      , Set () <$>
        genAnyWhitespaces <*>
-       localState (modify (inSequence .~ True) *> genSizedCommaSep1' genExpr) <*>
+       genSizedCommaSep1' (genSetItem genExpr) <*>
        genWhitespaces
      , genDeref
      , genParens (genExpr' isExp)
-     , localState $
-       modify (inSequence .~ False) *>
-       sized2M
+     , sized2M
          (\a b -> (\ws1 -> Call () a ws1 b) <$> genWhitespaces <*> genWhitespaces)
          genExpr
          (sizedMaybe genArgs)
@@ -341,70 +332,53 @@ genExpr' isExp = do
          pure $
          BinOp () (e1 & trailingWhitespace .~ [Space]) (op & trailingWhitespace .~ [Space]) e2
      , genTuple genExpr
-     , localState $ do
-         modify (inSequence .~ False)
-         Not () <$> (NonEmpty.toList <$> genWhitespaces1) <*> genExpr
-     , localState $ do
-         inSequence .= False
-         UnOp () <$> genUnOp <*> genExpr
-     , localState $ do
-         inSequence .= False
-         sized3M
-           (\a b c ->
-              (\ws1 ws2 -> Ternary () a ws1 b ws2 c) <$>
-              genWhitespaces <*>
-              genWhitespaces)
-           genExpr
-           genExpr
-           genExpr
-     , localState $ do
-         inSequence .= False
-         sizedBind genParams $ \a ->
-           let paramIdents = a ^.. folded.paramName.identValue in
-           Lambda () <$>
-           (NonEmpty.toList <$> genWhitespaces1) <*>
-           pure a <*>
+     , Not () <$> (NonEmpty.toList <$> genWhitespaces1) <*> genExpr
+     , UnOp () <$> genUnOp <*> genExpr
+     , sized3M
+         (\a b c ->
+           (\ws1 ws2 -> Ternary () a ws1 b ws2 c) <$>
            genWhitespaces <*>
-           localState (do
-             inLoop .= False
-             modify $ \ctxt ->
-               ctxt
-               { _inFunction =
-                   fmap
-                     (`union` paramIdents)
-                     (_inFunction ctxt) <|>
-                   Just paramIdents
-               , _currentNonlocals = _willBeNonlocals ctxt <> _currentNonlocals ctxt
-               }
-             genExpr)
+           genWhitespaces)
+         genExpr
+         genExpr
+         genExpr
+     , sizedBind genParams $ \a ->
+         let paramIdents = a ^.. folded.paramName.identValue in
+         Lambda () <$>
+         (NonEmpty.toList <$> genWhitespaces1) <*>
+         pure a <*>
+         genWhitespaces <*>
+         localState (do
+           inLoop .= False
+           modify $ \ctxt ->
+             ctxt
+             { _inFunction =
+                 fmap
+                   (`union` paramIdents)
+                   (_inFunction ctxt) <|>
+                 Just paramIdents
+             , _currentNonlocals = _willBeNonlocals ctxt <> _currentNonlocals ctxt
+             }
+           genExpr)
      ] ++
-     [ localState $ do
-         modify (inSequence .~ False)
-         Yield () <$>
-           (NonEmpty.toList <$> genWhitespaces1) <*>
-           sizedMaybe genExpr
+     [ Yield () <$>
+         (NonEmpty.toList <$> genWhitespaces1) <*>
+         sizedMaybe genExpr
      | isInFunction || isInGenerator
      ] ++
-     [ localState $ do
-         modify (inSequence .~ False)
-         YieldFrom () <$>
-           (NonEmpty.toList <$> genWhitespaces1) <*>
-           (NonEmpty.toList <$> genWhitespaces1) <*>
-           genExpr
+     [ YieldFrom () <$>
+         (NonEmpty.toList <$> genWhitespaces1) <*>
+         (NonEmpty.toList <$> genWhitespaces1) <*>
+         genExpr
      | isInFunction || isInGenerator
-     ] ++
-     [ localState $ modify (inSequence .~ False) *> (Unpack () <$> genWhitespaces <*> genExpr)
-     | isInSequence
      ])
 
 genSubscript :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genSubscript =
-  localState $ do
-    modify (inSequence .~ False)
-    sized2M
-      (\a b -> (\ws1 -> Subscript () a ws1 b) <$> genWhitespaces <*> genWhitespaces)
-      genExpr
-      (genSizedCommaSep1' genSubscriptItem)
+  sized2M
+    (\a b -> (\ws1 -> Subscript () a ws1 b) <$> genWhitespaces <*> genWhitespaces)
+    genExpr
+    (genSizedCommaSep1' genSubscriptItem)
 
 genAssignable :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genAssignable =

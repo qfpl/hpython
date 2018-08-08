@@ -416,17 +416,17 @@ validateAssignExprScope
   :: AsScopeError e v a
   => Expr v a
   -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
-validateAssignExprScope (Unpack a ws1 e1) =
-  Unpack a ws1 <$>
-  validateAssignExprScope e1
 validateAssignExprScope (Subscript a e1 ws1 e2 ws2) =
   (\e1' e2' -> Subscript a e1' ws1 e2' ws2) <$>
   validateAssignExprScope e1 <*>
   traverse validateSubscriptScope e2
 validateAssignExprScope (List a ws1 es ws2) =
   List a ws1 <$>
-  traverseOf (traverse.traverse) validateAssignExprScope es <*>
+  traverseOf (traverse.traverse) listItem es <*>
   pure ws2
+  where
+    listItem (ListItem a b) = ListItem a <$> validateAssignExprScope b
+    listItem (ListUnpack a b c) = ListUnpack a b <$> validateAssignExprScope c
 validateAssignExprScope (Deref a e ws1 r) =
   Deref a <$>
   validateExprScope e <*>
@@ -438,9 +438,12 @@ validateAssignExprScope (Parens a ws1 e ws2) =
   pure ws2
 validateAssignExprScope (Tuple a b ws d) =
   Tuple a <$>
-  validateAssignExprScope b <*>
+  tupleItem b <*>
   pure ws <*>
-  traverseOf (traverse.traverse) validateAssignExprScope d
+  traverseOf (traverse.traverse) tupleItem d
+  where
+    tupleItem (TupleItem a b) = TupleItem a <$> validateAssignExprScope b
+    tupleItem (TupleUnpack a b c) = TupleUnpack a b <$> validateAssignExprScope c
 validateAssignExprScope e@Unit{} = pure $ coerce e
 validateAssignExprScope e@Lambda{} = pure $ coerce e
 validateAssignExprScope e@Yield{} = pure $ coerce e
@@ -483,12 +486,31 @@ validateSubscriptScope (SubscriptSlice a b c d) =
   traverse validateExprScope c <*>
   traverseOf (traverse._2.traverse) validateExprScope d
 
+validateListItemScope
+  :: AsScopeError e v a
+  => ListItem v a
+  -> ValidateScope a e (ListItem (Nub (Scope ': v)) a)
+validateListItemScope (ListItem a b) = ListItem a <$> validateExprScope b
+validateListItemScope (ListUnpack a b c) = ListUnpack a b <$> validateExprScope c
+
+validateSetItemScope
+  :: AsScopeError e v a
+  => SetItem v a
+  -> ValidateScope a e (SetItem (Nub (Scope ': v)) a)
+validateSetItemScope (SetItem a b) = SetItem a <$> validateExprScope b
+validateSetItemScope (SetUnpack a b c) = SetUnpack a b <$> validateExprScope c
+
+validateTupleItemScope
+  :: AsScopeError e v a
+  => TupleItem v a
+  -> ValidateScope a e (TupleItem (Nub (Scope ': v)) a)
+validateTupleItemScope (TupleItem a b) = TupleItem a <$> validateExprScope b
+validateTupleItemScope (TupleUnpack a b c) = TupleUnpack a b <$> validateExprScope c
+
 validateExprScope
   :: AsScopeError e v a
   => Expr v a
   -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
-validateExprScope (Unpack a b c) =
-  Unpack a b <$> validateExprScope c
 validateExprScope (Lambda a b c d e) =
   Lambda a b <$>
   traverse validateParamScope c <*>
@@ -510,7 +532,7 @@ validateExprScope (Subscript a b c d e) =
 validateExprScope (Not a ws e) = Not a ws <$> validateExprScope e
 validateExprScope (List a ws1 es ws2) =
   List a ws1 <$>
-  traverseOf (traverse.traverse) validateExprScope es <*>
+  traverseOf (traverse.traverse) validateListItemScope es <*>
   pure ws2
 validateExprScope (ListComp a ws1 comp ws2) =
   ListComp a ws1 <$>
@@ -547,9 +569,9 @@ validateExprScope (Ident a i) =
   validateIdentScope i
 validateExprScope (Tuple a b ws d) =
   Tuple a <$>
-  validateExprScope b <*>
+  validateTupleItemScope b <*>
   pure ws <*>
-  traverseOf (traverse.traverse) validateExprScope d
+  traverseOf (traverse.traverse) validateTupleItemScope d
 validateExprScope e@None{} = pure $ coerce e
 validateExprScope e@Int{} = pure $ coerce e
 validateExprScope e@Float{} = pure $ coerce e
@@ -559,7 +581,7 @@ validateExprScope e@Unit{} = pure $ coerce e
 validateExprScope (Dict a b c d) =
   (\c' -> Dict a b c' d) <$> traverseOf (traverse.traverse) validateDictItemScope c
 validateExprScope (Set a b c d) =
-  (\c' -> Set a b c' d) <$> traverse validateExprScope c
+  (\c' -> Set a b c' d) <$> traverse validateSetItemScope c
 
 validateModuleScope
   :: AsScopeError e v a

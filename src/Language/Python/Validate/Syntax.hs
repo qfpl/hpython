@@ -11,8 +11,8 @@ module Language.Python.Validate.Syntax where
 
 import Control.Applicative ((<|>), liftA2)
 import Control.Lens.Cons (_Cons, snoc)
-import Control.Lens.Fold ((^..), (^?), folded, toListOf)
-import Control.Lens.Getter ((^.))
+import Control.Lens.Fold ((^..), (^?), (^?!), folded, allOf, toListOf)
+import Control.Lens.Getter ((^.), getting)
 import Control.Lens.Prism (_Right)
 import Control.Lens.Review ((#))
 import Control.Lens.Setter ((.~))
@@ -57,7 +57,6 @@ data SyntaxContext
   , _inFunction :: Maybe [String]
   , _inGenerator :: Bool
   , _inParens :: Bool
-  , _inSequence :: Bool
   }
 makeLenses ''SyntaxContext
 
@@ -123,7 +122,6 @@ initialSyntaxContext =
   , _inFunction = Nothing
   , _inGenerator = False
   , _inParens = False
-  , _inSequence = False
   }
 
 isIdentifier :: String -> Bool
@@ -172,7 +170,6 @@ validateComprehensionSyntax
   => Comprehension v a
   -> ValidateSyntax e (Comprehension (Nub (Syntax ': v)) a)
 validateComprehensionSyntax (Comprehension a b c d) =
-  localSyntaxContext (inSequence .~ False) $
   Comprehension a <$>
   validateExprSyntax b <*>
   validateCompForSyntax c <*>
@@ -239,21 +236,42 @@ validateSubscriptSyntax (SubscriptSlice a b c d) =
   traverse validateExprSyntax c <*>
   traverseOf (traverse._2.traverse) validateExprSyntax d
 
+validateListItemSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => ListItem v a
+  -> ValidateSyntax e (ListItem (Nub (Syntax ': v)) a)
+validateListItemSyntax (ListItem a b) = ListItem a <$> validateExprSyntax b
+validateListItemSyntax (ListUnpack a b c) =
+  ListUnpack a <$> validateWhitespace a b <*> validateExprSyntax c
+
+validateSetItemSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => SetItem v a
+  -> ValidateSyntax e (SetItem (Nub (Syntax ': v)) a)
+validateSetItemSyntax (SetItem a b) = SetItem a <$> validateExprSyntax b
+validateSetItemSyntax (SetUnpack a b c) =
+  SetUnpack a <$> validateWhitespace a b <*> validateExprSyntax c
+
+validateTupleItemSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => TupleItem v a
+  -> ValidateSyntax e (TupleItem (Nub (Syntax ': v)) a)
+validateTupleItemSyntax (TupleItem a b) = TupleItem a <$> validateExprSyntax b
+validateTupleItemSyntax (TupleUnpack a b c) =
+  TupleUnpack a <$> validateWhitespace a b <*> validateExprSyntax c
+
 validateExprSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
      )
   => Expr v a
   -> ValidateSyntax e (Expr (Nub (Syntax ': v)) a)
-validateExprSyntax (Unpack a b c) =
-  syntaxContext `bindValidateSyntax` \ctxt ->
-  if _inSequence ctxt
-  then
-    Unpack a <$>
-    validateWhitespace a b <*>
-    localSyntaxContext (inSequence .~ False) (validateExprSyntax c)
-  else
-    syntaxErrors [_InvalidUnpacking # a]
 validateExprSyntax (Unit a b c) =
   Unit a <$>
   localSyntaxContext (\ctxt -> ctxt { _inParens = True }) (validateWhitespace a b) <*>
@@ -262,7 +280,6 @@ validateExprSyntax (Lambda a b c d e) =
   let
     paramIdents = c ^.. folded.unvalidated.paramName.identValue
   in
-    localSyntaxContext (inSequence .~ False) $
     Lambda a <$>
     validateWhitespace a b <*>
     validateParamsSyntax c <*>
@@ -279,7 +296,6 @@ validateExprSyntax (Lambda a b c d e) =
           })
       (validateExprSyntax e)
 validateExprSyntax (Yield a b c) =
-  localSyntaxContext (inSequence .~ False) $
   Yield a <$>
   validateWhitespace a b <*
   (syntaxContext `bindValidateSyntax` \ctxt ->
@@ -290,7 +306,6 @@ validateExprSyntax (Yield a b c) =
         Just{} -> pure ()) <*>
   traverse validateExprSyntax c
 validateExprSyntax (YieldFrom a b c d) =
-  localSyntaxContext (inSequence .~ False) $
   YieldFrom a <$>
   validateWhitespace a b <*>
   validateWhitespace a c <*
@@ -302,7 +317,6 @@ validateExprSyntax (YieldFrom a b c d) =
         Just{} -> pure ()) <*>
   validateExprSyntax d
 validateExprSyntax (Ternary a b c d e f) =
-  localSyntaxContext (inSequence .~ False) $
   (\b' d' f' -> Ternary a b' c d' e f') <$>
   validateExprSyntax b <*>
   validateExprSyntax d <*>
@@ -312,7 +326,6 @@ validateExprSyntax (Subscript a b c d e) =
   validateExprSyntax b <*>
   traverse validateSubscriptSyntax d
 validateExprSyntax (Not a ws e) =
-  localSyntaxContext (inSequence .~ False) $
   Not a <$>
   validateWhitespace a ws <*>
   validateExprSyntax e
@@ -322,7 +335,6 @@ validateExprSyntax (Parens a ws1 e ws2) =
   validateWhitespace a ws2
 validateExprSyntax (Bool a b ws) = pure $ Bool a b ws
 validateExprSyntax (UnOp a op expr) =
-  localSyntaxContext (inSequence .~ False) $
   UnOp a op <$> validateExprSyntax expr
 validateExprSyntax (String a strLits) =
   if
@@ -336,11 +348,10 @@ validateExprSyntax (Int a n ws) = pure $ Int a n ws
 validateExprSyntax (Float a n ws) = pure $ Float a n ws
 validateExprSyntax (Ident a name) = Ident a <$> validateIdent name
 validateExprSyntax (List a ws1 exprs ws2) =
-  localSyntaxContext (inSequence .~ True) $
   List a ws1 <$>
   localSyntaxContext
     (inParens .~ True)
-    (traverseOf (traverse.traverse) validateExprSyntax exprs) <*>
+    (traverseOf (traverse.traverse) validateListItemSyntax exprs) <*>
   validateWhitespace a ws2
 validateExprSyntax (ListComp a ws1 comp ws2) =
   ListComp a ws1 <$>
@@ -359,7 +370,6 @@ validateExprSyntax (Deref a expr ws1 name) =
   validateWhitespace a ws1 <*>
   validateIdent name
 validateExprSyntax (Call a expr ws args ws2) =
-  localSyntaxContext (inSequence .~ False) $
   Call a <$>
   validateExprSyntax expr <*>
   localSyntaxContext (inParens .~ True) (validateWhitespace a ws) <*>
@@ -372,11 +382,10 @@ validateExprSyntax (BinOp a e1 op e2) =
   pure op <*>
   validateExprSyntax e2
 validateExprSyntax (Tuple a b ws d) =
-  localSyntaxContext (inSequence .~ True) $
   Tuple a <$>
-  validateExprSyntax b <*>
+  validateTupleItemSyntax b <*>
   validateWhitespace a ws <*>
-  traverseOf (traverse.traverse) validateExprSyntax d
+  traverseOf (traverse.traverse) validateTupleItemSyntax d
 validateExprSyntax (Dict a b c d) =
   Dict a b <$>
   localSyntaxContext
@@ -384,11 +393,10 @@ validateExprSyntax (Dict a b c d) =
     (traverseOf (traverse.traverse) validateDictItemSyntax c) <*>
   validateWhitespace a d
 validateExprSyntax (Set a b c d) =
-  localSyntaxContext (inSequence .~ True) $
   Set a b <$>
   localSyntaxContext
     (inParens .~ True)
-    (traverse validateExprSyntax c) <*>
+    (traverse validateSetItemSyntax c) <*>
   validateWhitespace a d
 
 validateBlockSyntax
@@ -728,16 +736,11 @@ canAssignTo BinOp{} = False
 canAssignTo Bool{} = False
 canAssignTo (Parens _ _ a _) = canAssignTo a
 canAssignTo String{} = False
-canAssignTo (List _ _ a _) = all (all canAssignTo) a
-canAssignTo (Tuple _ a _ b) = all canAssignTo $ a : toListOf (folded.folded) b
+canAssignTo (List _ _ a _) =
+  all (allOf (folded.getting _Exprs) canAssignTo) a
+canAssignTo (Tuple _ a _ b) =
+  all canAssignTo $ (a ^?! getting _Exprs) : toListOf (folded.folded.getting _Exprs) b
 canAssignTo _ = True
-
-unpackingUnderParens :: Expr v a -> Maybe ([Whitespace], Expr v a -> Expr v a, Expr v a)
-unpackingUnderParens (Parens a b c d) =
-  (\(ws, f, x) -> (ws, \y -> Parens a b (f y) d, x)) <$>
-  unpackingUnderParens c
-unpackingUnderParens (Unpack _ ws a) = Just (ws, id, a)
-unpackingUnderParens _ = Nothing
 
 validateArgsSyntax
   :: ( AsSyntaxError e v a
@@ -758,18 +761,10 @@ validateArgsSyntax e = fmap coerce e <$ go [] False False (toList e)
       -> ValidateSyntax e [Arg (Nub (Syntax ': v)) a]
     go _ _ _ [] = pure []
     go names False False (arg@(PositionalArg a expr) : args) =
-      maybe
-        (pure ())
-        (\(ws, _ignored, x) -> syntaxErrors [_AmbiguousArg # (arg, StarArg a ws x)])
-        (unpackingUnderParens expr) *>
       liftA2 (:)
         (PositionalArg a <$> validateExprSyntax expr)
         (go names False False args)
     go names seenKeyword seenUnpack (arg@(PositionalArg a expr) : args) =
-      maybe
-        (pure ())
-        (\(ws, _ignored, x) -> syntaxErrors [_AmbiguousArg # (arg, StarArg a ws x)])
-        (unpackingUnderParens expr) *>
       when seenKeyword (syntaxErrors [_PositionalAfterKeywordArg # (a, expr)]) *>
       when seenUnpack (syntaxErrors [_PositionalAfterKeywordUnpacking # (a, expr)]) *>
       go names seenKeyword seenUnpack args

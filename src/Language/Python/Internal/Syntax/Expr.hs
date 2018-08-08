@@ -261,13 +261,64 @@ instance HasTrailingWhitespace (Subscript v a) where
                   Nothing -> (b, c, Just (ws, f))
                   Just g -> (b, c, Just (e, Just $ g & trailingWhitespace .~ ws)))
 
-data Expr (v :: [*]) a
-  = Unpack
-  { _exprAnnotation :: a
-  , _unsafeUnpackWhitespace :: [Whitespace]
-  , _unsafeUnpackValue :: Expr v a
+data ListItem v a
+  = ListItem
+  { _listItemAnn :: a
+  , _unsafeListItemValue :: Expr v a
   }
-  | Unit
+  | ListUnpack
+  { _listItemAnn :: a
+  , _unsafeListUnpackWhitespace :: [Whitespace]
+  , _unsafeListUnpackValue :: Expr v a
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasExprs ListItem where
+  _Exprs f (ListItem a b) = ListItem a <$> f b
+  _Exprs f (ListUnpack a b c) = ListUnpack a b <$> f c
+
+data SetItem v a
+  = SetItem
+  { _setItemAnn :: a
+  , _unsafeSetItemValue :: Expr v a
+  }
+  | SetUnpack
+  { _setItemAnn :: a
+  , _unsafeSetUnpackWhitespace :: [Whitespace]
+  , _unsafeSetUnpackValue :: Expr v a
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasExprs SetItem where
+  _Exprs f (SetItem a b) = SetItem a <$> f b
+  _Exprs f (SetUnpack a b c) = SetUnpack a b <$> f c
+
+data TupleItem v a
+  = TupleItem
+  { _tupleItemAnn :: a
+  , _unsafeTupleItemValue :: Expr v a
+  }
+  | TupleUnpack
+  { _tupleItemAnn :: a
+  , _unsafeTupleUnpackWhitespace :: [Whitespace]
+  , _unsafeTupleUnpackValue :: Expr v a
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasExprs TupleItem where
+  _Exprs f (TupleItem a b) = TupleItem a <$> f b
+  _Exprs f (TupleUnpack a b c) = TupleUnpack a b <$> f c
+
+instance HasTrailingWhitespace (TupleItem v a) where
+  trailingWhitespace =
+    lens
+      (\case
+          TupleItem _ a -> a ^. trailingWhitespace
+          TupleUnpack _ _ a -> a ^. trailingWhitespace)
+      (\a ws ->
+         case a of
+           TupleItem b c -> TupleItem b $ c & trailingWhitespace .~ ws
+           TupleUnpack b c d -> TupleUnpack b c $ d & trailingWhitespace .~ ws)
+
+data Expr (v :: [*]) a
+  = Unit
   { _exprAnnotation :: a
   , _unsafeUnitWhitespaceInner :: [Whitespace]
   , _unsafeUnitWhitespaceRight :: [Whitespace]
@@ -317,7 +368,7 @@ data Expr (v :: [*]) a
   -- [ spaces
   , _unsafeListWhitespaceLeft :: [Whitespace]
   -- exprs
-  , _unsafeListValues :: Maybe (CommaSep1' (Expr v a))
+  , _unsafeListValues :: Maybe (CommaSep1' (ListItem v a))
   -- ] spaces
   , _unsafeListWhitespaceRight :: [Whitespace]
   }
@@ -330,7 +381,7 @@ data Expr (v :: [*]) a
   | Set
   { _exprAnnotation :: a
   , _unsafeSetWhitespaceLeft :: [Whitespace]
-  , _unsafeSetValues :: CommaSep1' (Expr v a)
+  , _unsafeSetValues :: CommaSep1' (SetItem v a)
   , _unsafeSetWhitespaceRight :: [Whitespace]
   }
   | Deref
@@ -414,11 +465,11 @@ data Expr (v :: [*]) a
   | Tuple
   { _exprAnnotation :: a
   -- expr
-  , _unsafeTupleHead :: Expr v a
+  , _unsafeTupleHead :: TupleItem v a
   -- , spaces
   , _unsafeTupleWhitespace :: [Whitespace]
   -- [exprs]
-  , _unsafeTupleTail :: Maybe (CommaSep1' (Expr v a))
+  , _unsafeTupleTail :: Maybe (CommaSep1' (TupleItem v a))
   }
   | Not
   { _exprAnnotation :: a
@@ -435,7 +486,6 @@ instance HasTrailingWhitespace (Expr v a) where
   trailingWhitespace =
     lens
       (\case
-          Unpack _ _ a -> a ^. trailingWhitespace
           Unit _ _ a -> a
           Lambda _ _ _ _ a -> a ^. trailingWhitespace
           Yield _ ws Nothing -> ws
@@ -464,7 +514,6 @@ instance HasTrailingWhitespace (Expr v a) where
           Generator  _ a -> a ^. trailingWhitespace)
       (\e ws ->
         case e of
-          Unpack a b c -> Unpack a b (c & trailingWhitespace .~ ws)
           Unit a b _ -> Unit a b ws
           Lambda a b c d f -> Lambda a b c d (f & trailingWhitespace .~ ws)
           Yield a _ Nothing -> Yield a ws Nothing
@@ -540,7 +589,6 @@ shouldBracketLeft op left =
         (Not{}, BoolAnd{}) -> False
         (Not{}, BoolOr{}) -> False
         (Not{}, _) -> True
-        (Unpack{}, _) -> True
         _ -> maybe False (\p -> p < entry ^. opPrec) (lEntry ^? _Just.opPrec)
   in
     leftf || leftf'
@@ -566,7 +614,6 @@ shouldBracketRight op right =
         (BoolAnd{}, Not{}) -> False
         (BoolOr{}, Not{}) -> False
         (_, Not{}) -> True
-        (_, Unpack{}) -> True
         _ -> maybe False (\p -> p < entry ^. opPrec) (rEntry ^? _Just.opPrec)
   in
     rightf || rightf'

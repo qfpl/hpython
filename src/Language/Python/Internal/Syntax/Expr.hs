@@ -298,24 +298,27 @@ data TupleItem v a
   }
   | TupleUnpack
   { _tupleItemAnn :: a
+  , _unsafeTupleParens :: Maybe ([Whitespace], [Whitespace])
   , _unsafeTupleUnpackWhitespace :: [Whitespace]
   , _unsafeTupleUnpackValue :: Expr v a
   } deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasExprs TupleItem where
   _Exprs f (TupleItem a b) = TupleItem a <$> f b
-  _Exprs f (TupleUnpack a b c) = TupleUnpack a b <$> f c
+  _Exprs f (TupleUnpack a b c d) = TupleUnpack a b c <$> f d
 
 instance HasTrailingWhitespace (TupleItem v a) where
   trailingWhitespace =
     lens
       (\case
           TupleItem _ a -> a ^. trailingWhitespace
-          TupleUnpack _ _ a -> a ^. trailingWhitespace)
+          TupleUnpack _ Nothing _ a -> a ^. trailingWhitespace
+          TupleUnpack _ (Just (_, ws)) _ _ -> ws)
       (\a ws ->
          case a of
            TupleItem b c -> TupleItem b $ c & trailingWhitespace .~ ws
-           TupleUnpack b c d -> TupleUnpack b c $ d & trailingWhitespace .~ ws)
+           TupleUnpack b Nothing d e -> TupleUnpack b Nothing d $ e & trailingWhitespace .~ ws
+           TupleUnpack b (Just (c, _)) e f -> TupleUnpack b (Just (c, ws)) e f)
 
 data Expr (v :: [*]) a
   = Unit

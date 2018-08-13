@@ -13,7 +13,7 @@ import Control.Applicative ((<|>), liftA2)
 import Control.Lens.Cons (_Cons, snoc)
 import Control.Lens.Fold ((^..), (^?), (^?!), folded, allOf, toListOf)
 import Control.Lens.Getter ((^.), getting)
-import Control.Lens.Prism (_Right)
+import Control.Lens.Prism (_Right, _Just)
 import Control.Lens.Review ((#))
 import Control.Lens.Setter ((.~))
 import Control.Lens.TH (makeLenses, makeWrapped)
@@ -263,8 +263,11 @@ validateTupleItemSyntax
   => TupleItem v a
   -> ValidateSyntax e (TupleItem (Nub (Syntax ': v)) a)
 validateTupleItemSyntax (TupleItem a b) = TupleItem a <$> validateExprSyntax b
-validateTupleItemSyntax (TupleUnpack a b c) =
-  TupleUnpack a <$> validateWhitespace a b <*> validateExprSyntax c
+validateTupleItemSyntax (TupleUnpack a b c d) =
+  TupleUnpack a <$>
+  traverseOf (_Just._2) (validateWhitespace a) b <*>
+  validateWhitespace a c <*>
+  validateExprSyntax d
 
 validateExprSyntax
   :: ( AsSyntaxError e v a

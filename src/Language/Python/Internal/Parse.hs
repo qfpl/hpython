@@ -302,24 +302,67 @@ indents = Parser $ do
         Right ll@(Line a is _ _) : rest' -> pure $ Indents is a
         Left l : _ -> throwError $ UnexpectedIndent ann
 
+tupleUnpack :: Parser ann Whitespace -> Parser ann (TupleItem '[] ann)
+tupleUnpack ws =
+  (\(ws1, (tk, sp), e) -> TupleUnpack (pyTokenAnn tk) ws1 sp e) <$> go
+  where
+    go =
+      (\a (c, d) f -> (Just (a, f), c, d)) <$>
+      (snd <$> token anySpace (TkLeftParen ())) <*>
+      ((\a b -> (a, b)) <$>
+      token ws (TkStar ()) <*>
+      orExpr ws) <*>
+      (snd <$> token ws (TkRightParen ()))
+      <!>
+      (\a b -> (Nothing, a, b)) <$>
+      token ws (TkStar ()) <*>
+      orExpr ws
+
+tupleUnpackOrExpr
+  :: Parser ann Whitespace
+  -> Parser ann (Expr '[] ann)
+  -> Parser ann (Either (TupleItem '[] ann) (Expr '[] ann))
+tupleUnpackOrExpr ws ex =
+  (\case
+      Left (ws1, (tk, sp), e) -> Left $ TupleUnpack (pyTokenAnn tk) ws1 sp e
+      Right x -> Right x) <$> go
+  where
+    go =
+      (\(aAnn, aWs) b fWs ->
+         case b of
+           Left (c, d) -> Left (Just (aWs, fWs), c, d)
+           Right x -> Right $ Parens (pyTokenAnn aAnn) aWs x fWs) <$>
+      (token anySpace (TkLeftParen ())) <*>
+      ((\a b -> Left (a, b)) <$>
+       token ws (TkStar ()) <*>
+       orExpr ws) <*>
+      (snd <$> token ws (TkRightParen ()))
+      <!>
+      (\a b -> Left (Nothing, a, b)) <$>
+      token ws (TkStar ()) <*>
+      orExpr ws
+      <!>
+      Right <$> ex
+
 exprList :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
-exprList ws =
-  (\a -> Tuple (_tupleItemAnn a) a) <$>
-  tupleUnpack ws <*>
-  (snd <$> comma ws) <*>
-  optional (commaSep1' ws $ tupleItem ws (orExpr ws))
-  <!>
-  (\e a ->
-     case a of
-       Nothing -> e
-       (Just (x, y)) ->
-         let
-           ann = e ^. exprAnnotation
-         in
-           Tuple ann (TupleItem ann e) x y) <$>
-  expr ws <*>
-  (optional
-     ((,) <$> (snd <$> comma ws) <*> optional (commaSep1' ws (tupleItem ws (expr ws)))))
+exprList ws = do
+  ex <- tupleUnpackOrExpr ws $ expr ws
+  case ex of
+    Left a ->
+      Tuple (_tupleItemAnn a) a <$>
+      (snd <$> comma ws) <*>
+      optional (commaSep1' ws $ tupleItem ws (orExpr ws))
+    Right e ->
+      (\a ->
+        case a of
+          Nothing -> e
+          Just (x, y) ->
+            let
+              ann = e ^. exprAnnotation
+            in
+              Tuple ann (TupleItem ann e) x y) <$>
+      optional
+        ((,) <$> (snd <$> comma ws) <*> optional (commaSep1' ws (tupleItem ws (expr ws))))
 
 compIf :: Parser ann (CompIf '[] ann)
 compIf =
@@ -359,35 +402,31 @@ exprComp ws =
   optional ((,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf))
 
 exprListComp :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
-exprListComp ws =
-  (\a -> Tuple (_tupleItemAnn a) a) <$>
-  tupleUnpack ws <*>
-  (snd <$> comma ws) <*>
-  optional (commaSep1' ws $ tupleItem ws (orExpr ws))
-  <!>
-  (\e a ->
-     case a of
-       Left (x, y) ->
-         let
-           ann = e ^. exprAnnotation
-         in
-           Generator ann $ Comprehension ann e x y
-       Right Nothing -> e
-       Right (Just (x, y)) ->
-         let
-           ann = e ^. exprAnnotation
-         in
-           Tuple ann (TupleItem ann e) x y) <$>
-  expr ws <*>
-  (fmap Left ((,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf)) <!>
-   Right <$>
-   optional ((,) <$> (snd <$> comma ws) <*> optional (commaSep1' ws (tupleItem ws (expr ws)))))
-
-tupleUnpack :: Parser ann Whitespace -> Parser ann (TupleItem '[] ann)
-tupleUnpack ws =
-  (\(tk, sp) -> TupleUnpack (pyTokenAnn tk) sp) <$>
-  token ws (TkStar ()) <*>
-  orExpr ws
+exprListComp ws = do
+  ex <- tupleUnpackOrExpr ws $ expr ws
+  case ex of
+    Left a ->
+      Tuple (_tupleItemAnn a) a <$>
+      (snd <$> comma ws) <*>
+      optional (commaSep1' ws $ tupleItem ws (orExpr ws))
+    Right e ->
+      (\a ->
+        case a of
+          Left (x, y) ->
+            let
+              ann = e ^. exprAnnotation
+            in
+              Generator ann $ Comprehension ann e x y
+          Right Nothing -> e
+          Right (Just (x, y)) ->
+            let
+              ann = e ^. exprAnnotation
+            in
+              Tuple ann (TupleItem ann e) x y) <$>
+      (fmap Left ((,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf)) <!>
+      Right <$>
+      optional
+        ((,) <$> (snd <$> comma ws) <*> optional (commaSep1' ws (tupleItem ws (expr ws)))))
 
 tupleItem
   :: Parser ann Whitespace
@@ -398,22 +437,22 @@ tupleItem ws e =
   tupleUnpack ws
 
 orExprList :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
-orExprList ws =
-  (\e ->
-     let
-       ann = e ^. exprAnnotation
-     in
-       maybe e (uncurry $ Tuple ann (TupleItem ann e))) <$>
-  orExpr ws <*>
-  optional
-    ((,) <$>
-     (snd <$> comma ws) <*>
-     optional (commaSep1' ws $ tupleItem ws (orExpr ws)))
-  <!>
-  (\e -> Tuple (_tupleItemAnn e) e) <$>
-  tupleUnpack ws <*>
-  (snd <$> comma ws) <*>
-  optional (commaSep1' ws $ tupleItem ws (orExpr ws))
+orExprList ws = do
+  ex <- tupleUnpackOrExpr ws $ orExpr ws
+  case ex of
+    Right e ->
+      let
+        ann = e ^. exprAnnotation
+      in
+        maybe e (uncurry $ Tuple ann (TupleItem ann e)) <$>
+        optional
+          ((,) <$>
+          (snd <$> comma ws) <*>
+          optional (commaSep1' ws $ tupleItem ws (orExpr ws)))
+    Left e ->
+      Tuple (_tupleItemAnn e) e <$>
+      (snd <$> comma ws) <*>
+      optional (commaSep1' ws $ tupleItem ws (orExpr ws))
 
 binOp :: Parser ann (BinOp ann) -> Parser ann (Expr '[] ann) -> Parser ann (Expr '[] ann)
 binOp op tm =

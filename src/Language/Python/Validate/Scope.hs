@@ -443,7 +443,7 @@ validateAssignExprScope (Tuple a b ws d) =
   traverseOf (traverse.traverse) tupleItem d
   where
     tupleItem (TupleItem a b) = TupleItem a <$> validateAssignExprScope b
-    tupleItem (TupleUnpack a b c) = TupleUnpack a b <$> validateAssignExprScope c
+    tupleItem (TupleUnpack a b c d) = TupleUnpack a b c <$> validateAssignExprScope d
 validateAssignExprScope e@Unit{} = pure $ coerce e
 validateAssignExprScope e@Lambda{} = pure $ coerce e
 validateAssignExprScope e@Yield{} = pure $ coerce e
@@ -505,7 +505,7 @@ validateTupleItemScope
   => TupleItem v a
   -> ValidateScope a e (TupleItem (Nub (Scope ': v)) a)
 validateTupleItemScope (TupleItem a b) = TupleItem a <$> validateExprScope b
-validateTupleItemScope (TupleUnpack a b c) = TupleUnpack a b <$> validateExprScope c
+validateTupleItemScope (TupleUnpack a b c d) = TupleUnpack a b c <$> validateExprScope d
 
 validateExprScope
   :: AsScopeError e v a

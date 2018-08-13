@@ -596,25 +596,44 @@ renderSetItem (SetUnpack _ a b) =
   foldMap renderWhitespace a <>
   renderUnpackTarget b
 
+renderNestedParens :: RenderOutput -> Maybe ([Whitespace], [Whitespace]) -> RenderOutput
+renderNestedParens =
+  foldr
+    (\(ws1, ws2) y ->
+        TkLeftParen () `cons`
+        foldMap renderWhitespace ws1 <>
+        y <>
+        singleton (TkRightParen ()) <>
+        foldMap renderWhitespace ws2)
+
 renderTupleItems :: CommaSep1' (TupleItem v a) -> RenderOutput
 renderTupleItems (CommaSepOne1' a Nothing) =
   case a of
     TupleItem _ b -> bracketTupleGenerator b
-    TupleUnpack _ b c ->
-      TkStar () `cons`
-      foldMap renderWhitespace b <>
-      renderUnpackTarget c
+    TupleUnpack _ b c d ->
+      renderNestedParens
+        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        b
 renderTupleItems (CommaSepOne1' a (Just ws)) =
   case a of
     TupleItem _ b -> bracketTupleGenerator b
-    TupleUnpack _ b c ->
+    TupleUnpack _ Nothing b c ->
       bracket (TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c) <>
+      singleton (TkComma ()) <> foldMap renderWhitespace ws
+    TupleUnpack _ b c d ->
+      renderNestedParens
+        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        b <>
       singleton (TkComma ()) <> foldMap renderWhitespace ws
 renderTupleItems (CommaSepMany1' a ws rest) =
   (case a of
     TupleItem _ b -> bracketTupleGenerator b
-    TupleUnpack _ b c ->
-      bracket (TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c)) <>
+    TupleUnpack _ Nothing b c ->
+      bracket (TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c)
+    TupleUnpack _ b c d ->
+      renderNestedParens
+        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        b) <>
   singleton (TkComma ()) <> foldMap renderWhitespace ws <>
   renderTupleItems rest
 

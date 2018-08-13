@@ -431,6 +431,7 @@ genTupleItem ws ge =
   [ TupleItem () <$>
     ge
   , TupleUnpack () <$>
+    Gen.maybe ((,) <$> genAnyWhitespaces <*> ws) <*>
     ws <*>
     ge
   ]

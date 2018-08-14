@@ -9,10 +9,12 @@ import Hedgehog
 import Language.Python.Internal.Lexer
 import Language.Python.Internal.Parse
 import Language.Python.Internal.Render
+import Language.Python.Internal.Syntax.IR (fromIR, fromIR_statement, fromIR_expr)
 import Language.Python.Internal.Syntax.Whitespace
 import Language.Python.Internal.Token
 
-import Helpers (doToPython, doParse, doParse', doNested, doTokenize, doIndentation)
+import Helpers
+  (doToPython, doParse, doNested)
 
 lexerParserTests :: Group
 lexerParserTests =
@@ -42,125 +44,81 @@ test_fulltrip_1 :: Property
 test_fulltrip_1 =
   withTests 1 . property $ do
     let str = "def a(x, y=2, *z, **w):\n   return 2 + 3"
-    a <- doToPython statement str
-    showStatement a === str
+
+    tree <- doToPython statement fromIR_statement str
+    annotateShow tree
+
+    showStatement tree === str
 
 test_fulltrip_2 :: Property
 test_fulltrip_2 =
   withTests 1 . property $ do
     let str = "(   1\n       *\n  3\n    )"
-    a <- doToPython (expr space) str
-    showExpr a === str
+
+    tree <- doToPython (expr space) fromIR_expr str
+    annotateShow tree
+
+    showExpr tree === str
 
 test_fulltrip_3 :: Property
 test_fulltrip_3 =
   withTests 1 . property $ do
     let str = "pass;"
-    a <- doToPython statement str
-    showStatement a === str
+
+    tree <- doToPython statement fromIR_statement str
+    annotateShow tree
+
+    showStatement tree === str
 
 test_fulltrip_4 :: Property
 test_fulltrip_4 =
   withTests 1 . property $ do
     let str = "def a():\n pass\n #\n pass\n"
 
-    tks <- doTokenize str
-    annotateShow tks
+    tree <- doToPython statement fromIR_statement str
+    annotateShow tree
 
-    let lls = logicalLines tks
-    length lls === 4
-    annotateShow lls
-
-    ils <- doIndentation lls
-    annotateShow ils
-
-    nst <- doNested ils
-    annotateShow nst
-
-    a <- doToPython statement str
-    showStatement a === str
+    showStatement tree === str
 
 test_fulltrip_5 :: Property
 test_fulltrip_5 =
   withTests 1 . property $ do
     let str = "if False:\n pass\n pass\nelse:\n pass\n pass\n"
 
-    tks <- doTokenize str
-    annotateShow tks
+    tree <- doToPython statement fromIR_statement str
+    annotateShow tree
 
-    let lls = logicalLines tks
-    length lls === 6
-    annotateShow lls
-
-    ils <- doIndentation lls
-    annotateShow ils
-
-    nst <- doNested ils
-    annotateShow nst
-
-    a <- doToPython statement str
-    showStatement a === str
+    showStatement tree === str
 
 test_fulltrip_6 :: Property
 test_fulltrip_6 =
   withTests 1 . property $ do
     let str = "# blah\ndef boo():\n    pass\n       #bing\n    #   bop\n"
 
-    tks <- doTokenize str
-    annotateShow tks
+    tree <- doToPython module_ fromIR str
+    annotateShow tree
 
-    let lls = logicalLines tks
-    length lls === 5
-    annotateShow lls
-
-    ils <- doIndentation lls
-    annotateShow ils
-
-    nst <- doNested ils
-    annotateShow nst
-
-    a <- doToPython module_ str
-    showModule a === str
+    showModule tree === str
 
 test_fulltrip_7 :: Property
 test_fulltrip_7 =
   withTests 1 . property $ do
     let str = "if False:\n pass\nelse \\\n      \\\r\n:\n pass\n"
 
-    tks <- doTokenize str
-    annotateShow tks
+    tree <- doToPython module_ fromIR str
+    annotateShow tree
 
-    let lls = logicalLines tks
-    annotateShow lls
-
-    ils <- doIndentation lls
-    annotateShow ils
-
-    nst <- doNested ils
-    annotateShow nst
-
-    a <- doToPython module_ str
-    showModule a === str
+    showModule tree === str
 
 test_fulltrip_8 :: Property
 test_fulltrip_8 =
   withTests 1 . property $ do
     let str = "def a():\n \n pass\n pass\n"
 
-    tks <- doTokenize str
-    annotateShow tks
+    tree <- doToPython module_ fromIR str
+    annotateShow tree
 
-    let lls = logicalLines tks
-    annotateShow lls
-
-    ils <- doIndentation lls
-    annotateShow ils
-
-    nst <- doNested ils
-    annotateShow nst
-
-    a <- doToPython module_ str
-    showModule a === str
+    showModule tree === str
 
 test_fulltrip_9 :: Property
 test_fulltrip_9 =
@@ -169,22 +127,10 @@ test_fulltrip_9 =
       str =
         "try:\n pass\nexcept False:\n pass\nelse:\n pass\nfinally:\n pass\n def a():\n  pass\n pass\n"
 
-    tks <- doTokenize str
-    annotateShow tks
+    tree <- doToPython module_ fromIR str
+    annotateShow tree
 
-    let lls = logicalLines tks
-    annotateShow lls
-
-    ils <- doIndentation lls
-    annotateShow ils
-
-    nst <- doNested ils
-    annotateShow nst
-
-    a <- doParse' module_ nst
-    annotateShow a
-
-    showModule a === str
+    showModule tree === str
 
 test_fulltrip_10 :: Property
 test_fulltrip_10 =
@@ -205,22 +151,10 @@ test_fulltrip_10 =
         , "    pass"
         ]
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- doToPython module_ fromIR str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
-
-    ils <- doIndentation lls
-    annotateShow $! ils
-
-    nst <- doNested ils
-    annotateShow $! nst
-
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === str
+    showModule tree === str
 
 test_fulltrip_11 :: Property
 test_fulltrip_11 =
@@ -236,22 +170,10 @@ test_fulltrip_11 =
         , " \tpass"
         ]
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- doToPython module_ fromIR str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
-
-    ils <- doIndentation lls
-    annotateShow $! ils
-
-    nst <- doNested ils
-    annotateShow $! nst
-
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === str
+    showModule tree === str
 
 test_fulltrip_12 :: Property
 test_fulltrip_12 =
@@ -268,22 +190,10 @@ test_fulltrip_12 =
         , " pass"
         ]
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- doToPython module_ fromIR str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
-
-    ils <- doIndentation lls
-    annotateShow $! ils
-
-    nst <- doNested ils
-    annotateShow $! nst
-
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === str
+    showModule tree === str
 
 test_fulltrip_13 :: Property
 test_fulltrip_13 =
@@ -302,22 +212,10 @@ test_fulltrip_13 =
         , " pass"
         ]
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- doToPython module_ fromIR str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
-
-    ils <- doIndentation lls
-    annotateShow $! ils
-
-    nst <- doNested ils
-    annotateShow $! nst
-
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === str
+    showModule tree === str
 
 test_fulltrip_14 :: Property
 test_fulltrip_14 =
@@ -325,22 +223,10 @@ test_fulltrip_14 =
     let
       str = "not ((False for a in False) if False else False or False)"
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- doToPython module_ fromIR str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
-
-    ils <- doIndentation lls
-    annotateShow $! ils
-
-    nst <- doNested ils
-    annotateShow $! nst
-
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === str
+    showModule tree === str
 
 test_fulltrip_15 :: Property
 test_fulltrip_15 =
@@ -348,22 +234,10 @@ test_fulltrip_15 =
     let
       str = "01."
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- doToPython module_ fromIR str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
-
-    ils <- doIndentation lls
-    annotateShow $! ils
-
-    nst <- doNested ils
-    annotateShow $! nst
-
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === str
+    showModule tree === str
 
 test_fulltrip_16 :: Property
 test_fulltrip_16 =
@@ -371,44 +245,20 @@ test_fulltrip_16 =
     let
       str = "def a():\n  return ~i"
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- doToPython module_ fromIR str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
-
-    ils <- doIndentation lls
-    annotateShow $! ils
-
-    nst <- doNested ils
-    annotateShow $! nst
-
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === str
+    showModule tree === str
 
 test_fulltrip_17 :: Property
 test_fulltrip_17 =
   withTests 1 . property $ do
-    let str = "((*a),)"
+    let str = "(*()),"
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- doToPython module_ fromIR str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
-
-    ils <- doIndentation lls
-    annotateShow $! ils
-
-    nst <- doNested ils
-    annotateShow $! nst
-
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === str
+    showModule tree === str
 
 parseTab :: Parser ann Whitespace
 parseTab = do

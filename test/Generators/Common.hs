@@ -431,28 +431,30 @@ genTupleItem ws ge =
   [ TupleItem () <$>
     ge
   , TupleUnpack () <$>
-    Gen.maybe ((,) <$> genAnyWhitespaces <*> ws) <*>
+    Gen.list (Range.constant 0 10) ((,) <$> genAnyWhitespaces <*> ws) <*>
     ws <*>
     ge
   ]
 
-genListItem :: MonadGen m => m (Expr v ()) -> m (ListItem v ())
-genListItem ge =
+genListItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (ListItem v ())
+genListItem ws ge =
   Gen.choice
   [ ListItem () <$>
     ge
   , ListUnpack () <$>
-    genAnyWhitespaces <*>
+    Gen.list (Range.constant 0 10) ((,) <$> genAnyWhitespaces <*> ws) <*>
+    ws <*>
     ge
   ]
 
-genSetItem :: MonadGen m => m (Expr v ()) -> m (SetItem v ())
-genSetItem ge =
+genSetItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (SetItem v ())
+genSetItem ws ge =
   Gen.choice
   [ SetItem () <$>
     ge
   , SetUnpack () <$>
-    genAnyWhitespaces <*>
+    Gen.list (Range.constant 0 10) ((,) <$> genAnyWhitespaces <*> ws) <*>
+    ws <*>
     ge
   ]
 

@@ -5,6 +5,7 @@ import Language.Python.Internal.Optics
 import Language.Python.Internal.Parse
 import Language.Python.Internal.Render
 import Language.Python.Internal.Syntax
+import Language.Python.Internal.Syntax.IR (fromIR_statement, fromIR_expr)
 import Language.Python.Validate.Indentation
 import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Syntax
@@ -167,7 +168,7 @@ expr_printparseprint_print =
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <- doToPython (expr space) (showExpr res')
+            py <- doToPython (exprList space) fromIR_expr (showExpr res')
             showExpr (res' ^. unvalidated) === showExpr (res $> ())
 
 statement_printparseprint_print :: Property
@@ -181,7 +182,7 @@ statement_printparseprint_print =
         case validateStatementSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <- doToPython statement $ showStatement res'
+            py <- doToPython statement fromIR_statement $ showStatement res'
             annotateShow py
             showStatement (res' ^. unvalidated) ===
               showStatement (py $> ())

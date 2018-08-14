@@ -20,7 +20,7 @@ import Control.Lens.TH (makeLenses)
 import Control.Lens.Tuple (_2, _3)
 import Control.Lens.Traversal (traverseOf)
 import Control.Lens.Wrapped (_Wrapped)
-import Control.Monad.State (State, modify, evalState)
+import Control.Monad.State (MonadState, State, evalState, modify)
 import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
 import Data.Foldable (traverse_)
@@ -29,7 +29,8 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.String (fromString)
 import Data.Type.Set (Nub)
 import Data.Trie (Trie)
-import Data.Validate (Validate(..))
+import Data.Validate (Validate)
+import Data.Validate.Monadic (ValidateM(..), runValidateM, bindVM, liftVM0, errorVM)
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Trie as Trie
@@ -55,38 +56,32 @@ makeLenses ''ScopeContext
 initialScopeContext :: ScopeContext a
 initialScopeContext = ScopeContext Trie.empty Trie.empty Trie.empty
 
-newtype ValidateScope ann e a
-  = ValidateScope
-  { unValidateScope :: Compose (State (ScopeContext ann)) (Validate [e]) a
-  } deriving (Functor, Applicative)
+type ValidateScope ann e = ValidateM [e] (State (ScopeContext ann))
 
 runValidateScope :: ScopeContext ann -> ValidateScope ann e a -> Validate [e] a
-runValidateScope ctxt (ValidateScope s) = evalState (getCompose s) ctxt
-
-scopeErrors :: [e] -> ValidateScope ann e a
-scopeErrors = ValidateScope . Compose . pure . Failure
+runValidateScope s = flip evalState s . runValidateM
 
 extendScope
   :: Setter' (ScopeContext ann) (Trie ann)
   -> [(ann, String)]
   -> ValidateScope ann e ()
 extendScope l s =
-  ValidateScope . Compose . fmap pure $ do
-  gs <- use scGlobalScope
-  let t = buildTrie gs Trie.empty
-  modify (over l (t `Trie.unionL`))
+  liftVM0 $ do
+    gs <- use scGlobalScope
+    let t = buildTrie gs Trie.empty
+    modify (over l (t `Trie.unionL`))
   where
     buildTrie gs t =
-       foldr
-       (\(ann, a) b ->
+      foldr
+      (\(ann, a) b ->
           let
             a' = fromString a
           in
             if Trie.member a' gs
             then b
             else Trie.insert a' ann b)
-       t
-       s
+      t
+      s
 
 locallyOver
   :: Lens' (ScopeContext ann) b
@@ -94,27 +89,10 @@ locallyOver
   -> ValidateScope ann e a
   -> ValidateScope ann e a
 locallyOver l f m =
-  ValidateScope . Compose $ do
+  ValidateM . Compose $ do
     before <- use l
     modify (l %~ f)
-    getCompose (unValidateScope m) <* modify (l .~ before)
-
-scopeContext
-  :: Lens' (ScopeContext ann) b
-  -> ValidateScope ann e b
-scopeContext l =
-  ValidateScope . Compose . fmap pure $ use l
-
-bindValidateScope
-  :: ValidateScope ann e a
-  -> (a -> ValidateScope ann e b)
-  -> ValidateScope ann e b
-bindValidateScope v f =
-  ValidateScope . Compose $ do
-    a <- getCompose (unValidateScope v)
-    case a of
-      Failure e -> pure $ Failure e
-      Success x -> getCompose . unValidateScope $ f x
+    getCompose (unValidateM m) <* modify (l .~ before)
 
 locallyExtendOver
   :: Lens' (ScopeContext ann) (Trie ann)
@@ -123,21 +101,23 @@ locallyExtendOver
   -> ValidateScope ann e a
 locallyExtendOver l s m = locallyOver l id $ extendScope l s *> m
 
-inScope :: String -> ValidateScope ann e (Maybe (Binding, ann))
-inScope s =
-  ValidateScope . Compose . fmap pure $ do
-    gs <- use scGlobalScope
-    ls <- use scLocalScope
-    is <- use scImmediateScope
-    let
-      s' = fromString s
-      inls = Trie.lookup s' ls
-      ings = Trie.lookup s' gs
-    pure $
-      ((,) Clean <$> Trie.lookup s' is) <|>
-      (ings *> ((,) Clean <$> inls)) <|>
-      ((,) Clean <$> ings) <|>
-      ((,) Dirty <$> inls)
+inScope
+  :: MonadState (ScopeContext ann) m
+  => String
+  -> m (Maybe (Binding, ann))
+inScope s = do
+  gs <- use scGlobalScope
+  ls <- use scLocalScope
+  is <- use scImmediateScope
+  let
+    s' = fromString s
+    inls = Trie.lookup s' ls
+    ings = Trie.lookup s' gs
+  pure $
+    ((,) Clean <$> Trie.lookup s' is) <|>
+    (ings *> ((,) Clean <$> inls)) <|>
+    ((,) Clean <$> ings) <|>
+    ((,) Dirty <$> inls)
 
 validateExceptAsScope
   :: AsScopeError e v a
@@ -184,8 +164,8 @@ validateCompoundStatementScope (Fundef a decos idnts ws1 name ws2 params ws3 s) 
   extendScope scLocalScope [(_identAnnotation &&& _identValue) name] <*
   extendScope scImmediateScope [(_identAnnotation &&& _identValue) name]
 validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
-  scopeContext scLocalScope `bindValidateScope` (\ls ->
-  scopeContext scImmediateScope `bindValidateScope` (\is ->
+  use scLocalScope `bindVM` (\ls ->
+  use scImmediateScope `bindVM` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty)
     (If idnts a ws1 <$>
@@ -199,16 +179,16 @@ validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
        elifs <*>
      traverseOf (traverse._3) validateSuiteScope melse)))
 validateCompoundStatementScope (While idnts a ws1 e b) =
-  scopeContext scLocalScope `bindValidateScope` (\ls ->
-  scopeContext scImmediateScope `bindValidateScope` (\is ->
+  use scLocalScope `bindVM` (\ls ->
+  use scImmediateScope `bindVM` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty)
     (While idnts a ws1 <$>
      validateExprScope e <*>
      validateSuiteScope b)))
 validateCompoundStatementScope (TryExcept idnts a b e f k l) =
-  scopeContext scLocalScope `bindValidateScope` (\ls ->
-  scopeContext scImmediateScope `bindValidateScope` (\is ->
+  use scLocalScope `bindVM` (\ls ->
+  use scImmediateScope `bindVM` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty)
     (TryExcept idnts a b <$>
@@ -225,8 +205,8 @@ validateCompoundStatementScope (TryExcept idnts a b e f k l) =
      traverseOf (traverse._3) validateSuiteScope k <*>
      traverseOf (traverse._3) validateSuiteScope l)))
 validateCompoundStatementScope (TryFinally idnts a b e idnts2 f i) =
-  scopeContext scLocalScope `bindValidateScope` (\ls ->
-  scopeContext scImmediateScope `bindValidateScope` (\is ->
+  use scLocalScope `bindVM` (\ls ->
+  use scImmediateScope `bindVM` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty)
     (TryFinally idnts a b <$>
@@ -235,16 +215,16 @@ validateCompoundStatementScope (TryFinally idnts a b e idnts2 f i) =
      pure f <*>
      validateSuiteScope i)))
 validateCompoundStatementScope (For idnts a b c d e h i) =
-  scopeContext scLocalScope `bindValidateScope` (\ls ->
-  scopeContext scImmediateScope `bindValidateScope` (\is ->
+  use scLocalScope `bindVM` (\ls ->
+  use scImmediateScope `bindVM` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty) $
     For idnts a b <$>
     (coerce c <$
      traverse
        (\s ->
-          inScope (s ^. identValue) `bindValidateScope` \res ->
-          maybe (pure ()) (\_ -> scopeErrors [_BadShadowing # coerce s]) res)
+          inScope (s ^. identValue) `bindVM` \res ->
+          maybe (pure ()) (\_ -> errorVM [_BadShadowing # coerce s]) res)
        (c ^.. unvalidated.cosmos._Ident._2)) <*>
     pure d <*>
     validateExprScope e <*>
@@ -314,11 +294,11 @@ validateSmallStatementScope (AugAssign a l aa r) =
   (\l' -> AugAssign a l' aa) <$>
   validateExprScope l <*>
   validateExprScope r
-validateSmallStatementScope (Global a _ _) = scopeErrors [_FoundGlobal # a]
-validateSmallStatementScope (Nonlocal a _ _) = scopeErrors [_FoundNonlocal # a]
+validateSmallStatementScope (Global a _ _) = errorVM [_FoundGlobal # a]
+validateSmallStatementScope (Nonlocal a _ _) = errorVM [_FoundNonlocal # a]
 validateSmallStatementScope (Del a ws cs) =
   Del a ws <$
-  traverse_ (\case; Ident ann _-> scopeErrors [_DeletedIdent # ann]; _ -> pure ()) cs <*>
+  traverse_ (\case; Ident ann _-> errorVM [_DeletedIdent # ann]; _ -> pure ()) cs <*>
   traverse validateExprScope cs
 validateSmallStatementScope s@Pass{} = pure $ coerce s
 validateSmallStatementScope s@Break{} = pure $ coerce s
@@ -344,12 +324,12 @@ validateIdentScope
   => Ident v a
   -> ValidateScope a e (Ident (Nub (Scope ': v)) a)
 validateIdentScope i =
-  inScope (_identValue i) `bindValidateScope`
+  inScope (_identValue i) `bindVM`
   \context ->
   case context of
     Just (Clean, _) -> pure $ coerce i
-    Just (Dirty, ann)-> scopeErrors [_FoundDynamic # (ann, i)]
-    Nothing -> scopeErrors [_NotInScope # i]
+    Just (Dirty, ann)-> errorVM [_FoundDynamic # (ann, i)]
+    Nothing -> errorVM [_NotInScope # i]
 
 validateArgScope
   :: AsScopeError e v a
@@ -401,8 +381,7 @@ validateComprehensionScope (Comprehension a b c d) =
       (\c' -> CompFor a b c' d) <$>
       validateAssignExprScope c <*>
       validateExprScope e <*
-      extendScope
-        scGlobalScope
+      extendScope scGlobalScope
         (c ^.. unvalidated.assignTargets.to (_identAnnotation &&& _identValue))
 
     validateCompIfScope
@@ -426,7 +405,7 @@ validateAssignExprScope (List a ws1 es ws2) =
   pure ws2
   where
     listItem (ListItem a b) = ListItem a <$> validateAssignExprScope b
-    listItem (ListUnpack a b c) = ListUnpack a b <$> validateAssignExprScope c
+    listItem (ListUnpack a b c d) = ListUnpack a b c <$> validateAssignExprScope d
 validateAssignExprScope (Deref a e ws1 r) =
   Deref a <$>
   validateExprScope e <*>
@@ -491,14 +470,14 @@ validateListItemScope
   => ListItem v a
   -> ValidateScope a e (ListItem (Nub (Scope ': v)) a)
 validateListItemScope (ListItem a b) = ListItem a <$> validateExprScope b
-validateListItemScope (ListUnpack a b c) = ListUnpack a b <$> validateExprScope c
+validateListItemScope (ListUnpack a b c d) = ListUnpack a b c <$> validateExprScope d
 
 validateSetItemScope
   :: AsScopeError e v a
   => SetItem v a
   -> ValidateScope a e (SetItem (Nub (Scope ': v)) a)
 validateSetItemScope (SetItem a b) = SetItem a <$> validateExprScope b
-validateSetItemScope (SetUnpack a b c) = SetUnpack a b <$> validateExprScope c
+validateSetItemScope (SetUnpack a b c d) = SetUnpack a b c <$> validateExprScope d
 
 validateTupleItemScope
   :: AsScopeError e v a

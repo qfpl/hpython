@@ -170,35 +170,6 @@ instance HasTrailingWhitespace (CompFor v a) where
       (\(CompFor _ _ _ _ a) -> a ^. trailingWhitespace)
       (\(CompFor a b c d e) ws -> CompFor a b c d $ e & trailingWhitespace .~ ws)
 
-data StringLiteral a
-  = StringLiteral
-  { _stringLiteralAnn :: a
-  , _unsafeStringLiteralPrefix :: Maybe StringPrefix
-  , _stringLiteralQuoteType :: QuoteType
-  , _stringLiteralType :: StringType
-  , _stringLiteralValue :: [PyChar]
-  , _stringLiteralWhitespace :: [Whitespace]
-  }
-  | BytesLiteral
-  { _stringLiteralAnn :: a
-  , _unsafeBytesLiteralPrefix :: BytesPrefix
-  , _stringLiteralQuoteType :: QuoteType
-  , _stringLiteralType :: StringType
-  , _stringLiteralValue :: [PyChar]
-  , _stringLiteralWhitespace :: [Whitespace]
-  }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-
-instance HasTrailingWhitespace (StringLiteral a) where
-  trailingWhitespace =
-    lens
-      (\case
-          StringLiteral _ _ _ _ _ ws -> ws
-          BytesLiteral _ _ _ _ _ ws -> ws)
-      (\s ws -> case s of
-          StringLiteral a b c d e _ -> StringLiteral a b c d e ws
-          BytesLiteral a b c d e _ -> BytesLiteral a b c d e ws)
-
 data DictItem (v :: [*]) a
   = DictItem
   { _dictItemAnn :: a
@@ -268,13 +239,27 @@ data ListItem v a
   }
   | ListUnpack
   { _listItemAnn :: a
+  , _unsafeListUnpackParens :: [([Whitespace], [Whitespace])]
   , _unsafeListUnpackWhitespace :: [Whitespace]
   , _unsafeListUnpackValue :: Expr v a
   } deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasExprs ListItem where
   _Exprs f (ListItem a b) = ListItem a <$> f b
-  _Exprs f (ListUnpack a b c) = ListUnpack a b <$> f c
+  _Exprs f (ListUnpack a b c d) = ListUnpack a b c <$> f d
+
+instance HasTrailingWhitespace (ListItem v a) where
+  trailingWhitespace =
+    lens
+      (\case
+          ListItem _ a -> a ^. trailingWhitespace
+          ListUnpack _ [] _ a -> a ^. trailingWhitespace
+          ListUnpack _ ((_, ws) : _) _ _ -> ws)
+      (\a ws ->
+         case a of
+           ListItem b c -> ListItem b $ c & trailingWhitespace .~ ws
+           ListUnpack b [] d e -> ListUnpack b [] d $ e & trailingWhitespace .~ ws
+           ListUnpack b ((c, _) : rest) e f -> ListUnpack b ((c, ws) : rest) e f)
 
 data SetItem v a
   = SetItem
@@ -283,13 +268,27 @@ data SetItem v a
   }
   | SetUnpack
   { _setItemAnn :: a
+  , _unsafeSetUnpackParens :: [([Whitespace], [Whitespace])]
   , _unsafeSetUnpackWhitespace :: [Whitespace]
   , _unsafeSetUnpackValue :: Expr v a
   } deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasExprs SetItem where
   _Exprs f (SetItem a b) = SetItem a <$> f b
-  _Exprs f (SetUnpack a b c) = SetUnpack a b <$> f c
+  _Exprs f (SetUnpack a b c d) = SetUnpack a b c <$> f d
+
+instance HasTrailingWhitespace (SetItem v a) where
+  trailingWhitespace =
+    lens
+      (\case
+          SetItem _ a -> a ^. trailingWhitespace
+          SetUnpack _ [] _ a -> a ^. trailingWhitespace
+          SetUnpack _ ((_, ws) : _) _ _ -> ws)
+      (\a ws ->
+         case a of
+           SetItem b c -> SetItem b $ c & trailingWhitespace .~ ws
+           SetUnpack b [] d e -> SetUnpack b [] d $ e & trailingWhitespace .~ ws
+           SetUnpack b ((c, _) : rest) e f -> SetUnpack b ((c, ws) : rest) e f)
 
 data TupleItem v a
   = TupleItem
@@ -298,7 +297,7 @@ data TupleItem v a
   }
   | TupleUnpack
   { _tupleItemAnn :: a
-  , _unsafeTupleParens :: Maybe ([Whitespace], [Whitespace])
+  , _unsafeTupleUnpackParens :: [([Whitespace], [Whitespace])]
   , _unsafeTupleUnpackWhitespace :: [Whitespace]
   , _unsafeTupleUnpackValue :: Expr v a
   } deriving (Eq, Show, Functor, Foldable, Traversable)
@@ -312,13 +311,13 @@ instance HasTrailingWhitespace (TupleItem v a) where
     lens
       (\case
           TupleItem _ a -> a ^. trailingWhitespace
-          TupleUnpack _ Nothing _ a -> a ^. trailingWhitespace
-          TupleUnpack _ (Just (_, ws)) _ _ -> ws)
+          TupleUnpack _ [] _ a -> a ^. trailingWhitespace
+          TupleUnpack _ ((_, ws) : _) _ _ -> ws)
       (\a ws ->
          case a of
            TupleItem b c -> TupleItem b $ c & trailingWhitespace .~ ws
-           TupleUnpack b Nothing d e -> TupleUnpack b Nothing d $ e & trailingWhitespace .~ ws
-           TupleUnpack b (Just (c, _)) e f -> TupleUnpack b (Just (c, ws)) e f)
+           TupleUnpack b [] d e -> TupleUnpack b [] d $ e & trailingWhitespace .~ ws
+           TupleUnpack b ((c, _) : rest) e f -> TupleUnpack b ((c, ws) : rest) e f)
 
 data Expr (v :: [*]) a
   = Unit
@@ -349,11 +348,11 @@ data Expr (v :: [*]) a
   -- expr
   , _unsafeTernaryValue :: Expr v a
   -- 'if' spaces
-  , _unsafeListCompWhitespaceIf :: [Whitespace]
+  , _unsafeTernaryWhitespaceIf :: [Whitespace]
   -- expr
   , _unsafeTernaryCond :: Expr v a
   -- 'else' spaces
-  , _unsafeListCompWhitespaceElse :: [Whitespace]
+  , _unsafeTernaryWhitespaceElse :: [Whitespace]
   -- expr
   , _unsafeTernaryElse :: Expr v a
   }

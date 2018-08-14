@@ -1,7 +1,41 @@
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language LambdaCase #-}
 module Language.Python.Internal.Syntax.Strings where
 
+import Control.Lens.Lens (lens)
 import Data.Digit.Octal (OctDigit)
 import Data.Digit.HeXaDeCiMaL (HeXDigit)
+
+import Language.Python.Internal.Syntax.Whitespace
+
+data StringLiteral a
+  = StringLiteral
+  { _stringLiteralAnn :: a
+  , _unsafeStringLiteralPrefix :: Maybe StringPrefix
+  , _stringLiteralQuoteType :: QuoteType
+  , _stringLiteralType :: StringType
+  , _stringLiteralValue :: [PyChar]
+  , _stringLiteralWhitespace :: [Whitespace]
+  }
+  | BytesLiteral
+  { _stringLiteralAnn :: a
+  , _unsafeBytesLiteralPrefix :: BytesPrefix
+  , _stringLiteralQuoteType :: QuoteType
+  , _stringLiteralType :: StringType
+  , _stringLiteralValue :: [PyChar]
+  , _stringLiteralWhitespace :: [Whitespace]
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasTrailingWhitespace (StringLiteral a) where
+  trailingWhitespace =
+    lens
+      (\case
+          StringLiteral _ _ _ _ _ ws -> ws
+          BytesLiteral _ _ _ _ _ ws -> ws)
+      (\s ws -> case s of
+          StringLiteral a b c d e _ -> StringLiteral a b c d e ws
+          BytesLiteral a b c d e _ -> BytesLiteral a b c d e ws)
 
 data QuoteType
   = SingleQuote

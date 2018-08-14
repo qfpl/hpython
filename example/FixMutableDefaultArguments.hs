@@ -2,8 +2,8 @@
 {-# language DataKinds #-}
 module FixMutableDefaultArguments where
 
-import Control.Lens.Fold ((^..), (^?), filtered, folded)
-import Control.Lens.Getter ((^.))
+import Control.Lens.Fold ((^..), (^?), filtered, folded, anyOf)
+import Control.Lens.Getter ((^.), getting)
 import Control.Lens.Setter ((.~), over)
 import Data.Foldable (toList)
 import Data.Function ((&))
@@ -39,6 +39,7 @@ fixMutableDefaultArguments input = do
     (NonEmpty.fromList $ conditionalAssignments <> (suite ^.. _Statements.noIndents))
   where
     isMutable :: Expr v a -> Bool
+    isMutable Unit{} = False
     isMutable None{} = False
     isMutable Lambda{} = False
     isMutable Float{} = False
@@ -61,4 +62,4 @@ fixMutableDefaultArguments input = do
     isMutable Generator{} = True
     isMutable (Ternary _ _ _ a _ b) = isMutable a && isMutable b
     isMutable (Parens _ _ a _) = isMutable a
-    isMutable (Tuple _ a _ as) = isMutable a || any (any isMutable) as
+    isMutable (Tuple _ a _ as) = anyOf (getting _Exprs) isMutable a || anyOf (folded.folded.getting _Exprs) isMutable as

@@ -225,7 +225,7 @@ genList genExpr' =
         _ -> []) $
   List () <$>
   genWhitespaces <*>
-  Gen.maybe (genSizedCommaSep1' $ genListItem genExpr') <*>
+  Gen.maybe (genSizedCommaSep1' $ genListItem genWhitespaces genExpr') <*>
   genWhitespaces
 
 genParens :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
@@ -317,7 +317,7 @@ genExpr' isExp = do
        genWhitespaces
      , Set () <$>
        genAnyWhitespaces <*>
-       genSizedCommaSep1' (genSetItem genExpr) <*>
+       genSizedCommaSep1' (genSetItem genWhitespaces genExpr) <*>
        genWhitespaces
      , genDeref
      , genParens (genExpr' isExp)

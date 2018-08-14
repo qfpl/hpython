@@ -462,7 +462,7 @@ data Expr (v :: [*]) a
   }
   | String
   { _exprAnnotation :: a
-  , _unsafeStringLiteralValue :: NonEmpty (StringLiteral a)
+  , _unsafeStringValue :: NonEmpty (StringLiteral a)
   }
   | Tuple
   { _exprAnnotation :: a

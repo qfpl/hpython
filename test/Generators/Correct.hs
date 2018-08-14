@@ -287,11 +287,13 @@ genStringLiterals = do
   b <- Gen.bool_
   String () <$> go b n
   where
-    go True 1 = pure <$> genStringLiteral genPyChar
-    go False 1 = pure <$> genBytesLiteral genPyChar
+    ss = Gen.choice [genStringLiteral genPyChar, genRawStringLiteral]
+    bs = Gen.choice [genBytesLiteral genPyChar, genRawBytesLiteral]
+    go True 1 = pure <$> ss
+    go False 1 = pure <$> bs
     go b n =
       NonEmpty.cons <$>
-      (if b then genStringLiteral genPyChar else genBytesLiteral genPyChar) <*>
+      (if b then ss else bs) <*>
       go b (n-1)
 
 genExpr' :: (MonadGen m, MonadState GenState m) => Bool -> m (Expr '[] ())

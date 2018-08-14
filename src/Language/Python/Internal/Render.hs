@@ -88,16 +88,24 @@ showRenderOutput =
 showStringPrefix :: StringPrefix -> Text
 showStringPrefix sp =
   case sp of
-    Prefix_r -> "r"
-    Prefix_R -> "R"
     Prefix_u -> "u"
     Prefix_U -> "U"
+
+showRawStringPrefix :: RawStringPrefix -> Text
+showRawStringPrefix sp =
+  case sp of
+    Prefix_r -> "r"
+    Prefix_R -> "R"
 
 showBytesPrefix :: BytesPrefix -> Text
 showBytesPrefix sp =
   case sp of
     Prefix_b -> "b"
     Prefix_B -> "B"
+
+showRawBytesPrefix :: RawBytesPrefix -> Text
+showRawBytesPrefix sp =
+  case sp of
     Prefix_br -> "br"
     Prefix_Br -> "Br"
     Prefix_bR -> "bR"
@@ -171,6 +179,26 @@ showToken t =
         showBytesPrefix sp <>
         quote <>
         renderPyChars qt st s <>
+        quote
+    TkRawString sp qt st s _ ->
+      let
+        quote =
+          Text.pack $
+          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
+      in
+        showRawStringPrefix sp <>
+        quote <>
+        renderRawPyChars qt st (_RawString # s) <>
+        quote
+    TkRawBytes sp qt st s _ ->
+      let
+        quote =
+          Text.pack $
+          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
+      in
+        showRawBytesPrefix sp <>
+        quote <>
+        renderRawPyChars qt st (_RawString # s) <>
         quote
     TkSpace{} -> " "
     TkTab{} -> "\t"
@@ -286,6 +314,58 @@ intToHex n = Text.pack $ go n []
     go 14 = (++"E")
     go 15 = (++"F")
     go b = let (q, r) = quotRem b 16 in go r . go q
+
+renderRawPyChars :: QuoteType -> StringType -> [Char] -> Text
+renderRawPyChars qt st = Text.pack . go
+  where
+    endSingleQuotesShort a =
+      transform
+        (\x -> case x of
+           '\\' : '\'' : as -> x
+           c : '\'' : as -> c : '\\' : '\'' : as
+           _ -> x)
+        (case a of
+           '\'' : cs -> '\\' : '\'' : cs
+           _ -> a)
+
+    endSingleQuotesLong a =
+      transform
+        (\x -> case x of
+           '\'' : '\'' : '\'' : as -> "\\\'\\\'\\\'" ++ as
+           ['\\', '\''] -> ['\\', '\'']
+           [c, '\''] -> [c, '\\', '\'']
+           _ -> x)
+        (case a of
+           '\'' : cs -> '\\' : '\'' : cs
+           _ -> a)
+
+    endDoubleQuotesShort a =
+      transform
+        (\x -> case x of
+           '\\' : '\"' : as -> x
+           c : '\"' : as -> c : '\\' : '\"' : as
+           _ -> x)
+        (case a of
+           '\"' : cs -> '\\' : '\"' : cs
+           _ -> a)
+
+    endDoubleQuotesLong a =
+      transform
+        (\x -> case x of
+           '\"' : '\"' : '\"' : as -> "\\\"\\\"\\\"" ++ as
+           ['\\', '\"']  -> x
+           [c, '\"'] -> [c, '\\', '\"']
+           _ -> x)
+        (case a of
+           '\"' : cs -> '\\' : '\"' : cs
+           _ -> a)
+
+    go s =
+      case (qt, st) of
+        (SingleQuote, ShortString) -> endSingleQuotesShort s
+        (SingleQuote, LongString) -> endSingleQuotesLong s
+        (DoubleQuote, ShortString) -> endDoubleQuotesShort s
+        (DoubleQuote, LongString) -> endDoubleQuotesLong s
 
 renderPyChars :: QuoteType -> StringType -> [PyChar] -> Text
 renderPyChars qt st = Text.pack . go
@@ -546,6 +626,12 @@ renderStringLiteral (StringLiteral _ a b c d e) =
 renderStringLiteral (BytesLiteral _ a b c d e) =
   TkBytes a b c d () `cons`
   foldMap renderWhitespace e
+renderStringLiteral (RawStringLiteral _ a b c d e) =
+  TkRawString a b c d () `cons`
+  foldMap renderWhitespace e
+renderStringLiteral (RawBytesLiteral _ a b c d e) =
+  TkRawBytes a b c d () `cons`
+  foldMap renderWhitespace e
 
 renderSubscript :: Subscript v a -> RenderOutput
 renderSubscript (SubscriptExpr a) = bracketTupleGenerator a
@@ -604,7 +690,7 @@ renderTupleItems (CommaSepOne1' a (Just ws)) =
   (case a of
      TupleItem _ b -> bracketTupleGenerator b
      TupleUnpack _ [] b c ->
-       TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
+       bracket $ TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
      TupleUnpack _ b c d ->
        renderNestedParens
          (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
@@ -614,7 +700,7 @@ renderTupleItems (CommaSepMany1' a ws rest) =
   (case a of
     TupleItem _ b -> bracketTupleGenerator b
     TupleUnpack _ [] b c ->
-      TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
+      bracket $ TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
     TupleUnpack _ b c d ->
       renderNestedParens
         (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
@@ -883,7 +969,7 @@ renderSmallStatement (Assign _ lvalue rvalues) =
        renderYield bracketGenerator rvalue)
     rvalues
 renderSmallStatement (AugAssign _ lvalue as rvalue) =
-  renderExpr lvalue <> renderAugAssign as <> bracketGenerator rvalue
+  renderExpr lvalue <> renderAugAssign as <> bracketTupleGenerator rvalue
 renderSmallStatement (Pass _) = singleton $ TkPass ()
 renderSmallStatement (Continue _) = singleton $ TkContinue ()
 renderSmallStatement (Break _) = singleton $ TkBreak ()

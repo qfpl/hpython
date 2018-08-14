@@ -295,6 +295,12 @@ stringOrBytes ws =
        TkBytes sp qt st val ann ->
          Parser (consumed ann) $>
          BytesLiteral ann sp qt st val
+       TkRawString sp qt st val ann ->
+         Parser (consumed ann) $>
+         RawStringLiteral ann sp qt st val
+       TkRawBytes sp qt st val ann ->
+         Parser (consumed ann) $>
+         RawBytesLiteral ann sp qt st val
        _ -> Parser . throwError $ ExpectedStringOrBytes curTk) <*>
      many ws
 

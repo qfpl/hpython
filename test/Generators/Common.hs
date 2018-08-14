@@ -5,7 +5,7 @@ import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
-import Control.Lens.Fold ((^?!))
+import Control.Lens.Fold ((^?!), preview)
 import Control.Lens.Prism (_Right)
 import Control.Monad ((<=<))
 import Data.Digit.Enum (enumDecimal)
@@ -223,10 +223,15 @@ genNormalWhitespace = Gen.sized $ \n ->
 genStringPrefix :: MonadGen m => m StringPrefix
 genStringPrefix =
   Gen.element
+    [ Prefix_u
+    , Prefix_U
+    ]
+
+genRawStringPrefix :: MonadGen m => m RawStringPrefix
+genRawStringPrefix =
+  Gen.element
     [ Prefix_r
     , Prefix_R
-    , Prefix_u
-    , Prefix_U
     ]
 
 genBytesPrefix :: MonadGen m => m BytesPrefix
@@ -234,7 +239,12 @@ genBytesPrefix =
   Gen.element
     [ Prefix_b
     , Prefix_B
-    , Prefix_br
+    ]
+
+genRawBytesPrefix :: MonadGen m => m RawBytesPrefix
+genRawBytesPrefix =
+  Gen.element
+    [ Prefix_br
     , Prefix_Br
     , Prefix_bR
     , Prefix_BR
@@ -423,6 +433,27 @@ genBytesLiteral gChar =
   genQuoteType <*>
   genStringType <*>
   genString gChar <*>
+  genWhitespaces
+
+genRawString :: MonadGen m => m (RawString String)
+genRawString = Gen.just . fmap (preview _RawString) $ Gen.string (Range.constant 0 100) (Gen.filter (/= '\0') Gen.ascii)
+
+genRawStringLiteral :: MonadGen m => m (StringLiteral ())
+genRawStringLiteral =
+  RawStringLiteral () <$>
+  genRawStringPrefix <*>
+  genQuoteType <*>
+  genStringType <*>
+  genRawString <*>
+  genWhitespaces
+
+genRawBytesLiteral :: MonadGen m => m (StringLiteral ())
+genRawBytesLiteral =
+  RawBytesLiteral () <$>
+  genRawBytesPrefix <*>
+  genQuoteType <*>
+  genStringType <*>
+  genRawString <*>
   genWhitespaces
 
 genTupleItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (TupleItem v ())

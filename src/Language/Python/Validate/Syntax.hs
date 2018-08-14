@@ -170,6 +170,10 @@ validateStringLiteralSyntax (StringLiteral a b c d e f) =
   StringLiteral a b c d e <$> validateWhitespace a f
 validateStringLiteralSyntax (BytesLiteral a b c d e f) =
   BytesLiteral a b c d e <$> validateWhitespace a f
+validateStringLiteralSyntax (RawStringLiteral a b c d e f) =
+  RawStringLiteral a b c d e <$> validateWhitespace a f
+validateStringLiteralSyntax (RawBytesLiteral a b c d e f) =
+  RawBytesLiteral a b c d e <$> validateWhitespace a f
 
 validateDictItemSyntax
   :: ( AsSyntaxError e v a
@@ -311,8 +315,8 @@ validateExprSyntax (UnOp a op expr) =
   UnOp a op <$> validateExprSyntax expr
 validateExprSyntax (String a strLits) =
   if
-    all (\case; StringLiteral{} -> True; _ -> False) strLits ||
-    all (\case; BytesLiteral{} -> True; _ -> False) strLits
+    all (\case; StringLiteral{} -> True; RawStringLiteral{} -> True; _ -> False) strLits ||
+    all (\case; BytesLiteral{} -> True; RawBytesLiteral{} -> True; _ -> False) strLits
   then
     String a <$> traverse validateStringLiteralSyntax strLits
   else

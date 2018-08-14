@@ -8,8 +8,9 @@
 module Language.Python.Internal.Lexer where
 
 import Control.Applicative ((<**>), (<|>), many, optional)
-import Control.Lens.Iso (from)
+import Control.Lens.Fold ((^?))
 import Control.Lens.Getter ((^.))
+import Control.Lens.Iso (from)
 import Control.Monad (when, replicateM)
 import Control.Monad.Except (throwError)
 import Control.Monad.State (StateT, evalStateT, get, modify, put)
@@ -83,26 +84,41 @@ parseCommentNewline = do
          char '\r' *> (CRLF (Just $ Comment c) <$ char '\n' <|> pure (CR . Just $ Comment c))) <|>
       pure (TkComment c)
 
-stringOrBytesPrefix :: CharParsing m => m (Either StringPrefix BytesPrefix)
+stringOrBytesPrefix
+  :: CharParsing m
+  => m (Either
+          (Either RawStringPrefix StringPrefix)
+          (Either RawBytesPrefix BytesPrefix))
 stringOrBytesPrefix =
   (char 'r' *>
-   (Right Prefix_rb <$ char 'b' <|>
-    Right Prefix_rB <$ char 'B' <|>
-    pure (Left Prefix_r))) <|>
+   (Right (Left Prefix_rb) <$ char 'b' <|>
+    Right (Left Prefix_rB) <$ char 'B' <|>
+    pure (Left $ Left Prefix_r))) <|>
   (char 'R' *>
-   (Right Prefix_Rb <$ char 'b' <|>
-    Right Prefix_RB <$ char 'B' <|>
-    pure (Left Prefix_R))) <|>
+   (Right (Left Prefix_Rb) <$ char 'b' <|>
+    Right (Left Prefix_RB) <$ char 'B' <|>
+    pure (Left $ Left Prefix_R))) <|>
   (char 'b' *>
-   (Right Prefix_br <$ char 'r' <|>
-    Right Prefix_bR <$ char 'R' <|>
-    pure (Right Prefix_b))) <|>
+   (Right (Left Prefix_br) <$ char 'r' <|>
+    Right (Left Prefix_bR) <$ char 'R' <|>
+    pure (Right $ Right Prefix_b))) <|>
   (char 'B' *>
-   (Right Prefix_Br <$ char 'r' <|>
-    Right Prefix_BR <$ char 'R' <|>
-    pure (Right Prefix_B))) <|>
-  (Left Prefix_u <$ char 'u') <|>
-  (Left Prefix_U <$ char 'U')
+   (Right (Left Prefix_Br) <$ char 'r' <|>
+    Right (Left Prefix_BR) <$ char 'R' <|>
+    pure (Right $ Right Prefix_B))) <|>
+  (Left (Right Prefix_u) <$ char 'u') <|>
+  (Left (Right Prefix_U) <$ char 'U')
+
+rawStringChars :: (Monad m, CharParsing m) => m a -> m (RawString String)
+rawStringChars mc = do
+  str <-
+    manyTill
+      ((\x y -> [x, y]) <$> char '\\' <*> noneOf "\0" <|>
+       pure <$> noneOf "\0")
+      mc
+  case concat str ^? _RawString of
+    Nothing -> unexpected "odd number of backslashes terminating raw string"
+    Just str' -> pure str'
 
 stringChar :: CharParsing m => m PyChar
 stringChar =
@@ -289,13 +305,25 @@ parseToken =
             manyTill stringChar (text "\"\"\"")
             <|>
             TkString Nothing DoubleQuote ShortString <$> manyTill stringChar (char '"')
-          Just (Left prefix) ->
+          Just (Left (Left prefix)) ->
+            TkRawString prefix DoubleQuote LongString <$
+            text "\"\"" <*>
+            rawStringChars (text "\"\"\"")
+            <|>
+            TkRawString prefix DoubleQuote ShortString <$> rawStringChars (char '"')
+          Just (Left (Right prefix)) ->
             TkString (Just prefix) DoubleQuote LongString <$
             text "\"\"" <*>
             manyTill stringChar (text "\"\"\"")
             <|>
             TkString (Just prefix) DoubleQuote ShortString <$> manyTill stringChar (char '"')
-          Just (Right prefix) ->
+          Just (Right (Left prefix)) ->
+            TkRawBytes prefix DoubleQuote LongString <$
+            text "\"\"" <*>
+            rawStringChars (text "\"\"\"")
+            <|>
+            TkRawBytes prefix DoubleQuote ShortString <$> rawStringChars (char '"')
+          Just (Right (Right prefix)) ->
             TkBytes prefix DoubleQuote LongString <$
             text "\"\"" <*>
             manyTill stringChar (text "\"\"\"")
@@ -310,13 +338,25 @@ parseToken =
             manyTill stringChar (text "'''")
             <|>
             TkString Nothing SingleQuote ShortString <$> manyTill stringChar (char '\'')
-          Just (Left prefix) ->
+          Just (Left (Left prefix)) ->
+            TkRawString prefix SingleQuote LongString <$
+            text "''" <*>
+            rawStringChars (text "'''")
+            <|>
+            TkRawString prefix SingleQuote ShortString <$> rawStringChars (char '\'')
+          Just (Left (Right prefix)) ->
             TkString (Just prefix) SingleQuote LongString <$
             text "''" <*>
             manyTill stringChar (text "'''")
             <|>
             TkString (Just prefix) SingleQuote ShortString <$> manyTill stringChar (char '\'')
-          Just (Right prefix) ->
+          Just (Right (Left prefix)) ->
+            TkRawBytes prefix SingleQuote LongString <$
+            text "''" <*>
+            rawStringChars (text "'''")
+            <|>
+            TkRawBytes prefix SingleQuote ShortString <$> rawStringChars (char '\'')
+          Just (Right (Right prefix)) ->
             TkBytes prefix SingleQuote LongString <$
             text "''" <*>
             manyTill stringChar (text "'''")

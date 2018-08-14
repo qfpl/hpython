@@ -174,7 +174,12 @@ genExpr' isExp =
     , String () <$>
       Gen.nonEmpty
         (Range.constant 1 5)
-        (Gen.choice [genStringLiteral genPyChar, genBytesLiteral genPyChar])
+        (Gen.choice
+           [ genStringLiteral genPyChar
+           , genBytesLiteral genPyChar
+           , genRawStringLiteral
+           , genRawBytesLiteral
+           ])
     ]
     [ List () <$>
       genWhitespaces <*>

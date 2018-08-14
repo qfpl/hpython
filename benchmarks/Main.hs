@@ -17,6 +17,7 @@ import Language.Python.Internal.Render (showModule)
 import Language.Python.Internal.Lexer
   (SrcInfo, Nested, IndentedLine, LogicalLine, logicalLines, nested, indentation, tokenize, initialSrcInfo)
 import Language.Python.Internal.Token (PyToken)
+import Language.Python.Internal.Syntax.IR (fromIR)
 import Language.Python.Validate.Indentation
 import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Syntax
@@ -50,8 +51,21 @@ doParse initial pa input = do
     Left err -> print err *> exitFailure
     Right a -> pure a
 
-doToPython :: Parser SrcInfo a -> Text.Text -> IO a
-doToPython pa =
+doFromIR :: Show e => (a -> Validate e b) -> a -> IO b
+doFromIR f a = do
+  let res = f a
+  case res of
+    Failure err -> print err *> exitFailure
+    Success a -> pure a
+
+doToPython
+  :: Show ann
+  => Parser SrcInfo a
+  -> (a -> Validate [SyntaxError v ann] b)
+  -> Text.Text
+  -> IO b
+doToPython pa f =
+  doFromIR f <=<
   doParse (initialSrcInfo "test") pa <=<
   doNested <=<
   doIndentation <=<
@@ -67,7 +81,7 @@ tokensOnly name = do
 parseCheckPrint :: FilePath -> IO ()
 parseCheckPrint name = do
   file <- StrictText.readFile name
-  py <- doToPython module_ file
+  py <- doToPython module_ fromIR file
   case runValidateIndentation $ validateModuleIndentation py of
     Failure errs ->
       print (errs :: [IndentationError '[] SrcInfo]) *> exitFailure

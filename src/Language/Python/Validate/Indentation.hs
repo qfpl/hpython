@@ -12,7 +12,8 @@ import Data.Foldable (fold)
 import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Type.Set
-import Data.Validate
+import Data.Validate (Validate(..))
+import Data.Validate.Monadic (ValidateM(..), liftVM0, errorVM)
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Optics
@@ -27,10 +28,7 @@ data NextIndent
   | EqualTo
   deriving (Eq, Show)
 
-newtype ValidateIndentation e a
-  = ValidateIndentation
-  { unValidateIndentation :: Compose (State (NextIndent, [Indent])) (Validate [e]) a
-  } deriving (Functor, Applicative)
+type ValidateIndentation e = ValidateM [e] (State (NextIndent, [Indent]))
 
 runValidateIndentation :: ValidateIndentation e a -> Validate [e] a
 runValidateIndentation = runValidateIndentation' EqualTo []
@@ -39,17 +37,14 @@ runValidateIndentation' :: NextIndent -> [Indent] -> ValidateIndentation e a -> 
 runValidateIndentation' ni is =
   flip evalState (ni, is) .
   getCompose .
-  unValidateIndentation
+  unValidateM
 
 withNextIndent
   :: (NextIndent -> [Indent] -> ValidateIndentation e a)
   -> ValidateIndentation e a
 withNextIndent f =
-  ValidateIndentation . Compose $
-    get >>= getCompose . unValidateIndentation . uncurry f
-
-indentationError :: [e] -> ValidateIndentation e a
-indentationError = ValidateIndentation . Compose . pure . Failure
+  ValidateM . Compose $
+    get >>= getCompose . unValidateM . uncurry f
 
 checkIndent :: AsIndentationError e v a => Indents a -> ValidateIndentation e (Indents a)
 checkIndent i =
@@ -65,24 +60,24 @@ checkIndent i =
       GreaterThan ->
         case (absolute1Comparison, absolute8Comparison) of
           (GT, GT) -> pure i
-          (GT, _) -> indentationError [_TabError # a]
-          (_, GT) -> indentationError [_TabError # a]
-          (EQ, EQ) -> indentationError [_ExpectedGreaterThan # (i', i)]
-          (_, EQ) -> indentationError [_TabError # a]
-          (EQ, _) -> indentationError [_TabError # a]
-          (LT, LT) -> indentationError [_ExpectedGreaterThan # (i', i)]
+          (GT, _) -> errorVM [_TabError # a]
+          (_, GT) -> errorVM [_TabError # a]
+          (EQ, EQ) -> errorVM [_ExpectedGreaterThan # (i', i)]
+          (_, EQ) -> errorVM [_TabError # a]
+          (EQ, _) -> errorVM [_TabError # a]
+          (LT, LT) -> errorVM [_ExpectedGreaterThan # (i', i)]
       EqualTo ->
         case (absolute1Comparison, absolute8Comparison) of
           (EQ, EQ) -> pure i
-          (EQ, _) -> indentationError [_TabError # a]
-          (_, EQ) -> indentationError [_TabError # a]
-          (GT, GT) -> indentationError [_ExpectedEqualTo # (i', i)]
-          (_, GT) -> indentationError [_TabError # a]
-          (GT, _) -> indentationError [_TabError # a]
-          (LT, LT) -> indentationError [_ExpectedEqualTo # (i', i)]
+          (EQ, _) -> errorVM [_TabError # a]
+          (_, EQ) -> errorVM [_TabError # a]
+          (GT, GT) -> errorVM [_ExpectedEqualTo # (i', i)]
+          (_, GT) -> errorVM [_TabError # a]
+          (GT, _) -> errorVM [_TabError # a]
+          (LT, LT) -> errorVM [_ExpectedEqualTo # (i', i)]
 
 setNextIndent :: NextIndent -> [Indent] -> ValidateIndentation e ()
-setNextIndent ni is = ValidateIndentation . Compose $ pure () <$ put (ni, is)
+setNextIndent ni is = liftVM0 $ put (ni, is)
 
 equivalentIndentation :: [Whitespace] -> [Whitespace] -> Bool
 equivalentIndentation [] [] = True

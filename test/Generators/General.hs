@@ -178,7 +178,7 @@ genExpr' isExp =
     ]
     [ List () <$>
       genWhitespaces <*>
-      Gen.maybe (genSizedCommaSep1' $ genListItem genExpr) <*>
+      Gen.maybe (genSizedCommaSep1' $ genListItem genWhitespaces genExpr) <*>
       genWhitespaces
     , Dict () <$>
       genWhitespaces <*>
@@ -186,7 +186,7 @@ genExpr' isExp =
       genWhitespaces
     , Set () <$>
       genWhitespaces <*>
-      genSizedCommaSep1' (genSetItem genExpr) <*>
+      genSizedCommaSep1' (genSetItem genWhitespaces genExpr) <*>
       genWhitespaces
     , ListComp () <$>
       genWhitespaces <*>

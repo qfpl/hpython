@@ -17,11 +17,12 @@ import qualified Data.Text as Strict
 import Language.Python.Internal.Lexer (SrcInfo)
 import Language.Python.Internal.Parse (module_)
 import Language.Python.Internal.Render (showModule)
+import Language.Python.Internal.Syntax.IR (fromIR)
 import Language.Python.Validate.Indentation
   (Indentation, runValidateIndentation, validateModuleIndentation)
 import Language.Python.Validate.Indentation.Error (IndentationError)
 import Language.Python.Validate.Syntax
-  (validateModuleSyntax, runValidateSyntax, initialSyntaxContext)
+  (runValidateSyntax, validateModuleSyntax, initialSyntaxContext)
 import Language.Python.Validate.Syntax.Error (SyntaxError)
 
 import Helpers (doToPython)
@@ -45,7 +46,7 @@ doRoundtrip :: FilePath -> Property
 doRoundtrip name =
   property $ do
     file <- liftIO . StrictText.readFile $ "test/files" </> name
-    py <- doToPython module_ file
+    py <- doToPython module_ fromIR file
     case runValidateIndentation $ validateModuleIndentation py of
       Failure errs -> annotateShow (errs :: [IndentationError '[] SrcInfo]) *> failure
       Success res ->

@@ -4,6 +4,7 @@ module Scope (scopeTests) where
 import Control.Lens (has)
 import Data.Functor (($>))
 import Data.Validate
+
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Syntax.Error
 import Language.Python.Validate.Indentation

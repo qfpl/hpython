@@ -7,24 +7,23 @@
 {-# language UndecidableInstances #-}
 module Language.Python.Internal.Syntax.Statement where
 
-import Control.Lens.Getter ((^.), getting)
-import Control.Lens.Lens (lens)
 import Control.Lens.Plated (Plated(..), gplate)
-import Control.Lens.Prism (_Just, _Right)
-import Control.Lens.Setter ((.~), over, mapped)
+import Control.Lens.Prism (_Right)
+import Control.Lens.Setter (over, mapped)
 import Control.Lens.TH (makeLenses, makeWrapped)
 import Control.Lens.Traversal (Traversal, traverseOf)
 import Control.Lens.Tuple (_2, _3, _4)
 import Control.Lens.Wrapped (_Wrapped)
 import Data.Coerce (coerce)
-import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty)
 import GHC.Generics (Generic)
 
+import Language.Python.Internal.Syntax.AugAssign
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Comment
 import Language.Python.Internal.Syntax.Expr
 import Language.Python.Internal.Syntax.Ident
+import Language.Python.Internal.Syntax.Import
 import Language.Python.Internal.Syntax.ModuleNames
 import Language.Python.Internal.Syntax.Whitespace
 
@@ -96,6 +95,15 @@ data Statement (v :: [*]) a
       (CompoundStatement v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+instance HasExprs Statement where
+  _Exprs f (SmallStatements idnt s ss a c) =
+    SmallStatements idnt <$>
+    _Exprs f s <*>
+    (traverse._2._Exprs) f ss <*>
+    pure a <*>
+    pure c
+  _Exprs f (CompoundStatement c) = CompoundStatement <$> _Exprs f c
+
 instance HasBlocks Statement where
   _Blocks f (CompoundStatement c) = CompoundStatement <$> _Blocks f c
   _Blocks _ (SmallStatements idnt a b c d) =
@@ -130,118 +138,6 @@ instance Plated (Statement '[] a) where
       ClassDef idnt a decos b c d e ->
         ClassDef idnt a decos b c d <$> _Statements fun e
       With a b c d e -> With a b c (coerce d) <$> _Statements fun e
-
-instance HasExprs Statement where
-  _Exprs f (SmallStatements idnt s ss a c) =
-    SmallStatements idnt <$>
-    _Exprs f s <*>
-    (traverse._2._Exprs) f ss <*>
-    pure a <*>
-    pure c
-  _Exprs f (CompoundStatement c) = CompoundStatement <$> _Exprs f c
-
-data ImportAs e v a
-  = ImportAs a (e a) (Maybe (NonEmpty Whitespace, Ident v a))
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-
-importAsAnn :: ImportAs e v a -> a
-importAsAnn (ImportAs a _ _) = a
-
-instance HasTrailingWhitespace (e a) => HasTrailingWhitespace (ImportAs e v a) where
-  trailingWhitespace =
-    lens
-      (\(ImportAs _ a b) ->
-         maybe (a ^. getting trailingWhitespace) (^. _2.trailingWhitespace) b)
-      (\(ImportAs x a b) ws ->
-         ImportAs
-           x
-           (maybe (a & trailingWhitespace .~ ws) (const a) b)
-           (b & _Just._2.trailingWhitespace .~ ws))
-
-data ImportTargets v a
-  = ImportAll a [Whitespace]
-  | ImportSome a (CommaSep1 (ImportAs (Ident v) v a))
-  | ImportSomeParens
-      a
-      -- ( spaces
-      [Whitespace]
-      -- imports as
-      (CommaSep1' (ImportAs (Ident v) v a))
-      -- ) spaces
-      [Whitespace]
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-
-instance HasTrailingWhitespace (ImportTargets v a) where
-  trailingWhitespace =
-    lens
-      (\case
-          ImportAll _ ws -> ws
-          ImportSome _ cs -> cs ^. trailingWhitespace
-          ImportSomeParens _ _ _ ws -> ws)
-      (\ts ws ->
-         case ts of
-           ImportAll a _ -> ImportAll a ws
-           ImportSome a cs -> ImportSome a (cs & trailingWhitespace .~ ws)
-           ImportSomeParens x a b _ -> ImportSomeParens x a b ws)
-
-data AugAssign a
-  = PlusEq
-  { _augAssignAnn :: a
-  , _augAssignWhitespace :: [Whitespace]
-  }
-  | MinusEq
-  { _augAssignAnn :: a
-  , _augAssignWhitespace :: [Whitespace]
-  }
-  | StarEq
-  { _augAssignAnn :: a
-  , _augAssignWhitespace :: [Whitespace]
-  }
-  | AtEq
-  { _augAssignAnn :: a
-  , _augAssignWhitespace :: [Whitespace]
-  }
-  | SlashEq
-  { _augAssignAnn :: a
-  , _augAssignWhitespace :: [Whitespace]
-  }
-  | PercentEq
-  { _augAssignAnn :: a
-  , _augAssignWhitespace :: [Whitespace]
-  }
-  | AmpersandEq
-  { _augAssignAnn :: a
-  , _augAssignWhitespace :: [Whitespace]
-  }
-  | PipeEq
-  { _augAssignAnn :: a
-  , _augAssignWhitespace :: [Whitespace]
-  }
-  | CaretEq
-  { _augAssignAnn :: a
-  , _augAssignWhitespace :: [Whitespace]
-  }
-  | ShiftLeftEq
-  { _augAssignAnn :: a
-  , _augAssignWhitespace :: [Whitespace]
-  }
-  | ShiftRightEq
-  { _augAssignAnn :: a
-  , _augAssignWhitespace :: [Whitespace]
-  }
-  | DoubleStarEq
-  { _augAssignAnn :: a
-  , _augAssignWhitespace :: [Whitespace]
-  }
-  | DoubleSlashEq
-  { _augAssignAnn :: a
-  , _augAssignWhitespace :: [Whitespace]
-  }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-
-instance HasTrailingWhitespace (AugAssign a) where
-  trailingWhitespace =
-    lens _augAssignWhitespace (\a b -> a { _augAssignWhitespace = b })
 
 data SmallStatement (v :: [*]) a
   = Return a [Whitespace] (Maybe (Expr v a))

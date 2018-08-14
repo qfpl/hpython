@@ -26,7 +26,7 @@ data SyntaxError (v :: [*]) a
   | ParametersNonlocal a [String]
   | NoBindingNonlocal (Ident v a)
   | Can'tJoinStringAndBytes a
-  | YieldOutsideFunction a
+  | InvalidYield a
   | CommentAfterBackslash a
   | MalformedDecorator a
   | InvalidUnpacking a

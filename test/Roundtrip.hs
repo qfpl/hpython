@@ -40,6 +40,7 @@ roundtripTests =
   , "comments.py"
   , "pypy.py"
   , "pypy2.py"
+  , "sqlalchemy.py"
   ]
 
 doRoundtrip :: FilePath -> Property

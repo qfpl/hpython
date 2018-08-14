@@ -275,7 +275,7 @@ validateExprSyntax (Yield a b c) =
       case _inFunction ctxt of
         Nothing
           | _inGenerator ctxt -> pure ()
-          | otherwise -> errorVM [_YieldOutsideFunction # a]
+          | otherwise -> errorVM [_InvalidYield # a]
         Just{} -> pure ()) <*>
   traverse validateExprSyntax c
 validateExprSyntax (YieldFrom a b c d) =
@@ -286,7 +286,7 @@ validateExprSyntax (YieldFrom a b c d) =
       case _inFunction ctxt of
         Nothing
           | _inGenerator ctxt -> pure ()
-          | otherwise -> errorVM [_YieldOutsideFunction # a]
+          | otherwise -> errorVM [_InvalidYield # a]
         Just{} -> pure ()) <*>
   validateExprSyntax d
 validateExprSyntax (Ternary a b c d e f) =
@@ -329,7 +329,7 @@ validateExprSyntax (List a ws1 exprs ws2) =
 validateExprSyntax (ListComp a ws1 comp ws2) =
   ListComp a ws1 <$>
   liftVM1
-    (local $ inParens .~ True)
+    (local $ (inParens .~ True) . (inGenerator .~ True))
     (validateComprehensionSyntax comp) <*>
   validateWhitespace a ws2
 validateExprSyntax (Generator a comp) =
@@ -409,12 +409,12 @@ validateDecoratorSyntax (Decorator a b c d e) =
   isDecoratorValue d <*>
   pure e
   where
-    isDecoratorValue e@Ident{} = pure $ coerce e
+    someDerefs Ident{} = True
+    someDerefs (Deref _ a _ _) = someDerefs a
+    someDerefs _ = False
+
     isDecoratorValue e@(Call _ a _ _ _) | someDerefs a = pure $ coerce e
-      where
-        someDerefs Ident{} = True
-        someDerefs (Deref _ a _ _) = someDerefs a
-        someDerefs _ = False
+    isDecoratorValue e | someDerefs e = pure $ coerce e
     isDecoratorValue _ = errorVM [_MalformedDecorator # a]
 
 validateCompoundStatementSyntax

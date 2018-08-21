@@ -180,7 +180,9 @@ statement_printparseprint_print =
         case validateStatementSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <- validate (const failure) pure $ parseStatement "test" (showStatement res')
+            py <-
+              validate (\e -> annotateShow e *> failure) pure $
+              parseStatement "test" (showStatement res')
             annotateShow py
             showStatement (res' ^. unvalidated) ===
               showStatement (py $> ())

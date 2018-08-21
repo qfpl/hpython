@@ -362,6 +362,9 @@ genWhitespaces1 = do
 genNone :: MonadGen m => m (Expr '[] ())
 genNone = None () <$> genWhitespaces
 
+genEllipsis :: MonadGen m => m (Expr '[] ())
+genEllipsis = Ellipsis () <$> genWhitespaces
+
 genBool :: MonadGen m => m (Expr '[] ())
 genBool = Bool () <$> Gen.bool <*> genWhitespaces
 

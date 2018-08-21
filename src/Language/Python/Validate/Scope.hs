@@ -466,6 +466,7 @@ validateAssignExprScope e@UnOp{} = pure $ coerce e
 validateAssignExprScope e@BinOp{} = pure $ coerce e
 validateAssignExprScope e@Ident{} = pure $ coerce e
 validateAssignExprScope e@None{} = pure $ coerce e
+validateAssignExprScope e@Ellipsis{} = pure $ coerce e
 validateAssignExprScope e@Int{} = pure $ coerce e
 validateAssignExprScope e@Float{} = pure $ coerce e
 validateAssignExprScope e@Imag{} = pure $ coerce e
@@ -585,6 +586,7 @@ validateExprScope (Tuple a b ws d) =
   pure ws <*>
   traverseOf (traverse.traverse) validateTupleItemScope d
 validateExprScope e@None{} = pure $ coerce e
+validateExprScope e@Ellipsis{} = pure $ coerce e
 validateExprScope e@Int{} = pure $ coerce e
 validateExprScope e@Float{} = pure $ coerce e
 validateExprScope e@Imag{} = pure $ coerce e

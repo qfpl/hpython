@@ -276,6 +276,7 @@ assignTargets f e =
     Subscript{} -> pure $ coerce e
     Call{} -> pure $ coerce e
     None{} -> pure $ coerce e
+    Ellipsis{} -> pure $ coerce e
     BinOp{} -> pure $ coerce e
     UnOp{} -> pure $ coerce e
     Int{} -> pure $ coerce e

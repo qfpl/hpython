@@ -349,6 +349,10 @@ data Expr a
   { _exprAnnotation :: a
   , _unsafeNoneWhitespace :: [Whitespace]
   }
+  | Ellipsis
+  { _exprAnnotation :: a
+  , _unsafeEllipsisWhitespace :: [Whitespace]
+  }
   | BinOp
   { _exprAnnotation :: a
   , _unsafeBinOpExprLeft :: Expr a
@@ -514,6 +518,7 @@ fromIR_expr ex =
       fromIR_expr b <*>
       traverseOf (traverse.traverse) fromIR_arg d
     None a b -> pure $ Syntax.None a b
+    Ellipsis a b -> pure $ Syntax.Ellipsis a b
     BinOp a b c d ->
       (\b' d' -> Syntax.BinOp a b' c d') <$>
       fromIR_expr b <*>

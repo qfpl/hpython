@@ -421,6 +421,10 @@ data Expr (v :: [*]) a
   { _exprAnnotation :: a
   , _unsafeNoneWhitespace :: [Whitespace]
   }
+  | Ellipsis
+  { _exprAnnotation :: a
+  , _unsafeEllipsisWhitespace :: [Whitespace]
+  }
   | BinOp
   { _exprAnnotation :: a
   , _unsafeBinOpExprLeft :: Expr v a
@@ -500,6 +504,7 @@ instance HasTrailingWhitespace (Expr v a) where
           YieldFrom _ _ _ e -> e ^. trailingWhitespace
           Ternary _ _ _ _ _ e -> e ^. trailingWhitespace
           None _ ws -> ws
+          Ellipsis _ ws -> ws
           List _ _ _ ws -> ws
           ListComp _ _ _ ws -> ws
           Deref _ _ _ a -> a ^. trailingWhitespace
@@ -529,6 +534,7 @@ instance HasTrailingWhitespace (Expr v a) where
           YieldFrom a b c d -> YieldFrom a b c (d & trailingWhitespace .~ ws)
           Ternary a b c d e f -> Ternary a b c d e (f & trailingWhitespace .~ ws)
           None a _ -> None a ws
+          Ellipsis a _ -> Ellipsis a ws
           List a b c _ -> List a b (coerce c) ws
           ListComp a b c _ -> ListComp a b (coerce c) ws
           Deref a b c d -> Deref a (coerce b) c (d & trailingWhitespace .~ ws)

@@ -41,6 +41,7 @@ fixMutableDefaultArguments input = do
     isMutable :: Expr v a -> Bool
     isMutable Unit{} = False
     isMutable None{} = False
+    isMutable Ellipsis{} = False
     isMutable Lambda{} = False
     isMutable Float{} = False
     isMutable Imag{} = False

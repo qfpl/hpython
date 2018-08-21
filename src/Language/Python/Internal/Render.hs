@@ -137,6 +137,7 @@ showToken t =
     TkTrue{} -> "True"
     TkFalse{} -> "False"
     TkNone{} -> "None"
+    TkEllipsis{} -> "..."
     TkOr{} -> "or"
     TkAnd{} -> "and"
     TkIs{} -> "is"
@@ -879,6 +880,7 @@ renderExpr (Deref _ expr ws name) =
   foldMap renderWhitespace ws <>
   renderIdent name
 renderExpr (None _ ws) = TkNone () `cons` foldMap renderWhitespace ws
+renderExpr (Ellipsis _ ws) = TkEllipsis () `cons` foldMap renderWhitespace ws
 renderExpr (BinOp _ e1 op e2) =
   (if shouldBracketLeft op e1 then bracket else id) (bracketTernaryLambda bracketGenerator e1) <>
   renderBinOp op <>

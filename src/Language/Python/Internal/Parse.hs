@@ -265,6 +265,9 @@ bool ws =
 none :: Parser ann Whitespace -> Parser ann (Expr ann)
 none ws = (\(tk, s) -> None (pyTokenAnn tk) s) <$> token ws (TkNone ())
 
+ellipsis :: Parser ann Whitespace -> Parser ann (Expr ann)
+ellipsis ws = (\(tk, s) -> Ellipsis (pyTokenAnn tk) s) <$> token ws (TkEllipsis ())
+
 integer :: Parser ann Whitespace -> Parser ann (Expr ann)
 integer ws = do
   curTk <- currentToken
@@ -666,6 +669,7 @@ orExpr ws =
       list <!>
       bool ws <!>
       none ws <!>
+      ellipsis ws <!>
       integer ws <!>
       float ws <!>
       imag ws <!>
@@ -775,13 +779,18 @@ smallStatement =
           token space (TkImport ()) <*>
           commaSep1 space (importAs space _moduleNameAnn moduleName)
 
+        dots =
+          fmap concat . some $
+          pure . Dot . snd <$> token space (TkDot ()) <!>
+          (\(_, ws) -> [Dot [], Dot [], Dot ws]) <$> token space (TkEllipsis ())
+
         relativeModuleName =
           RelativeWithName [] <$> moduleName
 
           <!>
 
           (\a -> maybe (Relative $ NonEmpty.fromList a) (RelativeWithName a)) <$>
-          some (Dot . snd <$> token space (TkDot ())) <*>
+          dots <*>
           optional moduleName
 
         importTargets =

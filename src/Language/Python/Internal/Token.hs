@@ -27,6 +27,7 @@ data PyToken a
   | TkTrue a
   | TkFalse a
   | TkNone a
+  | TkEllipsis a
   | TkOr a
   | TkAnd a
   | TkIs a
@@ -121,6 +122,7 @@ pyTokenAnn tk =
     TkTrue a -> a
     TkFalse a -> a
     TkNone a -> a
+    TkEllipsis a -> a
     TkOr a -> a
     TkAnd a -> a
     TkIs a -> a

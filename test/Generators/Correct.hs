@@ -301,7 +301,9 @@ genExpr' isExp = do
   isInFunction <- isJust <$> gets _inFunction
   isInGenerator <- gets _inGenerator
   sizedRecursive
-    [ genUnit
+    [ genNone
+    , genEllipsis
+    , genUnit
     , genBool
     , if isExp then genSmallInt else genInt
     , if isExp then genSmallFloat else genFloat

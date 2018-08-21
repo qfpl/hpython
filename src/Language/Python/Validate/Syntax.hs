@@ -381,7 +381,8 @@ validateExprSyntax (Call a expr ws args ws2) =
   liftVM1 (local $ inParens .~ True) (validateWhitespace a ws) <*>
   liftVM1 (local $ inParens .~ True) (traverse validateArgsSyntax args) <*>
   validateWhitespace a ws2
-validateExprSyntax (None a ws) = pure $ None a ws
+validateExprSyntax (None a ws) = None a <$> validateWhitespace a ws
+validateExprSyntax (Ellipsis a ws) = Ellipsis a <$> validateWhitespace a ws
 validateExprSyntax (BinOp a e1 op e2) =
   BinOp a <$>
   validateExprSyntax e1 <*>
@@ -741,6 +742,7 @@ validateStatementSyntax (SmallStatements idnts s ss sc nl) =
 
 canAssignTo :: Expr v a -> Bool
 canAssignTo None{} = False
+canAssignTo Ellipsis{} = False
 canAssignTo UnOp{} = False
 canAssignTo Int{} = False
 canAssignTo Call{} = False

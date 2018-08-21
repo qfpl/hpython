@@ -19,9 +19,7 @@ import Language.Python.Internal.Lexer
 import Language.Python.Internal.Token (PyToken)
 import Language.Python.Internal.Syntax.IR (fromIR)
 import Language.Python.Validate.Indentation
-import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Syntax
-import Language.Python.Validate.Syntax.Error
 
 doTokenize :: Text.Text -> IO [PyToken SrcInfo]
 doTokenize str = do

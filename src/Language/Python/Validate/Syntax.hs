@@ -7,11 +7,45 @@
 {-# language TemplateHaskell, TypeFamilies, MultiParamTypeClasses #-}
 {-# language RankNTypes #-}
 {-# language LambdaCase #-}
-module Language.Python.Validate.Syntax where
+module Language.Python.Validate.Syntax
+  ( module Language.Python.Validate.Syntax.Error
+  , Syntax
+  , SyntaxContext(..), inLoop, inFunction, inGenerator, inParens
+  , initialSyntaxContext
+  , runValidateSyntax
+  , validateModuleSyntax
+  , validateStatementSyntax
+  , validateExprSyntax
+    -- * Miscellany
+  , canAssignTo
+  , deleteBy'
+  , deleteFirstsBy'
+  , localNonlocals
+  , validateArgsSyntax
+  , validateBlockSyntax
+  , validateCompoundStatementSyntax
+  , validateComprehensionSyntax
+  , validateDecoratorSyntax
+  , validateDictItemSyntax
+  , validateExceptAsSyntax
+  , validateIdentSyntax
+  , validateImportAsSyntax
+  , validateImportTargetsSyntax
+  , validateListItemSyntax
+  , validateParamsSyntax
+  , validateSetItemSyntax
+  , validateSmallStatementSyntax
+  , validateStringLiteralSyntax
+  , validateSubscriptSyntax
+  , validateSuiteSyntax
+  , validateTupleItemSyntax
+  , validateWhitespace
+  )
+where
 
 import Control.Applicative ((<|>), liftA2)
-import Control.Lens.Cons (_Cons, snoc)
-import Control.Lens.Fold ((^..), (^?), (^?!), folded, allOf, toListOf)
+import Control.Lens.Cons (snoc)
+import Control.Lens.Fold ((^..), (^?!), folded, allOf, toListOf)
 import Control.Lens.Getter ((^.), getting)
 import Control.Lens.Prism (_Right)
 import Control.Lens.Review ((#))
@@ -87,19 +121,13 @@ initialSyntaxContext =
   , _inParens = False
   }
 
-isIdentifier :: String -> Bool
-isIdentifier s =
-  case s ^? _Cons of
-    Nothing -> False
-    Just (x, xs) -> isIdentifierStart x && all isIdentifierChar xs
-
-validateIdent
+validateIdentSyntax
   :: ( AsSyntaxError e v ann
      , Member Indentation v
      )
   => Ident v ann
   -> ValidateSyntax e (Ident (Nub (Syntax ': v)) ann)
-validateIdent (MkIdent a name ws)
+validateIdentSyntax (MkIdent a name ws)
   | not (all isAscii name) = errorVM [_BadCharacter # (a, name)]
   | null name = errorVM [_EmptyIdentifier # a]
   | name `elem` reservedWords = errorVM [_IdentifierReservedWord # (a, name)]
@@ -323,7 +351,7 @@ validateExprSyntax (String a strLits) =
     errorVM [_Can'tJoinStringAndBytes # a]
 validateExprSyntax (Int a n ws) = pure $ Int a n ws
 validateExprSyntax (Float a n ws) = pure $ Float a n ws
-validateExprSyntax (Ident a name) = Ident a <$> validateIdent name
+validateExprSyntax (Ident a name) = Ident a <$> validateIdentSyntax name
 validateExprSyntax (List a ws1 exprs ws2) =
   List a ws1 <$>
   liftVM1
@@ -345,7 +373,7 @@ validateExprSyntax (Deref a expr ws1 name) =
   Deref a <$>
   validateExprSyntax expr <*>
   validateWhitespace a ws1 <*>
-  validateIdent name
+  validateIdentSyntax name
 validateExprSyntax (Call a expr ws args ws2) =
   Call a <$>
   validateExprSyntax expr <*>
@@ -433,7 +461,7 @@ validateCompoundStatementSyntax (Fundef a decos idnts ws1 name ws2 params ws3 bo
   in
     (\decos' -> Fundef a decos' idnts ws1) <$>
     traverse validateDecoratorSyntax decos <*>
-    validateIdent name <*>
+    validateIdentSyntax name <*>
     pure ws2 <*>
     validateParamsSyntax params <*>
     pure ws3 <*>
@@ -515,7 +543,7 @@ validateCompoundStatementSyntax (ClassDef a decos idnts b c d g) =
   (\decos' -> ClassDef a decos' idnts) <$>
   traverse validateDecoratorSyntax decos <*>
   validateWhitespace a b <*>
-  validateIdent c <*>
+  validateIdentSyntax c <*>
   traverse
     (\(x, y, z) ->
        (,,) <$>
@@ -547,40 +575,40 @@ validateExceptAsSyntax
 validateExceptAsSyntax (ExceptAs ann e f) =
   ExceptAs ann <$>
   validateExprSyntax e <*>
-  traverse (\(a, b) -> (,) <$> validateWhitespace ann a <*> validateIdent b) f
+  traverse (\(a, b) -> (,) <$> validateWhitespace ann a <*> validateIdentSyntax b) f
 
-validateImportAs
+validateImportAsSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
      )
   => (t a -> ValidateSyntax e (t' a))
   -> ImportAs t v a
   -> ValidateSyntax e (ImportAs t' (Nub (Syntax ': v)) a)
-validateImportAs v (ImportAs x a b) =
+validateImportAsSyntax v (ImportAs x a b) =
   ImportAs x <$>
   v a <*>
   traverse
     (\(c, d) ->
        (,) <$>
        (c <$ validateWhitespace x (NonEmpty.toList c)) <*>
-       validateIdent d)
+       validateIdentSyntax d)
     b
 
-validateImportTargets
+validateImportTargetsSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
      )
   => ImportTargets v a
   -> ValidateSyntax e (ImportTargets (Nub (Syntax ': v)) a)
-validateImportTargets (ImportAll a ws) = ImportAll a <$> validateWhitespace a ws
-validateImportTargets (ImportSome a cs) =
-  ImportSome a <$> traverse (validateImportAs validateIdent) cs
-validateImportTargets (ImportSomeParens a ws1 cs ws2) =
+validateImportTargetsSyntax (ImportAll a ws) = ImportAll a <$> validateWhitespace a ws
+validateImportTargetsSyntax (ImportSome a cs) =
+  ImportSome a <$> traverse (validateImportAsSyntax validateIdentSyntax) cs
+validateImportTargetsSyntax (ImportSomeParens a ws1 cs ws2) =
   liftVM1
     (local $ inParens .~ True)
     (ImportSomeParens a <$>
      validateWhitespace a ws1 <*>
-     traverse (validateImportAs validateIdent) cs) <*>
+     traverse (validateImportAsSyntax validateIdentSyntax) cs) <*>
   validateWhitespace a ws2
 
 validateSmallStatementSyntax
@@ -668,7 +696,7 @@ validateSmallStatementSyntax (Continue a) =
     then pure $ Continue a
     else errorVM [_ContinueOutsideLoop # a]
 validateSmallStatementSyntax (Global a ws ids) =
-  Global a ws <$> traverse validateIdent ids
+  Global a ws <$> traverse validateIdentSyntax ids
 validateSmallStatementSyntax (Nonlocal a ws ids) =
   ask `bindVM` \sctxt ->
   get `bindVM` \nls ->
@@ -679,7 +707,7 @@ validateSmallStatementSyntax (Nonlocal a ws ids) =
     Nothing -> errorVM [_NonlocalOutsideFunction # a]
     Just params ->
       case intersect params (ids ^.. folded.unvalidated.identValue) of
-        [] -> Nonlocal a ws <$> traverse validateIdent ids
+        [] -> Nonlocal a ws <$> traverse validateIdentSyntax ids
         bad -> errorVM [_ParametersNonlocal # (a, bad)]
 validateSmallStatementSyntax (Del a ws ids) =
   Del a ws <$> traverse validateExprSyntax ids
@@ -688,7 +716,7 @@ validateSmallStatementSyntax (Import a ws mns) =
 validateSmallStatementSyntax (From a ws1 mn ws2 ts) =
   From a ws1 (coerce mn) <$>
   validateWhitespace a ws2 <*>
-  validateImportTargets ts
+  validateImportTargetsSyntax ts
 
 validateStatementSyntax
   :: ( AsSyntaxError e v a
@@ -757,12 +785,12 @@ validateArgsSyntax e = fmap coerce e <$ go [] False False (toList e)
     go names _ seenUnpack (KeywordArg a name ws2 expr : args)
       | _identValue name `elem` names =
           errorVM [_DuplicateArgument # (a, _identValue name)] <*>
-          validateIdent name <*>
+          validateIdentSyntax name <*>
           go names True seenUnpack args
       | otherwise =
           liftA2 (:)
             (KeywordArg a <$>
-             validateIdent name <*>
+             validateIdentSyntax name <*>
              pure ws2 <*>
              validateExprSyntax expr)
             (go (_identValue name:names) True seenUnpack args)
@@ -785,22 +813,22 @@ validateParamsSyntax e = coerce e <$ go [] False (toList e)
     go names False (PositionalParam a name : params)
       | _identValue name `elem` names =
           errorVM [_DuplicateArgument # (a, _identValue name)] <*>
-          validateIdent name <*>
+          validateIdentSyntax name <*>
           go (_identValue name:names) False params
       | otherwise =
           liftA2
             (:)
-            (PositionalParam a <$> validateIdent name)
+            (PositionalParam a <$> validateIdentSyntax name)
             (go (_identValue name:names) False params)
     go names seen (StarParam a ws name : params)
       | _identValue name `elem` names =
           errorVM [_DuplicateArgument # (a, _identValue name)] <*>
-          validateIdent name <*>
+          validateIdentSyntax name <*>
           go (_identValue name:names) seen params
       | otherwise =
           liftA2
             (:)
-            (StarParam a ws <$> validateIdent name)
+            (StarParam a ws <$> validateIdentSyntax name)
             (go (_identValue name:names) seen params)
     go names True (PositionalParam a name : params) =
       let
@@ -816,7 +844,7 @@ validateParamsSyntax e = coerce e <$ go [] False (toList e)
       | otherwise =
           liftA2 (:)
             (KeywordParam a <$>
-             validateIdent name <*>
+             validateIdentSyntax name <*>
              pure ws2 <*>
              validateExprSyntax expr)
             (go (_identValue name:names) True params)
@@ -824,7 +852,7 @@ validateParamsSyntax e = coerce e <$ go [] False (toList e)
       | _identValue name `elem` names =
           errorVM [_DuplicateArgument # (a, _identValue name)]
       | otherwise =
-          fmap pure $ DoubleStarParam a ws <$> validateIdent name
+          fmap pure $ DoubleStarParam a ws <$> validateIdentSyntax name
     go names _ (DoubleStarParam a ws name : _) =
       (if _identValue name `elem` names
        then errorVM [_DuplicateArgument # (a, _identValue name)]

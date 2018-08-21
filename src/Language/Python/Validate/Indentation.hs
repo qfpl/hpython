@@ -1,7 +1,23 @@
-{-# language DataKinds #-}
-{-# language TypeOperators #-}
-{-# language GeneralizedNewtypeDeriving #-}
-module Language.Python.Validate.Indentation where
+{-# language DataKinds, TypeOperators #-}
+module Language.Python.Validate.Indentation
+  ( module Language.Python.Validate.Indentation.Error
+  , Indentation
+  , runValidateIndentation
+  , validateModuleIndentation
+  , validateStatementIndentation
+  , validateExprIndentation
+    -- * Miscellany
+  , NextIndent(..)
+  , runValidateIndentation'
+  , validateArgsIndentation
+  , validateBlockIndentation
+  , validateCompoundStatementIndentation
+  , validateDecoratorIndentation
+  , validateExceptAsIndentation
+  , validateParamsIndentation
+  , validateSuiteIndentation
+  )
+where
 
 import Control.Lens ((#), _Wrapped, over, _2, traverseOf, _Right)
 import Control.Lens.Fold ((^?!), folded)

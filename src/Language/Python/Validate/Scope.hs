@@ -4,7 +4,39 @@
 {-# language FlexibleContexts #-}
 {-# language RankNTypes #-}
 {-# language LambdaCase #-}
-module Language.Python.Validate.Scope where
+module Language.Python.Validate.Scope
+  ( module Language.Python.Validate.Scope.Error
+  , Scope
+  , ScopeContext(..), scGlobalScope, scLocalScope, scImmediateScope
+  , initialScopeContext
+  , runValidateScope
+  , validateModuleScope
+  , validateStatementScope
+  , validateExprScope
+    -- * Miscellany
+  , Binding(..)
+  , inScope
+  , extendScope
+  , locallyOver
+  , locallyExtendOver
+  , validateArgScope
+  , validateAssignExprScope
+  , validateBlockScope
+  , validateCompoundStatementScope
+  , validateComprehensionScope
+  , validateDecoratorScope
+  , validateDictItemScope
+  , validateExceptAsScope
+  , validateIdentScope
+  , validateListItemScope
+  , validateParamScope
+  , validateSetItemScope
+  , validateSmallStatementScope
+  , validateSubscriptScope
+  , validateSuiteScope
+  , validateTupleItemScope
+  )
+where
 
 import Control.Arrow ((&&&))
 import Control.Applicative ((<|>))

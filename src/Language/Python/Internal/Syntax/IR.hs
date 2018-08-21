@@ -111,9 +111,9 @@ data SmallStatement a
   | Expr a (Expr a)
   | Assign a (Expr a) (NonEmpty ([Whitespace], Expr a))
   | AugAssign a (Expr a) (AugAssign a) (Expr a)
-  | Pass a
-  | Break a
-  | Continue a
+  | Pass a [Whitespace]
+  | Break a [Whitespace]
+  | Continue a [Whitespace]
   | Global a (NonEmpty Whitespace) (CommaSep1 (Ident '[] a))
   | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident '[] a))
   | Del a (NonEmpty Whitespace) (CommaSep1' (Expr a))
@@ -642,9 +642,9 @@ fromIR_smallStatement ex =
       (\b' d' -> Syntax.AugAssign a b' c d') <$>
       fromIR_expr b <*>
       fromIR_expr d
-    Pass a -> pure $ Syntax.Pass a
-    Break a -> pure $ Syntax.Break a
-    Continue a -> pure $ Syntax.Continue a
+    Pass a ws -> pure $ Syntax.Pass a ws
+    Break a ws -> pure $ Syntax.Break a ws
+    Continue a ws -> pure $ Syntax.Continue a ws
     Global a b c -> pure $ Syntax.Global a b c
     Nonlocal a b c -> pure $ Syntax.Nonlocal a b c
     Del a b c -> Syntax.Del a b <$> traverse fromIR_expr c

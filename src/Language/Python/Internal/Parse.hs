@@ -700,9 +700,9 @@ smallStatement =
       token space (TkReturn ()) <*>
       optional (exprList space)
 
-    passSt = Pass . pyTokenAnn <$> tokenEq (TkPass ())
-    breakSt = Break . pyTokenAnn <$> tokenEq (TkBreak ())
-    continueSt = Continue . pyTokenAnn <$> tokenEq (TkContinue ())
+    passSt = uncurry (Pass . pyTokenAnn) <$> token space (TkPass ())
+    breakSt = uncurry (Break . pyTokenAnn) <$> token space (TkBreak ())
+    continueSt = uncurry (Continue . pyTokenAnn) <$> token space (TkContinue ())
 
     augAssign =
       (\(tk, s) -> PlusEq (pyTokenAnn tk) s) <$> token space (TkPlusEq ()) <!>

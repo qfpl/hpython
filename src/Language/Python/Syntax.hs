@@ -180,10 +180,10 @@ none_ :: Expr '[] ()
 none_ = None () []
 
 pass_ :: Statement '[] ()
-pass_ = SmallStatements (Indents [] ()) (Pass ()) [] Nothing (Right (LF Nothing))
+pass_ = SmallStatements (Indents [] ()) (Pass () []) [] Nothing (Right (LF Nothing))
 
 break_ :: Statement '[] ()
-break_ = SmallStatements (Indents [] ()) (Break ()) [] Nothing (Right (LF Nothing))
+break_ = SmallStatements (Indents [] ()) (Break () []) [] Nothing (Right (LF Nothing))
 
 true_ :: Expr '[] ()
 true_ = Bool () True []

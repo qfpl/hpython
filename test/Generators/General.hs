@@ -253,7 +253,10 @@ genExpr' isExp =
 genSmallStatement :: MonadGen m => m (SmallStatement '[] ())
 genSmallStatement =
   sizedRecursive
-    (pure <$> [Pass (), Break (), Continue ()])
+    [ Pass () <$> genWhitespaces
+    , Break () <$> genWhitespaces
+    , Continue () <$> genWhitespaces
+    ]
     [ Expr () <$> genExpr
     , sized2
         (Assign ())

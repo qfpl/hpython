@@ -410,7 +410,9 @@ genSmallStatement = do
   ctxt <- get
   nonlocals <- use currentNonlocals
   sizedRecursive
-    (fmap pure $ [Pass ()] <> [Break () | _inLoop ctxt] <> [Continue () | _inLoop ctxt])
+    ([Pass () <$> genWhitespaces] <>
+     [Break () <$> genWhitespaces | _inLoop ctxt] <>
+     [Continue () <$> genWhitespaces | _inLoop ctxt])
     ([ Expr () <$> genExpr
      , sizedBind (sizedNonEmpty $ (,) <$> genWhitespaces <*> genAssignable) $ \a -> do
          isInFunction <- use inFunction

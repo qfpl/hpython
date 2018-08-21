@@ -144,9 +144,9 @@ data SmallStatement (v :: [*]) a
   | Expr a (Expr v a)
   | Assign a (Expr v a) (NonEmpty ([Whitespace], Expr v a))
   | AugAssign a (Expr v a) (AugAssign a) (Expr v a)
-  | Pass a
-  | Break a
-  | Continue a
+  | Pass a [Whitespace]
+  | Break a [Whitespace]
+  | Continue a [Whitespace]
   | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Del a (NonEmpty Whitespace) (CommaSep1' (Expr v a))

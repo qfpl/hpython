@@ -685,17 +685,22 @@ validateSmallStatementSyntax (AugAssign a lvalue aa rvalue) =
     else errorVM [_CannotAssignTo # (a, lvalue)]) <*>
   pure aa <*>
   validateExprSyntax rvalue
-validateSmallStatementSyntax p@Pass{} = pure $ coerce p
-validateSmallStatementSyntax (Break a) =
-  ask `bindVM` \sctxt ->
-    if _inLoop sctxt
-    then pure $ Break a
-    else errorVM [_BreakOutsideLoop # a]
-validateSmallStatementSyntax (Continue a) =
-  ask `bindVM` \sctxt ->
-    if _inLoop sctxt
-    then pure $ Continue a
-    else errorVM [_ContinueOutsideLoop # a]
+validateSmallStatementSyntax (Pass a ws) =
+  Pass a <$> validateWhitespace a ws
+validateSmallStatementSyntax (Break a ws) =
+  Break a <$
+  (ask `bindVM` \sctxt ->
+     if _inLoop sctxt
+     then pure ()
+     else errorVM [_BreakOutsideLoop # a]) <*>
+  validateWhitespace a ws
+validateSmallStatementSyntax (Continue a ws) =
+  Continue a <$
+  (ask `bindVM` \sctxt ->
+     if _inLoop sctxt
+     then pure ()
+     else errorVM [_ContinueOutsideLoop # a]) <*>
+  validateWhitespace a ws
 validateSmallStatementSyntax (Global a ws ids) =
   Global a ws <$> traverse validateIdentSyntax ids
 validateSmallStatementSyntax (Nonlocal a ws ids) =

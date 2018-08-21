@@ -981,9 +981,9 @@ renderSmallStatement (Assign _ lvalue rvalues) =
     rvalues
 renderSmallStatement (AugAssign _ lvalue as rvalue) =
   renderExpr lvalue <> renderAugAssign as <> bracketTupleGenerator rvalue
-renderSmallStatement (Pass _) = singleton $ TkPass ()
-renderSmallStatement (Continue _) = singleton $ TkContinue ()
-renderSmallStatement (Break _) = singleton $ TkBreak ()
+renderSmallStatement (Pass _ ws) = TkPass () `cons` foldMap renderWhitespace ws
+renderSmallStatement (Continue _ ws) = TkContinue () `cons` foldMap renderWhitespace ws
+renderSmallStatement (Break _ ws) = TkBreak () `cons` foldMap renderWhitespace ws
 renderSmallStatement (Global _ ws ids) =
   TkGlobal () `cons` foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
 renderSmallStatement (Nonlocal _ ws ids) =

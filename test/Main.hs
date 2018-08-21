@@ -7,9 +7,7 @@ import Language.Python.Internal.Render
 import Language.Python.Internal.Syntax
 import Language.Python.Internal.Syntax.IR (fromIR_statement, fromIR_expr)
 import Language.Python.Validate.Indentation
-import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Syntax
-import Language.Python.Validate.Syntax.Error
 
 import LexerParser
 import Scope

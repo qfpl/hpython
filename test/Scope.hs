@@ -6,11 +6,8 @@ import Data.Functor (($>))
 import Data.Validate
 
 import Language.Python.Validate.Syntax
-import Language.Python.Validate.Syntax.Error
 import Language.Python.Validate.Indentation
-import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Scope
-import Language.Python.Validate.Scope.Error
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax
 

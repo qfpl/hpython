@@ -454,7 +454,7 @@ logicalLines tks =
 
 data IndentedLine a
   = Indent Int a
-  | Dedent
+  | Dedent a
   | IndentedLine (LogicalLine a)
   deriving (Eq, Show)
 
@@ -470,36 +470,36 @@ data TabError a
   | IncorrectDedent a
   deriving (Eq, Show)
 
-indentation :: [LogicalLine a] -> Either (TabError a) [IndentedLine a]
-indentation lls =
-  flip evalStateT (pure mempty) $
+indentation :: a -> [LogicalLine a] -> Either (TabError a) [IndentedLine a]
+indentation ann lls =
+  flip evalStateT (pure (ann, mempty)) $
   (<>) <$> (concat <$> traverse go lls) <*> finalDedents
   where
-    finalDedents :: StateT (NonEmpty Indent) (Either (TabError a)) [IndentedLine a]
+    finalDedents :: StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
     finalDedents = do
-      i :| is <- get
+      (ann, i) :| is <- get
       case is of
         [] -> pure []
         i' : is' -> do
           put $ i' :| is'
-          (Dedent :) <$> finalDedents
+          (Dedent ann :) <$> finalDedents
 
-    dedents :: a -> Int -> StateT (NonEmpty Indent) (Either (TabError a)) [IndentedLine a]
+    dedents :: a -> Int -> StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
     dedents ann n = do
       is <- get
-      let (popped, remainder) = NonEmpty.span ((> n) . indentLevel) is
-      when (n `notElem` fmap indentLevel (NonEmpty.toList is)) .
+      let (popped, remainder) = NonEmpty.span ((> n) . indentLevel . snd) is
+      when (n `notElem` fmap (indentLevel . snd) (NonEmpty.toList is)) .
         throwError $ IncorrectDedent ann
       put $ case remainder of
         [] -> error "I don't know whether this can happen"
         x : xs -> x :| xs
-      pure $ replicate (length popped) Dedent
+      pure $ replicate (length popped) (Dedent ann)
 
-    go :: LogicalLine a -> StateT (NonEmpty Indent) (Either (TabError a)) [IndentedLine a]
+    go :: LogicalLine a -> StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
     go ll@(LogicalLine ann spcs line nl)
       | all isBlankToken line = pure [IndentedLine ll]
       | otherwise = do
-          i :| is <- get
+          (_, i) :| is <- get
           let
             et8 = absoluteIndentLevel 8 spcs
             et1 = absoluteIndentLevel 1 spcs
@@ -517,7 +517,7 @@ indentation lls =
             LT -> (<> [IndentedLine ll]) <$> dedents ann ilSpcs
             EQ -> pure [IndentedLine ll]
             GT -> do
-              modify $ NonEmpty.cons spcs
+              modify $ NonEmpty.cons (ann, spcs)
               pure [Indent (ilSpcs - ili) ann, IndentedLine ll]
 
 data Line a
@@ -537,12 +537,12 @@ newtype Nested a
   { unNested :: Seq (Either (Nested a) (Line a))
   } deriving (Eq, Show)
 
-nestedAnnotation :: Nested a -> Maybe a
-nestedAnnotation (Nested s) = s !? 0 >>= either nestedAnnotation (pure . lineAnn)
+nestedAnn :: Nested a -> Maybe a
+nestedAnn (Nested s) = s !? 0 >>= either nestedAnn (pure . lineAnn)
 
-data IndentationError
-  = UnexpectedDedent
-  | ExpectedDedent
+data IndentationError a
+  = UnexpectedDedent a
+  | ExpectedDedent a
   deriving (Eq, Show)
 
 newtype Summed a
@@ -573,26 +573,26 @@ splitIndents ns ws = go ns ws []
                 then error $ "could not carve out " <> show n <> " from " <> show ws
                 else go ns' (MkIndent befores) .  (MkIndent afters :)
 
-nested :: [IndentedLine a] -> Either IndentationError (Nested a)
+nested :: [IndentedLine a] -> Either (IndentationError a) (Nested a)
 nested = fmap Nested . go FingerTree.empty []
   where
     go
       :: FingerTree (Sum Int) (Summed Int)
-      -> [Seq (Either (Nested a) (Line a))]
+      -> [(a, Seq (Either (Nested a) (Line a)))]
       -> [IndentedLine a]
       -> Either
-           IndentationError
+           (IndentationError a)
            (Seq (Either (Nested a) (Line a)))
     go leaps [] [] = pure mempty
-    go leaps (a : as) [] = foldr (\_ _ -> Left ExpectedDedent) (pure a) as
-    go leaps ctxt (Indent n a : is) = go (leaps FingerTree.|> Summed n) (mempty : ctxt) is
-    go leaps [] (Dedent : is) = Left UnexpectedDedent
-    go leaps (a : as) (Dedent : is) =
+    go leaps ((ann, a) : as) [] = foldr (\_ _ -> Left $ ExpectedDedent ann) (pure a) as
+    go leaps ctxt (Indent n a : is) = go (leaps FingerTree.|> Summed n) ((a, mempty) : ctxt) is
+    go leaps [] (Dedent a : is) = Left $ UnexpectedDedent a
+    go leaps ((ann, a) : as) (Dedent _ : is) =
       case FingerTree.viewr leaps of
         FingerTree.EmptyR -> error "impossible"
         leaps' FingerTree.:> _ ->
           case as of
-            x : xs -> go leaps' ((x |> Left (Nested a)) : xs) is
-            [] -> go leaps' [Sequence.singleton $ Left (Nested a)] is
-    go leaps [] (IndentedLine ll : is) = go leaps [Sequence.singleton (Right $ logicalToLine leaps ll)] is
-    go leaps (a : as) (IndentedLine ll : is) = go leaps ((a |> Right (logicalToLine leaps ll)) : as) is
+            (ann', x) : xs -> go leaps' ((ann', x |> Left (Nested a)) : xs) is
+            [] -> go leaps' [(ann, Sequence.singleton $ Left (Nested a))] is
+    go leaps [] (IndentedLine ll : is) = go leaps [(llAnn ll, Sequence.singleton (Right $ logicalToLine leaps ll))] is
+    go leaps ((ann, a) : as) (IndentedLine ll : is) = go leaps ((ann, a |> Right (logicalToLine leaps ll)) : as) is

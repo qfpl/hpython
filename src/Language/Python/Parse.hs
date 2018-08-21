@@ -33,12 +33,12 @@ data ParseError a
   = LexicalError (NonEmpty a) (Maybe (ErrorItem Char)) (Set (ErrorItem Char))
   | TabError a
   | IncorrectDedent a
-  | UnexpectedDedent
+  | UnexpectedDedent a
   | UnexpectedEndOfInput a
   | UnexpectedEndOfLine a
   | UnexpectedEndOfBlock a
   | UnexpectedIndent a
-  | ExpectedDedent
+  | ExpectedDedent a
   | ExpectedIndent a
   | ExpectedEndOfBlock { peGotCtxt :: Line a }
   | ExpectedIdentifier { peGot :: PyToken a }
@@ -65,11 +65,11 @@ fromTabError e =
     Lexer.TabError a -> TabError a
     Lexer.IncorrectDedent a -> IncorrectDedent a
 
-fromIndentationError :: Lexer.IndentationError -> ParseError a
+fromIndentationError :: Lexer.IndentationError a -> ParseError a
 fromIndentationError e =
   case e of
-    Lexer.UnexpectedDedent -> UnexpectedDedent
-    Lexer.ExpectedDedent -> ExpectedDedent
+    Lexer.UnexpectedDedent a -> UnexpectedDedent a
+    Lexer.ExpectedDedent a -> ExpectedDedent a
 
 fromParseError :: Parse.ParseError a -> ParseError a
 fromParseError e =
@@ -99,35 +99,38 @@ fromIRError e =
 parseModule :: FilePath -> Text -> Validate [ParseError SrcInfo] (Module '[] SrcInfo)
 parseModule fp input =
   let
+    si = initialSrcInfo fp
     ir = do
       tokens <- first fromLexicalError $ tokenize fp input
       let ls = logicalLines tokens
-      ils <- first fromTabError $ indentation ls
+      ils <- first fromTabError $ indentation si ls
       nst <- first fromIndentationError $ nested ils
-      first fromParseError $ Parse.runParser (initialSrcInfo fp) Parse.module_ nst
+      first fromParseError $ Parse.runParser si Parse.module_ nst
   in
     fromEither (first pure ir) `bindValidate` (first (fmap fromIRError) . IR.fromIR)
 
 parseStatement :: FilePath -> Text -> Validate [ParseError SrcInfo] (Statement '[] SrcInfo)
 parseStatement fp input =
   let
+    si = initialSrcInfo fp
     ir = do
       tokens <- first fromLexicalError $ tokenize fp input
       let ls = logicalLines tokens
-      ils <- first fromTabError $ indentation ls
+      ils <- first fromTabError $ indentation si ls
       nst <- first fromIndentationError $ nested ils
-      first fromParseError $ Parse.runParser (initialSrcInfo fp) Parse.statement nst
+      first fromParseError $ Parse.runParser si Parse.statement nst
   in
     fromEither (first pure ir) `bindValidate` (first (fmap fromIRError) . IR.fromIR_statement)
 
 parseExpr :: FilePath -> Text -> Validate [ParseError SrcInfo] (Expr '[] SrcInfo)
 parseExpr fp input =
   let
+    si = initialSrcInfo fp
     ir = do
       tokens <- first fromLexicalError $ tokenize fp input
       let ls = logicalLines tokens
-      ils <- first fromTabError $ indentation ls
+      ils <- first fromTabError $ indentation si ls
       nst <- first fromIndentationError $ nested ils
-      first fromParseError $ Parse.runParser (initialSrcInfo fp) (Parse.exprList Parse.space) nst
+      first fromParseError $ Parse.runParser si (Parse.exprList Parse.space) nst
   in
     fromEither (first pure ir) `bindValidate` (first (fmap fromIRError) . IR.fromIR_expr)

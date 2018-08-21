@@ -185,6 +185,8 @@ statement_printparseprint_print =
 
 main = do
   checkParallel lexerParserTests
+  checkParallel scopeTests
+  checkParallel roundtripTests
   let file = "hedgehog-test.py"
   check . withTests 200 $ syntax_expr file
   check . withTests 200 $ syntax_statement file
@@ -193,6 +195,4 @@ main = do
   check . withTests 200 $ correct_syntax_statement file
   check expr_printparseprint_print
   check . withShrinks 2000 $ statement_printparseprint_print
-  checkParallel scopeTests
-  checkParallel roundtripTests
   removeFile "hedgehog-test.py"

@@ -7,7 +7,7 @@ import Language.Python.Internal.Lexer
   )
 import Language.Python.Internal.Parse (Parser, runParser)
 
-doNested :: Monad m => [IndentedLine a] -> PropertyT m (Nested a)
+doNested :: (Show a, Monad m)=> [IndentedLine a] -> PropertyT m (Nested a)
 doNested ils = do
   let res = nested ils
   case res of

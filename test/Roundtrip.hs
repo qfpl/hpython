@@ -44,7 +44,7 @@ doRoundtrip :: FilePath -> Property
 doRoundtrip name =
   property $ do
     file <- liftIO . StrictText.readFile $ "test/files" </> name
-    py <- validate (const failure) pure $ parseModule "test" file
+    py <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" file
     case runValidateIndentation $ validateModuleIndentation py of
       Failure errs -> annotateShow (errs :: [IndentationError '[] SrcInfo]) *> failure
       Success res ->

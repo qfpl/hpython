@@ -30,7 +30,7 @@ import Data.Sequence ((!?), (|>), Seq)
 import Data.These (These(..))
 import Data.Void (Void)
 import Text.Megaparsec
-  (MonadParsec, parse, parseErrorPretty, unPos)
+  (MonadParsec, ParseError, parse, unPos)
 import Text.Megaparsec.Parsers
 
 import qualified Data.FingerTree as FingerTree
@@ -47,7 +47,7 @@ data SrcInfo
   { _srcInfoName :: FilePath
   , _srcInfoLine :: !Int
   , _srcInfoCol :: !Int
-  , _srcInfoOffset :: !Int
+  , _srcInfoOffset :: !(Maybe Int)
   }
   deriving (Eq, Show)
 
@@ -57,13 +57,13 @@ initialSrcInfo fp =
   { _srcInfoName = fp
   , _srcInfoLine = 0
   , _srcInfoCol = 0
-  , _srcInfoOffset = 0
+  , _srcInfoOffset = Just 0
   }
 
 {-# inline getSrcInfo #-}
 getSrcInfo :: MonadParsec e s m => m SrcInfo
 getSrcInfo =
-  (\(Parsec.SourcePos name l c) -> SrcInfo name (unPos l) (unPos c)) <$>
+  (\(Parsec.SourcePos name l c) -> SrcInfo name (unPos l) (unPos c) . Just) <$>
   Parsec.getPosition <*>
   Parsec.getTokensProcessed
 
@@ -368,8 +368,8 @@ parseToken =
       many (satisfy isIdentifierChar)
     ]
 
-tokenize :: Text.Text -> Either String [PyToken SrcInfo]
-tokenize = first parseErrorPretty . parse (unParsecT tokens) "test"
+tokenize :: FilePath -> Text.Text -> Either (ParseError Char Void) [PyToken SrcInfo]
+tokenize fp = parse (unParsecT tokens) fp
   where
     tokens :: ParsecT Void Text.Text Identity [PyToken SrcInfo]
     tokens = many parseToken <* Parsec.eof
@@ -466,7 +466,7 @@ isBlankToken TkNewline{} = True
 isBlankToken _ = False
 
 data TabError a
-  = TabError
+  = TabError a
   | IncorrectDedent a
   deriving (Eq, Show)
 
@@ -509,7 +509,7 @@ indentation lls =
             (not (et8 < et8i && et1 < et1i) &&
              not (et8 > et8i && et1 > et1i) &&
              not (et8 == et8i && et1 == et1i))
-            (throwError TabError)
+            (throwError $ TabError ann)
           let
             ilSpcs = indentLevel spcs
             ili = indentLevel i

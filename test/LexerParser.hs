@@ -2,6 +2,7 @@
 module LexerParser (lexerParserTests) where
 
 import Data.Functor.Alt ((<!>))
+import Data.Validate (validate)
 import qualified Data.Text as Text
 import qualified Data.Functor.Alt as Alt (many)
 import Hedgehog
@@ -9,12 +10,11 @@ import Hedgehog
 import Language.Python.Internal.Lexer
 import Language.Python.Internal.Parse
 import Language.Python.Internal.Render
-import Language.Python.Internal.Syntax.IR (fromIR, fromIR_statement, fromIR_expr)
 import Language.Python.Internal.Syntax.Whitespace
 import Language.Python.Internal.Token
+import Language.Python.Parse (parseModule, parseStatement, parseExpr)
 
-import Helpers
-  (doToPython, doParse, doNested)
+import Helpers (doParse, doNested)
 
 lexerParserTests :: Group
 lexerParserTests =
@@ -45,7 +45,7 @@ test_fulltrip_1 =
   withTests 1 . property $ do
     let str = "def a(x, y=2, *z, **w):\n   return 2 + 3"
 
-    tree <- doToPython statement fromIR_statement str
+    tree <- validate (const failure) pure $ parseStatement "test" str
     annotateShow tree
 
     showStatement tree === str
@@ -55,7 +55,7 @@ test_fulltrip_2 =
   withTests 1 . property $ do
     let str = "(   1\n       *\n  3\n    )"
 
-    tree <- doToPython (expr space) fromIR_expr str
+    tree <- validate (const failure) pure $ parseExpr "test" str
     annotateShow tree
 
     showExpr tree === str
@@ -65,7 +65,7 @@ test_fulltrip_3 =
   withTests 1 . property $ do
     let str = "pass;"
 
-    tree <- doToPython statement fromIR_statement str
+    tree <- validate (const failure) pure $ parseStatement "test" str
     annotateShow tree
 
     showStatement tree === str
@@ -75,7 +75,7 @@ test_fulltrip_4 =
   withTests 1 . property $ do
     let str = "def a():\n pass\n #\n pass\n"
 
-    tree <- doToPython statement fromIR_statement str
+    tree <- validate (const failure) pure $ parseStatement "test" str
     annotateShow tree
 
     showStatement tree === str
@@ -85,7 +85,7 @@ test_fulltrip_5 =
   withTests 1 . property $ do
     let str = "if False:\n pass\n pass\nelse:\n pass\n pass\n"
 
-    tree <- doToPython statement fromIR_statement str
+    tree <- validate (const failure) pure $ parseStatement "test" str
     annotateShow tree
 
     showStatement tree === str
@@ -95,7 +95,7 @@ test_fulltrip_6 =
   withTests 1 . property $ do
     let str = "# blah\ndef boo():\n    pass\n       #bing\n    #   bop\n"
 
-    tree <- doToPython module_ fromIR str
+    tree <- validate (const failure) pure $ parseModule "test" str
     annotateShow tree
 
     showModule tree === str
@@ -105,7 +105,7 @@ test_fulltrip_7 =
   withTests 1 . property $ do
     let str = "if False:\n pass\nelse \\\n      \\\r\n:\n pass\n"
 
-    tree <- doToPython module_ fromIR str
+    tree <- validate (const failure) pure $ parseModule "test" str
     annotateShow tree
 
     showModule tree === str
@@ -115,7 +115,7 @@ test_fulltrip_8 =
   withTests 1 . property $ do
     let str = "def a():\n \n pass\n pass\n"
 
-    tree <- doToPython module_ fromIR str
+    tree <- validate (const failure) pure $ parseModule "test" str
     annotateShow tree
 
     showModule tree === str
@@ -127,7 +127,7 @@ test_fulltrip_9 =
       str =
         "try:\n pass\nexcept False:\n pass\nelse:\n pass\nfinally:\n pass\n def a():\n  pass\n pass\n"
 
-    tree <- doToPython module_ fromIR str
+    tree <- validate (const failure) pure $ parseModule "test" str
     annotateShow tree
 
     showModule tree === str
@@ -151,7 +151,7 @@ test_fulltrip_10 =
         , "    pass"
         ]
 
-    tree <- doToPython module_ fromIR str
+    tree <- validate (const failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -170,7 +170,7 @@ test_fulltrip_11 =
         , " \tpass"
         ]
 
-    tree <- doToPython module_ fromIR str
+    tree <- validate (const failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -190,7 +190,7 @@ test_fulltrip_12 =
         , " pass"
         ]
 
-    tree <- doToPython module_ fromIR str
+    tree <- validate (const failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -212,7 +212,7 @@ test_fulltrip_13 =
         , " pass"
         ]
 
-    tree <- doToPython module_ fromIR str
+    tree <- validate (const failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -223,7 +223,7 @@ test_fulltrip_14 =
     let
       str = "not ((False for a in False) if False else False or False)"
 
-    tree <- doToPython module_ fromIR str
+    tree <- validate (const failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -234,7 +234,7 @@ test_fulltrip_15 =
     let
       str = "01."
 
-    tree <- doToPython module_ fromIR str
+    tree <- validate (const failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -245,7 +245,7 @@ test_fulltrip_16 =
     let
       str = "def a():\n  return ~i"
 
-    tree <- doToPython module_ fromIR str
+    tree <- validate (const failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -255,7 +255,7 @@ test_fulltrip_17 =
   withTests 1 . property $ do
     let str = "r\"\\\"\""
 
-    tree <- doToPython module_ fromIR str
+    tree <- validate (const failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str

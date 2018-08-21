@@ -2,17 +2,15 @@
 module Main where
 
 import Language.Python.Internal.Optics
-import Language.Python.Internal.Parse
 import Language.Python.Internal.Render
 import Language.Python.Internal.Syntax
-import Language.Python.Internal.Syntax.IR (fromIR_statement, fromIR_expr)
+import Language.Python.Parse (parseStatement, parseExpr)
 import Language.Python.Validate.Indentation
 import Language.Python.Validate.Syntax
 
 import LexerParser
 import Scope
 import Roundtrip
-import Helpers (doToPython)
 
 import qualified Generators.General as General
 import qualified Generators.Correct as Correct
@@ -23,7 +21,7 @@ import Control.Monad.State
 import Data.Functor
 import Data.List
 import Data.Text (Text)
-import Data.Validate
+import Data.Validate (Validate(..), validate)
 import System.Directory
 import System.Exit
 import System.Process
@@ -166,7 +164,7 @@ expr_printparseprint_print =
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <- doToPython (exprList space) fromIR_expr (showExpr res')
+            py <- validate (const failure) pure $ parseExpr "test" (showExpr res')
             showExpr (res' ^. unvalidated) === showExpr (res $> ())
 
 statement_printparseprint_print :: Property
@@ -180,7 +178,7 @@ statement_printparseprint_print =
         case validateStatementSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <- doToPython statement fromIR_statement $ showStatement res'
+            py <- validate (const failure) pure $ parseStatement "test" (showStatement res')
             annotateShow py
             showStatement (res' ^. unvalidated) ===
               showStatement (py $> ())

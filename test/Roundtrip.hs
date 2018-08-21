@@ -4,7 +4,7 @@ module Roundtrip (roundtripTests) where
 
 import Control.Monad.IO.Class (liftIO)
 import Data.String (fromString)
-import Data.Validate (Validate(..))
+import Data.Validate (Validate(..), validate)
 import Hedgehog
   ( (===), Group(..), Property, annotateShow, failure, property
   , withTests, withShrinks
@@ -15,17 +15,14 @@ import qualified Data.Text.IO as StrictText
 import qualified Data.Text as Strict
 
 import Language.Python.Internal.Lexer (SrcInfo)
-import Language.Python.Internal.Parse (module_)
 import Language.Python.Internal.Render (showModule)
-import Language.Python.Internal.Syntax.IR (fromIR)
+import Language.Python.Parse (parseModule)
 import Language.Python.Validate.Indentation
   (Indentation, runValidateIndentation, validateModuleIndentation)
 import Language.Python.Validate.Indentation.Error (IndentationError)
 import Language.Python.Validate.Syntax
   (runValidateSyntax, validateModuleSyntax, initialSyntaxContext)
 import Language.Python.Validate.Syntax.Error (SyntaxError)
-
-import Helpers (doToPython)
 
 roundtripTests :: Group
 roundtripTests =
@@ -47,7 +44,7 @@ doRoundtrip :: FilePath -> Property
 doRoundtrip name =
   property $ do
     file <- liftIO . StrictText.readFile $ "test/files" </> name
-    py <- doToPython module_ fromIR file
+    py <- validate (const failure) pure $ parseModule "test" file
     case runValidateIndentation $ validateModuleIndentation py of
       Failure errs -> annotateShow (errs :: [IndentationError '[] SrcInfo]) *> failure
       Success res ->

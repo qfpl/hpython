@@ -170,6 +170,7 @@ genExpr' isExp =
     , genBool
     , if isExp then genSmallInt else genInt
     , if isExp then genSmallFloat else genFloat
+    , genImag
     , Ident () <$> genIdent
     , String () <$>
       Gen.nonEmpty

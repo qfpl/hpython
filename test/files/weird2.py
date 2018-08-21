@@ -6,3 +6,5 @@
 
 [(yield)for a in()]
 
+def a():
+    pass  # cmt

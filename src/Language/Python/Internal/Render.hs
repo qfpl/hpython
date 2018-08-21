@@ -159,6 +159,7 @@ showToken t =
     TkYield{} -> "yield"
     TkInt i -> renderIntLiteral i
     TkFloat i -> renderFloatLiteral i
+    TkImag i -> renderImagLiteral i
     TkIdent s _ -> Text.pack s
     TkString sp qt st s _ ->
       let
@@ -618,6 +619,15 @@ renderFloatLiteral (FloatLiteralFull _ a b) =
 renderFloatLiteral (FloatLiteralPoint _ a b) =
   Text.pack ('.' : fmap (charDecimal #) (NonEmpty.toList a)) <>
   foldMap renderFloatExponent b
+renderFloatLiteral (FloatLiteralWhole _ a b) =
+  Text.pack (fmap (charDecimal #) (NonEmpty.toList a)) <>
+  renderFloatExponent b
+
+renderImagLiteral :: ImagLiteral a -> Text
+renderImagLiteral (ImagLiteralInt _ ds b) =
+  Text.pack $ fmap (charDecimal #) (NonEmpty.toList ds) ++ [if b then 'J' else 'j']
+renderImagLiteral (ImagLiteralFloat _ f b) =
+  renderFloatLiteral f <> Text.singleton (if b then 'J' else 'j')
 
 renderStringLiteral :: StringLiteral a -> RenderOutput
 renderStringLiteral (StringLiteral _ a b c d e) =
@@ -832,6 +842,7 @@ renderExpr (UnOp _ op expr) =
 renderExpr (String _ vs) = foldMap renderStringLiteral vs
 renderExpr (Int a n ws) = TkInt (() <$ n) `cons` foldMap renderWhitespace ws
 renderExpr (Float a n ws) = TkFloat (() <$ n) `cons` foldMap renderWhitespace ws
+renderExpr (Imag a n ws) = TkImag (() <$ n) `cons` foldMap renderWhitespace ws
 renderExpr (Ident _ name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) =
   TkLeftBracket () `cons`

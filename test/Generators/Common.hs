@@ -134,9 +134,23 @@ genSmallFloat =
       Gen.maybe (Gen.element [Pos, Neg]) <*>
       genDecs
 
-genFloat :: MonadGen m => m (Expr '[] ())
-genFloat =
-  Float () <$>
+genImag :: MonadGen m => m (Expr '[] ())
+genImag =
+  Imag () <$>
+  Gen.choice
+    [ ImagLiteralInt () <$>
+      genDecs <*>
+      Gen.bool
+    , ImagLiteralFloat () <$>
+      genFloatLiteral <*>
+      Gen.bool
+    ] <*>
+  genWhitespaces
+  where
+    genDecs = Gen.nonEmpty (Range.constant 1 10) (Gen.element enumDecimal)
+
+genFloatLiteral :: MonadGen m => m (FloatLiteral ())
+genFloatLiteral =
   Gen.choice
     [ FloatLiteralFull () <$>
       genDecs <*>
@@ -149,8 +163,10 @@ genFloat =
     , FloatLiteralPoint () <$>
       genDecs <*>
       Gen.maybe floatExponent
-    ] <*>
-  genWhitespaces
+    , FloatLiteralWhole () <$>
+      genDecs <*>
+      floatExponent
+    ]
   where
     genDecs = Gen.nonEmpty (Range.constant 1 10) (Gen.element enumDecimal)
     floatExponent =
@@ -158,6 +174,12 @@ genFloat =
       Gen.bool <*>
       Gen.maybe (Gen.element [Pos, Neg]) <*>
       genDecs
+
+genFloat :: MonadGen m => m (Expr '[] ())
+genFloat =
+  Float () <$>
+  genFloatLiteral <*>
+  genWhitespaces
 
 genString :: MonadGen m => m PyChar -> m [PyChar]
 genString = Gen.list (Range.constant 0 50)

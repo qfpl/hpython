@@ -280,6 +280,7 @@ assignTargets f e =
     UnOp{} -> pure $ coerce e
     Int{} -> pure $ coerce e
     Float{} -> pure $ coerce e
+    Imag{} -> pure $ coerce e
     Bool{} -> pure $ coerce e
     String{} -> pure $ coerce e
     Not{} -> pure $ coerce e

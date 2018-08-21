@@ -52,5 +52,26 @@ data FloatLiteral a
   -- [ 'e' ['-' | '+'] [0-9]+ ]
   , _floatLiteralPointExponent :: Maybe FloatExponent
   }
+  | FloatLiteralWhole
+  { _floatLiteralAnn :: a
+  -- [0-9]+
+  , _floatLiteralWholeRight :: NonEmpty DecDigit
+  -- [ 'e' ['-' | '+'] [0-9]+ ]
+  , _floatLiteralWholeExponent :: FloatExponent
+  }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 deriveEq1 ''FloatLiteral
+
+data ImagLiteral a
+  = ImagLiteralInt
+  { _imagLiteralAnn :: a
+  , _unsafeImagLiteralIntValue :: NonEmpty DecDigit
+  , _imagLiteralUppercase :: Bool
+  }
+  | ImagLiteralFloat
+  { _imagLiteralAnn :: a
+  , _unsafeImagLiteralFloatValue :: FloatLiteral a
+  , _imagLiteralUppercase :: Bool
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+deriveEq1 ''ImagLiteral

@@ -164,7 +164,9 @@ expr_printparseprint_print =
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <- validate (const failure) pure $ parseExpr "test" (showExpr res')
+            py <-
+              validate (\e -> annotateShow e *> failure) pure $
+              parseExpr "test" (showExpr res')
             showExpr (res' ^. unvalidated) === showExpr (res $> ())
 
 statement_printparseprint_print :: Property

@@ -305,6 +305,7 @@ genExpr' isExp = do
     , genBool
     , if isExp then genSmallInt else genInt
     , if isExp then genSmallFloat else genFloat
+    , genImag
     , Ident () <$> genIdent
     , genStringLiterals
     ]

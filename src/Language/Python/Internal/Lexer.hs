@@ -161,25 +161,44 @@ number = do
       nn <- optional $ (:|) <$> parseDecimalNoZero <*> many parseDecimal
       case nn of
         Just n ->
-          (\x ann -> case x of
-             Nothing -> TkInt $ IntLiteralDec ann n
-             Just (Left e) -> TkFloat $ FloatLiteralFull ann n (Just (That e))
-             Just (Right (a, b)) ->
-               TkFloat . FloatLiteralFull ann n $
-               case (a, b) of
-                 (Nothing, Nothing) -> Nothing
-                 (Just x, Nothing) -> Just $ This x
-                 (Nothing, Just x) -> Just $ That x
-                 (Just x, Just y) -> Just $ These x y) <$>
+          (\x j ann ->
+             case x of
+               Nothing ->
+                 maybe (TkInt $ IntLiteralDec ann n) (TkImag . ImagLiteralInt ann n) j
+               Just (Right e) ->
+                 let
+                   f = FloatLiteralWhole ann n e
+                 in
+                   maybe (TkFloat f) (TkImag . ImagLiteralFloat ann f) j
+               Just (Left (Left e)) ->
+                 let
+                   f = FloatLiteralFull ann n (Just (That e))
+                 in
+                   maybe (TkFloat f) (TkImag . ImagLiteralFloat ann f) j
+               Just (Left (Right (a, b))) ->
+                 let
+                   f = FloatLiteralFull ann n $
+                     case (a, b) of
+                       (Nothing, Nothing) -> Nothing
+                       (Just x, Nothing) -> Just $ This x
+                       (Nothing, Just x) -> Just $ That x
+                       (Just x, Just y) -> Just $ These x y
+                 in
+                   maybe (TkFloat f) (TkImag . ImagLiteralFloat ann f) j) <$>
           optional
-            (char '.' *>
-             (Left <$> floatExp <|>
-              fmap Right ((,) <$> optional (some1 parseDecimal) <*> optional floatExp)))
+            (Left <$> (char '.' *> (Left <$> floatExp <|> Right <$> ((,) <$> optional (some1 parseDecimal) <*> optional floatExp))) <|>
+             Right <$> floatExp) <*>
+          optional (False <$ char 'j' <|> True <$ char 'J')
         Nothing ->
-          (\a b ann -> TkFloat $ FloatLiteralPoint ann a b) <$>
+          (\a b j ann ->
+             let
+               f = FloatLiteralPoint ann a b
+             in
+               maybe (TkFloat f) (TkImag . ImagLiteralFloat ann f) j) <$>
           -- try is necessary here to prevent the intercepting of dereference tokens
           try (char '.' *> some1 parseDecimal) <*>
-          optional floatExp
+          optional floatExp <*>
+          optional (True <$ char 'J' <|> False <$ char 'j')
     Just z ->
       (\xX a b -> TkInt (IntLiteralHex b xX a)) <$>
       (True <$ char 'X' <|> False <$ char 'x') <*>
@@ -193,19 +212,34 @@ number = do
       (True <$ char 'O' <|> False <$ char 'o') <*>
       some1 parseOctal
       <|>
-      (\n a -> TkInt (IntLiteralDec a (z :| n))) <$>
-      try (many parse0 <* notFollowedBy (char '.' <|> digit))
+      (\n j a ->
+         maybe (TkInt $ IntLiteralDec a (z :| n)) (TkImag . ImagLiteralInt a (z :| n)) j) <$>
+      try (many parse0 <* notFollowedBy (char '.' <|> digit)) <*>
+      optional (False <$ char 'j' <|> True <$ char 'J')
       <|>
-      (\n' a b ann ->
-        TkFloat . FloatLiteralFull ann (z :| n') $
-        case (a, b) of
-          (Nothing, Nothing) -> Nothing
-          (Just x, Nothing) -> Just $ This x
-          (Nothing, Just x) -> Just $ That x
-          (Just x, Just y) -> Just $ These x y) <$>
-      many parseDecimal <* char '.' <*>
-      optional (some1 parseDecimal) <*>
-      optional floatExp
+      (\n' a j ann ->
+         case a of
+           Left (b, c) ->
+             let
+               f = FloatLiteralFull ann (z :| n') $
+                 case (b, c) of
+                   (Nothing, Nothing) -> Nothing
+                   (Just x, Nothing) -> Just $ This x
+                   (Nothing, Just x) -> Just $ That x
+                   (Just x, Just y) -> Just $ These x y
+             in
+               maybe (TkFloat f) (TkImag . ImagLiteralFloat ann f) j
+           Right (Just x) ->
+             let
+               f = FloatLiteralWhole ann (z :| n') x
+             in
+               maybe (TkFloat f) (TkImag . ImagLiteralFloat ann f) j
+           Right Nothing ->
+             maybe (TkInt $ IntLiteralDec ann (z :| n')) (TkImag . ImagLiteralInt ann (z :| n')) j) <$>
+      many parseDecimal <*>
+      (Left <$> ((,) <$ char '.' <*> optional (some1 parseDecimal) <*> optional floatExp) <|>
+       Right <$> optional floatExp) <*>
+      optional (False <$ char 'j' <|> True <$ char 'J')
   where
     floatExp =
       FloatExponent <$>

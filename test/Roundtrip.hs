@@ -28,7 +28,8 @@ roundtripTests :: Group
 roundtripTests =
   Group "Roundtrip tests" $
   (\name -> (fromString name, withTests 1 . withShrinks 1 $ doRoundtrip name)) <$>
-  [ "weird.py"
+  [ "imaginary.py"
+  , "weird.py"
   , "weird2.py"
   , "django.py"
   , "django2.py"

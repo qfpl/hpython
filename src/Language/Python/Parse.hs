@@ -47,6 +47,7 @@ data ParseError a
   | ExpectedStringOrBytes { peGot :: PyToken a }
   | ExpectedInteger { peGot :: PyToken a }
   | ExpectedFloat { peGot :: PyToken a }
+  | ExpectedImag { peGot :: PyToken a }
   | ExpectedComment { peGot :: PyToken a }
   | ExpectedToken { peExpected :: PyToken (), peGot :: PyToken a }
   | ExpectedEndOfLine { peGotTokens :: [PyToken a] }
@@ -86,6 +87,7 @@ fromParseError e =
     Parse.ExpectedStringOrBytes a -> ExpectedStringOrBytes a
     Parse.ExpectedInteger a -> ExpectedInteger a
     Parse.ExpectedFloat a -> ExpectedFloat a
+    Parse.ExpectedImag a -> ExpectedImag a
     Parse.ExpectedComment a -> ExpectedComment a
     Parse.ExpectedToken a b -> ExpectedToken a b
     Parse.ExpectedEndOfLine a -> ExpectedEndOfLine a

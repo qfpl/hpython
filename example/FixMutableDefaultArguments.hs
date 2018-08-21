@@ -43,6 +43,7 @@ fixMutableDefaultArguments input = do
     isMutable None{} = False
     isMutable Lambda{} = False
     isMutable Float{} = False
+    isMutable Imag{} = False
     isMutable Int{} = False
     isMutable Bool{} = False
     isMutable String{} = False

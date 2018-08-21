@@ -383,6 +383,11 @@ data Expr a
   , _unsafeFloatValue :: FloatLiteral a
   , _unsafeFloatWhitespace :: [Whitespace]
   }
+  | Imag
+  { _exprAnnotation :: a
+  , _unsafeImagValue :: ImagLiteral a
+  , _unsafeImagWhitespace :: [Whitespace]
+  }
   | Bool
   { _exprAnnotation :: a
   , _unsafeBoolValue :: Bool
@@ -521,6 +526,7 @@ fromIR_expr ex =
     Ident a b -> pure $ Syntax.Ident a b
     Int a b c -> pure $ Syntax.Int a b c
     Float a b c -> pure $ Syntax.Float a b c
+    Imag a b c -> pure $ Syntax.Imag a b c
     Bool a b c -> pure $ Syntax.Bool a b c
     String a b -> pure $ Syntax.String a b
     Tuple a b c d ->

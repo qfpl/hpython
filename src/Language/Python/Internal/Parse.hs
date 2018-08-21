@@ -58,6 +58,7 @@ data ParseError ann
   | ExpectedStringOrBytes { peGot :: PyToken ann }
   | ExpectedInteger { peGot :: PyToken ann }
   | ExpectedFloat { peGot :: PyToken ann }
+  | ExpectedImag { peGot :: PyToken ann }
   | ExpectedComment { peGot :: PyToken ann }
   | ExpectedToken { peExpected :: PyToken (), peGot :: PyToken ann }
   | ExpectedEndOfLine { peGotTokens :: [PyToken ann] }
@@ -283,6 +284,16 @@ float ws = do
       Parser $ consumed ann
       Float ann n <$> many ws
     _ -> Parser . throwError $ ExpectedFloat curTk
+
+imag :: Parser ann Whitespace -> Parser ann (Expr ann)
+imag ws = do
+  curTk <- currentToken
+  case curTk of
+    TkImag n -> do
+      let ann = _imagLiteralAnn n
+      Parser $ consumed ann
+      Imag ann n <$> many ws
+    _ -> Parser . throwError $ ExpectedImag curTk
 
 stringOrBytes :: Parser ann Whitespace -> Parser ann (Expr ann)
 stringOrBytes ws =
@@ -657,6 +668,7 @@ orExpr ws =
       none ws <!>
       integer ws <!>
       float ws <!>
+      imag ws <!>
       stringOrBytes ws <!>
       (\a -> Ident (_identAnnotation a) a) <$> identifier ws <!>
       parensOrUnit

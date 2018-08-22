@@ -2,6 +2,7 @@
 {-# language FlexibleContexts #-}
 {-# language GeneralizedNewtypeDeriving #-}
 {-# language TemplateHaskell #-}
+{-# language LambdaCase #-}
 module Language.Python.Internal.Parse where
 
 import Control.Applicative (liftA2)
@@ -13,7 +14,7 @@ import Control.Monad (unless)
 import Control.Monad.Except (ExceptT(..), runExceptT, throwError, catchError)
 import Control.Monad.State
   (MonadState, StateT(..), get, put, evalStateT, runStateT)
-import Control.Monad.Writer.Strict (MonadWriter, Writer, runWriter, writer, tell)
+import Control.Monad.Writer.Strict (MonadWriter, Writer, runWriter, tell, writer)
 import Data.Bifunctor (first)
 import Data.Foldable (toList)
 import Data.Function ((&))
@@ -27,7 +28,18 @@ import Data.Sequence (viewl, ViewL(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Lexer
-import Language.Python.Internal.Syntax
+import Language.Python.Internal.Syntax.AugAssign
+import Language.Python.Internal.Syntax.BinOp
+import Language.Python.Internal.Syntax.Comment
+import Language.Python.Internal.Syntax.CommaSep
+import Language.Python.Internal.Syntax.IR
+import Language.Python.Internal.Syntax.Ident
+import Language.Python.Internal.Syntax.Import
+import Language.Python.Internal.Syntax.ModuleNames
+import Language.Python.Internal.Syntax.Numbers
+import Language.Python.Internal.Syntax.Strings
+import Language.Python.Internal.Syntax.UnOp
+import Language.Python.Internal.Syntax.Whitespace
 import Language.Python.Internal.Token
 
 some1 :: (Alt f, Applicative f) => f a -> f (NonEmpty a)
@@ -46,6 +58,7 @@ data ParseError ann
   | ExpectedStringOrBytes { peGot :: PyToken ann }
   | ExpectedInteger { peGot :: PyToken ann }
   | ExpectedFloat { peGot :: PyToken ann }
+  | ExpectedImag { peGot :: PyToken ann }
   | ExpectedComment { peGot :: PyToken ann }
   | ExpectedToken { peExpected :: PyToken (), peGot :: PyToken ann }
   | ExpectedEndOfLine { peGotTokens :: [PyToken ann] }
@@ -116,9 +129,9 @@ currentToken = Parser $ do
           case tks of
             [] -> throwError $ UnexpectedEndOfLine ann
             [tk] | Nothing <- nl -> do
-              assign parseContext $ case rest' of
-                [] -> rest
-                _ -> rest' : rest
+              case rest' of
+                [] -> assign parseContext rest
+                _ -> assign parseContext $ rest' : rest
               pure tk
             tk : rest'' ->
               assign parseContext ((Right (ll { lineLine = rest'' }) : rest') : rest) $> tk
@@ -237,7 +250,7 @@ identifier ws = do
       MkIdent ann n <$> many ws
     _ -> Parser . throwError $ ExpectedIdentifier curTk
 
-bool :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+bool :: Parser ann Whitespace -> Parser ann (Expr ann)
 bool ws =
   (\(tk, s) ->
      Bool
@@ -249,10 +262,13 @@ bool ws =
        s) <$>
   (token ws (TkTrue ()) <!> token ws (TkFalse ()))
 
-none :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+none :: Parser ann Whitespace -> Parser ann (Expr ann)
 none ws = (\(tk, s) -> None (pyTokenAnn tk) s) <$> token ws (TkNone ())
 
-integer :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+ellipsis :: Parser ann Whitespace -> Parser ann (Expr ann)
+ellipsis ws = (\(tk, s) -> Ellipsis (pyTokenAnn tk) s) <$> token ws (TkEllipsis ())
+
+integer :: Parser ann Whitespace -> Parser ann (Expr ann)
 integer ws = do
   curTk <- currentToken
   case curTk of
@@ -262,7 +278,7 @@ integer ws = do
       Int ann n <$> many ws
     _ -> Parser . throwError $ ExpectedInteger curTk
 
-float :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+float :: Parser ann Whitespace -> Parser ann (Expr ann)
 float ws = do
   curTk <- currentToken
   case curTk of
@@ -272,7 +288,17 @@ float ws = do
       Float ann n <$> many ws
     _ -> Parser . throwError $ ExpectedFloat curTk
 
-stringOrBytes :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+imag :: Parser ann Whitespace -> Parser ann (Expr ann)
+imag ws = do
+  curTk <- currentToken
+  case curTk of
+    TkImag n -> do
+      let ann = _imagLiteralAnn n
+      Parser $ consumed ann
+      Imag ann n <$> many ws
+    _ -> Parser . throwError $ ExpectedImag curTk
+
+stringOrBytes :: Parser ann Whitespace -> Parser ann (Expr ann)
 stringOrBytes ws =
   fmap (\vs -> String (_stringLiteralAnn $ NonEmpty.head vs) vs) . some1 $ do
     curTk <- currentToken
@@ -283,6 +309,12 @@ stringOrBytes ws =
        TkBytes sp qt st val ann ->
          Parser (consumed ann) $>
          BytesLiteral ann sp qt st val
+       TkRawString sp qt st val ann ->
+         Parser (consumed ann) $>
+         RawStringLiteral ann sp qt st val
+       TkRawBytes sp qt st val ann ->
+         Parser (consumed ann) $>
+         RawBytesLiteral ann sp qt st val
        _ -> Parser . throwError $ ExpectedStringOrBytes curTk) <*>
      many ws
 
@@ -301,22 +333,25 @@ indents = Parser $ do
         Right ll@(Line a is _ _) : rest' -> pure $ Indents is a
         Left l : _ -> throwError $ UnexpectedIndent ann
 
-exprList :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+exprList :: Parser ann Whitespace -> Parser ann (Expr ann)
 exprList ws =
-  (\a -> maybe a (uncurry $ Tuple (_exprAnnotation a) a)) <$>
+  (\e ->
+     maybe
+       e
+       (uncurry $ Tuple (_exprAnnotation e) e)) <$>
   expr ws <*>
   optional
     ((,) <$>
      (snd <$> comma ws) <*>
      optional (commaSep1' ws $ expr ws))
 
-compIf :: Parser ann (CompIf '[] ann)
+compIf :: Parser ann (CompIf ann)
 compIf =
   (\(tk, s) -> CompIf (pyTokenAnn tk) s) <$>
   token anySpace (TkIf ()) <*>
   exprNoCond anySpace
 
-compFor :: Parser ann (CompFor '[] ann)
+compFor :: Parser ann (CompFor ann)
 compFor =
   (\(tk, s) -> CompFor (pyTokenAnn tk) s) <$>
   token anySpace (TkFor ()) <*>
@@ -336,53 +371,64 @@ commaSepRest x = do
         Nothing -> pure ([], Just c')
         Just e' -> first ((c', e') :) <$> commaSepRest x
 
-exprComp :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+exprComp :: Parser ann Whitespace -> Parser ann (Expr ann)
 exprComp ws =
   (\ex a ->
      case a of
        Nothing -> ex
        Just (cf, rest) ->
-         Generator (ex ^. exprAnnotation) $
-         Comprehension (ex ^. exprAnnotation) ex cf rest) <$>
+         Generator (_exprAnnotation ex) $
+         Comprehension (_exprAnnotation ex) ex cf rest) <$>
   expr ws <*>
   optional ((,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf))
 
-exprListComp :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
-exprListComp ws = do
-  ex <- expr ws
-  val <-
-    Left <$> compFor <!>
-    Right <$> commaSepRest (expr anySpace)
-  case val of
-    Left cf ->
-      Generator (ex ^. exprAnnotation) .
-      Comprehension (ex ^. exprAnnotation) ex cf <$>
-      many (Left <$> compFor <!> Right <$> compIf)
-    Right ([], Nothing) -> pure ex
-    Right ([], Just ws) ->
-      pure $ Tuple (ex ^. exprAnnotation) ex ws Nothing
-    Right ((ws, ex') : cs, mws) ->
-      pure $ Tuple (ex ^. exprAnnotation) ex ws . Just $ (ex', cs, mws) ^. _CommaSep1'
+starExpr :: Parser ann Whitespace -> Parser ann (Expr ann)
+starExpr ws =
+  (\(tk, sp) -> StarExpr (pyTokenAnn tk) sp) <$>
+  token ws (TkStar ()) <*>
+  orExpr ws
 
-orExprList :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+exprListComp :: Parser ann Whitespace -> Parser ann (Expr ann)
+exprListComp ws =
+  (\e a ->
+     case a of
+       Left (cf, cfs) ->
+         let
+           ann = _exprAnnotation e
+         in
+           Generator ann $ Comprehension ann e cf cfs
+       Right (Just (c, cs)) -> Tuple (_exprAnnotation e) e c cs
+       Right Nothing -> e) <$>
+  (expr ws <!> starExpr ws) <*>
+  (Left <$>
+   ((,) <$>
+    compFor <*>
+    many (Left <$> compFor <!> Right <$> compIf)) <!>
+   Right <$>
+   optional
+     ((,) <$>
+      (snd <$> comma ws) <*>
+      optional (commaSep1' ws $ expr ws <!> starExpr ws)))
+
+orExprList :: Parser ann Whitespace -> Parser ann (Expr ann)
 orExprList ws =
-  (\a -> maybe a (uncurry $ Tuple (_exprAnnotation a) a)) <$>
-  orExpr ws <*>
+  (\e -> maybe e (uncurry $ Tuple (_exprAnnotation e) e)) <$>
+  (orExpr ws <!> starExpr ws) <*>
   optional
     ((,) <$>
      (snd <$> comma ws) <*>
-     optional (commaSep1' ws $ orExpr ws))
+     optional (commaSep1' ws $ orExpr ws <!> starExpr ws))
 
-binOp :: Parser ann (BinOp ann) -> Parser ann (Expr '[] ann) -> Parser ann (Expr '[] ann)
+binOp :: Parser ann (BinOp ann) -> Parser ann (Expr ann) -> Parser ann (Expr ann)
 binOp op tm =
   (\t ts ->
       case ts of
         [] -> t
-        _ -> foldl (\tm (o, val) -> BinOp (tm ^. exprAnnotation) tm o val) t ts) <$>
+        _ -> foldl (\tm (o, val) -> BinOp (_exprAnnotation tm) tm o val) t ts) <$>
   tm <*>
   many ((,) <$> op <*> tm)
 
-orTest :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+orTest :: Parser ann Whitespace -> Parser ann (Expr ann)
 orTest ws = binOp orOp andTest
   where
     orOp = (\(tk, ws) -> BoolOr (pyTokenAnn tk) ws) <$> token ws (TkOr ())
@@ -409,35 +455,35 @@ orTest ws = binOp orOp andTest
       (\(tk, ws) -> NotEquals (pyTokenAnn tk) ws) <$> token ws (TkBangEq ())
     comparison = binOp compOp $ orExpr ws
 
-yieldExpr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+yieldExpr :: Parser ann Whitespace -> Parser ann (Expr ann)
 yieldExpr ws =
   (\(tk, s) -> either (uncurry $ YieldFrom (pyTokenAnn tk) s) (Yield (pyTokenAnn tk) s)) <$>
   token ws (TkYield ()) <*>
   (fmap Left ((,) <$> (snd <$> token ws (TkFrom ())) <*> expr ws) <!>
    (Right <$> optional (exprList ws)))
 
-lambda :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+lambda :: Parser ann Whitespace -> Parser ann (Expr ann)
 lambda ws =
   (\(tk, s) -> Lambda (pyTokenAnn tk) s) <$>
   token ws (TkLambda ()) <*>
-  commaSep ws param <*>
+  commaSep ws untypedParam <*>
   (snd <$> token ws (TkColon ())) <*>
   expr ws
 
-lambdaNoCond :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+lambdaNoCond :: Parser ann Whitespace -> Parser ann (Expr ann)
 lambdaNoCond ws =
   (\(tk, s) -> Lambda (pyTokenAnn tk) s) <$>
   token ws (TkLambda ()) <*>
-  commaSep ws param <*>
+  commaSep ws untypedParam <*>
   (snd <$> token ws (TkColon ())) <*>
   exprNoCond ws
 
-exprNoCond :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+exprNoCond :: Parser ann Whitespace -> Parser ann (Expr ann)
 exprNoCond ws = orTest ws <!> lambdaNoCond ws
 
-expr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+expr :: Parser ann Whitespace -> Parser ann (Expr ann)
 expr ws =
-  (\a -> maybe a (\(b, c, d, e) -> Ternary (a ^. exprAnnotation) a b c d e)) <$>
+  (\a -> maybe a (\(b, c, d, e) -> Ternary (_exprAnnotation a) a b c d e)) <$>
   orTest ws <*>
   optional
     ((,,,) <$>
@@ -448,7 +494,7 @@ expr ws =
   <!>
   lambda ws
 
-orExpr :: Parser ann Whitespace -> Parser ann (Expr '[] ann)
+orExpr :: Parser ann Whitespace -> Parser ann (Expr ann)
 orExpr ws =
   binOp
     ((\(tk, ws) -> BitOr (pyTokenAnn tk) ws) <$> token ws (TkPipe ()))
@@ -538,70 +584,109 @@ orExpr ws =
 
     atomExpr = foldl' (&) <$> atom <*> many trailer
 
-    parens = do
-      (tk, s) <- token anySpace $ TkLeftParen ()
-      ex <- yieldExpr anySpace <!> exprListComp anySpace
-      Parens (pyTokenAnn tk) s ex <$> 
-        (snd <$> token ws (TkRightParen ()))
+    parensOrUnit =
+      (\(tk, s) maybeEx sps ->
+       case maybeEx of
+         Nothing -> Unit (pyTokenAnn tk) s sps
+         Just ex -> Parens (pyTokenAnn tk) s ex sps) <$>
+      token anySpace (TkLeftParen ()) <*>
+      optional (yieldExpr anySpace <!> exprListComp anySpace) <*>
+      (snd <$> token ws (TkRightParen ()))
 
-    list = do
-      (tk, s) <- token anySpace $ TkLeftBracket ()
-      ex <- optional $ expr anySpace
-      (case ex of
-        Nothing -> pure $ List (pyTokenAnn tk) s Nothing
-        Just ex' -> do
-          val <-
-            Left <$> compFor <!>
-            Right <$> commaSepRest (expr anySpace)
-          case val of
-            Left cf ->
-              ListComp (pyTokenAnn tk) s <$>
-              (Comprehension (ex' ^. exprAnnotation)ex' cf <$>
-               many (Left <$> compFor <!> Right <$> compIf))
-            Right (cs, mws) ->
-              pure $ List (pyTokenAnn tk) s (Just $ (ex', cs, mws) ^. _CommaSep1')) <*>
-        (snd <$> token ws (TkRightBracket()))
+    list =
+      (\(tk, sp1) ->
+         maybe (List (pyTokenAnn tk) sp1 Nothing) (\f -> f (pyTokenAnn tk) sp1)) <$>
+      token anySpace (TkLeftBracket ()) <*>
+      optional
+        ((\e a ann ws1 ->
+          case a of
+            Left (cf, cfs) -> ListComp ann ws1 (Comprehension (_exprAnnotation e) e cf cfs)
+            Right Nothing -> List ann ws1 (Just $ CommaSepOne1' e Nothing)
+            Right (Just (c, Nothing)) -> List ann ws1 (Just $ CommaSepOne1' e $ Just c)
+            Right (Just (c, Just cs)) -> List ann ws1 (Just $ CommaSepMany1' e c cs)) <$>
+        (expr anySpace <!> starExpr anySpace) <*>
+        (Left <$>
+        ((,) <$>
+          compFor <*>
+          many (Left <$> compFor <!> Right <$> compIf)) <!>
+        Right <$>
+        optional
+          ((,) <$>
+           (snd <$> comma anySpace) <*>
+           optional (commaSep1' anySpace (expr anySpace <!> starExpr anySpace))))) <*>
+      (snd <$> token ws (TkRightBracket()))
+
+    doubleStarExpr ws =
+      (\(tk, sp) -> DictUnpack (pyTokenAnn tk) sp) <$>
+      token ws (TkDoubleStar ()) <*>
+      orExpr ws
 
     dictItem =
-      (\a -> DictItem (a ^. exprAnnotation) a) <$>
+      (\a -> DictItem (_exprAnnotation a) a) <$>
       expr anySpace <*>
       (snd <$> colon anySpace) <*>
       expr anySpace
+      <!>
+      doubleStarExpr anySpace
+
+    compRHS = (,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf)
 
     dictOrSet = do
       (a, ws1) <- token anySpace (TkLeftBrace ())
       let ann = pyTokenAnn a
-      maybeExpr <- optional $ expr anySpace
+      maybeExpr <-
+        optional $
+          Left . Left <$> expr anySpace <!>
+          Left . Right <$> starExpr anySpace <!>
+          Right <$> doubleStarExpr anySpace
       (case maybeExpr of
          Nothing -> pure $ Dict ann ws1 Nothing
-         Just ex -> do
+         Just (Left (Left ex)) -> do
            maybeColon <- optional $ snd <$> token anySpace (TkColon ())
            case maybeColon of
              Nothing ->
-               (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$>
-               commaSepRest (expr anySpace)
+               -- The order of this choice matters because commaSepRest is implemented
+               -- in a slightly odd way
+               (\(c, d) -> SetComp ann ws1 (Comprehension (_exprAnnotation ex) ex c d)) <$> compRHS
+               <!>
+               (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$> commaSepRest (expr ws <!> starExpr ws)
              Just clws ->
-               let
-                 firstDictItem = DictItem (ex ^. exprAnnotation) ex clws
-               in
-                 (\ex2 (rest, final) ->
-                    Dict ann ws1 (Just $ (firstDictItem ex2, rest, final) ^. _CommaSep1')) <$>
-                 expr anySpace <*>
-                 commaSepRest dictItem) <*>
+               (\ex2 a ->
+                 let
+                   dictItemAnn = _exprAnnotation ex
+                   firstDictItem = DictItem dictItemAnn ex clws ex2
+                 in
+                 case a of
+                   Left (c, d) ->
+                     DictComp ann ws1 (Comprehension dictItemAnn firstDictItem c d)
+                   Right (rest, final) ->
+                     Dict ann ws1 (Just $ (firstDictItem, rest, final) ^. _CommaSep1')) <$>
+               expr anySpace <*>
+               (Left <$> compRHS <!> Right <$> commaSepRest dictItem)
+         Just (Left (Right ex)) ->
+           ((\(c, d) -> SetComp ann ws1 (Comprehension (_exprAnnotation ex) ex c d)) <$> compRHS
+           <!>
+           (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$> commaSepRest (expr ws <!> starExpr ws))
+         Just (Right ex) ->
+           ((\(c, d) -> DictComp ann ws1 (Comprehension (_dictItemAnn ex) ex c d)) <$> compRHS
+           <!>
+           (\(rest, final) -> Dict ann ws1 (Just $ (ex, rest, final) ^. _CommaSep1')) <$> commaSepRest dictItem)) <*>
          (snd <$> token ws (TkRightBrace ()))
 
     atom =
       dictOrSet <!>
       list <!>
-      bool ws <!>
       none ws <!>
+      bool ws <!>
+      ellipsis ws <!>
       integer ws <!>
       float ws <!>
+      imag ws <!>
       stringOrBytes ws <!>
       (\a -> Ident (_identAnnotation a) a) <$> identifier ws <!>
-      parens
+      parensOrUnit
 
-smallStatement :: Parser ann (SmallStatement '[] ann)
+smallStatement :: Parser ann (SmallStatement ann)
 smallStatement =
   returnSt <!>
   passSt <!>
@@ -621,16 +706,16 @@ smallStatement =
       expr space <*>
       optional ((,) <$> (snd <$> comma space) <*> expr space)
 
-    yieldSt = (\a -> Expr (a ^. exprAnnotation) a) <$> yieldExpr space
+    yieldSt = (\a -> Expr (_exprAnnotation a) a) <$> yieldExpr space
 
     returnSt =
       (\(tkReturn, retSpaces) -> Return (pyTokenAnn tkReturn) retSpaces) <$>
       token space (TkReturn ()) <*>
       optional (exprList space)
 
-    passSt = Pass . pyTokenAnn <$> tokenEq (TkPass ())
-    breakSt = Break . pyTokenAnn <$> tokenEq (TkBreak ())
-    continueSt = Continue . pyTokenAnn <$> tokenEq (TkContinue ())
+    passSt = uncurry (Pass . pyTokenAnn) <$> token space (TkPass ())
+    breakSt = uncurry (Break . pyTokenAnn) <$> token space (TkBreak ())
+    continueSt = uncurry (Continue . pyTokenAnn) <$> token space (TkContinue ())
 
     augAssign =
       (\(tk, s) -> PlusEq (pyTokenAnn tk) s) <$> token space (TkPlusEq ()) <!>
@@ -656,8 +741,8 @@ smallStatement =
               (uncurry $ AugAssign (_exprAnnotation a) a))) <$>
       exprList space <*>
       optional
-        (Left <$> some1 ((,) <$> (snd <$> token space (TkEq ())) <*> exprList space) <!>
-         Right <$> ((,) <$> augAssign <*> exprList space))
+        (Left <$> some1 ((,) <$> (snd <$> token space (TkEq ())) <*> (yieldExpr space <!> exprList space)) <!>
+         Right <$> ((,) <$> augAssign <*> (yieldExpr space <!> exprList space)))
 
     globalSt =
       (\(tk, s) -> Global (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
@@ -703,13 +788,18 @@ smallStatement =
           token space (TkImport ()) <*>
           commaSep1 space (importAs space _moduleNameAnn moduleName)
 
+        dots =
+          fmap concat . some $
+          pure . Dot . snd <$> token space (TkDot ()) <!>
+          (\(_, ws) -> [Dot [], Dot [], Dot ws]) <$> token space (TkEllipsis ())
+
         relativeModuleName =
           RelativeWithName [] <$> moduleName
 
           <!>
 
           (\a -> maybe (Relative $ NonEmpty.fromList a) (RelativeWithName a)) <$>
-          some (Dot . snd <$> token space (TkDot ())) <*>
+          dots <*>
           optional moduleName
 
         importTargets =
@@ -749,7 +839,7 @@ sepBy1' val sep = go
       val <*>
       optional ((,) <$> sep <*> optional go)
 
-statement :: Parser ann (Statement '[] ann)
+statement :: Parser ann (Statement ann)
 statement =
   (\d (a, b, c) -> SmallStatements d a b c) <$>
   indents <*>
@@ -782,7 +872,7 @@ comment = do
       Parser (consumed ann) $> Comment str
     _ -> Parser . throwError $ ExpectedComment curTk
 
-suite :: Parser ann (Suite '[] ann)
+suite :: Parser ann (Suite ann)
 suite =
   (\(tk, s) ->
      either
@@ -846,26 +936,60 @@ commaSep1' ws pa =
     from a [] b = CommaSepOne1' a b
     from a ((b, c) : bs) d = CommaSepMany1' a b $ from c bs d
 
-param :: Parser ann (Param '[] ann)
-param =
-  (\a ->
+untypedParam :: Parser ann (Param ann)
+untypedParam =
+  (\a b ->
      maybe
-       (PositionalParam (_identAnnotation a) a)
-       (uncurry $ KeywordParam (_identAnnotation a) a)) <$>
+       (PositionalParam (_identAnnotation a) a b)
+       (uncurry $ KeywordParam (_identAnnotation a) a b)) <$>
   identifier anySpace <*>
+  pure Nothing <*>
   optional ((,) <$> (snd <$> token anySpace (TkEq ())) <*> expr anySpace)
 
   <!>
 
-  (\(a, b) -> StarParam (pyTokenAnn a) b) <$> token anySpace (TkStar ()) <*> identifier anySpace
+  (\(a, b) -> StarParam (pyTokenAnn a) b) <$>
+  token anySpace (TkStar ()) <*>
+  optional (identifier anySpace) <*>
+  pure Nothing
 
   <!>
 
   (\(a, b) -> DoubleStarParam (pyTokenAnn a) b) <$>
   token anySpace (TkDoubleStar ()) <*>
-  identifier anySpace
+  identifier anySpace <*>
+  pure Nothing
 
-arg :: Parser ann (Arg '[] ann)
+typedParam :: Parser ann (Param ann)
+typedParam =
+  (\a b ->
+     maybe
+       (PositionalParam (_identAnnotation a) a b)
+       (uncurry $ KeywordParam (_identAnnotation a) a b)) <$>
+  identifier anySpace <*>
+  optional tyAnn <*>
+  optional ((,) <$> (snd <$> token anySpace (TkEq ())) <*> expr anySpace)
+
+  <!>
+
+  (\(a, b) ->
+     maybe
+       (StarParam (pyTokenAnn a) b Nothing Nothing)
+       (\(c, d) -> StarParam (pyTokenAnn a) b (Just c) d)) <$>
+  token anySpace (TkStar ()) <*>
+  optional ((,) <$> identifier anySpace <*> optional tyAnn)
+
+  <!>
+
+  (\(a, b) -> DoubleStarParam (pyTokenAnn a) b) <$>
+  token anySpace (TkDoubleStar ()) <*>
+  identifier anySpace <*>
+  optional tyAnn
+  where
+    tyAnn =
+      (,) <$> (snd <$> token anySpace (TkColon ())) <*> expr anySpace
+
+arg :: Parser ann (Arg ann)
 arg =
   (do
       e <- exprComp anySpace
@@ -891,7 +1015,7 @@ arg =
   token anySpace (TkDoubleStar ()) <*>
   expr anySpace
 
-decoratorValue :: Parser ann (Expr '[] ann)
+decoratorValue :: Parser ann (Expr ann)
 decoratorValue = do
   id1 <- identifier space
   ids <- many ((,) <$> (snd <$> token space (TkDot ())) <*> identifier space)
@@ -904,15 +1028,15 @@ decoratorValue = do
   let
     derefs =
       foldl
-        (\b (ws, a) -> Deref (b ^. exprAnnotation) b ws a)
+        (\b (ws, a) -> Deref (_exprAnnotation b) b ws a)
         (Ident (_identAnnotation id1) id1)
         ids
   pure $
     case args of
       Nothing -> derefs
-      Just (l, x, r) -> Call (derefs ^. exprAnnotation) derefs l x r
+      Just (l, x, r) -> Call (_exprAnnotation derefs) derefs l x r
 
-decorator :: Parser ann (Decorator '[] ann)
+decorator :: Parser ann (Decorator ann)
 decorator =
   (\i (tk, spcs) -> Decorator (pyTokenAnn tk) i spcs) <$>
   indents <*>
@@ -920,7 +1044,7 @@ decorator =
   decoratorValue <*>
   eol
 
-compoundStatement :: Parser ann (CompoundStatement '[] ann)
+compoundStatement :: Parser ann (CompoundStatement ann)
 compoundStatement =
   ifSt <!>
   whileSt <!>
@@ -949,8 +1073,9 @@ compoundStatement =
       token space (TkDef ()) <*>
       identifier space <*>
       fmap snd (token anySpace $ TkLeftParen ()) <*>
-      commaSep anySpace param <*>
+      commaSep anySpace typedParam <*>
       fmap snd (token space $ TkRightParen ()) <*>
+      optional ((,) <$> (snd <$> token space (TkRightArrow ())) <*> expr space) <*>
       suite
 
     ifSt =
@@ -1005,7 +1130,7 @@ compoundStatement =
              ((,,,) <$>
               indents <*>
               (snd <$> token space (TkExcept ())) <*>
-              exceptAs <*>
+              optional exceptAs <*>
               suite) <*>
            optional
              ((,,) <$>
@@ -1024,7 +1149,7 @@ compoundStatement =
       token space (TkWith ()) <*>
       commaSep1
         space
-        ((\a -> WithItem (a ^. exprAnnotation) a) <$>
+        ((\a -> WithItem (_exprAnnotation a) a) <$>
          expr space <*>
          optional ((,) <$> (snd <$> token space (TkAs ())) <*> orExpr space)) <*>
       suite
@@ -1043,7 +1168,7 @@ compoundStatement =
          (snd <$> token space (TkElse ())) <*>
          suite)
 
-module_ :: Parser ann (Module '[] ann)
+module_ :: Parser ann (Module ann)
 module_ =
   Module <$>
   many (Left <$> maybeComment <!> Right <$> statement)

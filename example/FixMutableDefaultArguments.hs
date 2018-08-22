@@ -2,8 +2,8 @@
 {-# language DataKinds #-}
 module FixMutableDefaultArguments where
 
-import Control.Lens.Fold ((^..), (^?), filtered, folded)
-import Control.Lens.Getter ((^.))
+import Control.Lens.Fold ((^..), (^?), filtered, folded, anyOf)
+import Control.Lens.Getter ((^.), getting)
 import Control.Lens.Setter ((.~), over)
 import Data.Foldable (toList)
 import Data.Function ((&))
@@ -16,7 +16,7 @@ import Language.Python.Syntax
 
 fixMutableDefaultArguments :: Statement '[] () -> Maybe (Statement '[] ())
 fixMutableDefaultArguments input = do
-  (idnts, _, _, name, _, params, _, suite) <- input ^? _Fundef
+  (_, decos, idnts, _, name, _, params, _, _, suite) <- input ^? _Fundef
 
   let paramsList = toList params
   _ <- paramsList ^? folded._KeywordParam.filtered (isMutable._kpExpr)
@@ -39,7 +39,12 @@ fixMutableDefaultArguments input = do
     (NonEmpty.fromList $ conditionalAssignments <> (suite ^.. _Statements.noIndents))
   where
     isMutable :: Expr v a -> Bool
+    isMutable Unit{} = False
     isMutable None{} = False
+    isMutable Ellipsis{} = False
+    isMutable Lambda{} = False
+    isMutable Float{} = False
+    isMutable Imag{} = False
     isMutable Int{} = False
     isMutable Bool{} = False
     isMutable String{} = False
@@ -48,15 +53,17 @@ fixMutableDefaultArguments input = do
     isMutable Deref{} = True
     isMutable Call{} = True
     isMutable BinOp{} = True
-    isMutable Negate{} = True
+    isMutable UnOp{} = True
     isMutable Not{} = True
+    isMutable DictComp{} = True
     isMutable Dict{} = True
     isMutable Ident{} = True
     isMutable Yield{} = True
     isMutable YieldFrom{} = True
+    isMutable SetComp{} = True
     isMutable Set{} = True
     isMutable Subscript{} = True
     isMutable Generator{} = True
     isMutable (Ternary _ _ _ a _ b) = isMutable a || isMutable b
     isMutable (Parens _ _ a _) = isMutable a
-    isMutable (Tuple _ a _ as) = isMutable a || any (any isMutable) as
+    isMutable (Tuple _ a _ as) = anyOf (getting _Exprs) isMutable a || anyOf (folded.folded.getting _Exprs) isMutable as

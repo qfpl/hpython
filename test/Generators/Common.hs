@@ -5,7 +5,7 @@ import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
-import Control.Lens.Fold ((^?!))
+import Control.Lens.Fold ((^?!), preview)
 import Control.Lens.Prism (_Right)
 import Control.Monad ((<=<))
 import Data.Digit.Enum (enumDecimal)
@@ -90,6 +90,9 @@ genSmallInt = do
     ] <*>
     genWhitespaces
 
+genUnit :: MonadGen m => m (Expr '[] ())
+genUnit = Unit () <$> genAnyWhitespaces <*> genWhitespaces
+
 genInt :: MonadGen m => m (Expr '[] ())
 genInt = do
   n <- Gen.integral (Range.constant (-2^32) (2^32))
@@ -131,9 +134,23 @@ genSmallFloat =
       Gen.maybe (Gen.element [Pos, Neg]) <*>
       genDecs
 
-genFloat :: MonadGen m => m (Expr '[] ())
-genFloat =
-  Float () <$>
+genImag :: MonadGen m => m (Expr '[] ())
+genImag =
+  Imag () <$>
+  Gen.choice
+    [ ImagLiteralInt () <$>
+      genDecs <*>
+      Gen.bool
+    , ImagLiteralFloat () <$>
+      genFloatLiteral <*>
+      Gen.bool
+    ] <*>
+  genWhitespaces
+  where
+    genDecs = Gen.nonEmpty (Range.constant 1 10) (Gen.element enumDecimal)
+
+genFloatLiteral :: MonadGen m => m (FloatLiteral ())
+genFloatLiteral =
   Gen.choice
     [ FloatLiteralFull () <$>
       genDecs <*>
@@ -146,8 +163,10 @@ genFloat =
     , FloatLiteralPoint () <$>
       genDecs <*>
       Gen.maybe floatExponent
-    ] <*>
-  genWhitespaces
+    , FloatLiteralWhole () <$>
+      genDecs <*>
+      floatExponent
+    ]
   where
     genDecs = Gen.nonEmpty (Range.constant 1 10) (Gen.element enumDecimal)
     floatExponent =
@@ -155,6 +174,12 @@ genFloat =
       Gen.bool <*>
       Gen.maybe (Gen.element [Pos, Neg]) <*>
       genDecs
+
+genFloat :: MonadGen m => m (Expr '[] ())
+genFloat =
+  Float () <$>
+  genFloatLiteral <*>
+  genWhitespaces
 
 genString :: MonadGen m => m PyChar -> m [PyChar]
 genString = Gen.list (Range.constant 0 50)
@@ -220,10 +245,15 @@ genNormalWhitespace = Gen.sized $ \n ->
 genStringPrefix :: MonadGen m => m StringPrefix
 genStringPrefix =
   Gen.element
+    [ Prefix_u
+    , Prefix_U
+    ]
+
+genRawStringPrefix :: MonadGen m => m RawStringPrefix
+genRawStringPrefix =
+  Gen.element
     [ Prefix_r
     , Prefix_R
-    , Prefix_u
-    , Prefix_U
     ]
 
 genBytesPrefix :: MonadGen m => m BytesPrefix
@@ -231,7 +261,12 @@ genBytesPrefix =
   Gen.element
     [ Prefix_b
     , Prefix_B
-    , Prefix_br
+    ]
+
+genRawBytesPrefix :: MonadGen m => m RawBytesPrefix
+genRawBytesPrefix =
+  Gen.element
+    [ Prefix_br
     , Prefix_Br
     , Prefix_bR
     , Prefix_BR
@@ -327,6 +362,9 @@ genWhitespaces1 = do
 genNone :: MonadGen m => m (Expr '[] ())
 genNone = None () <$> genWhitespaces
 
+genEllipsis :: MonadGen m => m (Expr '[] ())
+genEllipsis = Ellipsis () <$> genWhitespaces
+
 genBool :: MonadGen m => m (Expr '[] ())
 genBool = Bool () <$> Gen.bool <*> genWhitespaces
 
@@ -351,13 +389,6 @@ genSizedCommaSep ma = Gen.sized $ \n ->
             (Gen.resize (n - n') $ genSizedCommaSep ma)
             (\b -> CommaSepMany a <$> genWhitespaces <*> pure b)
       ]
-
-genTuple :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
-genTuple expr =
-  Tuple () <$>
-  expr <*>
-  genWhitespaces <*>
-  Gen.maybe (genSizedCommaSep1' expr)
 
 genSizedCommaSep1 :: MonadGen m => m a -> m (CommaSep1 a)
 genSizedCommaSep1 ma = Gen.sized $ \n ->
@@ -429,12 +460,71 @@ genBytesLiteral gChar =
   genString gChar <*>
   genWhitespaces
 
+genRawString :: MonadGen m => m (RawString String)
+genRawString = Gen.just . fmap (preview _RawString) $ Gen.string (Range.constant 0 100) (Gen.filter (/= '\0') Gen.ascii)
+
+genRawStringLiteral :: MonadGen m => m (StringLiteral ())
+genRawStringLiteral =
+  RawStringLiteral () <$>
+  genRawStringPrefix <*>
+  genQuoteType <*>
+  genStringType <*>
+  genRawString <*>
+  genWhitespaces
+
+genRawBytesLiteral :: MonadGen m => m (StringLiteral ())
+genRawBytesLiteral =
+  RawBytesLiteral () <$>
+  genRawBytesPrefix <*>
+  genQuoteType <*>
+  genStringType <*>
+  genRawString <*>
+  genWhitespaces
+
+genTupleItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (TupleItem v ())
+genTupleItem ws ge =
+  Gen.choice
+  [ TupleItem () <$>
+    ge
+  , TupleUnpack () <$>
+    Gen.list (Range.constant 0 10) ((,) <$> genAnyWhitespaces <*> ws) <*>
+    ws <*>
+    ge
+  ]
+
+genListItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (ListItem v ())
+genListItem ws ge =
+  Gen.choice
+  [ ListItem () <$>
+    ge
+  , ListUnpack () <$>
+    Gen.list (Range.constant 0 10) ((,) <$> genAnyWhitespaces <*> ws) <*>
+    ws <*>
+    ge
+  ]
+
+genSetItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (SetItem v ())
+genSetItem ws ge =
+  Gen.choice
+  [ SetItem () <$>
+    ge
+  , SetUnpack () <$>
+    Gen.list (Range.constant 0 10) ((,) <$> genAnyWhitespaces <*> ws) <*>
+    ws <*>
+    ge
+  ]
+
 genDictItem :: MonadGen m => m (Expr v ()) -> m (DictItem v ())
 genDictItem ge =
-  DictItem () <$>
-  ge <*>
-  genAnyWhitespaces <*>
-  ge
+  Gen.choice
+  [ DictItem () <$>
+    ge <*>
+    genAnyWhitespaces <*>
+    ge
+  , DictUnpack () <$>
+    genAnyWhitespaces <*>
+    ge
+  ]
 
 genHexDigit :: MonadGen m => m HeXDigit
 genHexDigit =

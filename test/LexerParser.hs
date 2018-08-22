@@ -2,7 +2,8 @@
 module LexerParser (lexerParserTests) where
 
 import Data.Functor.Alt ((<!>))
-import qualified Data.Text.Lazy as Lazy
+import Data.Validate (validate)
+import qualified Data.Text as Text
 import qualified Data.Functor.Alt as Alt (many)
 import Hedgehog
 
@@ -11,8 +12,9 @@ import Language.Python.Internal.Parse
 import Language.Python.Internal.Render
 import Language.Python.Internal.Syntax.Whitespace
 import Language.Python.Internal.Token
+import Language.Python.Parse (parseModule, parseStatement, parseExpr)
 
-import Helpers (doToPython, doParse, doParse', doNested, doTokenize, doIndentation)
+import Helpers (doParse, doNested)
 
 lexerParserTests :: Group
 lexerParserTests =
@@ -35,131 +37,88 @@ lexerParserTests =
   , ("Test full trip 14", test_fulltrip_14)
   , ("Test full trip 15", test_fulltrip_15)
   , ("Test full trip 16", test_fulltrip_16)
+  , ("Test full trip 17", test_fulltrip_17)
   ]
 
 test_fulltrip_1 :: Property
 test_fulltrip_1 =
   withTests 1 . property $ do
     let str = "def a(x, y=2, *z, **w):\n   return 2 + 3"
-    a <- doToPython statement str
-    showStatement a === Lazy.pack str
+
+    tree <- validate (const failure) pure $ parseStatement "test" str
+    annotateShow tree
+
+    showStatement tree === str
 
 test_fulltrip_2 :: Property
 test_fulltrip_2 =
   withTests 1 . property $ do
     let str = "(   1\n       *\n  3\n    )"
-    a <- doToPython (expr space) str
-    showExpr a === Lazy.pack str
+
+    tree <- validate (const failure) pure $ parseExpr "test" str
+    annotateShow tree
+
+    showExpr tree === str
 
 test_fulltrip_3 :: Property
 test_fulltrip_3 =
   withTests 1 . property $ do
     let str = "pass;"
-    a <- doToPython statement str
-    showStatement a === Lazy.pack str
+
+    tree <- validate (const failure) pure $ parseStatement "test" str
+    annotateShow tree
+
+    showStatement tree === str
 
 test_fulltrip_4 :: Property
 test_fulltrip_4 =
   withTests 1 . property $ do
     let str = "def a():\n pass\n #\n pass\n"
 
-    tks <- doTokenize str
-    annotateShow tks
+    tree <- validate (const failure) pure $ parseStatement "test" str
+    annotateShow tree
 
-    let lls = logicalLines tks
-    length lls === 4
-    annotateShow lls
-
-    ils <- doIndentation lls
-    annotateShow ils
-
-    nst <- doNested ils
-    annotateShow nst
-
-    a <- doToPython statement str
-    showStatement a === Lazy.pack str
+    showStatement tree === str
 
 test_fulltrip_5 :: Property
 test_fulltrip_5 =
   withTests 1 . property $ do
     let str = "if False:\n pass\n pass\nelse:\n pass\n pass\n"
 
-    tks <- doTokenize str
-    annotateShow tks
+    tree <- validate (const failure) pure $ parseStatement "test" str
+    annotateShow tree
 
-    let lls = logicalLines tks
-    length lls === 6
-    annotateShow lls
-
-    ils <- doIndentation lls
-    annotateShow ils
-
-    nst <- doNested ils
-    annotateShow nst
-
-    a <- doToPython statement str
-    showStatement a === Lazy.pack str
+    showStatement tree === str
 
 test_fulltrip_6 :: Property
 test_fulltrip_6 =
   withTests 1 . property $ do
     let str = "# blah\ndef boo():\n    pass\n       #bing\n    #   bop\n"
 
-    tks <- doTokenize str
-    annotateShow tks
+    tree <- validate (const failure) pure $ parseModule "test" str
+    annotateShow tree
 
-    let lls = logicalLines tks
-    length lls === 5
-    annotateShow lls
-
-    ils <- doIndentation lls
-    annotateShow ils
-
-    nst <- doNested ils
-    annotateShow nst
-
-    a <- doToPython module_ str
-    showModule a === Lazy.pack str
+    showModule tree === str
 
 test_fulltrip_7 :: Property
 test_fulltrip_7 =
   withTests 1 . property $ do
     let str = "if False:\n pass\nelse \\\n      \\\r\n:\n pass\n"
 
-    tks <- doTokenize str
-    annotateShow tks
+    tree <- validate (const failure) pure $ parseModule "test" str
+    annotateShow tree
 
-    let lls = logicalLines tks
-    annotateShow lls
-
-    ils <- doIndentation lls
-    annotateShow ils
-
-    nst <- doNested ils
-    annotateShow nst
-
-    a <- doToPython module_ str
-    showModule a === Lazy.pack str
+    showModule tree === str
 
 test_fulltrip_8 :: Property
 test_fulltrip_8 =
   withTests 1 . property $ do
     let str = "def a():\n \n pass\n pass\n"
 
-    tks <- doTokenize str
-    annotateShow tks
+    tree <- validate (const failure) pure $ parseModule "test" str
+    annotateShow tree
 
-    let lls = logicalLines tks
-    annotateShow lls
-
-    ils <- doIndentation lls
-    annotateShow ils
-
-    nst <- doNested ils
-    annotateShow nst
-
-    a <- doToPython module_ str
-    showModule a === Lazy.pack str
+    showModule tree === str
 
 test_fulltrip_9 :: Property
 test_fulltrip_9 =
@@ -168,29 +127,17 @@ test_fulltrip_9 =
       str =
         "try:\n pass\nexcept False:\n pass\nelse:\n pass\nfinally:\n pass\n def a():\n  pass\n pass\n"
 
-    tks <- doTokenize str
-    annotateShow tks
+    tree <- validate (const failure) pure $ parseModule "test" str
+    annotateShow tree
 
-    let lls = logicalLines tks
-    annotateShow lls
-
-    ils <- doIndentation lls
-    annotateShow ils
-
-    nst <- doNested ils
-    annotateShow nst
-
-    a <- doParse' module_ nst
-    annotateShow a
-
-    showModule a === Lazy.pack str
+    showModule tree === str
 
 test_fulltrip_10 :: Property
 test_fulltrip_10 =
   withTests 1 . property $ do
     let
       str =
-        unlines
+        Text.unlines
         [ "from blah import  boo"
         , "import baz   as wop"
         , ""
@@ -204,29 +151,17 @@ test_fulltrip_10 =
         , "    pass"
         ]
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- validate (const failure) pure $ parseModule "test" str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
-
-    ils <- doIndentation lls
-    annotateShow $! ils
-
-    nst <- doNested ils
-    annotateShow $! nst
-
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === Lazy.pack str
+    showModule tree === str
 
 test_fulltrip_11 :: Property
 test_fulltrip_11 =
   withTests 1 . property $ do
     let
       str =
-        unlines
+        Text.unlines
         [ "if False:"
         , " pass"
         , " pass"
@@ -235,29 +170,17 @@ test_fulltrip_11 =
         , " \tpass"
         ]
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- validate (const failure) pure $ parseModule "test" str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
-
-    ils <- doIndentation lls
-    annotateShow $! ils
-
-    nst <- doNested ils
-    annotateShow $! nst
-
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === Lazy.pack str
+    showModule tree === str
 
 test_fulltrip_12 :: Property
 test_fulltrip_12 =
   withTests 1 . property $ do
     let
       str =
-        unlines
+        Text.unlines
         [ "try:"
         , " \tpass"
         , " \tdef a():"
@@ -267,29 +190,17 @@ test_fulltrip_12 =
         , " pass"
         ]
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- validate (const failure) pure $ parseModule "test" str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
-
-    ils <- doIndentation lls
-    annotateShow $! ils
-
-    nst <- doNested ils
-    annotateShow $! nst
-
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === Lazy.pack str
+    showModule tree === str
 
 test_fulltrip_13 :: Property
 test_fulltrip_13 =
   withTests 1 . property $ do
     let
       str =
-        unlines
+        Text.unlines
         [ "if []:"
         , " False"
         , " def a():"
@@ -301,22 +212,10 @@ test_fulltrip_13 =
         , " pass"
         ]
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- validate (const failure) pure $ parseModule "test" str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
-
-    ils <- doIndentation lls
-    annotateShow $! ils
-
-    nst <- doNested ils
-    annotateShow $! nst
-
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === Lazy.pack str
+    showModule tree === str
 
 test_fulltrip_14 :: Property
 test_fulltrip_14 =
@@ -324,22 +223,10 @@ test_fulltrip_14 =
     let
       str = "not ((False for a in False) if False else False or False)"
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- validate (const failure) pure $ parseModule "test" str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
-
-    ils <- doIndentation lls
-    annotateShow $! ils
-
-    nst <- doNested ils
-    annotateShow $! nst
-
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === Lazy.pack str
+    showModule tree === str
 
 test_fulltrip_15 :: Property
 test_fulltrip_15 =
@@ -347,22 +234,10 @@ test_fulltrip_15 =
     let
       str = "01."
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- validate (const failure) pure $ parseModule "test" str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
-
-    ils <- doIndentation lls
-    annotateShow $! ils
-
-    nst <- doNested ils
-    annotateShow $! nst
-
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === Lazy.pack str
+    showModule tree === str
 
 test_fulltrip_16 :: Property
 test_fulltrip_16 =
@@ -370,22 +245,20 @@ test_fulltrip_16 =
     let
       str = "def a():\n  return ~i"
 
-    tks <- doTokenize str
-    annotateShow $! tks
+    tree <- validate (const failure) pure $ parseModule "test" str
+    annotateShow $! tree
 
-    let lls = logicalLines tks
-    annotateShow $! lls
+    showModule tree === str
 
-    ils <- doIndentation lls
-    annotateShow $! ils
+test_fulltrip_17 :: Property
+test_fulltrip_17 =
+  withTests 1 . property $ do
+    let str = "r\"\\\"\""
 
-    nst <- doNested ils
-    annotateShow $! nst
+    tree <- validate (const failure) pure $ parseModule "test" str
+    annotateShow $! tree
 
-    a <- doParse' module_ nst
-    annotateShow $! a
-
-    showModule a === Lazy.pack str
+    showModule tree === str
 
 parseTab :: Parser ann Whitespace
 parseTab = do

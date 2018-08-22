@@ -164,6 +164,21 @@ sameOperator op op' =
     (ShiftRight{}, ShiftRight{}) -> True
     _ -> False
 
+isComparison :: BinOp a -> Bool
+isComparison a =
+  case a of
+    Is{} -> True
+    IsNot{} -> True
+    In{} -> True
+    NotIn{} -> True
+    Equals{} -> True
+    Lt{} -> True
+    LtEquals{} -> True
+    Gt{} -> True
+    GtEquals{} -> True
+    NotEquals{} -> True
+    _ -> False
+
 lookupOpEntry :: BinOp a -> [OpEntry] -> OpEntry
 lookupOpEntry op =
   go (op $> ())

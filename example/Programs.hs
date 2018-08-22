@@ -17,15 +17,16 @@ import Language.Python.Syntax
 -- Written without the DSL
 append_to =
   CompoundStatement $
-  Fundef (Indents [] ()) ()
+  Fundef () [] (Indents [] ())
     [Space]
     "append_to"
     []
-    ( CommaSepMany (PositionalParam () "element") [Space] $
-      CommaSepOne (KeywordParam () "to" [] (List () [] Nothing []))
+    ( CommaSepMany (PositionalParam () "element" Nothing) [Space] $
+      CommaSepOne (KeywordParam () "to" Nothing [] (List () [] Nothing []))
     )
     []
-    (Suite () [] Nothing LF $
+    Nothing
+    (SuiteMany () [] (LF Nothing) $
      Block
      [ Right $
        SmallStatements
@@ -38,16 +39,14 @@ append_to =
             [])
          []
          Nothing
-         Nothing
-         (Just LF)
+         (Right $ LF Nothing)
      , Right $
        SmallStatements
          (Indents [replicate 4 Space ^. from indentWhitespaces] ())
          (Return () [Space] (Just $ Ident () "to"))
          []
          Nothing
-         Nothing
-         (Just LF)
+         (Right $ LF Nothing)
      ])
 
 -- |
@@ -106,12 +105,12 @@ yes =
 everything =
   Module
     [ Right append_to
-    , Left (Indents [] (), Nothing, Just LF)
+    , Left (Indents [] (), Nothing, Just $ LF Nothing)
     , Right append_to'
-    , Left (Indents [] (), Nothing, Just LF)
+    , Left (Indents [] (), Nothing, Just $ LF Nothing)
     , Right fact_tr
-    , Left (Indents [] (), Nothing, Just LF)
+    , Left (Indents [] (), Nothing, Just $ LF Nothing)
     , Right spin
-    , Left (Indents [] (), Nothing, Just LF)
+    , Left (Indents [] (), Nothing, Just $ LF Nothing)
     , Right yes
     ]

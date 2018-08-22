@@ -4,9 +4,13 @@ module Language.Python.Internal.Token where
 
 import Data.Deriving (deriveEq1)
 
-import Language.Python.Internal.Syntax.Numbers (IntLiteral(..), FloatLiteral(..))
+import Language.Python.Internal.Syntax.Numbers (IntLiteral(..), FloatLiteral(..), ImagLiteral(..))
 import Language.Python.Internal.Syntax.Strings
-  (StringPrefix(..), BytesPrefix(..), QuoteType(..), StringType(..), PyChar(..))
+  ( StringPrefix(..), BytesPrefix(..)
+  , RawStringPrefix(..), RawBytesPrefix(..)
+  , QuoteType(..), StringType(..), PyChar(..)
+  )
+import Language.Python.Internal.Syntax.Strings.Raw (RawString(..))
 import Language.Python.Internal.Syntax.Whitespace (Newline(..))
 
 data PyToken a
@@ -23,6 +27,7 @@ data PyToken a
   | TkTrue a
   | TkFalse a
   | TkNone a
+  | TkEllipsis a
   | TkOr a
   | TkAnd a
   | TkIs a
@@ -39,15 +44,19 @@ data PyToken a
   | TkExcept a
   | TkFinally a
   | TkClass a
+  | TkRightArrow a
   | TkWith a
   | TkFor a
   | TkIn a
   | TkYield a
   | TkInt (IntLiteral a)
   | TkFloat (FloatLiteral a)
+  | TkImag (ImagLiteral a)
   | TkIdent String a
   | TkString (Maybe StringPrefix) QuoteType StringType [PyChar] a
   | TkBytes BytesPrefix QuoteType StringType [PyChar] a
+  | TkRawString RawStringPrefix QuoteType StringType (RawString [Char]) a
+  | TkRawBytes RawBytesPrefix QuoteType StringType (RawString [Char]) a
   | TkSpace a
   | TkTab a
   | TkNewline Newline a
@@ -114,6 +123,7 @@ pyTokenAnn tk =
     TkTrue a -> a
     TkFalse a -> a
     TkNone a -> a
+    TkEllipsis a -> a
     TkOr a -> a
     TkAnd a -> a
     TkIs a -> a
@@ -130,6 +140,7 @@ pyTokenAnn tk =
     TkExcept a -> a
     TkFinally a -> a
     TkClass a -> a
+    TkRightArrow a -> a
     TkWith a -> a
     TkFor a -> a
     TkIn a -> a
@@ -144,9 +155,12 @@ pyTokenAnn tk =
     TkAssert a -> a
     TkInt a -> _intLiteralAnn a
     TkFloat a -> _floatLiteralAnn a
+    TkImag a -> _imagLiteralAnn a
     TkIdent _ a -> a
     TkString _ _ _ _ a -> a
     TkBytes _ _ _ _ a -> a
+    TkRawString _ _ _ _ a -> a
+    TkRawBytes _ _ _ _ a -> a
     TkSpace a -> a
     TkTab a -> a
     TkNewline _ a -> a

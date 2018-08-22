@@ -3,13 +3,11 @@ module Scope (scopeTests) where
 
 import Control.Lens (has)
 import Data.Functor (($>))
-import Data.Validate
+import Data.Validate (Validate(..), _Success)
+
 import Language.Python.Validate.Syntax
-import Language.Python.Validate.Syntax.Error
 import Language.Python.Validate.Indentation
-import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Scope
-import Language.Python.Validate.Scope.Error
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax
 
@@ -31,13 +29,13 @@ scopeTests =
   , ("Scope test 11", withTests 1 test_11)
   ]
 
-validate
+fullyValidate
   :: Statement '[] ()
   -> PropertyT IO
        (Validate
           [ScopeError '[Syntax, Indentation] ()]
           (Statement '[Scope, Syntax, Indentation] ()))
-validate x =
+fullyValidate x =
   case runValidateIndentation $ validateStatementIndentation x of
     Failure errs -> do
       annotateShow (errs :: [IndentationError '[] ()])
@@ -58,7 +56,7 @@ test_1 =
           [ if_ true_ [ var_ "c" .= 2]
           , return_ $ var_ "a" .+ var_ "b" .+ var_ "c"
           ]
-    res <- validate expr
+    res <- fullyValidate expr
     res === Failure [FoundDynamic () (MkIdent () "c" [])]
 
 test_2 :: Property
@@ -71,7 +69,7 @@ test_2 =
           , if_ true_ [ var_ "c" .= 2]
           , return_ $ var_ "a" .+ var_ "b" .+ var_ "c"
           ]
-    res <- validate expr
+    res <- fullyValidate expr
     annotateShow res
     assert $ has _Success res
 
@@ -82,7 +80,7 @@ test_3 =
       expr =
         def_ "test" [p_ "a", p_ "b"]
           [ return_ $ var_ "a" .+ var_ "b" .+ var_ "c" ]
-    res <- validate expr
+    res <- fullyValidate expr
     annotateShow res
     res === Failure [NotInScope (MkIdent () "c" [])]
 
@@ -95,7 +93,7 @@ test_4 =
           [ def_ "f" [] [ def_ "g" [] [pass_] ]
           , expr_ $ call_ (var_ "g") []
           ]
-    res <- validate expr
+    res <- fullyValidate expr
     res === Failure [NotInScope (MkIdent () "g" [])]
 
 test_5 :: Property
@@ -106,7 +104,7 @@ test_5 =
         def_ "test" [p_ "a"]
           [ def_ "f" [k_ "b" (var_ "c")] [ pass_ ]
           ]
-    res <- validate expr
+    res <- fullyValidate expr
     annotateShow res
     res === Failure [NotInScope (MkIdent () "c" [])]
 
@@ -119,7 +117,7 @@ test_6 =
           [ ifElse_ true_ [ var_ "x" .= 2 ] [ pass_ ]
           , expr_ "x"
           ]
-    res <- validate expr
+    res <- fullyValidate expr
     annotateShow res
     res === Failure [FoundDynamic () (MkIdent () "x" [])]
 
@@ -132,7 +130,7 @@ test_7 =
           [ ifElse_ true_ [ pass_ ] [ var_ "x" .= 3 ]
           , expr_ "x"
           ]
-    res <- validate expr
+    res <- fullyValidate expr
     annotateShow res
     res === Failure [FoundDynamic () (MkIdent () "x" [])]
 
@@ -146,7 +144,7 @@ test_8 =
           , var_ "x" .= 1
           , expr_ "x"
           ]
-    res <- validate expr
+    res <- fullyValidate expr
     annotateShow res
     (res $> ()) === Success ()
 
@@ -159,7 +157,7 @@ test_9 =
           [ for_ "x" (list_ [1]) [ pass_ ]
           , expr_ "x"
           ]
-    res <- validate expr
+    res <- fullyValidate expr
     annotateShow res
     res === Failure [FoundDynamic () (MkIdent () "x" [])]
 
@@ -171,7 +169,7 @@ test_10 =
         def_ "test" []
           [ for_ "x" (list_ [1]) [ expr_ "x" ]
           ]
-    res <- validate expr
+    res <- fullyValidate expr
     annotateShow res
     (res $> ()) === Success ()
 
@@ -184,6 +182,6 @@ test_11 =
           [ "x" .= 2
           , for_ "x" (list_ [1]) [ pass_ ]
           ]
-    res <- validate expr
+    res <- fullyValidate expr
     annotateShow res
     res === Failure [BadShadowing (MkIdent () "x" [Space])]

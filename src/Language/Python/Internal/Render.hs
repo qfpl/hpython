@@ -53,8 +53,9 @@ cons :: PyToken () -> RenderOutput -> RenderOutput
 cons a (RenderOutput b) = RenderOutput $ DList.cons a b
 infixr 5 `cons`
 
-showRenderOutput :: RenderOutput -> Lazy.Text
+showRenderOutput :: RenderOutput -> Text
 showRenderOutput =
+  Lazy.toStrict .
   Builder.toLazyText .
   foldMap (Builder.fromText . showToken) .
   correctSpaces .
@@ -87,16 +88,24 @@ showRenderOutput =
 showStringPrefix :: StringPrefix -> Text
 showStringPrefix sp =
   case sp of
-    Prefix_r -> "r"
-    Prefix_R -> "R"
     Prefix_u -> "u"
     Prefix_U -> "U"
+
+showRawStringPrefix :: RawStringPrefix -> Text
+showRawStringPrefix sp =
+  case sp of
+    Prefix_r -> "r"
+    Prefix_R -> "R"
 
 showBytesPrefix :: BytesPrefix -> Text
 showBytesPrefix sp =
   case sp of
     Prefix_b -> "b"
     Prefix_B -> "B"
+
+showRawBytesPrefix :: RawBytesPrefix -> Text
+showRawBytesPrefix sp =
+  case sp of
     Prefix_br -> "br"
     Prefix_Br -> "Br"
     Prefix_bR -> "bR"
@@ -128,6 +137,7 @@ showToken t =
     TkTrue{} -> "True"
     TkFalse{} -> "False"
     TkNone{} -> "None"
+    TkEllipsis{} -> "..."
     TkOr{} -> "or"
     TkAnd{} -> "and"
     TkIs{} -> "is"
@@ -144,12 +154,14 @@ showToken t =
     TkExcept{} -> "except"
     TkFinally{} -> "finally"
     TkClass{} -> "class"
+    TkRightArrow{} -> "->"
     TkWith{} -> "with"
     TkFor{} -> "for"
     TkIn{} -> "in"
     TkYield{} -> "yield"
     TkInt i -> renderIntLiteral i
     TkFloat i -> renderFloatLiteral i
+    TkImag i -> renderImagLiteral i
     TkIdent s _ -> Text.pack s
     TkString sp qt st s _ ->
       let
@@ -170,6 +182,26 @@ showToken t =
         showBytesPrefix sp <>
         quote <>
         renderPyChars qt st s <>
+        quote
+    TkRawString sp qt st s _ ->
+      let
+        quote =
+          Text.pack $
+          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
+      in
+        showRawStringPrefix sp <>
+        quote <>
+        renderRawPyChars qt st (_RawString # s) <>
+        quote
+    TkRawBytes sp qt st s _ ->
+      let
+        quote =
+          Text.pack $
+          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
+      in
+        showRawBytesPrefix sp <>
+        quote <>
+        renderRawPyChars qt st (_RawString # s) <>
         quote
     TkSpace{} -> " "
     TkTab{} -> "\t"
@@ -285,6 +317,58 @@ intToHex n = Text.pack $ go n []
     go 14 = (++"E")
     go 15 = (++"F")
     go b = let (q, r) = quotRem b 16 in go r . go q
+
+renderRawPyChars :: QuoteType -> StringType -> [Char] -> Text
+renderRawPyChars qt st = Text.pack . go
+  where
+    endSingleQuotesShort a =
+      transform
+        (\x -> case x of
+           '\\' : '\'' : as -> x
+           c : '\'' : as -> c : '\\' : '\'' : as
+           _ -> x)
+        (case a of
+           '\'' : cs -> '\\' : '\'' : cs
+           _ -> a)
+
+    endSingleQuotesLong a =
+      transform
+        (\x -> case x of
+           '\'' : '\'' : '\'' : as -> "\\\'\\\'\\\'" ++ as
+           ['\\', '\''] -> ['\\', '\'']
+           [c, '\''] -> [c, '\\', '\'']
+           _ -> x)
+        (case a of
+           '\'' : cs -> '\\' : '\'' : cs
+           _ -> a)
+
+    endDoubleQuotesShort a =
+      transform
+        (\x -> case x of
+           '\\' : '\"' : as -> x
+           c : '\"' : as -> c : '\\' : '\"' : as
+           _ -> x)
+        (case a of
+           '\"' : cs -> '\\' : '\"' : cs
+           _ -> a)
+
+    endDoubleQuotesLong a =
+      transform
+        (\x -> case x of
+           '\"' : '\"' : '\"' : as -> "\\\"\\\"\\\"" ++ as
+           ['\\', '\"']  -> x
+           [c, '\"'] -> [c, '\\', '\"']
+           _ -> x)
+        (case a of
+           '\"' : cs -> '\\' : '\"' : cs
+           _ -> a)
+
+    go s =
+      case (qt, st) of
+        (SingleQuote, ShortString) -> endSingleQuotesShort s
+        (SingleQuote, LongString) -> endSingleQuotesLong s
+        (DoubleQuote, ShortString) -> endDoubleQuotesShort s
+        (DoubleQuote, LongString) -> endDoubleQuotesLong s
 
 renderPyChars :: QuoteType -> StringType -> [PyChar] -> Text
 renderPyChars qt st = Text.pack . go
@@ -480,9 +564,9 @@ renderCompIf (CompIf _ ws ex) =
   foldMap renderWhitespace ws <>
   bracketTernaryLambda bracketTupleGenerator ex
 
-renderComprehension :: Comprehension v a -> RenderOutput
-renderComprehension (Comprehension _ expr cf cs) =
-  bracketTupleGenerator expr <>
+renderComprehension :: (e v a -> RenderOutput) -> Comprehension e v a -> RenderOutput
+renderComprehension f (Comprehension _ expr cf cs) =
+  f expr <>
   renderCompFor cf <>
   foldMap (bifoldMap renderCompFor renderCompIf) cs
 
@@ -492,6 +576,15 @@ renderDictItem (DictItem _ a b c) =
   singleton (TkColon ()) <>
   foldMap renderWhitespace b <>
   bracketTupleGenerator c
+renderDictItem (DictUnpack _ a b) =
+  TkDoubleStar () `cons`
+  foldMap renderWhitespace a <>
+  case b of
+    BinOp _ _ BoolAnd{} _ -> bracket $ renderExpr b
+    BinOp _ _ BoolOr{} _ -> bracket $ renderExpr b
+    BinOp _ _ op _ | isComparison op -> bracket $ renderExpr b
+    Not{} -> bracket $ renderExpr b
+    _ -> bracketTernaryLambda bracketTupleGenerator b
 
 renderIntLiteral :: IntLiteral a -> Text
 renderIntLiteral (IntLiteralDec _ n) =
@@ -528,6 +621,15 @@ renderFloatLiteral (FloatLiteralFull _ a b) =
 renderFloatLiteral (FloatLiteralPoint _ a b) =
   Text.pack ('.' : fmap (charDecimal #) (NonEmpty.toList a)) <>
   foldMap renderFloatExponent b
+renderFloatLiteral (FloatLiteralWhole _ a b) =
+  Text.pack (fmap (charDecimal #) (NonEmpty.toList a)) <>
+  renderFloatExponent b
+
+renderImagLiteral :: ImagLiteral a -> Text
+renderImagLiteral (ImagLiteralInt _ ds b) =
+  Text.pack $ fmap (charDecimal #) (NonEmpty.toList ds) ++ [if b then 'J' else 'j']
+renderImagLiteral (ImagLiteralFloat _ f b) =
+  renderFloatLiteral f <> Text.singleton (if b then 'J' else 'j')
 
 renderStringLiteral :: StringLiteral a -> RenderOutput
 renderStringLiteral (StringLiteral _ a b c d e) =
@@ -535,6 +637,12 @@ renderStringLiteral (StringLiteral _ a b c d e) =
   foldMap renderWhitespace e
 renderStringLiteral (BytesLiteral _ a b c d e) =
   TkBytes a b c d () `cons`
+  foldMap renderWhitespace e
+renderStringLiteral (RawStringLiteral _ a b c d e) =
+  TkRawString a b c d () `cons`
+  foldMap renderWhitespace e
+renderStringLiteral (RawBytesLiteral _ a b c d e) =
+  TkRawBytes a b c d () `cons`
   foldMap renderWhitespace e
 
 renderSubscript :: Subscript v a -> RenderOutput
@@ -563,23 +671,148 @@ renderYield re (YieldFrom _ a b c) =
   re c
 renderYield re e = re e
 
+renderUnpackTarget :: Expr v a -> RenderOutput
+renderUnpackTarget e =
+  case e of
+    BinOp _ _ BoolAnd{} _ -> bracket $ renderExpr e
+    BinOp _ _ BoolOr{} _ -> bracket $ renderExpr e
+    BinOp _ _ op _ | isComparison op -> bracket $ renderExpr e
+    Not{} -> bracket $ renderExpr e
+    _ -> bracketTernaryLambda bracketTupleGenerator e
+
+renderNestedParens :: RenderOutput -> [([Whitespace], [Whitespace])] -> RenderOutput
+renderNestedParens =
+  foldr
+    (\(ws1, ws2) y ->
+        TkLeftParen () `cons`
+        foldMap renderWhitespace ws1 <>
+        y <>
+        singleton (TkRightParen ()) <>
+        foldMap renderWhitespace ws2)
+
+renderTupleItems :: CommaSep1' (TupleItem v a) -> RenderOutput
+renderTupleItems (CommaSepOne1' a Nothing) =
+  case a of
+    TupleItem _ b -> bracketTupleGenerator b
+    TupleUnpack _ b c d ->
+      renderNestedParens
+        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        b
+renderTupleItems (CommaSepOne1' a (Just ws)) =
+  (case a of
+     TupleItem _ b -> bracketTupleGenerator b
+     TupleUnpack _ [] b c ->
+       bracket $ TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
+     TupleUnpack _ b c d ->
+       renderNestedParens
+         (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+         b) <>
+  singleton (TkComma ()) <> foldMap renderWhitespace ws
+renderTupleItems (CommaSepMany1' a ws rest) =
+  (case a of
+    TupleItem _ b -> bracketTupleGenerator b
+    TupleUnpack _ [] b c ->
+      bracket $ TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
+    TupleUnpack _ b c d ->
+      renderNestedParens
+        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        b) <>
+  singleton (TkComma ()) <> foldMap renderWhitespace ws <>
+  renderTupleItems rest
+
+renderSetItem :: SetItem v a -> RenderOutput
+renderSetItem a =
+  case a of
+    SetItem _ b -> bracketTupleGenerator b
+    SetUnpack _ b c d ->
+      renderNestedParens
+        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        b
+
+renderSetItems :: CommaSep1' (SetItem v a) -> RenderOutput
+renderSetItems (CommaSepOne1' a Nothing) =
+  case a of
+    SetItem _ b -> bracketTupleGenerator b
+    SetUnpack _ b c d ->
+      renderNestedParens
+        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        b
+renderSetItems (CommaSepOne1' a (Just ws)) =
+  (case a of
+     SetItem _ b -> bracketTupleGenerator b
+     SetUnpack _ [] b c ->
+       TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
+     SetUnpack _ b c d ->
+       renderNestedParens
+         (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+         b) <>
+  singleton (TkComma ()) <> foldMap renderWhitespace ws
+renderSetItems (CommaSepMany1' a ws rest) =
+  (case a of
+    SetItem _ b -> bracketTupleGenerator b
+    SetUnpack _ [] b c ->
+      TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
+    SetUnpack _ b c d ->
+      renderNestedParens
+        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        b) <>
+  singleton (TkComma ()) <> foldMap renderWhitespace ws <>
+  renderSetItems rest
+
+renderListItems :: CommaSep1' (ListItem v a) -> RenderOutput
+renderListItems (CommaSepOne1' a Nothing) =
+  case a of
+    ListItem _ b -> bracketTupleGenerator b
+    ListUnpack _ b c d ->
+      renderNestedParens
+        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        b
+renderListItems (CommaSepOne1' a (Just ws)) =
+  (case a of
+     ListItem _ b -> bracketTupleGenerator b
+     ListUnpack _ [] b c ->
+       TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
+     ListUnpack _ b c d ->
+       renderNestedParens
+         (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+         b) <>
+  singleton (TkComma ()) <> foldMap renderWhitespace ws
+renderListItems (CommaSepMany1' a ws rest) =
+  (case a of
+    ListItem _ b -> bracketTupleGenerator b
+    ListUnpack _ [] b c ->
+      TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
+    ListUnpack _ b c d ->
+      renderNestedParens
+        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        b) <>
+  singleton (TkComma ()) <> foldMap renderWhitespace ws <>
+  renderListItems rest
+
 renderExpr :: Expr v a -> RenderOutput
+renderExpr (Unit _ a b) =
+  TkLeftParen () `cons`
+  foldMap renderWhitespace a <>
+  singleton (TkRightParen ()) <>
+  foldMap renderWhitespace b
 renderExpr (Lambda _ a b c d) =
   TkLambda () `cons`
   foldMap renderWhitespace a <>
   renderCommaSep renderParam b <>
   singleton (TkColon ()) <> foldMap renderWhitespace c <>
   bracketTupleGenerator d
-renderExpr e@Yield{} = bracket $ renderYield renderExpr e
+renderExpr e@Yield{} = bracket $ renderYield bracketTupleGenerator e
 renderExpr e@YieldFrom{} = bracket $ renderYield bracketTupleGenerator e
 renderExpr (Ternary _ a b c d e) =
   (case a of
      Generator{} -> bracket $ renderExpr a
      _ -> bracketTupleGenerator a) <>
   singleton (TkIf ()) <> foldMap renderWhitespace b <>
-  bracketTernaryLambda bracketTupleGenerator c <>
+  (case c of
+     _ -> bracketTernaryLambda bracketTupleGenerator c) <>
   singleton (TkElse ()) <> foldMap renderWhitespace d <>
-  bracketTupleGenerator e
+  (case e of
+     _ -> bracketTupleGenerator e)
 renderExpr (Subscript _ a b c d) =
   (case a of
      BinOp{} -> bracket $ renderExpr a
@@ -620,18 +853,17 @@ renderExpr (UnOp _ op expr) =
 renderExpr (String _ vs) = foldMap renderStringLiteral vs
 renderExpr (Int a n ws) = TkInt (() <$ n) `cons` foldMap renderWhitespace ws
 renderExpr (Float a n ws) = TkFloat (() <$ n) `cons` foldMap renderWhitespace ws
+renderExpr (Imag a n ws) = TkImag (() <$ n) `cons` foldMap renderWhitespace ws
 renderExpr (Ident _ name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) =
   TkLeftBracket () `cons`
   foldMap renderWhitespace ws1 <>
-  foldMap
-    (renderCommaSep1' bracketTupleGenerator)
-    exprs <>
+  foldMap renderListItems exprs <>
   singleton (TkRightBracket ()) <> foldMap renderWhitespace ws2
 renderExpr (ListComp _ ws1 comp ws2) =
   TkLeftBracket () `cons`
   foldMap renderWhitespace ws1 <>
-  renderComprehension comp <>
+  renderComprehension bracketTupleGenerator comp <>
   singleton (TkRightBracket ()) <> foldMap renderWhitespace ws2
 renderExpr (Call _ expr ws args ws2) =
   (case expr of
@@ -658,28 +890,39 @@ renderExpr (Deref _ expr ws name) =
   foldMap renderWhitespace ws <>
   renderIdent name
 renderExpr (None _ ws) = TkNone () `cons` foldMap renderWhitespace ws
+renderExpr (Ellipsis _ ws) = TkEllipsis () `cons` foldMap renderWhitespace ws
 renderExpr (BinOp _ e1 op e2) =
   (if shouldBracketLeft op e1 then bracket else id) (bracketTernaryLambda bracketGenerator e1) <>
   renderBinOp op <>
   (if shouldBracketRight op e2 then bracket else id) (bracketTernaryLambda bracketGenerator e2)
 renderExpr (Tuple _ a ws c) =
-  bracketTupleGenerator a <> singleton (TkComma ()) <> foldMap renderWhitespace ws <>
-  foldMap
-    (renderCommaSep1' bracketTupleGenerator)
-    c
+  renderTupleItems $
+  case c of
+    Nothing -> CommaSepOne1' a (Just ws)
+    Just c' -> CommaSepMany1' a ws c'
+renderExpr (DictComp _ ws1 comp ws2) =
+  TkLeftBrace () `cons`
+  foldMap renderWhitespace ws1 <>
+  renderComprehension renderDictItem comp <>
+  singleton (TkRightBrace ()) <> foldMap renderWhitespace ws2
 renderExpr (Dict _ a b c) =
   TkLeftBrace () `cons`
   foldMap renderWhitespace a <>
   foldMap (renderCommaSep1' renderDictItem) b <>
   singleton (TkRightBrace ()) <>
   foldMap renderWhitespace c
+renderExpr (SetComp _ ws1 comp ws2) =
+  TkLeftBrace () `cons`
+  foldMap renderWhitespace ws1 <>
+  renderComprehension renderSetItem comp <>
+  singleton (TkRightBrace ()) <> foldMap renderWhitespace ws2
 renderExpr (Set _ a b c) =
   TkLeftBrace () `cons`
   foldMap renderWhitespace a <>
-  renderCommaSep1' bracketTupleGenerator b <>
+  renderSetItems b <>
   singleton (TkRightBrace ()) <>
   foldMap renderWhitespace c
-renderExpr (Generator _ a) = renderComprehension a
+renderExpr (Generator _ a) = renderComprehension bracketTupleGenerator a
 
 renderModuleName :: ModuleName v a -> RenderOutput
 renderModuleName (ModuleNameOne _ s) = renderIdent s
@@ -759,10 +1002,10 @@ renderSmallStatement (Assign _ lvalue rvalues) =
        renderYield bracketGenerator rvalue)
     rvalues
 renderSmallStatement (AugAssign _ lvalue as rvalue) =
-  renderExpr lvalue <> renderAugAssign as <> bracketGenerator rvalue
-renderSmallStatement (Pass _) = singleton $ TkPass ()
-renderSmallStatement (Continue _) = singleton $ TkContinue ()
-renderSmallStatement (Break _) = singleton $ TkBreak ()
+  renderExpr lvalue <> renderAugAssign as <> bracketTupleGenerator rvalue
+renderSmallStatement (Pass _ ws) = TkPass () `cons` foldMap renderWhitespace ws
+renderSmallStatement (Continue _ ws) = TkContinue () `cons` foldMap renderWhitespace ws
+renderSmallStatement (Break _ ws) = TkBreak () `cons` foldMap renderWhitespace ws
 renderSmallStatement (Global _ ws ids) =
   TkGlobal () `cons` foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
 renderSmallStatement (Nonlocal _ ws ids) =
@@ -818,12 +1061,16 @@ renderDecorator (Decorator _ a b c d) =
   singleton (renderNewline d)
 
 renderCompoundStatement :: CompoundStatement v a -> RenderOutput
-renderCompoundStatement (Fundef _ decos idnt ws1 name ws2 params ws3 s) =
+renderCompoundStatement (Fundef _ decos idnt ws1 name ws2 params ws3 mty s) =
   foldMap renderDecorator decos <>
   renderIndents idnt <>
   singleton (TkDef ()) <> foldMap renderWhitespace ws1 <> renderIdent name <>
   bracket (foldMap renderWhitespace ws2 <> renderCommaSep renderParam params) <>
-  foldMap renderWhitespace ws3 <> renderSuite s
+  foldMap renderWhitespace ws3 <>
+  foldMap
+    (\(ws, ty) -> TkRightArrow () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
+    mty <>
+  renderSuite s
 renderCompoundStatement (If idnt _ ws1 expr s elifs body') =
   renderIndents idnt <>
   singleton (TkIf ()) <> foldMap renderWhitespace ws1 <>
@@ -854,7 +1101,7 @@ renderCompoundStatement (TryExcept idnt _ a s e f g) =
     (\(idnt, ws1, eas, s) ->
        renderIndents idnt <>
        singleton (TkExcept ()) <> foldMap renderWhitespace ws1 <>
-       renderExceptAs eas <>
+       foldMap renderExceptAs eas <>
        renderSuite s)
     e <>
   foldMap
@@ -960,14 +1207,31 @@ renderArg re (DoubleStarArg _ ws expr) =
   bracketTupleGenerator expr
 
 renderParam :: Param v a -> RenderOutput
-renderParam (PositionalParam _ name) =
-  renderIdent name
-renderParam (StarParam _ ws name) =
-  TkStar () `cons` foldMap renderWhitespace ws <> renderIdent name
-renderParam (DoubleStarParam _ ws name) =
-  TkDoubleStar () `cons` foldMap renderWhitespace ws <> renderIdent name
-renderParam (KeywordParam _ name ws2 expr) =
-  renderIdent name <> singleton (TkEq ()) <>
+renderParam (PositionalParam _ name mty) =
+  renderIdent name <>
+  foldMap
+    (\(ws, ty) -> TkColon () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
+    mty
+renderParam (StarParam _ ws name mty) =
+  TkStar () `cons`
+  foldMap renderWhitespace ws <>
+  foldMap renderIdent name <>
+  foldMap
+    (\(ws, ty) -> TkColon () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
+    mty
+renderParam (DoubleStarParam _ ws name mty) =
+  TkDoubleStar () `cons`
+  foldMap renderWhitespace ws <>
+  renderIdent name <>
+  foldMap
+    (\(ws, ty) -> TkColon () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
+    mty
+renderParam (KeywordParam _ name mty ws2 expr) =
+  renderIdent name <>
+  foldMap
+    (\(ws, ty) -> TkColon () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
+    mty <>
+  singleton (TkEq ()) <>
   foldMap renderWhitespace ws2 <> bracketTupleGenerator expr
 
 renderUnOp :: UnOp a -> RenderOutput
@@ -1024,11 +1288,11 @@ renderModule (Module ms) =
        renderStatement)
     ms
 
-showModule :: Module v a -> Lazy.Text
+showModule :: Module v a -> Text
 showModule = showRenderOutput . renderModule
 
-showStatement :: Statement v a -> Lazy.Text
+showStatement :: Statement v a -> Text
 showStatement = showRenderOutput . renderStatement
 
-showExpr :: Expr v a -> Lazy.Text
+showExpr :: Expr v a -> Text
 showExpr = showRenderOutput . bracketGenerator

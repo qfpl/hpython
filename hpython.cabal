@@ -17,23 +17,30 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Data.Validate
+                     , Data.Validate.Monadic
+                     , Language.Python.Parse
                      , Language.Python.Syntax
                      , Language.Python.Internal.Lexer
                      , Language.Python.Internal.Optics
+                     , Language.Python.Internal.Optics.Validated
                      , Language.Python.Internal.Parse
                      , Language.Python.Internal.Render
                      , Language.Python.Internal.Syntax
                      , Language.Python.Internal.Token
+                     , Language.Python.Internal.Syntax.AugAssign
                      , Language.Python.Internal.Syntax.BinOp
                      , Language.Python.Internal.Syntax.Comment
                      , Language.Python.Internal.Syntax.CommaSep
                      , Language.Python.Internal.Syntax.Expr
                      , Language.Python.Internal.Syntax.Ident
+                     , Language.Python.Internal.Syntax.Import
+                     , Language.Python.Internal.Syntax.IR
                      , Language.Python.Internal.Syntax.Module
                      , Language.Python.Internal.Syntax.ModuleNames
                      , Language.Python.Internal.Syntax.Numbers
                      , Language.Python.Internal.Syntax.Statement
                      , Language.Python.Internal.Syntax.Strings
+                     , Language.Python.Internal.Syntax.Strings.Raw
                      , Language.Python.Internal.Syntax.UnOp
                      , Language.Python.Internal.Syntax.Whitespace
                      , Language.Python.Validate.Scope
@@ -48,7 +55,7 @@ library
                      , lens
                      , type-level-sets >=0.8.6.0
                      , parsers
-                     , trifecta
+                     , megaparsec >=6.3 && <6.4
                      , fingertree >=0.1 && <0.2
                      , mtl
                      , bytestring-trie >=0.2
@@ -57,6 +64,7 @@ library
                      , semigroupoids >=5.2.2 && <5.3
                      , text >=1.2 && <1.3
                      , these >=0.7.4 && <0.7.5
+                     , parsers-megaparsec >=0.1 && <0.2
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -O
@@ -72,7 +80,7 @@ executable example
                      , OptimizeTailRecursion
                      , Programs
   hs-source-dirs:      example
-  build-depends:       base >=4.9 && <4.11, lens, hpython
+  build-depends:       base >=4.9 && <4.11, lens, hpython, text
   default-language:    Haskell2010
   ghc-options:         -O
                        -Wincomplete-patterns
@@ -83,7 +91,12 @@ executable example
 executable benchmarks
   main-is:             Main.hs
   hs-source-dirs:      benchmarks
-  build-depends:       base >=4.9 && <4.11, hpython, trifecta, criterion, deepseq
+  build-depends:       base >=4.9 && <4.11
+                     , hpython
+                     , megaparsec
+                     , criterion
+                     , deepseq
+                     , text
   default-language:    Haskell2010
   ghc-options:         -O
                        -Wincomplete-patterns
@@ -115,7 +128,7 @@ test-suite hpython-tests
                      , semigroupoids >=5.2.2 && <5.3
                      , text >=1.2 && <1.3
                      , transformers
-                     , trifecta
+                     , megaparsec >=6.3 && <6.4
                      , these >=0.7.4 && <0.7.5
   default-language:    Haskell2010
   ghc-options:         -O

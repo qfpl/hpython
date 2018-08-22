@@ -1,19 +1,16 @@
 {-# language DataKinds, TypeOperators, FlexibleContexts #-}
 module Main where
 
-import Language.Python.Internal.Optics
-import Language.Python.Internal.Parse
+import Language.Python.Internal.Optics.Validated (unvalidated)
 import Language.Python.Internal.Render
 import Language.Python.Internal.Syntax
+import Language.Python.Parse (parseStatement, parseExpr)
 import Language.Python.Validate.Indentation
-import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Syntax
-import Language.Python.Validate.Syntax.Error
 
 import LexerParser
 import Scope
 import Roundtrip
-import Helpers (doToPython)
 
 import qualified Generators.General as General
 import qualified Generators.Correct as Correct
@@ -23,11 +20,13 @@ import Control.Monad.IO.Class
 import Control.Monad.State
 import Data.Functor
 import Data.List
-import Data.Validate
+import Data.Text (Text)
+import Data.Validate (Validate(..), validate)
 import System.Directory
 import System.Exit
 import System.Process
-import qualified Data.Text.Lazy as Lazy
+
+import qualified Data.Text.IO as StrictText
 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -64,9 +63,9 @@ validateModuleIndentation'
   -> Validate [IndentationError '[] a] (Module '[Indentation] a)
 validateModuleIndentation' = runValidateIndentation . validateModuleIndentation
 
-runPython3 :: (MonadTest m, MonadIO m) => FilePath -> Bool -> String -> m ()
+runPython3 :: (MonadTest m, MonadIO m) => FilePath -> Bool -> Text -> m ()
 runPython3 path shouldSucceed str = do
-  () <- liftIO $ writeFile path str
+  () <- liftIO $ StrictText.writeFile path str
   (ec, sto, ste) <- liftIO $ readProcessWithExitCode "python3" ["-m", "py_compile", path] ""
   annotateShow shouldSucceed
   annotateShow ec
@@ -84,7 +83,7 @@ syntax_expr :: FilePath -> Property
 syntax_expr path =
   property $ do
     ex <- forAll $ Gen.resize 300 General.genExpr
-    let rex = Lazy.unpack $ showExpr ex
+    let rex = showExpr ex
     shouldSucceed <-
       case validateExprIndentation' ex of
         Failure errs -> annotateShow errs $> False
@@ -93,7 +92,7 @@ syntax_expr path =
             Failure [] -> pure True
             Failure errs'' -> annotateShow errs'' $> False
             Success res' -> pure True
-    annotate rex
+    annotateShow rex
     runPython3
       path
       shouldSucceed
@@ -103,7 +102,7 @@ syntax_statement :: FilePath -> Property
 syntax_statement path =
   property $ do
     st <- forAll $ Gen.resize 300 General.genStatement
-    let rst = Lazy.unpack $ showStatement st
+    let rst = showStatement st
     shouldSucceed <-
       case validateStatementIndentation' st of
         Failure errs -> annotateShow errs $> False
@@ -112,14 +111,14 @@ syntax_statement path =
             Failure [] -> pure True
             Failure errs'' -> annotateShow errs'' $> False
             Success res' -> pure True
-    annotate rst
+    annotateShow rst
     runPython3 path shouldSucceed rst
 
 syntax_module :: FilePath -> Property
 syntax_module path =
   property $ do
     st <- forAll $ Gen.resize 300 General.genModule
-    let rst = Lazy.unpack $ showModule st
+    let rst = showModule st
     shouldSucceed <-
       case validateModuleIndentation' st of
         Failure errs -> annotateShow errs $> False
@@ -128,7 +127,7 @@ syntax_module path =
             Failure [] -> pure True
             Failure errs'' -> annotateShow errs'' $> False
             Success res' -> pure True
-    annotate rst
+    annotateShow rst
     runPython3 path shouldSucceed rst
 
 correct_syntax_expr :: FilePath -> Property
@@ -140,52 +139,58 @@ correct_syntax_expr path =
       Success res ->
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
-          Success res' -> runPython3 path True (Lazy.unpack $ showExpr ex)
+          Success res' -> runPython3 path True (showExpr ex)
 
 correct_syntax_statement :: FilePath -> Property
 correct_syntax_statement path =
   property $ do
     st <- forAll $ evalStateT Correct.genStatement Correct.initialGenState
-    annotate . Lazy.unpack $ showStatement st
+    annotateShow $ showStatement st
     case validateStatementIndentation' st of
       Failure errs -> annotateShow errs *> failure
       Success res ->
         case validateStatementSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
-          Success res' -> runPython3 path True . Lazy.unpack $ showStatement st
+          Success res' -> runPython3 path True $ showStatement st
 
 expr_printparseprint_print :: Property
 expr_printparseprint_print =
   property $ do
     ex <- forAll $ evalStateT Correct.genExpr Correct.initialGenState
-    -- annotate (showExpr ex)
+    annotateShow $ showExpr ex
     case validateExprIndentation' ex of
       Failure errs -> annotateShow errs *> failure
       Success res ->
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <- doToPython (expr space) (Lazy.unpack $ showExpr res')
+            py <-
+              validate (\e -> annotateShow e *> failure) pure $
+              parseExpr "test" (showExpr res')
             showExpr (res' ^. unvalidated) === showExpr (res $> ())
 
 statement_printparseprint_print :: Property
 statement_printparseprint_print =
   property $ do
     st <- forAll $ evalStateT Correct.genStatement Correct.initialGenState
-    -- annotate $ showStatement st
+    annotateShow $ showStatement st
     case validateStatementIndentation' st of
       Failure errs -> annotateShow errs *> failure
       Success res ->
         case validateStatementSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <- doToPython statement . Lazy.unpack $ showStatement res'
+            py <-
+              validate (\e -> annotateShow e *> failure) pure $
+              parseStatement "test" (showStatement res')
             annotateShow py
             showStatement (res' ^. unvalidated) ===
               showStatement (py $> ())
 
 main = do
   checkParallel lexerParserTests
+  checkParallel scopeTests
+  checkParallel roundtripTests
   let file = "hedgehog-test.py"
   check . withTests 200 $ syntax_expr file
   check . withTests 200 $ syntax_statement file
@@ -194,6 +199,4 @@ main = do
   check . withTests 200 $ correct_syntax_statement file
   check expr_printparseprint_print
   check . withShrinks 2000 $ statement_printparseprint_print
-  checkParallel scopeTests
-  checkParallel roundtripTests
   removeFile "hedgehog-test.py"

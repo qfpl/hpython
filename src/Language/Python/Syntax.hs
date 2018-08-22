@@ -1,6 +1,7 @@
 {-# language DataKinds #-}
 {-# language MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 {-# language OverloadedLists #-}
+{-# language LambdaCase #-}
 module Language.Python.Syntax where
 
 import Data.Function ((&))
@@ -18,23 +19,34 @@ class HasPositional p v | p -> v where
 class HasKeyword p where
   k_ :: Ident '[] () -> Expr '[] () -> p
 
-instance HasPositional (Param '[] ()) (Ident '[] ()) where; p_ = PositionalParam ()
-instance HasKeyword (Param '[] ()) where; k_ a = KeywordParam () a []
+instance HasPositional (Param '[] ()) (Ident '[] ()) where
+  p_ i = PositionalParam () i Nothing
+instance HasKeyword (Param '[] ()) where
+  k_ a = KeywordParam () a Nothing []
 instance HasPositional (Arg '[] ()) (Expr '[] ()) where; p_ = PositionalArg ()
 instance HasKeyword (Arg '[] ()) where; k_ a = KeywordArg () a []
 
-def_ :: Ident '[] () -> [Param '[] ()] -> NonEmpty (Statement '[] ()) -> Statement '[] ()
-def_ name params block =
+defD_
+  :: [Decorator '[] ()]
+  -> Ident '[] ()
+  -> [Param '[] ()]
+  -> NonEmpty (Statement '[] ())
+  -> Statement '[] ()
+defD_ ds name params block =
   CompoundStatement $
   Fundef ()
-    []
+    ds
     (Indents [] ())
     [Space]
     name
     []
     (listToCommaSep params)
     []
+    Nothing
     (SuiteMany () [] (LF Nothing) $ toBlock block)
+
+def_ :: Ident '[] () -> [Param '[] ()] -> NonEmpty (Statement '[] ()) -> Statement '[] ()
+def_ = defD_ []
 
 call_ :: Expr '[] () -> [Arg '[] ()] -> Expr '[] ()
 call_ expr args =
@@ -54,7 +66,7 @@ expr_ :: Expr '[] () -> Statement '[] ()
 expr_ e = SmallStatements (Indents [] ()) (Expr () e) [] Nothing (Right (LF Nothing))
 
 list_ :: [Expr '[] ()] -> Expr '[] ()
-list_ es = List () [] (listToCommaSep1' es) []
+list_ es = List () [] (listToCommaSep1' $ ListItem () <$> es) []
 
 is_ :: Expr '[] () -> Expr '[] () -> Expr '[] ()
 is_ a = BinOp () (a & trailingWhitespace .~ [Space]) (Is () [Space])
@@ -171,10 +183,10 @@ none_ :: Expr '[] ()
 none_ = None () []
 
 pass_ :: Statement '[] ()
-pass_ = SmallStatements (Indents [] ()) (Pass ()) [] Nothing (Right (LF Nothing))
+pass_ = SmallStatements (Indents [] ()) (Pass () []) [] Nothing (Right (LF Nothing))
 
 break_ :: Statement '[] ()
-break_ = SmallStatements (Indents [] ()) (Break ()) [] Nothing (Right (LF Nothing))
+break_ = SmallStatements (Indents [] ()) (Break () []) [] Nothing (Right (LF Nothing))
 
 true_ :: Expr '[] ()
 true_ = Bool () True []

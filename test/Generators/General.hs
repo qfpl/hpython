@@ -15,13 +15,31 @@ import Language.Python.Internal.Syntax
 import Generators.Common
 import Generators.Sized
 
+genTuple :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
+genTuple expr =
+  Tuple () <$>
+  genTupleItem genWhitespaces expr <*>
+  genWhitespaces <*>
+  Gen.maybe (genSizedCommaSep1' $ genTupleItem genWhitespaces expr)
+
 genParam :: MonadGen m => m (Expr '[] ()) -> m (Param '[] ())
 genParam genExpr =
   sizedRecursive
-    [ StarParam () <$> genWhitespaces <*> genIdent
-    , DoubleStarParam () <$> genWhitespaces <*> genIdent
+    [ StarParam () <$>
+      genWhitespaces <*>
+      Gen.maybe genIdent <*>
+      sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr)
+    , DoubleStarParam () <$>
+      genWhitespaces <*>
+      genIdent <*>
+      sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr)
     ]
-    [ KeywordParam () <$> genIdent <*> genWhitespaces <*> genExpr ]
+    [ KeywordParam () <$>
+      genIdent <*>
+      sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr) <*>
+      genWhitespaces <*>
+      genExpr
+    ]
 
 genArg :: MonadGen m => m (Expr '[] ()) -> m (Arg '[] ())
 genArg genExpr =
@@ -98,11 +116,11 @@ genCompIf =
   genWhitespaces <*>
   Gen.scale (max 0 . subtract 1) genExpr
 
-genComprehension :: MonadGen m => m (Comprehension '[] ())
-genComprehension =
+genComprehension :: MonadGen m => m (e '[] ()) -> m (Comprehension e '[] ())
+genComprehension me =
   sized3
     (Comprehension ())
-    genExpr
+    me
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
@@ -117,6 +135,22 @@ genSubscript =
         (sizedMaybe $ (,) <$> genWhitespaces <*> sizedMaybe genExpr)
     ]
     []
+
+genDictComp :: MonadGen m => m (Comprehension DictItem '[] ())
+genDictComp =
+  sized3
+    (Comprehension ())
+    (genDictItem genExpr)
+    genCompFor
+    (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
+
+genSetComp :: MonadGen m => m (Comprehension SetItem '[] ())
+genSetComp =
+  sized3
+    (Comprehension ())
+    (genSetItem genAnyWhitespaces genExpr)
+    genCompFor
+    (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
 -- | This is necessary to prevent generating exponentials that will take forever to evaluate
 -- when python does constant folding
@@ -159,29 +193,49 @@ genPyChar =
 genExpr' :: MonadGen m => Bool -> m (Expr '[] ())
 genExpr' isExp =
   sizedRecursive
-    [ genBool
+    [ genNone
+    , genEllipsis
+    , genUnit
+    , genBool
     , if isExp then genSmallInt else genInt
     , if isExp then genSmallFloat else genFloat
+    , genImag
     , Ident () <$> genIdent
     , String () <$>
       Gen.nonEmpty
         (Range.constant 1 5)
-        (Gen.choice [genStringLiteral genPyChar, genBytesLiteral genPyChar])
+        (Gen.choice
+           [ genStringLiteral genPyChar
+           , genBytesLiteral genPyChar
+           , genRawStringLiteral
+           , genRawBytesLiteral
+           ])
     ]
     [ List () <$>
       genWhitespaces <*>
-      Gen.maybe (genSizedCommaSep1' genExpr) <*>
+      Gen.maybe (genSizedCommaSep1' $ genListItem genWhitespaces genExpr) <*>
       genWhitespaces
     , Dict () <$>
       genWhitespaces <*>
       sizedMaybe (genSizedCommaSep1' $ genDictItem genExpr) <*>
       genWhitespaces
-    , Set () <$> genWhitespaces <*> genSizedCommaSep1' genExpr <*> genWhitespaces
+    , Set () <$>
+      genWhitespaces <*>
+      genSizedCommaSep1' (genSetItem genWhitespaces genExpr) <*>
+      genWhitespaces
     , ListComp () <$>
       genWhitespaces <*>
-      genComprehension <*>
+      genComprehension genExpr <*>
       genWhitespaces
-    , Generator () <$> genComprehension
+    , DictComp () <$>
+      genWhitespaces <*>
+      genDictComp <*>
+      genWhitespaces
+    , SetComp () <$>
+      genWhitespaces <*>
+      genSetComp <*>
+      genWhitespaces
+    , Generator () <$> genComprehension genExpr
     , Gen.subtermM
         genExpr
         (\a ->
@@ -236,7 +290,10 @@ genExpr' isExp =
 genSmallStatement :: MonadGen m => m (SmallStatement '[] ())
 genSmallStatement =
   sizedRecursive
-    (pure <$> [Pass (), Break (), Continue ()])
+    [ Pass () <$> genWhitespaces
+    , Break () <$> genWhitespaces
+    , Continue () <$> genWhitespaces
+    ]
     [ Expr () <$> genExpr
     , sized2
         (Assign ())
@@ -288,13 +345,14 @@ genCompoundStatement
   => m (CompoundStatement '[] ())
 genCompoundStatement =
   sizedRecursive
-    [ sized3M
-        (\a b c ->
+    [ sized4M
+        (\a b c d ->
            Fundef () a <$> genIndents <*>
            genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure b <*>
-           genWhitespaces <*> pure c)
+           genWhitespaces <*> pure c <*> pure d)
         (sizedList genDecorator)
         (genSizedCommaSep $ genParam genExpr)
+        (sizedMaybe $ (,) <$> genWhitespaces <*> genExpr)
         (genSuite genSmallStatement genBlock)
     , sized4M
         (\a b c d ->
@@ -323,7 +381,8 @@ genCompoundStatement =
          sized2M
            (\a b ->
               (,,,) <$> genIndents <*> genWhitespaces <*>
-              (ExceptAs () <$> pure a <*> Gen.maybe ((,) <$> genWhitespaces <*> genIdent)) <*>
+              Gen.maybe
+                (ExceptAs () <$> pure a <*> Gen.maybe ((,) <$> genWhitespaces <*> genIdent)) <*>
               pure b)
            genExpr
            (genSuite genSmallStatement genBlock))

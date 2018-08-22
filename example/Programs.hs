@@ -21,10 +21,11 @@ append_to =
     [Space]
     "append_to"
     []
-    ( CommaSepMany (PositionalParam () "element") [Space] $
-      CommaSepOne (KeywordParam () "to" [] (List () [] Nothing []))
+    ( CommaSepMany (PositionalParam () "element" Nothing) [Space] $
+      CommaSepOne (KeywordParam () "to" Nothing [] (List () [] Nothing []))
     )
     []
+    Nothing
     (SuiteMany () [] (LF Nothing) $
      Block
      [ Right $

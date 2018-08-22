@@ -22,7 +22,7 @@ import Language.Python.Syntax
 
 optimizeTailRecursion :: Statement '[] () -> Maybe (Statement '[] ())
 optimizeTailRecursion st = do
-  (_, decos, idnts, _, name, _, params, _, suite) <- st ^? _Fundef
+  (_, decos, idnts, _, name, _, params, _, _, suite) <- st ^? _Fundef
   bodyLast <- toListOf (unvalidated._Statements) suite ^? _last
 
   let

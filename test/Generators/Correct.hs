@@ -170,47 +170,72 @@ genArgs =
     (sizedList $ (,) <$> genWhitespaces <*> genKeywordArg)
     (Gen.maybe genWhitespaces)
 
-genPositionalParams :: MonadGen m => m (CommaSep (Param '[] ()))
-genPositionalParams =
+genPositionalParams
+  :: (MonadGen m, MonadState GenState m)
+  => Bool -- ^ This is for a lambda
+  -> m (CommaSep (Param '[] ()))
+genPositionalParams isLambda =
   Gen.scale (max 0 . subtract 1) $
-  Gen.sized $ fmap (listToCommaSep . fmap (PositionalParam ())) . go []
+  Gen.sized $ fmap (listToCommaSep . fmap (uncurry $ PositionalParam ())) . go []
   where
     go seen 0 = pure []
     go seen n = do
       i <- Gen.filter ((`notElem` seen) . _identValue) genIdent
-      (i :) <$> go (_identValue i : seen) (n-1)
+      mty <-
+        if isLambda
+        then pure Nothing
+        else sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr)
+      ((i, mty) :) <$> go (_identValue i : seen) (n-1)
 
-genKeywordParam :: (MonadGen m, MonadState GenState m) => [String] -> m (Param '[] ())
-genKeywordParam positionals =
+genKeywordParam
+  :: (MonadGen m, MonadState GenState m)
+  => Bool -- ^ This is for a lambda
+  -> [String]
+  -> m (Param '[] ())
+genKeywordParam isLambda positionals =
   Gen.scale (max 0 . subtract 1) $
   KeywordParam () <$>
   Gen.filter (\i -> _identValue i `notElem` positionals) genIdent <*>
+  (if isLambda then pure Nothing else sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr)) <*>
   genWhitespaces <*>
   genExpr
 
-genStarParam :: MonadGen m => [String] -> m (Param '[] ())
-genStarParam positionals =
+genStarParam
+  :: (MonadGen m, MonadState GenState m)
+  => Bool -- ^ This is for a lambda
+  -> [String]
+  -> m (Param '[] ())
+genStarParam isLambda positionals =
   Gen.scale (max 0 . subtract 1) $
   StarParam () <$>
   genWhitespaces <*>
-  Gen.filter (\i -> _identValue i `notElem` positionals) genIdent
+  Gen.filter (\i -> _identValue i `notElem` positionals) genIdent <*>
+  (if isLambda then pure Nothing else sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr))
 
-genDoubleStarParam :: MonadGen m => [String] -> m (Param '[] ())
-genDoubleStarParam positionals =
+genDoubleStarParam
+  :: (MonadGen m, MonadState GenState m)
+  => Bool -- ^ This is for a lambda
+  -> [String]
+  -> m (Param '[] ())
+genDoubleStarParam isLambda positionals =
   Gen.scale (max 0 . subtract 1) $
   DoubleStarParam () <$>
   genWhitespaces <*>
-  Gen.filter (\i -> _identValue i `notElem` positionals) genIdent
+  Gen.filter (\i -> _identValue i `notElem` positionals) genIdent <*>
+  (if isLambda then pure Nothing else sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr))
 
-genParams :: (MonadGen m, MonadState GenState m) => m (CommaSep (Param '[] ()))
-genParams =
-  sizedBind genPositionalParams $ \pparams ->
+genParams
+  :: (MonadGen m, MonadState GenState m)
+  => Bool -- ^ These are for a lambda
+  -> m (CommaSep (Param '[] ()))
+genParams isLambda =
+  sizedBind (genPositionalParams isLambda) $ \pparams ->
   let pparamNames = pparams ^.. folded.paramName.identValue in
-  sizedBind (sizedMaybe $ genStarParam pparamNames) $ \sp ->
+  sizedBind (sizedMaybe $ genStarParam isLambda pparamNames) $ \sp ->
   let pparamNames' = pparamNames <> (sp ^.. _Just.paramName.identValue) in
-  sizedBind (genSizedCommaSep (genKeywordParam pparamNames')) $ \kwparams ->
+  sizedBind (genSizedCommaSep (genKeywordParam isLambda pparamNames')) $ \kwparams ->
   let pparamNames'' = pparamNames' <> kwparams ^.. folded.paramName.identValue in
-  sizedBind (sizedMaybe $ genDoubleStarParam pparamNames'') $ \dsp ->
+  sizedBind (sizedMaybe $ genDoubleStarParam isLambda pparamNames'') $ \dsp ->
 
   pure $
     appendCommaSep
@@ -365,7 +390,7 @@ genExpr' isExp = do
          genExpr
          genExpr
          genExpr
-     , sizedBind genParams $ \a ->
+     , sizedBind (genParams True) $ \a ->
          let paramIdents = a ^.. folded.paramName.identValue in
          Lambda () <$>
          (NonEmpty.toList <$> genWhitespaces1) <*>
@@ -513,7 +538,7 @@ genCompoundStatement
   => m (CompoundStatement '[] ())
 genCompoundStatement =
   sizedRecursive
-    [ sizedBind genParams $ \a ->
+    [ sizedBind (genParams False) $ \a ->
       let paramIdents = a ^.. folded.paramName.identValue in
       sizedBind
         (localState $ do

@@ -31,6 +31,7 @@ data SyntaxError (v :: [*]) a
   | MalformedDecorator a
   | InvalidDictUnpacking a
   | InvalidSetUnpacking a
+  | TypedParamInLambda a
   deriving (Eq, Show)
 
 makeClassyPrisms ''SyntaxError

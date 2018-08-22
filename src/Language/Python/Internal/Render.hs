@@ -1202,14 +1202,31 @@ renderArg re (DoubleStarArg _ ws expr) =
   bracketTupleGenerator expr
 
 renderParam :: Param v a -> RenderOutput
-renderParam (PositionalParam _ name) =
-  renderIdent name
-renderParam (StarParam _ ws name) =
-  TkStar () `cons` foldMap renderWhitespace ws <> renderIdent name
-renderParam (DoubleStarParam _ ws name) =
-  TkDoubleStar () `cons` foldMap renderWhitespace ws <> renderIdent name
-renderParam (KeywordParam _ name ws2 expr) =
-  renderIdent name <> singleton (TkEq ()) <>
+renderParam (PositionalParam _ name mty) =
+  renderIdent name <>
+  foldMap
+    (\(ws, ty) -> TkColon () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
+    mty
+renderParam (StarParam _ ws name mty) =
+  TkStar () `cons`
+  foldMap renderWhitespace ws <>
+  renderIdent name <>
+  foldMap
+    (\(ws, ty) -> TkColon () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
+    mty
+renderParam (DoubleStarParam _ ws name mty) =
+  TkDoubleStar () `cons`
+  foldMap renderWhitespace ws <>
+  renderIdent name <>
+  foldMap
+    (\(ws, ty) -> TkColon () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
+    mty
+renderParam (KeywordParam _ name mty ws2 expr) =
+  renderIdent name <>
+  foldMap
+    (\(ws, ty) -> TkColon () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
+    mty <>
+  singleton (TkEq ()) <>
   foldMap renderWhitespace ws2 <> bracketTupleGenerator expr
 
 renderUnOp :: UnOp a -> RenderOutput

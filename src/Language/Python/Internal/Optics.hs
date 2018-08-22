@@ -22,6 +22,7 @@ data KeywordParam v a
   = MkKeywordParam
   { _kpAnn :: a
   , _kpName :: Ident v a
+  , _kpType :: Maybe ([Whitespace], Expr v a)
   , _kpWhitespaceRight :: [Whitespace]
   , _kpExpr :: Expr v a
   } deriving (Eq, Show)
@@ -35,9 +36,9 @@ _KeywordParam
        (KeywordParam '[] a)
 _KeywordParam =
   prism
-    (\(MkKeywordParam a b d e) -> KeywordParam a b d e)
+    (\(MkKeywordParam a b c d e) -> KeywordParam a b c d e)
     (\case
-        KeywordParam a b d e -> Right (MkKeywordParam a b d e)
+        KeywordParam a b c d e -> Right (MkKeywordParam a b c d e)
         a -> Left $ a ^. unvalidated)
 
 _Fundef

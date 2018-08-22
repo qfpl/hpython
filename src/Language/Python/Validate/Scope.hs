@@ -384,12 +384,20 @@ validateParamScope
   :: AsScopeError e v a
   => Param v a
   -> ValidateScope a e (Param (Nub (Scope ': v)) a)
-validateParamScope (PositionalParam a ident) =
-  pure . PositionalParam a $ coerce ident
-validateParamScope (KeywordParam a ident ws2 expr) =
-  KeywordParam a (coerce ident) ws2 <$> validateExprScope expr
-validateParamScope a@StarParam{} = pure $ unsafeCoerce a
-validateParamScope a@DoubleStarParam{} = pure $ unsafeCoerce a
+validateParamScope (PositionalParam a ident mty) =
+  PositionalParam a (coerce ident) <$>
+  traverseOf (traverse._2) validateExprScope mty
+validateParamScope (KeywordParam a ident mty ws2 expr) =
+  KeywordParam a (coerce ident) <$>
+  traverseOf (traverse._2) validateExprScope mty <*>
+  pure ws2 <*>
+  validateExprScope expr
+validateParamScope (StarParam a b c d) =
+  StarParam a b (coerce c) <$>
+  traverseOf (traverse._2) validateExprScope d
+validateParamScope (DoubleStarParam a b c d) =
+  DoubleStarParam a b (coerce c) <$>
+  traverseOf (traverse._2) validateExprScope d
 
 validateBlockScope
   :: AsScopeError e v a

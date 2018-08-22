@@ -466,7 +466,7 @@ lambda :: Parser ann Whitespace -> Parser ann (Expr ann)
 lambda ws =
   (\(tk, s) -> Lambda (pyTokenAnn tk) s) <$>
   token ws (TkLambda ()) <*>
-  commaSep ws param <*>
+  commaSep ws untypedParam <*>
   (snd <$> token ws (TkColon ())) <*>
   expr ws
 
@@ -474,7 +474,7 @@ lambdaNoCond :: Parser ann Whitespace -> Parser ann (Expr ann)
 lambdaNoCond ws =
   (\(tk, s) -> Lambda (pyTokenAnn tk) s) <$>
   token ws (TkLambda ()) <*>
-  commaSep ws param <*>
+  commaSep ws untypedParam <*>
   (snd <$> token ws (TkColon ())) <*>
   exprNoCond ws
 
@@ -936,24 +936,56 @@ commaSep1' ws pa =
     from a [] b = CommaSepOne1' a b
     from a ((b, c) : bs) d = CommaSepMany1' a b $ from c bs d
 
-param :: Parser ann (Param ann)
-param =
-  (\a ->
+untypedParam :: Parser ann (Param ann)
+untypedParam =
+  (\a b ->
      maybe
-       (PositionalParam (_identAnnotation a) a)
-       (uncurry $ KeywordParam (_identAnnotation a) a)) <$>
+       (PositionalParam (_identAnnotation a) a b)
+       (uncurry $ KeywordParam (_identAnnotation a) a b)) <$>
   identifier anySpace <*>
+  pure Nothing <*>
   optional ((,) <$> (snd <$> token anySpace (TkEq ())) <*> expr anySpace)
 
   <!>
 
-  (\(a, b) -> StarParam (pyTokenAnn a) b) <$> token anySpace (TkStar ()) <*> identifier anySpace
+  (\(a, b) -> StarParam (pyTokenAnn a) b) <$>
+  token anySpace (TkStar ()) <*>
+  identifier anySpace <*>
+  pure Nothing
 
   <!>
 
   (\(a, b) -> DoubleStarParam (pyTokenAnn a) b) <$>
   token anySpace (TkDoubleStar ()) <*>
-  identifier anySpace
+  identifier anySpace <*>
+  pure Nothing
+
+typedParam :: Parser ann (Param ann)
+typedParam =
+  (\a b ->
+     maybe
+       (PositionalParam (_identAnnotation a) a b)
+       (uncurry $ KeywordParam (_identAnnotation a) a b)) <$>
+  identifier anySpace <*>
+  optional tyAnn <*>
+  optional ((,) <$> (snd <$> token anySpace (TkEq ())) <*> expr anySpace)
+
+  <!>
+
+  (\(a, b) -> StarParam (pyTokenAnn a) b) <$>
+  token anySpace (TkStar ()) <*>
+  identifier anySpace <*>
+  optional tyAnn
+
+  <!>
+
+  (\(a, b) -> DoubleStarParam (pyTokenAnn a) b) <$>
+  token anySpace (TkDoubleStar ()) <*>
+  identifier anySpace <*>
+  optional tyAnn
+  where
+    tyAnn =
+      (,) <$> (snd <$> token anySpace (TkColon ())) <*> expr anySpace
 
 arg :: Parser ann (Arg ann)
 arg =
@@ -1039,7 +1071,7 @@ compoundStatement =
       token space (TkDef ()) <*>
       identifier space <*>
       fmap snd (token anySpace $ TkLeftParen ()) <*>
-      commaSep anySpace param <*>
+      commaSep anySpace typedParam <*>
       fmap snd (token space $ TkRightParen ()) <*>
       suite
 

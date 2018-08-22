@@ -25,10 +25,21 @@ genTuple expr =
 genParam :: MonadGen m => m (Expr '[] ()) -> m (Param '[] ())
 genParam genExpr =
   sizedRecursive
-    [ StarParam () <$> genWhitespaces <*> genIdent
-    , DoubleStarParam () <$> genWhitespaces <*> genIdent
+    [ StarParam () <$>
+      genWhitespaces <*>
+      genIdent <*>
+      sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr)
+    , DoubleStarParam () <$>
+      genWhitespaces <*>
+      genIdent <*>
+      sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr)
     ]
-    [ KeywordParam () <$> genIdent <*> genWhitespaces <*> genExpr ]
+    [ KeywordParam () <$>
+      genIdent <*>
+      sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr) <*>
+      genWhitespaces <*>
+      genExpr
+    ]
 
 genArg :: MonadGen m => m (Expr '[] ()) -> m (Arg '[] ())
 genArg genExpr =

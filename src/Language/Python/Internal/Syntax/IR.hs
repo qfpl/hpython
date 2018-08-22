@@ -140,10 +140,13 @@ data Param a
   = PositionalParam
   { _paramAnn :: a
   , _paramName :: Ident '[] a
+  , _paramType :: Maybe ([Whitespace], Expr a)
   }
   | KeywordParam
   { _paramAnn :: a
   , _paramName :: Ident '[] a
+  -- ':' spaces <expr>
+  , _paramType :: Maybe ([Whitespace], Expr a)
   -- = spaces
   , _unsafeKeywordParamWhitespaceRight :: [Whitespace]
   , _unsafeKeywordParamExpr :: Expr a
@@ -153,12 +156,14 @@ data Param a
   -- '*' spaces
   , _unsafeStarParamWhitespace :: [Whitespace]
   , _paramName :: Ident '[] a
+  , _paramType :: Maybe ([Whitespace], Expr a)
   }
   | DoubleStarParam
   { _paramAnn :: a
   -- '**' spaces
   , _unsafeDoubleStarParamWhitespace :: [Whitespace]
   , _paramName :: Ident '[] a
+  , _paramType :: Maybe ([Whitespace], Expr a)
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -578,10 +583,17 @@ fromIR_suite s =
 fromIR_param :: Param a -> Validate [IRError a] (Syntax.Param '[] a)
 fromIR_param p =
   case p of
-    PositionalParam a b -> pure $ Syntax.PositionalParam a b
-    KeywordParam a b c d -> Syntax.KeywordParam a b c <$> fromIR_expr d
-    StarParam a b c -> pure $ Syntax.StarParam a b c
-    DoubleStarParam a b c -> pure $ Syntax.DoubleStarParam a b c
+    PositionalParam a b c ->
+      Syntax.PositionalParam a b <$> traverseOf (traverse._2) fromIR_expr c
+    KeywordParam a b c d e ->
+      Syntax.KeywordParam a b <$>
+      traverseOf (traverse._2) fromIR_expr c <*>
+      pure d <*>
+      fromIR_expr e
+    StarParam a b c d ->
+      Syntax.StarParam a b c <$> traverseOf (traverse._2) fromIR_expr d
+    DoubleStarParam a b c d ->
+      Syntax.DoubleStarParam a b c <$> traverseOf (traverse._2) fromIR_expr d
 
 fromIR_arg :: Arg a -> Validate [IRError a] (Syntax.Arg '[] a)
 fromIR_arg a =

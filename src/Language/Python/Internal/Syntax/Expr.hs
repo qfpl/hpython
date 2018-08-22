@@ -15,7 +15,8 @@ import Control.Lens.Plated (Plated(..), gplate)
 import Control.Lens.Prism (_Just, _Left, _Right)
 import Control.Lens.Setter ((.~))
 import Control.Lens.TH (makeLenses)
-import Control.Lens.Traversal (Traversal, failing)
+import Control.Lens.Traversal (Traversal, failing, traverseOf)
+import Control.Lens.Tuple (_2)
 import Data.Bifunctor (bimap)
 import Data.Bifoldable (bifoldMap)
 import Data.Bitraversable (bitraverse)
@@ -58,10 +59,13 @@ data Param (v :: [*]) a
   = PositionalParam
   { _paramAnn :: a
   , _paramName :: Ident v a
+  , _paramType :: Maybe ([Whitespace], Expr v a)
   }
   | KeywordParam
   { _paramAnn :: a
   , _paramName :: Ident v a
+  -- ':' spaces <expr>
+  , _paramType :: Maybe ([Whitespace], Expr v a)
   -- = spaces
   , _unsafeKeywordParamWhitespaceRight :: [Whitespace]
   , _unsafeKeywordParamExpr :: Expr v a
@@ -71,12 +75,16 @@ data Param (v :: [*]) a
   -- '*' spaces
   , _unsafeStarParamWhitespace :: [Whitespace]
   , _paramName :: Ident v a
+  -- ':' spaces <expr>
+  , _paramType :: Maybe ([Whitespace], Expr v a)
   }
   | DoubleStarParam
   { _paramAnn :: a
   -- '**' spaces
   , _unsafeDoubleStarParamWhitespace :: [Whitespace]
   , _paramName :: Ident v a
+  -- ':' spaces <expr>
+  , _paramType :: Maybe ([Whitespace], Expr v a)
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -87,11 +95,17 @@ paramName :: Lens (Param v a) (Param '[] a) (Ident v a) (Ident v a)
 paramName = lens _paramName (\s a -> (s { _paramName = a}) ^. unvalidated)
 
 instance HasExprs Param where
-  _Exprs f (KeywordParam a name ws2 expr) =
-    KeywordParam a (coerce name) <$> pure ws2 <*> f expr
-  _Exprs _ p@PositionalParam{} = pure $ p ^. unvalidated
-  _Exprs _ p@StarParam{} = pure $ p ^. unvalidated
-  _Exprs _ p@DoubleStarParam{} = pure $ p ^. unvalidated
+  _Exprs f (KeywordParam a name ty ws2 expr) =
+    KeywordParam a (coerce name) <$>
+    traverseOf (traverse._2) f ty <*>
+    pure ws2 <*>
+    f expr
+  _Exprs f (PositionalParam a b c) =
+    PositionalParam a (coerce b) <$> traverseOf (traverse._2) f c
+  _Exprs f (StarParam a b c d) =
+    StarParam a b (coerce c) <$> traverseOf (traverse._2) f d
+  _Exprs f (DoubleStarParam a b c d) =
+    DoubleStarParam a b (coerce c) <$> traverseOf (traverse._2) f d
 
 data Arg (v :: [*]) a
   = PositionalArg

@@ -741,8 +741,8 @@ smallStatement =
               (uncurry $ AugAssign (_exprAnnotation a) a))) <$>
       exprList space <*>
       optional
-        (Left <$> some1 ((,) <$> (snd <$> token space (TkEq ())) <*> exprList space) <!>
-         Right <$> ((,) <$> augAssign <*> exprList space))
+        (Left <$> some1 ((,) <$> (snd <$> token space (TkEq ())) <*> (yieldExpr space <!> exprList space)) <!>
+         Right <$> ((,) <$> augAssign <*> (yieldExpr space <!> exprList space)))
 
     globalSt =
       (\(tk, s) -> Global (pyTokenAnn tk) $ NonEmpty.fromList s) <$>

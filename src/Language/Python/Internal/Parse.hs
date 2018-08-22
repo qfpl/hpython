@@ -643,8 +643,16 @@ orExpr ws =
            maybeColon <- optional $ snd <$> token anySpace (TkColon ())
            case maybeColon of
              Nothing ->
-               (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$>
-               commaSepRest (expr ws <!> starExpr ws)
+               (\a ->
+                  case a of
+                    Left (rest, final) ->
+                      Set ann ws1 ((ex, rest, final) ^. _CommaSep1')
+                    Right (c, d) ->
+                      SetComp ann ws1 (Comprehension (_exprAnnotation ex) ex c d)) <$>
+               -- The order of this choice matters because commaSepRest is implemented
+               -- in a slightly odd way
+               (Right <$> ((,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf)) <!>
+                Left <$> commaSepRest (expr ws <!> starExpr ws))
              Just clws ->
                (\ex2 a ->
                  let
@@ -657,13 +665,17 @@ orExpr ws =
                    Right (c, d) ->
                      DictComp ann ws1 (Comprehension dictItemAnn firstDictItem c d)) <$>
                expr anySpace <*>
-               -- The order of this choice matters because commaSepRest is implemented
-               -- in a slightly odd way
                (Right <$> ((,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf)) <!>
                 Left <$> commaSepRest dictItem)
          Just (Left (Right ex)) ->
-           (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$>
-           commaSepRest (expr ws <!> starExpr ws)
+           (\a ->
+              case a of
+                Left (rest, final) ->
+                  Set ann ws1 ((ex, rest, final) ^. _CommaSep1')
+                Right (c, d) ->
+                  SetComp ann ws1 (Comprehension (_exprAnnotation ex) ex c d)) <$>
+           (Right <$> ((,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf)) <!>
+            Left <$> commaSepRest (expr ws <!> starExpr ws))
          Just (Right ex) ->
             (\a ->
                case a of

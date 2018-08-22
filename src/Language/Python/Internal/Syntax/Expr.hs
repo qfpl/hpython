@@ -391,11 +391,11 @@ data Expr (v :: [*]) a
   }
   | DictComp
   { _exprAnnotation :: a
-  -- [ spaces
+  -- { spaces
   , _unsafeDictCompWhitespaceLeft :: [Whitespace]
   -- comprehension
   , _unsafeDictCompValue :: Comprehension DictItem v a
-  -- ] spaces
+  -- } spaces
   , _unsafeDictCompWhitespaceRight :: [Whitespace]
   }
   | Dict
@@ -403,6 +403,15 @@ data Expr (v :: [*]) a
   , _unsafeDictWhitespaceLeft :: [Whitespace]
   , _unsafeDictValues :: Maybe (CommaSep1' (DictItem v a))
   , _unsafeDictWhitespaceRight :: [Whitespace]
+  }
+  | SetComp
+  { _exprAnnotation :: a
+  -- { spaces
+  , _unsafeSetCompWhitespaceLeft :: [Whitespace]
+  -- comprehension
+  , _unsafeSetCompValue :: Comprehension SetItem v a
+  -- } spaces
+  , _unsafeSetCompWhitespaceRight :: [Whitespace]
   }
   | Set
   { _exprAnnotation :: a
@@ -548,6 +557,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Tuple _ _ _ (Just cs) -> cs ^. trailingWhitespace
           DictComp _ _ _ ws -> ws
           Dict _ _ _ ws -> ws
+          SetComp _ _ _ ws -> ws
           Set _ _ _ ws -> ws
           Generator  _ a -> a ^. trailingWhitespace)
       (\e ws ->
@@ -580,6 +590,7 @@ instance HasTrailingWhitespace (Expr v a) where
             Tuple a (coerce b) ws (Just $ cs & trailingWhitespace .~ ws)
           DictComp a b c _ -> DictComp a b c ws
           Dict a b c _ -> Dict a b c ws
+          SetComp a b c _ -> SetComp a b c ws
           Set a b c _ -> Set a b c ws
           Generator a b -> Generator a $ b & trailingWhitespace .~ ws)
 

@@ -275,5 +275,6 @@ assignTargets f e =
     Not{} -> pure $ e ^. unvalidated
     DictComp{} -> pure $ e ^. unvalidated
     Dict{} -> pure $ e ^. unvalidated
+    SetComp{} -> pure $ e ^. unvalidated
     Set{} -> pure $ e ^. unvalidated
     Generator{} -> pure $ e ^. unvalidated

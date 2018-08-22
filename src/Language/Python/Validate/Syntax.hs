@@ -411,6 +411,15 @@ validateExprSyntax (Dict a b c d) =
     (local $ inParens .~ True)
     (traverseOf (traverse.traverse) validateDictItemSyntax c) <*>
   validateWhitespace a d
+validateExprSyntax (SetComp a ws1 comp ws2) =
+  SetComp a ws1 <$>
+  liftVM1
+    (local $ (inParens .~ True) . (inGenerator .~ True))
+    (validateComprehensionSyntax setItem comp) <*>
+  validateWhitespace a ws2
+  where
+    setItem (SetUnpack a _ _ _) = errorVM [_InvalidSetUnpacking # a]
+    setItem a = validateSetItemSyntax a
 validateExprSyntax (Set a b c d) =
   Set a b <$>
   liftVM1

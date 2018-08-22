@@ -304,11 +304,11 @@ data Expr a
   }
   | DictComp
   { _exprAnnotation :: a
-  -- [ spaces
+  -- { spaces
   , _unsafeDictCompWhitespaceLeft :: [Whitespace]
   -- comprehension
   , _unsafeDictCompValue :: Comprehension DictItem a
-  -- ] spaces
+  -- } spaces
   , _unsafeDictCompWhitespaceRight :: [Whitespace]
   }
   | Dict
@@ -316,6 +316,15 @@ data Expr a
   , _unsafeDictWhitespaceLeft :: [Whitespace]
   , _unsafeDictValues :: Maybe (CommaSep1' (DictItem a))
   , _unsafeDictWhitespaceRight :: [Whitespace]
+  }
+  | SetComp
+  { _exprAnnotation :: a
+  -- { spaces
+  , _unsafeSetCompWhitespaceLeft :: [Whitespace]
+  -- comprehension
+  , _unsafeSetCompValue :: Comprehension Expr a
+  -- } spaces
+  , _unsafeSetCompWhitespaceRight :: [Whitespace]
   }
   | Set
   { _exprAnnotation :: a
@@ -515,6 +524,9 @@ fromIR_expr ex =
     Dict a b c d ->
       (\c' -> Syntax.Dict a b c' d) <$>
       traverseOf (traverse.traverse) fromIR_dictItem c
+    SetComp a b c d ->
+      (\c' -> Syntax.SetComp a b c' d) <$>
+      fromIR_comprehension fromIR_setItem c
     Set a b c d ->
       (\c' -> Syntax.Set a b c' d) <$>
       traverse fromIR_setItem c

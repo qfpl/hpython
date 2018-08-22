@@ -133,6 +133,14 @@ genDictComp =
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
+genSetComp :: MonadGen m => m (Comprehension SetItem '[] ())
+genSetComp =
+  sized3
+    (Comprehension ())
+    (genSetItem genAnyWhitespaces genExpr)
+    genCompFor
+    (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
+
 -- | This is necessary to prevent generating exponentials that will take forever to evaluate
 -- when python does constant folding
 genExpr :: MonadGen m => m (Expr '[] ())
@@ -211,6 +219,10 @@ genExpr' isExp =
     , DictComp () <$>
       genWhitespaces <*>
       genDictComp <*>
+      genWhitespaces
+    , SetComp () <$>
+      genWhitespaces <*>
+      genSetComp <*>
       genWhitespaces
     , Generator () <$> genComprehension genExpr
     , Gen.subtermM

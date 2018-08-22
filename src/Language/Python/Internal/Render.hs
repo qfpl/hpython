@@ -719,6 +719,15 @@ renderTupleItems (CommaSepMany1' a ws rest) =
   singleton (TkComma ()) <> foldMap renderWhitespace ws <>
   renderTupleItems rest
 
+renderSetItem :: SetItem v a -> RenderOutput
+renderSetItem a =
+  case a of
+    SetItem _ b -> bracketTupleGenerator b
+    SetUnpack _ b c d ->
+      renderNestedParens
+        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        b
+
 renderSetItems :: CommaSep1' (SetItem v a) -> RenderOutput
 renderSetItems (CommaSepOne1' a Nothing) =
   case a of
@@ -901,6 +910,11 @@ renderExpr (Dict _ a b c) =
   foldMap (renderCommaSep1' renderDictItem) b <>
   singleton (TkRightBrace ()) <>
   foldMap renderWhitespace c
+renderExpr (SetComp _ ws1 comp ws2) =
+  TkLeftBrace () `cons`
+  foldMap renderWhitespace ws1 <>
+  renderComprehension renderSetItem comp <>
+  singleton (TkRightBrace ()) <> foldMap renderWhitespace ws2
 renderExpr (Set _ a b c) =
   TkLeftBrace () `cons`
   foldMap renderWhitespace a <>

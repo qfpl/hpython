@@ -302,6 +302,15 @@ data Expr a
   -- ] spaces
   , _unsafeListWhitespaceRight :: [Whitespace]
   }
+  | DictComp
+  { _exprAnnotation :: a
+  -- [ spaces
+  , _unsafeDictCompWhitespaceLeft :: [Whitespace]
+  -- comprehension
+  , _unsafeDictCompValue :: Comprehension DictItem a
+  -- ] spaces
+  , _unsafeDictCompWhitespaceRight :: [Whitespace]
+  }
   | Dict
   { _exprAnnotation :: a
   , _unsafeDictWhitespaceLeft :: [Whitespace]
@@ -500,6 +509,9 @@ fromIR_expr ex =
     List a b c d ->
       (\c' -> Syntax.List a b c' d) <$>
       traverseOf (traverse.traverse) fromIR_listItem c
+    DictComp a b c d ->
+      (\c' -> Syntax.DictComp a b c' d) <$>
+      fromIR_comprehension fromIR_dictItem c
     Dict a b c d ->
       (\c' -> Syntax.Dict a b c' d) <$>
       traverseOf (traverse.traverse) fromIR_dictItem c

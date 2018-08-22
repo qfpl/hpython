@@ -389,6 +389,15 @@ data Expr (v :: [*]) a
   -- ] spaces
   , _unsafeListWhitespaceRight :: [Whitespace]
   }
+  | DictComp
+  { _exprAnnotation :: a
+  -- [ spaces
+  , _unsafeDictCompWhitespaceLeft :: [Whitespace]
+  -- comprehension
+  , _unsafeDictCompValue :: Comprehension DictItem v a
+  -- ] spaces
+  , _unsafeDictCompWhitespaceRight :: [Whitespace]
+  }
   | Dict
   { _exprAnnotation :: a
   , _unsafeDictWhitespaceLeft :: [Whitespace]
@@ -537,6 +546,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Not _ _ e -> e ^. trailingWhitespace
           Tuple _ _ ws Nothing -> ws
           Tuple _ _ _ (Just cs) -> cs ^. trailingWhitespace
+          DictComp _ _ _ ws -> ws
           Dict _ _ _ ws -> ws
           Set _ _ _ ws -> ws
           Generator  _ a -> a ^. trailingWhitespace)
@@ -568,6 +578,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Tuple a e _ Nothing -> Tuple a (coerce e) ws Nothing
           Tuple a b ws (Just cs) ->
             Tuple a (coerce b) ws (Just $ cs & trailingWhitespace .~ ws)
+          DictComp a b c _ -> DictComp a b c ws
           Dict a b c _ -> Dict a b c ws
           Set a b c _ -> Set a b c ws
           Generator a b -> Generator a $ b & trailingWhitespace .~ ws)

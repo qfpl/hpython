@@ -890,6 +890,11 @@ renderExpr (Tuple _ a ws c) =
   case c of
     Nothing -> CommaSepOne1' a (Just ws)
     Just c' -> CommaSepMany1' a ws c'
+renderExpr (DictComp _ ws1 comp ws2) =
+  TkLeftBrace () `cons`
+  foldMap renderWhitespace ws1 <>
+  renderComprehension renderDictItem comp <>
+  singleton (TkRightBrace ()) <> foldMap renderWhitespace ws2
 renderExpr (Dict _ a b c) =
   TkLeftBrace () `cons`
   foldMap renderWhitespace a <>

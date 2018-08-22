@@ -273,6 +273,7 @@ assignTargets f e =
     Bool{} -> pure $ e ^. unvalidated
     String{} -> pure $ e ^. unvalidated
     Not{} -> pure $ e ^. unvalidated
+    DictComp{} -> pure $ e ^. unvalidated
     Dict{} -> pure $ e ^. unvalidated
     Set{} -> pure $ e ^. unvalidated
     Generator{} -> pure $ e ^. unvalidated

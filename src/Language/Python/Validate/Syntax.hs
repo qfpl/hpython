@@ -396,6 +396,15 @@ validateExprSyntax (Tuple a b ws d) =
   validateTupleItemSyntax b <*>
   validateWhitespace a ws <*>
   traverseOf (traverse.traverse) validateTupleItemSyntax d
+validateExprSyntax (DictComp a ws1 comp ws2) =
+  DictComp a ws1 <$>
+  liftVM1
+    (local $ (inParens .~ True) . (inGenerator .~ True))
+    (validateComprehensionSyntax dictItem comp) <*>
+  validateWhitespace a ws2
+  where
+    dictItem (DictUnpack a _ _) = errorVM [_InvalidDictUnpacking # a]
+    dictItem a = validateDictItemSyntax a
 validateExprSyntax (Dict a b c d) =
   Dict a b <$>
   liftVM1

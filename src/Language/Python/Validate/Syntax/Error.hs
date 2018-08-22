@@ -29,6 +29,7 @@ data SyntaxError (v :: [*]) a
   | InvalidYield a
   | CommentAfterBackslash a
   | MalformedDecorator a
+  | InvalidDictUnpacking a
   deriving (Eq, Show)
 
 makeClassyPrisms ''SyntaxError

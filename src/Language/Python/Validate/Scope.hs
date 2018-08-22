@@ -477,6 +477,7 @@ validateAssignExprScope e@Float{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Imag{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Bool{} = pure $ unsafeCoerce e
 validateAssignExprScope e@String{} = pure $ unsafeCoerce e
+validateAssignExprScope e@DictComp{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Dict{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Set{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Generator{} = pure $ unsafeCoerce e
@@ -598,6 +599,10 @@ validateExprScope e@Imag{} = pure $ unsafeCoerce e
 validateExprScope e@Bool{} = pure $ unsafeCoerce e
 validateExprScope e@String{} = pure $ unsafeCoerce e
 validateExprScope e@Unit{} = pure $ unsafeCoerce e
+validateExprScope (DictComp a ws1 comp ws2) =
+  DictComp a ws1 <$>
+  validateComprehensionScope validateDictItemScope comp <*>
+  pure ws2
 validateExprScope (Dict a b c d) =
   (\c' -> Dict a b c' d) <$> traverseOf (traverse.traverse) validateDictItemScope c
 validateExprScope (Set a b c d) =

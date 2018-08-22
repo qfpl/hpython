@@ -156,7 +156,7 @@ data Param a
   { _paramAnn :: a
   -- '*' spaces
   , _unsafeStarParamWhitespace :: [Whitespace]
-  , _paramName :: Ident '[] a
+  , _unsafeStarParamName :: Maybe (Ident '[] a)
   , _paramType :: Maybe ([Whitespace], Expr a)
   }
   | DoubleStarParam

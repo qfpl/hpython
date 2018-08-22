@@ -27,7 +27,7 @@ genParam genExpr =
   sizedRecursive
     [ StarParam () <$>
       genWhitespaces <*>
-      genIdent <*>
+      Gen.maybe genIdent <*>
       sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr)
     , DoubleStarParam () <$>
       genWhitespaces <*>

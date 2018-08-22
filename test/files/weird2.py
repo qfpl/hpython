@@ -8,3 +8,5 @@
 
 def a():
     pass  # cmt
+
+def a():a=yield

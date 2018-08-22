@@ -206,11 +206,19 @@ genStarParam
   -> [String]
   -> m (Param '[] ())
 genStarParam isLambda positionals =
-  Gen.scale (max 0 . subtract 1) $
-  StarParam () <$>
-  genWhitespaces <*>
-  Gen.filter (\i -> _identValue i `notElem` positionals) genIdent <*>
-  (if isLambda then pure Nothing else sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr))
+  Gen.scale (max 0 . subtract 1) $ do
+    ident <- Gen.maybe $ Gen.filter (\i -> _identValue i `notElem` positionals) genIdent
+    mty <-
+      if isLambda
+      then pure Nothing
+      else
+        case ident of
+          Nothing -> pure Nothing
+          _ -> sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr)
+    StarParam () <$>
+      genWhitespaces <*>
+      pure ident <*>
+      pure mty
 
 genDoubleStarParam
   :: (MonadGen m, MonadState GenState m)

@@ -1215,7 +1215,7 @@ renderParam (PositionalParam _ name mty) =
 renderParam (StarParam _ ws name mty) =
   TkStar () `cons`
   foldMap renderWhitespace ws <>
-  renderIdent name <>
+  foldMap renderIdent name <>
   foldMap
     (\(ws, ty) -> TkColon () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
     mty

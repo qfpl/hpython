@@ -860,8 +860,8 @@ validateParamsSyntax isLambda e =
              validateIdentSyntax name <*>
              checkTy a mty)
             (go (_identValue name:names) False params)
-    go names seen (StarParam a ws name mty : params)
-      | _identValue name `elem` names =
+    go names seen (StarParam a ws mname mty : params)
+      | Just name <- mname, _identValue name `elem` names =
           errorVM [_DuplicateArgument # (a, _identValue name)] <*>
           validateIdentSyntax name <*>
           checkTy a mty <*>
@@ -870,9 +870,12 @@ validateParamsSyntax isLambda e =
           liftA2
             (:)
             (StarParam a ws <$>
-             validateIdentSyntax name <*>
+             traverse validateIdentSyntax mname <*
+             (case (mname, mty) of
+                (Nothing, Just{}) -> errorVM [_TypedUnnamedStarParam # a]
+                _ -> pure ()) <*>
              checkTy a mty)
-            (go (_identValue name:names) seen params)
+            (go (maybe names (\n -> _identValue n : names) mname) seen params)
     go names True (PositionalParam a name mty : params) =
       let
         name' = _identValue name

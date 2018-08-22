@@ -950,7 +950,7 @@ untypedParam =
 
   (\(a, b) -> StarParam (pyTokenAnn a) b) <$>
   token anySpace (TkStar ()) <*>
-  identifier anySpace <*>
+  optional (identifier anySpace) <*>
   pure Nothing
 
   <!>
@@ -972,10 +972,12 @@ typedParam =
 
   <!>
 
-  (\(a, b) -> StarParam (pyTokenAnn a) b) <$>
+  (\(a, b) ->
+     maybe
+       (StarParam (pyTokenAnn a) b Nothing Nothing)
+       (\(c, d) -> StarParam (pyTokenAnn a) b (Just c) d)) <$>
   token anySpace (TkStar ()) <*>
-  identifier anySpace <*>
-  optional tyAnn
+  optional ((,) <$> identifier anySpace <*> optional tyAnn)
 
   <!>
 

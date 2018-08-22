@@ -9,11 +9,11 @@ module Language.Python.Internal.Syntax.Expr where
 
 import Control.Lens.Cons (_last)
 import Control.Lens.Fold ((^?), (^?!))
-import Control.Lens.Getter ((^.), getting, to)
+import Control.Lens.Getter ((^.), getting, to, view)
 import Control.Lens.Lens (Lens, Lens', lens)
 import Control.Lens.Plated (Plated(..), gplate)
 import Control.Lens.Prism (_Just, _Left, _Right)
-import Control.Lens.Setter ((.~))
+import Control.Lens.Setter ((.~), mapped, over)
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (Traversal, failing, traverseOf)
 import Control.Lens.Tuple (_2)
@@ -74,7 +74,7 @@ data Param (v :: [*]) a
   { _paramAnn :: a
   -- '*' spaces
   , _unsafeStarParamWhitespace :: [Whitespace]
-  , _paramName :: Ident v a
+  , _unsafeStarParamName :: Maybe (Ident v a)
   -- ':' spaces <expr>
   , _paramType :: Maybe ([Whitespace], Expr v a)
   }
@@ -91,8 +91,18 @@ data Param (v :: [*]) a
 paramAnn :: Lens' (Param v a) a
 paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
 
-paramName :: Lens (Param v a) (Param '[] a) (Ident v a) (Ident v a)
-paramName = lens _paramName (\s a -> (s { _paramName = a}) ^. unvalidated)
+paramName :: Traversal (Param v a) (Param '[] a) (Ident v a) (Ident '[] a)
+paramName f (PositionalParam a b c) =
+  PositionalParam a <$> f b <*> pure (over (mapped._2) (view unvalidated) c)
+paramName f (KeywordParam a b c d e) =
+  (\b' -> KeywordParam a b' (over (mapped._2) (view unvalidated) c) d (e ^. unvalidated)) <$>
+  f b
+paramName f (StarParam a b c d) =
+  (\c' -> StarParam a b c' (over (mapped._2) (view unvalidated) d)) <$>
+  traverse f c
+paramName f (DoubleStarParam a b c d) =
+  (\c' -> DoubleStarParam a b c' (over (mapped._2) (view unvalidated) d)) <$>
+  f c
 
 instance HasExprs Param where
   _Exprs f (KeywordParam a name ty ws2 expr) =

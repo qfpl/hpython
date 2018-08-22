@@ -676,8 +676,8 @@ orExpr ws =
     atom =
       dictOrSet <!>
       list <!>
-      bool ws <!>
       none ws <!>
+      bool ws <!>
       ellipsis ws <!>
       integer ws <!>
       float ws <!>
@@ -1130,7 +1130,7 @@ compoundStatement =
              ((,,,) <$>
               indents <*>
               (snd <$> token space (TkExcept ())) <*>
-              exceptAs <*>
+              optional exceptAs <*>
               suite) <*>
            optional
              ((,,) <$>

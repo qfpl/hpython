@@ -1101,7 +1101,7 @@ renderCompoundStatement (TryExcept idnt _ a s e f g) =
     (\(idnt, ws1, eas, s) ->
        renderIndents idnt <>
        singleton (TkExcept ()) <> foldMap renderWhitespace ws1 <>
-       renderExceptAs eas <>
+       foldMap renderExceptAs eas <>
        renderSuite s)
     e <>
   foldMap

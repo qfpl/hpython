@@ -72,13 +72,13 @@ data CompoundStatement a
       (Indents a) a
       [Whitespace] (Expr a) (Suite a)
   -- ^ 'try' <spaces> ':' <spaces> <newline> <block>
-  --   ( 'except' <spaces> exceptAs ':' <spaces> <newline> <block> )+
+  --   ( 'except' <spaces> [<exceptAs>] ':' <spaces> <newline> <block> )+
   --   [ 'else' <spaces> ':' <spaces> <newline> <block> ]
   --   [ 'finally' <spaces> ':' <spaces> <newline> <block> ]
   | TryExcept
       (Indents a) a
       [Whitespace] (Suite a)
-      (NonEmpty (Indents a, [Whitespace], ExceptAs a, Suite a))
+      (NonEmpty (Indents a, [Whitespace], Maybe (ExceptAs a), Suite a))
       (Maybe (Indents a, [Whitespace], Suite a))
       (Maybe (Indents a, [Whitespace], Suite a))
   -- ^ 'try' <spaces> ':' <spaces> <newline> <block>
@@ -729,7 +729,9 @@ fromIR_compoundStatement st =
     TryExcept a b c d e f g ->
       Syntax.TryExcept a b c <$>
       fromIR_suite d <*>
-      traverse (\(a, b, c, d) -> (,,,) a b <$> fromIR_exceptAs c <*> fromIR_suite d) e <*>
+      traverse
+        (\(a, b, c, d) -> (,,,) a b <$> traverse fromIR_exceptAs c <*> fromIR_suite d)
+        e <*>
       traverseOf (traverse._3) fromIR_suite f <*>
       traverseOf (traverse._3) fromIR_suite g
     TryFinally a b c d e f g ->

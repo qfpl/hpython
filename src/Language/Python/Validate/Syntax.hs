@@ -486,7 +486,7 @@ validateCompoundStatementSyntax (Fundef a decos idnts ws1 name ws2 params ws3 mt
     traverse validateDecoratorSyntax decos <*>
     validateIdentSyntax name <*>
     pure ws2 <*>
-    validateParamsSyntax False params <*>
+    liftVM1 (local $ inParens .~ True) (validateParamsSyntax False params) <*>
     pure ws3 <*>
     traverse (bitraverse (validateWhitespace a) validateExprSyntax) mty <*>
     localNonlocals id
@@ -527,7 +527,7 @@ validateCompoundStatementSyntax (TryExcept idnts a b e f k l) =
     (\(idnts, f, g, j) ->
        (,,,) idnts <$>
        validateWhitespace a f <*>
-       validateExceptAsSyntax g <*>
+       traverse validateExceptAsSyntax g <*>
        validateSuiteSyntax j)
     f <*>
   traverse

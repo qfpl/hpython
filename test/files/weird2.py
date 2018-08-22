@@ -10,3 +10,8 @@ def a():
     pass  # cmt
 
 def a():a=yield
+
+def a(
+ b=None
+):
+  pass

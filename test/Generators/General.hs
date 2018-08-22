@@ -381,7 +381,8 @@ genCompoundStatement =
          sized2M
            (\a b ->
               (,,,) <$> genIndents <*> genWhitespaces <*>
-              (ExceptAs () <$> pure a <*> Gen.maybe ((,) <$> genWhitespaces <*> genIdent)) <*>
+              Gen.maybe
+                (ExceptAs () <$> pure a <*> Gen.maybe ((,) <$> genWhitespaces <*> genIdent)) <*>
               pure b)
            genExpr
            (genSuite genSmallStatement genBlock))

@@ -619,9 +619,10 @@ genCompoundStatement =
             (,,,) <$>
             use currentIndentation <*>
             (NonEmpty.toList <$> genWhitespaces1) <*>
-            (ExceptAs ()
-              (a & trailingWhitespace .~ [Space]) <$>
-              Gen.maybe ((,) <$> (NonEmpty.toList <$> genWhitespaces1) <*> genIdent)) <*>
+            Gen.maybe
+              (ExceptAs ()
+                 (a & trailingWhitespace .~ [Space]) <$>
+                 Gen.maybe ((,) <$> (NonEmpty.toList <$> genWhitespaces1) <*> genIdent)) <*>
             pure b)
            genExpr
            (genSuite genSmallStatement genBlock))

@@ -75,7 +75,9 @@ instance HasBlocks CompoundStatement where
   _Blocks fun (TryExcept idnt a b c d e f) =
     TryExcept idnt a (coerce b) <$>
     _Blocks fun c <*>
-    traverse (\(a, b, c, d) -> (,,,) a b (c ^. unvalidated) <$> _Blocks fun d) d <*>
+    traverse
+      (\(a, b, c, d) -> (,,,) a b (view unvalidated <$> c) <$> _Blocks fun d)
+      d <*>
     traverseOf (traverse._3._Blocks) fun e <*>
     traverseOf (traverse._3._Blocks) fun f
   _Blocks fun (TryFinally idnt a b c d e f) =
@@ -280,7 +282,7 @@ data CompoundStatement (v :: [*]) a
   | TryExcept
       (Indents a) a
       [Whitespace] (Suite v a)
-      (NonEmpty (Indents a, [Whitespace], ExceptAs v a, Suite v a))
+      (NonEmpty (Indents a, [Whitespace], Maybe (ExceptAs v a), Suite v a))
       (Maybe (Indents a, [Whitespace], Suite v a))
       (Maybe (Indents a, [Whitespace], Suite v a))
   -- ^ 'try' <spaces> ':' <spaces> <newline> <block>
@@ -351,7 +353,9 @@ instance HasExprs CompoundStatement where
     While idnt a ws1 <$> f e <*> _Exprs f s
   _Exprs fun (TryExcept idnt a b c d e f) =
     TryExcept idnt a b <$> _Exprs fun c <*>
-    traverse (\(a, b, c, d) -> (,,,) a b <$> _Exprs fun c <*> _Exprs fun d) d <*>
+    traverse
+      (\(a, b, c, d) -> (,,,) a b <$> traverse (_Exprs fun) c <*> _Exprs fun d)
+      d <*>
     (traverse._3._Exprs) fun e <*>
     (traverse._3._Exprs) fun f
   _Exprs fun (TryFinally idnt a b c d e f) =

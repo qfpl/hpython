@@ -235,7 +235,7 @@ validateCompoundStatementIndentation (TryExcept idnt a b c d e f) =
        (\a' -> (,,,) a' b) <$
        setNextIndent EqualTo (idnt ^. indentsValue) <*>
        checkIndent a <*>
-       validateExceptAsIndentation c <*>
+       traverse validateExceptAsIndentation c <*>
        validateSuiteIndentation idnt d)
     d <*
   setNextIndent EqualTo (idnt ^. indentsValue) <*>

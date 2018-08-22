@@ -233,10 +233,10 @@ validateCompoundStatementScope (TryExcept idnts a b e f k l) =
      traverse
        (\(idnts, ws, g, h) ->
           (,,,) idnts ws <$>
-          validateExceptAsScope g <*>
+          traverse validateExceptAsScope g <*>
           locallyExtendOver
             scGlobalScope
-            (toListOf (exceptAsName._Just._2.to (_identAnnotation &&& _identValue)) g)
+            (toListOf (folded.exceptAsName._Just._2.to (_identAnnotation &&& _identValue)) g)
             (validateSuiteScope h))
        f <*>
      traverseOf (traverse._3) validateSuiteScope k <*>

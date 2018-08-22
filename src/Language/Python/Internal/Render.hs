@@ -154,6 +154,7 @@ showToken t =
     TkExcept{} -> "except"
     TkFinally{} -> "finally"
     TkClass{} -> "class"
+    TkRightArrow{} -> "->"
     TkWith{} -> "with"
     TkFor{} -> "for"
     TkIn{} -> "in"
@@ -1060,12 +1061,16 @@ renderDecorator (Decorator _ a b c d) =
   singleton (renderNewline d)
 
 renderCompoundStatement :: CompoundStatement v a -> RenderOutput
-renderCompoundStatement (Fundef _ decos idnt ws1 name ws2 params ws3 s) =
+renderCompoundStatement (Fundef _ decos idnt ws1 name ws2 params ws3 mty s) =
   foldMap renderDecorator decos <>
   renderIndents idnt <>
   singleton (TkDef ()) <> foldMap renderWhitespace ws1 <> renderIdent name <>
   bracket (foldMap renderWhitespace ws2 <> renderCommaSep renderParam params) <>
-  foldMap renderWhitespace ws3 <> renderSuite s
+  foldMap renderWhitespace ws3 <>
+  foldMap
+    (\(ws, ty) -> TkRightArrow () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
+    mty <>
+  renderSuite s
 renderCompoundStatement (If idnt _ ws1 expr s elifs body') =
   renderIndents idnt <>
   singleton (TkIf ()) <> foldMap renderWhitespace ws1 <>

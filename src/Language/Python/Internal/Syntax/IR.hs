@@ -44,7 +44,7 @@ data Statement a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data CompoundStatement a
-  -- ^ 'def' <spaces> <ident> '(' <spaces> stuff ')' <spaces> ':' <spaces> <newline>
+  -- ^ 'def' <spaces> <ident> '(' <spaces> stuff ')' <spaces> ['->' <expr>] ':' <spaces> <newline>
   --   <block>
   = Fundef a
       [Decorator a]
@@ -52,6 +52,7 @@ data CompoundStatement a
       (NonEmpty Whitespace) (Ident '[] a)
       [Whitespace] (CommaSep (Param a))
       [Whitespace]
+      (Maybe ([Whitespace], Expr a))
       (Suite a)
   -- ^ 'if' <spaces> <expr> ':' <spaces> <newline>
   --   <block>
@@ -711,11 +712,12 @@ fromIR_compoundStatement
   -> Validate [IRError a] (Syntax.CompoundStatement '[] a)
 fromIR_compoundStatement st =
   case st of
-    Fundef a b c d e f g h i ->
+    Fundef a b c d e f g h i j ->
       (\b' g' i' -> Syntax.Fundef a b' c d e f g' h i') <$>
       traverse fromIR_decorator b <*>
       traverse fromIR_param g <*>
-      fromIR_suite i
+      traverseOf (traverse._2) fromIR_expr i <*>
+      fromIR_suite j
     If a b c d e f g ->
       Syntax.If a b c <$>
       fromIR_expr d <*>

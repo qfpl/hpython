@@ -193,8 +193,8 @@ validateCompoundStatementIndentation
    . AsIndentationError e v a
   => CompoundStatement v a
   -> ValidateIndentation e (CompoundStatement (Nub (Indentation ': v)) a)
-validateCompoundStatementIndentation (Fundef a decos idnt ws1 name ws2 params ws3 s) =
-  (\decos' idnt' params' -> Fundef a decos' idnt' ws1 (coerce name) ws2 params' ws3) <$>
+validateCompoundStatementIndentation (Fundef a decos idnt ws1 name ws2 params ws3 mty s) =
+  (\decos' idnt' params' -> Fundef a decos' idnt' ws1 (coerce name) ws2 params' ws3 (unsafeCoerce mty)) <$>
   traverse validateDecoratorIndentation decos <*>
   checkIndent idnt <*>
   validateParamsIndentation params <*>

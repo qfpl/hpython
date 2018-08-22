@@ -42,6 +42,7 @@ defD_ ds name params block =
     []
     (listToCommaSep params)
     []
+    Nothing
     (SuiteMany () [] (LF Nothing) $ toBlock block)
 
 def_ :: Ident '[] () -> [Param '[] ()] -> NonEmpty (Statement '[] ()) -> Statement '[] ()

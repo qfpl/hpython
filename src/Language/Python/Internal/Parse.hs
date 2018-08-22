@@ -1073,6 +1073,7 @@ compoundStatement =
       fmap snd (token anySpace $ TkLeftParen ()) <*>
       commaSep anySpace typedParam <*>
       fmap snd (token space $ TkRightParen ()) <*>
+      optional ((,) <$> (snd <$> token space (TkRightArrow ())) <*> expr space) <*>
       suite
 
     ifSt =

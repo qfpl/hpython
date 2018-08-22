@@ -185,13 +185,14 @@ validateCompoundStatementScope
    . AsScopeError e v a
   => CompoundStatement v a
   -> ValidateScope a e (CompoundStatement (Nub (Scope ': v)) a)
-validateCompoundStatementScope (Fundef a decos idnts ws1 name ws2 params ws3 s) =
+validateCompoundStatementScope (Fundef a decos idnts ws1 name ws2 params ws3 mty s) =
   (locallyOver scLocalScope (const Trie.empty) $
    locallyOver scImmediateScope (const Trie.empty) $
      (\decos' -> Fundef a decos' idnts ws1 (coerce name) ws2) <$>
      traverse validateDecoratorScope decos <*>
      traverse validateParamScope params <*>
      pure ws3 <*>
+     traverseOf (traverse._2) validateExprScope mty <*>
      locallyExtendOver
        scGlobalScope
        ((_identAnnotation &&& _identValue) name :

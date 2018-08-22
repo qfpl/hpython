@@ -478,7 +478,7 @@ validateCompoundStatementSyntax
      )
   => CompoundStatement v a
   -> ValidateSyntax e (CompoundStatement (Nub (Syntax ': v)) a)
-validateCompoundStatementSyntax (Fundef a decos idnts ws1 name ws2 params ws3 body) =
+validateCompoundStatementSyntax (Fundef a decos idnts ws1 name ws2 params ws3 mty body) =
   let
     paramIdents = params ^.. folded.unvalidated.paramName.identValue
   in
@@ -488,6 +488,7 @@ validateCompoundStatementSyntax (Fundef a decos idnts ws1 name ws2 params ws3 bo
     pure ws2 <*>
     validateParamsSyntax False params <*>
     pure ws3 <*>
+    traverse (bitraverse (validateWhitespace a) validateExprSyntax) mty <*>
     localNonlocals id
       (liftVM1
          (local $

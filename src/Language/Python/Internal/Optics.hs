@@ -47,24 +47,26 @@ _Fundef
        (Statement '[] a)
        ( a
        , [Decorator v a]
-       , Indents a
+       ,  Indents a
        , NonEmpty Whitespace, Ident v a
        , [Whitespace], CommaSep (Param v a)
-       , [Whitespace], Suite v a
+       , [Whitespace], Maybe ([Whitespace], Expr v a)
+       , Suite v a
        )
        ( a
        , [Decorator '[] a]
        , Indents a
        , NonEmpty Whitespace, Ident '[] a
        , [Whitespace], CommaSep (Param '[] a)
-       , [Whitespace], Suite '[] a
+       , [Whitespace], Maybe ([Whitespace], Expr '[] a)
+       , Suite '[] a
        )
 _Fundef =
   prism
-    (\(idnt, a, b, c, d, e, f, g, h) -> CompoundStatement (Fundef idnt a b c d e f g h))
+    (\(idnt, a, b, c, d, e, f, g, h, i) -> CompoundStatement (Fundef idnt a b c d e f g h i))
     (\case
-        CompoundStatement (Fundef idnt a b c d e f g h) ->
-          Right (idnt, a, b, c, d, e, f, g, h)
+        CompoundStatement (Fundef idnt a b c d e f g h i) ->
+          Right (idnt, a, b, c, d, e, f, g, h, i)
         a -> Left $ a ^. unvalidated)
 
 _Call
@@ -117,11 +119,11 @@ instance HasIndents Decorator where
 instance HasIndents CompoundStatement where
   _Indents fun s =
     case s of
-      Fundef a decos idnt b c d e f g ->
-        (\decos' idnt' -> Fundef a decos' idnt' b c d e f) <$>
+      Fundef a decos idnt b c d e f g h ->
+        (\decos' idnt' -> Fundef a decos' idnt' b c d e f g) <$>
         traverse (_Indents fun) decos <*>
         fun idnt <*>
-        _Indents fun g
+        _Indents fun h
       If idnt a b c d elifs e ->
         (\idnt' -> If idnt' a b c) <$>
         fun idnt <*>
@@ -209,8 +211,8 @@ instance HasNewlines Decorator where
 instance HasNewlines CompoundStatement where
   _Newlines fun s =
     case s of
-      Fundef ann decos idnt ws1 name ws2 params ws3 s ->
-        (\decos' -> Fundef ann decos' idnt ws1 name ws2 params ws3) <$>
+      Fundef ann decos idnt ws1 name ws2 params ws3 mty s ->
+        (\decos' -> Fundef ann decos' idnt ws1 name ws2 params ws3 mty) <$>
         traverse (_Newlines fun) decos <*>
         _Newlines fun s
       If idnt ann ws1 cond s elifs els ->

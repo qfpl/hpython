@@ -345,13 +345,14 @@ genCompoundStatement
   => m (CompoundStatement '[] ())
 genCompoundStatement =
   sizedRecursive
-    [ sized3M
-        (\a b c ->
+    [ sized4M
+        (\a b c d ->
            Fundef () a <$> genIndents <*>
            genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure b <*>
-           genWhitespaces <*> pure c)
+           genWhitespaces <*> pure c <*> pure d)
         (sizedList genDecorator)
         (genSizedCommaSep $ genParam genExpr)
+        (sizedMaybe $ (,) <$> genWhitespaces <*> genExpr)
         (genSuite genSmallStatement genBlock)
     , sized4M
         (\a b c d ->

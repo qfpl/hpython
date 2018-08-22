@@ -298,6 +298,7 @@ parseToken =
     , TkYield <$ text "yield"
     ] <>
     [ number
+    , TkRightArrow <$ text "->"
     , TkEllipsis <$ text "..."
     , TkSpace <$ char ' '
     , TkTab <$ char '\t'

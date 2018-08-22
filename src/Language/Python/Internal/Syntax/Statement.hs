@@ -60,10 +60,10 @@ instance HasBlocks Suite where
   _Blocks f (SuiteMany a b c e) = SuiteMany a b c <$> f e
 
 instance HasBlocks CompoundStatement where
-  _Blocks f (Fundef a decos idnt ws1 name ws2 params ws3 s) =
+  _Blocks f (Fundef a decos idnt ws1 name ws2 params ws3 mty s) =
     Fundef a
       (view unvalidated <$> decos) idnt ws1 (coerce name) ws2
-      (view unvalidated <$> params) ws3 <$>
+      (view unvalidated <$> params) ws3 (over (mapped._2) (view unvalidated) mty) <$>
     _Blocks f s
   _Blocks f (If idnt a ws1 e1 s elifs b') =
     If idnt a ws1 (e1 ^. unvalidated) <$>
@@ -132,8 +132,8 @@ instance Plated (Statement '[] a) where
   plate fun (CompoundStatement s) =
     CompoundStatement <$>
     case s of
-      Fundef idnt a decos ws1 b ws2 c ws3 s ->
-        Fundef idnt a decos ws1 b ws2 c ws3 <$> _Statements fun s
+      Fundef idnt a decos ws1 b ws2 c ws3 mty s ->
+        Fundef idnt a decos ws1 b ws2 c ws3 mty <$> _Statements fun s
       If idnt a ws1 b s elifs sts' ->
         If idnt a ws1 b <$>
         _Statements fun s <*>
@@ -246,7 +246,7 @@ data Decorator (v :: [*]) a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data CompoundStatement (v :: [*]) a
-  -- ^ 'def' <spaces> <ident> '(' <spaces> stuff ')' <spaces> ':' <spaces> <newline>
+  -- ^ 'def' <spaces> <ident> '(' <spaces> stuff ')' <spaces> ['->' <expr>] ':' <spaces> <newline>
   --   <block>
   = Fundef a
       [Decorator v a]
@@ -254,6 +254,7 @@ data CompoundStatement (v :: [*]) a
       (NonEmpty Whitespace) (Ident v a)
       [Whitespace] (CommaSep (Param v a))
       [Whitespace]
+      (Maybe ([Whitespace], Expr v a))
       (Suite v a)
   -- ^ 'if' <spaces> <expr> ':' <spaces> <newline>
   --   <block>
@@ -327,7 +328,7 @@ instance HasExprs Decorator where
     _Exprs fun d <*> pure e
 
 instance HasExprs CompoundStatement where
-  _Exprs f (Fundef a decos idnt ws1 name ws2 params ws3 s) =
+  _Exprs f (Fundef a decos idnt ws1 name ws2 params ws3 mty s) =
     Fundef a <$>
     traverse (_Exprs f) decos <*>
     pure idnt <*>
@@ -336,6 +337,7 @@ instance HasExprs CompoundStatement where
     pure ws2 <*>
     (traverse._Exprs) f params <*>
     pure ws3 <*>
+    traverseOf (traverse._2) f mty <*>
     _Exprs f s
   _Exprs fun (If idnt a ws1 e s elifs sts') =
     If idnt a ws1 <$>

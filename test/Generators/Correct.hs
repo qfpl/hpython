@@ -555,10 +555,11 @@ genCompoundStatement =
             (genSuite genSmallStatement genBlock)) $
         \b ->
       sizedBind (sizedList genDecorator) $ \c ->
+      sizedBind (sizedMaybe $ (,) <$> genWhitespaces <*> genExpr) $ \d ->
       Fundef () c <$>
         use currentIndentation <*>
         genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure a <*>
-        genWhitespaces <*> pure b
+        genWhitespaces <*> pure d <*> pure b
     , sized4M
         (\a b c d -> 
            If <$>

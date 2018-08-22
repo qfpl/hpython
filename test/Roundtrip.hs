@@ -41,6 +41,7 @@ roundtripTests =
   , "pypy2.py"
   , "sqlalchemy.py"
   , "numpy.py"
+  , "numpy2.py"
   ]
 
 doRoundtrip :: FilePath -> Property

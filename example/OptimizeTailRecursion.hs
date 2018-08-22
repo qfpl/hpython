@@ -16,6 +16,7 @@ import Data.Semigroup ((<>))
 import Control.Lens ((&), (.~))
 
 import Language.Python.Internal.Optics
+import Language.Python.Internal.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax
 

@@ -629,6 +629,8 @@ orExpr ws =
       <!>
       doubleStarExpr anySpace
 
+    compRHS = (,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf)
+
     dictOrSet = do
       (a, ws1) <- token anySpace (TkLeftBrace ())
       let ann = pyTokenAnn a
@@ -643,16 +645,11 @@ orExpr ws =
            maybeColon <- optional $ snd <$> token anySpace (TkColon ())
            case maybeColon of
              Nothing ->
-               (\a ->
-                  case a of
-                    Left (rest, final) ->
-                      Set ann ws1 ((ex, rest, final) ^. _CommaSep1')
-                    Right (c, d) ->
-                      SetComp ann ws1 (Comprehension (_exprAnnotation ex) ex c d)) <$>
                -- The order of this choice matters because commaSepRest is implemented
                -- in a slightly odd way
-               (Right <$> ((,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf)) <!>
-                Left <$> commaSepRest (expr ws <!> starExpr ws))
+               (\(c, d) -> SetComp ann ws1 (Comprehension (_exprAnnotation ex) ex c d)) <$> compRHS
+               <!>
+               (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$> commaSepRest (expr ws <!> starExpr ws)
              Just clws ->
                (\ex2 a ->
                  let
@@ -660,31 +657,20 @@ orExpr ws =
                    firstDictItem = DictItem dictItemAnn ex clws ex2
                  in
                  case a of
-                   Left (rest, final) ->
-                     Dict ann ws1 (Just $ (firstDictItem, rest, final) ^. _CommaSep1')
-                   Right (c, d) ->
-                     DictComp ann ws1 (Comprehension dictItemAnn firstDictItem c d)) <$>
+                   Left (c, d) ->
+                     DictComp ann ws1 (Comprehension dictItemAnn firstDictItem c d)
+                   Right (rest, final) ->
+                     Dict ann ws1 (Just $ (firstDictItem, rest, final) ^. _CommaSep1')) <$>
                expr anySpace <*>
-               (Right <$> ((,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf)) <!>
-                Left <$> commaSepRest dictItem)
+               (Left <$> compRHS <!> Right <$> commaSepRest dictItem)
          Just (Left (Right ex)) ->
-           (\a ->
-              case a of
-                Left (rest, final) ->
-                  Set ann ws1 ((ex, rest, final) ^. _CommaSep1')
-                Right (c, d) ->
-                  SetComp ann ws1 (Comprehension (_exprAnnotation ex) ex c d)) <$>
-           (Right <$> ((,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf)) <!>
-            Left <$> commaSepRest (expr ws <!> starExpr ws))
+           ((\(c, d) -> SetComp ann ws1 (Comprehension (_exprAnnotation ex) ex c d)) <$> compRHS
+           <!>
+           (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$> commaSepRest (expr ws <!> starExpr ws))
          Just (Right ex) ->
-            (\a ->
-               case a of
-                 Left (rest, final) ->
-                   Dict ann ws1 (Just $ (ex, rest, final) ^. _CommaSep1')
-                 Right (c, d) ->
-                   DictComp ann ws1 (Comprehension (_dictItemAnn ex) ex c d)) <$>
-            (Right <$> ((,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf)) <!>
-             Left <$> commaSepRest dictItem)) <*>
+           ((\(c, d) -> DictComp ann ws1 (Comprehension (_dictItemAnn ex) ex c d)) <$> compRHS
+           <!>
+           (\(rest, final) -> Dict ann ws1 (Just $ (ex, rest, final) ^. _CommaSep1')) <$> commaSepRest dictItem)) <*>
          (snd <$> token ws (TkRightBrace ()))
 
     atom =

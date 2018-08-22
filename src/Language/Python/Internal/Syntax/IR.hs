@@ -172,20 +172,20 @@ data CompFor a
   = CompFor a [Whitespace] (Expr a) [Whitespace] (Expr a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-data Comprehension a
+data Comprehension e a
   -- ^ <expr> <comp_for> (comp_for | comp_if)*
-  = Comprehension a (Expr a) (CompFor a) [Either (CompFor a) (CompIf a)]
+  = Comprehension a (e a) (CompFor a) [Either (CompFor a) (CompIf a)]
   deriving (Eq, Show)
 
-instance Functor Comprehension where
+instance Functor e => Functor (Comprehension e) where
   fmap f (Comprehension a b c d) =
     Comprehension (f a) (fmap f b) (fmap f c) (fmap (bimap (fmap f) (fmap f)) d)
 
-instance Foldable Comprehension where
+instance Foldable e => Foldable (Comprehension e) where
   foldMap f (Comprehension a b c d) =
     f a <> foldMap f b <> foldMap f c <> foldMap (bifoldMap (foldMap f) (foldMap f)) d
 
-instance Traversable Comprehension where
+instance Traversable e => Traversable (Comprehension e) where
   traverse f (Comprehension a b c d) =
     Comprehension <$>
     f a <*>
@@ -289,7 +289,7 @@ data Expr a
   -- [ spaces
   , _unsafeListCompWhitespaceLeft :: [Whitespace]
   -- comprehension
-  , _unsafeListCompValue :: Comprehension a
+  , _unsafeListCompValue :: Comprehension Expr a
   -- ] spaces
   , _unsafeListCompWhitespaceRight :: [Whitespace]
   }
@@ -417,7 +417,7 @@ data Expr a
   }
   | Generator
   { _exprAnnotation :: a
-  , _generatorValue :: Comprehension a
+  , _generatorValue :: Comprehension Expr a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -496,7 +496,7 @@ fromIR_expr ex =
       fromIR_expr f
     ListComp a b c d ->
       (\c' -> Syntax.ListComp a b c' d) <$>
-      fromIR_comprehension c
+      fromIR_comprehension fromIR_expr c
     List a b c d ->
       (\c' -> Syntax.List a b c' d) <$>
       traverseOf (traverse.traverse) fromIR_listItem c
@@ -539,7 +539,7 @@ fromIR_expr ex =
       fromIR_tupleItem b <*>
       traverseOf (traverse.traverse) fromIR_tupleItem d
     Not a b c -> Syntax.Not a b <$> fromIR_expr c
-    Generator a b -> Syntax.Generator a <$> fromIR_comprehension b
+    Generator a b -> Syntax.Generator a <$> fromIR_comprehension fromIR_expr b
 
 fromIR_suite :: Suite a -> Validate [IRError a] (Syntax.Suite '[] a)
 fromIR_suite s =
@@ -583,10 +583,13 @@ fromIR_withItem (WithItem a b c) =
   fromIR_expr b <*>
   traverseOf (traverse._2) fromIR_expr c
 
-fromIR_comprehension :: Comprehension a -> Validate [IRError a] (Syntax.Comprehension '[] a)
-fromIR_comprehension (Comprehension a b c d) =
+fromIR_comprehension
+  :: (e a -> Validate [IRError a] (e' '[] a))
+  -> Comprehension e a
+  -> Validate [IRError a] (Syntax.Comprehension e' '[] a)
+fromIR_comprehension f (Comprehension a b c d) =
   Syntax.Comprehension a <$>
-  fromIR_expr b <*>
+  f b <*>
   fromIR_compFor c <*>
   traverse (bitraverse fromIR_compFor fromIR_compIf) d
 

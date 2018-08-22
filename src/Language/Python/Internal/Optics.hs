@@ -4,30 +4,19 @@
 module Language.Python.Internal.Optics where
 
 import Control.Lens.Fold (Fold)
-import Control.Lens.Getter (Getter, to)
+import Control.Lens.Getter ((^.))
 import Control.Lens.Setter ((.~))
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (Traversal, Traversal', traverseOf, failing)
 import Control.Lens.Tuple (_3, _4)
 import Control.Lens.Prism (Prism, _Right, _Left, prism)
 import Control.Lens.Wrapped (_Wrapped)
-import Data.Coerce (Coercible, coerce)
+import Data.Coerce (coerce)
 import Data.Function ((&))
 import Data.List.NonEmpty
+
+import Language.Python.Internal.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax
-
-class Validated (s :: [*] -> * -> *) where
-  unvalidated :: Getter (s v a) (s '[] a)
-  default unvalidated :: Coercible (s v a) (s '[] a) => Getter (s v a) (s '[] a)
-  unvalidated = to coerce
-
-instance Validated Expr where
-instance Validated Statement where
-instance Validated Block where
-instance Validated Ident where
-instance Validated Param where
-instance Validated Suite where
-instance Validated WithItem where
 
 data KeywordParam v a
   = MkKeywordParam
@@ -48,8 +37,8 @@ _KeywordParam =
   prism
     (\(MkKeywordParam a b d e) -> KeywordParam a b d e)
     (\case
-        (coerce -> KeywordParam a b d e) -> Right (MkKeywordParam a b d e)
-        (coerce -> a) -> Left a)
+        KeywordParam a b d e -> Right (MkKeywordParam a b d e)
+        a -> Left $ a ^. unvalidated)
 
 _Fundef
   :: Prism
@@ -73,9 +62,9 @@ _Fundef =
   prism
     (\(idnt, a, b, c, d, e, f, g, h) -> CompoundStatement (Fundef idnt a b c d e f g h))
     (\case
-        (coerce -> CompoundStatement (Fundef idnt a b c d e f g h)) ->
+        CompoundStatement (Fundef idnt a b c d e f g h) ->
           Right (idnt, a, b, c, d, e, f, g, h)
-        (coerce -> a) -> Left a)
+        a -> Left $ a ^. unvalidated)
 
 _Call
   :: Prism
@@ -86,18 +75,17 @@ _Call
 _Call =
   prism
     (\(a, b, c, d, e) -> Call a b c d e)
-    (\case; (coerce -> Call a b c d e) -> Right (a, b, c, d, e); (coerce -> a) -> Left a)
+    (\case
+        Call a b c d e -> Right (a, b, c, d, e)
+        a -> Left $ a ^. unvalidated)
 
-_Ident
-  :: Prism
-       (Expr v a)
-       (Expr '[] a)
-       (a, Ident v a)
-       (a, Ident '[] a)
+_Ident :: Prism (Expr v a) (Expr '[] a) (a, Ident v a) (a, Ident '[] a)
 _Ident =
   prism
     (\(a, b) -> Ident a b)
-    (\case; (coerce -> Ident a b) -> Right (a, b); (coerce -> a) -> Left a)
+    (\case
+        Ident a b -> Right (a, b)
+        a -> Left $ a ^. unvalidated)
 
 _Indent :: HasIndents s => Traversal' (s '[] a) [Whitespace]
 _Indent = _Indents.indentsValue.traverse.indentWhitespaces
@@ -266,25 +254,25 @@ assignTargets f e =
       (\b' d' -> Tuple a b' c d') <$>
       (_Exprs.assignTargets) f b <*>
       (traverse.traverse._Exprs.assignTargets) f d
-    Unit{} -> pure $ coerce e
-    Lambda{} -> pure $ coerce e
-    Yield{} -> pure $ coerce e
-    YieldFrom{} -> pure $ coerce e
-    Ternary{} -> pure $ coerce e
-    ListComp{} -> pure $ coerce e
-    Deref{} -> pure $ coerce e
-    Subscript{} -> pure $ coerce e
-    Call{} -> pure $ coerce e
-    None{} -> pure $ coerce e
-    Ellipsis{} -> pure $ coerce e
-    BinOp{} -> pure $ coerce e
-    UnOp{} -> pure $ coerce e
-    Int{} -> pure $ coerce e
-    Float{} -> pure $ coerce e
-    Imag{} -> pure $ coerce e
-    Bool{} -> pure $ coerce e
-    String{} -> pure $ coerce e
-    Not{} -> pure $ coerce e
-    Dict{} -> pure $ coerce e
-    Set{} -> pure $ coerce e
-    Generator{} -> pure $ coerce e
+    Unit{} -> pure $ e ^. unvalidated
+    Lambda{} -> pure $ e ^. unvalidated
+    Yield{} -> pure $ e ^. unvalidated
+    YieldFrom{} -> pure $ e ^. unvalidated
+    Ternary{} -> pure $ e ^. unvalidated
+    ListComp{} -> pure $ e ^. unvalidated
+    Deref{} -> pure $ e ^. unvalidated
+    Subscript{} -> pure $ e ^. unvalidated
+    Call{} -> pure $ e ^. unvalidated
+    None{} -> pure $ e ^. unvalidated
+    Ellipsis{} -> pure $ e ^. unvalidated
+    BinOp{} -> pure $ e ^. unvalidated
+    UnOp{} -> pure $ e ^. unvalidated
+    Int{} -> pure $ e ^. unvalidated
+    Float{} -> pure $ e ^. unvalidated
+    Imag{} -> pure $ e ^. unvalidated
+    Bool{} -> pure $ e ^. unvalidated
+    String{} -> pure $ e ^. unvalidated
+    Not{} -> pure $ e ^. unvalidated
+    Dict{} -> pure $ e ^. unvalidated
+    Set{} -> pure $ e ^. unvalidated
+    Generator{} -> pure $ e ^. unvalidated

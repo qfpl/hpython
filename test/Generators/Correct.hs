@@ -256,7 +256,7 @@ genCompIf =
     [ Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr ]
     []
 
-genComprehension :: (MonadGen m, MonadState GenState m) => m (Comprehension '[] ())
+genComprehension :: (MonadGen m, MonadState GenState m) => m (Comprehension Expr '[] ())
 genComprehension =
   sized3
     (Comprehension ())

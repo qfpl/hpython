@@ -105,11 +105,11 @@ genCompIf =
   genWhitespaces <*>
   Gen.scale (max 0 . subtract 1) genExpr
 
-genComprehension :: MonadGen m => m (Comprehension '[] ())
-genComprehension =
+genComprehension :: MonadGen m => m (e '[] ()) -> m (Comprehension e '[] ())
+genComprehension me =
   sized3
     (Comprehension ())
-    genExpr
+    me
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
@@ -198,9 +198,9 @@ genExpr' isExp =
       genWhitespaces
     , ListComp () <$>
       genWhitespaces <*>
-      genComprehension <*>
+      genComprehension genExpr <*>
       genWhitespaces
-    , Generator () <$> genComprehension
+    , Generator () <$> genComprehension genExpr
     , Gen.subtermM
         genExpr
         (\a ->

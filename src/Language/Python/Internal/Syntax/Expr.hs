@@ -9,7 +9,7 @@ module Language.Python.Internal.Syntax.Expr where
 
 import Control.Lens.Cons (_last)
 import Control.Lens.Fold ((^?), (^?!))
-import Control.Lens.Getter ((^.), getting)
+import Control.Lens.Getter ((^.), getting, to)
 import Control.Lens.Lens (Lens, Lens', lens)
 import Control.Lens.Plated (Plated(..), gplate)
 import Control.Lens.Prism (_Just, _Left, _Right)
@@ -26,7 +26,9 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Monoid ((<>))
 import Data.String (IsString(..))
 import GHC.Generics (Generic)
+import Unsafe.Coerce (unsafeCoerce)
 
+import Language.Python.Internal.Optics.Validated (Validated(..))
 import Language.Python.Internal.Syntax.BinOp
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Ident
@@ -34,6 +36,19 @@ import Language.Python.Internal.Syntax.Numbers
 import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Syntax.UnOp
 import Language.Python.Internal.Syntax.Whitespace
+
+{-
+
+[unsafeCoerce Validation]
+
+We can't 'coerce' 'Expr's because the @v@ parameter is considered to have a
+nominal role, due to datatypes like 'Comprehension'. We only ever use @v@ in
+as a phantom in 'Expr', so 'unsafeCoerce :: Expr v a -> Expr '[]' is safe.
+
+-}
+instance Validated Expr where; unvalidated = to unsafeCoerce
+instance Validated Param where; unvalidated = to unsafeCoerce
+instance Validated Arg where; unvalidated = to unsafeCoerce
 
 -- | 'Traversal' over all the expressions in a term
 class HasExprs s where
@@ -69,14 +84,14 @@ paramAnn :: Lens' (Param v a) a
 paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
 
 paramName :: Lens (Param v a) (Param '[] a) (Ident v a) (Ident v a)
-paramName = lens _paramName (\s a -> coerce $ s { _paramName = a})
+paramName = lens _paramName (\s a -> (s { _paramName = a}) ^. unvalidated)
 
 instance HasExprs Param where
   _Exprs f (KeywordParam a name ws2 expr) =
     KeywordParam a (coerce name) <$> pure ws2 <*> f expr
-  _Exprs _ p@PositionalParam{} = pure $ coerce p
-  _Exprs _ p@StarParam{} = pure $ coerce p
-  _Exprs _ p@DoubleStarParam{} = pure $ coerce p
+  _Exprs _ p@PositionalParam{} = pure $ p ^. unvalidated
+  _Exprs _ p@StarParam{} = pure $ p ^. unvalidated
+  _Exprs _ p@DoubleStarParam{} = pure $ p ^. unvalidated
 
 data Arg (v :: [*]) a
   = PositionalArg
@@ -104,7 +119,7 @@ data Arg (v :: [*]) a
 instance IsString (Arg '[] ()) where; fromString = PositionalArg () . fromString
 
 argExpr :: Lens (Arg v a) (Arg '[] a) (Expr v a) (Expr '[] a)
-argExpr = lens _argExpr (\s a -> (coerce s) { _argExpr = a })
+argExpr = lens _argExpr (\s a -> (s ^. unvalidated) { _argExpr = a })
 
 instance HasExprs Arg where
   _Exprs f (KeywordArg a name ws2 expr) = KeywordArg a (coerce name) ws2 <$> f expr
@@ -112,12 +127,12 @@ instance HasExprs Arg where
   _Exprs f (StarArg a ws expr) = StarArg a ws <$> f expr
   _Exprs f (DoubleStarArg a ws expr) = StarArg a ws <$> f expr
 
-data Comprehension (v :: [*]) a
+data Comprehension e (v :: [*]) a
   -- ^ <expr> <comp_for> (comp_for | comp_if)*
-  = Comprehension a (Expr v a) (CompFor v a) [Either (CompFor v a) (CompIf v a)]
+  = Comprehension a (e v a) (CompFor v a) [Either (CompFor v a) (CompIf v a)]
   deriving (Eq, Show)
 
-instance HasTrailingWhitespace (Comprehension v a) where
+instance HasTrailingWhitespace (Comprehension e v a) where
   trailingWhitespace =
     lens
       (\(Comprehension _ _ a b) ->
@@ -132,15 +147,15 @@ instance HasTrailingWhitespace (Comprehension v a) where
                (d &
                 _last.failing (_Left.trailingWhitespace) (_Right.trailingWhitespace) .~ ws))
 
-instance Functor (Comprehension v) where
+instance Functor (e v) => Functor (Comprehension e v) where
   fmap f (Comprehension a b c d) =
     Comprehension (f a) (fmap f b) (fmap f c) (fmap (bimap (fmap f) (fmap f)) d)
 
-instance Foldable (Comprehension v) where
+instance Foldable (e v) => Foldable (Comprehension e v) where
   foldMap f (Comprehension a b c d) =
     f a <> foldMap f b <> foldMap f c <> foldMap (bifoldMap (foldMap f) (foldMap f)) d
 
-instance Traversable (Comprehension v) where
+instance Traversable (e v) => Traversable (Comprehension e v) where
   traverse f (Comprehension a b c d) =
     Comprehension <$>
     f a <*>
@@ -232,7 +247,7 @@ instance HasTrailingWhitespace (Subscript v a) where
                   Nothing -> (b, c, Just (ws, f))
                   Just g -> (b, c, Just (e, Just $ g & trailingWhitespace .~ ws)))
 
-data ListItem v a
+data ListItem (v :: [*]) a
   = ListItem
   { _listItemAnn :: a
   , _unsafeListItemValue :: Expr v a
@@ -261,7 +276,7 @@ instance HasTrailingWhitespace (ListItem v a) where
            ListUnpack b [] d e -> ListUnpack b [] d $ e & trailingWhitespace .~ ws
            ListUnpack b ((c, _) : rest) e f -> ListUnpack b ((c, ws) : rest) e f)
 
-data SetItem v a
+data SetItem (v :: [*]) a
   = SetItem
   { _setItemAnn :: a
   , _unsafeSetItemValue :: Expr v a
@@ -290,7 +305,7 @@ instance HasTrailingWhitespace (SetItem v a) where
            SetUnpack b [] d e -> SetUnpack b [] d $ e & trailingWhitespace .~ ws
            SetUnpack b ((c, _) : rest) e f -> SetUnpack b ((c, ws) : rest) e f)
 
-data TupleItem v a
+data TupleItem (v :: [*]) a
   = TupleItem
   { _tupleItemAnn :: a
   , _unsafeTupleItemValue :: Expr v a
@@ -361,7 +376,7 @@ data Expr (v :: [*]) a
   -- [ spaces
   , _unsafeListCompWhitespaceLeft :: [Whitespace]
   -- comprehension
-  , _unsafeListCompValue :: Comprehension v a
+  , _unsafeListCompValue :: Comprehension Expr v a
   -- ] spaces
   , _unsafeListCompWhitespaceRight :: [Whitespace]
   }
@@ -489,7 +504,7 @@ data Expr (v :: [*]) a
   }
   | Generator
   { _exprAnnotation :: a
-  , _generatorValue :: Comprehension v a
+  , _generatorValue :: Comprehension Expr v a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 

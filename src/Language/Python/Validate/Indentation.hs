@@ -1,4 +1,5 @@
 {-# language DataKinds, TypeOperators #-}
+{-# language ScopedTypeVariables, TypeApplications #-}
 module Language.Python.Validate.Indentation
   ( module Language.Python.Validate.Indentation.Error
   , Indentation
@@ -28,11 +29,13 @@ import Data.Foldable (fold)
 import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Type.Set
+import Unsafe.Coerce (unsafeCoerce)
 import Data.Validate (Validate(..))
 import Data.Validate.Monadic (ValidateM(..), liftVM0, errorVM)
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Optics
+import Language.Python.Internal.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax
 import Language.Python.Validate.Indentation.Error
 
@@ -145,25 +148,25 @@ validateSuiteIndentation idnt (SuiteMany ann a c d) =
   SuiteMany ann a c <$
   setNextIndent GreaterThan (idnt ^. indentsValue) <*>
   validateBlockIndentation d
-validateSuiteIndentation idnt (SuiteOne ann a c d) = pure $ SuiteOne ann a (coerce c) d
+validateSuiteIndentation idnt (SuiteOne ann a c d) = pure $ SuiteOne ann a (unsafeCoerce c) d
 
 validateExprIndentation
   :: AsIndentationError e v a
   => Expr v a
   -> ValidateIndentation e (Expr (Nub (Indentation ': v)) a)
-validateExprIndentation e = pure $ coerce e
+validateExprIndentation e = pure $ unsafeCoerce e
 
 validateParamsIndentation
   :: AsIndentationError e v a
   => CommaSep (Param v a)
   -> ValidateIndentation e (CommaSep (Param (Nub (Indentation ': v)) a))
-validateParamsIndentation e = pure $ coerce e
+validateParamsIndentation e = pure $ unsafeCoerce e
 
 validateArgsIndentation
   :: AsIndentationError e v a
   => CommaSep (Arg v a)
   -> ValidateIndentation e (CommaSep (Arg (Nub (Indentation ': v)) a))
-validateArgsIndentation e = pure $ coerce e
+validateArgsIndentation e = pure $ unsafeCoerce e
 
 validateExceptAsIndentation
   :: AsIndentationError e v a
@@ -182,11 +185,12 @@ validateDecoratorIndentation (Decorator a b c d e) =
   Decorator a <$>
   checkIndent b <*>
   pure c <*>
-  pure (coerce d) <*>
+  pure (unsafeCoerce d) <*>
   pure e
 
 validateCompoundStatementIndentation
-  :: AsIndentationError e v a
+  :: forall e v a
+   . AsIndentationError e v a
   => CompoundStatement v a
   -> ValidateIndentation e (CompoundStatement (Nub (Indentation ': v)) a)
 validateCompoundStatementIndentation (Fundef a decos idnt ws1 name ws2 params ws3 s) =
@@ -272,14 +276,22 @@ validateCompoundStatementIndentation (For idnt a b c d e h i) =
        validateSuiteIndentation idnt b)
     i
 validateCompoundStatementIndentation (ClassDef a decos idnt b c d e) =
-  (\decos' idnt' -> ClassDef a decos' idnt'  b (coerce c) (coerce d)) <$>
+  (\decos' idnt' ->
+     ClassDef @(Nub (Indentation ': v)) a decos' idnt' b (coerce c) (unsafeCoerce d)) <$>
   traverse validateDecoratorIndentation decos <*>
   checkIndent idnt <*>
   validateSuiteIndentation idnt e
 validateCompoundStatementIndentation (With idnt a b c d) =
-  (\idnt' -> With idnt' a b (coerce c)) <$>
+  (\idnt' -> With @(Nub (Indentation ': v)) idnt' a b) <$>
   checkIndent idnt <*>
+  traverse validateWithItemIndentation c <*>
   validateSuiteIndentation idnt d
+
+validateWithItemIndentation
+  :: AsIndentationError e v a
+  => WithItem v a
+  -> ValidateIndentation e (WithItem (Nub (Indentation ': v)) a)
+validateWithItemIndentation a = pure $ unsafeCoerce a
 
 validateStatementIndentation
   :: AsIndentationError e v a
@@ -287,7 +299,7 @@ validateStatementIndentation
   -> ValidateIndentation e (Statement (Nub (Indentation ': v)) a)
 validateStatementIndentation (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementIndentation c
-validateStatementIndentation s@SmallStatements{} = pure $ coerce s
+validateStatementIndentation s@SmallStatements{} = pure $ unsafeCoerce s
 
 validateModuleIndentation
   :: AsIndentationError e v a

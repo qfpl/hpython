@@ -563,9 +563,9 @@ renderCompIf (CompIf _ ws ex) =
   foldMap renderWhitespace ws <>
   bracketTernaryLambda bracketTupleGenerator ex
 
-renderComprehension :: Comprehension v a -> RenderOutput
-renderComprehension (Comprehension _ expr cf cs) =
-  bracketTupleGenerator expr <>
+renderComprehension :: (e v a -> RenderOutput) -> Comprehension e v a -> RenderOutput
+renderComprehension f (Comprehension _ expr cf cs) =
+  f expr <>
   renderCompFor cf <>
   foldMap (bifoldMap renderCompFor renderCompIf) cs
 
@@ -853,7 +853,7 @@ renderExpr (List _ ws1 exprs ws2) =
 renderExpr (ListComp _ ws1 comp ws2) =
   TkLeftBracket () `cons`
   foldMap renderWhitespace ws1 <>
-  renderComprehension comp <>
+  renderComprehension bracketTupleGenerator comp <>
   singleton (TkRightBracket ()) <> foldMap renderWhitespace ws2
 renderExpr (Call _ expr ws args ws2) =
   (case expr of
@@ -902,7 +902,7 @@ renderExpr (Set _ a b c) =
   renderSetItems b <>
   singleton (TkRightBrace ()) <>
   foldMap renderWhitespace c
-renderExpr (Generator _ a) = renderComprehension a
+renderExpr (Generator _ a) = renderComprehension bracketTupleGenerator a
 
 renderModuleName :: ModuleName v a -> RenderOutput
 renderModuleName (ModuleNameOne _ s) = renderIdent s

@@ -69,10 +69,12 @@ import Data.Semigroup (Semigroup(..))
 import Data.Type.Set (Nub, Member)
 import Data.Validate (Validate(..))
 import Data.Validate.Monadic (ValidateM(..), bindVM, liftVM0, liftVM1, errorVM)
+import Unsafe.Coerce (unsafeCoerce)
 
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Optics
+import Language.Python.Internal.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax
 import Language.Python.Validate.Indentation
 import Language.Python.Validate.Syntax.Error
@@ -158,11 +160,12 @@ validateComprehensionSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
      )
-  => Comprehension v a
-  -> ValidateSyntax e (Comprehension (Nub (Syntax ': v)) a)
-validateComprehensionSyntax (Comprehension a b c d) =
+  => (ex v a -> ValidateSyntax e (ex (Nub (Syntax ': v)) a))
+  -> Comprehension ex v a
+  -> ValidateSyntax e (Comprehension ex (Nub (Syntax ': v)) a)
+validateComprehensionSyntax f (Comprehension a b c d) =
   Comprehension a <$>
-  validateExprSyntax b <*>
+  f b <*>
   validateCompForSyntax c <*>
   traverse (bitraverse validateCompForSyntax validateCompIfSyntax) d
   where
@@ -363,13 +366,13 @@ validateExprSyntax (ListComp a ws1 comp ws2) =
   ListComp a ws1 <$>
   liftVM1
     (local $ (inParens .~ True) . (inGenerator .~ True))
-    (validateComprehensionSyntax comp) <*>
+    (validateComprehensionSyntax validateExprSyntax comp) <*>
   validateWhitespace a ws2
 validateExprSyntax (Generator a comp) =
   Generator a <$>
   liftVM1
     (local $ inGenerator .~ True)
-    (validateComprehensionSyntax comp)
+    (validateComprehensionSyntax validateExprSyntax comp)
 validateExprSyntax (Deref a expr ws1 name) =
   Deref a <$>
   validateExprSyntax expr <*>
@@ -447,8 +450,8 @@ validateDecoratorSyntax (Decorator a b c d e) =
     someDerefs (Deref _ a _ _) = someDerefs a
     someDerefs _ = False
 
-    isDecoratorValue e@(Call _ a _ _ _) | someDerefs a = pure $ coerce e
-    isDecoratorValue e | someDerefs e = pure $ coerce e
+    isDecoratorValue e@(Call _ a _ _ _) | someDerefs a = pure $ unsafeCoerce e
+    isDecoratorValue e | someDerefs e = pure $ unsafeCoerce e
     isDecoratorValue _ = errorVM [_MalformedDecorator # a]
 
 validateCompoundStatementSyntax
@@ -762,7 +765,7 @@ validateArgsSyntax
      )
   => CommaSep1' (Arg v a)
   -> ValidateSyntax e (CommaSep1' (Arg (Nub (Syntax ': v)) a))
-validateArgsSyntax e = fmap coerce e <$ go [] False False (toList e)
+validateArgsSyntax e = unsafeCoerce e <$ go [] False False (toList e)
   where
     go
       :: (AsSyntaxError e v a, Member Indentation v)
@@ -815,7 +818,7 @@ validateParamsSyntax
      )
   => CommaSep (Param v a)
   -> ValidateSyntax e (CommaSep (Param (Nub (Syntax ': v)) a))
-validateParamsSyntax e = coerce e <$ go [] False (toList e)
+validateParamsSyntax e = unsafeCoerce e <$ go [] False (toList e)
   where
     go _ _ [] = pure []
     go names False (PositionalParam a name : params)

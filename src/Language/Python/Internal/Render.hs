@@ -1071,7 +1071,7 @@ renderCompoundStatement (Fundef _ decos idnt ws1 name ws2 params ws3 mty s) =
     (\(ws, ty) -> TkRightArrow () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
     mty <>
   renderSuite s
-renderCompoundStatement (If idnt _ ws1 expr s elifs body') =
+renderCompoundStatement (If _ idnt ws1 expr s elifs body') =
   renderIndents idnt <>
   singleton (TkIf ()) <> foldMap renderWhitespace ws1 <>
   bracketTupleGenerator expr <>
@@ -1089,11 +1089,11 @@ renderCompoundStatement (If idnt _ ws1 expr s elifs body') =
         singleton (TkElse ()) <> foldMap renderWhitespace ws4 <>
         renderSuite s)
     body'
-renderCompoundStatement (While idnt _ ws1 expr s) =
+renderCompoundStatement (While _ idnt ws1 expr s) =
   renderIndents idnt <>
   singleton (TkWhile ()) <> foldMap renderWhitespace ws1 <> bracketTupleGenerator expr <>
   renderSuite s
-renderCompoundStatement (TryExcept idnt _ a s e f g) =
+renderCompoundStatement (TryExcept _ idnt a s e f g) =
   renderIndents idnt <>
   singleton (TkTry ()) <> foldMap renderWhitespace a <>
   renderSuite s <>
@@ -1116,14 +1116,14 @@ renderCompoundStatement (TryExcept idnt _ a s e f g) =
        singleton (TkFinally ()) <> foldMap renderWhitespace ws1 <>
        renderSuite s)
     g
-renderCompoundStatement (TryFinally idnt _ a s idnt2 e s') =
+renderCompoundStatement (TryFinally _ idnt a s idnt2 e s') =
   renderIndents idnt <>
   singleton (TkTry ()) <> foldMap renderWhitespace a <>
   renderSuite s <>
   renderIndents idnt2 <>
   singleton (TkFinally ()) <> foldMap renderWhitespace e <>
   renderSuite s'
-renderCompoundStatement (For idnt _ a b c d s h) =
+renderCompoundStatement (For _ idnt a b c d s h) =
   renderIndents idnt <>
   singleton (TkFor ()) <> foldMap renderWhitespace a <> bracketGenerator b <>
   singleton (TkIn ()) <> foldMap renderWhitespace c <> bracketGenerator d <>
@@ -1147,7 +1147,7 @@ renderCompoundStatement (ClassDef _ decos idnt a b c s) =
       foldMap renderWhitespace z)
     c <>
   renderSuite s
-renderCompoundStatement (With idnt _ a b s) =
+renderCompoundStatement (With _ idnt a b s) =
   renderIndents idnt <>
   singleton (TkWith ()) <> foldMap renderWhitespace a <>
   renderCommaSep1 renderWithItem b <>

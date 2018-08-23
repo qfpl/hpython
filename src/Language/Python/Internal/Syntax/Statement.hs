@@ -248,7 +248,7 @@ data Decorator (v :: [*]) a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data CompoundStatement (v :: [*]) a
-  -- ^ 'def' <spaces> <ident> '(' <spaces> stuff ')' <spaces> ['->' <expr>] ':' <spaces> <newline>
+  -- ^ ['async'] 'def' <spaces> <ident> '(' <spaces> stuff ')' <spaces> ['->' <expr>] ':' <spaces> <newline>
   --   <block>
   = Fundef a
       [Decorator v a]
@@ -263,38 +263,37 @@ data CompoundStatement (v :: [*]) a
   --   [ 'else' <spaces> ':' <spaces> <newline>
   --     <block>
   --   ]
-  | If
-      (Indents a) a
+  | If a
+      (Indents a)
       [Whitespace] (Expr v a) (Suite v a)
       [(Indents a, [Whitespace], Expr v a, Suite v a)]
       (Maybe (Indents a, [Whitespace], Suite v a))
-  -- ^ 'if' <spaces> <expr> ':' <spaces> <newline>
+  -- ^ ['async'] 'while' <spaces> <expr> ':' <spaces> <newline>
   --   <block>
-  --   ('elif' <spaces> <expr> ':' <spaces> <newline> <block>)*
   --   ['else' <spaces> ':' <spaces> <newline> <block>]
-  | While
-      (Indents a) a
+  | While a
+      (Indents a)
       [Whitespace] (Expr v a) (Suite v a)
   -- ^ 'try' <spaces> ':' <spaces> <newline> <block>
   --   ( 'except' <spaces> exceptAs ':' <spaces> <newline> <block> )+
   --   [ 'else' <spaces> ':' <spaces> <newline> <block> ]
   --   [ 'finally' <spaces> ':' <spaces> <newline> <block> ]
-  | TryExcept
-      (Indents a) a
+  | TryExcept a
+      (Indents a)
       [Whitespace] (Suite v a)
       (NonEmpty (Indents a, [Whitespace], Maybe (ExceptAs v a), Suite v a))
       (Maybe (Indents a, [Whitespace], Suite v a))
       (Maybe (Indents a, [Whitespace], Suite v a))
   -- ^ 'try' <spaces> ':' <spaces> <newline> <block>
   --   'finally' <spaces> ':' <spaces> <newline> <block>
-  | TryFinally
-      (Indents a) a
+  | TryFinally a
+      (Indents a)
       [Whitespace] (Suite v a)
       (Indents a) [Whitespace] (Suite v a)
-  -- ^ 'for' <spaces> expr 'in' <spaces> expr ':' <spaces> <newline> <block>
+  -- ^ ['async'] 'for' <spaces> expr 'in' <spaces> expr ':' <spaces> <newline> <block>
   --   [ 'else' <spaces> ':' <spaces> <newline> <block> ]
-  | For
-      (Indents a) a
+  | For a
+      (Indents a)
       [Whitespace] (Expr v a) [Whitespace] (Expr v a) (Suite v a)
       (Maybe (Indents a, [Whitespace], Suite v a))
   -- ^ 'class' <spaces> ident [ '(' <spaces> [ args ] ')' <spaces>] ':' <spaces> <newline>
@@ -306,8 +305,8 @@ data CompoundStatement (v :: [*]) a
       (Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace]))
       (Suite v a)
   -- ^ 'with' <spaces> with_item (',' <spaces> with_item)* ':' <spaces> <newline> <block>
-  | With
-      (Indents a) a
+  | With a
+      (Indents a)
       [Whitespace] (CommaSep1 (WithItem v a)) (Suite v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 

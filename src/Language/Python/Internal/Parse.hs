@@ -1079,7 +1079,7 @@ compoundStatement =
       suite
 
     ifSt =
-      (\a (tk, s) -> If a (pyTokenAnn tk) s) <$>
+      (\a (tk, s) -> If (pyTokenAnn tk) a s) <$>
       indents <*>
       token space (TkIf ()) <*>
       expr space <*>
@@ -1097,7 +1097,7 @@ compoundStatement =
          suite)
 
     whileSt =
-      (\a (tk, s) -> While a (pyTokenAnn tk) s) <$>
+      (\a (tk, s) -> While (pyTokenAnn tk) a s) <$>
       indents <*>
       token space (TkWhile ()) <*>
       expr space <*>
@@ -1111,8 +1111,8 @@ compoundStatement =
     trySt =
       (\i (tk, s) a d ->
          case d of
-           Left (e, f, g) -> TryFinally i (pyTokenAnn tk) s a e f g
-           Right (e, f, g) -> TryExcept i (pyTokenAnn tk) s a e f g) <$>
+           Left (e, f, g) -> TryFinally (pyTokenAnn tk) i s a e f g
+           Right (e, f, g) -> TryExcept (pyTokenAnn tk) i s a e f g) <$>
       indents <*>
       token space (TkTry ()) <*>
       suite <*>
@@ -1144,7 +1144,7 @@ compoundStatement =
               suite)))
 
     withSt =
-      (\a (tk, s) -> With a (pyTokenAnn tk) s) <$>
+      (\a (tk, s) -> With (pyTokenAnn tk) a s) <$>
       indents <*>
       token space (TkWith ()) <*>
       commaSep1
@@ -1155,7 +1155,7 @@ compoundStatement =
       suite
 
     forSt =
-      (\a (tk, s) -> For a (pyTokenAnn tk) s) <$>
+      (\a (tk, s) -> For (pyTokenAnn tk) a s) <$>
       indents <*>
       token space (TkFor ()) <*>
       orExprList space <*>

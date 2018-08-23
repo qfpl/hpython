@@ -571,8 +571,8 @@ genCompoundStatement =
     , sized4M
         (\a b c d -> 
            If <$>
-             use currentIndentation <*>
              pure () <*>
+             use currentIndentation <*>
              fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
              pure b <*> pure c <*> pure d)
         genExpr
@@ -596,8 +596,8 @@ genCompoundStatement =
     , sized2M
         (\a b ->
           While <$>
-          use currentIndentation <*>
           pure () <*>
+          use currentIndentation <*>
           fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
           pure b)
         genExpr
@@ -605,8 +605,8 @@ genCompoundStatement =
     , sized4M
         (\a b e1 e2 ->
           TryExcept <$>
-          use currentIndentation <*>
           pure () <*>
+          use currentIndentation <*>
           genWhitespaces <*>
           pure a <*>
           pure b <*>
@@ -641,7 +641,7 @@ genCompoundStatement =
     , sized2M
         (\a b ->
            TryFinally <$>
-           use currentIndentation <*> pure () <*>
+           pure () <*> use currentIndentation <*>
            (NonEmpty.toList <$> genWhitespaces1) <*>
            pure a <*>
            use currentIndentation <*>
@@ -665,7 +665,7 @@ genCompoundStatement =
         (genSuite genSmallStatement genBlock)
     , sized2M
         (\a b ->
-           With <$> use currentIndentation <*> pure () <*>
+           With <$> pure () <*> use currentIndentation <*>
            (NonEmpty.toList <$> genWhitespaces1) <*>
            pure a <*> pure b)
         (genSizedCommaSep1 $
@@ -675,7 +675,7 @@ genCompoundStatement =
         (genSuite genSmallStatement genBlock)
     , sized4M
         (\a b c d ->
-           For <$> use currentIndentation <*> pure () <*>
+           For <$> pure () <*> use currentIndentation <*>
            (NonEmpty.toList <$> genWhitespaces1) <*> pure a <*>
            (NonEmpty.toList <$> genWhitespaces1) <*> pure b <*>
            pure c <*>

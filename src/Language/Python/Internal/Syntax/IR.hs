@@ -59,8 +59,8 @@ data CompoundStatement a
   --   [ 'else' <spaces> ':' <spaces> <newline>
   --     <block>
   --   ]
-  | If
-      (Indents a) a
+  | If a
+      (Indents a)
       [Whitespace] (Expr a) (Suite a)
       [(Indents a, [Whitespace], Expr a, Suite a)]
       (Maybe (Indents a, [Whitespace], Suite a))
@@ -68,29 +68,29 @@ data CompoundStatement a
   --   <block>
   --   ('elif' <spaces> <expr> ':' <spaces> <newline> <block>)*
   --   ['else' <spaces> ':' <spaces> <newline> <block>]
-  | While
-      (Indents a) a
+  | While a
+      (Indents a)
       [Whitespace] (Expr a) (Suite a)
   -- ^ 'try' <spaces> ':' <spaces> <newline> <block>
   --   ( 'except' <spaces> [<exceptAs>] ':' <spaces> <newline> <block> )+
   --   [ 'else' <spaces> ':' <spaces> <newline> <block> ]
   --   [ 'finally' <spaces> ':' <spaces> <newline> <block> ]
-  | TryExcept
-      (Indents a) a
+  | TryExcept a
+      (Indents a)
       [Whitespace] (Suite a)
       (NonEmpty (Indents a, [Whitespace], Maybe (ExceptAs a), Suite a))
       (Maybe (Indents a, [Whitespace], Suite a))
       (Maybe (Indents a, [Whitespace], Suite a))
   -- ^ 'try' <spaces> ':' <spaces> <newline> <block>
   --   'finally' <spaces> ':' <spaces> <newline> <block>
-  | TryFinally
-      (Indents a) a
+  | TryFinally a
+      (Indents a)
       [Whitespace] (Suite a)
       (Indents a) [Whitespace] (Suite a)
   -- ^ 'for' <spaces> expr 'in' <spaces> expr ':' <spaces> <newline> <block>
   --   [ 'else' <spaces> ':' <spaces> <newline> <block> ]
-  | For
-      (Indents a) a
+  | For a
+      (Indents a)
       [Whitespace] (Expr a) [Whitespace] (Expr a) (Suite a)
       (Maybe (Indents a, [Whitespace], Suite a))
   -- ^ 'class' <spaces> ident [ '(' <spaces> [ args ] ')' <spaces>] ':' <spaces> <newline>
@@ -102,8 +102,8 @@ data CompoundStatement a
       (Maybe ([Whitespace], Maybe (CommaSep1' (Arg a)), [Whitespace]))
       (Suite a)
   -- ^ 'with' <spaces> with_item (',' <spaces> with_item)* ':' <spaces> <newline> <block>
-  | With
-      (Indents a) a
+  | With a
+      (Indents a)
       [Whitespace] (CommaSep1 (WithItem a)) (Suite a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 

@@ -502,8 +502,8 @@ validateCompoundStatementSyntax (Fundef a decos idnts ws1 name ws2 params ws3 mt
                 Just paramIdents
             })
          (validateSuiteSyntax body))
-validateCompoundStatementSyntax (If idnts a ws1 expr body elifs body') =
-  If idnts a <$>
+validateCompoundStatementSyntax (If a idnts ws1 expr body elifs body') =
+  If a idnts <$>
   validateWhitespace a ws1 <*>
   validateExprSyntax expr <*>
   validateSuiteSyntax body <*>
@@ -514,13 +514,13 @@ validateCompoundStatementSyntax (If idnts a ws1 expr body elifs body') =
        validateSuiteSyntax d)
     elifs <*>
   traverseOf (traverse._3) validateSuiteSyntax body'
-validateCompoundStatementSyntax (While idnts a ws1 expr body) =
-  While idnts a <$>
+validateCompoundStatementSyntax (While a idnts ws1 expr body) =
+  While a idnts <$>
   validateWhitespace a ws1 <*>
   validateExprSyntax expr <*>
   liftVM1 (local $ inLoop .~ True) (validateSuiteSyntax body)
-validateCompoundStatementSyntax (TryExcept idnts a b e f k l) =
-  TryExcept idnts a <$>
+validateCompoundStatementSyntax (TryExcept a idnts b e f k l) =
+  TryExcept a idnts <$>
   validateWhitespace a b <*>
   validateSuiteSyntax e <*>
   traverse
@@ -542,14 +542,14 @@ validateCompoundStatementSyntax (TryExcept idnts a b e f k l) =
        validateWhitespace a x <*>
        validateSuiteSyntax w)
     l
-validateCompoundStatementSyntax (TryFinally idnts a b e idnts2 f i) =
-  TryFinally idnts a <$>
+validateCompoundStatementSyntax (TryFinally a idnts b e idnts2 f i) =
+  TryFinally a idnts <$>
   validateWhitespace a b <*>
   validateSuiteSyntax e <*> pure idnts2 <*>
   validateWhitespace a f <*>
   validateSuiteSyntax i
-validateCompoundStatementSyntax (For idnts a b c d e h i) =
-  For idnts a <$>
+validateCompoundStatementSyntax (For a idnts b c d e h i) =
+  For a idnts <$>
   validateWhitespace a b <*>
   (if canAssignTo c
    then validateExprSyntax c

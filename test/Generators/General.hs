@@ -356,7 +356,7 @@ genCompoundStatement =
         (genSuite genSmallStatement genBlock)
     , sized4M
         (\a b c d ->
-           If <$> genIndents <*> pure () <*> genWhitespaces <*>
+           If <$> pure () <*> genIndents <*> genWhitespaces <*>
            pure a <*> pure b <*> pure c <*> pure d)
         genExpr
         (genSuite genSmallStatement genBlock)
@@ -369,12 +369,12 @@ genCompoundStatement =
          (,,) <$>
          genIndents <*> genWhitespaces <*> genSuite genSmallStatement genBlock)
     , sized2M
-        (\a b -> While <$> genIndents <*> pure () <*> genWhitespaces <*> pure a <*> pure b)
+        (\a b -> While <$> pure () <*> genIndents <*> genWhitespaces <*> pure a <*> pure b)
         genExpr
         (genSuite genSmallStatement genBlock)
     , sized4M
         (\a b c d ->
-           TryExcept <$> genIndents <*> pure () <*> genWhitespaces <*>
+           TryExcept <$> pure () <*> genIndents <*> genWhitespaces <*>
            pure a <*> pure b <*> pure c <*> pure d)
         (genSuite genSmallStatement genBlock)
         (sizedNonEmpty $
@@ -395,8 +395,8 @@ genCompoundStatement =
     , sized2M
         (\a b -> 
            TryFinally <$>
-           genIndents <*>
            pure () <*>
+           genIndents <*>
            genWhitespaces <*>
            pure a <*>
            genIndents <*>
@@ -414,7 +414,7 @@ genCompoundStatement =
         (genSuite genSmallStatement genBlock)
     , sized4M
         (\a b c d ->
-           For <$> genIndents <*> pure () <*> genWhitespaces <*> pure a <*>
+           For <$> pure () <*> genIndents <*> genWhitespaces <*> pure a <*>
            genWhitespaces <*> pure b <*>
            pure c <*> pure d)
         genExpr
@@ -424,7 +424,7 @@ genCompoundStatement =
          (,,) <$>
          genIndents <*> genWhitespaces <*> genSuite genSmallStatement genBlock)
     , sized2M
-        (\a b -> With <$> genIndents <*> pure () <*> genWhitespaces <*> pure a <*> pure b)
+        (\a b -> With <$> pure () <*> genIndents <*> genWhitespaces <*> pure a <*> pure b)
         (genSizedCommaSep1 $
          WithItem () <$>
          genExpr <*>

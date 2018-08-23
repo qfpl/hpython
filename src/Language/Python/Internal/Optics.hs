@@ -124,8 +124,8 @@ instance HasIndents CompoundStatement where
         traverse (_Indents fun) decos <*>
         fun idnt <*>
         _Indents fun h
-      If idnt a b c d elifs e ->
-        (\idnt' -> If idnt' a b c) <$>
+      If a idnt b c d elifs e ->
+        (\idnt' -> If a idnt' b c) <$>
         fun idnt <*>
         _Indents fun d <*>
         traverse
@@ -140,12 +140,12 @@ instance HasIndents CompoundStatement where
              fun idnt <*>
              _Indents fun b)
           e
-      While idnt a b c d ->
-        (\idnt' -> While idnt' a b c) <$>
+      While a idnt b c d ->
+        (\idnt' -> While a idnt' b c) <$>
         fun idnt <*>
         _Indents fun d
-      TryExcept idnt a b c d e f ->
-        (\idnt' -> TryExcept idnt' a b) <$>
+      TryExcept a idnt b c d e f ->
+        (\idnt' -> TryExcept a idnt' b) <$>
         fun idnt <*>
         _Indents fun c <*>
         traverse
@@ -166,14 +166,14 @@ instance HasIndents CompoundStatement where
              fun idnt <*>
              _Indents fun b)
           f
-      TryFinally idnt a b c idnt2 d e ->
-        (\idnt' c' idnt2' -> TryFinally idnt' a b c' idnt2' d) <$>
+      TryFinally a idnt b c idnt2 d e ->
+        (\idnt' c' idnt2' -> TryFinally a idnt' b c' idnt2' d) <$>
         fun idnt <*>
         _Indents fun c <*>
         fun idnt2 <*>
         _Indents fun e
-      For idnt a b c d e f g ->
-        (\idnt' -> For idnt' a b c d e) <$>
+      For a idnt b c d e f g ->
+        (\idnt' -> For a idnt' b c d e) <$>
         fun idnt <*>
         _Indents fun f <*>
         traverse
@@ -188,8 +188,8 @@ instance HasIndents CompoundStatement where
         fun idnt <*>
         _Indents fun e
       With a b c d e ->
-        (\a' -> With a' b c d) <$>
-        fun a <*>
+        (\b' -> With a b' c d) <$>
+        fun b <*>
         _Indents fun e
 
 class HasNewlines s where

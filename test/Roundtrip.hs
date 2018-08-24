@@ -12,8 +12,9 @@ import Hedgehog
 import System.FilePath ((</>))
 
 import qualified Data.Text.IO as StrictText
+import qualified Data.Text as Strict
 
-import Language.Python.Internal.Lexer (SrcInfo, tokenize)
+import Language.Python.Internal.Lexer (SrcInfo)
 import Language.Python.Internal.Render (showModule)
 import Language.Python.Parse (parseModule)
 import Language.Python.Validate.Indentation
@@ -27,7 +28,8 @@ roundtripTests :: Group
 roundtripTests =
   Group "Roundtrip tests" $
   (\name -> (fromString name, withTests 1 . withShrinks 1 $ doRoundtrip name)) <$>
-  [ "typeann.py"
+  [ "asyncstatements.py"
+  , "typeann.py"
   , "dictcomp.py"
   , "imaginary.py"
   , "weird.py"
@@ -56,11 +58,12 @@ doRoundtrip :: FilePath -> Property
 doRoundtrip name =
   property $ do
     file <- liftIO . StrictText.readFile $ "test/files" </> name
-    annotateShow $ tokenize name file
     py <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" file
     case runValidateIndentation $ validateModuleIndentation py of
       Failure errs -> annotateShow (errs :: [IndentationError '[] SrcInfo]) *> failure
       Success res ->
         case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
-          Failure errs' -> annotateShow (errs' :: [SyntaxError '[Indentation] SrcInfo]) *> failure
-          Success _ -> showModule py === file
+          Failure errs' -> do
+            annotateShow res
+            annotateShow (errs' :: [SyntaxError '[Indentation] SrcInfo]) *> failure
+          Success _ -> Strict.lines (showModule py) === Strict.lines file

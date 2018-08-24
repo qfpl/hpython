@@ -923,6 +923,17 @@ renderExpr (Set _ a b c) =
   singleton (TkRightBrace ()) <>
   foldMap renderWhitespace c
 renderExpr (Generator _ a) = renderComprehension bracketTupleGenerator a
+renderExpr (Await _ ws expr) =
+  TkIdent "await" () `cons`
+  foldMap renderWhitespace ws <>
+  (case expr of
+     UnOp{} -> bracket $ renderExpr expr
+     BinOp{} -> bracket $ renderExpr expr
+     Tuple{} -> bracket $ renderExpr expr
+     Not{} -> bracket $ renderExpr expr
+     Ternary{} -> bracket $ renderExpr expr
+     Lambda{} -> bracket $ renderExpr expr
+     _ -> bracketGenerator expr)
 
 renderModuleName :: ModuleName v a -> RenderOutput
 renderModuleName (ModuleNameOne _ s) = renderIdent s
@@ -1061,9 +1072,10 @@ renderDecorator (Decorator _ a b c d) =
   singleton (renderNewline d)
 
 renderCompoundStatement :: CompoundStatement v a -> RenderOutput
-renderCompoundStatement (Fundef _ decos idnt ws1 name ws2 params ws3 mty s) =
+renderCompoundStatement (Fundef _ decos idnt asyncWs ws1 name ws2 params ws3 mty s) =
   foldMap renderDecorator decos <>
   renderIndents idnt <>
+  foldMap (\ws -> TkIdent "async" () `cons` foldMap renderWhitespace ws) asyncWs <>
   singleton (TkDef ()) <> foldMap renderWhitespace ws1 <> renderIdent name <>
   bracket (foldMap renderWhitespace ws2 <> renderCommaSep renderParam params) <>
   foldMap renderWhitespace ws3 <>
@@ -1071,7 +1083,7 @@ renderCompoundStatement (Fundef _ decos idnt ws1 name ws2 params ws3 mty s) =
     (\(ws, ty) -> TkRightArrow () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
     mty <>
   renderSuite s
-renderCompoundStatement (If idnt _ ws1 expr s elifs body') =
+renderCompoundStatement (If _ idnt ws1 expr s elifs body') =
   renderIndents idnt <>
   singleton (TkIf ()) <> foldMap renderWhitespace ws1 <>
   bracketTupleGenerator expr <>
@@ -1089,11 +1101,11 @@ renderCompoundStatement (If idnt _ ws1 expr s elifs body') =
         singleton (TkElse ()) <> foldMap renderWhitespace ws4 <>
         renderSuite s)
     body'
-renderCompoundStatement (While idnt _ ws1 expr s) =
+renderCompoundStatement (While _ idnt ws1 expr s) =
   renderIndents idnt <>
   singleton (TkWhile ()) <> foldMap renderWhitespace ws1 <> bracketTupleGenerator expr <>
   renderSuite s
-renderCompoundStatement (TryExcept idnt _ a s e f g) =
+renderCompoundStatement (TryExcept _ idnt a s e f g) =
   renderIndents idnt <>
   singleton (TkTry ()) <> foldMap renderWhitespace a <>
   renderSuite s <>
@@ -1116,15 +1128,16 @@ renderCompoundStatement (TryExcept idnt _ a s e f g) =
        singleton (TkFinally ()) <> foldMap renderWhitespace ws1 <>
        renderSuite s)
     g
-renderCompoundStatement (TryFinally idnt _ a s idnt2 e s') =
+renderCompoundStatement (TryFinally _ idnt a s idnt2 e s') =
   renderIndents idnt <>
   singleton (TkTry ()) <> foldMap renderWhitespace a <>
   renderSuite s <>
   renderIndents idnt2 <>
   singleton (TkFinally ()) <> foldMap renderWhitespace e <>
   renderSuite s'
-renderCompoundStatement (For idnt _ a b c d s h) =
+renderCompoundStatement (For _ idnt asyncWs a b c d s h) =
   renderIndents idnt <>
+  foldMap (\ws -> TkIdent "async" () `cons` foldMap renderWhitespace ws) asyncWs <>
   singleton (TkFor ()) <> foldMap renderWhitespace a <> bracketGenerator b <>
   singleton (TkIn ()) <> foldMap renderWhitespace c <> bracketGenerator d <>
   renderSuite s <>
@@ -1147,8 +1160,9 @@ renderCompoundStatement (ClassDef _ decos idnt a b c s) =
       foldMap renderWhitespace z)
     c <>
   renderSuite s
-renderCompoundStatement (With idnt _ a b s) =
+renderCompoundStatement (With _ idnt asyncWs a b s) =
   renderIndents idnt <>
+  foldMap (\ws -> TkIdent "async" () `cons` foldMap renderWhitespace ws) asyncWs <>
   singleton (TkWith ()) <> foldMap renderWhitespace a <>
   renderCommaSep1 renderWithItem b <>
   renderSuite s

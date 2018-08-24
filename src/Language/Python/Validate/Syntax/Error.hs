@@ -33,6 +33,10 @@ data SyntaxError (v :: [*]) a
   | InvalidSetUnpacking a
   | TypedParamInLambda a
   | TypedUnnamedStarParam a
+  | AsyncWithOutsideCoroutine a
+  | AsyncForOutsideCoroutine a
+  | YieldFromInsideCoroutine a
+  | AwaitOutsideCoroutine a
   deriving (Eq, Show)
 
 makeClassyPrisms ''SyntaxError

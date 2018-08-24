@@ -60,9 +60,9 @@ instance HasBlocks Suite where
   _Blocks f (SuiteMany a b c e) = SuiteMany a b c <$> f e
 
 instance HasBlocks CompoundStatement where
-  _Blocks f (Fundef a decos idnt ws1 name ws2 params ws3 mty s) =
+  _Blocks f (Fundef a decos idnt asyncWs ws1 name ws2 params ws3 mty s) =
     Fundef a
-      (view unvalidated <$> decos) idnt ws1 (coerce name) ws2
+      (view unvalidated <$> decos) idnt asyncWs ws1 (coerce name) ws2
       (view unvalidated <$> params) ws3 (over (mapped._2) (view unvalidated) mty) <$>
     _Blocks f s
   _Blocks f (If idnt a ws1 e1 s elifs b') =
@@ -86,8 +86,8 @@ instance HasBlocks CompoundStatement where
     pure d <*>
     pure e <*>
     _Blocks fun f
-  _Blocks fun (For idnt a b c d e f g) =
-    For idnt a b (c ^. unvalidated) d (e ^. unvalidated) <$>
+  _Blocks fun (For idnt a asyncWs b c d e f g) =
+    For idnt a asyncWs b (c ^. unvalidated) d (e ^. unvalidated) <$>
     _Blocks fun f <*>
     (traverse._3._Blocks) fun g
   _Blocks fun (ClassDef a decos idnt b c d e) =
@@ -95,7 +95,8 @@ instance HasBlocks CompoundStatement where
       (view unvalidated <$> decos) idnt b
       (coerce c) (over (mapped._2.mapped.mapped) (view unvalidated) d) <$>
     _Blocks fun e
-  _Blocks fun (With a b c d e) = With a b c (view unvalidated <$> d) <$> _Blocks fun e
+  _Blocks fun (With a b asyncWs c d e) =
+    With a b asyncWs c (view unvalidated <$> d) <$> _Blocks fun e
 
 instance HasStatements Block where
   _Statements = _Wrapped.traverse._Right
@@ -134,8 +135,8 @@ instance Plated (Statement '[] a) where
   plate fun (CompoundStatement s) =
     CompoundStatement <$>
     case s of
-      Fundef idnt a decos ws1 b ws2 c ws3 mty s ->
-        Fundef idnt a decos ws1 b ws2 c ws3 mty <$> _Statements fun s
+      Fundef idnt a decos asyncWs ws1 b ws2 c ws3 mty s ->
+        Fundef idnt a decos asyncWs ws1 b ws2 c ws3 mty <$> _Statements fun s
       If idnt a ws1 b s elifs sts' ->
         If idnt a ws1 b <$>
         _Statements fun s <*>
@@ -151,13 +152,13 @@ instance Plated (Statement '[] a) where
       TryFinally idnt a b c d e f ->
         TryFinally idnt a b <$> _Statements fun c <*> pure d <*>
         pure e <*> _Statements fun f
-      For idnt a b c d e f g ->
-        For idnt a b c d e <$>
+      For idnt a asyncWs b c d e f g ->
+        For idnt a asyncWs b c d e <$>
         _Statements fun f <*>
         (traverse._3._Statements) fun g
       ClassDef idnt a decos b c d e ->
         ClassDef idnt a decos b c d <$> _Statements fun e
-      With a b c d e -> With a b c (coerce d) <$> _Statements fun e
+      With a b asyncWs c d e -> With a b asyncWs c (coerce d) <$> _Statements fun e
 
 data SmallStatement (v :: [*]) a
   = Return a [Whitespace] (Maybe (Expr v a))
@@ -248,67 +249,65 @@ data Decorator (v :: [*]) a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data CompoundStatement (v :: [*]) a
-  -- ^ 'def' <spaces> <ident> '(' <spaces> stuff ')' <spaces> ['->' <expr>] ':' <spaces> <newline>
-  --   <block>
   = Fundef a
       [Decorator v a]
       (Indents a)
-      (NonEmpty Whitespace) (Ident v a)
-      [Whitespace] (CommaSep (Param v a))
-      [Whitespace]
-      (Maybe ([Whitespace], Expr v a))
-      (Suite v a)
-  -- ^ 'if' <spaces> <expr> ':' <spaces> <newline>
-  --   <block>
-  --   [ 'else' <spaces> ':' <spaces> <newline>
-  --     <block>
-  --   ]
-  | If
-      (Indents a) a
-      [Whitespace] (Expr v a) (Suite v a)
-      [(Indents a, [Whitespace], Expr v a, Suite v a)]
-      (Maybe (Indents a, [Whitespace], Suite v a))
-  -- ^ 'if' <spaces> <expr> ':' <spaces> <newline>
-  --   <block>
-  --   ('elif' <spaces> <expr> ':' <spaces> <newline> <block>)*
-  --   ['else' <spaces> ':' <spaces> <newline> <block>]
-  | While
-      (Indents a) a
-      [Whitespace] (Expr v a) (Suite v a)
-  -- ^ 'try' <spaces> ':' <spaces> <newline> <block>
-  --   ( 'except' <spaces> exceptAs ':' <spaces> <newline> <block> )+
-  --   [ 'else' <spaces> ':' <spaces> <newline> <block> ]
-  --   [ 'finally' <spaces> ':' <spaces> <newline> <block> ]
-  | TryExcept
-      (Indents a) a
-      [Whitespace] (Suite v a)
-      (NonEmpty (Indents a, [Whitespace], Maybe (ExceptAs v a), Suite v a))
-      (Maybe (Indents a, [Whitespace], Suite v a))
-      (Maybe (Indents a, [Whitespace], Suite v a))
-  -- ^ 'try' <spaces> ':' <spaces> <newline> <block>
-  --   'finally' <spaces> ':' <spaces> <newline> <block>
-  | TryFinally
-      (Indents a) a
-      [Whitespace] (Suite v a)
-      (Indents a) [Whitespace] (Suite v a)
-  -- ^ 'for' <spaces> expr 'in' <spaces> expr ':' <spaces> <newline> <block>
-  --   [ 'else' <spaces> ':' <spaces> <newline> <block> ]
-  | For
-      (Indents a) a
-      [Whitespace] (Expr v a) [Whitespace] (Expr v a) (Suite v a)
-      (Maybe (Indents a, [Whitespace], Suite v a))
-  -- ^ 'class' <spaces> ident [ '(' <spaces> [ args ] ')' <spaces>] ':' <spaces> <newline>
-  --   <block>
+      (Maybe (NonEmpty Whitespace)) -- ^ ['async' <spaces>]
+      (NonEmpty Whitespace) -- ^ 'def' <spaces>
+      (Ident v a) -- ^ <ident>
+      [Whitespace] -- ^ '(' <spaces>
+      (CommaSep (Param v a)) -- ^ <parameters>
+      [Whitespace] -- ^ ')' <spaces>
+      (Maybe ([Whitespace], Expr v a)) -- ^ ['->' <spaces> <expr>]
+      (Suite v a) -- ^ <suite>
+  | If a
+      (Indents a)
+      [Whitespace] -- ^ 'if' <spaces>
+      (Expr v a) -- ^ <expr>
+      (Suite v a) -- ^ <suite>
+      [(Indents a, [Whitespace], Expr v a, Suite v a)] -- ^ ('elif' <spaces> <expr> <suite>)*
+      (Maybe (Indents a, [Whitespace], Suite v a)) -- ^ ['else' <spaces> <suite>]
+  | While a
+      (Indents a)
+      [Whitespace] -- ^ 'while' <spaces>
+      (Expr v a) -- ^ <expr>
+      (Suite v a) -- ^ <suite>
+  | TryExcept a
+      (Indents a)
+      [Whitespace] -- ^ 'try' <spaces>
+      (Suite v a) -- ^ <suite>
+      (NonEmpty (Indents a, [Whitespace], Maybe (ExceptAs v a), Suite v a)) -- ^ ('except' <spaces> <except_as> <suite>)+
+      (Maybe (Indents a, [Whitespace], Suite v a)) -- ^ ['else' <spaces> <suite>]
+      (Maybe (Indents a, [Whitespace], Suite v a)) -- ^ ['finally' <spaces> <suite>]
+  | TryFinally a
+      (Indents a)
+      [Whitespace] -- ^ 'try' <spaces>
+      (Suite v a) -- ^ <suite>
+      (Indents a)
+      [Whitespace] -- ^ 'finally' <spaces>
+      (Suite v a) -- ^ <suite>
+  | For a
+      (Indents a)
+      (Maybe (NonEmpty Whitespace)) -- ^ ['async' <spaces>]
+      [Whitespace] -- ^ 'for' <spaces>
+      (Expr v a) -- ^ <expr>
+      [Whitespace] -- ^ 'in' <spaces>
+      (Expr v a) -- ^ <expr>
+      (Suite v a) -- ^ <suite>
+      (Maybe (Indents a, [Whitespace], Suite v a)) -- ^ ['else' <spaces> <suite>]
   | ClassDef a
       [Decorator v a]
       (Indents a)
-      (NonEmpty Whitespace) (Ident v a)
-      (Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace]))
-      (Suite v a)
-  -- ^ 'with' <spaces> with_item (',' <spaces> with_item)* ':' <spaces> <newline> <block>
-  | With
-      (Indents a) a
-      [Whitespace] (CommaSep1 (WithItem v a)) (Suite v a)
+      (NonEmpty Whitespace) -- ^ 'class' <spaces>
+      (Ident v a) -- ^ <ident>
+      (Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace])) -- ^ ['(' <spaces> [<args>] ')' <spaces>]
+      (Suite v a) -- ^ <suite>
+  | With a
+      (Indents a)
+      (Maybe (NonEmpty Whitespace)) -- ^ ['async' <spaces>]
+      [Whitespace] -- ^ 'with' <spaces>
+      (CommaSep1 (WithItem v a)) -- ^ <with_items>
+      (Suite v a) -- ^ <suite>
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasExprs ExceptAs where
@@ -330,10 +329,11 @@ instance HasExprs Decorator where
     _Exprs fun d <*> pure e
 
 instance HasExprs CompoundStatement where
-  _Exprs f (Fundef a decos idnt ws1 name ws2 params ws3 mty s) =
+  _Exprs f (Fundef a decos idnt asyncWs ws1 name ws2 params ws3 mty s) =
     Fundef a <$>
     traverse (_Exprs f) decos <*>
     pure idnt <*>
+    pure asyncWs <*>
     pure ws1 <*>
     pure (coerce name) <*>
     pure ws2 <*>
@@ -361,8 +361,8 @@ instance HasExprs CompoundStatement where
   _Exprs fun (TryFinally idnt a b c d e f) =
     TryFinally idnt a b <$> _Exprs fun c <*> pure d <*>
     pure e <*> _Exprs fun f
-  _Exprs fun (For idnt a b c d e f g) =
-    For idnt a b <$> fun c <*> pure d <*> fun e <*>
+  _Exprs fun (For idnt a asyncWs b c d e f g) =
+    For idnt a asyncWs b <$> fun c <*> pure d <*> fun e <*>
     _Exprs fun f <*>
     (traverse._3._Exprs) fun g
   _Exprs fun (ClassDef a decos idnt b c d e) =
@@ -373,7 +373,8 @@ instance HasExprs CompoundStatement where
     pure (coerce c) <*>
     (traverse._2.traverse.traverse._Exprs) fun d <*>
     _Exprs fun e
-  _Exprs fun (With a b c d e) = With a b c <$> traverseOf (traverse._Exprs) fun d <*> _Exprs fun e
+  _Exprs fun (With a b asyncWs c d e) =
+    With a b asyncWs c <$> traverseOf (traverse._Exprs) fun d <*> _Exprs fun e
 
 makeWrapped ''Block
 makeLenses ''ExceptAs

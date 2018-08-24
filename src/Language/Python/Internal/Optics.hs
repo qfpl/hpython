@@ -48,6 +48,7 @@ _Fundef
        ( a
        , [Decorator v a]
        ,  Indents a
+       , Maybe (NonEmpty Whitespace)
        , NonEmpty Whitespace, Ident v a
        , [Whitespace], CommaSep (Param v a)
        , [Whitespace], Maybe ([Whitespace], Expr v a)
@@ -56,6 +57,7 @@ _Fundef
        ( a
        , [Decorator '[] a]
        , Indents a
+       , Maybe (NonEmpty Whitespace)
        , NonEmpty Whitespace, Ident '[] a
        , [Whitespace], CommaSep (Param '[] a)
        , [Whitespace], Maybe ([Whitespace], Expr '[] a)
@@ -63,10 +65,11 @@ _Fundef
        )
 _Fundef =
   prism
-    (\(idnt, a, b, c, d, e, f, g, h, i) -> CompoundStatement (Fundef idnt a b c d e f g h i))
+    (\(idnt, a, b, c, d, e, f, g, h, i, j) ->
+       CompoundStatement (Fundef idnt a b c d e f g h i j))
     (\case
-        CompoundStatement (Fundef idnt a b c d e f g h i) ->
-          Right (idnt, a, b, c, d, e, f, g, h, i)
+        CompoundStatement (Fundef idnt a b c d e f g h i j) ->
+          Right (idnt, a, b, c, d, e, f, g, h, i, j)
         a -> Left $ a ^. unvalidated)
 
 _Call
@@ -119,13 +122,13 @@ instance HasIndents Decorator where
 instance HasIndents CompoundStatement where
   _Indents fun s =
     case s of
-      Fundef a decos idnt b c d e f g h ->
-        (\decos' idnt' -> Fundef a decos' idnt' b c d e f g) <$>
+      Fundef a decos idnt asyncWs b c d e f g h ->
+        (\decos' idnt' -> Fundef a decos' idnt' asyncWs b c d e f g) <$>
         traverse (_Indents fun) decos <*>
         fun idnt <*>
         _Indents fun h
-      If idnt a b c d elifs e ->
-        (\idnt' -> If idnt' a b c) <$>
+      If a idnt b c d elifs e ->
+        (\idnt' -> If a idnt' b c) <$>
         fun idnt <*>
         _Indents fun d <*>
         traverse
@@ -140,12 +143,12 @@ instance HasIndents CompoundStatement where
              fun idnt <*>
              _Indents fun b)
           e
-      While idnt a b c d ->
-        (\idnt' -> While idnt' a b c) <$>
+      While a idnt b c d ->
+        (\idnt' -> While a idnt' b c) <$>
         fun idnt <*>
         _Indents fun d
-      TryExcept idnt a b c d e f ->
-        (\idnt' -> TryExcept idnt' a b) <$>
+      TryExcept a idnt b c d e f ->
+        (\idnt' -> TryExcept a idnt' b) <$>
         fun idnt <*>
         _Indents fun c <*>
         traverse
@@ -166,14 +169,14 @@ instance HasIndents CompoundStatement where
              fun idnt <*>
              _Indents fun b)
           f
-      TryFinally idnt a b c idnt2 d e ->
-        (\idnt' c' idnt2' -> TryFinally idnt' a b c' idnt2' d) <$>
+      TryFinally a idnt b c idnt2 d e ->
+        (\idnt' c' idnt2' -> TryFinally a idnt' b c' idnt2' d) <$>
         fun idnt <*>
         _Indents fun c <*>
         fun idnt2 <*>
         _Indents fun e
-      For idnt a b c d e f g ->
-        (\idnt' -> For idnt' a b c d e) <$>
+      For a idnt asyncWs b c d e f g ->
+        (\idnt' -> For a idnt' asyncWs b c d e) <$>
         fun idnt <*>
         _Indents fun f <*>
         traverse
@@ -187,9 +190,9 @@ instance HasIndents CompoundStatement where
         traverse (_Indents fun) decos <*>
         fun idnt <*>
         _Indents fun e
-      With a b c d e ->
-        (\a' -> With a' b c d) <$>
-        fun a <*>
+      With a b asyncWs c d e ->
+        (\b' -> With a b' asyncWs c d) <$>
+        fun b <*>
         _Indents fun e
 
 class HasNewlines s where
@@ -211,8 +214,8 @@ instance HasNewlines Decorator where
 instance HasNewlines CompoundStatement where
   _Newlines fun s =
     case s of
-      Fundef ann decos idnt ws1 name ws2 params ws3 mty s ->
-        (\decos' -> Fundef ann decos' idnt ws1 name ws2 params ws3 mty) <$>
+      Fundef ann decos idnt asyncWs ws1 name ws2 params ws3 mty s ->
+        (\decos' -> Fundef ann decos' idnt asyncWs ws1 name ws2 params ws3 mty) <$>
         traverse (_Newlines fun) decos <*>
         _Newlines fun s
       If idnt ann ws1 cond s elifs els ->
@@ -230,13 +233,13 @@ instance HasNewlines CompoundStatement where
       TryFinally idnt a b c idnt2 f g ->
         TryFinally idnt a b <$> _Newlines fun c <*> pure idnt2 <*>
         pure f <*> _Newlines fun g
-      For idnt a b c d e f g ->
-        For idnt a b c d e <$> _Newlines fun f <*> (traverse._3._Newlines) fun g
+      For idnt a asyncWs b c d e f g ->
+        For idnt a asyncWs b c d e <$> _Newlines fun f <*> (traverse._3._Newlines) fun g
       ClassDef a decos idnt b c d e ->
         (\decos' -> ClassDef a decos' idnt b (coerce c) (coerce d)) <$>
         traverse (_Newlines fun) decos <*>
         _Newlines fun e
-      With a b c d e -> With a b c (coerce d) <$> _Newlines fun e
+      With a b asyncWs c d e -> With a b asyncWs c (coerce d) <$> _Newlines fun e
 
 instance HasNewlines Statement where
   _Newlines f (CompoundStatement c) =
@@ -281,3 +284,4 @@ assignTargets f e =
     SetComp{} -> pure $ e ^. unvalidated
     Set{} -> pure $ e ^. unvalidated
     Generator{} -> pure $ e ^. unvalidated
+    Await{} -> pure $ e ^. unvalidated

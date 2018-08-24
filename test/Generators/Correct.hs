@@ -78,14 +78,17 @@ localState m = do
   put a
   pure b
 
-genIdent :: MonadGen m => m (Ident '[] ())
-genIdent =
-  Gen.filter (\i -> not $ any (`isPrefixOf` _identValue i) reservedWords) $
-  MkIdent () <$>
-  liftA2 (:)
-    (Gen.choice [Gen.alpha, pure '_'])
-    (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_'])) <*>
-  genWhitespaces
+genIdent :: (MonadGen m, MonadState GenState m) => m (Ident '[] ())
+genIdent = do
+  isAsync <- maybe False snd <$> use inFunction
+  let reserved = reservedWords <> (if isAsync then ["async", "await"] else [])
+  Gen.filter
+    (\i -> not $ any (`isPrefixOf` _identValue i) reserved) $
+    MkIdent () <$>
+    liftA2 (:)
+      (Gen.choice [Gen.alpha, pure '_'])
+      (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_'])) <*>
+    genWhitespaces
 
 genTuple :: (MonadGen m, MonadState GenState m) => m (Expr '[] ()) -> m (Expr '[] ())
 genTuple expr =
@@ -94,7 +97,7 @@ genTuple expr =
   genWhitespaces <*>
   Gen.maybe (genSizedCommaSep1' $ genTupleItem genWhitespaces expr)
 
-genModuleName :: MonadGen m => m (ModuleName '[] ())
+genModuleName :: (MonadGen m, MonadState GenState m) => m (ModuleName '[] ())
 genModuleName =
   Gen.recursive Gen.choice
   [ ModuleNameOne () <$> genIdent ]
@@ -104,7 +107,7 @@ genModuleName =
     genModuleName
   ]
 
-genRelativeModuleName :: MonadGen m => m (RelativeModuleName '[] ())
+genRelativeModuleName :: (MonadGen m, MonadState GenState m) => m (RelativeModuleName '[] ())
 genRelativeModuleName =
   Gen.choice
   [ Relative <$>
@@ -114,7 +117,7 @@ genRelativeModuleName =
     genModuleName
   ]
 
-genImportTargets :: MonadGen m => m (ImportTargets '[] ())
+genImportTargets :: (MonadGen m, MonadState GenState m) => m (ImportTargets '[] ())
 genImportTargets =
   Gen.choice
   [ ImportAll () <$> genWhitespaces

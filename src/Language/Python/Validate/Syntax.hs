@@ -46,7 +46,7 @@ where
 import Control.Applicative ((<|>), liftA2)
 import Control.Lens.Cons (snoc)
 import Control.Lens.Fold ((^..), (^?), (^?!), folded, allOf, toListOf)
-import Control.Lens.Getter ((^.), getting)
+import Control.Lens.Getter ((^.), getting, view)
 import Control.Lens.Prism (_Right, _Just)
 import Control.Lens.Review ((#))
 import Control.Lens.Setter ((.~), (%~))
@@ -139,8 +139,18 @@ validateIdentSyntax
 validateIdentSyntax (MkIdent a name ws)
   | not (all isAscii name) = errorVM [_BadCharacter # (a, name)]
   | null name = errorVM [_EmptyIdentifier # a]
-  | name `elem` reservedWords = errorVM [_IdentifierReservedWord # (a, name)]
-  | otherwise = pure $ MkIdent a name ws
+  | otherwise =
+      bindVM (view inFunction) $ \fi ->
+        let
+          reserved =
+            reservedWords <>
+            if fromMaybe False (fi ^? _Just.asyncFunction)
+            then ["async", "await"]
+            else []
+        in
+          if (name `elem` reserved)
+            then errorVM [_IdentifierReservedWord # (a, name)]
+            else pure $ MkIdent a name ws
 
 validateWhitespace
   :: (AsSyntaxError e v a, Foldable f)

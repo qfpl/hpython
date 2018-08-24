@@ -329,7 +329,10 @@ validateExprSyntax (YieldFrom a b c d) =
         Nothing
           | _inGenerator ctxt -> pure ()
           | otherwise -> errorVM [_InvalidYield # a]
-        Just{} -> pure ()) <*>
+        Just fi ->
+          if fi ^. asyncFunction
+          then errorVM [_YieldFromInsideCoroutine # a]
+          else pure ()) <*>
   validateExprSyntax d
 validateExprSyntax (Ternary a b c d e f) =
   (\b' d' f' -> Ternary a b' c d' e f') <$>

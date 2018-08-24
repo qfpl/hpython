@@ -348,8 +348,9 @@ genStringLiterals = do
 
 genExpr' :: (MonadGen m, MonadState GenState m) => Bool -> m (Expr '[] ())
 genExpr' isExp = do
-  isInFunction <- isJust <$> gets _inFunction
-  isInGenerator <- gets _inGenerator
+  isInFunction <- isJust <$> use inFunction
+  isAsync <- maybe False snd <$> use inFunction
+  isInGenerator <- use inGenerator
   sizedRecursive
     [ genNone
     , genEllipsis
@@ -427,7 +428,7 @@ genExpr' isExp = do
          (NonEmpty.toList <$> genWhitespaces1) <*>
          (NonEmpty.toList <$> genWhitespaces1) <*>
          genExpr
-     | isInFunction || isInGenerator
+     | (isInFunction || isInGenerator) && not isAsync
      ])
 
 genSubscript :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())

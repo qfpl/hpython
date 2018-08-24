@@ -35,6 +35,7 @@ data SyntaxError (v :: [*]) a
   | TypedUnnamedStarParam a
   | AsyncWithOutsideCoroutine a
   | AsyncForOutsideCoroutine a
+  | YieldFromInsideCoroutine a
   deriving (Eq, Show)
 
 makeClassyPrisms ''SyntaxError

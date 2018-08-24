@@ -9,7 +9,7 @@ module Language.Python.Internal.Render
   , RenderOutput, showRenderOutput, singleton, cons
   , renderModule, renderStatement, renderExpr
     -- * Miscellany
-  , showQuoteType, showStringPrefix, showBytesPrefix, showToken
+  , showQuoteType, showStringPrefix, showBytesPrefix, showToken, showTokens
   , bracket, renderWhitespace, renderCommaSep, renderCommaSep1, renderCommaSep1'
   , renderIdent, renderComment, renderModuleName, renderDot, renderRelativeModuleName
   , renderImportAs, renderImportTargets, renderSmallStatement, renderCompoundStatement
@@ -84,6 +84,12 @@ showRenderOutput =
         TkContinued (CR cmt) () : TkNewline (LF cmt') () : rest ->
           TkContinued (CRLF cmt) () : TkNewline (LF cmt') () : rest
         a -> a
+
+showTokens :: [PyToken a] -> Text
+showTokens =
+  Lazy.toStrict .
+  Builder.toLazyText .
+  foldMap (Builder.fromText . showToken . (() <$))
 
 showStringPrefix :: StringPrefix -> Text
 showStringPrefix sp =

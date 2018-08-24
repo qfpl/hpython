@@ -88,7 +88,7 @@ executable example
                        -Wunused-imports
                        -Werror
 
-executable benchmarks
+executable bench
   main-is:             Main.hs
   hs-source-dirs:      benchmarks
   build-depends:       base >=4.9 && <4.11

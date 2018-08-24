@@ -96,11 +96,13 @@ newtype Parser ann a
   }
 
 instance Functor (Parser ann) where
+  {-# inline fmap #-}
   fmap f (Parser g) =
     Parser $ \st btf err bts succ ->
     g st btf err (bts . f) (succ . f)
 
 instance Apply (Parser ann) where
+  {-# inline (<.>) #-}
   Parser mf <.> Parser ma =
     Parser $ \st btf err bts succ ->
     mf st
@@ -110,10 +112,13 @@ instance Apply (Parser ann) where
       (\f st' -> let succ' = succ . f in ma st' err err succ' succ')
 
 instance Applicative (Parser ann) where
+  {-# inline pure #-}
   pure a = Parser $ \st _ _ bts _ -> bts a st
+  {-# inline (<*>) #-}
   (<*>) = (<.>)
 
 instance Monad (Parser ann) where
+  {-# inline (>>=) #-}
   Parser ma >>= f =
     Parser $ \st btf err bts succ ->
     ma st
@@ -123,21 +128,27 @@ instance Monad (Parser ann) where
       (\a st' -> unParser (f a) st' err err succ succ)
 
 instance Alt (Parser ann) where
+  {-# inline (<!>) #-}
   Parser ma <!> Parser mb =
     Parser $ \st btf err bts succ ->
     ma st (\e -> mb st btf err bts succ) err bts succ
 
+{-# inline try #-}
 try :: Parser ann a -> Parser ann a
 try (Parser ma) =
   Parser $ \st btf _ bts succ ->
   ma st btf btf bts succ
 
 instance MonadState (ParseState ann) (Parser ann) where
+  {-# inline get #-}
   get = Parser $ \st _ _ bts _ -> bts st st
+  {-# inline put #-}
   put st = Parser $ \_ _ _ bts _ -> bts () st
 
 instance MonadError (ParseError ann) (Parser ann) where
+  {-# inline throwError #-}
   throwError e = Parser $ \st btf _ _ _ -> btf e
+  {-# inline catchError #-}
   catchError (Parser ma) f =
     Parser $ \st btf err bts succ ->
     ma st
@@ -146,6 +157,7 @@ instance MonadError (ParseError ann) (Parser ann) where
       bts
       succ
 
+{-# inline runParser #-}
 runParser :: ann -> Parser ann a -> Nested ann -> Either (ParseError ann) a
 runParser initial (Parser p) input =
   p

@@ -260,43 +260,46 @@ parseToken
   :: (Monad m, CharParsing m, MonadParsec e s m)
   => m (PyToken SrcInfo)
 parseToken =
-  (<**>) getSrcInfo .
-  asum $
-    fmap
-    (\p -> try $ p <* notFollowedBy (satisfy isIdentifierStart))
-    [ TkIf <$ text "if"
-    , TkElse <$ text "else"
-    , TkElif <$ text "elif"
-    , TkWhile <$ text "while"
-    , TkAssert <$ text "assert"
-    , TkDef <$ text "def"
-    , TkReturn <$ text "return"
-    , TkPass <$ text "pass"
-    , TkBreak <$ text "break"
-    , TkContinue <$ text "continue"
-    , TkTrue <$ text "True"
-    , TkFalse <$ text "False"
-    , TkNone <$ text "None"
-    , TkOr <$ text "or"
-    , TkAnd <$ text "and"
-    , TkIs <$ text "is"
-    , TkNot <$ text "not"
-    , TkGlobal <$ text "global"
-    , TkDel <$ text "del"
-    , TkLambda <$ text "lambda"
-    , TkImport <$ text "import"
-    , TkFrom <$ text "from"
-    , TkAs <$ text "as"
-    , TkRaise <$ text "raise"
-    , TkTry <$ text "try"
-    , TkExcept <$ text "except"
-    , TkFinally <$ text "finally"
-    , TkClass <$ text "class"
-    , TkWith <$ text "with"
-    , TkFor <$ text "for"
-    , TkIn <$ text "in"
-    , TkYield <$ text "yield"
-    ] <>
+  (<**>) getSrcInfo $
+  try
+    (asum
+     [ TkIf <$ text "if"
+     , TkElse <$ text "else"
+     , TkElif <$ text "elif"
+     , TkWhile <$ text "while"
+     , TkAssert <$ text "assert"
+     , TkDef <$ text "def"
+     , TkReturn <$ text "return"
+     , TkPass <$ text "pass"
+     , TkBreak <$ text "break"
+     , TkContinue <$ text "continue"
+     , TkTrue <$ text "True"
+     , TkFalse <$ text "False"
+     , TkNone <$ text "None"
+     , TkOr <$ text "or"
+     , TkAnd <$ text "and"
+     , TkIs <$ text "is"
+     , TkNot <$ text "not"
+     , TkGlobal <$ text "global"
+     , TkDel <$ text "del"
+     , TkLambda <$ text "lambda"
+     , TkImport <$ text "import"
+     , TkFrom <$ text "from"
+     , TkAs <$ text "as"
+     , TkRaise <$ text "raise"
+     , TkTry <$ text "try"
+     , TkExcept <$ text "except"
+     , TkFinally <$ text "finally"
+     , TkClass <$ text "class"
+     , TkWith <$ text "with"
+     , TkFor <$ text "for"
+     , TkIn <$ text "in"
+     , TkYield <$ text "yield"
+     ] <* notFollowedBy (satisfy isIdentifierChar))
+
+    <|>
+
+    asum
     [ number
     , TkRightArrow <$ text "->"
     , TkEllipsis <$ text "..."
@@ -412,6 +415,7 @@ parseToken =
       many (satisfy isIdentifierChar)
     ]
 
+{-# noinline tokenize #-}
 tokenize :: FilePath -> Text.Text -> Either (ParseError Char Void) [PyToken SrcInfo]
 tokenize fp = parse (unParsecT tokens) fp
   where

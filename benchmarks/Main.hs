@@ -4,20 +4,18 @@ module Main where
 
 import Criterion.Main
 
-import Control.DeepSeq (rnf)
 import Data.Validate (Validate(..))
 import System.Exit (exitFailure)
 
 import qualified Data.Text.IO as StrictText
 
 import Language.Python.Parse (parseModule)
-import Language.Python.Internal.Render (showModule)
-import Language.Python.Internal.Lexer (SrcInfo)
+import Language.Python.Internal.Lexer (SrcInfo, tokenize)
 import Language.Python.Validate.Indentation
 import Language.Python.Validate.Syntax
 
-parseCheckPrint :: FilePath -> IO ()
-parseCheckPrint name = do
+parseCheckSeq :: FilePath -> IO ()
+parseCheckSeq name = do
   file <- StrictText.readFile name
   py <-
     case parseModule name file of
@@ -30,10 +28,20 @@ parseCheckPrint name = do
       case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
         Failure errs' ->
           print (errs' :: [SyntaxError '[Indentation] SrcInfo]) *> exitFailure
-        Success _ -> pure $! rnf (showModule py)
+        Success a -> pure $ seq a ()
+
+tokenizeSeq :: FilePath -> IO ()
+tokenizeSeq name = do
+  file <- StrictText.readFile name
+  case tokenize name file of
+    Left e -> print e *> exitFailure
+    Right a -> pure $ seq (length a) ()
 
 main :: IO ()
 main =
   defaultMain
-  [ bench "9000 lines of correct python" $ nfIO (parseCheckPrint "./benchmarks/pypy.py")
+  [ bench "tokenize 9000 lines of correct python" $
+    nfIO (tokenizeSeq "./benchmarks/pypy.py")
+  , bench "9000 lines of correct python" $
+    nfIO (parseCheckSeq "./benchmarks/pypy.py")
   ]

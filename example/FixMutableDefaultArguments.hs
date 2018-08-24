@@ -4,7 +4,7 @@ module FixMutableDefaultArguments where
 
 import Control.Lens.Fold ((^..), (^?), filtered, folded, anyOf)
 import Control.Lens.Getter ((^.), getting)
-import Control.Lens.Setter ((.~), over)
+import Control.Lens.Setter ((.~), (%~), over)
 import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.Semigroup ((<>))
@@ -14,11 +14,12 @@ import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax
 
-fixMutableDefaultArguments :: Statement '[] () -> Maybe (Statement '[] ())
+fixMutableDefaultArguments :: Raw Statement -> Maybe (Raw Statement)
 fixMutableDefaultArguments input = do
-  (_, decos, idnts, _, _, name, _, params, _, _, suite) <- input ^? _Fundef
+  -- (_, decos, idnts, _, _, name, _, params, _, _, suite) <- input ^? _Fundef
+  function <- input ^? _Fundef
 
-  let paramsList = toList params
+  let paramsList = function ^.. parameters.folded
   _ <- paramsList ^? folded._KeywordParam.filtered (isMutable._kpExpr)
 
   let
@@ -34,11 +35,18 @@ fixMutableDefaultArguments input = do
       paramsList & traverse._KeywordParam.filtered (isMutable._kpExpr).kpExpr .~ none_
 
   pure $
+    fundef
+      (function &
+       setParameters newparams &
+       fdBody %~ (conditionalAssignments <>))
+  {-
+  pure $
     over (_Indents.indentsValue) (idnts ^. indentsValue <>) $
     def_ name newparams
     (NonEmpty.fromList $ conditionalAssignments <> (suite ^.. _Statements.noIndents))
+-}
   where
-    isMutable :: Expr v a -> Bool
+    isMutable :: Raw Expr -> Bool
     isMutable Unit{} = False
     isMutable None{} = False
     isMutable Ellipsis{} = False

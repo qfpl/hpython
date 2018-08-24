@@ -4,7 +4,8 @@ module Programs where
 
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
-import Language.Python.Internal.Syntax
+import Language.Python.Internal.Syntax hiding (CompoundStatement(Fundef))
+import qualified Language.Python.Internal.Syntax as AST (CompoundStatement(Fundef))
 import Language.Python.Syntax
 
 -- |
@@ -17,7 +18,7 @@ import Language.Python.Syntax
 -- Written without the DSL
 append_to =
   CompoundStatement $
-  Fundef () [] (Indents [] ())
+  AST.Fundef () [] (Indents [] ())
     Nothing
     [Space]
     "append_to"

@@ -18,8 +18,6 @@ cabal-version:       >=1.10
 library
   exposed-modules:     Data.Validate
                      , Data.Validate.Monadic
-                     , Language.Python.Parse
-                     , Language.Python.Syntax
                      , Language.Python.Internal.Lexer
                      , Language.Python.Internal.Optics
                      , Language.Python.Internal.Optics.Validated
@@ -43,6 +41,9 @@ library
                      , Language.Python.Internal.Syntax.Strings.Raw
                      , Language.Python.Internal.Syntax.UnOp
                      , Language.Python.Internal.Syntax.Whitespace
+                     , Language.Python.Parse
+                     , Language.Python.Syntax
+                     , Language.Python.Syntax.Types
                      , Language.Python.Validate.Scope
                      , Language.Python.Validate.Scope.Error
                      , Language.Python.Validate.Syntax

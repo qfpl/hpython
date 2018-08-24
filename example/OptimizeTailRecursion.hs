@@ -17,10 +17,10 @@ import Control.Lens ((&), (.~))
 
 import Language.Python.Internal.Optics
 import Language.Python.Internal.Optics.Validated (unvalidated)
-import Language.Python.Internal.Syntax
+import Language.Python.Internal.Syntax hiding (Expr(), Statement())
 import Language.Python.Syntax
 
-optimizeTailRecursion :: Statement '[] () -> Maybe (Statement '[] ())
+optimizeTailRecursion :: Raw Statement -> Maybe (Raw Statement)
 optimizeTailRecursion st = do
   (_, decos, idnts, _, _, name, _, params, _, _, suite) <- st ^? _Fundef
   bodyLast <- toListOf (unvalidated._Statements) suite ^? _last
@@ -49,13 +49,13 @@ optimizeTailRecursion st = do
         ]
 
   where
-    isTailCall :: String -> Expr '[] () -> Bool
+    isTailCall :: String -> Expr -> Bool
     isTailCall name e
       | anyOf (cosmos._Call._2._Ident._2.identValue) (== name) e
       = (e ^? _Call._2._Ident._2.identValue) == Just name
       | otherwise = False
 
-    hasTC :: String -> Statement '[] () -> Bool
+    hasTC :: String -> Raw Statement -> Bool
     hasTC name st =
       case st of
         CompoundStatement (If _ _ _ e sts [] sts') ->
@@ -69,12 +69,12 @@ optimizeTailRecursion st = do
             _ -> False
         _ -> False
 
-    renameIn :: [String] -> String -> Expr '[] () -> Expr '[] ()
+    renameIn :: [String] -> String -> Expr -> Expr
     renameIn params suffix =
       transform
         (_Ident._2.identValue %~ (\a -> if a `elem` params then a <> suffix else a))
 
-    looped :: String -> [String] -> Statement '[] () -> [Statement '[] ()]
+    looped :: String -> [String] -> Raw Statement -> [Raw Statement]
     looped name params st =
       case st of
         CompoundStatement c ->

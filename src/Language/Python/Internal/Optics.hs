@@ -13,10 +13,11 @@ import Control.Lens.Prism (Prism, _Right, _Left, prism)
 import Control.Lens.Wrapped (_Wrapped)
 import Data.Coerce (coerce)
 import Data.Function ((&))
-import Data.List.NonEmpty
 
 import Language.Python.Internal.Optics.Validated (unvalidated)
-import Language.Python.Internal.Syntax
+import Language.Python.Internal.Syntax hiding (Fundef)
+import Language.Python.Syntax.Types
+import qualified Language.Python.Internal.Syntax as AST (CompoundStatement(Fundef))
 
 data KeywordParam v a
   = MkKeywordParam
@@ -45,31 +46,15 @@ _Fundef
   :: Prism
        (Statement v a)
        (Statement '[] a)
-       ( a
-       , [Decorator v a]
-       ,  Indents a
-       , Maybe (NonEmpty Whitespace)
-       , NonEmpty Whitespace, Ident v a
-       , [Whitespace], CommaSep (Param v a)
-       , [Whitespace], Maybe ([Whitespace], Expr v a)
-       , Suite v a
-       )
-       ( a
-       , [Decorator '[] a]
-       , Indents a
-       , Maybe (NonEmpty Whitespace)
-       , NonEmpty Whitespace, Ident '[] a
-       , [Whitespace], CommaSep (Param '[] a)
-       , [Whitespace], Maybe ([Whitespace], Expr '[] a)
-       , Suite '[] a
-       )
+       (Fundef v a)
+       (Fundef '[] a)
 _Fundef =
   prism
-    (\(idnt, a, b, c, d, e, f, g, h, i, j) ->
-       CompoundStatement (Fundef idnt a b c d e f g h i j))
+    (\(Fundef idnt a b c d e f g h i j) ->
+       CompoundStatement (AST.Fundef idnt a b c d e f g h i j))
     (\case
-        CompoundStatement (Fundef idnt a b c d e f g h i j) ->
-          Right (idnt, a, b, c, d, e, f, g, h, i, j)
+        CompoundStatement (AST.Fundef idnt a b c d e f g h i j) ->
+          Right $ Fundef idnt a b c d e f g h i j
         a -> Left $ a ^. unvalidated)
 
 _Call
@@ -122,8 +107,8 @@ instance HasIndents Decorator where
 instance HasIndents CompoundStatement where
   _Indents fun s =
     case s of
-      Fundef a decos idnt asyncWs b c d e f g h ->
-        (\decos' idnt' -> Fundef a decos' idnt' asyncWs b c d e f g) <$>
+      AST.Fundef a decos idnt asyncWs b c d e f g h ->
+        (\decos' idnt' -> AST.Fundef a decos' idnt' asyncWs b c d e f g) <$>
         traverse (_Indents fun) decos <*>
         fun idnt <*>
         _Indents fun h
@@ -214,8 +199,8 @@ instance HasNewlines Decorator where
 instance HasNewlines CompoundStatement where
   _Newlines fun s =
     case s of
-      Fundef ann decos idnt asyncWs ws1 name ws2 params ws3 mty s ->
-        (\decos' -> Fundef ann decos' idnt asyncWs ws1 name ws2 params ws3 mty) <$>
+      AST.Fundef ann decos idnt asyncWs ws1 name ws2 params ws3 mty s ->
+        (\decos' -> AST.Fundef ann decos' idnt asyncWs ws1 name ws2 params ws3 mty) <$>
         traverse (_Newlines fun) decos <*>
         _Newlines fun s
       If idnt ann ws1 cond s elifs els ->

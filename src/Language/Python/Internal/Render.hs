@@ -923,6 +923,17 @@ renderExpr (Set _ a b c) =
   singleton (TkRightBrace ()) <>
   foldMap renderWhitespace c
 renderExpr (Generator _ a) = renderComprehension bracketTupleGenerator a
+renderExpr (Await _ ws expr) =
+  TkIdent "await" () `cons`
+  foldMap renderWhitespace ws <>
+  (case expr of
+     UnOp{} -> bracket $ renderExpr expr
+     BinOp{} -> bracket $ renderExpr expr
+     Tuple{} -> bracket $ renderExpr expr
+     Not{} -> bracket $ renderExpr expr
+     Ternary{} -> bracket $ renderExpr expr
+     Lambda{} -> bracket $ renderExpr expr
+     _ -> bracketGenerator expr)
 
 renderModuleName :: ModuleName v a -> RenderOutput
 renderModuleName (ModuleNameOne _ s) = renderIdent s

@@ -548,6 +548,11 @@ data Expr (v :: [*]) a
   { _exprAnnotation :: a
   , _generatorValue :: Comprehension Expr v a
   }
+  | Await
+  { _exprAnnotation :: a
+  , _unsafeAwaitWhitespace :: [Whitespace]
+  , _unsafeAwaitValue :: Expr v a
+  }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 instance HasTrailingWhitespace (Expr v a) where
@@ -583,7 +588,8 @@ instance HasTrailingWhitespace (Expr v a) where
           Dict _ _ _ ws -> ws
           SetComp _ _ _ ws -> ws
           Set _ _ _ ws -> ws
-          Generator  _ a -> a ^. trailingWhitespace)
+          Generator  _ a -> a ^. trailingWhitespace
+          Await _ _ e -> e ^. trailingWhitespace)
       (\e ws ->
         case e of
           Unit a b _ -> Unit a b ws
@@ -616,7 +622,8 @@ instance HasTrailingWhitespace (Expr v a) where
           Dict a b c _ -> Dict a b c ws
           SetComp a b c _ -> SetComp a b c ws
           Set a b c _ -> Set a b c ws
-          Generator a b -> Generator a $ b & trailingWhitespace .~ ws)
+          Generator a b -> Generator a $ b & trailingWhitespace .~ ws
+          Await a b c -> Not a b (c & trailingWhitespace .~ ws))
 
 instance IsString (Expr '[] ()) where
   fromString s = Ident () (MkIdent () s [])

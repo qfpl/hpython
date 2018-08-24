@@ -432,6 +432,14 @@ genExpr' isExp = do
          (NonEmpty.toList <$> genWhitespaces1) <*>
          genExpr
      | (isInFunction || isInGenerator) && not isAsync
+     ] ++
+     [ Gen.subtermM
+         genExpr
+         (\a ->
+            Await () <$>
+            (NonEmpty.toList <$> genWhitespaces1) <*>
+            pure a)
+     | isAsync
      ])
 
 genSubscript :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())

@@ -72,11 +72,15 @@ runPython3 path shouldSucceed str = do
   annotate sto
   annotate ste
   case (shouldSucceed, ec) of
+    -- Validation is sound but not complete
+    --
+    -- If the python repl would fail, then validation should fail
+    -- If validation succeeds, then the python repl should succeed
     (True, ExitSuccess) -> success
     (True, ExitFailure{})
       | "SyntaxError" `isInfixOf` last (lines ste) -> failure
       | otherwise -> success
-    (False, ExitSuccess) -> failure
+    (False, ExitSuccess) -> success
     (False, ExitFailure{}) -> success
 
 syntax_expr :: FilePath -> Property

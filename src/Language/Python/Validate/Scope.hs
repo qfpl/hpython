@@ -491,6 +491,7 @@ validateAssignExprScope e@Dict{} = pure $ unsafeCoerce e
 validateAssignExprScope e@SetComp{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Set{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Generator{} = pure $ unsafeCoerce e
+validateAssignExprScope e@Await{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Ternary{} = pure $ unsafeCoerce e
 
 validateDictItemScope
@@ -570,6 +571,7 @@ validateExprScope (ListComp a ws1 comp ws2) =
 validateExprScope (Generator a comp) =
   Generator a <$>
   validateComprehensionScope validateExprScope comp
+validateExprScope (Await a ws expr) = Await a ws <$> validateExprScope expr
 validateExprScope (Deref a e ws1 r) =
   Deref a <$>
   validateExprScope e <*>

@@ -7,10 +7,10 @@ def a():
 @a
 async def a():
     async with a as b:
-        pass
+        await f(1, 2, 3)
 
     async for x in y:
-        pass
+        await (lambda x: x)
 
 @a
 def a():
@@ -20,6 +20,7 @@ def a():
     for x in y:
         pass
 
+
 async def a():
     with a as b:
         pass
@@ -27,6 +28,10 @@ async def a():
     async for x in y:
         pass
 
+    await 3
+
 async = 2
 async
+await = 2
+await
 print(async)

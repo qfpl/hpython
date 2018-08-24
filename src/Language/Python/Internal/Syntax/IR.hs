@@ -441,6 +441,11 @@ data Expr a
   { _exprAnnotation :: a
   , _generatorValue :: Comprehension Expr a
   }
+  | Await
+  { _exprAnnotation :: a
+  , _unsafeAwaitWhitespace :: [Whitespace]
+  , _unsafeAwaitValue :: Expr a
+  }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Suite a
@@ -568,6 +573,7 @@ fromIR_expr ex =
       traverseOf (traverse.traverse) fromIR_tupleItem d
     Not a b c -> Syntax.Not a b <$> fromIR_expr c
     Generator a b -> Syntax.Generator a <$> fromIR_comprehension fromIR_expr b
+    Await a b c -> Syntax.Await a b <$> fromIR_expr c
 
 fromIR_suite :: Suite a -> Validate [IRError a] (Syntax.Suite '[] a)
 fromIR_suite s =

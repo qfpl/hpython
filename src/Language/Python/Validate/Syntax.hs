@@ -393,6 +393,14 @@ validateExprSyntax (Generator a comp) =
   liftVM1
     (local $ inGenerator .~ True)
     (validateComprehensionSyntax validateExprSyntax comp)
+validateExprSyntax (Await a ws expr) =
+  bindVM (view inFunction) $ \fi ->
+  Await a <$>
+  validateWhitespace a ws <*
+  (if not $ fromMaybe False (fi ^? _Just.asyncFunction)
+   then errorVM [_AwaitOutsideCoroutine # a]
+   else pure ()) <*>
+  validateExprSyntax expr
 validateExprSyntax (Deref a expr ws1 name) =
   Deref a <$>
   validateExprSyntax expr <*>

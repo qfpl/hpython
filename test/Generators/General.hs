@@ -238,6 +238,9 @@ genExpr' isExp =
     , Generator () <$> genComprehension genExpr
     , Gen.subtermM
         genExpr
+        (\a -> Await () <$> genWhitespaces <*> pure a)
+    , Gen.subtermM
+        genExpr
         (\a ->
             Deref () <$>
             pure a <*>

@@ -284,3 +284,4 @@ assignTargets f e =
     SetComp{} -> pure $ e ^. unvalidated
     Set{} -> pure $ e ^. unvalidated
     Generator{} -> pure $ e ^. unvalidated
+    Await{} -> pure $ e ^. unvalidated

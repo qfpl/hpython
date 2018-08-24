@@ -624,7 +624,14 @@ orExpr ws =
       commaSep1' anySpace subscript <*>
       (snd <$> token ws (TkRightBracket ()))
 
-    atomExpr = foldl' (&) <$> atom <*> many trailer
+    atomExpr =
+      (\(mAwait, a) b ->
+         let e = foldl' (&) a b
+         in maybe e (\(tk, sp) -> Await (pyTokenAnn tk) sp e) mAwait) <$>
+      try ((,) <$> optional (token ws $ TkIdent "await" ()) <*> atom) <*>
+      many trailer
+      <!>
+      foldl' (&) <$> atom <*> many trailer
 
     parensOrUnit =
       (\(tk, s) maybeEx sps ->

@@ -36,6 +36,7 @@ data SyntaxError (v :: [*]) a
   | AsyncWithOutsideCoroutine a
   | AsyncForOutsideCoroutine a
   | YieldFromInsideCoroutine a
+  | AwaitOutsideCoroutine a
   deriving (Eq, Show)
 
 makeClassyPrisms ''SyntaxError

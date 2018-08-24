@@ -59,6 +59,7 @@ fixMutableDefaultArguments input = do
     isMutable Dict{} = True
     isMutable Ident{} = True
     isMutable Yield{} = True
+    isMutable Await{} = True
     isMutable YieldFrom{} = True
     isMutable SetComp{} = True
     isMutable Set{} = True

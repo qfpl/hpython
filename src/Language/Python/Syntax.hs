@@ -37,6 +37,7 @@ defD_ ds name params block =
   Fundef ()
     ds
     (Indents [] ())
+    Nothing
     [Space]
     name
     []
@@ -227,13 +228,13 @@ forElse_
   -> Statement '[] ()
 forElse_ val vals block els =
   CompoundStatement $
-  For () (Indents [] ()) [Space] (val & trailingWhitespace .~ [Space]) [Space] vals
+  For () (Indents [] ()) Nothing [Space] (val & trailingWhitespace .~ [Space]) [Space] vals
     (SuiteMany () [] (LF Nothing) $ toBlock block)
     (Just (Indents [] (), [], SuiteMany () [] (LF Nothing) $ toBlock els))
 
 for_ :: Expr '[] () -> Expr '[] () -> NonEmpty (Statement '[] ()) -> Statement '[] ()
 for_ val vals block =
   CompoundStatement $
-  For () (Indents [] ()) [Space] (val & trailingWhitespace .~ [Space]) [Space] vals
+  For () (Indents [] ()) Nothing [Space] (val & trailingWhitespace .~ [Space]) [Space] vals
     (SuiteMany () [] (LF Nothing) $ toBlock block)
     Nothing

@@ -45,11 +45,11 @@ where
 
 import Control.Applicative ((<|>), liftA2)
 import Control.Lens.Cons (snoc)
-import Control.Lens.Fold ((^..), (^?!), folded, allOf, toListOf)
+import Control.Lens.Fold ((^..), (^?), (^?!), folded, allOf, toListOf)
 import Control.Lens.Getter ((^.), getting)
-import Control.Lens.Prism (_Right)
+import Control.Lens.Prism (_Right, _Just)
 import Control.Lens.Review ((#))
-import Control.Lens.Setter ((.~))
+import Control.Lens.Setter ((.~), (%~))
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Tuple (_2, _3)
 import Control.Lens.Traversal (traverseOf)
@@ -64,7 +64,7 @@ import Data.Bitraversable (bitraverse)
 import Data.Functor.Compose (Compose(..))
 import Data.List (intersect, union)
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromMaybe)
 import Data.Semigroup (Semigroup(..))
 import Data.Type.Set (Nub, Member)
 import Data.Validate (Validate(..))
@@ -88,10 +88,17 @@ deleteFirstsBy' eq = foldl (flip (deleteBy' (flip eq)))
 
 data Syntax
 
+data FunctionInfo
+  = FunctionInfo
+  { _functionParams :: [String]
+  , _asyncFunction :: Bool
+  }
+makeLenses ''FunctionInfo
+
 data SyntaxContext
   = SyntaxContext
   { _inLoop :: Bool
-  , _inFunction :: Maybe [String]
+  , _inFunction :: Maybe FunctionInfo
   , _inGenerator :: Bool
   , _inParens :: Bool
   }
@@ -298,9 +305,9 @@ validateExprSyntax (Lambda a b c d e) =
           { _inLoop = False
           , _inFunction =
               fmap
-                (`union` paramIdents)
+                ((functionParams %~ (`union` paramIdents)) . (asyncFunction .~ False))
                 (_inFunction ctxt) <|>
-              Just paramIdents
+              Just (FunctionInfo paramIdents False)
           })
       (validateExprSyntax e)
 validateExprSyntax (Yield a b c) =
@@ -473,17 +480,20 @@ validateDecoratorSyntax (Decorator a b c d e) =
     isDecoratorValue _ = errorVM [_MalformedDecorator # a]
 
 validateCompoundStatementSyntax
-  :: ( AsSyntaxError e v a
+  :: forall e v a
+   . ( AsSyntaxError e v a
      , Member Indentation v
      )
   => CompoundStatement v a
   -> ValidateSyntax e (CompoundStatement (Nub (Syntax ': v)) a)
-validateCompoundStatementSyntax (Fundef a decos idnts ws1 name ws2 params ws3 mty body) =
+validateCompoundStatementSyntax (Fundef a decos idnts asyncWs ws1 name ws2 params ws3 mty body) =
   let
     paramIdents = params ^.. folded.unvalidated.paramName.identValue
   in
-    (\decos' -> Fundef a decos' idnts ws1) <$>
+    (\decos' -> Fundef a decos' idnts) <$>
     traverse validateDecoratorSyntax decos <*>
+    traverse (validateWhitespace a) asyncWs <*>
+    validateWhitespace a ws1 <*>
     validateIdentSyntax name <*>
     pure ws2 <*>
     liftVM1 (local $ inParens .~ True) (validateParamsSyntax False params) <*>
@@ -497,9 +507,10 @@ validateCompoundStatementSyntax (Fundef a decos idnts ws1 name ws2 params ws3 mt
             { _inLoop = False
             , _inFunction =
                 fmap
-                  (`union` paramIdents)
+                  ((functionParams %~ (`union` paramIdents)) .
+                   (asyncFunction %~ (|| isJust asyncWs)))
                   (_inFunction ctxt) <|>
-                Just paramIdents
+                Just (FunctionInfo paramIdents $ isJust asyncWs)
             })
          (validateSuiteSyntax body))
 validateCompoundStatementSyntax (If a idnts ws1 expr body elifs body') =
@@ -548,21 +559,6 @@ validateCompoundStatementSyntax (TryFinally a idnts b e idnts2 f i) =
   validateSuiteSyntax e <*> pure idnts2 <*>
   validateWhitespace a f <*>
   validateSuiteSyntax i
-validateCompoundStatementSyntax (For a idnts b c d e h i) =
-  For a idnts <$>
-  validateWhitespace a b <*>
-  (if canAssignTo c
-   then validateExprSyntax c
-   else errorVM [_CannotAssignTo # (a, c)]) <*>
-  validateWhitespace a d <*>
-  validateExprSyntax e <*>
-  liftVM1 (local $ inLoop .~ True) (validateSuiteSyntax h) <*>
-  traverse
-    (\(idnts, x, w) ->
-       (,,) idnts <$>
-       validateWhitespace a x <*>
-       validateSuiteSyntax w)
-    i
 validateCompoundStatementSyntax (ClassDef a decos idnts b c d g) =
   (\decos' -> ClassDef a decos' idnts) <$>
   traverse validateDecoratorSyntax decos <*>
@@ -578,8 +574,34 @@ validateCompoundStatementSyntax (ClassDef a decos idnts b c d g) =
        validateWhitespace a z)
     d <*>
   validateSuiteSyntax g
-validateCompoundStatementSyntax (With a b c d e) =
-  With a b c <$>
+validateCompoundStatementSyntax (For a idnts asyncWs b c d e h i) =
+  bindVM ask $ \ctxt ->
+  For a idnts <$
+  (if isJust asyncWs && not (fromMaybe False $ ctxt ^? inFunction._Just.asyncFunction)
+   then errorVM [_AsyncForOutsideCoroutine # a]
+   else pure ()) <*>
+  traverse (validateWhitespace a) asyncWs <*>
+  validateWhitespace a b <*>
+  (if canAssignTo c
+   then validateExprSyntax c
+   else errorVM [_CannotAssignTo # (a, c)]) <*>
+  validateWhitespace a d <*>
+  validateExprSyntax e <*>
+  liftVM1 (local $ inLoop .~ True) (validateSuiteSyntax h) <*>
+  traverse
+    (\(idnts, x, w) ->
+       (,,) idnts <$>
+       validateWhitespace a x <*>
+       validateSuiteSyntax w)
+    i
+validateCompoundStatementSyntax (With a b asyncWs c d e) =
+  bindVM ask $ \ctxt ->
+  With a b <$
+  (if isJust asyncWs && not (fromMaybe False $ ctxt ^? inFunction._Just.asyncFunction)
+   then errorVM [_AsyncWithOutsideCoroutine # a]
+   else pure ()) <*>
+  traverse (validateWhitespace a) asyncWs <*>
+  validateWhitespace a c <*>
   traverse
     (\(WithItem a b c) ->
         WithItem a <$>
@@ -732,7 +754,7 @@ validateSmallStatementSyntax (Nonlocal a ws ids) =
   (case deleteFirstsBy' (\a -> (==) (a ^. unvalidated.identValue)) (ids ^.. folded) nls of
      [] -> pure ()
      ids -> traverse_ (\e -> errorVM [_NoBindingNonlocal # e]) ids) *>
-  case _inFunction sctxt of
+  case sctxt ^? inFunction._Just.functionParams of
     Nothing -> errorVM [_NonlocalOutsideFunction # a]
     Just params ->
       case intersect params (ids ^.. folded.unvalidated.identValue) of

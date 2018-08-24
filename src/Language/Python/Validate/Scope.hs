@@ -185,10 +185,10 @@ validateCompoundStatementScope
    . AsScopeError e v a
   => CompoundStatement v a
   -> ValidateScope a e (CompoundStatement (Nub (Scope ': v)) a)
-validateCompoundStatementScope (Fundef a decos idnts ws1 name ws2 params ws3 mty s) =
+validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params ws3 mty s) =
   (locallyOver scLocalScope (const Trie.empty) $
    locallyOver scImmediateScope (const Trie.empty) $
-     (\decos' -> Fundef a decos' idnts ws1 (coerce name) ws2) <$>
+     (\decos' -> Fundef a decos' idnts asyncWs ws1 (coerce name) ws2) <$>
      traverse validateDecoratorScope decos <*>
      traverse validateParamScope params <*>
      pure ws3 <*>
@@ -251,12 +251,12 @@ validateCompoundStatementScope (TryFinally idnts a b e idnts2 f i) =
      pure idnts2 <*>
      pure f <*>
      validateSuiteScope i)))
-validateCompoundStatementScope (For idnts a b c d e h i) =
+validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
   locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
   locallyOver scImmediateScope (const Trie.empty) $
-    For @(Nub (Scope ': v)) idnts a b <$>
+    For @(Nub (Scope ': v)) idnts a asyncWs b <$>
     (unsafeCoerce c <$
      traverse
        (\s ->
@@ -278,14 +278,14 @@ validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
   traverseOf (traverse._2.traverse.traverse) validateArgScope d <*>
   validateSuiteScope g <*
   extendScope scImmediateScope [c ^. to (_identAnnotation &&& _identValue)]
-validateCompoundStatementScope (With a b c d e) =
+validateCompoundStatementScope (With a b asyncWs c d e) =
   let
     names =
       d ^..
       folded.unvalidated.to _withItemBinder.folded._2.
       assignTargets.to (_identAnnotation &&& _identValue)
   in
-    With @(Nub (Scope ': v)) a b c <$>
+    With @(Nub (Scope ': v)) a b asyncWs c <$>
     traverse
       (\(WithItem a b c) ->
          WithItem @(Nub (Scope ': v)) a <$>

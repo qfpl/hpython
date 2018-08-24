@@ -16,7 +16,7 @@ import Language.Python.Syntax
 
 fixMutableDefaultArguments :: Statement '[] () -> Maybe (Statement '[] ())
 fixMutableDefaultArguments input = do
-  (_, decos, idnts, _, name, _, params, _, _, suite) <- input ^? _Fundef
+  (_, decos, idnts, _, _, name, _, params, _, _, suite) <- input ^? _Fundef
 
   let paramsList = toList params
   _ <- paramsList ^? folded._KeywordParam.filtered (isMutable._kpExpr)

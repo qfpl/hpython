@@ -18,6 +18,7 @@ import Language.Python.Syntax
 append_to =
   CompoundStatement $
   Fundef () [] (Indents [] ())
+    Nothing
     [Space]
     "append_to"
     []

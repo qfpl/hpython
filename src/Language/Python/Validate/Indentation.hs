@@ -193,8 +193,9 @@ validateCompoundStatementIndentation
    . AsIndentationError e v a
   => CompoundStatement v a
   -> ValidateIndentation e (CompoundStatement (Nub (Indentation ': v)) a)
-validateCompoundStatementIndentation (Fundef a decos idnt ws1 name ws2 params ws3 mty s) =
-  (\decos' idnt' params' -> Fundef a decos' idnt' ws1 (coerce name) ws2 params' ws3 (unsafeCoerce mty)) <$>
+validateCompoundStatementIndentation (Fundef a decos idnt asyncWs ws1 name ws2 params ws3 mty s) =
+  (\decos' idnt' params' ->
+     Fundef a decos' idnt' asyncWs ws1 (coerce name) ws2 params' ws3 (unsafeCoerce mty)) <$>
   traverse validateDecoratorIndentation decos <*>
   checkIndent idnt <*>
   validateParamsIndentation params <*>
@@ -261,8 +262,8 @@ validateCompoundStatementIndentation (TryFinally a idnt b c idnt2 d e) =
   setNextIndent EqualTo (idnt ^. indentsValue) <*>
   checkIndent idnt2 <*>
   validateSuiteIndentation idnt e
-validateCompoundStatementIndentation (For a idnt b c d e h i) =
-  (\idnt' c' -> For a idnt' b c' d) <$>
+validateCompoundStatementIndentation (For a idnt asyncWs b c d e h i) =
+  (\idnt' c' -> For a idnt' asyncWs b c' d) <$>
   checkIndent idnt <*>
   validateExprIndentation c <*>
   validateExprIndentation e <*>
@@ -281,8 +282,8 @@ validateCompoundStatementIndentation (ClassDef a decos idnt b c d e) =
   traverse validateDecoratorIndentation decos <*>
   checkIndent idnt <*>
   validateSuiteIndentation idnt e
-validateCompoundStatementIndentation (With a idnt b c d) =
-  (\idnt' -> With @(Nub (Indentation ': v)) a idnt' b) <$>
+validateCompoundStatementIndentation (With a idnt asyncWs b c d) =
+  (\idnt' -> With @(Nub (Indentation ': v)) a idnt' asyncWs b) <$>
   checkIndent idnt <*>
   traverse validateWithItemIndentation c <*>
   validateSuiteIndentation idnt d

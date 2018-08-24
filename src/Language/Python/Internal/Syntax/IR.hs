@@ -44,67 +44,65 @@ data Statement a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data CompoundStatement a
-  -- ^ 'def' <spaces> <ident> '(' <spaces> stuff ')' <spaces> ['->' <expr>] ':' <spaces> <newline>
-  --   <block>
   = Fundef a
       [Decorator a]
       (Indents a)
-      (NonEmpty Whitespace) (Ident '[] a)
-      [Whitespace] (CommaSep (Param a))
-      [Whitespace]
-      (Maybe ([Whitespace], Expr a))
-      (Suite a)
-  -- ^ 'if' <spaces> <expr> ':' <spaces> <newline>
-  --   <block>
-  --   [ 'else' <spaces> ':' <spaces> <newline>
-  --     <block>
-  --   ]
+      (Maybe (NonEmpty Whitespace)) -- ^ ['async' <spaces>]
+      (NonEmpty Whitespace) -- ^ 'def' <spaces>
+      (Ident '[] a) -- ^ <ident>
+      [Whitespace] -- ^ '(' <spaces>
+      (CommaSep (Param a)) -- ^ <parameters>
+      [Whitespace] -- ^ ')' <spaces>
+      (Maybe ([Whitespace], Expr a)) -- ^ ['->' <spaces> <expr>]
+      (Suite a) -- ^ <suite>
   | If a
       (Indents a)
-      [Whitespace] (Expr a) (Suite a)
-      [(Indents a, [Whitespace], Expr a, Suite a)]
-      (Maybe (Indents a, [Whitespace], Suite a))
-  -- ^ 'if' <spaces> <expr> ':' <spaces> <newline>
-  --   <block>
-  --   ('elif' <spaces> <expr> ':' <spaces> <newline> <block>)*
-  --   ['else' <spaces> ':' <spaces> <newline> <block>]
+      [Whitespace] -- ^ 'if' <spaces>
+      (Expr a) -- ^ <expr>
+      (Suite a) -- ^ <suite>
+      [(Indents a, [Whitespace], Expr a, Suite a)] -- ^ ('elif' <spaces> <expr> <suite>)*
+      (Maybe (Indents a, [Whitespace], Suite a)) -- ^ ['else' <spaces> <suite>]
   | While a
       (Indents a)
-      [Whitespace] (Expr a) (Suite a)
-  -- ^ 'try' <spaces> ':' <spaces> <newline> <block>
-  --   ( 'except' <spaces> [<exceptAs>] ':' <spaces> <newline> <block> )+
-  --   [ 'else' <spaces> ':' <spaces> <newline> <block> ]
-  --   [ 'finally' <spaces> ':' <spaces> <newline> <block> ]
+      [Whitespace] -- ^ 'while' <spaces>
+      (Expr a) -- ^ <expr>
+      (Suite a) -- ^ <suite>
   | TryExcept a
       (Indents a)
-      [Whitespace] (Suite a)
-      (NonEmpty (Indents a, [Whitespace], Maybe (ExceptAs a), Suite a))
-      (Maybe (Indents a, [Whitespace], Suite a))
-      (Maybe (Indents a, [Whitespace], Suite a))
-  -- ^ 'try' <spaces> ':' <spaces> <newline> <block>
-  --   'finally' <spaces> ':' <spaces> <newline> <block>
+      [Whitespace] -- ^ 'try' <spaces>
+      (Suite a) -- ^ <suite>
+      (NonEmpty (Indents a, [Whitespace], Maybe (ExceptAs a), Suite a)) -- ^ ('except' <spaces> <except_as> <suite>)+
+      (Maybe (Indents a, [Whitespace], Suite a)) -- ^ ['else' <spaces> <suite>]
+      (Maybe (Indents a, [Whitespace], Suite a)) -- ^ ['finally' <spaces> <suite>]
   | TryFinally a
       (Indents a)
-      [Whitespace] (Suite a)
-      (Indents a) [Whitespace] (Suite a)
-  -- ^ 'for' <spaces> expr 'in' <spaces> expr ':' <spaces> <newline> <block>
-  --   [ 'else' <spaces> ':' <spaces> <newline> <block> ]
+      [Whitespace] -- ^ 'try' <spaces>
+      (Suite a) -- ^ <suite>
+      (Indents a)
+      [Whitespace] -- ^ 'finally' <spaces>
+      (Suite a) -- ^ <suite>
   | For a
       (Indents a)
-      [Whitespace] (Expr a) [Whitespace] (Expr a) (Suite a)
-      (Maybe (Indents a, [Whitespace], Suite a))
-  -- ^ 'class' <spaces> ident [ '(' <spaces> [ args ] ')' <spaces>] ':' <spaces> <newline>
-  --   <block>
+      (Maybe (NonEmpty Whitespace)) -- ^ ['async' <spaces>]
+      [Whitespace] -- ^ 'for' <spaces>
+      (Expr a) -- ^ <expr>
+      [Whitespace] -- ^ 'in' <spaces>
+      (Expr a) -- ^ <expr>
+      (Suite a) -- ^ <suite>
+      (Maybe (Indents a, [Whitespace], Suite a)) -- ^ ['else' <spaces> <suite>]
   | ClassDef a
       [Decorator a]
       (Indents a)
-      (NonEmpty Whitespace) (Ident '[] a)
-      (Maybe ([Whitespace], Maybe (CommaSep1' (Arg a)), [Whitespace]))
-      (Suite a)
-  -- ^ 'with' <spaces> with_item (',' <spaces> with_item)* ':' <spaces> <newline> <block>
+      (NonEmpty Whitespace) -- ^ 'class' <spaces>
+      (Ident '[] a) -- ^ <ident>
+      (Maybe ([Whitespace], Maybe (CommaSep1' (Arg a)), [Whitespace])) -- ^ ['(' <spaces> [<args>] ')' <spaces>]
+      (Suite a) -- ^ <suite>
   | With a
       (Indents a)
-      [Whitespace] (CommaSep1 (WithItem a)) (Suite a)
+      (Maybe (NonEmpty Whitespace)) -- ^ ['async' <spaces>]
+      [Whitespace] -- ^ 'with' <spaces>
+      (CommaSep1 (WithItem a)) -- ^ <with_items>
+      (Suite a) -- ^ <suite>
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data SmallStatement a
@@ -712,8 +710,8 @@ fromIR_compoundStatement
   -> Validate [IRError a] (Syntax.CompoundStatement '[] a)
 fromIR_compoundStatement st =
   case st of
-    Fundef a b c d e f g h i j ->
-      (\b' g' i' -> Syntax.Fundef a b' c d e f g' h i') <$>
+    Fundef a b asyncWs c d e f g h i j ->
+      (\b' g' i' -> Syntax.Fundef a b' asyncWs c d e f g' h i') <$>
       traverse fromIR_decorator b <*>
       traverse fromIR_param g <*>
       traverseOf (traverse._2) fromIR_expr i <*>
@@ -736,8 +734,8 @@ fromIR_compoundStatement st =
       traverseOf (traverse._3) fromIR_suite g
     TryFinally a b c d e f g ->
       (\d' -> Syntax.TryFinally a b c d' e f) <$> fromIR_suite d <*> fromIR_suite g
-    For a b c d e f g h ->
-      (\d' -> Syntax.For a b c d' e) <$>
+    For a b asyncWs c d e f g h ->
+      (\d' -> Syntax.For a b asyncWs c d' e) <$>
       fromIR_expr d <*>
       fromIR_expr f <*>
       fromIR_suite g <*>
@@ -747,8 +745,8 @@ fromIR_compoundStatement st =
       traverse fromIR_decorator b <*>
       traverseOf (traverse._2.traverse.traverse) fromIR_arg f <*>
       fromIR_suite g
-    With a b c d e ->
-      Syntax.With a b c <$>
+    With a b asyncWs c d e ->
+      Syntax.With a b asyncWs c <$>
       traverse fromIR_withItem d <*>
       fromIR_suite e
 

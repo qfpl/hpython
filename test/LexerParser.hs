@@ -1,6 +1,7 @@
 {-# language OverloadedStrings, OverloadedLists #-}
 module LexerParser (lexerParserTests) where
 
+import Control.Monad.Except (throwError)
 import Data.Functor.Alt ((<!>))
 import Data.Validate (validate)
 import qualified Data.Text as Text
@@ -265,14 +266,14 @@ parseTab = do
   curTk <- currentToken
   case curTk of
     TkTab{} -> pure Tab
-    _ -> parseError $ ExpectedToken (TkTab ()) curTk
+    _ -> throwError $ ExpectedToken (TkTab ()) curTk
 
 parseSpace :: Parser ann Whitespace
 parseSpace = do
   curTk <- currentToken
   case curTk of
     TkSpace{} -> pure Space
-    _ -> parseError $ ExpectedToken (TkSpace ()) curTk
+    _ -> throwError $ ExpectedToken (TkSpace ()) curTk
 
 test_parse_1 :: Property
 test_parse_1 =

@@ -348,7 +348,9 @@ genCompoundStatement =
     [ sized4M
         (\a b c d ->
            Fundef () a <$> genIndents <*>
-           genWhitespaces1 <*> genIdent <*> genWhitespaces <*> pure b <*>
+           Gen.maybe genWhitespaces1 <*>
+           genWhitespaces1 <*> genIdent <*>
+           genWhitespaces <*> pure b <*>
            genWhitespaces <*> pure c <*> pure d)
         (sizedList genDecorator)
         (genSizedCommaSep $ genParam genExpr)
@@ -369,7 +371,10 @@ genCompoundStatement =
          (,,) <$>
          genIndents <*> genWhitespaces <*> genSuite genSmallStatement genBlock)
     , sized2M
-        (\a b -> While <$> pure () <*> genIndents <*> genWhitespaces <*> pure a <*> pure b)
+        (\a b ->
+           While <$>
+           pure () <*> genIndents <*>
+           genWhitespaces <*> pure a <*> pure b)
         genExpr
         (genSuite genSmallStatement genBlock)
     , sized4M
@@ -414,7 +419,9 @@ genCompoundStatement =
         (genSuite genSmallStatement genBlock)
     , sized4M
         (\a b c d ->
-           For <$> pure () <*> genIndents <*> genWhitespaces <*> pure a <*>
+           For <$>
+           pure () <*> genIndents <*> Gen.maybe genWhitespaces1 <*>
+           genWhitespaces <*> pure a <*>
            genWhitespaces <*> pure b <*>
            pure c <*> pure d)
         genExpr
@@ -424,7 +431,10 @@ genCompoundStatement =
          (,,) <$>
          genIndents <*> genWhitespaces <*> genSuite genSmallStatement genBlock)
     , sized2M
-        (\a b -> With <$> pure () <*> genIndents <*> genWhitespaces <*> pure a <*> pure b)
+        (\a b ->
+           With <$>
+           pure () <*> genIndents <*>
+           Gen.maybe genWhitespaces1 <*> genWhitespaces <*> pure a <*> pure b)
         (genSizedCommaSep1 $
          WithItem () <$>
          genExpr <*>

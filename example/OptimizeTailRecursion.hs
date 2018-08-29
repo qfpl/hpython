@@ -1,55 +1,62 @@
 {-# language OverloadedLists, OverloadedStrings #-}
 {-# language DataKinds #-}
+{-# language BangPatterns #-}
 module OptimizeTailRecursion where
 
+import Control.Applicative ((<|>))
 import Control.Lens.Cons (_last, _init)
 import Control.Lens.Fold ((^..), (^?), (^?!), allOf, anyOf, folded, foldrOf, toListOf)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Plated (cosmos, transform, transformOn)
 import Control.Lens.Prism (_Just)
-import Control.Lens.Setter ((%~), over)
+import Control.Lens.Setter ((%~))
 import Control.Lens.Tuple (_2, _3)
 import Data.Foldable (toList)
-import qualified Data.List.NonEmpty as NonEmpty
+import Data.Function ((&))
 import Data.Semigroup ((<>))
 
-import Control.Lens ((&), (.~))
+import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Optics
-import Language.Python.Internal.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax hiding (Expr(), Statement())
 import Language.Python.Syntax
 
 optimizeTailRecursion :: Raw Statement -> Maybe (Raw Statement)
 optimizeTailRecursion st = do
-  (_, decos, idnts, _, _, name, _, params, _, _, suite) <- st ^? _Fundef
-  bodyLast <- toListOf (unvalidated._Statements) suite ^? _last
+  function <- st ^? _Fundef
+  let functionBody = toList $ getBody function
+  bodyLast <- lastStatement functionBody
 
   let
-    params' = toList params
-    paramNames = (_identValue . _paramName) <$> params'
+    functionName = function ^. fdName.identValue
+    bodyInit = functionBody ^?! _init
+    paramNames = function ^.. fdParameters.folded.paramName.identValue
 
-  if not $ hasTC (name ^. identValue) bodyLast
+  if not $ hasTC functionName bodyLast
     then Nothing
     else
-      Just .
-      -- I don't like needing to care about indentation for these things but I think
-      -- it's a necessary part of the design
-      over (_Indents.indentsValue) (idnts ^. indentsValue <>) .
-      def_ name params' . NonEmpty.fromList $
-        zipWith (\a b -> var_ (a <> "__tr") .= var_ b) paramNames paramNames <>
-        [ "__res__tr" .= none_
-        , while_ true_ . NonEmpty.fromList .
-          transformOn (traverse._Exprs) (renameIn paramNames "__tr") $
-            ((toListOf (unvalidated._Statements) suite ^?! _init)
-               -- Same here - clear the old indentation
-               & traverse._Indents.indentsValue .~ []) <>
-            looped (name ^. identValue) paramNames bodyLast
-        , return_ "__res__tr"
-        ]
+      Just $
+      fundef
+        (function &
+         setBody
+           (flip (foldr NonEmpty.cons)
+              (zipWith (\a b -> st_ $ var_ (a <> "__tr") .= var_ b) paramNames paramNames)
+              [ st_ $ "__res__tr" .= none_
+              , st_ . while_ true_ .
+                NonEmpty.fromList . transformOn (traverse._Exprs) (renameIn paramNames "__tr") $
+                  bodyInit <>
+                  fmap st_ (looped functionName paramNames bodyLast)
+              , st_ $ return_ "__res__tr"
+              ]))
 
   where
-    isTailCall :: String -> Expr -> Bool
+    lastStatement :: [Raw Line] -> Maybe (Raw Statement)
+    lastStatement = go Nothing
+      where
+        go !res [] = res
+        go !res (a:as) = go (res <|> a ^? _Statements) as
+
+    isTailCall :: String -> Raw Expr -> Bool
     isTailCall name e
       | anyOf (cosmos._Call._2._Ident._2.identValue) (== name) e
       = (e ^? _Call._2._Ident._2.identValue) == Just name
@@ -69,7 +76,7 @@ optimizeTailRecursion st = do
             _ -> False
         _ -> False
 
-    renameIn :: [String] -> String -> Expr -> Expr
+    renameIn :: [String] -> String -> Raw Expr -> Raw Expr
     renameIn params suffix =
       transform
         (_Ident._2.identValue %~ (\a -> if a `elem` params then a <> suffix else a))
@@ -84,18 +91,18 @@ optimizeTailRecursion st = do
                   case sts' of
                     Nothing ->
                       [ if_ e
-                          (NonEmpty.fromList $
-                          (toListOf _Statements sts ^?! _init) <>
-                          looped name params (toListOf _Statements sts ^?! _last))
+                          (fmap st_ . NonEmpty.fromList $
+                           (toListOf _Statements sts ^?! _init) <>
+                           looped name params (toListOf _Statements sts ^?! _last))
                       ]
                     Just (_, _, sts'') ->
                       [ ifElse_ e
-                          (NonEmpty.fromList $
-                          (toListOf _Statements sts ^?! _init) <>
-                          looped name params (toListOf _Statements sts ^?! _last))
-                          (NonEmpty.fromList $
-                          (toListOf _Statements sts'' ^?! _init) <>
-                          looped name params (toListOf _Statements sts'' ^?! _last))
+                          (fmap st_ . NonEmpty.fromList $
+                           (toListOf _Statements sts ^?! _init) <>
+                           looped name params (toListOf _Statements sts ^?! _last))
+                          (fmap st_ . NonEmpty.fromList $
+                           (toListOf _Statements sts'' ^?! _init) <>
+                           looped name params (toListOf _Statements sts'' ^?! _last))
                       ]
             _ -> [st]
         SmallStatements idnts s ss sc cmtnl ->

@@ -61,8 +61,8 @@ append_to =
 -- Written with the DSL
 append_to' =
   def_ "append_to" [ p_ "element", k_ "to" (list_ []) ]
-    [ expr_ $ call_ ("to" /> "append") [ "element" ]
-    , return_ "to"
+    [ st_ . expr_ $ call_ ("to" /> "append") [ "element" ]
+    , st_ $ return_ "to"
     ]
 
 -- |
@@ -77,12 +77,14 @@ append_to' =
 -- @
 fact_tr =
   def_ "fact" [p_ "n"]
-  [ def_ "go" [p_ "n", p_ "acc"]
-    [ ifElse_ ("n" .== 0)
-      [return_ "acc"]
-      [return_ $ call_ "go" [p_ $ "n" .- 1, p_ $ "n" .* "acc"]]
-    ]
-  , return_ $ call_ "go" [p_ "n", p_ 1]
+  [ st_ $
+    def_ "go" [p_ "n", p_ "acc"]
+      [ st_ $
+        ifElse_ ("n" .== 0)
+          [st_ $ return_ "acc"]
+          [st_ . return_ $ call_ "go" [p_ $ "n" .- 1, p_ $ "n" .* "acc"]]
+      ]
+  , st_ . return_ $ call_ "go" [p_ "n", p_ 1]
   ]
 
 -- |
@@ -90,7 +92,7 @@ fact_tr =
 -- def spin():
 --   spin()
 -- @
-spin = def_ "spin" [] [expr_ $ call_ "spin" []]
+spin = def_ "spin" [] [st_ . expr_ $ call_ "spin" []]
 
 -- |
 -- @
@@ -100,8 +102,8 @@ spin = def_ "spin" [] [expr_ $ call_ "spin" []]
 -- @
 yes =
   def_ "yes" []
-  [ expr_ $ call_ "print" [p_ $ str_ "yes"]
-  , expr_ $ call_ "yes" []
+  [ st_ . expr_ $ call_ "print" [p_ $ str_ "yes"]
+  , st_ . expr_ $ call_ "yes" []
   ]
 
 everything =

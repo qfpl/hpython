@@ -2,7 +2,7 @@
 {-# language MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 {-# language OverloadedLists #-}
 {-# language RecordWildCards #-}
-{-# language KindSignatures, TemplateHaskell #-}
+{-# language LambdaCase #-}
 module Language.Python.Syntax
   ( Raw
   , Statement
@@ -16,6 +16,11 @@ module Language.Python.Syntax
   , HasDecorators(..)
   , decorated_
     -- * Statements
+    -- ** Block bodies
+  , blank_
+  , st_
+  , Line(..)
+  , HasBody(..)
     -- ** Function definitions
   , Fundef(..)
   , mkFundef
@@ -36,9 +41,12 @@ module Language.Python.Syntax
     -- ** Assignment
   , (.=)
     -- ** Flow control
+  , pass_
+  , break_
   , if_
   , ifElse_
   , return_
+  , while_
     -- * Expressions
   , expr_
   , var_
@@ -47,6 +55,8 @@ module Language.Python.Syntax
   , list_
   , none_
   , str_
+  , true_
+  , false_
     -- ** Dereferencing
   , (/>)
     -- ** Binary operators
@@ -61,15 +71,86 @@ import Data.Function ((&))
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
 import Control.Lens.Lens (Lens')
+import Control.Lens.Prism (_Right)
 import Control.Lens.Setter ((.~), over)
-import Data.List.NonEmpty (NonEmpty)
+import Control.Lens.Traversal (traverseOf)
+import Data.List.NonEmpty (NonEmpty(..))
+import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
 
 import Language.Python.Internal.Optics
-import Language.Python.Internal.Syntax hiding (Fundef)
+import Language.Python.Internal.Syntax hiding (Fundef, While)
 import Language.Python.Syntax.Types
-import qualified Language.Python.Internal.Syntax as AST (CompoundStatement(Fundef))
+import qualified Language.Python.Internal.Syntax as AST (CompoundStatement(Fundef, While))
 
 type Raw f = f '[] ()
+
+blank_ :: Raw Line
+blank_ = Line $ Left ([], LF Nothing)
+
+st_ :: Raw Statement -> Raw Line
+st_ = Line . Right
+
+newtype Line v a = Line { unLine :: Either ([Whitespace], Newline) (Statement v a) }
+  deriving (Eq, Show)
+
+instance HasExprs Line where
+  _Exprs f (Line a) = Line <$> (_Right._Exprs) f a
+
+instance HasStatements Line where
+  _Statements f (Line a) = Line <$> _Right f a
+
+class HasBody s where
+  setBody :: NonEmpty (Raw Line) -> Raw s -> Raw s
+  getBody :: Raw s -> NonEmpty (Raw Line)
+  modifyBody :: (NonEmpty (Raw Line) -> NonEmpty (Raw Line)) -> Raw s -> Raw s
+  body :: Lens' (Raw s) (Raw Suite)
+
+doIndent :: [Indent] -> [Indent]
+doIndent a = replicate 4 Space ^. from indentWhitespaces : a
+
+instance HasBody Fundef where
+  body = fdBody
+
+  setBody new fun =
+    fun
+    { _fdBody =
+      over
+        (_Indents.indentsValue)
+        ((_fdIndents fun ^. indentsValue <>) . doIndent)
+        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> new)
+    }
+
+  getBody fun =
+    (\case
+        SuiteOne a b c d ->
+          st_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| []
+        SuiteMany a b c d ->
+          Line <$> unBlock d) $
+    fromMaybe
+      (error "malformed indentation in function block")
+      (traverseOf _Indents (subtractStart $ _fdIndents fun) (_fdBody fun))
+
+  modifyBody f fun =
+    let
+      indents = _fdIndents fun
+    in
+      fun
+      { _fdBody =
+          over
+            (_Indents.indentsValue)
+            ((indents ^. indentsValue <>) . doIndent) .
+          (\case
+              SuiteOne a b c d ->
+                case fmap unLine . f $ st_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| [] of
+                  Right (SmallStatements (Indents [] ()) c' [] Nothing (Right d')) :| [] -> SuiteOne a b c' d'
+                  ss -> SuiteMany a b d . Block $ ss
+              SuiteMany a b c d ->
+                SuiteMany a b c (Block . fmap unLine . f $ Line <$> unBlock d)) $
+          fromMaybe
+            (error "malformed indentation in function block")
+            (traverseOf _Indents (subtractStart indents) (_fdBody fun))
+      }
 
 class HasPositional p v | p -> v where
   p_ :: v -> p
@@ -101,7 +182,7 @@ instance HasParameters Fundef where
   setParameters p = fdParameters .~ listToCommaSep p
   parameters = fdParameters
 
-mkFundef :: Ident '[] () -> NonEmpty (Raw Statement) -> Raw Fundef
+mkFundef :: Ident '[] () -> NonEmpty (Raw Line) -> Raw Fundef
 mkFundef name body =
   Fundef
   { _fdAnn = ()
@@ -132,7 +213,7 @@ fundef Fundef{..} =
     _fdReturnType
     _fdBody
 
-def_ :: Ident '[] () -> [Param '[] ()] -> NonEmpty (Raw Statement) -> Raw Statement
+def_ :: Ident '[] () -> [Param '[] ()] -> NonEmpty (Raw Line) -> Raw Statement
 def_ name params body =
   fundef $ (mkFundef name body) { _fdParameters = listToCommaSep params }
 
@@ -223,24 +304,20 @@ infixl 9 />
 neg :: Raw Expr -> Raw Expr
 neg = negate
 
-toBlock :: NonEmpty (Raw Statement) -> Block '[] ()
-toBlock sts =
-  Block $
-  Right .
-  over (_Indents.indentsValue) (replicate 4 Space ^. from indentWhitespaces :) <$>
-  sts
+toBlock :: NonEmpty (Raw Line) -> Block '[] ()
+toBlock = over (_Indents.indentsValue) doIndent . Block . fmap unLine
 
-while_ :: Raw Expr -> NonEmpty (Raw Statement) -> Raw Statement
+while_ :: Raw Expr -> NonEmpty (Raw Line) -> Raw Statement
 while_ e sts =
   CompoundStatement $
-  While () (Indents [] ()) [Space] e
+  AST.While () (Indents [] ()) [Space] e
     (SuiteMany () [] (LF Nothing) $ toBlock sts)
 
 ifElifsElse_
   :: Raw Expr
-  -> NonEmpty (Raw Statement)
-  -> [(Raw Expr, NonEmpty (Raw Statement))]
-  -> NonEmpty (Raw Statement)
+  -> NonEmpty (Raw Line)
+  -> [(Raw Expr, NonEmpty (Raw Line))]
+  -> NonEmpty (Raw Line)
   -> Raw Statement
 ifElifsElse_ e sts elifs sts' =
   CompoundStatement $
@@ -249,7 +326,7 @@ ifElifsElse_ e sts elifs sts' =
     ((\(a, b) -> (Indents [] (), [Space], a, SuiteMany () [] (LF Nothing) $ toBlock b)) <$> elifs)
     (Just (Indents [] (), [], SuiteMany () [] (LF Nothing) $ toBlock sts'))
 
-if_ :: Raw Expr -> NonEmpty (Raw Statement) -> Raw Statement
+if_ :: Raw Expr -> NonEmpty (Raw Line) -> Raw Statement
 if_ e sts =
   CompoundStatement $
   If () (Indents [] ()) [Space] e
@@ -259,8 +336,8 @@ if_ e sts =
 
 ifElse_
   :: Raw Expr
-  -> NonEmpty (Raw Statement)
-  -> NonEmpty (Raw Statement)
+  -> NonEmpty (Raw Line)
+  -> NonEmpty (Raw Line)
   -> Raw Statement
 ifElse_ e sts = ifElifsElse_ e sts []
 
@@ -310,8 +387,8 @@ longStr_ s =
 forElse_
   :: Raw Expr
   -> Raw Expr
-  -> NonEmpty (Raw Statement)
-  -> NonEmpty (Raw Statement)
+  -> NonEmpty (Raw Line)
+  -> NonEmpty (Raw Line)
   -> Raw Statement
 forElse_ val vals block els =
   CompoundStatement $
@@ -319,7 +396,7 @@ forElse_ val vals block els =
     (SuiteMany () [] (LF Nothing) $ toBlock block)
     (Just (Indents [] (), [], SuiteMany () [] (LF Nothing) $ toBlock els))
 
-for_ :: Raw Expr -> Raw Expr -> NonEmpty (Raw Statement) -> Raw Statement
+for_ :: Raw Expr -> Raw Expr -> NonEmpty (Raw Line) -> Raw Statement
 for_ val vals block =
   CompoundStatement $
   For () (Indents [] ()) Nothing [Space] (val & trailingWhitespace .~ [Space]) [Space] vals

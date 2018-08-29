@@ -15,9 +15,9 @@ import Data.Coerce (coerce)
 import Data.Function ((&))
 
 import Language.Python.Internal.Optics.Validated (unvalidated)
-import Language.Python.Internal.Syntax hiding (Fundef)
+import Language.Python.Internal.Syntax hiding (Fundef, While)
 import Language.Python.Syntax.Types
-import qualified Language.Python.Internal.Syntax as AST (CompoundStatement(Fundef))
+import qualified Language.Python.Internal.Syntax as AST (CompoundStatement(Fundef, While))
 
 data KeywordParam v a
   = MkKeywordParam
@@ -55,6 +55,21 @@ _Fundef =
     (\case
         CompoundStatement (AST.Fundef idnt a b c d e f g h i j) ->
           Right $ Fundef idnt a b c d e f g h i j
+        a -> Left $ a ^. unvalidated)
+
+_While
+  :: Prism
+       (Statement v a)
+       (Statement '[] a)
+       (While v a)
+       (While '[] a)
+_While =
+  prism
+    (\(While a b c d e) ->
+       CompoundStatement (AST.While a b c d e))
+    (\case
+        CompoundStatement (AST.While a b c d e) ->
+          Right $ While a b c d e
         a -> Left $ a ^. unvalidated)
 
 _Call
@@ -128,8 +143,8 @@ instance HasIndents CompoundStatement where
              fun idnt <*>
              _Indents fun b)
           e
-      While a idnt b c d ->
-        (\idnt' -> While a idnt' b c) <$>
+      AST.While a idnt b c d ->
+        (\idnt' -> AST.While a idnt' b c) <$>
         fun idnt <*>
         _Indents fun d
       TryExcept a idnt b c d e f ->
@@ -208,8 +223,8 @@ instance HasNewlines CompoundStatement where
         _Newlines fun s <*>
         traverseOf (traverse._4._Newlines) fun elifs <*>
         traverseOf (traverse._3._Newlines) fun els
-      While idnt ann ws1 cond s ->
-        While idnt ann ws1 cond <$> _Newlines fun s
+      AST.While idnt ann ws1 cond s ->
+        AST.While idnt ann ws1 cond <$> _Newlines fun s
       TryExcept idnt a b c f k l ->
         TryExcept idnt a b <$> _Newlines fun c <*>
         traverseOf (traverse._4._Newlines) fun f <*>

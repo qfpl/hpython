@@ -8,7 +8,7 @@ module Language.Python.Internal.Syntax.Whitespace
   , HasTrailingWhitespace(..)
   , IndentLevel, getIndentLevel, indentLevel, absoluteIndentLevel
   , Indent(..), indentWhitespaces
-  , Indents(..), indentsValue, indentsAnn
+  , Indents(..), indentsValue, indentsAnn, subtractStart
   )
 where
 
@@ -20,6 +20,7 @@ import Control.Lens.TH (makeLenses)
 import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.FingerTree (FingerTree, Measured(..), fromList)
+import Data.List (stripPrefix)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Monoid (Monoid, Endo(..), Dual(..))
 import Data.Semigroup (Semigroup)
@@ -98,6 +99,10 @@ instance IsList Indent where
 indentWhitespaces :: Iso' Indent [Whitespace]
 indentWhitespaces =
   iso (Data.Foldable.toList . unIndent) (MkIndent . Data.FingerTree.fromList)
+
+-- ^ Subtract the first argument from the beginning of the second
+subtractStart :: Indents a -> Indents a -> Maybe (Indents a)
+subtractStart (Indents a _) (Indents b c) = Indents <$> stripPrefix a b <*> pure c
 
 data Indents a
   = Indents

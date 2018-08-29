@@ -3,11 +3,9 @@
 module FixMutableDefaultArguments where
 
 import Control.Lens.Fold ((^..), (^?), filtered, folded, anyOf)
-import Control.Lens.Getter ((^.), getting)
-import Control.Lens.Setter ((.~), (%~), over)
-import Data.Foldable (toList)
+import Control.Lens.Getter (getting)
+import Control.Lens.Setter ((.~))
 import Data.Function ((&))
-import Data.Semigroup ((<>))
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Optics
@@ -16,7 +14,6 @@ import Language.Python.Syntax
 
 fixMutableDefaultArguments :: Raw Statement -> Maybe (Raw Statement)
 fixMutableDefaultArguments input = do
-  -- (_, decos, idnts, _, _, name, _, params, _, _, suite) <- input ^? _Fundef
   function <- input ^? _Fundef
 
   let paramsList = function ^.. parameters.folded
@@ -26,7 +23,8 @@ fixMutableDefaultArguments input = do
     targetParams = paramsList ^.. folded._KeywordParam.filtered (isMutable._kpExpr)
 
     conditionalAssignments =
-      (\(pname, value) -> if_ (var_ pname `is_` none_) [ var_ pname .= value ]) <$>
+      (\(pname, value) ->
+         st_ $ if_ (var_ pname `is_` none_) [ st_ $ var_ pname .= value ]) <$>
       zip
         (targetParams ^.. folded.kpName.identValue)
         (paramsList ^.. folded._KeywordParam.kpExpr.filtered isMutable)
@@ -38,13 +36,7 @@ fixMutableDefaultArguments input = do
     fundef
       (function &
        setParameters newparams &
-       fdBody %~ (conditionalAssignments <>))
-  {-
-  pure $
-    over (_Indents.indentsValue) (idnts ^. indentsValue <>) $
-    def_ name newparams
-    (NonEmpty.fromList $ conditionalAssignments <> (suite ^.. _Statements.noIndents))
--}
+       modifyBody (flip (foldr NonEmpty.cons) conditionalAssignments))
   where
     isMutable :: Raw Expr -> Bool
     isMutable Unit{} = False
@@ -75,4 +67,5 @@ fixMutableDefaultArguments input = do
     isMutable Generator{} = True
     isMutable (Ternary _ _ _ a _ b) = isMutable a || isMutable b
     isMutable (Parens _ _ a _) = isMutable a
-    isMutable (Tuple _ a _ as) = anyOf (getting _Exprs) isMutable a || anyOf (folded.folded.getting _Exprs) isMutable as
+    isMutable (Tuple _ a _ as) =
+      anyOf (getting _Exprs) isMutable a || anyOf (folded.folded.getting _Exprs) isMutable as

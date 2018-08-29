@@ -53,8 +53,8 @@ test_1 =
     let
       expr =
         def_ "test" [p_ "a", p_ "b"]
-          [ if_ true_ [ var_ "c" .= 2]
-          , return_ $ var_ "a" .+ var_ "b" .+ var_ "c"
+          [ st_ $ if_ true_ [ st_ $ var_ "c" .= 2]
+          , st_ . return_ $ var_ "a" .+ var_ "b" .+ var_ "c"
           ]
     res <- fullyValidate expr
     res === Failure [FoundDynamic () (MkIdent () "c" [])]
@@ -65,9 +65,9 @@ test_2 =
     let
       expr =
         def_ "test" [p_ "a", p_ "b"]
-          [ var_ "c" .= 0
-          , if_ true_ [ var_ "c" .= 2]
-          , return_ $ var_ "a" .+ var_ "b" .+ var_ "c"
+          [ st_ $ var_ "c" .= 0
+          , st_ $ if_ true_ [ st_ $ var_ "c" .= 2]
+          , st_ . return_ $ var_ "a" .+ var_ "b" .+ var_ "c"
           ]
     res <- fullyValidate expr
     annotateShow res
@@ -79,7 +79,7 @@ test_3 =
     let
       expr =
         def_ "test" [p_ "a", p_ "b"]
-          [ return_ $ var_ "a" .+ var_ "b" .+ var_ "c" ]
+          [ st_ . return_ $ var_ "a" .+ var_ "b" .+ var_ "c" ]
     res <- fullyValidate expr
     annotateShow res
     res === Failure [NotInScope (MkIdent () "c" [])]
@@ -90,8 +90,8 @@ test_4 =
     let
       expr =
         def_ "test" [p_ "a", p_ "b"]
-          [ def_ "f" [] [ def_ "g" [] [pass_] ]
-          , expr_ $ call_ (var_ "g") []
+          [ st_ $ def_ "f" [] [ st_ $ def_ "g" [] [ st_ pass_ ] ]
+          , st_ $ expr_ $ call_ (var_ "g") []
           ]
     res <- fullyValidate expr
     res === Failure [NotInScope (MkIdent () "g" [])]
@@ -102,7 +102,7 @@ test_5 =
     let
       expr =
         def_ "test" [p_ "a"]
-          [ def_ "f" [k_ "b" (var_ "c")] [ pass_ ]
+          [ st_ $ def_ "f" [k_ "b" (var_ "c")] [ st_ pass_ ]
           ]
     res <- fullyValidate expr
     annotateShow res
@@ -114,8 +114,8 @@ test_6 =
     let
       expr =
         def_ "test" []
-          [ ifElse_ true_ [ var_ "x" .= 2 ] [ pass_ ]
-          , expr_ "x"
+          [ st_ $ ifElse_ true_ [ st_ $ var_ "x" .= 2 ] [ st_ pass_ ]
+          , st_ $ expr_ "x"
           ]
     res <- fullyValidate expr
     annotateShow res
@@ -127,8 +127,8 @@ test_7 =
     let
       expr =
         def_ "test" []
-          [ ifElse_ true_ [ pass_ ] [ var_ "x" .= 3 ]
-          , expr_ "x"
+          [ st_ $ ifElse_ true_ [ st_ pass_ ] [ st_ $ var_ "x" .= 3 ]
+          , st_ $ expr_ "x"
           ]
     res <- fullyValidate expr
     annotateShow res
@@ -140,9 +140,9 @@ test_8 =
     let
       expr =
         def_ "test" []
-          [ ifElse_ true_ [ pass_ ] [ var_ "x" .= 3 ]
-          , var_ "x" .= 1
-          , expr_ "x"
+          [ st_ $ ifElse_ true_ [ st_ pass_ ] [ st_ $ var_ "x" .= 3 ]
+          , st_ $ var_ "x" .= 1
+          , st_ $ expr_ "x"
           ]
     res <- fullyValidate expr
     annotateShow res
@@ -154,8 +154,8 @@ test_9 =
     let
       expr =
         def_ "test" []
-          [ for_ "x" (list_ [1]) [ pass_ ]
-          , expr_ "x"
+          [ st_ $ for_ "x" (list_ [1]) [ st_ pass_ ]
+          , st_ $ expr_ "x"
           ]
     res <- fullyValidate expr
     annotateShow res
@@ -167,7 +167,7 @@ test_10 =
     let
       expr =
         def_ "test" []
-          [ for_ "x" (list_ [1]) [ expr_ "x" ]
+          [ st_ $ for_ "x" (list_ [1]) [ st_ $ expr_ "x" ]
           ]
     res <- fullyValidate expr
     annotateShow res
@@ -179,8 +179,8 @@ test_11 =
     let
       expr =
         def_ "test" []
-          [ "x" .= 2
-          , for_ "x" (list_ [1]) [ pass_ ]
+          [ st_ $ "x" .= 2
+          , st_ $ for_ "x" (list_ [1]) [ st_ pass_ ]
           ]
     res <- fullyValidate expr
     annotateShow res

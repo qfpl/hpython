@@ -41,10 +41,11 @@ module Language.Python.Syntax
     -- ** Assignment
   , (.=)
     -- ** Flow control
-  , pass_
   , break_
+  , for_
   , if_
   , ifElse_
+  , pass_
   , return_
   , while_
     -- * Expressions
@@ -63,6 +64,7 @@ module Language.Python.Syntax
   , is_
   , (.*)
   , (.-)
+  , (.+)
   , (.==)
   )
 where

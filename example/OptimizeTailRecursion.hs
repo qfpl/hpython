@@ -108,8 +108,7 @@ optimizeTailRecursion st = do
         SmallStatements idnts s ss sc cmtnl ->
           let
             initExps = foldr (\_ _ -> init ss) [] ss
-            lastExp =
-              foldrOf (folded._2) (\_ _ -> last ss ^. _2) s ss
+            lastExp = foldrOf (folded._2) (\_ _ -> last ss ^. _2) s ss
             newSts =
               case initExps of
                 [] -> []

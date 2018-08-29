@@ -10,7 +10,7 @@ lexer still occasionally lets its latent character-ism out.
 
 In particular, a raw string cannot end in an odd number of backslashes.
 
-@r"\\"@ means "a string consisting of two backslash characters", but there is no way to
+@r"\\\\"@ means "a string consisting of two backslash characters", but there is no way to
 represent "a string consisting of three backslash characters" using raw string syntax.
 
 Thus, a 'RawString' is "a sequence of of 'Char's ending in an even number of

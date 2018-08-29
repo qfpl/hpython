@@ -8,8 +8,8 @@ mkDerivation {
   version = "0.6";
   src = fetchgit {
     url = "https://github.com/qfpl/digit";
-    sha256 = "0lxsy5ydj2gir06pwd0qb2fdhnbr5pfng2rqix4lgck562rar782";
-    rev = "d03309afac13fbed6814944386d7298c4545d7a2";
+    sha256 = "0bm2bfg27ry7c7aspikvbqj9zk5f0iayy98yy5jk4sprhs9q7alv";
+    rev = "27fd4bb3857649f16c5e5ba188cb1b03d436df60";
   };
   libraryHaskellDepends = [
     base lens papa parsers scientific semigroupoids semigroups

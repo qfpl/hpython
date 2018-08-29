@@ -160,12 +160,15 @@ class HasPositional p v | p -> v where
 class HasKeyword p where
   k_ :: Ident '[] () -> Raw Expr -> p
 
-instance HasPositional (Param '[] ()) (Ident '[] ()) where
+instance HasPositional (Raw Param) (Raw Ident) where
   p_ i = PositionalParam () i Nothing
-instance HasKeyword (Param '[] ()) where
+
+instance HasKeyword (Raw Param) where
   k_ a = KeywordParam () a Nothing []
-instance HasPositional (Arg '[] ()) (Raw Expr) where; p_ = PositionalArg ()
-instance HasKeyword (Arg '[] ()) where; k_ a = KeywordArg () a []
+
+instance HasPositional (Raw Arg) (Raw Expr) where; p_ = PositionalArg ()
+
+instance HasKeyword (Raw Arg) where; k_ a = KeywordArg () a []
 
 class HasParameters s where
   setParameters :: [Raw Param] -> Raw s -> Raw s
@@ -184,7 +187,7 @@ instance HasParameters Fundef where
   setParameters p = fdParameters .~ listToCommaSep p
   parameters = fdParameters
 
-mkFundef :: Ident '[] () -> NonEmpty (Raw Line) -> Raw Fundef
+mkFundef :: Raw Ident -> NonEmpty (Raw Line) -> Raw Fundef
 mkFundef name body =
   Fundef
   { _fdAnn = ()
@@ -215,11 +218,11 @@ fundef Fundef{..} =
     _fdReturnType
     _fdBody
 
-def_ :: Ident '[] () -> [Param '[] ()] -> NonEmpty (Raw Line) -> Raw Statement
+def_ :: Raw Ident -> [Raw Param] -> NonEmpty (Raw Line) -> Raw Statement
 def_ name params body =
   fundef $ (mkFundef name body) { _fdParameters = listToCommaSep params }
 
-call_ :: Raw Expr -> [Arg '[] ()] -> Raw Expr
+call_ :: Raw Expr -> [Raw Arg] -> Raw Expr
 call_ expr args =
   Call ()
     expr
@@ -299,7 +302,7 @@ infixl 7 .%
 (.**) a = BinOp () (a & trailingWhitespace .~ [Space]) (Exp () [Space])
 infixr 8 .**
 
-(/>) :: Raw Expr -> Ident '[] () -> Raw Expr
+(/>) :: Raw Expr -> Raw Ident -> Raw Expr
 (/>) a b = Deref () a [] b
 infixl 9 />
 

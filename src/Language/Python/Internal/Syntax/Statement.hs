@@ -249,65 +249,81 @@ data Decorator (v :: [*]) a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data CompoundStatement (v :: [*]) a
-  = Fundef a
-      [Decorator v a]
-      (Indents a)
-      (Maybe (NonEmpty Whitespace)) -- ^ ['async' <spaces>]
-      (NonEmpty Whitespace) -- ^ 'def' <spaces>
-      (Ident v a) -- ^ <ident>
-      [Whitespace] -- ^ '(' <spaces>
-      (CommaSep (Param v a)) -- ^ <parameters>
-      [Whitespace] -- ^ ')' <spaces>
-      (Maybe ([Whitespace], Expr v a)) -- ^ ['->' <spaces> <expr>]
-      (Suite v a) -- ^ <suite>
-  | If a
-      (Indents a)
-      [Whitespace] -- ^ 'if' <spaces>
-      (Expr v a) -- ^ <expr>
-      (Suite v a) -- ^ <suite>
-      [(Indents a, [Whitespace], Expr v a, Suite v a)] -- ^ ('elif' <spaces> <expr> <suite>)*
-      (Maybe (Indents a, [Whitespace], Suite v a)) -- ^ ['else' <spaces> <suite>]
-  | While a
-      (Indents a)
-      [Whitespace] -- ^ 'while' <spaces>
-      (Expr v a) -- ^ <expr>
-      (Suite v a) -- ^ <suite>
-  | TryExcept a
-      (Indents a)
-      [Whitespace] -- ^ 'try' <spaces>
-      (Suite v a) -- ^ <suite>
-      (NonEmpty (Indents a, [Whitespace], Maybe (ExceptAs v a), Suite v a)) -- ^ ('except' <spaces> <except_as> <suite>)+
-      (Maybe (Indents a, [Whitespace], Suite v a)) -- ^ ['else' <spaces> <suite>]
-      (Maybe (Indents a, [Whitespace], Suite v a)) -- ^ ['finally' <spaces> <suite>]
-  | TryFinally a
-      (Indents a)
-      [Whitespace] -- ^ 'try' <spaces>
-      (Suite v a) -- ^ <suite>
-      (Indents a)
-      [Whitespace] -- ^ 'finally' <spaces>
-      (Suite v a) -- ^ <suite>
-  | For a
-      (Indents a)
-      (Maybe (NonEmpty Whitespace)) -- ^ ['async' <spaces>]
-      [Whitespace] -- ^ 'for' <spaces>
-      (Expr v a) -- ^ <expr>
-      [Whitespace] -- ^ 'in' <spaces>
-      (Expr v a) -- ^ <expr>
-      (Suite v a) -- ^ <suite>
-      (Maybe (Indents a, [Whitespace], Suite v a)) -- ^ ['else' <spaces> <suite>]
-  | ClassDef a
-      [Decorator v a]
-      (Indents a)
-      (NonEmpty Whitespace) -- ^ 'class' <spaces>
-      (Ident v a) -- ^ <ident>
-      (Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace])) -- ^ ['(' <spaces> [<args>] ')' <spaces>]
-      (Suite v a) -- ^ <suite>
-  | With a
-      (Indents a)
-      (Maybe (NonEmpty Whitespace)) -- ^ ['async' <spaces>]
-      [Whitespace] -- ^ 'with' <spaces>
-      (CommaSep1 (WithItem v a)) -- ^ <with_items>
-      (Suite v a) -- ^ <suite>
+  = Fundef
+  { _csAnn :: a
+  , _unsafeCsFundefDecorators :: [Decorator v a]
+  , _csIndents :: Indents a
+  , _unsafeCsFundefAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
+  , _unsafeCsFundefDef :: NonEmpty Whitespace -- ^ @\'def\' \<spaces\>@
+  , _unsafeCsFundefName :: Ident v a -- ^ @\<ident\>@
+  , _unsafeCsFundefLeftParen :: [Whitespace] -- ^ @\'(\' \<spaces\>@
+  , _unsafeCsFundefParameters :: CommaSep (Param v a) -- ^ @\<parameters\>@
+  , _unsafeCsFundefRightParen :: [Whitespace] -- ^ @\')\' \<spaces\>@
+  , _unsafeCsFundefReturnType :: Maybe ([Whitespace], Expr v a) -- ^ @[\'->\' \<spaces\> \<expr\>]@
+  , _unsafeCsFundefBody :: Suite v a -- ^ @\<suite\>@
+  }
+  | If
+  { _csAnn :: a
+  , _csIndents :: Indents a
+  , _unsafeCsIfIf :: [Whitespace] -- ^ @\'if\' \<spaces\>@
+  , _unsafeCsIfCond :: Expr v a -- ^ @\<expr\>@
+  , _unsafeCsIfBody :: Suite v a -- ^ @\<suite\>@
+  , _unsafeCsIfElifs :: [(Indents a, [Whitespace], Expr v a, Suite v a)] -- ^ @(\'elif\' \<spaces\> \<expr\> \<suite\>)*@
+  , _unsafeCsIfElse :: Maybe (Indents a, [Whitespace], Suite v a) -- ^ @[\'else\' \<spaces\> \<suite\>]@
+  }
+  | While
+  { _csAnn :: a
+  , _csIndents :: Indents a
+  , _unsafeCsWhileWhile :: [Whitespace] -- ^ @\'while\' \<spaces\>@
+  , _unsafeCsWhileCond :: Expr v a -- ^ @\<expr\>@
+  , _unsafeCsWhileBody :: Suite v a -- ^ @\<suite\>@
+  }
+  | TryExcept
+  { _csAnn :: a
+  , _csIndents :: Indents a
+  , _unsafeCsTryExceptTry :: [Whitespace] -- ^ @\'try\' \<spaces\>@
+  , _unsafeCsTryExceptBody :: Suite v a -- ^ @\<suite\>@
+  , _unsafeCsTryExceptExcepts :: NonEmpty (Indents a, [Whitespace], Maybe (ExceptAs v a), Suite v a) -- ^ @(\'except\' \<spaces\> \<except_as\> \<suite\>)+@
+  , _unsafeCsTryExceptElse :: Maybe (Indents a, [Whitespace], Suite v a) -- ^ @[\'else\' \<spaces\> \<suite\>]@
+  , _unsafeCsTryExceptFinally :: Maybe (Indents a, [Whitespace], Suite v a) -- ^ @[\'finally\' \<spaces\> \<suite\>]@
+  }
+  | TryFinally
+  { _csAnn :: a
+  , _csIndents :: Indents a
+  , _unsafeCsTryFinallyTry :: [Whitespace] -- ^ @\'try\' \<spaces\>@
+  , _unsafeCsTryFinallyTryBody :: Suite v a -- ^ @\<suite\>@
+  , _unsafeCsTryFinallyFinallyIndents :: Indents a
+  , _unsafeCsTryFinallyFinally :: [Whitespace] -- ^ @\'finally\' \<spaces\>@
+  , _unsafeCsTryFinallyFinallyBody :: Suite v a -- ^ @\<suite\>@
+  }
+  | For
+  { _csAnn :: a
+  , _csIndents :: Indents a
+  , _unsafeCsForAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
+  , _unsafeCsForFor :: [Whitespace] -- ^ @\'for\' \<spaces\>@
+  , _unsafeCsForBinder :: Expr v a -- ^ @\<expr\>@
+  , _unsafeCsForIn :: [Whitespace] -- ^ @\'in\' \<spaces\>@
+  , _unsafeCsForCollection :: Expr v a -- ^ @\<expr\>@
+  , _unsafeCsForBody :: Suite v a -- ^ @\<suite\>@
+  , _unsafeCsForElse :: Maybe (Indents a, [Whitespace], Suite v a) -- ^ @[\'else\' \<spaces\> \<suite\>]@
+  }
+  | ClassDef
+  { _csAnn :: a
+  , _unsafeCsClassDefDecorators :: [Decorator v a]
+  , _csIndents :: Indents a
+  , _unsafeCsClassDefClass :: NonEmpty Whitespace -- ^ @\'class\' \<spaces\>@
+  , _unsafeCsClassDefName :: Ident v a -- ^ @\<ident\>@
+  , _unsafeCsClassDefParameters :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace]) -- ^ @[\'(\' \<spaces\> [\<args\>] \')\' \<spaces\>]@
+  , _unsafeCsClassDefBody :: Suite v a -- ^ @\<suite\>@
+  }
+  | With
+  { _csAnn :: a
+  , _csIndents :: Indents a
+  , _unsafeCsWithAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
+  , _unsafeCsWithWith :: [Whitespace] -- ^ @\'with\' \<spaces\>@
+  , _unsafeCsWithItems :: CommaSep1 (WithItem v a) -- ^ @\<with_items\>@
+  , _unsafeCsWithBody :: Suite v a -- ^ @\<suite\>@
+  }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasExprs ExceptAs where

@@ -7,8 +7,7 @@ let
   f = import ./hpython.nix;
 
   haskellPackages =
-    (
-     (if compiler == "default"
+    ((if compiler == "default"
       then pkgs.haskellPackages
       else pkgs.haskell.packages.${compiler})).override {
        overrides = self: super: {
@@ -31,4 +30,4 @@ let
 
 in
 
-  pkgs.haskell.lib.dontHaddock drv
+  drv

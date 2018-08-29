@@ -44,65 +44,81 @@ data Statement a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data CompoundStatement a
-  = Fundef a
-      [Decorator a]
-      (Indents a)
-      (Maybe (NonEmpty Whitespace)) -- ^ ['async' <spaces>]
-      (NonEmpty Whitespace) -- ^ 'def' <spaces>
-      (Ident '[] a) -- ^ <ident>
-      [Whitespace] -- ^ '(' <spaces>
-      (CommaSep (Param a)) -- ^ <parameters>
-      [Whitespace] -- ^ ')' <spaces>
-      (Maybe ([Whitespace], Expr a)) -- ^ ['->' <spaces> <expr>]
-      (Suite a) -- ^ <suite>
-  | If a
-      (Indents a)
-      [Whitespace] -- ^ 'if' <spaces>
-      (Expr a) -- ^ <expr>
-      (Suite a) -- ^ <suite>
-      [(Indents a, [Whitespace], Expr a, Suite a)] -- ^ ('elif' <spaces> <expr> <suite>)*
-      (Maybe (Indents a, [Whitespace], Suite a)) -- ^ ['else' <spaces> <suite>]
-  | While a
-      (Indents a)
-      [Whitespace] -- ^ 'while' <spaces>
-      (Expr a) -- ^ <expr>
-      (Suite a) -- ^ <suite>
-  | TryExcept a
-      (Indents a)
-      [Whitespace] -- ^ 'try' <spaces>
-      (Suite a) -- ^ <suite>
-      (NonEmpty (Indents a, [Whitespace], Maybe (ExceptAs a), Suite a)) -- ^ ('except' <spaces> <except_as> <suite>)+
-      (Maybe (Indents a, [Whitespace], Suite a)) -- ^ ['else' <spaces> <suite>]
-      (Maybe (Indents a, [Whitespace], Suite a)) -- ^ ['finally' <spaces> <suite>]
-  | TryFinally a
-      (Indents a)
-      [Whitespace] -- ^ 'try' <spaces>
-      (Suite a) -- ^ <suite>
-      (Indents a)
-      [Whitespace] -- ^ 'finally' <spaces>
-      (Suite a) -- ^ <suite>
-  | For a
-      (Indents a)
-      (Maybe (NonEmpty Whitespace)) -- ^ ['async' <spaces>]
-      [Whitespace] -- ^ 'for' <spaces>
-      (Expr a) -- ^ <expr>
-      [Whitespace] -- ^ 'in' <spaces>
-      (Expr a) -- ^ <expr>
-      (Suite a) -- ^ <suite>
-      (Maybe (Indents a, [Whitespace], Suite a)) -- ^ ['else' <spaces> <suite>]
-  | ClassDef a
-      [Decorator a]
-      (Indents a)
-      (NonEmpty Whitespace) -- ^ 'class' <spaces>
-      (Ident '[] a) -- ^ <ident>
-      (Maybe ([Whitespace], Maybe (CommaSep1' (Arg a)), [Whitespace])) -- ^ ['(' <spaces> [<args>] ')' <spaces>]
-      (Suite a) -- ^ <suite>
-  | With a
-      (Indents a)
-      (Maybe (NonEmpty Whitespace)) -- ^ ['async' <spaces>]
-      [Whitespace] -- ^ 'with' <spaces>
-      (CommaSep1 (WithItem a)) -- ^ <with_items>
-      (Suite a) -- ^ <suite>
+  = Fundef
+  { _csAnn :: a
+  , _unsafeCsFundefDecorators :: [Decorator a]
+  , _csIndents :: Indents a
+  , _unsafeCsFundefAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
+  , _unsafeCsFundefDef :: NonEmpty Whitespace -- ^ @\'def\' \<spaces\>@
+  , _unsafeCsFundefName :: Ident '[] a -- ^ @\<ident\>@
+  , _unsafeCsFundefLeftParen :: [Whitespace] -- ^ @\'(\' \<spaces\>@
+  , _unsafeCsFundefParameters :: CommaSep (Param a) -- ^ @\<parameters\>@
+  , _unsafeCsFundefRightParen :: [Whitespace] -- ^ @\')\' \<spaces\>@
+  , _unsafeCsFundefReturnType :: Maybe ([Whitespace], Expr a) -- ^ @[\'->\' \<spaces\> \<expr\>]@
+  , _unsafeCsFundefBody :: Suite a -- ^ @\<suite\>@
+  }
+  | If
+  { _csAnn :: a
+  , _csIndents :: Indents a
+  , _unsafeCsIfIf :: [Whitespace] -- ^ @\'if\' \<spaces\>@
+  , _unsafeCsIfCond :: Expr a -- ^ @\<expr\>@
+  , _unsafeCsIfBody :: Suite a -- ^ @\<suite\>@
+  , _unsafeCsIfElifs :: [(Indents a, [Whitespace], Expr a, Suite a)] -- ^ @(\'elif\' \<spaces\> \<expr\> \<suite\>)*@
+  , _unsafeCsIfElse :: Maybe (Indents a, [Whitespace], Suite a) -- ^ @[\'else\' \<spaces\> \<suite\>]@
+  }
+  | While
+  { _csAnn :: a
+  , _csIndents :: Indents a
+  , _unsafeCsWhileWhile :: [Whitespace] -- ^ @\'while\' \<spaces\>@
+  , _unsafeCsWhileCond :: Expr a -- ^ @\<expr\>@
+  , _unsafeCsWhileBody :: Suite a -- ^ @\<suite\>@
+  }
+  | TryExcept
+  { _csAnn :: a
+  , _csIndents :: Indents a
+  , _unsafeCsTryExceptTry :: [Whitespace] -- ^ @\'try\' \<spaces\>@
+  , _unsafeCsTryExceptBody :: Suite a -- ^ @\<suite\>@
+  , _unsafeCsTryExceptExcepts :: NonEmpty (Indents a, [Whitespace], Maybe (ExceptAs a), Suite a) -- ^ @(\'except\' \<spaces\> \<except_as\> \<suite\>)+@
+  , _unsafeCsTryExceptElse :: Maybe (Indents a, [Whitespace], Suite a) -- ^ @[\'else\' \<spaces\> \<suite\>]@
+  , _unsafeCsTryExceptFinally :: Maybe (Indents a, [Whitespace], Suite a) -- ^ @[\'finally\' \<spaces\> \<suite\>]@
+  }
+  | TryFinally
+  { _csAnn :: a
+  , _csIndents :: Indents a
+  , _unsafeCsTryFinallyTry :: [Whitespace] -- ^ @\'try\' \<spaces\>@
+  , _unsafeCsTryFinallyTryBody :: Suite a -- ^ @\<suite\>@
+  , _unsafeCsTryFinallyFinallyIndents :: Indents a
+  , _unsafeCsTryFinallyFinally :: [Whitespace] -- ^ @\'finally\' \<spaces\>@
+  , _unsafeCsTryFinallyFinallyBody :: Suite a -- ^ @\<suite\>@
+  }
+  | For
+  { _csAnn :: a
+  , _csIndents :: Indents a
+  , _unsafeCsForAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
+  , _unsafeCsForFor :: [Whitespace] -- ^ @\'for\' \<spaces\>@
+  , _unsafeCsForBinder :: Expr a -- ^ @\<expr\>@
+  , _unsafeCsForIn :: [Whitespace] -- ^ @\'in\' \<spaces\>@
+  , _unsafeCsForCollection :: Expr a -- ^ @\<expr\>@
+  , _unsafeCsForBody :: Suite a -- ^ @\<suite\>@
+  , _unsafeCsForElse :: Maybe (Indents a, [Whitespace], Suite a) -- ^ @[\'else\' \<spaces\> \<suite\>]@
+  }
+  | ClassDef
+  { _csAnn :: a
+  , _unsafeCsClassDefDecorators :: [Decorator a]
+  , _csIndents :: Indents a
+  , _unsafeCsClassDefClass :: NonEmpty Whitespace -- ^ @\'class\' \<spaces\>@
+  , _unsafeCsClassDefName :: Ident '[] a -- ^ @\<ident\>@
+  , _unsafeCsClassDefParameters :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg a)), [Whitespace]) -- ^ @[\'(\' \<spaces\> [\<args\>] \')\' \<spaces\>]@
+  , _unsafeCsClassDefBody :: Suite a -- ^ @\<suite\>@
+  }
+  | With
+  { _csAnn :: a
+  , _csIndents :: Indents a
+  , _unsafeCsWithAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
+  , _unsafeCsWithWith :: [Whitespace] -- ^ @\'with\' \<spaces\>@
+  , _unsafeCsWithItems :: CommaSep1 (WithItem a) -- ^ @\<with_items\>@
+  , _unsafeCsWithBody :: Suite a -- ^ @\<suite\>@
+  }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data SmallStatement a
@@ -167,18 +183,15 @@ data Param a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data CompIf a
-  -- ^ 'if' <any_spaces> <expr>
-  = CompIf a [Whitespace] (Expr a)
+  = CompIf a [Whitespace] (Expr a) -- ^ 'if' <any_spaces> <expr>
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data CompFor a
-  -- ^ 'for' <any_spaces> <targets> 'in' <any_spaces> <expr>
-  = CompFor a [Whitespace] (Expr a) [Whitespace] (Expr a)
+  = CompFor a [Whitespace] (Expr a) [Whitespace] (Expr a) -- ^ 'for' <any_spaces> <targets> 'in' <any_spaces> <expr>
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Comprehension e a
-  -- ^ <expr> <comp_for> (comp_for | comp_if)*
-  = Comprehension a (e a) (CompFor a) [Either (CompFor a) (CompIf a)]
+  = Comprehension a (e a) (CompFor a) [Either (CompFor a) (CompIf a)] -- ^ <expr> <comp_for> (comp_for | comp_if)*
   deriving (Eq, Show)
 
 instance Functor e => Functor (Comprehension e) where

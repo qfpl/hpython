@@ -50,7 +50,7 @@ library
                      , Language.Python.Validate.Syntax.Error
                      , Language.Python.Validate.Indentation
                      , Language.Python.Validate.Indentation.Error
-  build-depends:       base >=4.9 && <4.11
+  build-depends:       base >=4.9 && <5
                      , digit >=0.6
                      , dlist >=0.8 && <0.9
                      , lens
@@ -81,7 +81,7 @@ executable example
                      , OptimizeTailRecursion
                      , Programs
   hs-source-dirs:      example
-  build-depends:       base >=4.9 && <4.11, lens, hpython, text
+  build-depends:       base >=4.9 && <5, lens, hpython, text
   default-language:    Haskell2010
   ghc-options:         -O
                        -Wincomplete-patterns
@@ -92,7 +92,7 @@ executable example
 executable bench
   main-is:             Main.hs
   hs-source-dirs:      benchmarks
-  build-depends:       base >=4.9 && <4.11
+  build-depends:       base >=4.9 && <5
                      , hpython
                      , megaparsec
                      , criterion
@@ -117,7 +117,7 @@ test-suite hpython-tests
                      , Scope
                      , Roundtrip
   hs-source-dirs:      test
-  build-depends:       base >=4.9 && <4.11
+  build-depends:       base >=4.9 && <5
                      , directory
                      , digit >=0.6
                      , filepath

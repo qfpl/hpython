@@ -152,8 +152,7 @@ instance HasExprs Arg where
   _Exprs f (DoubleStarArg a ws expr) = StarArg a ws <$> f expr
 
 data Comprehension e (v :: [*]) a
-  -- ^ <expr> <comp_for> (comp_for | comp_if)*
-  = Comprehension a (e v a) (CompFor v a) [Either (CompFor v a) (CompIf v a)]
+  = Comprehension a (e v a) (CompFor v a) [Either (CompFor v a) (CompIf v a)] -- ^ <expr> <comp_for> (comp_for | comp_if)*
   deriving (Eq, Show)
 
 instance HasTrailingWhitespace (Comprehension e v a) where
@@ -188,8 +187,7 @@ instance Traversable (e v) => Traversable (Comprehension e v) where
     traverse (bitraverse (traverse f) (traverse f)) d
 
 data CompIf (v :: [*]) a
-  -- ^ 'if' <any_spaces> <expr>
-  = CompIf a [Whitespace] (Expr v a)
+  = CompIf a [Whitespace] (Expr v a) -- ^ 'if' <any_spaces> <expr>
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasTrailingWhitespace (CompIf v a) where
@@ -199,8 +197,7 @@ instance HasTrailingWhitespace (CompIf v a) where
       (\(CompIf a b c) ws -> CompIf a b $ c & trailingWhitespace .~ ws)
 
 data CompFor (v :: [*]) a
-  -- ^ 'for' <any_spaces> <targets> 'in' <any_spaces> <expr>
-  = CompFor a [Whitespace] (Expr v a) [Whitespace] (Expr v a)
+  = CompFor a [Whitespace] (Expr v a) [Whitespace] (Expr v a) -- ^ 'for' <any_spaces> <targets> 'in' <any_spaces> <expr>
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasTrailingWhitespace (CompFor v a) where

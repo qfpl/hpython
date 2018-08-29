@@ -84,14 +84,10 @@ newtype Parser ann a
   { unParser
     :: forall r
      . ParseState ann
-    -- ^ Backtracking failure
-    -> (ParseError ann -> r)
-    -- ^ Non-backtracking failure
-    -> (ParseError ann -> r)
-    -- ^ Backtracking success
-    -> (a -> ParseState ann -> r)
-    -- ^ Non-backtracking success
-    -> (a -> ParseState ann -> r)
+    -> (ParseError ann -> r) -- Backtracking failure
+    -> (ParseError ann -> r) -- Non-backtracking failure
+    -> (a -> ParseState ann -> r) -- Backtracking success
+    -> (a -> ParseState ann -> r) -- Non-backtracking success
     -> r
   }
 

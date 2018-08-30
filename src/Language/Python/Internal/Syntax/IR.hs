@@ -261,35 +261,35 @@ data Arg a
 
 data Expr a
   = StarExpr
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeStarExprWhitespace :: [Whitespace]
   , _unsafeStarExprValue :: Expr a
   }
   | Unit
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeUnitWhitespaceInner :: [Whitespace]
   , _unsafeUnitWhitespaceRight :: [Whitespace]
   }
   | Lambda
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeLambdaWhitespace :: [Whitespace]
   , _unsafeLambdaArgs :: CommaSep (Param a)
   , _unsafeLambdaColon :: [Whitespace]
   , _unsafeLambdaBody :: Expr a
   }
   | Yield
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeYieldWhitespace :: [Whitespace]
   , _unsafeYieldValue :: Maybe (Expr a)
   }
   | YieldFrom
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeYieldWhitespace :: [Whitespace]
   , _unsafeFromWhitespace :: [Whitespace]
   , _unsafeYieldFromValue :: Expr a
   }
   | Ternary
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- expr
   , _unsafeTernaryValue :: Expr a
   -- 'if' spaces
@@ -302,7 +302,7 @@ data Expr a
   , _unsafeTernaryElse :: Expr a
   }
   | ListComp
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- [ spaces
   , _unsafeListCompWhitespaceLeft :: [Whitespace]
   -- comprehension
@@ -311,7 +311,7 @@ data Expr a
   , _unsafeListCompWhitespaceRight :: [Whitespace]
   }
   | List
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- [ spaces
   , _unsafeListWhitespaceLeft :: [Whitespace]
   -- exprs
@@ -320,7 +320,7 @@ data Expr a
   , _unsafeListWhitespaceRight :: [Whitespace]
   }
   | DictComp
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- { spaces
   , _unsafeDictCompWhitespaceLeft :: [Whitespace]
   -- comprehension
@@ -329,13 +329,13 @@ data Expr a
   , _unsafeDictCompWhitespaceRight :: [Whitespace]
   }
   | Dict
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeDictWhitespaceLeft :: [Whitespace]
   , _unsafeDictValues :: Maybe (CommaSep1' (DictItem a))
   , _unsafeDictWhitespaceRight :: [Whitespace]
   }
   | SetComp
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- { spaces
   , _unsafeSetCompWhitespaceLeft :: [Whitespace]
   -- comprehension
@@ -344,13 +344,13 @@ data Expr a
   , _unsafeSetCompWhitespaceRight :: [Whitespace]
   }
   | Set
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeSetWhitespaceLeft :: [Whitespace]
   , _unsafeSetValues :: CommaSep1' (Expr a)
   , _unsafeSetWhitespaceRight :: [Whitespace]
   }
   | Deref
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- expr
   , _unsafeDerefValueLeft :: Expr a
   -- . spaces
@@ -359,7 +359,7 @@ data Expr a
   , _unsafeDerefValueRight :: Ident '[] a
   }
   | Subscript
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- expr
   , _unsafeSubscriptValueLeft :: Expr a
   -- [ spaces
@@ -370,7 +370,7 @@ data Expr a
   , _unsafeSubscriptWhitespaceRight :: [Whitespace]
   }
   | Call
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- expr
   , _unsafeCallFunction :: Expr a
   -- ( spaces
@@ -381,26 +381,26 @@ data Expr a
   , _unsafeCallWhitespaceRight :: [Whitespace]
   }
   | None
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeNoneWhitespace :: [Whitespace]
   }
   | Ellipsis
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeEllipsisWhitespace :: [Whitespace]
   }
   | BinOp
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeBinOpExprLeft :: Expr a
   , _unsafeBinOpOp :: BinOp a
   , _unsafeBinOpExprRight :: Expr a
   }
   | UnOp
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeUnOpOp :: UnOp a
   , _unsafeUnOpValue :: Expr a
   }
   | Parens
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- ( spaces
   , _unsafeParensWhitespaceLeft :: [Whitespace]
   -- expr
@@ -412,31 +412,31 @@ data Expr a
   { _unsafeIdentValue :: Ident '[] a
   }
   | Int
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeIntValue :: IntLiteral a
   , _unsafeIntWhitespace :: [Whitespace]
   }
   | Float
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeFloatValue :: FloatLiteral a
   , _unsafeFloatWhitespace :: [Whitespace]
   }
   | Imag
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeImagValue :: ImagLiteral a
   , _unsafeImagWhitespace :: [Whitespace]
   }
   | Bool
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeBoolValue :: Bool
   , _unsafeBoolWhitespace :: [Whitespace]
   }
   | String
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeStringLiteralValue :: NonEmpty (StringLiteral a)
   }
   | Tuple
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- expr
   , _unsafeTupleHead :: Expr a
   -- , spaces
@@ -445,16 +445,16 @@ data Expr a
   , _unsafeTupleTail :: Maybe (CommaSep1' (Expr a))
   }
   | Not
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeNotWhitespace :: [Whitespace]
   , _unsafeNotValue :: Expr a
   }
   | Generator
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _generatorValue :: Comprehension Expr a
   }
   | Await
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeAwaitWhitespace :: [Whitespace]
   , _unsafeAwaitValue :: Expr a
   }
@@ -520,7 +520,7 @@ makeLenses ''FromIRContext
 fromIR_expr :: Expr a -> Validate [IRError a] (Syntax.Expr '[] a)
 fromIR_expr ex =
   case ex of
-    StarExpr{} -> Failure [InvalidUnpacking $ _exprAnnotation ex]
+    StarExpr{} -> Failure [InvalidUnpacking $ _exprAnn ex]
     Unit a b c -> pure $ Syntax.Unit a b c
     Lambda a b c d e ->
       (\c' -> Syntax.Lambda a b c' d) <$>
@@ -776,7 +776,7 @@ fromIR_listItem (Parens a b c d) =
       Syntax.ListUnpack w x y z -> Syntax.ListUnpack w ((b, d) : x) y z
       Syntax.ListItem x y -> Syntax.ListItem a (Syntax.Parens x b y d)) <$>
   fromIR_listItem c
-fromIR_listItem e = (\x -> Syntax.ListItem (Syntax._exprAnnotation x) x) <$> fromIR_expr e
+fromIR_listItem e = (\x -> Syntax.ListItem (Syntax._exprAnn x) x) <$> fromIR_expr e
 
 fromIR_tupleItem :: Expr a -> Validate [IRError a] (Syntax.TupleItem '[] a)
 fromIR_tupleItem (StarExpr a b c) =
@@ -787,7 +787,7 @@ fromIR_tupleItem (Parens a b c d) =
       Syntax.TupleItem x y -> Syntax.TupleItem a (Syntax.Parens x b y d)) <$>
   fromIR_tupleItem c
 fromIR_tupleItem e =
-  (\x -> Syntax.TupleItem (Syntax._exprAnnotation x) x) <$> fromIR_expr e
+  (\x -> Syntax.TupleItem (Syntax._exprAnn x) x) <$> fromIR_expr e
 
 fromIR_setItem :: Expr a -> Validate [IRError a] (Syntax.SetItem '[] a)
 fromIR_setItem (StarExpr a b c) =
@@ -797,7 +797,7 @@ fromIR_setItem (Parens a b c d) =
       Syntax.SetUnpack w x y z -> Syntax.SetUnpack w ((b, d) : x) y z
       Syntax.SetItem x y -> Syntax.SetItem a (Syntax.Parens x b y d)) <$>
   fromIR_setItem c
-fromIR_setItem e = (\x -> Syntax.SetItem (Syntax._exprAnnotation x) x) <$> fromIR_expr e
+fromIR_setItem e = (\x -> Syntax.SetItem (Syntax._exprAnn x) x) <$> fromIR_expr e
 
 fromIR :: Module a -> Validate [IRError a] (Syntax.Module '[] a)
 fromIR (Module ms) =

@@ -25,7 +25,7 @@ fixMutableDefaultArguments input = do
 
     conditionalAssignments =
       (\(pname, value) ->
-         st_ $ if_ (var_ pname `is_` none_) [ st_ $ var_ pname .= value ]) <$>
+         line_ $ if_ (var_ pname `is_` none_) [ line_ $ var_ pname .= value ]) <$>
       zip
         (targetParams ^.. folded.kpName.identValue)
         (paramsList ^.. folded._KeywordParam.kpExpr.filtered isMutable)
@@ -71,4 +71,5 @@ fixMutableDefaultArguments input = do
     isMutable (Ternary _ _ _ a _ b) = isMutable a || isMutable b
     isMutable (Parens _ _ a _) = isMutable a
     isMutable (Tuple _ a _ as) =
-      anyOf (getting _Exprs) isMutable a || anyOf (folded.folded.getting _Exprs) isMutable as
+      anyOf (getting _Exprs) isMutable a ||
+      anyOf (folded.folded.getting _Exprs) isMutable as

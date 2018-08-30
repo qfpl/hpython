@@ -25,10 +25,11 @@ module Language.Python.Syntax
   , decorated_
   , HasDecorators(..)
     -- * Statements
-    -- ** Block bodies
+    -- ** Lines of code
   , blank_
-  , st_
+  , AsLine(..)
   , Line(..)
+    -- ** Block bodies
   , HasBody(..)
   , modifyBody
     -- ** Function definitions
@@ -111,14 +112,30 @@ import Language.Python.Syntax.Types
 
 type Raw f = f '[] ()
 
+-- | Create a blank 'Line'
 blank_ :: Raw Line
 blank_ = Line $ Left ([], LF Nothing)
 
-st_ :: Raw Statement -> Raw Line
-st_ = Line . Right
-
+-- | One or more lines of Python code
 newtype Line v a = Line { unLine :: Either ([Whitespace], Newline) (Statement v a) }
   deriving (Eq, Show)
+
+-- | Convert some data to a 'Line'
+class AsLine s where
+  line_ :: Raw s -> Raw Line
+
+instance AsLine SmallStatement where
+  line_ ss =
+    Line . Right $ SmallStatements (Indents [] ()) ss [] Nothing (Right $ LF Nothing)
+
+instance AsLine CompoundStatement where
+  line_ = Line . Right . CompoundStatement
+
+instance AsLine Statement where
+  line_ = Line . Right
+
+instance AsLine Expr where
+  line_ e = line_ $ Expr (e ^. exprAnn) e
 
 instance HasExprs Line where
   _Exprs f (Line a) = Line <$> (_Right._Exprs) f a
@@ -215,7 +232,7 @@ instance HasBody Fundef where
   getBody fun =
     (\case
         SuiteOne a b c d ->
-          st_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| []
+          line_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| []
         SuiteMany a b c d ->
           Line <$> unBlock d) $
     fromMaybe

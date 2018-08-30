@@ -357,30 +357,30 @@ instance HasTrailingWhitespace (TupleItem v a) where
 
 data Expr (v :: [*]) a
   = Unit
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeUnitWhitespaceInner :: [Whitespace]
   , _unsafeUnitWhitespaceRight :: [Whitespace]
   }
   | Lambda
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeLambdaWhitespace :: [Whitespace]
   , _unsafeLambdaArgs :: CommaSep (Param v a)
   , _unsafeLambdaColon :: [Whitespace]
   , _unsafeLambdaBody :: Expr v a
   }
   | Yield
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeYieldWhitespace :: [Whitespace]
   , _unsafeYieldValue :: Maybe (Expr v a)
   }
   | YieldFrom
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeYieldWhitespace :: [Whitespace]
   , _unsafeFromWhitespace :: [Whitespace]
   , _unsafeYieldFromValue :: Expr v a
   }
   | Ternary
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- expr
   , _unsafeTernaryValue :: Expr v a
   -- 'if' spaces
@@ -393,7 +393,7 @@ data Expr (v :: [*]) a
   , _unsafeTernaryElse :: Expr v a
   }
   | ListComp
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- [ spaces
   , _unsafeListCompWhitespaceLeft :: [Whitespace]
   -- comprehension
@@ -402,7 +402,7 @@ data Expr (v :: [*]) a
   , _unsafeListCompWhitespaceRight :: [Whitespace]
   }
   | List
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- [ spaces
   , _unsafeListWhitespaceLeft :: [Whitespace]
   -- exprs
@@ -411,7 +411,7 @@ data Expr (v :: [*]) a
   , _unsafeListWhitespaceRight :: [Whitespace]
   }
   | DictComp
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- { spaces
   , _unsafeDictCompWhitespaceLeft :: [Whitespace]
   -- comprehension
@@ -420,13 +420,13 @@ data Expr (v :: [*]) a
   , _unsafeDictCompWhitespaceRight :: [Whitespace]
   }
   | Dict
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeDictWhitespaceLeft :: [Whitespace]
   , _unsafeDictValues :: Maybe (CommaSep1' (DictItem v a))
   , _unsafeDictWhitespaceRight :: [Whitespace]
   }
   | SetComp
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- { spaces
   , _unsafeSetCompWhitespaceLeft :: [Whitespace]
   -- comprehension
@@ -435,13 +435,13 @@ data Expr (v :: [*]) a
   , _unsafeSetCompWhitespaceRight :: [Whitespace]
   }
   | Set
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeSetWhitespaceLeft :: [Whitespace]
   , _unsafeSetValues :: CommaSep1' (SetItem v a)
   , _unsafeSetWhitespaceRight :: [Whitespace]
   }
   | Deref
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- expr
   , _unsafeDerefValueLeft :: Expr v a
   -- . spaces
@@ -450,7 +450,7 @@ data Expr (v :: [*]) a
   , _unsafeDerefValueRight :: Ident v a
   }
   | Subscript
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- expr
   , _unsafeSubscriptValueLeft :: Expr v a
   -- [ spaces
@@ -461,7 +461,7 @@ data Expr (v :: [*]) a
   , _unsafeSubscriptWhitespaceRight :: [Whitespace]
   }
   | Call
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- expr
   , _unsafeCallFunction :: Expr v a
   -- ( spaces
@@ -472,26 +472,26 @@ data Expr (v :: [*]) a
   , _unsafeCallWhitespaceRight :: [Whitespace]
   }
   | None
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeNoneWhitespace :: [Whitespace]
   }
   | Ellipsis
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeEllipsisWhitespace :: [Whitespace]
   }
   | BinOp
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeBinOpExprLeft :: Expr v a
   , _unsafeBinOpOp :: BinOp a
   , _unsafeBinOpExprRight :: Expr v a
   }
   | UnOp
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeUnOpOp :: UnOp a
   , _unsafeUnOpValue :: Expr v a
   }
   | Parens
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- ( spaces
   , _unsafeParensWhitespaceLeft :: [Whitespace]
   -- expr
@@ -503,31 +503,31 @@ data Expr (v :: [*]) a
   { _unsafeIdentValue :: Ident v a
   }
   | Int
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeIntValue :: IntLiteral a
   , _unsafeIntWhitespace :: [Whitespace]
   }
   | Float
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeFloatValue :: FloatLiteral a
   , _unsafeFloatWhitespace :: [Whitespace]
   }
   | Imag
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeImagValue :: ImagLiteral a
   , _unsafeImagWhitespace :: [Whitespace]
   }
   | Bool
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeBoolValue :: Bool
   , _unsafeBoolWhitespace :: [Whitespace]
   }
   | String
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeStringValue :: NonEmpty (StringLiteral a)
   }
   | Tuple
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   -- expr
   , _unsafeTupleHead :: TupleItem v a
   -- , spaces
@@ -536,16 +536,16 @@ data Expr (v :: [*]) a
   , _unsafeTupleTail :: Maybe (CommaSep1' (TupleItem v a))
   }
   | Not
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeNotWhitespace :: [Whitespace]
   , _unsafeNotValue :: Expr v a
   }
   | Generator
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _generatorValue :: Comprehension Expr v a
   }
   | Await
-  { _exprAnnotation :: a
+  { _exprAnn :: a
   , _unsafeAwaitWhitespace :: [Whitespace]
   , _unsafeAwaitValue :: Expr v a
   }

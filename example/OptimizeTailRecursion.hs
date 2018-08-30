@@ -41,13 +41,13 @@ optimizeTailRecursion st = do
         (function &
          setBody (replicate 4 Space)
            (flip (foldr NonEmpty.cons)
-              (zipWith (\a b -> st_ $ var_ (a <> "__tr") .= var_ b) paramNames paramNames)
-              [ st_ $ "__res__tr" .= none_
-              , st_ . while_ true_ .
+              (zipWith (\a b -> line_ $ var_ (a <> "__tr") .= var_ b) paramNames paramNames)
+              [ line_ $ "__res__tr" .= none_
+              , line_ . while_ true_ .
                 NonEmpty.fromList . transformOn (traverse._Exprs) (renameIn paramNames "__tr") $
                   bodyInit <>
-                  fmap st_ (looped functionName paramNames bodyLast)
-              , st_ $ return_ "__res__tr"
+                  fmap line_ (looped functionName paramNames bodyLast)
+              , line_ $ return_ "__res__tr"
               ]))
 
   where
@@ -92,16 +92,16 @@ optimizeTailRecursion st = do
                   case sts' of
                     Nothing ->
                       [ if_ e
-                          (fmap st_ . NonEmpty.fromList $
+                          (fmap line_ . NonEmpty.fromList $
                            (toListOf _Statements sts ^?! _init) <>
                            looped name params (toListOf _Statements sts ^?! _last))
                       ]
                     Just (_, _, sts'') ->
                       [ ifElse_ e
-                          (fmap st_ . NonEmpty.fromList $
+                          (fmap line_ . NonEmpty.fromList $
                            (toListOf _Statements sts ^?! _init) <>
                            looped name params (toListOf _Statements sts ^?! _last))
-                          (fmap st_ . NonEmpty.fromList $
+                          (fmap line_ . NonEmpty.fromList $
                            (toListOf _Statements sts'' ^?! _init) <>
                            looped name params (toListOf _Statements sts'' ^?! _last))
                       ]

@@ -18,8 +18,6 @@ cabal-version:       >=1.10
 library
   exposed-modules:     Data.Validate
                      , Data.Validate.Monadic
-                     , Language.Python.Parse
-                     , Language.Python.Syntax
                      , Language.Python.Internal.Lexer
                      , Language.Python.Internal.Optics
                      , Language.Python.Internal.Optics.Validated
@@ -43,13 +41,16 @@ library
                      , Language.Python.Internal.Syntax.Strings.Raw
                      , Language.Python.Internal.Syntax.UnOp
                      , Language.Python.Internal.Syntax.Whitespace
+                     , Language.Python.Parse
+                     , Language.Python.Syntax
+                     , Language.Python.Syntax.Types
                      , Language.Python.Validate.Scope
                      , Language.Python.Validate.Scope.Error
                      , Language.Python.Validate.Syntax
                      , Language.Python.Validate.Syntax.Error
                      , Language.Python.Validate.Indentation
                      , Language.Python.Validate.Indentation.Error
-  build-depends:       base >=4.9 && <4.11
+  build-depends:       base >=4.9 && <5
                      , digit >=0.6
                      , dlist >=0.8 && <0.9
                      , lens
@@ -80,7 +81,7 @@ executable example
                      , OptimizeTailRecursion
                      , Programs
   hs-source-dirs:      example
-  build-depends:       base >=4.9 && <4.11, lens, hpython, text
+  build-depends:       base >=4.9 && <5, lens, hpython, text
   default-language:    Haskell2010
   ghc-options:         -O
                        -Wincomplete-patterns
@@ -91,7 +92,7 @@ executable example
 executable bench
   main-is:             Main.hs
   hs-source-dirs:      benchmarks
-  build-depends:       base >=4.9 && <4.11
+  build-depends:       base >=4.9 && <5
                      , hpython
                      , megaparsec
                      , criterion
@@ -116,7 +117,7 @@ test-suite hpython-tests
                      , Scope
                      , Roundtrip
   hs-source-dirs:      test
-  build-depends:       base >=4.9 && <4.11
+  build-depends:       base >=4.9 && <5
                      , directory
                      , digit >=0.6
                      , filepath

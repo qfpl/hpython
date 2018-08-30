@@ -1,61 +1,69 @@
 {-# language OverloadedLists, OverloadedStrings #-}
 {-# language DataKinds #-}
+{-# language BangPatterns #-}
 module OptimizeTailRecursion where
 
+import Control.Applicative ((<|>))
 import Control.Lens.Cons (_last, _init)
 import Control.Lens.Fold ((^..), (^?), (^?!), allOf, anyOf, folded, foldrOf, toListOf)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Plated (cosmos, transform, transformOn)
 import Control.Lens.Prism (_Just)
-import Control.Lens.Setter ((%~), over)
+import Control.Lens.Review ((#))
+import Control.Lens.Setter ((%~))
 import Control.Lens.Tuple (_2, _3)
 import Data.Foldable (toList)
-import qualified Data.List.NonEmpty as NonEmpty
+import Data.Function ((&))
 import Data.Semigroup ((<>))
 
-import Control.Lens ((&), (.~))
+import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Optics
-import Language.Python.Internal.Optics.Validated (unvalidated)
-import Language.Python.Internal.Syntax
+import Language.Python.Internal.Syntax hiding (Expr(), Statement())
 import Language.Python.Syntax
 
-optimizeTailRecursion :: Statement '[] () -> Maybe (Statement '[] ())
+optimizeTailRecursion :: Raw Statement -> Maybe (Raw Statement)
 optimizeTailRecursion st = do
-  (_, decos, idnts, _, _, name, _, params, _, _, suite) <- st ^? _Fundef
-  bodyLast <- toListOf (unvalidated._Statements) suite ^? _last
+  function <- st ^? _Fundef
+  let functionBody = toList $ getBody function
+  bodyLast <- lastStatement functionBody
 
   let
-    params' = toList params
-    paramNames = (_identValue . _paramName) <$> params'
+    functionName = function ^. fdName.identValue
+    bodyInit = functionBody ^?! _init
+    paramNames = function ^.. fdParameters.folded.paramName.identValue
 
-  if not $ hasTC (name ^. identValue) bodyLast
+  if not $ hasTC functionName bodyLast
     then Nothing
     else
-      Just .
-      -- I don't like needing to care about indentation for these things but I think
-      -- it's a necessary part of the design
-      over (_Indents.indentsValue) (idnts ^. indentsValue <>) .
-      def_ name params' . NonEmpty.fromList $
-        zipWith (\a b -> var_ (a <> "__tr") .= var_ b) paramNames paramNames <>
-        [ "__res__tr" .= none_
-        , while_ true_ . NonEmpty.fromList .
-          transformOn (traverse._Exprs) (renameIn paramNames "__tr") $
-            ((toListOf (unvalidated._Statements) suite ^?! _init)
-               -- Same here - clear the old indentation
-               & traverse._Indents.indentsValue .~ []) <>
-            looped (name ^. identValue) paramNames bodyLast
-        , return_ "__res__tr"
-        ]
+      Just $
+      _Fundef #
+        (function &
+         setBody (replicate 4 Space)
+           (flip (foldr NonEmpty.cons)
+              (zipWith (\a b -> st_ $ var_ (a <> "__tr") .= var_ b) paramNames paramNames)
+              [ st_ $ "__res__tr" .= none_
+              , st_ . while_ true_ .
+                NonEmpty.fromList . transformOn (traverse._Exprs) (renameIn paramNames "__tr") $
+                  bodyInit <>
+                  fmap st_ (looped functionName paramNames bodyLast)
+              , st_ $ return_ "__res__tr"
+              ]))
 
   where
-    isTailCall :: String -> Expr '[] () -> Bool
+    lastStatement :: [Raw Line] -> Maybe (Raw Statement)
+    lastStatement = go Nothing
+      where
+        go !res [] = res
+        go !res (a:as) = go (a ^? _Statements <|> res) as
+
+    isTailCall :: String -> Raw Expr -> Bool
     isTailCall name e
       | anyOf (cosmos._Call._2._Ident._2.identValue) (== name) e
       = (e ^? _Call._2._Ident._2.identValue) == Just name
       | otherwise = False
 
-    hasTC :: String -> Statement '[] () -> Bool
+    hasTC :: String -> Raw Statement -> Bool
     hasTC name st =
       case st of
         CompoundStatement (If _ _ _ e sts [] sts') ->
@@ -69,12 +77,12 @@ optimizeTailRecursion st = do
             _ -> False
         _ -> False
 
-    renameIn :: [String] -> String -> Expr '[] () -> Expr '[] ()
+    renameIn :: [String] -> String -> Raw Expr -> Raw Expr
     renameIn params suffix =
       transform
         (_Ident._2.identValue %~ (\a -> if a `elem` params then a <> suffix else a))
 
-    looped :: String -> [String] -> Statement '[] () -> [Statement '[] ()]
+    looped :: String -> [String] -> Raw Statement -> [Raw Statement]
     looped name params st =
       case st of
         CompoundStatement c ->
@@ -84,25 +92,24 @@ optimizeTailRecursion st = do
                   case sts' of
                     Nothing ->
                       [ if_ e
-                          (NonEmpty.fromList $
-                          (toListOf _Statements sts ^?! _init) <>
-                          looped name params (toListOf _Statements sts ^?! _last))
+                          (fmap st_ . NonEmpty.fromList $
+                           (toListOf _Statements sts ^?! _init) <>
+                           looped name params (toListOf _Statements sts ^?! _last))
                       ]
                     Just (_, _, sts'') ->
                       [ ifElse_ e
-                          (NonEmpty.fromList $
-                          (toListOf _Statements sts ^?! _init) <>
-                          looped name params (toListOf _Statements sts ^?! _last))
-                          (NonEmpty.fromList $
-                          (toListOf _Statements sts'' ^?! _init) <>
-                          looped name params (toListOf _Statements sts'' ^?! _last))
+                          (fmap st_ . NonEmpty.fromList $
+                           (toListOf _Statements sts ^?! _init) <>
+                           looped name params (toListOf _Statements sts ^?! _last))
+                          (fmap st_ . NonEmpty.fromList $
+                           (toListOf _Statements sts'' ^?! _init) <>
+                           looped name params (toListOf _Statements sts'' ^?! _last))
                       ]
             _ -> [st]
         SmallStatements idnts s ss sc cmtnl ->
           let
             initExps = foldr (\_ _ -> init ss) [] ss
-            lastExp =
-              foldrOf (folded._2) (\_ _ -> last ss ^. _2) s ss
+            lastExp = foldrOf (folded._2) (\_ _ -> last ss ^. _2) s ss
             newSts =
               case initExps of
                 [] -> []

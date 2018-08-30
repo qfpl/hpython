@@ -1,32 +1,22 @@
-{-# language DataKinds, PolyKinds, LambdaCase, ViewPatterns #-}
-{-# language TemplateHaskell #-}
-{-# language DefaultSignatures, FlexibleContexts #-}
+{-# language DataKinds #-}
+{-# language PolyKinds #-}
+{-# language LambdaCase #-}
 module Language.Python.Internal.Optics where
 
 import Control.Lens.Fold (Fold)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Setter ((.~))
-import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (Traversal, Traversal', traverseOf, failing)
 import Control.Lens.Tuple (_3, _4)
 import Control.Lens.Prism (Prism, _Right, _Left, prism)
 import Control.Lens.Wrapped (_Wrapped)
 import Data.Coerce (coerce)
 import Data.Function ((&))
-import Data.List.NonEmpty
 
 import Language.Python.Internal.Optics.Validated (unvalidated)
-import Language.Python.Internal.Syntax
-
-data KeywordParam v a
-  = MkKeywordParam
-  { _kpAnn :: a
-  , _kpName :: Ident v a
-  , _kpType :: Maybe ([Whitespace], Expr v a)
-  , _kpWhitespaceRight :: [Whitespace]
-  , _kpExpr :: Expr v a
-  } deriving (Eq, Show)
-makeLenses ''KeywordParam
+import Language.Python.Internal.Syntax hiding (Fundef, While)
+import Language.Python.Syntax.Types
+import qualified Language.Python.Internal.Syntax as AST (CompoundStatement(Fundef, While))
 
 _KeywordParam
   :: Prism
@@ -45,31 +35,30 @@ _Fundef
   :: Prism
        (Statement v a)
        (Statement '[] a)
-       ( a
-       , [Decorator v a]
-       ,  Indents a
-       , Maybe (NonEmpty Whitespace)
-       , NonEmpty Whitespace, Ident v a
-       , [Whitespace], CommaSep (Param v a)
-       , [Whitespace], Maybe ([Whitespace], Expr v a)
-       , Suite v a
-       )
-       ( a
-       , [Decorator '[] a]
-       , Indents a
-       , Maybe (NonEmpty Whitespace)
-       , NonEmpty Whitespace, Ident '[] a
-       , [Whitespace], CommaSep (Param '[] a)
-       , [Whitespace], Maybe ([Whitespace], Expr '[] a)
-       , Suite '[] a
-       )
+       (Fundef v a)
+       (Fundef '[] a)
 _Fundef =
   prism
-    (\(idnt, a, b, c, d, e, f, g, h, i, j) ->
-       CompoundStatement (Fundef idnt a b c d e f g h i j))
+    (\(Fundef idnt a b c d e f g h i j) ->
+       CompoundStatement (AST.Fundef idnt a b c d e f g h i j))
     (\case
-        CompoundStatement (Fundef idnt a b c d e f g h i j) ->
-          Right (idnt, a, b, c, d, e, f, g, h, i, j)
+        CompoundStatement (AST.Fundef idnt a b c d e f g h i j) ->
+          Right $ Fundef idnt a b c d e f g h i j
+        a -> Left $ a ^. unvalidated)
+
+_While
+  :: Prism
+       (Statement v a)
+       (Statement '[] a)
+       (While v a)
+       (While '[] a)
+_While =
+  prism
+    (\(While a b c d e) ->
+       CompoundStatement (AST.While a b c d e))
+    (\case
+        CompoundStatement (AST.While a b c d e) ->
+          Right $ While a b c d e
         a -> Left $ a ^. unvalidated)
 
 _Call
@@ -122,8 +111,8 @@ instance HasIndents Decorator where
 instance HasIndents CompoundStatement where
   _Indents fun s =
     case s of
-      Fundef a decos idnt asyncWs b c d e f g h ->
-        (\decos' idnt' -> Fundef a decos' idnt' asyncWs b c d e f g) <$>
+      AST.Fundef a decos idnt asyncWs b c d e f g h ->
+        (\decos' idnt' -> AST.Fundef a decos' idnt' asyncWs b c d e f g) <$>
         traverse (_Indents fun) decos <*>
         fun idnt <*>
         _Indents fun h
@@ -143,8 +132,8 @@ instance HasIndents CompoundStatement where
              fun idnt <*>
              _Indents fun b)
           e
-      While a idnt b c d ->
-        (\idnt' -> While a idnt' b c) <$>
+      AST.While a idnt b c d ->
+        (\idnt' -> AST.While a idnt' b c) <$>
         fun idnt <*>
         _Indents fun d
       TryExcept a idnt b c d e f ->
@@ -214,8 +203,8 @@ instance HasNewlines Decorator where
 instance HasNewlines CompoundStatement where
   _Newlines fun s =
     case s of
-      Fundef ann decos idnt asyncWs ws1 name ws2 params ws3 mty s ->
-        (\decos' -> Fundef ann decos' idnt asyncWs ws1 name ws2 params ws3 mty) <$>
+      AST.Fundef ann decos idnt asyncWs ws1 name ws2 params ws3 mty s ->
+        (\decos' -> AST.Fundef ann decos' idnt asyncWs ws1 name ws2 params ws3 mty) <$>
         traverse (_Newlines fun) decos <*>
         _Newlines fun s
       If idnt ann ws1 cond s elifs els ->
@@ -223,8 +212,8 @@ instance HasNewlines CompoundStatement where
         _Newlines fun s <*>
         traverseOf (traverse._4._Newlines) fun elifs <*>
         traverseOf (traverse._3._Newlines) fun els
-      While idnt ann ws1 cond s ->
-        While idnt ann ws1 cond <$> _Newlines fun s
+      AST.While idnt ann ws1 cond s ->
+        AST.While idnt ann ws1 cond <$> _Newlines fun s
       TryExcept idnt a b c f k l ->
         TryExcept idnt a b <$> _Newlines fun c <*>
         traverseOf (traverse._4._Newlines) fun f <*>

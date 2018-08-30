@@ -362,7 +362,7 @@ genExpr' isExp = do
     , if isExp then genSmallInt else genInt
     , if isExp then genSmallFloat else genFloat
     , genImag
-    , Ident () <$> genIdent
+    , Ident <$> genIdent
     , genStringLiterals
     ]
     ([ genList genExpr
@@ -452,7 +452,7 @@ genSubscript =
 genAssignable :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genAssignable =
   sizedRecursive
-    [ Ident () <$> genIdent
+    [ Ident <$> genIdent
     ]
     [ genList genAssignable
     , genParens genAssignable
@@ -464,7 +464,7 @@ genAssignable =
 genAugAssignable :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genAugAssignable =
   sizedRecursive
-    [ Ident () <$> genIdent ]
+    [ Ident <$> genIdent ]
     [ genDeref
     , genSubscript
     ]
@@ -483,7 +483,7 @@ genSmallStatement = do
      , sizedBind (sizedNonEmpty $ (,) <$> genWhitespaces <*> genAssignable) $ \a -> do
          isInFunction <- use inFunction
          when (isJust isInFunction) $
-           willBeNonlocals %= ((a ^.. folded._2.cosmos._Ident._2.identValue) ++)
+           willBeNonlocals %= ((a ^.. folded._2.cosmos._Ident.identValue) ++)
          sizedBind ((,) <$> genWhitespaces <*> genExpr) $ \b ->
            pure $ Assign () (snd $ NonEmpty.head a) (NonEmpty.fromList $ snoc (NonEmpty.tail a) b)
      , sized2M
@@ -538,7 +538,7 @@ genDecorator =
   where
     genDecoratorValue =
       Gen.choice
-      [ Ident () <$> genIdent
+      [ Ident <$> genIdent
       , sized2M
          (\a b -> (\ws1 -> Call () a ws1 b) <$> genWhitespaces <*> genWhitespaces)
          genDerefs
@@ -547,7 +547,7 @@ genDecorator =
 
     genDerefs =
       sizedRecursive
-      [ Ident () <$> genIdent ]
+      [ Ident <$> genIdent ]
       [ Deref () <$>
         genDerefs <*>
         genWhitespaces <*>

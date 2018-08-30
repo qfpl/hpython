@@ -375,7 +375,7 @@ validateExprSyntax (String a strLits) =
 validateExprSyntax (Int a n ws) = pure $ Int a n ws
 validateExprSyntax (Float a n ws) = pure $ Float a n ws
 validateExprSyntax (Imag a n ws) = pure $ Imag a n ws
-validateExprSyntax (Ident a name) = Ident a <$> validateIdentSyntax name
+validateExprSyntax (Ident name) = Ident <$> validateIdentSyntax name
 validateExprSyntax (List a ws1 exprs ws2) =
   List a ws1 <$>
   liftVM1

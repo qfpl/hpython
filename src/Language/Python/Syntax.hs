@@ -16,14 +16,14 @@ module Language.Python.Syntax
   , KeywordParam(..)
   , _KeywordParam
     -- *** Lenses
-  , kpAnn 
+  , kpAnn
   , kpName
   , kpType
   , kpEquals
   , kpExpr
     -- * Decorators
-  , HasDecorators(..)
   , decorated_
+  , HasDecorators(..)
     -- * Statements
     -- ** Block bodies
   , blank_
@@ -32,10 +32,10 @@ module Language.Python.Syntax
   , HasBody(..)
   , modifyBody
     -- ** Function definitions
+  , def_
   , Fundef(..)
   , _Fundef
   , mkFundef
-  , def_
     -- *** Lenses
   , fdAnn
   , fdDecorators
@@ -57,11 +57,25 @@ module Language.Python.Syntax
   , ifElse_
   , pass_
   , return_
+  -- *** While loops
   , while_
+  , While(..)
+  , _While
+  , mkWhile
     -- * Expressions
   , expr_
   , var_
+    -- ** Function calls
   , call_
+  , Call(..)
+  , _Call
+  , mkCall
+    -- *** Lenses
+  , callAnn
+  , callFunction
+  , callLeftParen
+  , callArguments
+  , callRightParen
     -- * Literals
   , list_
   , none_
@@ -92,9 +106,8 @@ import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 
 import Language.Python.Internal.Optics
-import Language.Python.Internal.Syntax hiding (Fundef, While)
+import Language.Python.Internal.Syntax hiding (Fundef, While, Call)
 import Language.Python.Syntax.Types
-import qualified Language.Python.Internal.Syntax as AST (CompoundStatement(While))
 
 type Raw f = f '[] ()
 
@@ -271,9 +284,10 @@ instance HasParameters Fundef where
   setParameters p = fdParameters .~ listToCommaSep p
   parameters = fdParameters
 
+-- | Create a minimal valid function definition
 mkFundef :: Raw Ident -> NonEmpty (Raw Line) -> Raw Fundef
 mkFundef name body =
-  Fundef
+  MkFundef
   { _fdAnn = ()
   , _fdDecorators = []
   , _fdIndents = Indents [] ()
@@ -291,15 +305,26 @@ def_ :: Raw Ident -> [Raw Param] -> NonEmpty (Raw Line) -> Raw Statement
 def_ name params body =
   _Fundef # (mkFundef name body) { _fdParameters = listToCommaSep params }
 
+-- | Create a minimal valid 'Call'
+mkCall :: Raw Expr -> Raw Call
+mkCall e =
+  MkCall
+  { _callAnn = ()
+  , _callFunction = e
+  , _callLeftParen = []
+  , _callArguments = Nothing
+  , _callRightParen = []
+  }
+
 call_ :: Raw Expr -> [Raw Arg] -> Raw Expr
 call_ expr args =
-  Call ()
-    expr
-    []
-    (case args of
+  _Call #
+  (mkCall expr)
+  { _callArguments = 
+    case args of
       [] -> Nothing
-      a:as -> Just $ (a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1')
-    []
+      a:as -> Just $ (a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1'
+  }
 
 return_ :: Raw Expr -> Raw Statement
 return_ e =
@@ -381,11 +406,19 @@ neg = negate
 toBlock :: NonEmpty (Raw Line) -> Block '[] ()
 toBlock = over (_Indents.indentsValue) (doIndent $ replicate 4 Space) . Block . fmap unLine
 
+-- | Create a minimal valid 'While'
+mkWhile :: Raw Expr -> NonEmpty (Raw Line) -> Raw While
+mkWhile cond body =
+  MkWhile
+  { _whileAnn = ()
+  , _whileIndents = Indents [] ()
+  , _whileWhile = [Space]
+  , _whileCond = cond
+  , _whileBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  }
+
 while_ :: Raw Expr -> NonEmpty (Raw Line) -> Raw Statement
-while_ e sts =
-  CompoundStatement $
-  AST.While () (Indents [] ()) [Space] e
-    (SuiteMany () [] (LF Nothing) $ toBlock sts)
+while_ e sts = _While # mkWhile e sts
 
 ifElifsElse_
   :: Raw Expr
@@ -416,7 +449,7 @@ ifElse_
 ifElse_ e sts = ifElifsElse_ e sts []
 
 var_ :: String -> Raw Expr
-var_ s = Ident () (MkIdent () s [])
+var_ s = Ident $ MkIdent () s []
 
 none_ :: Raw Expr
 none_ = None () []

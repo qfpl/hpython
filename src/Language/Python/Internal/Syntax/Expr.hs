@@ -500,8 +500,7 @@ data Expr (v :: [*]) a
   , _unsafeParensWhitespaceAfter :: [Whitespace]
   }
   | Ident
-  { _exprAnnotation :: a
-  , _unsafeIdentValue :: Ident v a
+  { _unsafeIdentValue :: Ident v a
   }
   | Int
   { _exprAnnotation :: a
@@ -572,7 +571,7 @@ instance HasTrailingWhitespace (Expr v a) where
           BinOp _ _ _ e -> e ^. trailingWhitespace
           UnOp _ _ e -> e ^. trailingWhitespace
           Parens _ _ _ ws -> ws
-          Ident _ a -> a ^. getting trailingWhitespace
+          Ident a -> a ^. getting trailingWhitespace
           Int _ _ ws -> ws
           Float _ _ ws -> ws
           Imag _ _ ws -> ws
@@ -605,7 +604,7 @@ instance HasTrailingWhitespace (Expr v a) where
           BinOp a b c e -> BinOp a (coerce b) c (e & trailingWhitespace .~ ws)
           UnOp a b c -> UnOp a b (c & trailingWhitespace .~ ws)
           Parens a b c _ -> Parens a b (coerce c) ws
-          Ident a b -> Ident a (b & trailingWhitespace .~ ws)
+          Ident a -> Ident $ a & trailingWhitespace .~ ws
           Int a b _ -> Int a b ws
           Float a b _ -> Float a b ws
           Imag a b _ -> Imag a b ws
@@ -623,7 +622,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Await a b c -> Not a b (c & trailingWhitespace .~ ws))
 
 instance IsString (Expr '[] ()) where
-  fromString s = Ident () (MkIdent () s [])
+  fromString s = Ident $ MkIdent () s []
 
 instance Num (Expr '[] ()) where
   fromInteger n

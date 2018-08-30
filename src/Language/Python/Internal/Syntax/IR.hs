@@ -409,8 +409,7 @@ data Expr a
   , _unsafeParensWhitespaceAfter :: [Whitespace]
   }
   | Ident
-  { _exprAnnotation :: a
-  , _unsafeIdentValue :: Ident '[] a
+  { _unsafeIdentValue :: Ident '[] a
   }
   | Int
   { _exprAnnotation :: a
@@ -574,7 +573,7 @@ fromIR_expr ex =
     Parens a b c d ->
       (\c' -> Syntax.Parens a b c' d) <$>
       fromIR_expr c
-    Ident a b -> pure $ Syntax.Ident a b
+    Ident a -> pure $ Syntax.Ident a
     Int a b c -> pure $ Syntax.Int a b c
     Float a b c -> pure $ Syntax.Float a b c
     Imag a b c -> pure $ Syntax.Imag a b c

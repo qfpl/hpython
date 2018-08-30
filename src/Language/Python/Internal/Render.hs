@@ -860,7 +860,7 @@ renderExpr (String _ vs) = foldMap renderStringLiteral vs
 renderExpr (Int a n ws) = TkInt (() <$ n) `cons` foldMap renderWhitespace ws
 renderExpr (Float a n ws) = TkFloat (() <$ n) `cons` foldMap renderWhitespace ws
 renderExpr (Imag a n ws) = TkImag (() <$ n) `cons` foldMap renderWhitespace ws
-renderExpr (Ident _ name) = renderIdent name
+renderExpr (Ident name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) =
   TkLeftBracket () `cons`
   foldMap renderWhitespace ws1 <>

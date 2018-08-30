@@ -195,11 +195,11 @@ validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params
      traverseOf (traverse._2) validateExprScope mty <*>
      locallyExtendOver
        scGlobalScope
-       ((_identAnnotation &&& _identValue) name :
-         toListOf (folded.getting paramName.to (_identAnnotation &&& _identValue)) params)
+       ((_identAnn &&& _identValue) name :
+         toListOf (folded.getting paramName.to (_identAnn &&& _identValue)) params)
        (validateSuiteScope s)) <*
-  extendScope scLocalScope [(_identAnnotation &&& _identValue) name] <*
-  extendScope scImmediateScope [(_identAnnotation &&& _identValue) name]
+  extendScope scLocalScope [(_identAnn &&& _identValue) name] <*
+  extendScope scImmediateScope [(_identAnn &&& _identValue) name]
 validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
@@ -236,7 +236,7 @@ validateCompoundStatementScope (TryExcept idnts a b e f k l) =
           traverse validateExceptAsScope g <*>
           locallyExtendOver
             scGlobalScope
-            (toListOf (folded.exceptAsName._Just._2.to (_identAnnotation &&& _identValue)) g)
+            (toListOf (folded.exceptAsName._Just._2.to (_identAnn &&& _identValue)) g)
             (validateSuiteScope h))
        f <*>
      traverseOf (traverse._3) validateSuiteScope k <*>
@@ -262,11 +262,11 @@ validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
        (\s ->
           inScope (s ^. identValue) `bindVM` \res ->
           maybe (pure ()) (\_ -> errorVM [_BadShadowing # coerce s]) res)
-       (c ^.. unvalidated.cosmos._Ident._2)) <*>
+       (c ^.. unvalidated.cosmos._Ident)) <*>
     pure d <*>
     validateExprScope e <*>
     (let
-       ls = c ^.. unvalidated.cosmos._Ident._2.to (_identAnnotation &&& _identValue)
+       ls = c ^.. unvalidated.cosmos._Ident.to (_identAnn &&& _identValue)
      in
        extendScope scLocalScope ls *>
        extendScope scImmediateScope ls *>
@@ -277,13 +277,13 @@ validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
   traverse validateDecoratorScope decos <*>
   traverseOf (traverse._2.traverse.traverse) validateArgScope d <*>
   validateSuiteScope g <*
-  extendScope scImmediateScope [c ^. to (_identAnnotation &&& _identValue)]
+  extendScope scImmediateScope [c ^. to (_identAnn &&& _identValue)]
 validateCompoundStatementScope (With a b asyncWs c d e) =
   let
     names =
       d ^..
       folded.unvalidated.to _withItemBinder.folded._2.
-      assignTargets.to (_identAnnotation &&& _identValue)
+      assignTargets.to (_identAnn &&& _identValue)
   in
     With @(Nub (Scope ': v)) a b asyncWs c <$>
     traverse
@@ -318,7 +318,7 @@ validateSmallStatementScope (Assign a l rs) =
   let
     ls =
       (l : (snd <$> NonEmpty.init rs)) ^..
-      folded.unvalidated.assignTargets.to (_identAnnotation &&& _identValue)
+      folded.unvalidated.assignTargets.to (_identAnn &&& _identValue)
   in
   Assign a <$>
   validateAssignExprScope l <*>
@@ -335,7 +335,9 @@ validateSmallStatementScope (Global a _ _) = errorVM [_FoundGlobal # a]
 validateSmallStatementScope (Nonlocal a _ _) = errorVM [_FoundNonlocal # a]
 validateSmallStatementScope (Del a ws cs) =
   Del a ws <$
-  traverse_ (\case; Ident ann _-> errorVM [_DeletedIdent # ann]; _ -> pure ()) cs <*>
+  traverse_
+    (\case; Ident a -> errorVM [_DeletedIdent # (a ^. identAnn)]; _ -> pure ())
+    cs <*>
   traverse validateExprScope cs
 validateSmallStatementScope s@Pass{} = pure $ unsafeCoerce s
 validateSmallStatementScope s@Break{} = pure $ unsafeCoerce s
@@ -428,7 +430,7 @@ validateComprehensionScope f (Comprehension a b c d) =
       validateAssignExprScope c <*>
       validateExprScope e <*
       extendScope scGlobalScope
-        (c ^.. unvalidated.assignTargets.to (_identAnnotation &&& _identValue))
+        (c ^.. unvalidated.assignTargets.to (_identAnn &&& _identValue))
 
     validateCompIfScope
       :: AsScopeError e v a
@@ -595,9 +597,7 @@ validateExprScope (Parens a ws1 e ws2) =
   Parens a ws1 <$>
   validateExprScope e <*>
   pure ws2
-validateExprScope (Ident a i) =
-  Ident a <$>
-  validateIdentScope i
+validateExprScope (Ident i) = Ident <$> validateIdentScope i
 validateExprScope (Tuple a b ws d) =
   Tuple a <$>
   validateTupleItemScope b <*>

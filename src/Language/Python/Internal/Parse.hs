@@ -740,7 +740,7 @@ orExpr ws =
       float ws <!>
       imag ws <!>
       stringOrBytes ws <!>
-      (\a -> Ident (_identAnnotation a) a) <$> identifier ws <!>
+      Ident <$> identifier ws <!>
       parensOrUnit
 
 smallStatement :: Parser ann (SmallStatement ann)
@@ -867,13 +867,13 @@ smallStatement =
 
           (\(tk, s) -> ImportSomeParens (pyTokenAnn tk) s) <$>
           token anySpace (TkLeftParen ()) <*>
-          commaSep1' anySpace (importAs anySpace _identAnnotation (identifier anySpace)) <*>
+          commaSep1' anySpace (importAs anySpace _identAnn (identifier anySpace)) <*>
           (snd <$> token space (TkRightParen ()))
 
           <!>
 
           (\a -> ImportSome (importAsAnn $ commaSep1Head a) a) <$>
-          commaSep1 space (importAs space _identAnnotation (identifier space))
+          commaSep1 space (importAs space _identAnn (identifier space))
 
         importFrom =
           (\(tk, s) -> From (pyTokenAnn tk) s) <$>
@@ -991,8 +991,8 @@ untypedParam :: Parser ann (Param ann)
 untypedParam =
   (\a b ->
      maybe
-       (PositionalParam (_identAnnotation a) a b)
-       (uncurry $ KeywordParam (_identAnnotation a) a b)) <$>
+       (PositionalParam (_identAnn a) a b)
+       (uncurry $ KeywordParam (_identAnn a) a b)) <$>
   identifier anySpace <*>
   pure Nothing <*>
   optional ((,) <$> (snd <$> token anySpace (TkEq ())) <*> expr anySpace)
@@ -1015,8 +1015,8 @@ typedParam :: Parser ann (Param ann)
 typedParam =
   (\a b ->
      maybe
-       (PositionalParam (_identAnnotation a) a b)
-       (uncurry $ KeywordParam (_identAnnotation a) a b)) <$>
+       (PositionalParam (_identAnn a) a b)
+       (uncurry $ KeywordParam (_identAnn a) a b)) <$>
   identifier anySpace <*>
   optional tyAnn <*>
   optional ((,) <$> (snd <$> token anySpace (TkEq ())) <*> expr anySpace)
@@ -1045,7 +1045,7 @@ arg =
   (do
       e <- exprComp anySpace
       case e of
-        Ident _ ident -> do
+        Ident ident -> do
           eqSpaces <- optional $ snd <$> token anySpace (TkEq ())
           case eqSpaces of
             Nothing -> pure $ PositionalArg (_exprAnnotation e) e
@@ -1080,7 +1080,7 @@ decoratorValue = do
     derefs =
       foldl
         (\b (ws, a) -> Deref (_exprAnnotation b) b ws a)
-        (Ident (_identAnnotation id1) id1)
+        (Ident id1)
         ids
   pure $
     case args of

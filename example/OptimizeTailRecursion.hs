@@ -19,7 +19,7 @@ import Data.Semigroup ((<>))
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Optics
-import Language.Python.Internal.Syntax hiding (Expr(), Statement())
+import Language.Python.Internal.Syntax
 import Language.Python.Syntax
 
 optimizeTailRecursion :: Raw Statement -> Maybe (Raw Statement)
@@ -59,8 +59,8 @@ optimizeTailRecursion st = do
 
     isTailCall :: String -> Raw Expr -> Bool
     isTailCall name e
-      | anyOf (cosmos._Call._2._Ident._2.identValue) (== name) e
-      = (e ^? _Call._2._Ident._2.identValue) == Just name
+      | anyOf (cosmos._Call.callFunction._Ident.identValue) (== name) e
+      = (e ^? _Call.callFunction._Ident.identValue) == Just name
       | otherwise = False
 
     hasTC :: String -> Raw Statement -> Bool
@@ -80,7 +80,7 @@ optimizeTailRecursion st = do
     renameIn :: [String] -> String -> Raw Expr -> Raw Expr
     renameIn params suffix =
       transform
-        (_Ident._2.identValue %~ (\a -> if a `elem` params then a <> suffix else a))
+        (_Ident.identValue %~ (\a -> if a `elem` params then a <> suffix else a))
 
     looped :: String -> [String] -> Raw Statement -> [Raw Statement]
     looped name params st =
@@ -122,8 +122,8 @@ optimizeTailRecursion st = do
             case lastExp of
               Return _ _ e ->
                 case e ^? _Just._Call of
-                  Just (_, f, _, args, _)
-                    | Just name' <- f ^? _Ident._2.identValue
+                  Just call
+                    | Just name' <- call ^? callFunction._Ident.identValue
                     , name' == name ->
                         newSts <>
                         fmap (\a -> var_ (a <> "__tr__old") .= (var_ $ a <> "__tr")) params <>
@@ -133,7 +133,7 @@ optimizeTailRecursion st = do
                           (transformOn
                              traverse
                              (renameIn params "__tr__old")
-                             (args ^.. folded.folded.argExpr))
+                             (call ^.. callArguments.folded.folded.argExpr))
                   _ -> newSts <> maybe [] (\e' -> [ "__res__tr" .= e' ]) e <> [ break_ ]
               Expr _ e
                 | isTailCall name e -> newSts <> [pass_]

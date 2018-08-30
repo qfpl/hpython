@@ -12,7 +12,7 @@ import Language.Python.Internal.Syntax.Whitespace
 
 data Ident (v :: [*]) a
   = MkIdent
-  { _identAnnotation :: a
+  { _identAnn :: a
   , _identValue :: String
   , _identWhitespace :: [Whitespace]
   } deriving (Eq, Show, Functor, Foldable, Traversable)
@@ -35,8 +35,8 @@ instance IsString (Ident '[] ()) where
 identValue :: Lens (Ident v a) (Ident '[] a) String String
 identValue = lens _identValue (\s a -> s { _identValue = a })
 
-identAnnotation :: Lens (Ident v a) (Ident v a) a a
-identAnnotation = lens _identAnnotation (\s a -> s { _identAnnotation = a })
+identAnn :: Lens (Ident v a) (Ident v a) a a
+identAnn = lens _identAnn (\s a -> s { _identAnn = a })
 
 instance HasTrailingWhitespace (Ident v a) where
   trailingWhitespace = lens (\(MkIdent _ _ ws) -> ws) (\(MkIdent a b _) ws -> MkIdent a b ws)

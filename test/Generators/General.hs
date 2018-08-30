@@ -200,7 +200,7 @@ genExpr' isExp =
     , if isExp then genSmallInt else genInt
     , if isExp then genSmallFloat else genFloat
     , genImag
-    , Ident () <$> genIdent
+    , Ident <$> genIdent
     , String () <$>
       Gen.nonEmpty
         (Range.constant 1 5)

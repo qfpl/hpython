@@ -14,9 +14,8 @@ import Data.Coerce (coerce)
 import Data.Function ((&))
 
 import Language.Python.Internal.Optics.Validated (unvalidated)
-import Language.Python.Internal.Syntax hiding (Fundef, While)
+import Language.Python.Internal.Syntax
 import Language.Python.Syntax.Types
-import qualified Language.Python.Internal.Syntax as AST (CompoundStatement(Fundef, While))
 
 _KeywordParam
   :: Prism
@@ -39,11 +38,11 @@ _Fundef
        (Fundef '[] a)
 _Fundef =
   prism
-    (\(Fundef idnt a b c d e f g h i j) ->
-       CompoundStatement (AST.Fundef idnt a b c d e f g h i j))
+    (\(MkFundef idnt a b c d e f g h i j) ->
+       CompoundStatement (Fundef idnt a b c d e f g h i j))
     (\case
-        CompoundStatement (AST.Fundef idnt a b c d e f g h i j) ->
-          Right $ Fundef idnt a b c d e f g h i j
+        CompoundStatement (Fundef idnt a b c d e f g h i j) ->
+          Right $ MkFundef idnt a b c d e f g h i j
         a -> Left $ a ^. unvalidated)
 
 _While
@@ -54,32 +53,27 @@ _While
        (While '[] a)
 _While =
   prism
-    (\(While a b c d e) ->
-       CompoundStatement (AST.While a b c d e))
+    (\(MkWhile a b c d e) ->
+       CompoundStatement (While a b c d e))
     (\case
-        CompoundStatement (AST.While a b c d e) ->
-          Right $ While a b c d e
+        CompoundStatement (While a b c d e) ->
+          Right $ MkWhile a b c d e
         a -> Left $ a ^. unvalidated)
 
-_Call
-  :: Prism
-       (Expr v a)
-       (Expr '[] a)
-       (a, Expr v a, [Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace])
-       (a, Expr '[] a, [Whitespace], Maybe (CommaSep1' (Arg '[] a)), [Whitespace])
+_Call :: Prism (Expr v a) (Expr '[] a) (Call v a) (Call '[] a)
 _Call =
   prism
-    (\(a, b, c, d, e) -> Call a b c d e)
+    (\(MkCall a b c d e) -> Call a b c d e)
     (\case
-        Call a b c d e -> Right (a, b, c, d, e)
+        Call a b c d e -> Right $ MkCall a b c d e
         a -> Left $ a ^. unvalidated)
 
-_Ident :: Prism (Expr v a) (Expr '[] a) (a, Ident v a) (a, Ident '[] a)
+_Ident :: Prism (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
 _Ident =
   prism
-    (\(a, b) -> Ident a b)
+    (\a -> Ident a)
     (\case
-        Ident a b -> Right (a, b)
+        Ident a -> Right a
         a -> Left $ a ^. unvalidated)
 
 _Indent :: HasIndents s => Traversal' (s '[] a) [Whitespace]
@@ -111,8 +105,8 @@ instance HasIndents Decorator where
 instance HasIndents CompoundStatement where
   _Indents fun s =
     case s of
-      AST.Fundef a decos idnt asyncWs b c d e f g h ->
-        (\decos' idnt' -> AST.Fundef a decos' idnt' asyncWs b c d e f g) <$>
+      Fundef a decos idnt asyncWs b c d e f g h ->
+        (\decos' idnt' -> Fundef a decos' idnt' asyncWs b c d e f g) <$>
         traverse (_Indents fun) decos <*>
         fun idnt <*>
         _Indents fun h
@@ -132,8 +126,8 @@ instance HasIndents CompoundStatement where
              fun idnt <*>
              _Indents fun b)
           e
-      AST.While a idnt b c d ->
-        (\idnt' -> AST.While a idnt' b c) <$>
+      While a idnt b c d ->
+        (\idnt' -> While a idnt' b c) <$>
         fun idnt <*>
         _Indents fun d
       TryExcept a idnt b c d e f ->
@@ -203,8 +197,8 @@ instance HasNewlines Decorator where
 instance HasNewlines CompoundStatement where
   _Newlines fun s =
     case s of
-      AST.Fundef ann decos idnt asyncWs ws1 name ws2 params ws3 mty s ->
-        (\decos' -> AST.Fundef ann decos' idnt asyncWs ws1 name ws2 params ws3 mty) <$>
+      Fundef ann decos idnt asyncWs ws1 name ws2 params ws3 mty s ->
+        (\decos' -> Fundef ann decos' idnt asyncWs ws1 name ws2 params ws3 mty) <$>
         traverse (_Newlines fun) decos <*>
         _Newlines fun s
       If idnt ann ws1 cond s elifs els ->
@@ -212,8 +206,8 @@ instance HasNewlines CompoundStatement where
         _Newlines fun s <*>
         traverseOf (traverse._4._Newlines) fun elifs <*>
         traverseOf (traverse._3._Newlines) fun els
-      AST.While idnt ann ws1 cond s ->
-        AST.While idnt ann ws1 cond <$> _Newlines fun s
+      While idnt ann ws1 cond s ->
+        While idnt ann ws1 cond <$> _Newlines fun s
       TryExcept idnt a b c f k l ->
         TryExcept idnt a b <$> _Newlines fun c <*>
         traverseOf (traverse._4._Newlines) fun f <*>
@@ -244,7 +238,7 @@ assignTargets f e =
   case e of
     List a b c d -> (\c' -> List a b c' d) <$> (traverse.traverse._Exprs.assignTargets) f c
     Parens a b c d -> (\c' -> Parens a b c' d) <$> assignTargets f c
-    Ident a b -> Ident a <$> f b
+    Ident a -> Ident <$> f a
     Tuple a b c d ->
       (\b' d' -> Tuple a b' c d') <$>
       (_Exprs.assignTargets) f b <*>

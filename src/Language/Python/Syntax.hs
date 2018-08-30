@@ -217,28 +217,6 @@ doDedent :: Indents a -> Indents a
 doDedent i@(Indents [] _) = i
 doDedent (Indents (a:b) c) = Indents b c
 
-instance HasBody Fundef where
-  body = fdBody
-
-  setBody ws new fun =
-    fun
-    { _fdBody =
-      over
-        (_Indents.indentsValue)
-        ((_fdIndents fun ^. indentsValue <>) . doIndent ws)
-        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> new)
-    }
-
-  getBody fun =
-    (\case
-        SuiteOne a b c d ->
-          line_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| []
-        SuiteMany a b c d ->
-          Line <$> unBlock d) $
-    fromMaybe
-      (error "malformed indentation in function block")
-      (traverseOf _Indents (fmap doDedent . subtractStart (_fdIndents fun)) (_fdBody fun))
-
 -- | Modify the block body of some code
 modifyBody
   :: HasBody s
@@ -296,6 +274,28 @@ instance HasDecorators Fundef where
 
   getDecorators code =
     (\(Decorator () _ _ e _) -> e) <$> _fdDecorators code
+
+instance HasBody Fundef where
+  body = fdBody
+
+  setBody ws new fun =
+    fun
+    { _fdBody =
+      over
+        (_Indents.indentsValue)
+        ((_fdIndents fun ^. indentsValue <>) . doIndent ws)
+        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> new)
+    }
+
+  getBody fun =
+    (\case
+        SuiteOne a b c d ->
+          line_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| []
+        SuiteMany a b c d ->
+          Line <$> unBlock d) $
+    fromMaybe
+      (error "malformed indentation in function block")
+      (traverseOf _Indents (fmap doDedent . subtractStart (_fdIndents fun)) (_fdBody fun))
 
 instance HasParameters Fundef where
   setParameters p = fdParameters .~ listToCommaSep p
@@ -422,6 +422,31 @@ neg = negate
 
 toBlock :: NonEmpty (Raw Line) -> Block '[] ()
 toBlock = over (_Indents.indentsValue) (doIndent $ replicate 4 Space) . Block . fmap unLine
+
+instance HasBody While where
+  body = whileBody
+
+  setBody ws new fun =
+    fun
+    { _whileBody =
+      over
+        (_Indents.indentsValue)
+        ((_whileIndents fun ^. indentsValue <>) . doIndent ws)
+        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> new)
+    }
+
+  getBody fun =
+    (\case
+        SuiteOne a b c d ->
+          line_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| []
+        SuiteMany a b c d ->
+          Line <$> unBlock d) $
+    fromMaybe
+      (error "malformed indentation in function block")
+      (traverseOf
+         _Indents
+         (fmap doDedent . subtractStart (_whileIndents fun))
+         (_whileBody fun))
 
 -- | Create a minimal valid 'While'
 mkWhile :: Raw Expr -> NonEmpty (Raw Line) -> Raw While

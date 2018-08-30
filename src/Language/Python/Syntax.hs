@@ -52,13 +52,45 @@ module Language.Python.Syntax
     -- ** Assignment
   , (.=)
     -- ** Flow control
+    -- *** 'Else' clauses
+  , else_
+  , HasElse(..)
+    -- *** Break
   , break_
+    -- *** For loops
   , for_
+    -- *** If statements
   , if_
-  , ifElse_
+  , elif_
+  , If(..)
+  , _If
+  , mkIf
+  , Elif(..)
+  , _Elif
+  , mkElif
+  , Else(..)
+  , _Else
+  , mkElse
+    -- **** Lenses
+  , ifAnn
+  , ifIndents
+  , ifIf
+  , ifCond
+  , ifBody
+  , ifElifs
+  , ifElse
+  , elifIndents
+  , elifElif
+  , elifCond
+  , elifBody
+  , elseIndents
+  , elseElse
+  , elseBody
+    -- *** Pass
   , pass_
+    -- *** Return
   , return_
-  -- *** While loops
+    -- *** While loops
   , while_
   , While(..)
   , _While
@@ -100,7 +132,7 @@ import Control.Lens.Iso (from)
 import Control.Lens.Lens (Lens')
 import Control.Lens.Prism (_Right)
 import Control.Lens.Review ((#))
-import Control.Lens.Setter ((.~), over)
+import Control.Lens.Setter ((.~), (<>~), over)
 import Control.Lens.Traversal (traverseOf)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe)
@@ -130,6 +162,9 @@ instance AsLine SmallStatement where
 
 instance AsLine CompoundStatement where
   line_ = Line . Right . CompoundStatement
+
+instance AsLine If where
+  line_ = line_ . (_If #)
 
 instance AsLine Statement where
   line_ = Line . Right
@@ -294,7 +329,7 @@ instance HasBody Fundef where
         SuiteMany a b c d ->
           Line <$> unBlock d) $
     fromMaybe
-      (error "malformed indentation in function block")
+      (error "malformed indentation in function body")
       (traverseOf _Indents (fmap doDedent . subtractStart (_fdIndents fun)) (_fdBody fun))
 
 instance HasParameters Fundef where
@@ -442,7 +477,7 @@ instance HasBody While where
         SuiteMany a b c d ->
           Line <$> unBlock d) $
     fromMaybe
-      (error "malformed indentation in function block")
+      (error "malformed indentation in while body")
       (traverseOf
          _Indents
          (fmap doDedent . subtractStart (_whileIndents fun))
@@ -462,33 +497,96 @@ mkWhile cond body =
 while_ :: Raw Expr -> NonEmpty (Raw Line) -> Raw Statement
 while_ e sts = _While # mkWhile e sts
 
-ifElifsElse_
-  :: Raw Expr
-  -> NonEmpty (Raw Line)
-  -> [(Raw Expr, NonEmpty (Raw Line))]
-  -> NonEmpty (Raw Line)
-  -> Raw Statement
-ifElifsElse_ e sts elifs sts' =
-  CompoundStatement $
-  If () (Indents [] ()) [Space] e
-    (SuiteMany () [] (LF Nothing) $ toBlock sts)
-    ((\(a, b) -> (Indents [] (), [Space], a, SuiteMany () [] (LF Nothing) $ toBlock b)) <$> elifs)
-    (Just (Indents [] (), [], SuiteMany () [] (LF Nothing) $ toBlock sts'))
+-- | Create a minimal valid 'If'
+mkIf :: Raw Expr -> NonEmpty (Raw Line) -> Raw If
+mkIf cond body =
+  MkIf
+  { _ifAnn = ()
+  , _ifIndents = Indents [] ()
+  , _ifIf = [Space]
+  , _ifCond = cond
+  , _ifBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _ifElifs = []
+  , _ifElse = Nothing
+  }
 
-if_ :: Raw Expr -> NonEmpty (Raw Line) -> Raw Statement
-if_ e sts =
-  CompoundStatement $
-  If () (Indents [] ()) [Space] e
-    (SuiteMany () [] (LF Nothing) $ toBlock sts)
-    []
-    Nothing
+instance HasBody Elif where
+  body = elifBody
 
-ifElse_
-  :: Raw Expr
-  -> NonEmpty (Raw Line)
-  -> NonEmpty (Raw Line)
-  -> Raw Statement
-ifElse_ e sts = ifElifsElse_ e sts []
+  setBody ws new fun =
+    fun
+    { _elifBody =
+      over
+        (_Indents.indentsValue)
+        ((_elifIndents fun ^. indentsValue <>) . doIndent ws)
+        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> new)
+    }
+
+  getBody fun =
+    (\case
+        SuiteOne a b c d ->
+          line_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| []
+        SuiteMany a b c d ->
+          Line <$> unBlock d) $
+    fromMaybe
+      (error "malformed indentation in elif body")
+      (traverseOf
+         _Indents
+         (fmap doDedent . subtractStart (_elifIndents fun))
+         (_elifBody fun))
+
+instance HasBody Else where
+  body = elseBody
+
+  setBody ws new fun =
+    fun
+    { _elseBody =
+      over
+        (_Indents.indentsValue)
+        ((_elseIndents fun ^. indentsValue <>) . doIndent ws)
+        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> new)
+    }
+
+  getBody fun =
+    (\case
+        SuiteOne a b c d ->
+          line_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| []
+        SuiteMany a b c d ->
+          Line <$> unBlock d) $
+    fromMaybe
+      (error "malformed indentation in else body")
+      (traverseOf
+         _Indents
+         (fmap doDedent . subtractStart (_elseIndents fun))
+         (_elseBody fun))
+
+instance HasBody If where
+  body = ifBody
+
+  setBody ws new fun =
+    fun
+    { _ifBody =
+      over
+        (_Indents.indentsValue)
+        ((_ifIndents fun ^. indentsValue <>) . doIndent ws)
+        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> new)
+    }
+
+  getBody fun =
+    (\case
+        SuiteOne a b c d ->
+          line_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| []
+        SuiteMany a b c d ->
+          Line <$> unBlock d) $
+    fromMaybe
+      (error "malformed indentation in if body")
+      (traverseOf
+         _Indents
+         (fmap doDedent . subtractStart (_ifIndents fun))
+         (_ifBody fun))
+
+if_ :: Raw Expr -> NonEmpty (Raw Line) -> Raw If
+if_ cond body = mkIf cond body
 
 var_ :: String -> Raw Expr
 var_ s = Ident $ MkIdent () s []
@@ -498,6 +596,54 @@ none_ = None () []
 
 pass_ :: Raw Statement
 pass_ = SmallStatements (Indents [] ()) (Pass () []) [] Nothing (Right (LF Nothing))
+
+-- | Create a minimal valid 'Elif'
+mkElif :: Raw Expr -> NonEmpty (Raw Line) -> Raw Elif
+mkElif cond body =
+  MkElif
+  { _elifIndents = Indents [] ()
+  , _elifElif = [Space]
+  , _elifCond = cond
+  , _elifBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  }
+
+elif_ :: Raw Expr -> NonEmpty (Raw Line) -> Raw If -> Raw If
+elif_ cond body code = code & ifElifs <>~ [mkElif cond body]
+
+-- | Create a minimal valid 'Else'
+mkElse :: NonEmpty (Raw Line) -> Raw Else
+mkElse body =
+  MkElse
+  { _elseIndents = Indents [] ()
+  , _elseElse = []
+  , _elseBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  }
+
+class HasElse s where
+  getElse :: Raw s -> Maybe (Raw Else)
+  setElse :: [Whitespace] -> Maybe (Raw Else) -> Raw s -> Raw s
+
+else_ :: HasElse s => NonEmpty (Raw Line) -> Raw s -> Raw s
+else_ body = setElse (replicate 4 Space) $ Just (mkElse body)
+
+instance HasElse If where
+  getElse code =
+    fromMaybe
+      (error "malformed indentation in else block")
+      (traverseOf
+         (traverse._Indents)
+         (subtractStart (_ifIndents code))
+         (_ifElse code))
+
+  setElse ws new code =
+    code
+    { _ifElse =
+      fmap (elseIndents .~ _ifIndents code) $
+      over
+        (traverse._Indents.indentsValue)
+        (_ifIndents code ^. indentsValue <>)
+        new
+    }
 
 break_ :: Raw Statement
 break_ = SmallStatements (Indents [] ()) (Break () []) [] Nothing (Right (LF Nothing))

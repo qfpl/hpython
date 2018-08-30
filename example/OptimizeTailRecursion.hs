@@ -5,8 +5,8 @@ module OptimizeTailRecursion where
 
 import Control.Applicative ((<|>))
 import Control.Lens.Cons (_last, _init)
-import Control.Lens.Fold ((^..), (^?), (^?!), allOf, anyOf, folded, foldrOf, toListOf)
-import Control.Lens.Getter ((^.))
+import Control.Lens.Fold ((^..), (^?), (^?!), allOf, anyOf, folded, foldrOf)
+import Control.Lens.Getter ((^.), to)
 import Control.Lens.Plated (cosmos, transform, transformOn)
 import Control.Lens.Prism (_Just)
 import Control.Lens.Review ((#))
@@ -46,7 +46,7 @@ optimizeTailRecursion st = do
               , line_ . while_ true_ .
                 NonEmpty.fromList . transformOn (traverse._Exprs) (renameIn paramNames "__tr") $
                   bodyInit <>
-                  fmap line_ (looped functionName paramNames bodyLast)
+                  looped functionName paramNames bodyLast
               , line_ $ return_ "__res__tr"
               ]))
 
@@ -82,59 +82,64 @@ optimizeTailRecursion st = do
       transform
         (_Ident.identValue %~ (\a -> if a `elem` params then a <> suffix else a))
 
-    looped :: String -> [String] -> Raw Statement -> [Raw Statement]
-    looped name params st =
-      case st of
-        CompoundStatement c ->
-          case c of
-            If _ _ _ e sts [] sts'
-              | hasTC name st ->
-                  case sts' of
-                    Nothing ->
-                      [ if_ e
-                          (fmap line_ . NonEmpty.fromList $
-                           (toListOf _Statements sts ^?! _init) <>
-                           looped name params (toListOf _Statements sts ^?! _last))
-                      ]
-                    Just (_, _, sts'') ->
-                      [ ifElse_ e
-                          (fmap line_ . NonEmpty.fromList $
-                           (toListOf _Statements sts ^?! _init) <>
-                           looped name params (toListOf _Statements sts ^?! _last))
-                          (fmap line_ . NonEmpty.fromList $
-                           (toListOf _Statements sts'' ^?! _init) <>
-                           looped name params (toListOf _Statements sts'' ^?! _last))
-                      ]
-            _ -> [st]
-        SmallStatements idnts s ss sc cmtnl ->
+    looped :: String -> [String] -> Raw Statement -> [Raw Line]
+    looped name params st
+      | Just ifSt <- st ^? _If
+      , hasTC name st =
           let
-            initExps = foldr (\_ _ -> init ss) [] ss
-            lastExp = foldrOf (folded._2) (\_ _ -> last ss ^. _2) s ss
-            newSts =
-              case initExps of
-                [] -> []
-                first : rest ->
-                  let
-                    lss = last ss
-                  in
-                    [SmallStatements idnts (first ^. _2) rest sc cmtnl]
+            ifBodyLines = toList $ getBody ifSt
           in
-            case lastExp of
-              Return _ _ e ->
-                case e ^? _Just._Call of
-                  Just call
-                    | Just name' <- call ^? callFunction._Ident.identValue
-                    , name' == name ->
-                        newSts <>
-                        fmap (\a -> var_ (a <> "__tr__old") .= (var_ $ a <> "__tr")) params <>
-                        zipWith
-                          (\a b -> var_ (a <> "__tr") .= b)
-                          params
-                          (transformOn
-                             traverse
-                             (renameIn params "__tr__old")
-                             (call ^.. callArguments.folded.folded.argExpr))
-                  _ -> newSts <> maybe [] (\e' -> [ "__res__tr" .= e' ]) e <> [ break_ ]
-              Expr _ e
-                | isTailCall name e -> newSts <> [pass_]
-              _ -> [st]
+            case ifSt ^? to getElse._Just.to getBody of
+              Nothing ->
+                [ line_ $
+                  if_ (ifSt ^. ifCond)
+                    (NonEmpty.fromList $
+                      (ifBodyLines ^?! _init) <>
+                      looped name params (ifBodyLines ^?! _last._Statements))
+                ]
+              Just sts'' ->
+                [ line_ $
+                  if_ (ifSt ^. ifCond)
+                    (NonEmpty.fromList $
+                      (toList (getBody ifSt) ^?! _init) <>
+                      looped name params (ifBodyLines ^?! _last._Statements)) &
+                  else_
+                    (NonEmpty.fromList $
+                      (toList sts'' ^?! _init) <>
+                      looped name params (toList sts'' ^?! _last._Statements))
+                ]
+      | otherwise =
+          case st of
+            CompoundStatement{} -> [line_ st]
+            SmallStatements idnts s ss sc cmtnl ->
+              let
+                initExps = foldr (\_ _ -> init ss) [] ss
+                lastExp = foldrOf (folded._2) (\_ _ -> last ss ^. _2) s ss
+                newSts =
+                  case initExps of
+                    [] -> []
+                    first : rest ->
+                      let
+                        lss = last ss
+                      in
+                        [line_ $ SmallStatements idnts (first ^. _2) rest sc cmtnl]
+              in
+                case lastExp of
+                  Return _ _ e ->
+                    case e ^? _Just._Call of
+                      Just call
+                        | Just name' <- call ^? callFunction._Ident.identValue
+                        , name' == name ->
+                            newSts <>
+                            fmap (\a -> line_ $ var_ (a <> "__tr__old") .= (var_ $ a <> "__tr")) params <>
+                            zipWith
+                              (\a b -> line_ $ var_ (a <> "__tr") .= b)
+                              params
+                              (transformOn
+                                traverse
+                                (renameIn params "__tr__old")
+                                (call ^.. callArguments.folded.folded.argExpr))
+                      _ -> newSts <> maybe [] (\e' -> [ line_ $ "__res__tr" .= e' ]) e <> [ line_ break_ ]
+                  Expr _ e
+                    | isTailCall name e -> newSts <> [line_ pass_]
+                  _ -> [line_ st]

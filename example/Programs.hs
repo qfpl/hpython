@@ -4,6 +4,7 @@ module Programs where
 
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
+import Data.Function ((&))
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax
 
@@ -79,9 +80,8 @@ fact_tr =
   [ line_ $
     def_ "go" [p_ "n", p_ "acc"]
       [ line_ $
-        ifElse_ ("n" .== 0)
-          [line_ $ return_ "acc"]
-          [line_ . return_ $ call_ "go" [p_ $ "n" .- 1, p_ $ "n" .* "acc"]]
+        if_ ("n" .== 0) [line_ $ return_ "acc"] &
+        else_ [line_ . return_ $ call_ "go" [p_ $ "n" .- 1, p_ $ "n" .* "acc"]]
       ]
   , line_ . return_ $ call_ "go" [p_ "n", p_ 1]
   ]

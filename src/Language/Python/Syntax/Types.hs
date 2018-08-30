@@ -20,8 +20,7 @@ data Fundef v a
   , _fdRightParenSpaces :: [Whitespace]
   , _fdReturnType :: Maybe ([Whitespace], Expr v a)
   , _fdBody :: Suite v a
-  }
-  deriving (Eq, Show)
+  } deriving (Eq, Show)
 makeLenses ''Fundef
 
 data While v a
@@ -31,8 +30,7 @@ data While v a
   , _whileWhile :: [Whitespace]
   , _whileCond :: Expr v a
   , _whileBody :: Suite v a
-  }
-  deriving (Eq, Show)
+  } deriving (Eq, Show)
 makeLenses ''While
 
 data KeywordParam v a
@@ -54,3 +52,32 @@ data Call v a
   , _callRightParen :: [Whitespace]
   } deriving (Eq, Show)
 makeLenses ''Call
+
+data Elif v a
+  = MkElif
+  { _elifIndents :: Indents a
+  , _elifElif :: [Whitespace]
+  , _elifCond :: Expr v a
+  , _elifBody :: Suite v a
+  } deriving (Eq, Show)
+makeLenses ''Elif
+
+data Else v a
+  = MkElse
+  { _elseIndents :: Indents a
+  , _elseElse :: [Whitespace]
+  , _elseBody :: Suite v a
+  } deriving (Eq, Show)
+makeLenses ''Else
+
+data If v a
+  = MkIf
+  { _ifAnn :: a
+  , _ifIndents :: Indents a
+  , _ifIf :: [Whitespace]
+  , _ifCond :: Expr v a
+  , _ifBody :: Suite v a
+  , _ifElifs :: [Elif v a]
+  , _ifElse :: Maybe (Else v a)
+  } deriving (Eq, Show)
+makeLenses ''If

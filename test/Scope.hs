@@ -2,6 +2,7 @@
 module Scope (scopeTests) where
 
 import Control.Lens (has)
+import Data.Function ((&))
 import Data.Functor (($>))
 import Data.Validate (Validate(..), _Success)
 
@@ -114,7 +115,9 @@ test_6 =
     let
       expr =
         def_ "test" []
-          [ line_ $ ifElse_ true_ [ line_ $ var_ "x" .= 2 ] [ line_ pass_ ]
+          [ line_ $
+              if_ true_ [ line_ $ var_ "x" .= 2 ] &
+              else_ [ line_ pass_ ]
           , line_ $ var_ "x"
           ]
     res <- fullyValidate expr
@@ -127,7 +130,9 @@ test_7 =
     let
       expr =
         def_ "test" []
-          [ line_ $ ifElse_ true_ [ line_ pass_ ] [ line_ $ var_ "x" .= 3 ]
+          [ line_ $
+              if_ true_ [ line_ pass_ ] &
+              else_ [ line_ $ var_ "x" .= 3 ]
           , line_ $ var_ "x"
           ]
     res <- fullyValidate expr
@@ -140,7 +145,9 @@ test_8 =
     let
       expr =
         def_ "test" []
-          [ line_ $ ifElse_ true_ [ line_ pass_ ] [ line_ $ var_ "x" .= 3 ]
+          [ line_ $
+              if_ true_ [ line_ pass_ ] &
+              else_ [ line_ $ var_ "x" .= 3 ]
           , line_ $ var_ "x" .= 1
           , line_ $ var_ "x"
           ]

@@ -21,6 +21,7 @@ module Language.Python.Syntax
   , st_
   , Line(..)
   , HasBody(..)
+  , modifyBody
     -- ** Function definitions
   , Fundef(..)
   , mkFundef
@@ -105,11 +106,14 @@ instance HasStatements Line where
 class HasBody s where
   setBody :: NonEmpty (Raw Line) -> Raw s -> Raw s
   getBody :: Raw s -> NonEmpty (Raw Line)
-  modifyBody :: (NonEmpty (Raw Line) -> NonEmpty (Raw Line)) -> Raw s -> Raw s
   body :: Lens' (Raw s) (Raw Suite)
 
 doIndent :: [Indent] -> [Indent]
 doIndent a = replicate 4 Space ^. from indentWhitespaces : a
+
+doDedent :: Indents a -> Indents a
+doDedent i@(Indents [] _) = i
+doDedent (Indents (a:b) c) = Indents b c
 
 instance HasBody Fundef where
   body = fdBody
@@ -131,28 +135,10 @@ instance HasBody Fundef where
           Line <$> unBlock d) $
     fromMaybe
       (error "malformed indentation in function block")
-      (traverseOf _Indents (subtractStart $ _fdIndents fun) (_fdBody fun))
+      (traverseOf _Indents (fmap doDedent . subtractStart (_fdIndents fun)) (_fdBody fun))
 
-  modifyBody f fun =
-    let
-      indents = _fdIndents fun
-    in
-      fun
-      { _fdBody =
-          over
-            (_Indents.indentsValue)
-            ((indents ^. indentsValue <>) . doIndent) .
-          (\case
-              SuiteOne a b c d ->
-                case fmap unLine . f $ st_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| [] of
-                  Right (SmallStatements (Indents [] ()) c' [] Nothing (Right d')) :| [] -> SuiteOne a b c' d'
-                  ss -> SuiteMany a b d . Block $ ss
-              SuiteMany a b c d ->
-                SuiteMany a b c (Block . fmap unLine . f $ Line <$> unBlock d)) $
-          fromMaybe
-            (error "malformed indentation in function block")
-            (traverseOf _Indents (subtractStart indents) (_fdBody fun))
-      }
+modifyBody :: HasBody s => (NonEmpty (Raw Line) -> NonEmpty (Raw Line)) -> Raw s -> Raw s
+modifyBody f fun = setBody (f $ getBody fun) fun
 
 class HasPositional p v | p -> v where
   p_ :: v -> p

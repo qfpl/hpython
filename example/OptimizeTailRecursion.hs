@@ -54,7 +54,7 @@ optimizeTailRecursion st = do
     lastStatement = go Nothing
       where
         go !res [] = res
-        go !res (a:as) = go (res <|> a ^? _Statements) as
+        go !res (a:as) = go (a ^? _Statements <|> res) as
 
     isTailCall :: String -> Raw Expr -> Bool
     isTailCall name e

@@ -1,17 +1,26 @@
 {-# language DataKinds #-}
 {-# language MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 {-# language OverloadedLists #-}
-{-# language RecordWildCards #-}
 {-# language LambdaCase #-}
 module Language.Python.Syntax
   ( Raw
   , Statement
   , Expr
     -- * Parameters and arguments
-  , HasPositional(..)
-  , HasKeyword(..)
     -- ** Parameters
   , HasParameters(..)
+    -- ** Positional
+  , HasPositional(..)
+    -- ** Keyword
+  , HasKeyword(..)
+  , KeywordParam(..)
+  , _KeywordParam
+    -- *** Lenses
+  , kpAnn 
+  , kpName
+  , kpType
+  , kpEquals
+  , kpExpr
     -- * Decorators
   , HasDecorators(..)
   , decorated_
@@ -24,8 +33,8 @@ module Language.Python.Syntax
   , modifyBody
     -- ** Function definitions
   , Fundef(..)
+  , _Fundef
   , mkFundef
-  , fundef
   , def_
     -- *** Lenses
   , fdAnn
@@ -75,6 +84,7 @@ import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
 import Control.Lens.Lens (Lens')
 import Control.Lens.Prism (_Right)
+import Control.Lens.Review ((#))
 import Control.Lens.Setter ((.~), over)
 import Control.Lens.Traversal (traverseOf)
 import Data.List.NonEmpty (NonEmpty(..))
@@ -84,7 +94,7 @@ import Data.Monoid ((<>))
 import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax hiding (Fundef, While)
 import Language.Python.Syntax.Types
-import qualified Language.Python.Internal.Syntax as AST (CompoundStatement(Fundef, While))
+import qualified Language.Python.Internal.Syntax as AST (CompoundStatement(While))
 
 type Raw f = f '[] ()
 
@@ -103,13 +113,75 @@ instance HasExprs Line where
 instance HasStatements Line where
   _Statements f (Line a) = Line <$> _Right f a
 
+-- |
+-- @forall ws s. id ~ getBody . flip (setBody ws) s@
+--
+-- @forall ws. let f x = setBody ws (getBody x) x in f ~ f . f@
 class HasBody s where
-  setBody :: NonEmpty (Raw Line) -> Raw s -> Raw s
+  -- | Set the block body of some code, first indententing the block by a specified amount,
+  -- then indenting it by the level of its parent
+  --
+  -- For example, if we wanted to set the body of @function_b@ to
+  --
+  -- @
+  -- while True:
+  --   pass
+  -- @
+  --
+  -- in
+  --
+  -- @
+  -- def function_a():
+  --   def function_b():
+  --     pass
+  --     if True:
+  --       pass
+  --     else:
+  --       pass
+  -- @
+  --
+  -- then we would get
+  --
+  -- @
+  -- def function_a():
+  --   def function_b():
+  --     while True:
+  --       pass
+  -- @
+  setBody
+    :: [Whitespace] -- ^ Indentation scheme for the new lines
+    -> NonEmpty (Raw Line) -- ^ Lines to become the new body
+    -> Raw s -- ^ Current code
+    -> Raw s
+
+  -- | View the block body of some code without the indentation from its outer context
+  --
+  -- For example, if we ran 'getBody' @function_b@ in this code:
+  --
+  -- @
+  -- def function_a():
+  --   def function_b():
+  --     pass
+  --     if True:
+  --       pass
+  --     else:
+  --       pass
+  -- @
+  --
+  -- then we would get
+  --
+  -- @
+  -- pass
+  -- if True:
+  --   pass
+  -- else:
+  --   pass
+  -- @
   getBody :: Raw s -> NonEmpty (Raw Line)
   body :: Lens' (Raw s) (Raw Suite)
 
-doIndent :: [Indent] -> [Indent]
-doIndent a = replicate 4 Space ^. from indentWhitespaces : a
+doIndent :: [Whitespace] -> [Indent] -> [Indent]
+doIndent ws a = ws ^. from indentWhitespaces : a
 
 doDedent :: Indents a -> Indents a
 doDedent i@(Indents [] _) = i
@@ -118,12 +190,12 @@ doDedent (Indents (a:b) c) = Indents b c
 instance HasBody Fundef where
   body = fdBody
 
-  setBody new fun =
+  setBody ws new fun =
     fun
     { _fdBody =
       over
         (_Indents.indentsValue)
-        ((_fdIndents fun ^. indentsValue <>) . doIndent)
+        ((_fdIndents fun ^. indentsValue <>) . doIndent ws)
         (SuiteMany () [] (LF Nothing) . Block $ unLine <$> new)
     }
 
@@ -137,14 +209,30 @@ instance HasBody Fundef where
       (error "malformed indentation in function block")
       (traverseOf _Indents (fmap doDedent . subtractStart (_fdIndents fun)) (_fdBody fun))
 
-modifyBody :: HasBody s => (NonEmpty (Raw Line) -> NonEmpty (Raw Line)) -> Raw s -> Raw s
-modifyBody f fun = setBody (f $ getBody fun) fun
+-- | Modify the block body of some code
+modifyBody
+  :: HasBody s
+  => [Whitespace] -- ^ New indentation scheme
+  -> (NonEmpty (Raw Line) -> NonEmpty (Raw Line)) -- ^ Modification function
+  -> Raw s -- ^ Existing code
+  -> Raw s
+modifyBody ws f fun = setBody ws (f $ getBody fun) fun
 
+-- | Positional parameters/arguments
+--
+-- @
+-- p_ :: 'Raw' 'Expr' -> 'Raw' 'Arg'
+-- @
+--
+-- @
+-- p_ :: 'Raw' 'Ident' -> 'Raw' 'Param'
+-- @
 class HasPositional p v | p -> v where
   p_ :: v -> p
 
+-- | Keyword parameters/arguments
 class HasKeyword p where
-  k_ :: Ident '[] () -> Raw Expr -> p
+  k_ :: Raw Ident -> Raw Expr -> p
 
 instance HasPositional (Raw Param) (Raw Ident) where
   p_ i = PositionalParam () i Nothing
@@ -161,13 +249,23 @@ class HasParameters s where
   parameters :: Lens' (Raw s) (CommaSep (Raw Param))
 
 class HasDecorators s where
+  setDecorators :: [Raw Expr] -> Raw s -> Raw s
+  getDecorators :: Raw s -> [Raw Expr]
   decorators :: Lens' (Raw s) [Raw Decorator]
 
-decorated_ :: HasDecorators s => [Raw Decorator] -> Raw s -> Raw s
-decorated_ ds s = s & decorators .~ ds
+decorated_ :: HasDecorators s => [Raw Expr] -> Raw s -> Raw s
+decorated_ = setDecorators
 
 instance HasDecorators Fundef where
   decorators = fdDecorators
+
+  setDecorators new code =
+    code
+    { _fdDecorators = (\e -> Decorator () (_fdIndents code) [] e $ LF Nothing) <$> new
+    }
+
+  getDecorators code =
+    (\(Decorator () _ _ e _) -> e) <$> _fdDecorators code
 
 instance HasParameters Fundef where
   setParameters p = fdParameters .~ listToCommaSep p
@@ -189,24 +287,9 @@ mkFundef name body =
   , _fdBody = SuiteMany () [] (LF Nothing) $ toBlock body
   }
 
-fundef :: Raw Fundef -> Raw Statement
-fundef Fundef{..} =
-  CompoundStatement $
-  AST.Fundef ()
-    _fdDecorators
-    _fdIndents
-    _fdAsync
-    _fdDefSpaces
-    _fdName
-    _fdLeftParenSpaces
-    _fdParameters
-    _fdRightParenSpaces
-    _fdReturnType
-    _fdBody
-
 def_ :: Raw Ident -> [Raw Param] -> NonEmpty (Raw Line) -> Raw Statement
 def_ name params body =
-  fundef $ (mkFundef name body) { _fdParameters = listToCommaSep params }
+  _Fundef # (mkFundef name body) { _fdParameters = listToCommaSep params }
 
 call_ :: Raw Expr -> [Raw Arg] -> Raw Expr
 call_ expr args =
@@ -296,7 +379,7 @@ neg :: Raw Expr -> Raw Expr
 neg = negate
 
 toBlock :: NonEmpty (Raw Line) -> Block '[] ()
-toBlock = over (_Indents.indentsValue) doIndent . Block . fmap unLine
+toBlock = over (_Indents.indentsValue) (doIndent $ replicate 4 Space) . Block . fmap unLine
 
 while_ :: Raw Expr -> NonEmpty (Raw Line) -> Raw Statement
 while_ e sts =

@@ -4,6 +4,7 @@ module FixMutableDefaultArguments where
 
 import Control.Lens.Fold ((^..), (^?), filtered, folded, anyOf)
 import Control.Lens.Getter (getting)
+import Control.Lens.Review ((#))
 import Control.Lens.Setter ((.~))
 import Data.Function ((&))
 import qualified Data.List.NonEmpty as NonEmpty
@@ -33,10 +34,12 @@ fixMutableDefaultArguments input = do
       paramsList & traverse._KeywordParam.filtered (isMutable._kpExpr).kpExpr .~ none_
 
   pure $
-    fundef
+    _Fundef #
       (function &
        setParameters newparams &
-       modifyBody (flip (foldr NonEmpty.cons) conditionalAssignments))
+       modifyBody
+         (replicate 4 Space)
+         (flip (foldr NonEmpty.cons) conditionalAssignments))
   where
     isMutable :: Raw Expr -> Bool
     isMutable Unit{} = False

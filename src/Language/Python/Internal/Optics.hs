@@ -1,12 +1,11 @@
-{-# language DataKinds, PolyKinds, LambdaCase, ViewPatterns #-}
-{-# language TemplateHaskell #-}
-{-# language DefaultSignatures, FlexibleContexts #-}
+{-# language DataKinds #-}
+{-# language PolyKinds #-}
+{-# language LambdaCase #-}
 module Language.Python.Internal.Optics where
 
 import Control.Lens.Fold (Fold)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Setter ((.~))
-import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (Traversal, Traversal', traverseOf, failing)
 import Control.Lens.Tuple (_3, _4)
 import Control.Lens.Prism (Prism, _Right, _Left, prism)
@@ -18,16 +17,6 @@ import Language.Python.Internal.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax hiding (Fundef, While)
 import Language.Python.Syntax.Types
 import qualified Language.Python.Internal.Syntax as AST (CompoundStatement(Fundef, While))
-
-data KeywordParam v a
-  = MkKeywordParam
-  { _kpAnn :: a
-  , _kpName :: Ident v a
-  , _kpType :: Maybe ([Whitespace], Expr v a)
-  , _kpWhitespaceRight :: [Whitespace]
-  , _kpExpr :: Expr v a
-  } deriving (Eq, Show)
-makeLenses ''KeywordParam
 
 _KeywordParam
   :: Prism

@@ -9,6 +9,7 @@ import Control.Lens.Fold ((^..), (^?), (^?!), allOf, anyOf, folded, foldrOf, toL
 import Control.Lens.Getter ((^.))
 import Control.Lens.Plated (cosmos, transform, transformOn)
 import Control.Lens.Prism (_Just)
+import Control.Lens.Review ((#))
 import Control.Lens.Setter ((%~))
 import Control.Lens.Tuple (_2, _3)
 import Data.Foldable (toList)
@@ -36,9 +37,9 @@ optimizeTailRecursion st = do
     then Nothing
     else
       Just $
-      fundef
+      _Fundef #
         (function &
-         setBody
+         setBody (replicate 4 Space)
            (flip (foldr NonEmpty.cons)
               (zipWith (\a b -> st_ $ var_ (a <> "__tr") .= var_ b) paramNames paramNames)
               [ st_ $ "__res__tr" .= none_

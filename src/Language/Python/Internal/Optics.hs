@@ -143,6 +143,68 @@ noIndents f s = f $ s & _Indents.indentsValue .~ []
 class HasIndents s where
   _Indents :: Traversal' (s '[] a) (Indents a)
 
+instance HasIndents Fundef where
+  _Indents fun (MkFundef a b c d e f g h i j k) =
+    (\b' c' -> MkFundef a b' c' d e f g h i j) <$>
+    (traverse._Indents) fun b <*>
+    fun c <*>
+    _Indents fun k
+
+instance HasIndents For where
+  _Indents fun (MkFor a b c d e f g h i) =
+    (\b' -> MkFor a b' c d e f g) <$>
+    fun b <*>
+    _Indents fun h <*>
+    (traverse._Indents) fun i
+
+instance HasIndents TryFinally where
+  _Indents fun (MkTryFinally a b c d e) =
+    (\b' -> MkTryFinally a b' c) <$>
+    fun b <*>
+    _Indents fun d <*>
+    _Indents fun e
+
+instance HasIndents TryExcept where
+  _Indents fun (MkTryExcept a b c d e f g) =
+    (\b' -> MkTryExcept a b' c) <$>
+    fun b <*>
+    _Indents fun d <*>
+    (traverse._Indents) fun e <*>
+    (traverse._Indents) fun f <*>
+    (traverse._Indents) fun g
+
+instance HasIndents Except where
+  _Indents fun (MkExcept a b c d) =
+    (\a' -> MkExcept a' b c) <$>
+    fun a <*>
+    _Indents fun d
+
+instance HasIndents Finally where
+  _Indents fun (MkFinally a b c) =
+    (\a' -> MkFinally a' b) <$>
+    fun a <*>
+    _Indents fun c
+
+instance HasIndents If where
+  _Indents fun (MkIf a b c d e f g) =
+    (\b' -> MkIf a b' c d) <$>
+    fun b <*>
+    _Indents fun e <*>
+    (traverse._Indents) fun f <*>
+    (traverse._Indents) fun g
+
+instance HasIndents While where
+  _Indents fun (MkWhile a b c d e) =
+    (\b' -> MkWhile a b' c d) <$>
+    fun b <*>
+    _Indents fun e
+
+instance HasIndents Elif where
+  _Indents fun (MkElif a b c d) =
+    (\a' -> MkElif a' b c) <$>
+    fun a <*>
+    _Indents fun d
+
 instance HasIndents Else where
   _Indents f (MkElse a b c) = MkElse <$> f a <*> pure b <*> _Indents f c
 

@@ -399,27 +399,43 @@ instance HasDecorators Fundef where
   getDecorators code =
     (\(Decorator () _ _ e _) -> e) <$> _fdDecorators code
 
+mkSetBody
+  :: HasIndents s
+  => Setter' (Raw s) (Raw Suite)
+  -> (Raw s -> Indents ())
+  -> [Whitespace]
+  -> [Raw Line]
+  -> Raw s
+  -> Raw s
+mkSetBody bodyField indentsField ws new code =
+  code &
+  bodyField .~
+    over
+      (_Indents.indentsValue)
+      ((indentsField code ^. indentsValue <>) . doIndent ws)
+      (SuiteMany () [] (LF Nothing) . Block $ unLine <$> toNonEmptyLines new)
+
+mkGetBody
+  :: HasIndents s
+  => String
+  -> (Raw s -> Raw Suite)
+  -> (Raw s -> Indents ())
+  -> Raw s
+  -> [Raw Line]
+mkGetBody thing bodyField indentsField code =
+  (\case
+      SuiteOne a b c d ->
+        [ line_ $ SmallStatements (Indents [] ()) c [] Nothing (Right d) ]
+      SuiteMany a b c d ->
+        NonEmpty.toList $ Line <$> unBlock d) $
+  fromMaybe
+    (error $ "malformed indentation in " <> thing <> " body")
+    (traverseOf _Indents (fmap doDedent . subtractStart (indentsField code)) (bodyField code))
+
 instance HasBody Fundef where
   body = fdBody
-
-  setBody ws new fun =
-    fun
-    { _fdBody =
-      over
-        (_Indents.indentsValue)
-        ((_fdIndents fun ^. indentsValue <>) . doIndent ws)
-        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> toNonEmptyLines new)
-    }
-
-  getBody fun =
-    (\case
-        SuiteOne a b c d ->
-          [ line_ $ SmallStatements (Indents [] ()) c [] Nothing (Right d) ]
-        SuiteMany a b c d ->
-          NonEmpty.toList $ Line <$> unBlock d) $
-    fromMaybe
-      (error "malformed indentation in function body")
-      (traverseOf _Indents (fmap doDedent . subtractStart (_fdIndents fun)) (_fdBody fun))
+  setBody = mkSetBody fdBody _fdIndents
+  getBody = mkGetBody "function" _fdBody _fdIndents
 
 instance HasParameters Fundef where
   setParameters p = fdParameters .~ listToCommaSep p
@@ -556,28 +572,8 @@ toBlock =
 
 instance HasBody While where
   body = whileBody
-
-  setBody ws new fun =
-    fun
-    { _whileBody =
-      over
-        (_Indents.indentsValue)
-        ((_whileIndents fun ^. indentsValue <>) . doIndent ws)
-        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> toNonEmptyLines new)
-    }
-
-  getBody fun =
-    (\case
-        SuiteOne a b c d ->
-          [ line_ $ SmallStatements (Indents [] ()) c [] Nothing (Right d) ]
-        SuiteMany a b c d ->
-          NonEmpty.toList $ Line <$> unBlock d) $
-    fromMaybe
-      (error "malformed indentation in while body")
-      (traverseOf
-         _Indents
-         (fmap doDedent . subtractStart (_whileIndents fun))
-         (_whileBody fun))
+  setBody = mkSetBody whileBody _whileIndents
+  getBody = mkGetBody "while" _whileBody _whileIndents
 
 -- | Create a minimal valid 'While'
 mkWhile :: Raw Expr -> [Raw Line] -> Raw While
@@ -608,78 +604,18 @@ mkIf cond body =
 
 instance HasBody Elif where
   body = elifBody
-
-  setBody ws new fun =
-    fun
-    { _elifBody =
-      over
-        (_Indents.indentsValue)
-        ((_elifIndents fun ^. indentsValue <>) . doIndent ws)
-        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> toNonEmptyLines new)
-    }
-
-  getBody fun =
-    (\case
-        SuiteOne a b c d ->
-          [ line_ $ SmallStatements (Indents [] ()) c [] Nothing (Right d) ]
-        SuiteMany a b c d ->
-          NonEmpty.toList $ Line <$> unBlock d) $
-    fromMaybe
-      (error "malformed indentation in elif body")
-      (traverseOf
-         _Indents
-         (fmap doDedent . subtractStart (_elifIndents fun))
-         (_elifBody fun))
+  setBody = mkSetBody elifBody _elifIndents
+  getBody = mkGetBody "elif" _elifBody _elifIndents
 
 instance HasBody Else where
   body = elseBody
-
-  setBody ws new fun =
-    fun
-    { _elseBody =
-      over
-        (_Indents.indentsValue)
-        ((_elseIndents fun ^. indentsValue <>) . doIndent ws)
-        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> toNonEmptyLines new)
-    }
-
-  getBody fun =
-    (\case
-        SuiteOne a b c d ->
-          [ line_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) ]
-        SuiteMany a b c d ->
-          NonEmpty.toList $ Line <$> unBlock d) $
-    fromMaybe
-      (error "malformed indentation in else body")
-      (traverseOf
-         _Indents
-         (fmap doDedent . subtractStart (_elseIndents fun))
-         (_elseBody fun))
+  setBody = mkSetBody elseBody _elseIndents
+  getBody = mkGetBody "else" _elseBody _elseIndents
 
 instance HasBody If where
   body = ifBody
-
-  setBody ws new fun =
-    fun
-    { _ifBody =
-      over
-        (_Indents.indentsValue)
-        ((_ifIndents fun ^. indentsValue <>) . doIndent ws)
-        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> toNonEmptyLines new)
-    }
-
-  getBody fun =
-    (\case
-        SuiteOne a b c d ->
-          [ line_ $ SmallStatements (Indents [] ()) c [] Nothing (Right d) ]
-        SuiteMany a b c d ->
-          NonEmpty.toList $ Line <$> unBlock d) $
-    fromMaybe
-      (error "malformed indentation in if body")
-      (traverseOf
-         _Indents
-         (fmap doDedent . subtractStart (_ifIndents fun))
-         (_ifBody fun))
+  setBody = mkSetBody ifBody _ifIndents
+  getBody = mkGetBody "if" _ifBody _ifIndents
 
 if_ :: Raw Expr -> [Raw Line] -> Raw If
 if_ cond body = mkIf cond body
@@ -889,6 +825,11 @@ mkFor binder collection body =
 for_ :: Raw Expr -> Raw Expr -> [Raw Line] -> Raw Statement
 for_ val vals block = _For # mkFor val vals block
 
+instance HasBody For where
+  body = forBody
+  setBody = mkSetBody forBody _forIndents
+  getBody = mkGetBody "for" _forBody _forIndents
+
 instance AsLine For where
   line_ = line_ . (_For #)
 
@@ -953,8 +894,18 @@ instance HasFinally TryExcept where
 instance HasFinally TryFinally where
   finally_ body = tfFinally .~ mkFinally body
 
+instance HasBody TryExcept where
+  body = teBody
+  setBody = mkSetBody teBody _teIndents
+  getBody = mkGetBody "try except" _teBody _teIndents
+
 tryE_ :: [Raw Line] -> Raw Except -> Raw TryExcept
 tryE_ = mkTryExcept
+
+instance HasBody TryFinally where
+  body = tfBody
+  setBody = mkSetBody tfBody _tfIndents
+  getBody = mkGetBody "try finally" _tfBody _tfIndents
 
 tryF_ :: [Raw Line] -> [Raw Line] -> Raw TryFinally
 tryF_ = mkTryFinally

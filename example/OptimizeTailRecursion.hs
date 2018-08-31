@@ -1,4 +1,4 @@
-{-# language OverloadedLists, OverloadedStrings #-}
+{-# language OverloadedStrings #-}
 {-# language DataKinds #-}
 {-# language BangPatterns #-}
 module OptimizeTailRecursion where
@@ -16,7 +16,6 @@ import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.Semigroup ((<>))
 
-import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax
@@ -40,15 +39,14 @@ optimizeTailRecursion st = do
       _Fundef #
         (function &
          setBody (replicate 4 Space)
-           (flip (foldr NonEmpty.cons)
-              (zipWith (\a b -> line_ $ var_ (a <> "__tr") .= var_ b) paramNames paramNames)
-              [ line_ $ "__res__tr" .= none_
-              , line_ . while_ true_ .
-                NonEmpty.fromList . transformOn (traverse._Exprs) (renameIn paramNames "__tr") $
-                  bodyInit <>
-                  looped functionName paramNames bodyLast
-              , line_ $ return_ "__res__tr"
-              ]))
+           (zipWith (\a b -> line_ $ var_ (a <> "__tr") .= var_ b) paramNames paramNames <>
+            [ line_ $ "__res__tr" .= none_
+            , line_ . while_ true_ .
+              transformOn (traverse._Exprs) (renameIn paramNames "__tr") $
+                bodyInit <>
+                looped functionName paramNames bodyLast
+            , line_ $ return_ "__res__tr"
+            ]))
 
   where
     lastStatement :: [Raw Line] -> Maybe (Raw Statement)
@@ -93,20 +91,17 @@ optimizeTailRecursion st = do
               Nothing ->
                 [ line_ $
                   if_ (ifSt ^. ifCond)
-                    (NonEmpty.fromList $
-                      (ifBodyLines ^?! _init) <>
-                      looped name params (ifBodyLines ^?! _last._Statements))
+                    ((ifBodyLines ^?! _init) <>
+                     looped name params (ifBodyLines ^?! _last._Statements))
                 ]
               Just sts'' ->
                 [ line_ $
                   if_ (ifSt ^. ifCond)
-                    (NonEmpty.fromList $
-                      (toList (getBody ifSt) ^?! _init) <>
-                      looped name params (ifBodyLines ^?! _last._Statements)) &
+                    ((toList (getBody ifSt) ^?! _init) <>
+                     looped name params (ifBodyLines ^?! _last._Statements)) &
                   else_
-                    (NonEmpty.fromList $
-                      (toList sts'' ^?! _init) <>
-                      looped name params (toList sts'' ^?! _last._Statements))
+                    ((toList sts'' ^?! _init) <>
+                     looped name params (toList sts'' ^?! _last._Statements))
                 ]
       | otherwise =
           case st of

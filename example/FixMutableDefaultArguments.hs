@@ -1,4 +1,3 @@
-{-# language OverloadedLists #-}
 {-# language DataKinds #-}
 module FixMutableDefaultArguments where
 
@@ -7,7 +6,7 @@ import Control.Lens.Getter (getting)
 import Control.Lens.Review ((#))
 import Control.Lens.Setter ((.~))
 import Data.Function ((&))
-import qualified Data.List.NonEmpty as NonEmpty
+import Data.Semigroup ((<>))
 
 import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax
@@ -39,7 +38,7 @@ fixMutableDefaultArguments input = do
        setParameters newparams &
        modifyBody
          (replicate 4 Space)
-         (flip (foldr NonEmpty.cons) conditionalAssignments))
+         (conditionalAssignments <>))
   where
     isMutable :: Raw Expr -> Bool
     isMutable Unit{} = False

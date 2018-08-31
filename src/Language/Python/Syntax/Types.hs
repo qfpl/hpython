@@ -130,7 +130,7 @@ data TryFinally v a
   { _tfAnn :: a
   , _tfIndents :: Indents a
   , _tfTry :: [Whitespace]
-  , _tfBody :: Suite v a -- ^ @\<suite\>@
+  , _tfBody :: Suite v a
   , _tfFinally :: Finally v a
   } deriving (Eq, Show)
 makeLenses ''TryFinally

@@ -1,3 +1,10 @@
+{-|
+
+Passing @[]@ to a function which expects a @['Raw' 'Line']@ is the same as
+passing @['line_' 'pass_']@
+
+-}
+
 {-# language DataKinds #-}
 {-# language MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 {-# language OverloadedLists #-}
@@ -184,16 +191,25 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe)
 import Data.Semigroup ((<>))
 
+import qualified Data.List.NonEmpty as NonEmpty
+
 import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax hiding (Fundef, While, Call)
 import Language.Python.Syntax.Types
 
 type Raw f = f '[] ()
 
+toNonEmptyLines :: [Raw Line] -> NonEmpty (Raw Line)
+toNonEmptyLines [] = pure (line_ pass_)
+toNonEmptyLines (a:as) = a :| as
+
 -- | Create a blank 'Line'
 blank_ :: Raw Line
 blank_ = Line $ Left ([], LF Nothing)
 
+-- | 'Ident' has an 'Data.String.IsString' instance, but when a type class dispatches on
+-- an 'Ident' we will run into ambiguity if we try to use @OverloadedStrings@. In these
+-- cases we can use 'id_' to provide the extra type information
 id_ :: String -> Raw Ident
 id_ = fromString
 
@@ -264,7 +280,7 @@ class HasBody s where
   -- @
   setBody
     :: [Whitespace] -- ^ Indentation scheme for the new lines
-    -> NonEmpty (Raw Line) -- ^ Lines to become the new body
+    -> [Raw Line] -- ^ Lines to become the new body
     -> Raw s -- ^ Current code
     -> Raw s
 
@@ -291,7 +307,7 @@ class HasBody s where
   -- else:
   --   pass
   -- @
-  getBody :: Raw s -> NonEmpty (Raw Line)
+  getBody :: Raw s -> [Raw Line]
   body :: Lens' (Raw s) (Raw Suite)
 
 doIndent :: [Whitespace] -> [Indent] -> [Indent]
@@ -305,7 +321,7 @@ doDedent (Indents (a:b) c) = Indents b c
 modifyBody
   :: HasBody s
   => [Whitespace] -- ^ New indentation scheme
-  -> (NonEmpty (Raw Line) -> NonEmpty (Raw Line)) -- ^ Modification function
+  -> ([Raw Line] -> [Raw Line]) -- ^ Modification function
   -> Raw s -- ^ Existing code
   -> Raw s
 modifyBody ws f fun = setBody ws (f $ getBody fun) fun
@@ -368,15 +384,15 @@ instance HasBody Fundef where
       over
         (_Indents.indentsValue)
         ((_fdIndents fun ^. indentsValue <>) . doIndent ws)
-        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> new)
+        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> toNonEmptyLines new)
     }
 
   getBody fun =
     (\case
         SuiteOne a b c d ->
-          line_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| []
+          [ line_ $ SmallStatements (Indents [] ()) c [] Nothing (Right d) ]
         SuiteMany a b c d ->
-          Line <$> unBlock d) $
+          NonEmpty.toList $ Line <$> unBlock d) $
     fromMaybe
       (error "malformed indentation in function body")
       (traverseOf _Indents (fmap doDedent . subtractStart (_fdIndents fun)) (_fdBody fun))
@@ -386,7 +402,7 @@ instance HasParameters Fundef where
   parameters = fdParameters
 
 -- | Create a minimal valid function definition
-mkFundef :: Raw Ident -> NonEmpty (Raw Line) -> Raw Fundef
+mkFundef :: Raw Ident -> [Raw Line] -> Raw Fundef
 mkFundef name body =
   MkFundef
   { _fdAnn = ()
@@ -402,7 +418,7 @@ mkFundef name body =
   , _fdBody = SuiteMany () [] (LF Nothing) $ toBlock body
   }
 
-def_ :: Raw Ident -> [Raw Param] -> NonEmpty (Raw Line) -> Raw Statement
+def_ :: Raw Ident -> [Raw Param] -> [Raw Line] -> Raw Statement
 def_ name params body =
   _Fundef # (mkFundef name body) { _fdParameters = listToCommaSep params }
 
@@ -504,8 +520,12 @@ infixl 9 />
 neg :: Raw Expr -> Raw Expr
 neg = negate
 
-toBlock :: NonEmpty (Raw Line) -> Block '[] ()
-toBlock = over (_Indents.indentsValue) (doIndent $ replicate 4 Space) . Block . fmap unLine
+toBlock :: [Raw Line] -> Block '[] ()
+toBlock =
+  over
+    (_Indents.indentsValue)
+    (doIndent $ replicate 4 Space) .
+    Block . fmap unLine . toNonEmptyLines
 
 instance HasBody While where
   body = whileBody
@@ -516,15 +536,15 @@ instance HasBody While where
       over
         (_Indents.indentsValue)
         ((_whileIndents fun ^. indentsValue <>) . doIndent ws)
-        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> new)
+        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> toNonEmptyLines new)
     }
 
   getBody fun =
     (\case
         SuiteOne a b c d ->
-          line_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| []
+          [ line_ $ SmallStatements (Indents [] ()) c [] Nothing (Right d) ]
         SuiteMany a b c d ->
-          Line <$> unBlock d) $
+          NonEmpty.toList $ Line <$> unBlock d) $
     fromMaybe
       (error "malformed indentation in while body")
       (traverseOf
@@ -533,7 +553,7 @@ instance HasBody While where
          (_whileBody fun))
 
 -- | Create a minimal valid 'While'
-mkWhile :: Raw Expr -> NonEmpty (Raw Line) -> Raw While
+mkWhile :: Raw Expr -> [Raw Line] -> Raw While
 mkWhile cond body =
   MkWhile
   { _whileAnn = ()
@@ -543,11 +563,11 @@ mkWhile cond body =
   , _whileBody = SuiteMany () [] (LF Nothing) $ toBlock body
   }
 
-while_ :: Raw Expr -> NonEmpty (Raw Line) -> Raw Statement
+while_ :: Raw Expr -> [Raw Line] -> Raw Statement
 while_ e sts = _While # mkWhile e sts
 
 -- | Create a minimal valid 'If'
-mkIf :: Raw Expr -> NonEmpty (Raw Line) -> Raw If
+mkIf :: Raw Expr -> [Raw Line] -> Raw If
 mkIf cond body =
   MkIf
   { _ifAnn = ()
@@ -568,15 +588,15 @@ instance HasBody Elif where
       over
         (_Indents.indentsValue)
         ((_elifIndents fun ^. indentsValue <>) . doIndent ws)
-        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> new)
+        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> toNonEmptyLines new)
     }
 
   getBody fun =
     (\case
         SuiteOne a b c d ->
-          line_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| []
+          [ line_ $ SmallStatements (Indents [] ()) c [] Nothing (Right d) ]
         SuiteMany a b c d ->
-          Line <$> unBlock d) $
+          NonEmpty.toList $ Line <$> unBlock d) $
     fromMaybe
       (error "malformed indentation in elif body")
       (traverseOf
@@ -593,15 +613,15 @@ instance HasBody Else where
       over
         (_Indents.indentsValue)
         ((_elseIndents fun ^. indentsValue <>) . doIndent ws)
-        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> new)
+        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> toNonEmptyLines new)
     }
 
   getBody fun =
     (\case
         SuiteOne a b c d ->
-          line_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| []
+          [ line_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) ]
         SuiteMany a b c d ->
-          Line <$> unBlock d) $
+          NonEmpty.toList $ Line <$> unBlock d) $
     fromMaybe
       (error "malformed indentation in else body")
       (traverseOf
@@ -618,15 +638,15 @@ instance HasBody If where
       over
         (_Indents.indentsValue)
         ((_ifIndents fun ^. indentsValue <>) . doIndent ws)
-        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> new)
+        (SuiteMany () [] (LF Nothing) . Block $ unLine <$> toNonEmptyLines new)
     }
 
   getBody fun =
     (\case
         SuiteOne a b c d ->
-          line_ (SmallStatements (Indents [] ()) c [] Nothing (Right d)) :| []
+          [ line_ $ SmallStatements (Indents [] ()) c [] Nothing (Right d) ]
         SuiteMany a b c d ->
-          Line <$> unBlock d) $
+          NonEmpty.toList $ Line <$> unBlock d) $
     fromMaybe
       (error "malformed indentation in if body")
       (traverseOf
@@ -634,7 +654,7 @@ instance HasBody If where
          (fmap doDedent . subtractStart (_ifIndents fun))
          (_ifBody fun))
 
-if_ :: Raw Expr -> NonEmpty (Raw Line) -> Raw If
+if_ :: Raw Expr -> [Raw Line] -> Raw If
 if_ cond body = mkIf cond body
 
 var_ :: String -> Raw Expr
@@ -647,7 +667,7 @@ pass_ :: Raw Statement
 pass_ = SmallStatements (Indents [] ()) (Pass () []) [] Nothing (Right (LF Nothing))
 
 -- | Create a minimal valid 'Elif'
-mkElif :: Raw Expr -> NonEmpty (Raw Line) -> Raw Elif
+mkElif :: Raw Expr -> [Raw Line] -> Raw Elif
 mkElif cond body =
   MkElif
   { _elifIndents = Indents [] ()
@@ -656,11 +676,11 @@ mkElif cond body =
   , _elifBody = SuiteMany () [] (LF Nothing) $ toBlock body
   }
 
-elif_ :: Raw Expr -> NonEmpty (Raw Line) -> Raw If -> Raw If
+elif_ :: Raw Expr -> [Raw Line] -> Raw If -> Raw If
 elif_ cond body code = code & ifElifs <>~ [mkElif cond body]
 
 -- | Create a minimal valid 'Else'
-mkElse :: NonEmpty (Raw Line) -> Raw Else
+mkElse :: [Raw Line] -> Raw Else
 mkElse body =
   MkElse
   { _elseIndents = Indents [] ()
@@ -672,7 +692,7 @@ class HasElse s where
   getElse :: Raw s -> Maybe (Raw Else)
   setElse :: [Whitespace] -> Maybe (Raw Else) -> Raw s -> Raw s
 
-else_ :: HasElse s => NonEmpty (Raw Line) -> Raw s -> Raw s
+else_ :: HasElse s => [Raw Line] -> Raw s -> Raw s
 else_ body = setElse (replicate 4 Space) $ Just (mkElse body)
 
 mkGetElse
@@ -746,7 +766,7 @@ longStr_ s =
     Nothing
     (Right (LF Nothing))
 
-mkFor :: Raw Expr -> Raw Expr -> NonEmpty (Raw Line) -> Raw For
+mkFor :: Raw Expr -> Raw Expr -> [Raw Line] -> Raw For
 mkFor binder collection body =
   MkFor
   { _forAnn = ()
@@ -760,7 +780,7 @@ mkFor binder collection body =
   , _forElse = Nothing
   }
 
-for_ :: Raw Expr -> Raw Expr -> NonEmpty (Raw Line) -> Raw Statement
+for_ :: Raw Expr -> Raw Expr -> [Raw Line] -> Raw Statement
 for_ val vals block = _For # mkFor val vals block
 
 instance AsLine For where
@@ -776,7 +796,7 @@ instance HasAsync For where
   async_ = forAsync ?~ pure Space
 
 -- | Create a minimal valid 'Finally'
-mkFinally :: NonEmpty (Raw Line) -> Raw Finally
+mkFinally :: [Raw Line] -> Raw Finally
 mkFinally body =
   MkFinally
   { _finallyIndents = Indents [] ()
@@ -785,7 +805,7 @@ mkFinally body =
   }
 
 -- | Create a minimal valid 'Except'
-mkExcept :: NonEmpty (Raw Line) -> Raw Except
+mkExcept :: [Raw Line] -> Raw Except
 mkExcept body =
   MkExcept
   { _exceptIndents = Indents [] ()
@@ -795,7 +815,7 @@ mkExcept body =
   }
 
 -- | Create a minimal valid 'TryExcept'
-mkTryExcept :: NonEmpty (Raw Line) -> Raw Except -> Raw TryExcept
+mkTryExcept :: [Raw Line] -> Raw Except -> Raw TryExcept
 mkTryExcept body except =
   MkTryExcept
   { _teAnn = ()
@@ -808,7 +828,7 @@ mkTryExcept body except =
   }
 
 -- | Create a minimal valid 'TryFinally'
-mkTryFinally :: NonEmpty (Raw Line) -> NonEmpty (Raw Line) -> Raw TryFinally
+mkTryFinally :: [Raw Line] -> [Raw Line] -> Raw TryFinally
 mkTryFinally body fBody =
   MkTryFinally
   { _tfAnn = ()
@@ -819,7 +839,7 @@ mkTryFinally body fBody =
   }
 
 class HasFinally s where
-  finally_ :: NonEmpty (Raw Line) -> Raw s -> Raw s
+  finally_ :: [Raw Line] -> Raw s -> Raw s
 
 instance HasFinally TryExcept where
   finally_ body = teFinally ?~ mkFinally body
@@ -827,10 +847,10 @@ instance HasFinally TryExcept where
 instance HasFinally TryFinally where
   finally_ body = tfFinally .~ mkFinally body
 
-tryE_ :: NonEmpty (Raw Line) -> Raw Except -> Raw TryExcept
+tryE_ :: [Raw Line] -> Raw Except -> Raw TryExcept
 tryE_ = mkTryExcept
 
-tryF_ :: NonEmpty (Raw Line) -> NonEmpty (Raw Line) -> Raw TryFinally
+tryF_ :: [Raw Line] -> [Raw Line] -> Raw TryFinally
 tryF_ = mkTryFinally
 
 class AsExceptAs s where
@@ -843,10 +863,10 @@ instance AsExceptAs Expr where
   toExceptAs e = ExceptAs () e Nothing
 
 class HasExcept s where
-  except_ :: NonEmpty (Raw Line) -> s -> Raw TryExcept
+  except_ :: [Raw Line] -> s -> Raw TryExcept
   -- | You can use 'exceptAs_' without a binder:
   --
-  -- @'exceptAs_' :: 'Raw' 'Expr' -> 'NonEmpty' ('Raw' 'Line') -> 'Raw' s -> 'Raw' 'TryExcept'@
+  -- @'exceptAs_' :: 'Raw' 'Expr' -> ['Raw' 'Line'] -> 'Raw' s -> 'Raw' 'TryExcept'@
   --
   -- @
   -- 'exceptAs_' ('var_' \"Exception\") body
@@ -854,12 +874,12 @@ class HasExcept s where
   --
   -- or with a binder
   --
-  -- @'exceptAs_' :: 'Raw' 'ExceptAs' -> 'NonEmpty' ('Raw' 'Line') -> 'Raw' s -> 'Raw' 'TryExcept'@
+  -- @'exceptAs_' :: 'Raw' 'ExceptAs' -> ['Raw' 'Line'] -> 'Raw' s -> 'Raw' 'TryExcept'@
   --
   -- @
   -- 'exceptAs_' ('var_' \"Exception\" \``as_`\` 'id_' "a") body
   -- @
-  exceptAs_ :: AsExceptAs e => Raw e -> NonEmpty (Raw Line) -> s -> Raw TryExcept
+  exceptAs_ :: AsExceptAs e => Raw e -> [Raw Line] -> s -> Raw TryExcept
 
 -- |
 -- @

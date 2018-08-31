@@ -3,6 +3,8 @@
 {-# language OverloadedLists #-}
 {-# language LambdaCase #-}
 {-# language RankNTypes #-}
+{-# language KindSignatures #-}
+{-# language RecordWildCards #-}
 module Language.Python.Syntax
   ( Raw
   , Statement
@@ -26,6 +28,10 @@ module Language.Python.Syntax
   , decorated_
   , HasDecorators(..)
     -- * Statements
+    -- ** @as@
+  , As(..)
+    -- ** @async@
+  , HasAsync(..)
     -- ** Lines of code
   , blank_
   , AsLine(..)
@@ -52,6 +58,38 @@ module Language.Python.Syntax
   , fdBody
     -- ** Assignment
   , (.=)
+    -- ** Exceptions
+  , HasTry(..)
+  , HasExcept(..)
+  , HasFinally(..)
+  , TryExcept(..)
+  , _TryExcept
+  , mkTryExcept
+  , TryFinally(..)
+  , _TryFinally
+  , mkTryFinally
+  , AsExceptAs(..)
+  , Except(..)
+  , _Except
+  , mkExcept
+  , Finally(..)
+  , _Finally
+  , mkFinally
+    -- *** Lenses
+  , teAnn
+  , teIndents
+  , teTry
+  , teBody
+  , teExcepts
+  , teElse
+  , teFinally
+  , exceptIndents
+  , exceptExcept
+  , exceptExceptAs
+  , exceptBody
+  , finallyIndents
+  , finallyFinally
+  , finallyBody
     -- ** Flow control
     -- *** 'Else' clauses
   , else_
@@ -134,13 +172,13 @@ import Data.Function ((&))
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
 import Control.Lens.Lens (Lens')
-import Control.Lens.Prism (_Right)
+import Control.Lens.Prism (Prism, _Right)
 import Control.Lens.Review ((#))
-import Control.Lens.Setter ((.~), (<>~), Setter', over)
+import Control.Lens.Setter ((.~), (<>~), (?~), (%~), Setter', over)
 import Control.Lens.Traversal (traverseOf)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
+import Data.Semigroup ((<>))
 
 import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax hiding (Fundef, While, Call)
@@ -717,3 +755,138 @@ mkFor binder collection body =
 
 for_ :: Raw Expr -> Raw Expr -> NonEmpty (Raw Line) -> Raw Statement
 for_ val vals block = _For # mkFor val vals block
+
+instance AsLine For where
+  line_ = line_ . (_For #)
+
+class HasAsync s where
+  async_ :: Raw s -> Raw s
+
+instance HasAsync Fundef where
+  async_ = fdAsync ?~ pure Space
+
+instance HasAsync For where
+  async_ = forAsync ?~ pure Space
+
+-- | Create a minimal valid 'Finally'
+mkFinally :: NonEmpty (Raw Line) -> Raw Finally
+mkFinally body =
+  MkFinally
+  { _finallyIndents = Indents [] ()
+  , _finallyFinally = []
+  , _finallyBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  }
+
+-- | Create a minimal valid 'Except'
+mkExcept :: NonEmpty (Raw Line) -> Raw Except
+mkExcept body =
+  MkExcept
+  { _exceptIndents = Indents [] ()
+  , _exceptExcept = []
+  , _exceptExceptAs = Nothing
+  , _exceptBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  }
+
+-- | Create a minimal valid 'TryExcept'
+mkTryExcept :: NonEmpty (Raw Line) -> Raw Except -> Raw TryExcept
+mkTryExcept body except =
+  MkTryExcept
+  { _teAnn = ()
+  , _teIndents = Indents [] ()
+  , _teTry = [Space]
+  , _teBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _teExcepts = pure except
+  , _teElse = Nothing
+  , _teFinally = Nothing
+  }
+
+-- | Create a minimal valid 'TryFinally'
+mkTryFinally :: NonEmpty (Raw Line) -> NonEmpty (Raw Line) -> Raw TryFinally
+mkTryFinally body fBody =
+  MkTryFinally
+  { _tfAnn = ()
+  , _tfIndents = Indents [] ()
+  , _tfTry = [Space]
+  , _tfBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _tfFinally = mkFinally fBody
+  }
+
+class HasFinally s where
+  finally_ :: NonEmpty (Raw Line) -> Raw s -> Raw s
+
+instance HasFinally TryExcept where
+  finally_ body = teFinally ?~ mkFinally body
+
+instance HasFinally TryFinally where
+  finally_ body = tfFinally .~ mkFinally body
+
+class HasTry (t :: [*] -> * -> *) s | s -> t, t -> s where
+  _Try :: Prism (Statement v a) (Statement '[] a) (t v a) (t '[] a)
+  -- | Construct a @try@ statement
+  --
+  -- You don't *need* to use type applications if you don't want to; the correct @try@
+  -- statement will be picked based on the second argument to 'try_'
+  try_ :: NonEmpty (Raw Line) -> s
+
+-- | @'try_' \@'TryExcept' :: 'NonEmpty' ('Raw' 'Line') -> 'Raw' 'Except' -> 'Raw' 'Statement'@
+instance HasTry TryExcept (Raw Except -> Raw TryExcept) where
+  _Try = _TryExcept
+  try_ = mkTryExcept
+
+-- | @'try_' \@'TryFinally' :: 'NonEmpty' ('Raw' 'Line') -> 'NonEmpty' ('Raw' 'Line') -> 'Raw' 'Statement'@
+instance HasTry TryFinally (NonEmpty (Raw Line) -> Raw TryFinally) where
+  _Try = _TryFinally
+  try_ = mkTryFinally
+
+class AsExceptAs s where
+  toExceptAs :: Raw s -> Raw ExceptAs
+
+instance AsExceptAs ExceptAs where
+  toExceptAs = id
+
+instance AsExceptAs Expr where
+  toExceptAs e = ExceptAs () e Nothing
+
+class HasExcept s where
+  except_ :: NonEmpty (Raw Line) -> Raw s -> Raw TryExcept
+  exceptAs_ :: AsExceptAs e => Raw e -> NonEmpty (Raw Line) -> Raw s -> Raw TryExcept
+
+instance HasExcept TryExcept where
+  except_ body = teExcepts %~ (<> pure (mkExcept body))
+  exceptAs_ ea body =
+    teExcepts %~ (<> pure (mkExcept body & exceptExceptAs ?~ toExceptAs ea))
+
+instance HasExcept TryFinally where
+  except_ body MkTryFinally{..} =
+    MkTryExcept
+    { _teAnn = _tfAnn
+    , _teIndents = _tfIndents
+    , _teTry = _tfTry
+    , _teBody = _tfBody
+    , _teExcepts = pure $ mkExcept body
+    , _teElse = Nothing
+    , _teFinally = Just _tfFinally
+    }
+
+  exceptAs_ ea body MkTryFinally{..} =
+    MkTryExcept
+    { _teAnn = _tfAnn
+    , _teIndents = _tfIndents
+    , _teTry = _tfTry
+    , _teBody = _tfBody
+    , _teExcepts = pure $ mkExcept body & exceptExceptAs ?~ toExceptAs ea
+    , _teElse = Nothing
+    , _teFinally = Just _tfFinally
+    }
+
+instance AsLine TryExcept where
+  line_ = line_ . (_TryExcept #)
+
+instance AsLine TryFinally where
+  line_ = line_ . (_TryFinally #)
+
+class As s t u | s t -> u, u -> s t where
+  as_ :: Raw s -> Raw t -> Raw u
+
+instance As Expr Ident ExceptAs where
+  as_ e name = ExceptAs () e $ Just ([Space], name)

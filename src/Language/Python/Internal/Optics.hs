@@ -67,6 +67,12 @@ _Else = iso (\(MkElse a b c) -> (a, b, c)) (\(a, b, c) -> MkElse a b c)
 _Elif :: Iso' (Elif v a) (Indents a, [Whitespace], Expr v a, Suite v a)
 _Elif = iso (\(MkElif a b c d) -> (a, b, c, d)) (\(a, b, c, d) -> MkElif a b c d)
 
+_Finally :: Iso' (Finally v a) (Indents a, [Whitespace], Suite v a)
+_Finally = iso (\(MkFinally a b c) -> (a, b, c)) (\(a, b, c) -> MkFinally a b c)
+
+_Except :: Iso' (Except v a) (Indents a, [Whitespace], Maybe (ExceptAs v a), Suite v a)
+_Except = iso (\(MkExcept a b c d) -> (a, b, c, d)) (\(a, b, c, d) -> MkExcept a b c d)
+
 _If :: Prism (Statement v a) (Statement '[] a) (If v a) (If '[] a)
 _If =
   prism
@@ -75,6 +81,31 @@ _If =
     (\case
         CompoundStatement (If a b c d e f g) ->
           Right $ MkIf a b c d e (view (from _Elif) <$> f) (view (from _Else) <$> g)
+        a -> Left $ a ^. unvalidated)
+
+_TryExcept :: Prism (Statement v a) (Statement '[] a) (TryExcept v a) (TryExcept '[] a)
+_TryExcept =
+  prism
+    (\(MkTryExcept a b c d e f g) ->
+       CompoundStatement $
+       TryExcept a b c d (view _Except <$> e) (view _Else <$> f) (view _Finally <$> g))
+    (\case
+        CompoundStatement (TryExcept a b c d e f g) ->
+          Right $
+          MkTryExcept a b c d
+            (view (from _Except) <$> e)
+            (view (from _Else) <$> f)
+            (view (from _Finally) <$> g)
+        a -> Left $ a ^. unvalidated)
+
+_TryFinally :: Prism (Statement v a) (Statement '[] a) (TryFinally v a) (TryFinally '[] a)
+_TryFinally =
+  prism
+    (\(MkTryFinally a b c d e) ->
+       CompoundStatement $ (\(x, y, z) -> TryFinally a b c d x y z) (e ^. _Finally))
+    (\case
+        CompoundStatement (TryFinally a b c d e f g) ->
+          Right $ MkTryFinally a b c d ((e, f, g) ^. from _Finally)
         a -> Left $ a ^. unvalidated)
 
 _For :: Prism (Statement v a) (Statement '[] a) (For v a) (For '[] a)

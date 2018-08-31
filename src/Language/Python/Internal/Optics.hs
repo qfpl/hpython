@@ -67,12 +67,7 @@ _Else = iso (\(MkElse a b c) -> (a, b, c)) (\(a, b, c) -> MkElse a b c)
 _Elif :: Iso' (Elif v a) (Indents a, [Whitespace], Expr v a, Suite v a)
 _Elif = iso (\(MkElif a b c d) -> (a, b, c, d)) (\(a, b, c, d) -> MkElif a b c d)
 
-_If
-  :: Prism
-       (Statement v a)
-       (Statement '[] a)
-       (If v a)
-       (If '[] a)
+_If :: Prism (Statement v a) (Statement '[] a) (If v a) (If '[] a)
 _If =
   prism
     (\(MkIf a b c d e f g) ->
@@ -80,6 +75,16 @@ _If =
     (\case
         CompoundStatement (If a b c d e f g) ->
           Right $ MkIf a b c d e (view (from _Elif) <$> f) (view (from _Else) <$> g)
+        a -> Left $ a ^. unvalidated)
+
+_For :: Prism (Statement v a) (Statement '[] a) (For v a) (For '[] a)
+_For =
+  prism
+    (\(MkFor a b c d e f g h i) ->
+       CompoundStatement (For a b c d e f g h (view _Else <$> i)))
+    (\case
+        CompoundStatement (For a b c d e f g h i) ->
+          Right $ MkFor a b c d e f g h (view (from _Else) <$> i)
         a -> Left $ a ^. unvalidated)
 
 _Call :: Prism (Expr v a) (Expr '[] a) (Call v a) (Call '[] a)

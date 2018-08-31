@@ -2,6 +2,7 @@
 {-# language MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 {-# language OverloadedLists #-}
 {-# language LambdaCase #-}
+{-# language RankNTypes #-}
 module Language.Python.Syntax
   ( Raw
   , Statement
@@ -59,6 +60,9 @@ module Language.Python.Syntax
   , break_
     -- *** For loops
   , for_
+  , For(..)
+  , _For
+  , mkFor
     -- *** If statements
   , if_
   , elif_
@@ -132,7 +136,7 @@ import Control.Lens.Iso (from)
 import Control.Lens.Lens (Lens')
 import Control.Lens.Prism (_Right)
 import Control.Lens.Review ((#))
-import Control.Lens.Setter ((.~), (<>~), over)
+import Control.Lens.Setter ((.~), (<>~), Setter', over)
 import Control.Lens.Traversal (traverseOf)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe)
@@ -626,24 +630,42 @@ class HasElse s where
 else_ :: HasElse s => NonEmpty (Raw Line) -> Raw s -> Raw s
 else_ body = setElse (replicate 4 Space) $ Just (mkElse body)
 
-instance HasElse If where
-  getElse code =
-    fromMaybe
-      (error "malformed indentation in else block")
-      (traverseOf
-         (traverse._Indents)
-         (subtractStart (_ifIndents code))
-         (_ifElse code))
+mkGetElse
+  :: (Raw s -> Indents ())
+  -> (Raw s -> Maybe (Raw Else))
+  -> Raw s
+  -> Maybe (Raw Else)
+mkGetElse indentLevel elseField code =
+  fromMaybe
+    (error "malformed indentation in else block")
+    (traverseOf
+        (traverse._Indents)
+        (subtractStart (indentLevel code))
+        (elseField code))
 
-  setElse ws new code =
-    code
-    { _ifElse =
-      fmap (elseIndents .~ _ifIndents code) $
-      over
-        (traverse._Indents.indentsValue)
-        (_ifIndents code ^. indentsValue <>)
-        new
-    }
+mkSetElse
+  :: (Raw s -> Indents ())
+  -> Setter' (Raw s) (Maybe (Raw Else))
+  -> [Whitespace]
+  -> Maybe (Raw Else)
+  -> Raw s
+  -> Raw s
+mkSetElse indentLevel elseField ws new code =
+  code &
+  elseField .~
+    (fmap (elseIndents .~ indentLevel code) $
+     over
+       (traverse._Indents.indentsValue)
+       (indentLevel code ^. indentsValue <>)
+       new)
+
+instance HasElse For where
+  getElse = mkGetElse _forIndents _forElse
+  setElse = mkSetElse _forIndents forElse
+
+instance HasElse If where
+  getElse = mkGetElse _ifIndents _ifElse
+  setElse = mkSetElse _ifIndents ifElse
 
 break_ :: Raw Statement
 break_ = SmallStatements (Indents [] ()) (Break () []) [] Nothing (Right (LF Nothing))
@@ -679,21 +701,19 @@ longStr_ s =
     Nothing
     (Right (LF Nothing))
 
-forElse_
-  :: Raw Expr
-  -> Raw Expr
-  -> NonEmpty (Raw Line)
-  -> NonEmpty (Raw Line)
-  -> Raw Statement
-forElse_ val vals block els =
-  CompoundStatement $
-  For () (Indents [] ()) Nothing [Space] (val & trailingWhitespace .~ [Space]) [Space] vals
-    (SuiteMany () [] (LF Nothing) $ toBlock block)
-    (Just (Indents [] (), [], SuiteMany () [] (LF Nothing) $ toBlock els))
+mkFor :: Raw Expr -> Raw Expr -> NonEmpty (Raw Line) -> Raw For
+mkFor binder collection body =
+  MkFor
+  { _forAnn = ()
+  , _forIndents = Indents [] ()
+  , _forAsync = Nothing
+  , _forFor = [Space]
+  , _forBinder = binder
+  , _forIn = [Space]
+  , _forCollection = collection
+  , _forBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _forElse = Nothing
+  }
 
 for_ :: Raw Expr -> Raw Expr -> NonEmpty (Raw Line) -> Raw Statement
-for_ val vals block =
-  CompoundStatement $
-  For () (Indents [] ()) Nothing [Space] (val & trailingWhitespace .~ [Space]) [Space] vals
-    (SuiteMany () [] (LF Nothing) $ toBlock block)
-    Nothing
+for_ val vals block = _For # mkFor val vals block

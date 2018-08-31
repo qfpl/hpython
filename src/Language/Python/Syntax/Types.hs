@@ -81,3 +81,17 @@ data If v a
   , _ifElse :: Maybe (Else v a)
   } deriving (Eq, Show)
 makeLenses ''If
+
+data For v a
+  = MkFor
+  { _forAnn :: a
+  , _forIndents :: Indents a
+  , _forAsync :: Maybe (NonEmpty Whitespace)
+  , _forFor :: [Whitespace]
+  , _forBinder :: Expr v a
+  , _forIn :: [Whitespace]
+  , _forCollection :: Expr v a
+  , _forBody :: Suite v a
+  , _forElse :: Maybe (Else v a)
+  }
+makeLenses ''For

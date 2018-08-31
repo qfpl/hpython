@@ -3,12 +3,14 @@
 {-# language OverloadedLists #-}
 {-# language LambdaCase #-}
 {-# language RankNTypes #-}
-{-# language KindSignatures #-}
 {-# language RecordWildCards #-}
 module Language.Python.Syntax
-  ( Raw
+  ( (&)
+  , Raw
   , Statement
   , Expr
+    -- * Identifiers
+  , id_
     -- * Parameters and arguments
     -- ** Parameters
   , HasParameters(..)
@@ -59,7 +61,8 @@ module Language.Python.Syntax
     -- ** Assignment
   , (.=)
     -- ** Exceptions
-  , HasTry(..)
+  , tryE_
+  , tryF_
   , HasExcept(..)
   , HasFinally(..)
   , TryExcept(..)
@@ -169,10 +172,11 @@ module Language.Python.Syntax
 where
 
 import Data.Function ((&))
+import Data.String (fromString)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
 import Control.Lens.Lens (Lens')
-import Control.Lens.Prism (Prism, _Right)
+import Control.Lens.Prism (_Right)
 import Control.Lens.Review ((#))
 import Control.Lens.Setter ((.~), (<>~), (?~), (%~), Setter', over)
 import Control.Lens.Traversal (traverseOf)
@@ -189,6 +193,9 @@ type Raw f = f '[] ()
 -- | Create a blank 'Line'
 blank_ :: Raw Line
 blank_ = Line $ Left ([], LF Nothing)
+
+id_ :: String -> Raw Ident
+id_ = fromString
 
 -- | One or more lines of Python code
 newtype Line v a = Line { unLine :: Either ([Whitespace], Newline) (Statement v a) }
@@ -820,23 +827,11 @@ instance HasFinally TryExcept where
 instance HasFinally TryFinally where
   finally_ body = tfFinally .~ mkFinally body
 
-class HasTry (t :: [*] -> * -> *) s | s -> t, t -> s where
-  _Try :: Prism (Statement v a) (Statement '[] a) (t v a) (t '[] a)
-  -- | Construct a @try@ statement
-  --
-  -- You don't *need* to use type applications if you don't want to; the correct @try@
-  -- statement will be picked based on the second argument to 'try_'
-  try_ :: NonEmpty (Raw Line) -> s
+tryE_ :: NonEmpty (Raw Line) -> Raw Except -> Raw TryExcept
+tryE_ = mkTryExcept
 
--- | @'try_' \@'TryExcept' :: 'NonEmpty' ('Raw' 'Line') -> 'Raw' 'Except' -> 'Raw' 'Statement'@
-instance HasTry TryExcept (Raw Except -> Raw TryExcept) where
-  _Try = _TryExcept
-  try_ = mkTryExcept
-
--- | @'try_' \@'TryFinally' :: 'NonEmpty' ('Raw' 'Line') -> 'NonEmpty' ('Raw' 'Line') -> 'Raw' 'Statement'@
-instance HasTry TryFinally (NonEmpty (Raw Line) -> Raw TryFinally) where
-  _Try = _TryFinally
-  try_ = mkTryFinally
+tryF_ :: NonEmpty (Raw Line) -> NonEmpty (Raw Line) -> Raw TryFinally
+tryF_ = mkTryFinally
 
 class AsExceptAs s where
   toExceptAs :: Raw s -> Raw ExceptAs
@@ -848,15 +843,64 @@ instance AsExceptAs Expr where
   toExceptAs e = ExceptAs () e Nothing
 
 class HasExcept s where
-  except_ :: NonEmpty (Raw Line) -> Raw s -> Raw TryExcept
-  exceptAs_ :: AsExceptAs e => Raw e -> NonEmpty (Raw Line) -> Raw s -> Raw TryExcept
+  except_ :: NonEmpty (Raw Line) -> s -> Raw TryExcept
+  -- | You can use 'exceptAs_' without a binder:
+  --
+  -- @'exceptAs_' :: 'Raw' 'Expr' -> 'NonEmpty' ('Raw' 'Line') -> 'Raw' s -> 'Raw' 'TryExcept'@
+  --
+  -- @
+  -- 'exceptAs_' ('var_' \"Exception\") body
+  -- @
+  --
+  -- or with a binder
+  --
+  -- @'exceptAs_' :: 'Raw' 'ExceptAs' -> 'NonEmpty' ('Raw' 'Line') -> 'Raw' s -> 'Raw' 'TryExcept'@
+  --
+  -- @
+  -- 'exceptAs_' ('var_' \"Exception\" \``as_`\` 'id_' "a") body
+  -- @
+  exceptAs_ :: AsExceptAs e => Raw e -> NonEmpty (Raw Line) -> s -> Raw TryExcept
 
-instance HasExcept TryExcept where
+-- |
+-- @
+-- 'tryE_' ['line_' 'pass_'] '&'
+--   'except_' ['line_' 'pass_']
+-- @
+--
+-- @
+-- 'tryE_' ['line_' 'pass_'] '&'
+--   'exceptAs_' ('var_' \"Exception\" \``as_`\` 'id_' "b") ['line_' 'pass_']
+-- @
+instance HasExcept (Raw Except -> Raw TryExcept) where
+  except_ body f = f $ mkExcept body
+  exceptAs_ ea body f = f $ mkExcept body & exceptExceptAs ?~ toExceptAs ea
+
+-- |
+-- @
+-- (someTryStatement :: 'Raw' 'TryExcept') '&'
+--   'except_' ['line_' 'pass_']
+-- @
+--
+-- @
+-- (someTryStatement :: 'Raw' 'TryExcept') '&'
+--   'exceptAs_' ('var_' \"Exception\" \``as_`\` 'id_' "b") ['line_' 'pass_']
+-- @
+instance HasExcept (Raw TryExcept) where
   except_ body = teExcepts %~ (<> pure (mkExcept body))
   exceptAs_ ea body =
     teExcepts %~ (<> pure (mkExcept body & exceptExceptAs ?~ toExceptAs ea))
 
-instance HasExcept TryFinally where
+-- |
+-- @
+-- (someTryStatement :: 'Raw' 'TryFinally') '&'
+--   'except_' ['line_' 'pass_']
+-- @
+--
+-- @
+-- (someTryStatement :: 'Raw' 'TryFinally') '&'
+--   'exceptAs_' ('var_' \"Exception\" \``as_`\` 'id_' "b") ['line_' 'pass_']
+-- @
+instance HasExcept (Raw TryFinally) where
   except_ body MkTryFinally{..} =
     MkTryExcept
     { _teAnn = _tfAnn

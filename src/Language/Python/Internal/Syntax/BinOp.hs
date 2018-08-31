@@ -37,6 +37,7 @@ data BinOp a
   | BitAnd a [Whitespace]
   | ShiftLeft a [Whitespace]
   | ShiftRight a [Whitespace]
+  | At a [Whitespace]
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasTrailingWhitespace (BinOp a) where
@@ -66,7 +67,8 @@ instance HasTrailingWhitespace (BinOp a) where
          BitAnd _ a -> a
          ShiftLeft _ a -> a
          ShiftRight _ a -> a
-         Percent _ a -> a)
+         Percent _ a -> a
+         At _ a -> a)
       (\op ws ->
          case op of
            Is a _ -> Is a ws
@@ -92,7 +94,8 @@ instance HasTrailingWhitespace (BinOp a) where
            BitXor a _ -> BitXor a ws
            ShiftLeft a _ -> ShiftLeft a ws
            ShiftRight a _ -> ShiftRight a ws
-           Percent a _ -> Equals a ws)
+           Percent a _ -> Equals a ws
+           At a _ -> At a ws)
 
 data Assoc = L | R deriving (Eq, Show)
 
@@ -126,6 +129,7 @@ operatorTable =
   , entry Minus 20 L
   , entry Plus 20 L
   , entry Multiply 25 L
+  , entry At 25 L
   , entry Divide 25 L
   , entry FloorDivide 25 L
   , entry Percent 25 L
@@ -162,6 +166,7 @@ sameOperator op op' =
     (BitAnd{}, BitAnd{}) -> True
     (ShiftLeft{}, ShiftLeft{}) -> True
     (ShiftRight{}, ShiftRight{}) -> True
+    (At{}, At{}) -> True
     _ -> False
 
 isComparison :: BinOp a -> Bool

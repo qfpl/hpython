@@ -573,6 +573,7 @@ orExpr ws =
 
     termOp =
       (\(tk, ws) -> Multiply (pyTokenAnn tk) ws) <$> token ws (TkStar ()) <!>
+      (\(tk, ws) -> At (pyTokenAnn tk) ws) <$> token ws (TkAt ()) <!>
       (\(tk, ws) -> Divide (pyTokenAnn tk) ws) <$> token ws (TkSlash ()) <!>
       (\(tk, ws) -> FloorDivide (pyTokenAnn tk) ws) <$> token ws (TkDoubleSlash ()) <!>
       (\(tk, ws) -> Percent (pyTokenAnn tk) ws) <$> token ws (TkPercent ())

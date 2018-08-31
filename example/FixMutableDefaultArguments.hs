@@ -24,7 +24,7 @@ fixMutableDefaultArguments input = do
 
     conditionalAssignments =
       (\(pname, value) ->
-         line_ $ if_ (var_ pname `is_` none_) [ line_ $ var_ pname .= value ]) <$>
+         line_ $ if_ (var_ pname `is_` none_) [ line_ (var_ pname .= value) ]) <$>
       zip
         (targetParams ^.. folded.kpName.identValue)
         (paramsList ^.. folded._KeywordParam.kpExpr.filtered isMutable)

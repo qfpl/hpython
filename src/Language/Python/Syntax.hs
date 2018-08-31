@@ -66,7 +66,21 @@ module Language.Python.Syntax
   , fdReturnType
   , fdBody
     -- ** Assignment
+  , chainEq
   , (.=)
+  , (.+=)
+  , (.-=)
+  , (.*=)
+  , (.@=)
+  , (./=)
+  , (.%=)
+  , (.&=)
+  , (.|=)
+  , (.^=)
+  , (.<<=)
+  , (.>>=)
+  , (.**=)
+  , (.//=)
     -- ** Exceptions
   , tryE_
   , tryF_
@@ -175,6 +189,16 @@ module Language.Python.Syntax
   , (.-)
   , (.+)
   , (.==)
+  , (.|)
+  , (.^)
+  , (.&)
+  , (.<<)
+  , (.>>)
+  , (.@)
+  , (./)
+  , (.//)
+  , (.%)
+  , (.**)
   )
 where
 
@@ -457,28 +481,31 @@ is_ :: Raw Expr -> Raw Expr -> Raw Expr
 is_ a = BinOp () (a & trailingWhitespace .~ [Space]) (Is () [Space])
 infixl 1 `is_`
 
+mkBinOp :: ([Whitespace] -> BinOp ()) -> Raw Expr -> Raw Expr -> Raw Expr
+mkBinOp bop a = BinOp () (a & trailingWhitespace .~ [Space]) (bop [Space])
+
 (.==) :: Raw Expr -> Raw Expr -> Raw Expr
-(.==) a = BinOp () (a & trailingWhitespace .~ [Space]) (Equals () [Space])
+(.==) = mkBinOp $ Equals ()
 infixl 1 .==
 
 (.|) :: Raw Expr -> Raw Expr -> Raw Expr
-(.|) = undefined
+(.|) = mkBinOp $ BitOr ()
 infixl 2 .|
 
 (.^) :: Raw Expr -> Raw Expr -> Raw Expr
-(.^) = undefined
+(.^) = mkBinOp $ BitXor ()
 infixl 3 .^
 
 (.&) :: Raw Expr -> Raw Expr -> Raw Expr 
-(.&) = undefined
+(.&) = mkBinOp $ BitAnd ()
 infixl 4 .&
 
 (.<<) :: Raw Expr -> Raw Expr -> Raw Expr 
-(.<<) = undefined
+(.<<) = mkBinOp $ ShiftLeft ()
 infixl 5 .<<
 
 (.>>) :: Raw Expr -> Raw Expr -> Raw Expr 
-(.>>) = undefined
+(.>>) = mkBinOp $ ShiftRight ()
 infixl 5 .>>
 
 (.+) :: Raw Expr -> Raw Expr -> Raw Expr 
@@ -494,23 +521,23 @@ infixl 6 .-
 infixl 7 .*
 
 (.@) :: Raw Expr -> Raw Expr -> Raw Expr
-(.@) = undefined
+(.@) = mkBinOp $ At ()
 infixl 7 .@
 
 (./) :: Raw Expr -> Raw Expr -> Raw Expr
-(./) a = BinOp () (a & trailingWhitespace .~ [Space]) (Divide () [Space])
+(./) = mkBinOp $ Divide ()
 infixl 7 ./
 
 (.//) :: Raw Expr -> Raw Expr -> Raw Expr
-(.//) a = BinOp () (a & trailingWhitespace .~ [Space]) (FloorDivide () [Space])
+(.//) = mkBinOp $ FloorDivide ()
 infixl 7 .//
 
 (.%) :: Raw Expr -> Raw Expr -> Raw Expr
-(.%) a = BinOp () (a & trailingWhitespace .~ [Space]) (Percent () [Space])
+(.%) = mkBinOp $ Percent ()
 infixl 7 .%
 
 (.**) :: Raw Expr -> Raw Expr -> Raw Expr
-(.**) a = BinOp () (a & trailingWhitespace .~ [Space]) (Exp () [Space])
+(.**) = mkBinOp $ Exp ()
 infixr 8 .**
 
 (/>) :: Raw Expr -> Raw Ident -> Raw Expr
@@ -757,6 +784,32 @@ longStr_ s =
   String () . pure $
   StringLiteral () Nothing DoubleQuote LongString (Char_lit <$> s) []
 
+mkAugAssign :: ([Whitespace] -> AugAssign ()) -> Raw Expr -> Raw Expr -> Raw Statement
+mkAugAssign as a b =
+  SmallStatements
+    (Indents [] ())
+    (AugAssign () (a & trailingWhitespace .~ [Space]) (as [Space]) b)
+    []
+    Nothing
+    (Right (LF Nothing))
+
+-- | Chained assignment
+--
+-- >>> chainEq (var_ "a") []
+-- a
+--
+-- >>> chainEq (var_ "a") [var_ "b", var_ "c"]
+-- a = b = c
+chainEq :: Raw Expr -> [Raw Expr] -> Raw Statement
+chainEq t [] = expr_ t
+chainEq t (a:as) =
+  SmallStatements
+    (Indents [] ())
+    (Assign () t $ (,) [Space] <$> (a :| as))
+    []
+    Nothing
+    (Right $ LF Nothing)
+
 (.=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.=) a b =
   SmallStatements
@@ -764,7 +817,60 @@ longStr_ s =
     (Assign () (a & trailingWhitespace .~ [Space]) $ pure ([Space], b))
     []
     Nothing
-    (Right (LF Nothing))
+    (Right $ LF Nothing)
+infix 0 .=
+
+(.+=) :: Raw Expr -> Raw Expr -> Raw Statement
+(.+=) = mkAugAssign (PlusEq ())
+infix 0 .+=
+
+(.-=) :: Raw Expr -> Raw Expr -> Raw Statement
+(.-=) = mkAugAssign (MinusEq ())
+infix 0 .-=
+
+(.*=) :: Raw Expr -> Raw Expr -> Raw Statement
+(.*=) = mkAugAssign (StarEq ())
+infix 0 .*=
+
+(.@=) :: Raw Expr -> Raw Expr -> Raw Statement
+(.@=) = mkAugAssign (AtEq ())
+infix 0 .@=
+
+(./=) :: Raw Expr -> Raw Expr -> Raw Statement
+(./=) = mkAugAssign (SlashEq ())
+infix 0 ./=
+
+(.%=) :: Raw Expr -> Raw Expr -> Raw Statement
+(.%=) = mkAugAssign (PercentEq ())
+infix 0 .%=
+
+(.&=) :: Raw Expr -> Raw Expr -> Raw Statement
+(.&=) = mkAugAssign (AmpersandEq ())
+infix 0 .&=
+
+(.|=) :: Raw Expr -> Raw Expr -> Raw Statement
+(.|=) = mkAugAssign (PipeEq ())
+infix 0 .|=
+
+(.^=) :: Raw Expr -> Raw Expr -> Raw Statement
+(.^=) = mkAugAssign (CaretEq ())
+infix 0 .^=
+
+(.<<=) :: Raw Expr -> Raw Expr -> Raw Statement
+(.<<=) = mkAugAssign (ShiftLeftEq ())
+infix 0 .<<=
+
+(.>>=) :: Raw Expr -> Raw Expr -> Raw Statement
+(.>>=) = mkAugAssign (ShiftRightEq ())
+infix 0 .>>=
+
+(.**=) :: Raw Expr -> Raw Expr -> Raw Statement
+(.**=) = mkAugAssign (DoubleStarEq ())
+infix 0 .**=
+
+(.//=) :: Raw Expr -> Raw Expr -> Raw Statement
+(.//=) = mkAugAssign (DoubleSlashEq ())
+infix 0 .//=
 
 mkFor :: Raw Expr -> Raw Expr -> [Raw Line] -> Raw For
 mkFor binder collection body =
@@ -872,7 +978,7 @@ class HasExcept s where
   -- 'exceptAs_' ('var_' \"Exception\") body
   -- @
   --
-  -- or with a binder
+  -- or with a binder:
   --
   -- @'exceptAs_' :: 'Raw' 'ExceptAs' -> ['Raw' 'Line'] -> 'Raw' s -> 'Raw' 'TryExcept'@
   --

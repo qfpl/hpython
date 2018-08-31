@@ -54,7 +54,7 @@ test_1 =
     let
       expr =
         def_ "test" [p_ "a", p_ "b"]
-          [ line_ $ if_ true_ [ line_ $ var_ "c" .= 2]
+          [ line_ $ if_ true_ [ line_ (var_ "c" .= 2) ]
           , line_ . return_ $ var_ "a" .+ var_ "b" .+ var_ "c"
           ]
     res <- fullyValidate expr
@@ -66,8 +66,8 @@ test_2 =
     let
       expr =
         def_ "test" [p_ "a", p_ "b"]
-          [ line_ $ var_ "c" .= 0
-          , line_ $ if_ true_ [ line_ $ var_ "c" .= 2]
+          [ line_ (var_ "c" .= 0)
+          , line_ $ if_ true_ [ line_ (var_ "c" .= 2) ]
           , line_ . return_ $ var_ "a" .+ var_ "b" .+ var_ "c"
           ]
     res <- fullyValidate expr
@@ -116,7 +116,7 @@ test_6 =
       expr =
         def_ "test" []
           [ line_ $
-              if_ true_ [ line_ $ var_ "x" .= 2 ] &
+              if_ true_ [ line_ (var_ "x" .= 2) ] &
               else_ [ line_ pass_ ]
           , line_ $ var_ "x"
           ]
@@ -132,7 +132,7 @@ test_7 =
         def_ "test" []
           [ line_ $
               if_ true_ [ line_ pass_ ] &
-              else_ [ line_ $ var_ "x" .= 3 ]
+              else_ [ line_ (var_ "x" .= 3) ]
           , line_ $ var_ "x"
           ]
     res <- fullyValidate expr
@@ -147,8 +147,8 @@ test_8 =
         def_ "test" []
           [ line_ $
               if_ true_ [ line_ pass_ ] &
-              else_ [ line_ $ var_ "x" .= 3 ]
-          , line_ $ var_ "x" .= 1
+              else_ [ line_ (var_ "x" .= 3) ]
+          , line_ (var_ "x" .= 1)
           , line_ $ var_ "x"
           ]
     res <- fullyValidate expr
@@ -186,7 +186,7 @@ test_11 =
     let
       expr =
         def_ "test" []
-          [ line_ $ "x" .= 2
+          [ line_ ("x" .= 2)
           , line_ $ for_ "x" (list_ [1]) [ line_ pass_ ]
           ]
     res <- fullyValidate expr

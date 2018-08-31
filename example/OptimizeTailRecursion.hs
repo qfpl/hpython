@@ -39,8 +39,8 @@ optimizeTailRecursion st = do
       _Fundef #
         (function &
          setBody (replicate 4 Space)
-           (zipWith (\a b -> line_ $ var_ (a <> "__tr") .= var_ b) paramNames paramNames <>
-            [ line_ $ "__res__tr" .= none_
+           (zipWith (\a b -> line_ (var_ (a <> "__tr") .= var_ b)) paramNames paramNames <>
+            [ line_ ("__res__tr" .= none_)
             , line_ . while_ true_ .
               transformOn (traverse._Exprs) (renameIn paramNames "__tr") $
                 bodyInit <>
@@ -126,15 +126,19 @@ optimizeTailRecursion st = do
                         | Just name' <- call ^? callFunction._Ident.identValue
                         , name' == name ->
                             newSts <>
-                            fmap (\a -> line_ $ var_ (a <> "__tr__old") .= (var_ $ a <> "__tr")) params <>
+                            fmap
+                              (\a -> line_ (var_ (a <> "__tr__old") .= (var_ $ a <> "__tr")))
+                              params <>
                             zipWith
-                              (\a b -> line_ $ var_ (a <> "__tr") .= b)
+                              (\a b -> line_ (var_ (a <> "__tr") .= b))
                               params
                               (transformOn
                                 traverse
                                 (renameIn params "__tr__old")
                                 (call ^.. callArguments.folded.folded.argExpr))
-                      _ -> newSts <> maybe [] (\e' -> [ line_ $ "__res__tr" .= e' ]) e <> [ line_ break_ ]
+                      _ ->
+                        newSts <>
+                        maybe [] (\e' -> [ line_ ("__res__tr" .= e') ]) e <> [ line_ break_ ]
                   Expr _ e
                     | isTailCall name e -> newSts <> [line_ pass_]
                   _ -> [line_ st]

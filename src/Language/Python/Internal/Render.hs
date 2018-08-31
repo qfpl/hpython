@@ -1275,6 +1275,7 @@ renderBinOp (NotIn _ ws1 ws2) =
 renderBinOp (Plus _ ws) = TkPlus () `cons` foldMap renderWhitespace ws
 renderBinOp (Minus _ ws) = TkMinus () `cons` foldMap renderWhitespace ws
 renderBinOp (Multiply _ ws) = TkStar () `cons` foldMap renderWhitespace ws
+renderBinOp (At _ ws) = TkAt () `cons` foldMap renderWhitespace ws
 renderBinOp (Divide _ ws) = TkSlash () `cons` foldMap renderWhitespace ws
 renderBinOp (FloorDivide _ ws) =
   TkDoubleSlash () `cons` foldMap renderWhitespace ws

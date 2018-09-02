@@ -81,6 +81,11 @@ module Language.Python.Syntax
   , (.>>=)
   , (.**=)
   , (.//=)
+  , (.>)
+  , (.>=)
+  , (.<)
+  , (.<=)
+  , (.!=)
     -- ** Exceptions
   , tryE_
   , tryF_
@@ -185,6 +190,9 @@ module Language.Python.Syntax
   , (/>)
     -- ** Binary operators
   , is_
+  , isNot_
+  , in_
+  , notIn_
   , (.*)
   , (.-)
   , (.+)
@@ -493,16 +501,48 @@ expr_ e = SmallStatements (Indents [] ()) (Expr () e) [] Nothing (Right (LF Noth
 list_ :: [Raw Expr] -> Raw Expr
 list_ es = List () [] (listToCommaSep1' $ ListItem () <$> es) []
 
-is_ :: Raw Expr -> Raw Expr -> Raw Expr
-is_ a = BinOp () (a & trailingWhitespace .~ [Space]) (Is () [Space])
-infixl 1 `is_`
-
 mkBinOp :: ([Whitespace] -> BinOp ()) -> Raw Expr -> Raw Expr -> Raw Expr
 mkBinOp bop a = BinOp () (a & trailingWhitespace .~ [Space]) (bop [Space])
+
+is_ :: Raw Expr -> Raw Expr -> Raw Expr
+is_ = mkBinOp $ Is ()
+infixl 1 `is_`
+
+in_ :: Raw Expr -> Raw Expr -> Raw Expr
+in_ = mkBinOp $ In ()
+infixl 1 `in_`
+
+notIn_ :: Raw Expr -> Raw Expr -> Raw Expr
+notIn_ = mkBinOp $ NotIn () [Space]
+infixl 1 `notIn_`
+
+isNot_ :: Raw Expr -> Raw Expr -> Raw Expr
+isNot_ = mkBinOp $ IsNot () [Space]
+infixl 1 `isNot_`
 
 (.==) :: Raw Expr -> Raw Expr -> Raw Expr
 (.==) = mkBinOp $ Equals ()
 infixl 1 .==
+
+(.<) :: Raw Expr -> Raw Expr -> Raw Expr
+(.<) = mkBinOp $ Lt ()
+infixl 1 .<
+
+(.<=) :: Raw Expr -> Raw Expr -> Raw Expr
+(.<=) = mkBinOp $ LtEquals ()
+infixl 1 .<=
+
+(.>) :: Raw Expr -> Raw Expr -> Raw Expr
+(.>) = mkBinOp $ Gt ()
+infixl 1 .>
+
+(.>=) :: Raw Expr -> Raw Expr -> Raw Expr
+(.>=) = mkBinOp $ GtEquals ()
+infixl 1 .>=
+
+(.!=) :: Raw Expr -> Raw Expr -> Raw Expr
+(.!=) = mkBinOp $ NotEquals ()
+infixl 1 .!=
 
 (.|) :: Raw Expr -> Raw Expr -> Raw Expr
 (.|) = mkBinOp $ BitOr ()

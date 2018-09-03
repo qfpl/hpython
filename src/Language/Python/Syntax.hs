@@ -399,7 +399,7 @@ modifyBody ws f fun = setBody ws (f $ getBody fun) fun
 -- @
 -- p_ :: 'Raw' 'Ident' -> 'Raw' 'Param'
 -- @
-class HasPositional p v | p -> v where
+class HasPositional p v | p -> v, v -> p where
   p_ :: v -> p
 
 -- | Keyword parameters/arguments
@@ -633,7 +633,7 @@ infixl 7 .%
 infixr 8 .**
 
 (/>) :: Raw Expr -> Raw Ident -> Raw Expr
-(/>) a b = Deref () a [] b
+(/>) a = Deref () a []
 infixl 9 />
 
 neg :: Raw Expr -> Raw Expr
@@ -694,7 +694,7 @@ instance HasBody If where
   getBody = mkGetBody "if" _ifBody _ifIndents
 
 if_ :: Raw Expr -> [Raw Line] -> Raw If
-if_ cond body = mkIf cond body
+if_ = mkIf
 
 var_ :: String -> Raw Expr
 var_ s = Ident $ MkIdent () s []
@@ -757,8 +757,8 @@ mkSetElse
 mkSetElse indentLevel elseField ws new code =
   code &
   elseField .~
-    (fmap (elseIndents .~ indentLevel code) $
-     over
+    fmap (elseIndents .~ indentLevel code)
+    (over
        (traverse._Indents.indentsValue)
        (indentLevel code ^. indentsValue <>)
        new)

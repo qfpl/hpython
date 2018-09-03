@@ -134,3 +134,15 @@ data TryFinally v a
   , _tfFinally :: Finally v a
   } deriving (Eq, Show)
 makeLenses ''TryFinally
+
+data ClassDef v a
+  = MkClassDef
+  { _cdAnn :: a
+  , _cdDecorators :: [Decorator v a]
+  , _cdIndents :: Indents a
+  , _cdClass :: NonEmpty Whitespace
+  , _cdName :: Ident v a
+  , _cdParameters :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace])
+  , _cdBody :: Suite v a
+  }
+makeLenses ''ClassDef

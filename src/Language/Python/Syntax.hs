@@ -21,6 +21,8 @@ module Language.Python.Syntax
     -- * Parameters and arguments
     -- ** Parameters
   , HasParameters(..)
+    -- ** Arguments
+  , HasArguments(..)
     -- ** Positional
   , HasPositional(..)
     -- ** Keyword
@@ -65,6 +67,19 @@ module Language.Python.Syntax
   , fdRightParenSpaces
   , fdReturnType
   , fdBody
+    -- ** Class definitions
+  , class_
+  , ClassDef(..)
+  , _ClassDef
+  , mkClassDef
+    -- *** Lenses
+  , cdAnn
+  , cdDecorators
+  , cdIndents
+  , cdClass
+  , cdName
+  , cdParameters
+  , cdBody
     -- ** Assignment
   , chainEq
   , (.=)
@@ -212,6 +227,7 @@ where
 
 import Data.Function ((&))
 import Data.String (fromString)
+import Control.Lens.Fold ((^..), folded)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
 import Control.Lens.Lens (Lens')
@@ -219,6 +235,7 @@ import Control.Lens.Prism (_Right)
 import Control.Lens.Review ((#))
 import Control.Lens.Setter ((.~), (<>~), (?~), (%~), Setter', over)
 import Control.Lens.Traversal (traverseOf)
+import Control.Lens.Tuple (_2)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe)
 import Data.Semigroup ((<>))
@@ -387,6 +404,10 @@ instance HasKeyword (Raw Arg) where; k_ a = KeywordArg () a []
 class HasParameters s where
   setParameters :: [Raw Param] -> Raw s -> Raw s
   parameters :: Lens' (Raw s) (CommaSep (Raw Param))
+
+class HasArguments s where
+  setArguments :: [Raw Arg] -> Raw s -> Raw s
+  getArguments :: Raw s -> [Raw Arg]
 
 class HasDecorators s where
   setDecorators :: [Raw Expr] -> Raw s -> Raw s
@@ -1051,3 +1072,53 @@ class As s t u | s t -> u, u -> s t where
 
 instance As Expr Ident ExceptAs where
   as_ e name = ExceptAs () e $ Just ([Space], name)
+
+class_ :: Raw Ident -> [Raw Arg] -> [Raw Line] -> Raw Statement
+class_ name args body =
+  _ClassDef #
+  (mkClassDef name body) {
+    _cdParameters =
+      case args of
+        [] -> Nothing
+        a:as -> Just ([], Just $ (a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1', [])
+  }
+
+-- | Create a minimal 'ClassDef'
+mkClassDef :: Raw Ident -> [Raw Line] -> Raw ClassDef
+mkClassDef name body =
+  MkClassDef
+  { _cdAnn = ()
+  , _cdDecorators = []
+  , _cdIndents = Indents [] ()
+  , _cdClass = [Space]
+  , _cdName = name
+  , _cdParameters = Nothing
+  , _cdBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  }
+
+instance HasBody ClassDef where
+  body = cdBody
+  setBody = mkSetBody cdBody _cdIndents
+  getBody = mkGetBody "class" _cdBody _cdIndents
+
+instance HasDecorators ClassDef where
+  decorators = cdDecorators
+
+  setDecorators new code =
+    code
+    { _cdDecorators = (\e -> Decorator () (_cdIndents code) [] e $ LF Nothing) <$> new
+    }
+
+  getDecorators code =
+    (\(Decorator () _ _ e _) -> e) <$> _cdDecorators code
+
+instance HasArguments ClassDef where
+  setArguments args code =
+    code
+    { _cdParameters =
+        case args of
+          [] -> Nothing
+          a:as -> Just ([], Just $ (a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1', [])
+    }
+
+  getArguments code = _cdParameters code ^.. folded._2.folded.folded

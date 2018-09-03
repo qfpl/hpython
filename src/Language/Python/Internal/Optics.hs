@@ -126,6 +126,14 @@ _Call =
         Call a b c d e -> Right $ MkCall a b c d e
         a -> Left $ a ^. unvalidated)
 
+_ClassDef :: Prism (Statement v a) (Statement '[] a) (ClassDef v a) (ClassDef '[] a)
+_ClassDef =
+  prism
+    (\(MkClassDef a b c d e f g) -> CompoundStatement $ ClassDef a b c d e f g)
+    (\case
+        CompoundStatement (ClassDef a b c d e f g) -> Right $ MkClassDef a b c d e f g
+        a -> Left $ a ^. unvalidated)
+
 _Ident :: Prism (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
 _Ident =
   prism
@@ -224,6 +232,13 @@ instance HasIndents Decorator where
   _Indents fun (Decorator a b c d e) =
     (\b' -> Decorator a b' c d e) <$>
     fun b
+
+instance HasIndents ClassDef where
+  _Indents fun (MkClassDef a b c d e f g) =
+    (\b' c' -> MkClassDef a b' c' d e f) <$>
+    (traverse._Indents) fun b <*>
+    fun c <*>
+    _Indents fun g
 
 instance HasIndents CompoundStatement where
   _Indents fun s =

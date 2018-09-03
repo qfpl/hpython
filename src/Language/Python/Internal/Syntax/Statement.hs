@@ -313,7 +313,7 @@ data CompoundStatement (v :: [*]) a
   , _csIndents :: Indents a
   , _unsafeCsClassDefClass :: NonEmpty Whitespace -- ^ @\'class\' \<spaces\>@
   , _unsafeCsClassDefName :: Ident v a -- ^ @\<ident\>@
-  , _unsafeCsClassDefParameters :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace]) -- ^ @[\'(\' \<spaces\> [\<args\>] \')\' \<spaces\>]@
+  , _unsafeCsClassDefArguments :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace]) -- ^ @[\'(\' \<spaces\> [\<args\>] \')\' \<spaces\>]@
   , _unsafeCsClassDefBody :: Suite v a -- ^ @\<suite\>@
   }
   | With

@@ -11,6 +11,7 @@ passing @['line_' 'pass_']@
 {-# language LambdaCase #-}
 {-# language RankNTypes #-}
 {-# language RecordWildCards #-}
+{-# language KindSignatures #-}
 module Language.Python.Syntax
   ( (&)
   , Raw
@@ -18,6 +19,10 @@ module Language.Python.Syntax
   , Expr
     -- * Identifiers
   , id_
+    -- * Starred values
+  , HasStar(..)
+    -- * Double-starred values
+  , HasDoubleStar(..)
     -- * Parameters and arguments
     -- ** Parameters
   , HasParameters(..)
@@ -78,7 +83,7 @@ module Language.Python.Syntax
   , cdIndents
   , cdClass
   , cdName
-  , cdParameters
+  , cdArguments
   , cdBody
     -- ** Assignment
   , chainEq
@@ -199,6 +204,10 @@ module Language.Python.Syntax
     -- * Expressions
   , expr_
   , var_
+  , await_
+    -- ** Tuples
+  , tuple_
+  , AsTupleItem(..)
     -- ** Function calls
   , call_
   , Call(..)
@@ -216,8 +225,14 @@ module Language.Python.Syntax
   , str_
   , true_
   , false_
+  , ellipsis_
     -- ** Dereferencing
   , (/>)
+    -- ** Unary operators
+  , not_
+  , neg_
+  , pos_
+  , compl_
     -- ** Binary operators
   , is_
   , isNot_
@@ -400,21 +415,30 @@ modifyBody ws f fun = setBody ws (f $ getBody fun) fun
 -- p_ :: 'Raw' 'Ident' -> 'Raw' 'Param'
 -- @
 class HasPositional p v | p -> v, v -> p where
-  p_ :: v -> p
+  p_ :: Raw v -> Raw p
 
 -- | Keyword parameters/arguments
 class HasKeyword p where
-  k_ :: Raw Ident -> Raw Expr -> p
+  k_ :: Raw Ident -> Raw Expr -> Raw p
 
-instance HasPositional (Raw Param) (Raw Ident) where
+class HasStar v p | p -> v where
+  s_ :: Raw v -> Raw p
+
+instance HasStar Expr TupleItem where
+  s_ = TupleUnpack () [] []
+
+class HasDoubleStar v p | p -> v where
+  ss_ :: Raw v -> Raw p
+
+instance HasPositional Param Ident where
   p_ i = PositionalParam () i Nothing
 
-instance HasKeyword (Raw Param) where
+instance HasKeyword Param where
   k_ a = KeywordParam () a Nothing []
 
-instance HasPositional (Raw Arg) (Raw Expr) where; p_ = PositionalArg ()
+instance HasPositional Arg Expr where; p_ = PositionalArg ()
 
-instance HasKeyword (Raw Arg) where; k_ a = KeywordArg () a []
+instance HasKeyword Arg where; k_ a = KeywordArg () a []
 
 class HasParameters s where
   setParameters :: [Raw Param] -> Raw s -> Raw s
@@ -517,6 +541,17 @@ mkCall e =
   , _callRightParen = []
   }
 
+instance HasArguments Call where
+  setArguments args code =
+    code
+    { _callArguments =
+        case args of
+          [] -> Nothing
+          a:as -> Just $ (a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1'
+    }
+
+  getArguments code = _callArguments code ^.. folded.folded
+
 call_ :: Raw Expr -> [Raw Arg] -> Raw Expr
 call_ expr args =
   _Call #
@@ -555,6 +590,9 @@ infixl 1 `notIn_`
 isNot_ :: Raw Expr -> Raw Expr -> Raw Expr
 isNot_ = mkBinOp $ IsNot () [Space]
 infixl 1 `isNot_`
+
+not_ :: Raw Expr -> Raw Expr
+not_ = Not () [Space]
 
 (.==) :: Raw Expr -> Raw Expr -> Raw Expr
 (.==) = mkBinOp $ Equals ()
@@ -636,8 +674,14 @@ infixr 8 .**
 (/>) a = Deref () a []
 infixl 9 />
 
-neg :: Raw Expr -> Raw Expr
-neg = negate
+neg_ :: Raw Expr -> Raw Expr
+neg_ = negate
+
+pos_ :: Raw Expr -> Raw Expr
+pos_ = UnOp () (Positive () [])
+
+compl_ :: Raw Expr -> Raw Expr
+compl_ = UnOp () (Complement () [])
 
 toBlock :: [Raw Line] -> Block '[] ()
 toBlock =
@@ -1092,7 +1136,7 @@ class_ :: Raw Ident -> [Raw Arg] -> [Raw Line] -> Raw Statement
 class_ name args body =
   _ClassDef #
   (mkClassDef name body) {
-    _cdParameters =
+    _cdArguments =
       case args of
         [] -> Nothing
         a:as -> Just ([], Just $ (a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1', [])
@@ -1107,7 +1151,7 @@ mkClassDef name body =
   , _cdIndents = Indents [] ()
   , _cdClass = [Space]
   , _cdName = name
-  , _cdParameters = Nothing
+  , _cdArguments = Nothing
   , _cdBody = SuiteMany () [] (LF Nothing) $ toBlock body
   }
 
@@ -1130,13 +1174,13 @@ instance HasDecorators ClassDef where
 instance HasArguments ClassDef where
   setArguments args code =
     code
-    { _cdParameters =
+    { _cdArguments =
         case args of
           [] -> Nothing
           a:as -> Just ([], Just $ (a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1', [])
     }
 
-  getArguments code = _cdParameters code ^.. folded._2.folded.folded
+  getArguments code = _cdArguments code ^.. folded._2.folded.folded
 
 -- | Create a minimal valid 'With'
 mkWith :: NonEmpty (Raw WithItem) -> [Raw Line] -> Raw With
@@ -1187,3 +1231,42 @@ instance HasBody With where
 
 instance HasAsync With where
   async_ = withAsync ?~ pure Space
+
+ellipsis_ :: Raw Expr
+ellipsis_ = Ellipsis () []
+
+class AsTupleItem e where
+  ti_ :: Raw e -> Raw TupleItem
+
+instance AsTupleItem Expr where
+  ti_ = TupleItem ()
+
+instance AsTupleItem TupleItem where
+  ti_ = id
+
+-- |
+-- >>> tuple_ []
+-- ()
+--
+-- >>> tuple_ [var_ "a"]
+-- a,
+--
+-- >>> tuple_ [s_ $ var_ "a"]
+-- (*a),
+--
+-- >>> tuple_ [var_ "a", var_ "b"]
+-- a, b
+--
+-- >>> tuple_ [ti_ (var_ "a"), s_ (var_ "b")]
+-- a, *b
+tuple_ :: AsTupleItem e => [Raw e] -> Raw Expr
+tuple_ [] = Unit () [] []
+tuple_ (a:as) =
+  case ti_ <$> as of
+    [] -> Tuple () (ti_ a) [] Nothing
+    b:bs ->
+      Tuple () (ti_ a) [Space] . Just $
+      (b, zip (repeat [Space]) bs, Nothing) ^. _CommaSep1'
+
+await_ :: Raw Expr -> Raw Expr
+await_ = Await () [Space]

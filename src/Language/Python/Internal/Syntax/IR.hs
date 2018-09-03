@@ -108,7 +108,7 @@ data CompoundStatement a
   , _csIndents :: Indents a
   , _unsafeCsClassDefClass :: NonEmpty Whitespace -- ^ @\'class\' \<spaces\>@
   , _unsafeCsClassDefName :: Ident '[] a -- ^ @\<ident\>@
-  , _unsafeCsClassDefParameters :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg a)), [Whitespace]) -- ^ @[\'(\' \<spaces\> [\<args\>] \')\' \<spaces\>]@
+  , _unsafeCsClassDefArguments :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg a)), [Whitespace]) -- ^ @[\'(\' \<spaces\> [\<args\>] \')\' \<spaces\>]@
   , _unsafeCsClassDefBody :: Suite a -- ^ @\<suite\>@
   }
   | With

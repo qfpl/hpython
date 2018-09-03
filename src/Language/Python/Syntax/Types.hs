@@ -142,7 +142,7 @@ data ClassDef v a
   , _cdIndents :: Indents a
   , _cdClass :: NonEmpty Whitespace
   , _cdName :: Ident v a
-  , _cdParameters :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace])
+  , _cdArguments :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace])
   , _cdBody :: Suite v a
   }
 makeLenses ''ClassDef

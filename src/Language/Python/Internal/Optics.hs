@@ -134,6 +134,14 @@ _ClassDef =
         CompoundStatement (ClassDef a b c d e f g) -> Right $ MkClassDef a b c d e f g
         a -> Left $ a ^. unvalidated)
 
+_With :: Prism (Statement v a) (Statement '[] a) (With v a) (With '[] a)
+_With =
+  prism
+    (\(MkWith a b c d e f) -> CompoundStatement $ With a b c d e f)
+    (\case
+        CompoundStatement (With a b c d e f) -> Right $ MkWith a b c d e f
+        a -> Left $ a ^. unvalidated)
+
 _Ident :: Prism (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
 _Ident =
   prism
@@ -239,6 +247,12 @@ instance HasIndents ClassDef where
     (traverse._Indents) fun b <*>
     fun c <*>
     _Indents fun g
+
+instance HasIndents With where
+  _Indents fun (MkWith a b c d e f) =
+    (\b' -> MkWith a b' c d e) <$>
+    fun b <*>
+    _Indents fun f
 
 instance HasIndents CompoundStatement where
   _Indents fun s =

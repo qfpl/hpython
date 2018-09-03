@@ -134,6 +134,21 @@ module Language.Python.Syntax
   , finallyIndents
   , finallyFinally
   , finallyBody
+    -- ** With statements
+  , with_
+  , withItem_
+  , With(..)
+  , _With
+  , mkWith
+  , AsWithItem(..)
+  , WithItem(..)
+    -- *** Lenses
+  , withAnn
+  , withIndents
+  , withAsync
+  , withWith
+  , withItems
+  , withBody
     -- ** Flow control
     -- *** 'Else' clauses
   , else_
@@ -1122,3 +1137,53 @@ instance HasArguments ClassDef where
     }
 
   getArguments code = _cdParameters code ^.. folded._2.folded.folded
+
+-- | Create a minimal valid 'With'
+mkWith :: NonEmpty (Raw WithItem) -> [Raw Line] -> Raw With
+mkWith items body =
+  MkWith
+  { _withAnn = ()
+  , _withIndents = Indents [] ()
+  , _withAsync = Nothing
+  , _WithWith = [Space]
+  , _withItems = listToCommaSep1 items
+  , _withBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  }
+
+-- |
+--
+-- @
+-- with_ :: 'NonEmpty' ('Raw' 'Expr') -> ['Raw' 'Line'] -> 'Raw' 'Statement'
+-- with_ :: 'NonEmpty' ('Raw' 'WithItem') -> ['Raw' 'Line'] -> 'Raw' 'Statement'
+-- @
+--
+-- @
+-- 'with_' [e] body
+-- 'with_' [e \``as_`\` 'id_' "name"] body
+-- 'with_' ['withItem_' e 'Nothing'] body
+-- @
+with_ :: AsWithItem e => NonEmpty (Raw e) -> [Raw Line] -> Raw Statement
+with_ items body = _With # mkWith (toWithItem <$> items) body
+
+withItem_ :: Raw Expr -> Maybe (Raw Expr) -> Raw WithItem
+withItem_ a b = WithItem () a ((,) [Space] <$> b)
+
+instance As Expr Expr WithItem where
+  as_ a b = WithItem () a $ Just ([Space], b)
+
+class AsWithItem s where
+  toWithItem :: Raw s -> Raw WithItem
+
+instance AsWithItem Expr where
+  toWithItem e = WithItem () e Nothing
+
+instance AsWithItem WithItem where
+  toWithItem = id
+
+instance HasBody With where
+  body = withBody
+  setBody = mkSetBody withBody _withIndents
+  getBody = mkGetBody "with" _withBody _withIndents
+
+instance HasAsync With where
+  async_ = withAsync ?~ pure Space

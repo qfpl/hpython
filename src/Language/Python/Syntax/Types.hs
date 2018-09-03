@@ -146,3 +146,14 @@ data ClassDef v a
   , _cdBody :: Suite v a
   }
 makeLenses ''ClassDef
+
+data With v a
+  = MkWith
+  { _withAnn :: a
+  , _withIndents :: Indents a
+  , _withAsync :: Maybe (NonEmpty Whitespace)
+  , _WithWith :: [Whitespace]
+  , _withItems :: CommaSep1 (WithItem v a)
+  , _withBody :: Suite v a
+  }
+makeLenses ''With

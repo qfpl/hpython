@@ -11,6 +11,7 @@ passing @['line_' 'pass_']@
 {-# language LambdaCase #-}
 {-# language RankNTypes #-}
 {-# language RecordWildCards #-}
+{-# language TypeFamilies #-}
 {-# language KindSignatures #-}
 module Language.Python.Syntax
   ( (&)
@@ -20,13 +21,20 @@ module Language.Python.Syntax
     -- * Identifiers
   , id_
     -- * Starred values
-  , HasStar(..)
+  , s_
+  , Star(..)
     -- * Double-starred values
-  , HasDoubleStar(..)
-    -- * If syntax
+  , ss_
+  , DoubleStar(..)
+    -- * @if@ syntax
   , HasIf(..)
-    -- * For syntax
+    -- * @for@ syntax
   , HasFor(..)
+    -- * @in@ syntax
+  , HasIn(..)
+  , In(..)
+    -- * Comprehensions
+  , comp_
     -- * Parameters and arguments
     -- ** Parameters
   , HasParameters(..)
@@ -115,12 +123,14 @@ module Language.Python.Syntax
   , tryF_
   , HasExcept(..)
   , HasFinally(..)
+  , AsTry(..)
   , TryExcept(..)
   , _TryExcept
   , mkTryExcept
   , TryFinally(..)
   , _TryFinally
   , mkTryFinally
+  , ExceptAs(..)
   , AsExceptAs(..)
   , Except(..)
   , _Except
@@ -230,13 +240,15 @@ module Language.Python.Syntax
   , callArguments
   , callRightParen
     -- * Literals
-  , list_
-  , listComp_
   , none_
   , str_
+  , int_
   , true_
   , false_
   , ellipsis_
+    -- ** Lists
+  , AsList(..)
+  , AsListItem(..)
     -- ** Dereferencing
   , (/>)
     -- ** Unary operators
@@ -247,7 +259,6 @@ module Language.Python.Syntax
     -- ** Binary operators
   , is_
   , isNot_
-  , in_
   , notIn_
   , (.*)
   , (.-)
@@ -432,14 +443,15 @@ class HasPositional p v | p -> v, v -> p where
 class HasKeyword p where
   k_ :: Raw Ident -> Raw Expr -> Raw p
 
-class HasStar v p | p -> v where
-  s_ :: Raw v -> Raw p
+newtype Star s (v :: [*]) a = MkStar { unStar :: s v a }
 
-instance HasStar Expr TupleItem where
-  s_ = TupleUnpack () [] []
+s_ :: s v a -> Star s v a
+s_ = MkStar
 
-class HasDoubleStar v p | p -> v where
-  ss_ :: Raw v -> Raw p
+newtype DoubleStar s (v :: [*]) a = MkDoubleStar { unDoubleStar :: s v a }
+
+ss_ :: s v a -> DoubleStar s v a
+ss_ = MkDoubleStar
 
 instance HasPositional Param Ident where
   p_ i = PositionalParam () i Nothing
@@ -580,31 +592,70 @@ return_ e =
 expr_ :: Raw Expr -> Raw Statement
 expr_ e = SmallStatements (Indents [] ()) (Expr () e) [] Nothing (Right (LF Nothing))
 
-list_ :: [Raw Expr] -> Raw Expr
-list_ es = List () [] (listToCommaSep1' $ ListItem () <$> es) []
+-- |
+-- >>> list_ [var_ "a"]
+-- [a]
+--
+-- >>> list_ [s_ $ var_ "a"]
+-- [*a]
+--
+-- >>> list_ [li_ $ var_ "a", li_ $ s_ (var_ "b")]
+-- [a, *b]
+--
+-- >>> list_ $ comp_ (var_ "a") (for_ $ var_ "a" `in_` list_ [int_ 1, 2, 3]) [if_ $ var_ "a" .== 2]
+-- [a for a in [1, 2, 3] if a == 2]
+class AsList s where
+  list_ :: s -> Raw Expr
+
+class AsListItem s where
+  li_ :: Raw s -> Raw ListItem
+
+instance AsListItem ListItem where
+  li_ = id
+
+instance Expr ~ e => AsListItem (Star e) where
+  li_ (MkStar e) = ListUnpack () [] [] e
+
+instance AsListItem Expr where
+  li_ = ListItem ()
+
+instance AsListItem e => AsList [Raw e] where
+  list_ es = List () [] (listToCommaSep1' $ li_ <$> es) []
+
+instance e ~ Comprehension Expr => AsList (Raw e) where
+  list_ c = ListComp () [] c []
 
 newtype Guard v a = MkGuard { unGuard :: Either (CompFor v a) (CompIf v a) }
 
+-- |
+-- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") []
+-- a for a in b
 instance HasFor (Raw CompFor) where
-  forIn_ a = CompFor () [Space] a [Space]
+  for_ (MkIn a b) = CompFor () [Space] a [Space] b
 
+-- |
+-- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") [for_ $ var_ "c" \`in_\` var_ "d"]
+-- a for a in b for c in d
 instance HasFor (Raw Guard) where
-  forIn_ a = MkGuard . Left . CompFor () [Space] a [Space]
+  for_ (MkIn a b) = MkGuard . Left $ CompFor () [Space] a [Space] b
 
-instance HasIf (Raw CompIf) where
-  if_ = CompIf () [Space]
+class HasIf a where
+  if_ :: Raw Expr -> a
 
+-- |
+-- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") [if_ $ var_ "c" .== var_ "d"]
+-- a for a in b if c == d
 instance HasIf (Raw Guard) where
   if_ = MkGuard . Right . CompIf () [Space]
 
-listComp_ :: Raw Expr -> Raw CompFor -> [Raw Guard] -> Raw Expr
-listComp_ val cfor guards =
-  ListComp () []
-    (Comprehension ()
-       val
-       cfor
-       (unGuard <$> guards))
-    []
+comp_ :: Raw e -> Raw CompFor -> [Raw Guard] -> Raw (Comprehension e)
+comp_ val cfor guards =
+  Comprehension ()
+    val
+    (if null guards
+     then cfor
+     else cfor & trailingWhitespace .~ [Space])
+    (unGuard <$> guards)
 
 mkBinOp :: ([Whitespace] -> BinOp ()) -> Raw Expr -> Raw Expr -> Raw Expr
 mkBinOp bop a = BinOp () (a & trailingWhitespace .~ [Space]) (bop [Space])
@@ -613,9 +664,21 @@ is_ :: Raw Expr -> Raw Expr -> Raw Expr
 is_ = mkBinOp $ Is ()
 infixl 1 `is_`
 
-in_ :: Raw Expr -> Raw Expr -> Raw Expr
-in_ = mkBinOp $ In ()
+data In v a = MkIn (Expr v a) (Expr v a)
+
+class HasIn a where
+  in_ :: Raw Expr -> Raw Expr -> Raw a
+
 infixl 1 `in_`
+
+-- |
+-- >>> var_ "a" `in_` var_ "b"
+-- a in b
+instance HasIn Expr where
+  in_ = mkBinOp $ In ()
+
+instance HasIn In where
+  in_ = MkIn
 
 notIn_ :: Raw Expr -> Raw Expr -> Raw Expr
 notIn_ = mkBinOp $ NotIn () [Space]
@@ -771,10 +834,11 @@ instance HasBody If where
   setBody = mkSetBody ifBody _ifIndents
   getBody = mkGetBody "if" _ifBody _ifIndents
 
-class HasIf a where
-  if_ :: Raw Expr -> a
-
-instance HasIf ([Raw Line] -> Raw If) where
+-- |
+-- >>> if_ (var_ "a" .< 10) [var_ "a" .+= 1]
+-- if a < 10:
+--     a += 1
+instance (l ~ Raw Line, s ~ Raw If) => HasIf ([l] -> s) where
   if_ = mkIf
 
 ifThen_ :: Raw Expr -> [Raw Line] -> Raw If
@@ -785,6 +849,9 @@ var_ s = Ident $ MkIdent () s []
 
 none_ :: Raw Expr
 none_ = None () []
+
+int_ :: Integer -> Raw Expr
+int_ = fromInteger
 
 pass_ :: Raw Statement
 pass_ = SmallStatements (Indents [] ()) (Pass () []) [] Nothing (Right (LF Nothing))
@@ -983,10 +1050,14 @@ mkFor binder collection body =
   }
 
 class HasFor a where
-  forIn_ :: Raw Expr -> Raw Expr -> a
+  for_ :: Raw In -> a
 
-instance HasFor ([Raw Line] -> Raw Statement) where
-  forIn_ = forSt_
+-- |
+-- >>> for_ (var_ "a" `in_` var_ "b") [line_ (var_ "c" .+= var_ "a")]
+-- for a in b:
+--     c += a
+instance (l ~ Raw Line, s ~ Raw Statement) => HasFor ([l] -> s) where
+  for_ (MkIn a b) = forSt_ a b
 
 forSt_ :: Raw Expr -> Raw Expr -> [Raw Line] -> Raw Statement
 forSt_ val vals block = _For # mkFor val vals block
@@ -1105,16 +1176,18 @@ class HasExcept s where
   exceptAs_ :: AsExceptAs e => Raw e -> [Raw Line] -> s -> Raw TryExcept
 
 -- |
--- @
--- 'tryE_' ['line_' 'pass_'] '&'
---   'except_' ['line_' 'pass_']
--- @
+-- >>> _Try # (tryE_ [var_ "a" .= 2] & except_ [var_ "a" .= 3])
+-- try:
+--     a = 2
+-- except:
+--     a = 3
 --
--- @
--- 'tryE_' ['line_' 'pass_'] '&'
---   'exceptAs_' ('var_' \"Exception\" \``as_`\` 'id_' "b") ['line_' 'pass_']
--- @
-instance HasExcept (Raw Except -> Raw TryExcept) where
+-- >>> _Try # (tryE_ [var_ "a" .= 2] & exceptAs_ (var_ "Exception" `as_` id_ "b") [var_ "a" .= 3]
+-- try:
+--     a = 2
+-- except Exception as b:
+--     a = 3
+instance (e ~ Raw Except, s ~ Raw TryExcept) => HasExcept (e -> s) where
   except_ body f = f $ mkExcept body
   exceptAs_ ea body f = f $ mkExcept body & exceptExceptAs ?~ toExceptAs ea
 
@@ -1175,6 +1248,7 @@ instance AsLine TryFinally where
 class As s t u | s t -> u, u -> s t where
   as_ :: Raw s -> Raw t -> Raw u
 
+-- | See 'exceptAs_'
 instance As Expr Ident ExceptAs where
   as_ e name = ExceptAs () e $ Just ([Space], name)
 
@@ -1247,17 +1321,24 @@ mkWith items body =
 -- with_ :: 'NonEmpty' ('Raw' 'WithItem') -> ['Raw' 'Line'] -> 'Raw' 'Statement'
 -- @
 --
--- @
--- 'with_' [e] body
--- 'with_' [e \``as_`\` 'id_' "name"] body
--- 'with_' ['withItem_' e 'Nothing'] body
--- @
+-- >>> with_ [var_ "a"] [line_ $ var_ "b"]
+-- with a:
+--     b
+--
+-- >>> with_ [var_ "a" `as_\` id_ "name"] [line_ $ var_ "b"]
+-- with a as name:
+--     b
+--
+-- >>> with_ [withItem_ e Nothing] [line_ $ var_ "b"]
+-- with a:
+--     b
 with_ :: AsWithItem e => NonEmpty (Raw e) -> [Raw Line] -> Raw Statement
 with_ items body = _With # mkWith (toWithItem <$> items) body
 
 withItem_ :: Raw Expr -> Maybe (Raw Expr) -> Raw WithItem
 withItem_ a b = WithItem () a ((,) [Space] <$> b)
 
+-- | See 'with_'
 instance As Expr Expr WithItem where
   as_ a b = WithItem () a $ Just ([Space], b)
 
@@ -1290,6 +1371,9 @@ instance AsTupleItem Expr where
 instance AsTupleItem TupleItem where
   ti_ = id
 
+instance Expr ~ e => AsTupleItem (Star e) where
+  ti_ (MkStar e) = TupleUnpack () [] [] e
+
 -- |
 -- >>> tuple_ []
 -- ()
@@ -1303,7 +1387,7 @@ instance AsTupleItem TupleItem where
 -- >>> tuple_ [var_ "a", var_ "b"]
 -- a, b
 --
--- >>> tuple_ [ti_ (var_ "a"), s_ (var_ "b")]
+-- >>> tuple_ [ti_ (var_ "a"), ti_ $ s_ (var_ "b")]
 -- a, *b
 tuple_ :: AsTupleItem e => [Raw e] -> Raw Expr
 tuple_ [] = Unit () [] []

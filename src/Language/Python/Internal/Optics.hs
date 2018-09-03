@@ -83,6 +83,15 @@ _If =
           Right $ MkIf a b c d e (view (from _Elif) <$> f) (view (from _Else) <$> g)
         a -> Left $ a ^. unvalidated)
 
+class AsTry s where
+  _Try :: Prism (Statement v a) (Statement '[] a) (s v a) (s '[] a)
+
+instance AsTry TryExcept where
+  _Try = _TryExcept
+
+instance AsTry TryFinally where
+  _Try = _TryFinally
+
 _TryExcept :: Prism (Statement v a) (Statement '[] a) (TryExcept v a) (TryExcept '[] a)
 _TryExcept =
   prism

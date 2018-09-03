@@ -152,7 +152,7 @@ data With v a
   { _withAnn :: a
   , _withIndents :: Indents a
   , _withAsync :: Maybe (NonEmpty Whitespace)
-  , _WithWith :: [Whitespace]
+  , _withWith :: [Whitespace]
   , _withItems :: CommaSep1 (WithItem v a)
   , _withBody :: Suite v a
   }

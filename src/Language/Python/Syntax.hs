@@ -23,6 +23,10 @@ module Language.Python.Syntax
   , HasStar(..)
     -- * Double-starred values
   , HasDoubleStar(..)
+    -- * If syntax
+  , HasIf(..)
+    -- * For syntax
+  , HasFor(..)
     -- * Parameters and arguments
     -- ** Parameters
   , HasParameters(..)
@@ -161,12 +165,12 @@ module Language.Python.Syntax
     -- *** Break
   , break_
     -- *** For loops
-  , for_
+  , forSt_
   , For(..)
   , _For
   , mkFor
     -- *** If statements
-  , if_
+  , ifThen_
   , elif_
   , If(..)
   , _If
@@ -201,6 +205,12 @@ module Language.Python.Syntax
   , While(..)
   , _While
   , mkWhile
+    -- **** Lenses
+  , whileAnn
+  , whileIndents
+  , whileWhile
+  , whileCond
+  , whileBody
     -- * Expressions
   , expr_
   , var_
@@ -221,6 +231,7 @@ module Language.Python.Syntax
   , callRightParen
     -- * Literals
   , list_
+  , listComp_
   , none_
   , str_
   , true_
@@ -572,6 +583,29 @@ expr_ e = SmallStatements (Indents [] ()) (Expr () e) [] Nothing (Right (LF Noth
 list_ :: [Raw Expr] -> Raw Expr
 list_ es = List () [] (listToCommaSep1' $ ListItem () <$> es) []
 
+newtype Guard v a = MkGuard { unGuard :: Either (CompFor v a) (CompIf v a) }
+
+instance HasFor (Raw CompFor) where
+  forIn_ a = CompFor () [Space] a [Space]
+
+instance HasFor (Raw Guard) where
+  forIn_ a = MkGuard . Left . CompFor () [Space] a [Space]
+
+instance HasIf (Raw CompIf) where
+  if_ = CompIf () [Space]
+
+instance HasIf (Raw Guard) where
+  if_ = MkGuard . Right . CompIf () [Space]
+
+listComp_ :: Raw Expr -> Raw CompFor -> [Raw Guard] -> Raw Expr
+listComp_ val cfor guards =
+  ListComp () []
+    (Comprehension ()
+       val
+       cfor
+       (unGuard <$> guards))
+    []
+
 mkBinOp :: ([Whitespace] -> BinOp ()) -> Raw Expr -> Raw Expr -> Raw Expr
 mkBinOp bop a = BinOp () (a & trailingWhitespace .~ [Space]) (bop [Space])
 
@@ -737,8 +771,14 @@ instance HasBody If where
   setBody = mkSetBody ifBody _ifIndents
   getBody = mkGetBody "if" _ifBody _ifIndents
 
-if_ :: Raw Expr -> [Raw Line] -> Raw If
-if_ = mkIf
+class HasIf a where
+  if_ :: Raw Expr -> a
+
+instance HasIf ([Raw Line] -> Raw If) where
+  if_ = mkIf
+
+ifThen_ :: Raw Expr -> [Raw Line] -> Raw If
+ifThen_ = mkIf
 
 var_ :: String -> Raw Expr
 var_ s = Ident $ MkIdent () s []
@@ -942,8 +982,14 @@ mkFor binder collection body =
   , _forElse = Nothing
   }
 
-for_ :: Raw Expr -> Raw Expr -> [Raw Line] -> Raw Statement
-for_ val vals block = _For # mkFor val vals block
+class HasFor a where
+  forIn_ :: Raw Expr -> Raw Expr -> a
+
+instance HasFor ([Raw Line] -> Raw Statement) where
+  forIn_ = forSt_
+
+forSt_ :: Raw Expr -> Raw Expr -> [Raw Line] -> Raw Statement
+forSt_ val vals block = _For # mkFor val vals block
 
 instance HasBody For where
   body = forBody
@@ -1189,7 +1235,7 @@ mkWith items body =
   { _withAnn = ()
   , _withIndents = Indents [] ()
   , _withAsync = Nothing
-  , _WithWith = [Space]
+  , _withWith = [Space]
   , _withItems = listToCommaSep1 items
   , _withBody = SuiteMany () [] (LF Nothing) $ toBlock body
   }

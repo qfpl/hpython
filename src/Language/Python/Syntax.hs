@@ -26,6 +26,8 @@ module Language.Python.Syntax
     -- * Double-starred values
   , ss_
   , DoubleStar(..)
+    -- ** @as@ syntax
+  , As(..)
     -- * @if@ syntax
   , HasIf(..)
     -- * @for@ syntax
@@ -35,6 +37,7 @@ module Language.Python.Syntax
   , In(..)
     -- * Comprehensions
   , comp_
+  , Guard(..)
     -- * Parameters and arguments
     -- ** Parameters
   , HasParameters(..)
@@ -56,8 +59,6 @@ module Language.Python.Syntax
   , decorated_
   , HasDecorators(..)
     -- * Statements
-    -- ** @as@
-  , As(..)
     -- ** @async@
   , HasAsync(..)
     -- ** Lines of code
@@ -331,6 +332,12 @@ instance AsLine CompoundStatement where
 
 instance AsLine If where
   line_ = line_ . (_If #)
+
+instance AsLine While where
+  line_ = line_ . (_While #)
+
+instance AsLine With where
+  line_ = line_ . (_With #)
 
 instance AsLine Statement where
   line_ = Line . Right
@@ -613,6 +620,9 @@ class AsListItem s where
 instance AsListItem ListItem where
   li_ = id
 
+-- |
+-- >>> list_ [s_ $ var_ "a"]
+-- [*a]
 instance Expr ~ e => AsListItem (Star e) where
   li_ (MkStar e) = ListUnpack () [] [] e
 
@@ -628,12 +638,16 @@ instance e ~ Comprehension Expr => AsList (Raw e) where
 newtype Guard v a = MkGuard { unGuard :: Either (CompFor v a) (CompIf v a) }
 
 -- |
+-- @'for_' :: 'Raw' 'In' -> 'Raw' 'CompFor'@
+--
 -- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") []
 -- a for a in b
 instance HasFor (Raw CompFor) where
   for_ (MkIn a b) = CompFor () [Space] a [Space] b
 
 -- |
+-- @'for_' :: 'Raw' 'In' -> 'Raw' 'Guard'@
+--
 -- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") [for_ $ var_ "c" \`in_\` var_ "d"]
 -- a for a in b for c in d
 instance HasFor (Raw Guard) where
@@ -643,6 +657,8 @@ class HasIf a where
   if_ :: Raw Expr -> a
 
 -- |
+-- @'if_' :: 'Raw' 'Expr' -> 'Raw' 'Guard'@
+--
 -- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") [if_ $ var_ "c" .== var_ "d"]
 -- a for a in b if c == d
 instance HasIf (Raw Guard) where
@@ -677,6 +693,7 @@ infixl 1 `in_`
 instance HasIn Expr where
   in_ = mkBinOp $ In ()
 
+-- | See 'for_'
 instance HasIn In where
   in_ = MkIn
 
@@ -835,6 +852,8 @@ instance HasBody If where
   getBody = mkGetBody "if" _ifBody _ifIndents
 
 -- |
+-- @'if_' :: 'Raw' 'Expr' -> ['Raw' 'Line'] -> 'Raw' 'If'@
+--
 -- >>> if_ (var_ "a" .< 10) [var_ "a" .+= 1]
 -- if a < 10:
 --     a += 1
@@ -1053,6 +1072,8 @@ class HasFor a where
   for_ :: Raw In -> a
 
 -- |
+-- @'for_' :: 'Raw' 'In' -> ['Raw' 'Line'] -> 'Raw' 'Statement'@
+--
 -- >>> for_ (var_ "a" `in_` var_ "b") [line_ (var_ "c" .+= var_ "a")]
 -- for a in b:
 --     c += a
@@ -1136,6 +1157,7 @@ instance HasBody TryExcept where
   setBody = mkSetBody teBody _teIndents
   getBody = mkGetBody "try except" _teBody _teIndents
 
+-- | @try ... except@ with optional @else@ and optional @finally@
 tryE_ :: [Raw Line] -> Raw Except -> Raw TryExcept
 tryE_ = mkTryExcept
 
@@ -1144,6 +1166,13 @@ instance HasBody TryFinally where
   setBody = mkSetBody tfBody _tfIndents
   getBody = mkGetBody "try finally" _tfBody _tfIndents
 
+-- |
+-- @
+-- try:
+--     ...
+-- finally:
+--     ...
+-- @
 tryF_ :: [Raw Line] -> [Raw Line] -> Raw TryFinally
 tryF_ = mkTryFinally
 
@@ -1176,6 +1205,10 @@ class HasExcept s where
   exceptAs_ :: AsExceptAs e => Raw e -> [Raw Line] -> s -> Raw TryExcept
 
 -- |
+-- @'except_' :: ['Raw' 'Line'] -> ('Raw' 'Except' -> 'Raw' 'TryExcept') -> 'Raw' 'TryExcept'@
+--
+-- @'exceptAs_' :: AsExceptAs => 'Raw' e -> ['Raw' 'Line'] -> ('Raw' 'Except' -> 'Raw' 'TryExcept') -> 'Raw' 'TryExcept'@
+--
 -- >>> _Try # (tryE_ [var_ "a" .= 2] & except_ [var_ "a" .= 3])
 -- try:
 --     a = 2
@@ -1192,6 +1225,10 @@ instance (e ~ Raw Except, s ~ Raw TryExcept) => HasExcept (e -> s) where
   exceptAs_ ea body f = f $ mkExcept body & exceptExceptAs ?~ toExceptAs ea
 
 -- |
+-- @'except_' :: ['Raw' 'Line'] -> 'Raw' 'TryExcept' -> 'Raw' 'TryExcept'@
+--
+-- @'exceptAs_' :: AsExceptAs => 'Raw' e -> ['Raw' 'Line'] -> 'Raw' 'TryExcept' -> 'Raw' 'TryExcept'@
+--
 -- @
 -- (someTryStatement :: 'Raw' 'TryExcept') '&'
 --   'except_' ['line_' 'pass_']
@@ -1207,6 +1244,10 @@ instance HasExcept (Raw TryExcept) where
     teExcepts %~ (<> pure (mkExcept body & exceptExceptAs ?~ toExceptAs ea))
 
 -- |
+-- @'except_' :: ['Raw' 'Line'] -> 'Raw' 'TryFinally' -> 'Raw' 'TryExcept'@
+--
+-- @'exceptAs_' :: AsExceptAs => 'Raw' e -> ['Raw' 'Line'] -> 'Raw' 'TryFinally' -> 'Raw' 'TryExcept'@
+--
 -- @
 -- (someTryStatement :: 'Raw' 'TryFinally') '&'
 --   'except_' ['line_' 'pass_']
@@ -1371,6 +1412,9 @@ instance AsTupleItem Expr where
 instance AsTupleItem TupleItem where
   ti_ = id
 
+-- |
+-- >>> tuple_ [s_ $ var_ "a"]
+-- (*a),
 instance Expr ~ e => AsTupleItem (Star e) where
   ti_ (MkStar e) = TupleUnpack () [] [] e
 

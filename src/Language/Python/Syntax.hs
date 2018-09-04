@@ -228,7 +228,10 @@ module Language.Python.Syntax
     -- * Expressions
   , expr_
   , var_
+    -- ** @await@
   , await_
+    -- ** @... if ... else ...@
+  , ifThenElse_
     -- ** Tuples
   , tuple_
   , AsTupleItem(..)
@@ -1471,3 +1474,9 @@ tuple_ (a:as) =
 
 await_ :: Raw Expr -> Raw Expr
 await_ = Await () [Space]
+
+-- |
+-- >>> ifThenElse_ (var_ "a") (var_ "b") (var_ "c")
+-- a if b else c
+ifThenElse_ :: Raw Expr -> Raw Expr -> Raw Expr -> Raw Expr
+ifThenElse_ a b = Ternary () a [Space] b [Space]

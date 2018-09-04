@@ -31,6 +31,19 @@ _KeywordParam =
         KeywordParam a b c d e -> Right (MkKeywordParam a b c d e)
         a -> Left $ a ^. unvalidated)
 
+_PositionalParam
+  :: Prism
+       (Param v a)
+       (Param '[] a)
+       (PositionalParam v a)
+       (PositionalParam '[] a)
+_PositionalParam =
+  prism
+    (\(MkPositionalParam a b c) -> PositionalParam a b c)
+    (\case
+        PositionalParam a b c -> Right (MkPositionalParam a b c)
+        a -> Left $ a ^. unvalidated)
+
 _Fundef
   :: Prism
        (Statement v a)

@@ -45,6 +45,8 @@ module Language.Python.Syntax
   , HasArguments(..)
     -- ** Positional
   , HasPositional(..)
+  , PositionalParam(..)
+  , _PositionalParam
     -- ** Keyword
   , HasKeyword(..)
   , KeywordParam(..)

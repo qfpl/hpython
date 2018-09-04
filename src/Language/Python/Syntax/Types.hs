@@ -43,6 +43,14 @@ data KeywordParam v a
   } deriving (Eq, Show)
 makeLenses ''KeywordParam
 
+data PositionalParam v a
+  = MkPositionalParam
+  { _ppAnn :: a
+  , _ppName :: Ident v a
+  , _ppType :: Maybe ([Whitespace], Expr v a)
+  } deriving (Eq, Show)
+makeLenses ''PositionalParam
+
 data Call v a
   = MkCall
   { _callAnn :: a

@@ -455,6 +455,12 @@ instance HasStar Ident Param where
 instance HasDoubleStar Ident Param where
   ss_ i = DoubleStarParam () [] i Nothing
 
+instance HasStar Expr Arg where
+  s_ = StarArg () []
+
+instance HasDoubleStar Expr Arg where
+  ss_ = DoubleStarArg () []
+
 -- | Keyword parameters/arguments
 class HasKeyword p where
   k_ :: Raw Ident -> Raw Expr -> Raw p
@@ -587,6 +593,18 @@ instance HasArguments Call where
 
   getArguments code = _callArguments code ^.. folded.folded
 
+-- |
+-- >>> call_ "f" [p_ $ var_ "x"]
+-- f(x)
+--
+-- >>> call_ "f" [p_ $ var_ "x", k_ "y" 2]
+-- f(x, y=2)
+--
+-- >>> call_ "f" [p_ $ var_ "x", k_ "y" 2, s_ "z"]
+-- f(x, y=2, *z)
+--
+-- >>> call_ "f" [p_ $ var_ "x", k_ "y" 2, s_ "z", ss_ "w"]
+-- f(x, y=2, *z, **w)
 call_ :: Raw Expr -> [Raw Arg] -> Raw Expr
 call_ expr args =
   _Call #

@@ -12,7 +12,6 @@ passing @['line_' 'pass_']@
 {-# language RankNTypes #-}
 {-# language RecordWildCards #-}
 {-# language TypeFamilies #-}
-{-# language KindSignatures #-}
 module Language.Python.Syntax
   ( (&)
   , Raw
@@ -21,12 +20,10 @@ module Language.Python.Syntax
     -- * Identifiers
   , id_
     -- * Starred values
-  , s_
-  , Star(..)
+  , HasStar(..)
     -- * Double-starred values
-  , ss_
-  , DoubleStar(..)
-    -- ** @as@ syntax
+  , HasDoubleStar(..)
+    -- * @as@ syntax
   , As(..)
     -- * @if@ syntax
   , HasIf(..)
@@ -47,6 +44,10 @@ module Language.Python.Syntax
   , HasPositional(..)
   , PositionalParam(..)
   , _PositionalParam
+    -- *** Lenses
+  , ppAnn
+  , ppName
+  , ppType
     -- ** Keyword
   , HasKeyword(..)
   , KeywordParam(..)
@@ -448,19 +449,21 @@ modifyBody ws f fun = setBody ws (f $ getBody fun) fun
 class HasPositional p v | p -> v, v -> p where
   p_ :: Raw v -> Raw p
 
+instance HasStar Ident Param where
+  s_ i = StarParam () [] (Just i) Nothing
+
+instance HasDoubleStar Ident Param where
+  ss_ i = DoubleStarParam () [] i Nothing
+
 -- | Keyword parameters/arguments
 class HasKeyword p where
   k_ :: Raw Ident -> Raw Expr -> Raw p
 
-newtype Star s (v :: [*]) a = MkStar { unStar :: s v a }
+class HasStar s t | t -> s where
+  s_ :: Raw s -> Raw t
 
-s_ :: s v a -> Star s v a
-s_ = MkStar
-
-newtype DoubleStar s (v :: [*]) a = MkDoubleStar { unDoubleStar :: s v a }
-
-ss_ :: s v a -> DoubleStar s v a
-ss_ = MkDoubleStar
+class HasDoubleStar s t | t -> s where
+  ss_ :: Raw s -> Raw t
 
 instance HasPositional Param Ident where
   p_ i = PositionalParam () i Nothing
@@ -602,13 +605,13 @@ expr_ :: Raw Expr -> Raw Statement
 expr_ e = SmallStatements (Indents [] ()) (Expr () e) [] Nothing (Right (LF Nothing))
 
 -- |
--- >>> list_ [var_ "a"]
+-- >>> list_ [li_ $ var_ "a"]
 -- [a]
 --
 -- >>> list_ [s_ $ var_ "a"]
 -- [*a]
 --
--- >>> list_ [li_ $ var_ "a", li_ $ s_ (var_ "b")]
+-- >>> list_ [li_ $ var_ "a", s_ $ var_ "b"]
 -- [a, *b]
 --
 -- >>> list_ $ comp_ (var_ "a") (for_ $ var_ "a" `in_` list_ [int_ 1, 2, 3]) [if_ $ var_ "a" .== 2]
@@ -622,17 +625,14 @@ class AsListItem s where
 instance AsListItem ListItem where
   li_ = id
 
--- |
--- >>> list_ [s_ $ var_ "a"]
--- [*a]
-instance Expr ~ e => AsListItem (Star e) where
-  li_ (MkStar e) = ListUnpack () [] [] e
-
 instance AsListItem Expr where
   li_ = ListItem ()
 
-instance AsListItem e => AsList [Raw e] where
-  list_ es = List () [] (listToCommaSep1' $ li_ <$> es) []
+instance HasStar Expr ListItem where
+  s_ = ListUnpack () [] []
+
+instance e ~ Raw ListItem => AsList [e] where
+  list_ es = List () [] (listToCommaSep1' es) []
 
 instance e ~ Comprehension Expr => AsList (Raw e) where
   list_ c = ListComp () [] c []
@@ -1408,6 +1408,9 @@ ellipsis_ = Ellipsis () []
 class AsTupleItem e where
   ti_ :: Raw e -> Raw TupleItem
 
+instance HasStar Expr TupleItem where
+  s_ = TupleUnpack () [] []
+
 instance AsTupleItem Expr where
   ti_ = TupleItem ()
 
@@ -1415,33 +1418,27 @@ instance AsTupleItem TupleItem where
   ti_ = id
 
 -- |
--- >>> tuple_ [s_ $ var_ "a"]
--- (*a),
-instance Expr ~ e => AsTupleItem (Star e) where
-  ti_ (MkStar e) = TupleUnpack () [] [] e
-
--- |
 -- >>> tuple_ []
 -- ()
 --
--- >>> tuple_ [var_ "a"]
+-- >>> tuple_ [ti_ $ var_ "a"]
 -- a,
 --
 -- >>> tuple_ [s_ $ var_ "a"]
 -- (*a),
 --
--- >>> tuple_ [var_ "a", var_ "b"]
+-- >>> tuple_ [ti_ $ var_ "a", ti_ $ var_ "b"]
 -- a, b
 --
--- >>> tuple_ [ti_ (var_ "a"), ti_ $ s_ (var_ "b")]
+-- >>> tuple_ [ti_ $ var_ "a", s_ $ var_ "b"]
 -- a, *b
-tuple_ :: AsTupleItem e => [Raw e] -> Raw Expr
+tuple_ :: [Raw TupleItem] -> Raw Expr
 tuple_ [] = Unit () [] []
 tuple_ (a:as) =
-  case ti_ <$> as of
+  case as of
     [] -> Tuple () (ti_ a) [] Nothing
     b:bs ->
-      Tuple () (ti_ a) [Space] . Just $
+      Tuple () a [Space] . Just $
       (b, zip (repeat [Space]) bs, Nothing) ^. _CommaSep1'
 
 await_ :: Raw Expr -> Raw Expr

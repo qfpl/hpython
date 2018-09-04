@@ -243,7 +243,7 @@ module Language.Python.Syntax
   , callLeftParen
   , callArguments
   , callRightParen
-    -- * Literals
+    -- ** Literals
   , none_
   , str_
   , int_
@@ -449,15 +449,19 @@ modifyBody ws f fun = setBody ws (f $ getBody fun) fun
 class HasPositional p v | p -> v, v -> p where
   p_ :: Raw v -> Raw p
 
+-- | See 'def_'
 instance HasStar Ident Param where
   s_ i = StarParam () [] (Just i) Nothing
 
+-- | See 'def_'
 instance HasDoubleStar Ident Param where
   ss_ i = DoubleStarParam () [] i Nothing
 
+-- | See 'call_'
 instance HasStar Expr Arg where
   s_ = StarArg () []
 
+-- | See 'call_'
 instance HasDoubleStar Expr Arg where
   ss_ = DoubleStarArg () []
 
@@ -471,14 +475,18 @@ class HasStar s t | t -> s where
 class HasDoubleStar s t | t -> s where
   ss_ :: Raw s -> Raw t
 
+-- | See 'def_'
 instance HasPositional Param Ident where
   p_ i = PositionalParam () i Nothing
 
+-- | See 'def_'
 instance HasKeyword Param where
   k_ a = KeywordParam () a Nothing []
 
+-- | See 'call_'
 instance HasPositional Arg Expr where; p_ = PositionalArg ()
 
+-- | See 'call_'
 instance HasKeyword Arg where; k_ a = KeywordArg () a []
 
 class HasParameters s where
@@ -646,6 +654,7 @@ instance AsListItem ListItem where
 instance AsListItem Expr where
   li_ = ListItem ()
 
+-- | See 'list_'
 instance HasStar Expr ListItem where
   s_ = ListUnpack () [] []
 
@@ -1426,6 +1435,7 @@ ellipsis_ = Ellipsis () []
 class AsTupleItem e where
   ti_ :: Raw e -> Raw TupleItem
 
+-- | See 'tuple_'
 instance HasStar Expr TupleItem where
   s_ = TupleUnpack () [] []
 

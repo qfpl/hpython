@@ -19,6 +19,11 @@ module Language.Python.Syntax
   , Expr
     -- * Identifiers
   , id_
+  , Ident(..)
+    -- ** Lenses
+  , identAnn
+  , identValue
+  , identWhitespace
     -- * Starred values
   , HasStar(..)
     -- * Double-starred values
@@ -232,6 +237,10 @@ module Language.Python.Syntax
   , await_
     -- ** @... if ... else ...@
   , ifThenElse_
+    -- ** @yield@
+  , yield_
+    -- ** @yield from ...@
+  , yieldFrom_
     -- ** Tuples
   , tuple_
   , AsTupleItem(..)
@@ -256,6 +265,8 @@ module Language.Python.Syntax
     -- ** Lists
   , AsList(..)
   , AsListItem(..)
+    -- ** Lambdas
+  , lambda_
     -- ** Dereferencing
   , (/>)
     -- ** Unary operators
@@ -578,6 +589,22 @@ mkFundef name body =
   , _fdBody = SuiteMany () [] (LF Nothing) $ toBlock body
   }
 
+-- |
+-- >>> def_ "f" [p_ "x"] [line_ $ return_ "x"]
+-- def f(x):
+--     return x
+--
+-- >>> def_ "f" [p_ "x", k_ "y" 2] [line_ $ return_ "x"]
+-- def f(x, y=2):
+--     return x
+--
+-- >>> def_ "f" [p_ "x", k_ "y" 2, s_ "z"] [line_ $ return_ "x"]
+-- def f(x, y=2, *z):
+--     return x
+--
+-- >>> def_ "f" [p_ "x", k_ "y" 2, s_ "z", ss_ "w"] [line_ $ return_ "x"]
+-- def f(x, y=2, *z, **w)
+--     return x
 def_ :: Raw Ident -> [Raw Param] -> [Raw Line] -> Raw Statement
 def_ name params body =
   _Fundef # (mkFundef name body) { _fdParameters = listToCommaSep params }
@@ -1480,3 +1507,28 @@ await_ = Await () [Space]
 -- a if b else c
 ifThenElse_ :: Raw Expr -> Raw Expr -> Raw Expr -> Raw Expr
 ifThenElse_ a b = Ternary () a [Space] b [Space]
+
+-- |
+-- >>> lambda_ [p_ "x"] "x"
+-- lambda x: x
+--
+-- >>> lambda_ [p_ "x", k_ "y" 2] ("x" .+ "y")
+-- lambda x, y=2: x + y
+--
+-- >>> lambda_ [p_ "x", k_ "y" 2, s_ "z"] "a"
+-- lambda x, y=2, *z: a
+--
+-- >>> lambda_ [p_ "x", k_ "y" 2, s_ "z", ss_ "w"] "a"
+-- lambda x, y=2, *z, **w: a
+lambda_ :: [Raw Param] -> Raw Expr -> Raw Expr
+lambda_ params =
+  Lambda ()
+    (if null params then [] else [Space])
+    (listToCommaSep params)
+    [Space]
+
+yield_ :: Maybe (Raw Expr) -> Raw Expr
+yield_ a = Yield () (maybe [] (const [Space]) a) a
+
+yieldFrom_ :: Raw Expr -> Raw Expr
+yieldFrom_ = YieldFrom () [Space] [Space]

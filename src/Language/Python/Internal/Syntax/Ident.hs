@@ -1,6 +1,6 @@
 {-# language DataKinds, KindSignatures #-}
 {-# language FlexibleInstances #-}
-{-# Language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 module Language.Python.Internal.Syntax.Ident where
 
 import Control.Lens.Lens (Lens, lens)
@@ -37,6 +37,9 @@ identValue = lens _identValue (\s a -> s { _identValue = a })
 
 identAnn :: Lens (Ident v a) (Ident v a) a a
 identAnn = lens _identAnn (\s a -> s { _identAnn = a })
+
+identWhitespace :: Lens (Ident v a) (Ident v a) [Whitespace] [Whitespace]
+identWhitespace = lens _identWhitespace (\s a -> s { _identWhitespace = a })
 
 instance HasTrailingWhitespace (Ident v a) where
   trailingWhitespace = lens (\(MkIdent _ _ ws) -> ws) (\(MkIdent a b _) ws -> MkIdent a b ws)

@@ -211,7 +211,7 @@ data DictItem (v :: [*]) a
   { _dictItemAnn :: a
   , _unsafeDictItemKey :: Expr v a
   , _unsafeDictItemWhitespace :: [Whitespace]
-  , _unsafeDictItemvalue :: Expr v a
+  , _unsafeDictItemValue :: Expr v a
   }
   | DictUnpack
   { _dictItemAnn :: a

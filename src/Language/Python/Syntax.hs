@@ -37,6 +37,8 @@ module Language.Python.Syntax
     -- * @in@ syntax
   , HasIn(..)
   , In(..)
+    -- * @:@ syntax
+  , HasColon(..)
     -- * Comprehensions
   , comp_
   , Guard(..)
@@ -244,6 +246,7 @@ module Language.Python.Syntax
     -- ** Tuples
   , tuple_
   , AsTupleItem(..)
+  , TupleItem()
     -- ** Function calls
   , call_
   , Call(..)
@@ -265,6 +268,10 @@ module Language.Python.Syntax
     -- ** Lists
   , AsList(..)
   , AsListItem(..)
+  , ListItem()
+    -- ** Dictionaries
+  , AsDict(..)
+  , DictItem()
     -- ** Lambdas
   , lambda_
     -- ** Dereferencing
@@ -451,6 +458,25 @@ modifyBody
   -> Raw s
 modifyBody ws f fun = setBody ws (f $ getBody fun) fun
 
+class HasColon s t | s -> t, t -> s where
+  (.:) :: Raw s -> Raw Expr -> Raw t
+
+infix 0 .:
+
+-- | Constructing dictionary items
+--
+-- @('.:') :: 'Raw' 'Expr' -> 'Raw' 'Expr' -> 'Raw' 'DictItem'@
+instance HasColon Expr DictItem where
+  (.:) a = DictItem () a [Space]
+
+-- | Function parameter type annotations
+--
+-- @('.:') :: 'Raw' 'Param' -> 'Raw' 'Expr' -> 'Raw' 'Param'@
+--
+-- See 'def_'
+instance HasColon Param Param where
+  (.:) p t = p { _paramType = Just ([Space], t) }
+
 -- | Positional parameters/arguments
 --
 -- @
@@ -488,6 +514,9 @@ class HasStar s t | t -> s where
 
 class HasDoubleStar s t | t -> s where
   ss_ :: Raw s -> Raw t
+
+instance HasDoubleStar Expr DictItem where
+  ss_ = DictUnpack () []
 
 -- | See 'def_'
 instance HasPositional Param Ident where
@@ -605,6 +634,10 @@ mkFundef name body =
 -- >>> def_ "f" [p_ "x", k_ "y" 2, s_ "z", ss_ "w"] [line_ $ return_ "x"]
 -- def f(x, y=2, *z, **w)
 --     return x
+--
+-- >>> def_ "f" [p_ "x" .: "String"] [line_ $ return_ "x"]
+-- def f(x: String):
+--     return x
 def_ :: Raw Ident -> [Raw Param] -> [Raw Line] -> Raw Statement
 def_ name params body =
   _Fundef # (mkFundef name body) { _fdParameters = listToCommaSep params }
@@ -670,7 +703,7 @@ expr_ e = SmallStatements (Indents [] ()) (Expr () e) [] Nothing (Right (LF Noth
 -- >>> list_ [li_ $ var_ "a", s_ $ var_ "b"]
 -- [a, *b]
 --
--- >>> list_ $ comp_ (var_ "a") (for_ $ var_ "a" `in_` list_ [int_ 1, 2, 3]) [if_ $ var_ "a" .== 2]
+-- >>> list_ $ comp_ (var_ "a") (for_ $ var_ "a" `in_` list_ [li_ $ int_ 1, li_ $ int_ 2, li_ $ int_ 3]) [if_ $ var_ "a" .== 2]
 -- [a for a in [1, 2, 3] if a == 2]
 class AsList s where
   list_ :: s -> Raw Expr
@@ -731,6 +764,37 @@ comp_ val cfor guards =
      then cfor
      else cfor & trailingWhitespace .~ [Space])
     (unGuard <$> guards)
+
+-- |
+-- >>> dict_ [var_ "a" .: 1]
+-- {a: 1}
+--
+-- >>> dict_ [ss_ $ var_ "a"]
+-- {**a}
+--
+-- >>> dict_ [var_ "a" .: 1, ss_ $ var_ "b"]
+-- {a: 1, **b}
+--
+-- >>> dict_ $ comp_ (var_ "a" .: 1) (for_ $ var_ "a" `in_` list_ [li_ $ int_ 1, li_ $ int_ 2, li_ $ int_ 3]) [if_ $ var_ "a" .== 2]
+-- {a: 1 for a in [1, 2, 3] if a == 2}
+class AsDict s where
+  dict_ :: s -> Raw Expr
+
+-- |
+-- @'dict_' :: ['Raw' 'DictItem'] -> 'Raw' 'Expr'@
+instance e ~ Raw DictItem => AsDict [e] where
+  dict_ ds =
+    Dict ()
+    []
+    (case ds of
+       [] -> Nothing
+       a:as -> Just $ (a, zip (repeat [Space] ) as, Nothing) ^. _CommaSep1')
+    []
+
+-- |
+-- @'dict_' :: 'Raw' ('Comprehension' 'DictItem') -> 'Raw' 'Expr'@
+instance e ~ Comprehension DictItem => AsDict (Raw e) where
+  dict_ comp = DictComp () [] comp []
 
 mkBinOp :: ([Whitespace] -> BinOp ()) -> Raw Expr -> Raw Expr -> Raw Expr
 mkBinOp bop a = BinOp () (a & trailingWhitespace .~ [Space]) (bop [Space])

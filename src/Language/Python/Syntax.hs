@@ -272,6 +272,10 @@ module Language.Python.Syntax
     -- ** Dictionaries
   , AsDict(..)
   , DictItem()
+    -- ** Sets
+  , AsSet(..)
+  , AsSetItem(..)
+  , SetItem()
     -- ** Lambdas
   , lambda_
     -- ** Dereferencing
@@ -755,6 +759,46 @@ class HasIf a where
 -- a for a in b if c == d
 instance HasIf (Raw Guard) where
   if_ = MkGuard . Right . CompIf () [Space]
+
+-- |
+-- >>> set_ []
+-- set()
+--
+-- >>> set_ [si_ $ var_ "a"]
+-- {a}
+--
+-- >>> set_ [s_ $ var_ "a"]
+-- {*a}
+--
+-- >>> set_ [si_ $ var_ "a", s_ $ var_ "b"]
+-- {a, *b}
+--
+-- >>> set_ $ comp_ (var_ "a") (for_ $ var_ "a" `in_` set_ [si_ $ int_ 1, si_ $ int_ 2, si_ $ int_ 3]) [if_ $ var_ "a" .== 2]
+-- {a for a in [1, 2, 3] if a == 2}
+class AsSet s where
+  set_ :: s -> Raw Expr
+
+class AsSetItem s where
+  si_ :: Raw s -> Raw SetItem
+
+instance AsSetItem SetItem where
+  si_ = id
+
+instance AsSetItem Expr where
+  si_ = SetItem ()
+
+-- | See 'set_'
+instance HasStar Expr SetItem where
+  s_ = SetUnpack () [] []
+
+instance e ~ Raw SetItem => AsSet [e] where
+  set_ es =
+    case es of
+      [] -> call_ (var_ "set") []
+      a:as -> Set () [] ((a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1') []
+
+instance e ~ Comprehension SetItem => AsSet (Raw e) where
+  set_ c = SetComp () [] c []
 
 comp_ :: Raw e -> Raw CompFor -> [Raw Guard] -> Raw (Comprehension e)
 comp_ val cfor guards =

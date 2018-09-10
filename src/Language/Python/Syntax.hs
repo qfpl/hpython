@@ -299,12 +299,6 @@ module Language.Python.Syntax
   , sliceFT_
   , sliceFTS_
   , slice_
-  , Slice(..)
-    -- **** Lenses
-  , sliceLower
-  , sliceColon
-  , sliceUpper
-  , sliceStep
     -- ** Dereferencing
   , (/>)
     -- ** Unary operators
@@ -547,6 +541,7 @@ class HasStar s t | t -> s where
 class HasDoubleStar s t | t -> s where
   ss_ :: Raw s -> Raw t
 
+-- | See 'dict_'
 instance HasDoubleStar Expr DictItem where
   ss_ = DictUnpack () []
 
@@ -1561,7 +1556,7 @@ mkWith items body =
 -- with a:
 --     b
 --
--- >>> with_ [var_ "a" `as_\` id_ "name"] [line_ $ var_ "b"]
+-- >>> with_ [var_ "a" `as_` id_ "name"] [line_ $ var_ "b"]
 -- with a as name:
 --     b
 --
@@ -1733,6 +1728,9 @@ sliceTS_ x y = slice_ Nothing (Just x) (Just y)
 --
 -- >>> subs_ (var_ "a") (sliceFT_ (int_ 1) (int_ 10))
 -- a[1:10]
+--
+-- >>> sliceFT_ (int_ 1) (int_ 10)
+-- slice(1, 10, None)
 sliceFT_ :: Raw Expr -> Raw Expr -> Raw Expr
 sliceFT_ x y = slice_ (Just x) (Just y) Nothing
 

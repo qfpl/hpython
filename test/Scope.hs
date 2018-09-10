@@ -1,4 +1,4 @@
-{-# language OverloadedStrings, OverloadedLists, DataKinds #-}
+{-# language OverloadedStrings, DataKinds #-}
 module Scope (scopeTests) where
 
 import Control.Lens (has)
@@ -161,7 +161,7 @@ test_9 =
     let
       expr =
         def_ "test" []
-          [ line_ $ for_ "x" (list_ [1]) [ line_ pass_ ]
+          [ line_ $ for_ ("x" `in_` list_ [li_ $ int_ 1]) [ line_ pass_ ]
           , line_ $ var_ "x"
           ]
     res <- fullyValidate expr
@@ -174,7 +174,7 @@ test_10 =
     let
       expr =
         def_ "test" []
-          [ line_ $ for_ "x" (list_ [1]) [ line_ $ var_ "x" ]
+          [ line_ $ for_ ("x" `in_` list_ [li_ $ int_ 1]) [ line_ $ var_ "x" ]
           ]
     res <- fullyValidate expr
     annotateShow res
@@ -187,7 +187,7 @@ test_11 =
       expr =
         def_ "test" []
           [ line_ ("x" .= 2)
-          , line_ $ for_ "x" (list_ [1]) [ line_ pass_ ]
+          , line_ $ for_ ("x" `in_` list_ [li_ $ int_ 1]) [ line_ pass_ ]
           ]
     res <- fullyValidate expr
     annotateShow res

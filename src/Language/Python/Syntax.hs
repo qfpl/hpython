@@ -7,7 +7,6 @@ passing @['line_' 'pass_']@
 
 {-# language DataKinds #-}
 {-# language MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
-{-# language OverloadedLists #-}
 {-# language LambdaCase #-}
 {-# language RankNTypes #-}
 {-# language RecordWildCards #-}
@@ -245,6 +244,8 @@ module Language.Python.Syntax
   , yieldFrom_
     -- ** Tuples
   , tuple_
+  , Tuple(..)
+  , _Tuple
   , AsTupleItem(..)
   , TupleItem()
     -- ** Function calls
@@ -259,11 +260,21 @@ module Language.Python.Syntax
   , callArguments
   , callRightParen
     -- ** Literals
+    -- *** @None@
   , none_
+  , None(..)
+  , _None
+    -- **** Lenses
+  , noneAnn
+  , noneWhitespace
+    -- *** Strings 
   , str_
+    -- *** Integers
   , int_
+    -- *** Booleans
   , true_
   , false_
+    -- *** Ellipses
   , ellipsis_
     -- ** Lists
   , AsList(..)
@@ -278,6 +289,16 @@ module Language.Python.Syntax
   , SetItem()
     -- ** Lambdas
   , lambda_
+    -- ** Subscripting
+  , subs_
+    -- *** Slicing
+  , sliceF_
+  , sliceFS_
+  , sliceT_
+  , sliceTS_
+  , sliceFT_
+  , sliceFTS_
+  , slice_
     -- ** Dereferencing
   , (/>)
     -- ** Unary operators
@@ -306,17 +327,18 @@ module Language.Python.Syntax
   )
 where
 
-import Data.Function ((&))
-import Data.String (fromString)
-import Control.Lens.Fold ((^..), folded)
+import Control.Applicative ((<|>))
+import Control.Lens.Fold ((^..), (^?), folded)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
 import Control.Lens.Lens (Lens')
-import Control.Lens.Prism (_Right)
+import Control.Lens.Prism (_Right, _Just)
 import Control.Lens.Review ((#))
 import Control.Lens.Setter ((.~), (<>~), (?~), (%~), Setter', over)
 import Control.Lens.Traversal (traverseOf)
 import Control.Lens.Tuple (_2)
+import Data.Function ((&))
+import Data.String (fromString)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe)
 import Data.Semigroup ((<>))
@@ -519,6 +541,7 @@ class HasStar s t | t -> s where
 class HasDoubleStar s t | t -> s where
   ss_ :: Raw s -> Raw t
 
+-- | See 'dict_'
 instance HasDoubleStar Expr DictItem where
   ss_ = DictUnpack () []
 
@@ -1228,7 +1251,7 @@ mkFor binder collection body =
   , _forIndents = Indents [] ()
   , _forAsync = Nothing
   , _forFor = [Space]
-  , _forBinder = binder
+  , _forBinder = binder & trailingWhitespace .~ [Space]
   , _forIn = [Space]
   , _forCollection = collection
   , _forBody = SuiteMany () [] (LF Nothing) $ toBlock body
@@ -1477,7 +1500,7 @@ mkClassDef name body =
   { _cdAnn = ()
   , _cdDecorators = []
   , _cdIndents = Indents [] ()
-  , _cdClass = [Space]
+  , _cdClass = Space :| []
   , _cdName = name
   , _cdArguments = Nothing
   , _cdBody = SuiteMany () [] (LF Nothing) $ toBlock body
@@ -1533,7 +1556,7 @@ mkWith items body =
 -- with a:
 --     b
 --
--- >>> with_ [var_ "a" `as_\` id_ "name"] [line_ $ var_ "b"]
+-- >>> with_ [var_ "a" `as_` id_ "name"] [line_ $ var_ "b"]
 -- with a as name:
 --     b
 --
@@ -1640,3 +1663,178 @@ yield_ a = Yield () (maybe [] (const [Space]) a) a
 
 yieldFrom_ :: Raw Expr -> Raw Expr
 yieldFrom_ = YieldFrom () [Space] [Space]
+
+-- | The slice with no bounds
+--
+-- >>> subs_ (var_ "a") fullSlice_
+-- a[:]
+--
+-- >>> fullSlice_
+-- slice(None, None, None)
+fullSlice_ :: Raw Expr
+fullSlice_ = slice_ Nothing Nothing Nothing
+
+-- | Slice with *step* x
+--
+-- >>> subs_ (var_ "a") (sliceS_ $ int_ (-1))
+-- a[::-1]
+--
+-- >>> sliceS_ $ int_ (-1)
+-- slice(None, None, -1)
+sliceS_ :: Raw Expr -> Raw Expr
+sliceS_ x = slice_ Nothing Nothing (Just x)
+
+-- | Slice *from* x
+--
+-- >>> subs_ (var_ "a") (sliceF_ $ int_ 0)
+-- a[1:]
+--
+-- >>> sliceF_ $ int_ 0
+-- slice(1, None, None)
+sliceF_ :: Raw Expr -> Raw Expr
+sliceF_ x = slice_ (Just x) Nothing Nothing
+
+-- | Slice *from* x, with *step* y
+--
+-- >>> subs_ (var_ "a") (sliceFS_ (int_ 0) (int_ 2))
+-- a[1::2]
+--
+-- >>> sliceFS_ (int_ 0) (int_ 2)
+-- slice(1, None, 2)
+sliceFS_ :: Raw Expr -> Raw Expr -> Raw Expr
+sliceFS_ x y = slice_ (Just x) Nothing (Just y)
+
+-- | Slice *to* x
+--
+-- >>> subs_ (var_ "a") (sliceT_ $ int_ 10)
+-- a[:10]
+--
+-- >>> sliceT_ $ int_ 10
+-- slice(None, 10, None)
+sliceT_ :: Raw Expr -> Raw Expr
+sliceT_ x = slice_ Nothing (Just x) Nothing
+
+-- | Slice *to* x, with *step* y
+--
+-- >>> subs_ (var_ "a") (sliceTS_ (int_ 10) (int_ 2))
+-- a[:10:2]
+--
+-- >>> sliceTS_ (int_ 10) (int_ 2)
+-- slice(None, 10, 2)
+sliceTS_ :: Raw Expr -> Raw Expr -> Raw Expr
+sliceTS_ x y = slice_ Nothing (Just x) (Just y)
+
+-- | Slice *from* x *to* y
+--
+-- >>> subs_ (var_ "a") (sliceFT_ (int_ 1) (int_ 10))
+-- a[1:10]
+--
+-- >>> sliceFT_ (int_ 1) (int_ 10)
+-- slice(1, 10, None)
+sliceFT_ :: Raw Expr -> Raw Expr -> Raw Expr
+sliceFT_ x y = slice_ (Just x) (Just y) Nothing
+
+-- | Slice *from* x *to* y, with *step* z
+--
+-- >>> subs_ (var_ "a") (sliceFTS_ (int_ 1) (int_ 10) (int_ 2))
+-- a[1:10:2]
+--
+-- >>> sliceFTS_ (int_ 1) (int_ 10) (int_ 2)
+-- slice(1, 10, 2)
+sliceFTS_ :: Raw Expr -> Raw Expr -> Raw Expr -> Raw Expr
+sliceFTS_ x y z = slice_ (Just x) (Just y) (Just z)
+
+-- | A slice object
+--
+-- Represents a call to a functionc named \"slice\", with 3 arguments.
+-- If an argument is a 'Nothing' then it becomes a @None@, and if the argument is a
+-- 'Just' then the contents are extracted.
+slice_ :: Maybe (Raw Expr) -> Maybe (Raw Expr) -> Maybe (Raw Expr) -> Raw Expr
+slice_ a b c =
+  call_ (var_ "slice")
+    [ p_ $ fromMaybe none_ a
+    , p_ $ fromMaybe none_ b
+    , p_ $ fromMaybe none_ c
+    ]
+
+-- |
+-- >>> subs_ (var_ "a") (int_ 1)
+-- a[1]
+--
+-- >>> subs_ (var_ "a") (tuple_ [ti_ $ int_ 1])
+-- a[1,]
+--
+-- >>> subs_ (var_ "a") (tuple_ [ti_ $ int_ 1, ti_ $ int_ 2])
+-- a[1, 2]
+--
+-- >>> subs_ (var_ "a") (tuple_ [s_ $ var_ "b"])
+-- a[((*b),)]
+--
+-- >>> subs_ (var_ "a") (tuple_ [ti_ $ int_ 1, s_ $ var_ "b"])
+-- a[(1, *b)]
+subs_ :: Raw Expr -> Raw Expr -> Raw Expr
+subs_ a e =
+  Subscript () a
+    []
+    (exprToSubscript e ^. _CommaSep1')
+    []
+  where
+    exprToSubscript
+      :: Raw Expr
+      -> (Raw Subscript, [([Whitespace], Raw Subscript)], Maybe [Whitespace])
+    exprToSubscript e =
+      let
+        notSlice :: (Raw Subscript, [([Whitespace], Raw Subscript)], Maybe [Whitespace])
+        notSlice =
+          case e ^? _Tuple of
+            Nothing -> (SubscriptExpr e, [], Nothing)
+            Just tup ->
+              let
+                h = tup ^. tupleHead
+                ws = tup ^. tupleComma
+                t = tup ^? tupleTail._Just.from _CommaSep1'
+                res =
+                  case t of
+                    Just (a, bs, c) ->
+                      (,,) <$>
+                      fromTupleItem h <*>
+                      traverseOf (traverse._2) fromTupleItem ((ws, a) : bs) <*>
+                      pure c
+                    Nothing -> (\a -> (a, [], Just ws)) <$> fromTupleItem h
+              in
+                fromMaybe (SubscriptExpr e, [], Nothing) res
+      in
+        maybe notSlice (\a -> (a, [], Nothing)) $ mkSlice e
+      where
+        mkSlice
+          :: Raw Expr
+          -> Maybe (Raw Subscript)
+        mkSlice e = do
+          c <- e ^? _Call
+          case c ^? callFunction._Ident.identValue of
+            Just "slice" ->
+              pure $ case c ^.. callArguments.folded.folded of
+                [PositionalArg _ x] ->
+                  SubscriptSlice Nothing [] (Just x) Nothing
+                [PositionalArg _ x, PositionalArg _ y] ->
+                  SubscriptSlice
+                    (noneToMaybe x)
+                    []
+                    (noneToMaybe y)
+                    Nothing
+                [PositionalArg _ x, PositionalArg _ y, PositionalArg _ z] ->
+                  SubscriptSlice
+                    (noneToMaybe x)
+                    []
+                    (noneToMaybe y)
+                    ((,) [] . Just <$> noneToMaybe z)
+                _ -> SubscriptExpr e
+            _ -> Nothing
+
+        noneToMaybe x = fromMaybe (Just x) $ Nothing <$ (x ^? _None)
+
+        fromTupleItem
+          :: Raw TupleItem
+          -> Maybe (Raw Subscript)
+        fromTupleItem (TupleItem _ a) = mkSlice a <|> pure (SubscriptExpr a)
+        fromTupleItem _ = Nothing

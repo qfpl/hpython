@@ -8,6 +8,7 @@ import Language.Python.Parse (parseStatement, parseExpr)
 import Language.Python.Validate.Indentation
 import Language.Python.Validate.Syntax
 
+import DSL
 import LexerParser
 import Scope
 import Roundtrip
@@ -193,6 +194,7 @@ statement_printparseprint_print =
 
 main = do
   checkParallel lexerParserTests
+  traverse checkParallel dslTests
   checkParallel scopeTests
   checkParallel roundtripTests
   let file = "hedgehog-test.py"

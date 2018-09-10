@@ -4,9 +4,10 @@ module Roundtrip (roundtripTests) where
 
 import Control.Monad.IO.Class (liftIO)
 import Data.String (fromString)
+import Data.Text (Text)
 import Data.Validate (Validate(..), validate)
 import Hedgehog
-  ( (===), Group(..), Property, annotateShow, failure, property
+  ( (===), Group(..), Property, PropertyT, annotateShow, failure, property
   , withTests, withShrinks
   )
 import System.FilePath ((</>))
@@ -27,7 +28,7 @@ import Language.Python.Validate.Syntax.Error (SyntaxError)
 roundtripTests :: Group
 roundtripTests =
   Group "Roundtrip tests" $
-  (\name -> (fromString name, withTests 1 . withShrinks 1 $ doRoundtrip name)) <$>
+  (\name -> (fromString name, withTests 1 . withShrinks 1 $ doRoundtripFile name)) <$>
   [ "asyncstatements.py"
   , "typeann.py"
   , "dictcomp.py"
@@ -54,10 +55,14 @@ roundtripTests =
   , "pandas2.py"
   ]
 
-doRoundtrip :: FilePath -> Property
-doRoundtrip name =
+doRoundtripFile :: FilePath -> Property
+doRoundtripFile name =
   property $ do
     file <- liftIO . StrictText.readFile $ "test/files" </> name
+    doRoundtrip file
+
+doRoundtrip :: Text -> PropertyT IO ()
+doRoundtrip file = do
     py <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" file
     case runValidateIndentation $ validateModuleIndentation py of
       Failure errs -> annotateShow (errs :: [IndentationError '[] SrcInfo]) *> failure

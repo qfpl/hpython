@@ -1,4 +1,5 @@
 {-# language DataKinds #-}
+{-# language KindSignatures #-}
 {-# language TemplateHaskell #-}
 module Language.Python.Syntax.Types where
 
@@ -152,7 +153,7 @@ data ClassDef v a
   , _cdName :: Ident v a
   , _cdArguments :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace])
   , _cdBody :: Suite v a
-  }
+  } deriving (Eq, Show)
 makeLenses ''ClassDef
 
 data With v a
@@ -163,5 +164,21 @@ data With v a
   , _withWith :: [Whitespace]
   , _withItems :: CommaSep1 (WithItem v a)
   , _withBody :: Suite v a
-  }
+  } deriving (Eq, Show)
 makeLenses ''With
+
+data Tuple v a
+  = MkTuple
+  { _tupleAnn :: a
+  , _tupleHead :: TupleItem v a
+  , _tupleComma :: [Whitespace]
+  , _tupleTail :: Maybe (CommaSep1' (TupleItem v a))
+  } deriving (Eq, Show)
+makeLenses ''Tuple
+
+data None (v :: [*]) a
+  = MkNone
+  { _noneAnn :: a
+  , _noneWhitespace :: [Whitespace]
+  } deriving (Eq, Show)
+makeLenses ''None

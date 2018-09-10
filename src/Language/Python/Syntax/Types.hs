@@ -1,4 +1,5 @@
 {-# language DataKinds #-}
+{-# language KindSignatures #-}
 {-# language TemplateHaskell #-}
 module Language.Python.Syntax.Types where
 
@@ -165,3 +166,28 @@ data With v a
   , _withBody :: Suite v a
   }
 makeLenses ''With
+
+data Slice v a
+  = MkSlice
+  { _sliceLower :: Maybe (Expr v a)
+  , _sliceColon :: [Whitespace]
+  , _sliceUpper :: Maybe (Expr v a)
+  , _sliceStep :: Maybe ([Whitespace], Maybe (Expr v a))
+  }
+makeLenses ''Slice
+
+data Tuple v a
+  = MkTuple
+  { _tupleAnn :: a
+  , _tupleHead :: TupleItem v a
+  , _tupleComma :: [Whitespace]
+  , _tupleTail :: Maybe (CommaSep1' (TupleItem v a))
+  }
+makeLenses ''Tuple
+
+data None (v :: [*]) a
+  = MkNone
+  { _noneAnn :: a
+  , _noneWhitespace :: [Whitespace]
+  }
+makeLenses ''None

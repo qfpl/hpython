@@ -18,6 +18,22 @@ import Language.Python.Internal.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax.Types
 
+_Tuple :: Prism (Expr v a) (Expr '[] a) (Tuple v a) (Tuple '[] a)
+_Tuple =
+  prism
+    (\(MkTuple a b c d) -> Tuple a b c d)
+    (\case
+        Tuple a b c d -> Right (MkTuple a b c d)
+        a -> Left $ a ^. unvalidated)
+
+_None :: Prism (Expr v a) (Expr '[] a) (None v a) (None '[] a)
+_None =
+  prism
+    (\(MkNone a b) -> None a b)
+    (\case
+        None a b -> Right (MkNone a b)
+        a -> Left $ a ^. unvalidated)
+
 _KeywordParam
   :: Prism
        (Param v a)

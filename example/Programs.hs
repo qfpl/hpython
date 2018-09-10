@@ -1,10 +1,11 @@
-{-# language OverloadedLists, OverloadedStrings #-}
+{-# language OverloadedStrings #-}
 {-# language FlexibleContexts #-}
 module Programs where
 
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
 import Data.Function ((&))
+import Data.List.NonEmpty (NonEmpty(..))
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax
 
@@ -20,7 +21,7 @@ append_to =
   CompoundStatement $
   Fundef () [] (Indents [] ())
     Nothing
-    [Space]
+    (Space :| [])
     "append_to"
     []
     ( CommaSepMany (PositionalParam () "element" Nothing) [Space] $
@@ -28,9 +29,9 @@ append_to =
     )
     []
     Nothing
-    (SuiteMany () [] (LF Nothing) $
-     Block
-     [ Right $
+    (SuiteMany () [] (LF Nothing) .
+     Block $
+     ( Right $
        SmallStatements
          (Indents [replicate 4 Space ^. from indentWhitespaces] ())
          (Expr () $
@@ -42,13 +43,14 @@ append_to =
          []
          Nothing
          (Right $ LF Nothing)
-     , Right $
-       SmallStatements
-         (Indents [replicate 4 Space ^. from indentWhitespaces] ())
-         (Return () [Space] (Just $ Ident "to"))
-         []
-         Nothing
-         (Right $ LF Nothing)
+     ) :|
+     [ Right $
+         SmallStatements
+           (Indents [replicate 4 Space ^. from indentWhitespaces] ())
+           (Return () [Space] (Just $ Ident "to"))
+           []
+           Nothing
+           (Right $ LF Nothing)
      ])
 
 -- |
@@ -80,7 +82,7 @@ fact_tr =
   [ line_ $
     def_ "go" [p_ "n", p_ "acc"]
       [ line_ $
-        if_ ("n" .== 0) [line_ $ return_ "acc"] &
+        if_ ("n" .== 0) ([line_ $ return_ (var_ "acc")] :: [Raw Line]) &
         else_ [line_ . return_ $ call_ "go" [p_ $ "n" .- 1, p_ $ "n" .* "acc"]]
       ]
   , line_ . return_ $ call_ "go" [p_ "n", p_ 1]

@@ -460,26 +460,51 @@ genBytesLiteral gChar =
   genString gChar <*>
   genWhitespaces
 
-genRawString :: MonadGen m => m (RawString String)
-genRawString = Gen.just . fmap (preview _RawString) $ Gen.string (Range.constant 0 100) (Gen.filter (/= '\0') Gen.ascii)
+genLongRawString :: MonadGen m => m (LongRawString String)
+genLongRawString =
+  Gen.just .
+  fmap (preview _LongRawString) $
+  Gen.string
+    (Range.constant 0 100)
+    (Gen.filter (/= '\0') Gen.ascii)
+
+genShortRawString :: MonadGen m => m (ShortRawString String)
+genShortRawString =
+  Gen.just .
+  fmap (preview _ShortRawString) $
+  Gen.string
+    (Range.constant 0 100)
+    (Gen.filter (`notElem` "\0\r\n") Gen.ascii)
 
 genRawStringLiteral :: MonadGen m => m (StringLiteral ())
 genRawStringLiteral =
-  RawStringLiteral () <$>
-  genRawStringPrefix <*>
-  genQuoteType <*>
-  genStringType <*>
-  genRawString <*>
-  genWhitespaces
+  Gen.choice
+  [ LongRawStringLiteral () <$>
+    genRawStringPrefix <*>
+    genQuoteType <*>
+    genLongRawString <*>
+    genWhitespaces
+  , ShortRawStringLiteral () <$>
+    genRawStringPrefix <*>
+    genQuoteType <*>
+    genShortRawString <*>
+    genWhitespaces
+  ]
 
 genRawBytesLiteral :: MonadGen m => m (StringLiteral ())
 genRawBytesLiteral =
-  RawBytesLiteral () <$>
-  genRawBytesPrefix <*>
-  genQuoteType <*>
-  genStringType <*>
-  genRawString <*>
-  genWhitespaces
+  Gen.choice
+  [ LongRawBytesLiteral () <$>
+    genRawBytesPrefix <*>
+    genQuoteType <*>
+    genLongRawString <*>
+    genWhitespaces
+  , ShortRawBytesLiteral () <$>
+    genRawBytesPrefix <*>
+    genQuoteType <*>
+    genShortRawString <*>
+    genWhitespaces
+  ]
 
 genTupleItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (TupleItem v ())
 genTupleItem ws ge =

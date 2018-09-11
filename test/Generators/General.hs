@@ -187,7 +187,7 @@ genPyChar =
   , pure Char_esc_r
   , pure Char_esc_t
   , pure Char_esc_v
-  , Char_lit <$> Gen.latin1
+  , head . fromHaskellString . pure <$> Gen.latin1
   ]
 
 genExpr' :: MonadGen m => Bool -> m (Expr '[] ())

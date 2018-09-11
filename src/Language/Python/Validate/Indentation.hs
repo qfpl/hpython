@@ -1,5 +1,6 @@
 {-# language DataKinds, TypeOperators #-}
 {-# language ScopedTypeVariables, TypeApplications #-}
+{-# language LambdaCase #-}
 module Language.Python.Validate.Indentation
   ( module Language.Python.Validate.Indentation.Error
   , Indentation
@@ -20,10 +21,16 @@ module Language.Python.Validate.Indentation
   )
 where
 
-import Control.Lens ((#), _Wrapped, over, _2, traverseOf, _Right)
-import Control.Lens.Fold ((^?!), folded)
+import Control.Lens.Fold ((^?!), anyOf, folded)
 import Control.Lens.Getter ((^.))
+import Control.Lens.Prism (_Right)
+import Control.Lens.Review ((#))
+import Control.Lens.Setter (over, mapped)
+import Control.Lens.Traversal (traverseOf)
+import Control.Lens.Tuple (_2)
+import Control.Lens.Wrapped (_Wrapped)
 import Control.Monad.State (State, evalState, get, put)
+import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
 import Data.Foldable (fold)
 import Data.Functor.Compose (Compose(..))
@@ -300,7 +307,10 @@ validateStatementIndentation
   -> ValidateIndentation e (Statement (Nub (Indentation ': v)) a)
 validateStatementIndentation (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementIndentation c
-validateStatementIndentation s@SmallStatements{} = pure $ unsafeCoerce s
+validateStatementIndentation (SmallStatements idnt a b c d) =
+  (\idnt' ->
+     SmallStatements idnt' (unsafeCoerce a) (over (mapped._2) unsafeCoerce b) c d) <$>
+  checkIndent idnt
 
 validateModuleIndentation
   :: AsIndentationError e v a
@@ -308,5 +318,15 @@ validateModuleIndentation
   -> ValidateIndentation e (Module (Nub (Indentation ': v)) a)
 validateModuleIndentation =
   traverseOf
-    (_Wrapped.traverse._Right)
-    (\a -> setNextIndent EqualTo [] *> validateStatementIndentation a)
+    (_Wrapped.traverse)
+    (bitraverse
+      (\(a, b, c) ->
+         (a, b, c) <$
+         if
+           anyOf
+             (indentsValue.folded.indentWhitespaces.folded)
+             (\case; Continued{} -> True; _ -> False)
+             a
+         then setNextIndent EqualTo [] <* checkIndent a
+         else pure ())
+      (\a -> setNextIndent EqualTo [] *> validateStatementIndentation a))

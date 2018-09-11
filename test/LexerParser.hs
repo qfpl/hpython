@@ -3,7 +3,7 @@ module LexerParser (lexerParserTests) where
 
 import Control.Monad.Except (throwError)
 import Data.Functor.Alt ((<!>))
-import Data.Validate (validate)
+import Data.Validate (Validate(..), validate)
 import qualified Data.Text as Text
 import qualified Data.Functor.Alt as Alt (many)
 import Hedgehog
@@ -39,6 +39,10 @@ lexerParserTests =
   , ("Test full trip 15", test_fulltrip_15)
   , ("Test full trip 16", test_fulltrip_16)
   , ("Test full trip 17", test_fulltrip_17)
+  , ("Test full trip 18", test_fulltrip_18)
+  , ("Test full trip 19", test_fulltrip_19)
+  , ("Test full trip 20", test_fulltrip_20)
+  , ("Test full trip 21", test_fulltrip_21)
   ]
 
 test_fulltrip_1 :: Property
@@ -260,6 +264,60 @@ test_fulltrip_17 =
     annotateShow $! tree
 
     showModule tree === str
+
+test_fulltrip_18 :: Property
+test_fulltrip_18 =
+  withTests 1 . property $ do
+    let str = "\"\0\""
+
+    tree <- validate (const failure) pure $ parseModule "test" str
+    annotateShow $! tree
+
+    showModule tree === str
+
+test_fulltrip_19 :: Property
+test_fulltrip_19 =
+  withTests 1 . property $ do
+    let str = " \\\n"
+
+    let res = parseModule "test" str
+    case res of
+      Failure{} -> success
+      Success a -> do
+        annotateShow a
+        failure
+
+test_fulltrip_20 :: Property
+test_fulltrip_20 =
+  withTests 1 . property $ do
+    let str = " pass"
+
+    let res = parseModule "test" str
+    case res of
+      Failure{} -> success
+      Success a -> do
+        annotateShow a
+        failure
+
+test_fulltrip_21 :: Property
+test_fulltrip_21 =
+  withTests 1 . property $ do
+    let str = "if a:\n  \\\n\n  pass"
+
+    tks <-
+      case tokenize "test" str of
+        Left{} -> failure
+        Right a -> pure a
+    let lls = logicalLines tks
+    annotateShow lls
+    failure
+
+    let res = parseModule "test" str
+    case res of
+      Failure{} -> success
+      Success a -> do
+        annotateShow a
+        failure
 
 parseTab :: Parser ann Whitespace
 parseTab = do

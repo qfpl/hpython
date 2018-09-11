@@ -10,7 +10,7 @@ import Language.Python.Internal.Syntax.Strings
   , RawStringPrefix(..), RawBytesPrefix(..)
   , QuoteType(..), StringType(..), PyChar(..)
   )
-import Language.Python.Internal.Syntax.Strings.Raw (RawString(..))
+import Language.Python.Internal.Syntax.Strings.Raw (LongRawString(..), ShortRawString(..))
 import Language.Python.Internal.Syntax.Whitespace (Newline(..))
 
 data PyToken a
@@ -55,8 +55,10 @@ data PyToken a
   | TkIdent String a
   | TkString (Maybe StringPrefix) QuoteType StringType [PyChar] a
   | TkBytes BytesPrefix QuoteType StringType [PyChar] a
-  | TkRawString RawStringPrefix QuoteType StringType (RawString [Char]) a
-  | TkRawBytes RawBytesPrefix QuoteType StringType (RawString [Char]) a
+  | TkLongRawString RawStringPrefix QuoteType (LongRawString [Char]) a
+  | TkShortRawString RawStringPrefix QuoteType (ShortRawString [Char]) a
+  | TkLongRawBytes RawBytesPrefix QuoteType (LongRawString [Char]) a
+  | TkShortRawBytes RawBytesPrefix QuoteType (ShortRawString [Char]) a
   | TkSpace a
   | TkTab a
   | TkNewline Newline a
@@ -159,8 +161,10 @@ pyTokenAnn tk =
     TkIdent _ a -> a
     TkString _ _ _ _ a -> a
     TkBytes _ _ _ _ a -> a
-    TkRawString _ _ _ _ a -> a
-    TkRawBytes _ _ _ _ a -> a
+    TkLongRawString _ _ _ a -> a
+    TkShortRawString _ _ _ a -> a
+    TkLongRawBytes _ _ _ a -> a
+    TkShortRawBytes _ _ _ a -> a
     TkSpace a -> a
     TkTab a -> a
     TkNewline _ a -> a

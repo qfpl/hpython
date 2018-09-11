@@ -4,10 +4,20 @@ module Language.Python.Internal.Syntax.Strings where
 
 import Control.Lens.Lens (lens)
 import Data.Digit.Octal (OctDigit)
-import Data.Digit.HeXaDeCiMaL (HeXDigit)
+import Data.Digit.HeXaDeCiMaL (HeXDigit(..))
 
 import Language.Python.Internal.Syntax.Whitespace
 import Language.Python.Internal.Syntax.Strings.Raw
+
+data QuoteType
+  = SingleQuote
+  | DoubleQuote
+  deriving (Eq, Show)
+
+data StringType
+  = ShortString
+  | LongString
+  deriving (Eq, Show)
 
 data StringPrefix
   = Prefix_u
@@ -36,12 +46,18 @@ data RawBytesPrefix
   deriving (Eq, Show)
 
 data StringLiteral a
-  = RawStringLiteral
+  = LongRawStringLiteral
   { _stringLiteralAnn :: a
   , _unsafeRawStringLiteralPrefix :: RawStringPrefix
   , _stringLiteralQuoteType :: QuoteType
-  , _stringLiteralType :: StringType
-  , _unsafeRawStringLiteralValue :: RawString [Char]
+  , _unsafeLongRawStringLiteralValue :: LongRawString [Char]
+  , _stringLiteralWhitespace :: [Whitespace]
+  }
+  | ShortRawStringLiteral
+  { _stringLiteralAnn :: a
+  , _unsafeRawStringLiteralPrefix :: RawStringPrefix
+  , _stringLiteralQuoteType :: QuoteType
+  , _unsafeShortRawStringLiteralValue :: ShortRawString [Char]
   , _stringLiteralWhitespace :: [Whitespace]
   }
   | StringLiteral
@@ -52,12 +68,18 @@ data StringLiteral a
   , _unsafeStringLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }
-  | RawBytesLiteral
+  | LongRawBytesLiteral
   { _stringLiteralAnn :: a
   , _unsafeRawBytesLiteralPrefix :: RawBytesPrefix
   , _stringLiteralQuoteType :: QuoteType
-  , _stringLiteralType :: StringType
-  , _unsafeRawBytesLiteralValue :: RawString [Char]
+  , _unsafeLongRawBytesLiteralValue :: LongRawString [Char]
+  , _stringLiteralWhitespace :: [Whitespace]
+  }
+  | ShortRawBytesLiteral
+  { _stringLiteralAnn :: a
+  , _unsafeRawBytesLiteralPrefix :: RawBytesPrefix
+  , _stringLiteralQuoteType :: QuoteType
+  , _unsafeShortRawBytesLiteralValue :: ShortRawString [Char]
   , _stringLiteralWhitespace :: [Whitespace]
   }
   | BytesLiteral
@@ -74,25 +96,19 @@ instance HasTrailingWhitespace (StringLiteral a) where
   trailingWhitespace =
     lens
       (\case
-          RawStringLiteral _ _ _ _ _ ws -> ws
+          LongRawStringLiteral _ _ _ _ ws -> ws
+          ShortRawStringLiteral _ _ _ _ ws -> ws
           StringLiteral _ _ _ _ _ ws -> ws
-          RawBytesLiteral _ _ _ _ _ ws -> ws
+          LongRawBytesLiteral _ _ _ _ ws -> ws
+          ShortRawBytesLiteral _ _ _ _ ws -> ws
           BytesLiteral _ _ _ _ _ ws -> ws)
       (\s ws -> case s of
           StringLiteral a b c d e _ -> StringLiteral a b c d e ws
-          RawStringLiteral a b c d e _ -> RawStringLiteral a b c d e ws
+          LongRawStringLiteral a b c d _ -> LongRawStringLiteral a b c d ws
+          ShortRawStringLiteral a b c d _ -> ShortRawStringLiteral a b c d ws
           BytesLiteral a b c d e _ -> BytesLiteral a b c d e ws
-          RawBytesLiteral a b c d e _ -> RawBytesLiteral a b c d e ws)
-
-data QuoteType
-  = SingleQuote
-  | DoubleQuote
-  deriving (Eq, Show)
-
-data StringType
-  = ShortString
-  | LongString
-  deriving (Eq, Show)
+          LongRawBytesLiteral a b c d _ -> LongRawBytesLiteral a b c d ws
+          ShortRawBytesLiteral a b c d _ -> ShortRawBytesLiteral a b c d ws)
 
 data PyChar
   = Char_newline
@@ -124,3 +140,21 @@ data PyChar
   | Char_esc_v
   | Char_lit Char
   deriving (Eq, Show)
+
+fromHaskellString :: String -> [PyChar]
+fromHaskellString "" = []
+fromHaskellString (c:cs) =
+  (case c of
+    '\\' -> Char_esc_bslash
+    '\'' -> Char_esc_singlequote
+    '\"' -> Char_esc_doublequote
+    '\a' -> Char_esc_a
+    '\b' -> Char_esc_b
+    '\f' -> Char_esc_f
+    '\n' -> Char_esc_n
+    '\r' -> Char_esc_r
+    '\t' -> Char_esc_t
+    '\v' -> Char_esc_v
+    -- '\0' -> Char_hex HeXDigit0 HeXDigit0
+    _ -> Char_lit c) :
+  fromHaskellString cs

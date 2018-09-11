@@ -354,10 +354,14 @@ stringOrBytes ws =
          StringLiteral ann sp qt st val <$ consumed' ann
        TkBytes sp qt st val ann ->
          BytesLiteral ann sp qt st val <$ consumed' ann
-       TkRawString sp qt st val ann ->
-         RawStringLiteral ann sp qt st val <$ consumed' ann
-       TkRawBytes sp qt st val ann ->
-         RawBytesLiteral ann sp qt st val <$ consumed' ann
+       TkLongRawString sp qt val ann ->
+         LongRawStringLiteral ann sp qt val <$ consumed' ann
+       TkShortRawString sp qt val ann ->
+         ShortRawStringLiteral ann sp qt val <$ consumed' ann
+       TkLongRawBytes sp qt val ann ->
+         LongRawBytesLiteral ann sp qt val <$ consumed' ann
+       TkShortRawBytes sp qt val ann ->
+         ShortRawBytesLiteral ann sp qt val <$ consumed' ann
        _ -> throwError $ ExpectedStringOrBytes curTk) <*>
      many ws
 
@@ -388,7 +392,7 @@ exprList ws =
   (\e ->
      maybe
        e
-       (uncurry $ Tuple (_exprAnn e) e)) <$>
+       (uncurry $ Tuple (e ^. exprAnn) e)) <$>
   expr ws <*>
   optional
     ((,) <$>
@@ -427,8 +431,8 @@ exprComp ws =
      case a of
        Nothing -> ex
        Just (cf, rest) ->
-         Generator (_exprAnn ex) $
-         Comprehension (_exprAnn ex) ex cf rest) <$>
+         Generator (ex ^. exprAnn) $
+         Comprehension (ex ^. exprAnn) ex cf rest) <$>
   expr ws <*>
   optional ((,) <$> compFor <*> many (Left <$> compFor <!> Right <$> compIf))
 
@@ -444,10 +448,10 @@ exprListComp ws =
      case a of
        Left (cf, cfs) ->
          let
-           ann = _exprAnn e
+           ann = e ^. exprAnn
          in
            Generator ann $ Comprehension ann e cf cfs
-       Right (Just (c, cs)) -> Tuple (_exprAnn e) e c cs
+       Right (Just (c, cs)) -> Tuple (e ^. exprAnn) e c cs
        Right Nothing -> e) <$>
   (expr ws <!> starExpr ws) <*>
   (Left <$>
@@ -462,7 +466,7 @@ exprListComp ws =
 
 orExprList :: Parser ann Whitespace -> Parser ann (Expr ann)
 orExprList ws =
-  (\e -> maybe e (uncurry $ Tuple (_exprAnn e) e)) <$>
+  (\e -> maybe e (uncurry $ Tuple (e ^. exprAnn) e)) <$>
   (orExpr ws <!> starExpr ws) <*>
   optional
     ((,) <$>
@@ -474,7 +478,7 @@ binOp op tm =
   (\t ts ->
       case ts of
         [] -> t
-        _ -> foldl (\tm (o, val) -> BinOp (_exprAnn tm) tm o val) t ts) <$>
+        _ -> foldl (\tm (o, val) -> BinOp (tm ^. exprAnn) tm o val) t ts) <$>
   tm <*>
   many ((,) <$> op <*> tm)
 
@@ -533,7 +537,7 @@ exprNoCond ws = orTest ws <!> lambdaNoCond ws
 
 expr :: Parser ann Whitespace -> Parser ann (Expr ann)
 expr ws =
-  (\a -> maybe a (\(b, c, d, e) -> Ternary (_exprAnn a) a b c d e)) <$>
+  (\a -> maybe a (\(b, c, d, e) -> Ternary (a ^. exprAnn) a b c d e)) <$>
   orTest ws <*>
   optional
     ((,,,) <$>
@@ -593,7 +597,7 @@ orExpr ws =
 
     powerOp = (\(tk, ws) -> Exp (pyTokenAnn tk) ws) <$> token ws (TkDoubleStar ())
     power =
-      (\a -> maybe a (uncurry $ BinOp (_exprAnn a) a)) <$>
+      (\a -> maybe a (uncurry $ BinOp (a ^. exprAnn) a)) <$>
       atomExpr <*>
       optional ((,) <$> powerOp <*> factor)
 
@@ -615,20 +619,20 @@ orExpr ws =
               optional ((,) <$> (snd <$> colon anySpace) <*> optional (expr anySpace))
 
     trailer =
-      (\a b c -> Deref (_exprAnn c) c a b) <$>
+      (\a b c -> Deref (c ^. exprAnn) c a b) <$>
       (snd <$> token ws (TkDot ())) <*>
       identifier ws
 
       <!>
 
-      (\a b c d -> Call (_exprAnn d) d a b c) <$>
+      (\a b c d -> Call (d ^. exprAnn) d a b c) <$>
       (snd <$> token anySpace (TkLeftParen ())) <*>
       optional (commaSep1' anySpace arg) <*>
       (snd <$> token anySpace (TkRightParen ()))
 
       <!>
 
-      (\a b c d -> Subscript (_exprAnn d) d a b c) <$>
+      (\a b c d -> Subscript (d ^. exprAnn) d a b c) <$>
       (snd <$> token anySpace (TkLeftBracket ())) <*>
       commaSep1' anySpace subscript <*>
       (snd <$> token ws (TkRightBracket ()))
@@ -658,7 +662,7 @@ orExpr ws =
       optional
         ((\e a ann ws1 ->
           case a of
-            Left (cf, cfs) -> ListComp ann ws1 (Comprehension (_exprAnn e) e cf cfs)
+            Left (cf, cfs) -> ListComp ann ws1 (Comprehension (e ^. exprAnn) e cf cfs)
             Right Nothing -> List ann ws1 (Just $ CommaSepOne1' e Nothing)
             Right (Just (c, Nothing)) -> List ann ws1 (Just $ CommaSepOne1' e $ Just c)
             Right (Just (c, Just cs)) -> List ann ws1 (Just $ CommaSepMany1' e c cs)) <$>
@@ -680,7 +684,7 @@ orExpr ws =
       orExpr ws
 
     dictItem =
-      (\a -> DictItem (_exprAnn a) a) <$>
+      (\a -> DictItem (a ^. exprAnn) a) <$>
       expr anySpace <*>
       (snd <$> colon anySpace) <*>
       expr anySpace
@@ -705,13 +709,13 @@ orExpr ws =
              Nothing ->
                -- The order of this choice matters because commaSepRest is implemented
                -- in a slightly odd way
-               (\(c, d) -> SetComp ann ws1 (Comprehension (_exprAnn ex) ex c d)) <$> compRHS
+               (\(c, d) -> SetComp ann ws1 (Comprehension (ex ^. exprAnn) ex c d)) <$> compRHS
                <!>
                (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$> commaSepRest (expr ws <!> starExpr ws)
              Just clws ->
                (\ex2 a ->
                  let
-                   dictItemAnn = _exprAnn ex
+                   dictItemAnn = ex ^. exprAnn
                    firstDictItem = DictItem dictItemAnn ex clws ex2
                  in
                  case a of
@@ -722,7 +726,7 @@ orExpr ws =
                expr anySpace <*>
                (Left <$> compRHS <!> Right <$> commaSepRest dictItem)
          Just (Left (Right ex)) ->
-           ((\(c, d) -> SetComp ann ws1 (Comprehension (_exprAnn ex) ex c d)) <$> compRHS
+           ((\(c, d) -> SetComp ann ws1 (Comprehension (ex ^. exprAnn) ex c d)) <$> compRHS
            <!>
            (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$> commaSepRest (expr ws <!> starExpr ws))
          Just (Right ex) ->
@@ -764,7 +768,7 @@ smallStatement =
       expr space <*>
       optional ((,) <$> (snd <$> comma space) <*> expr space)
 
-    yieldSt = (\a -> Expr (_exprAnn a) a) <$> yieldExpr space
+    yieldSt = (\a -> Expr (a ^. exprAnn) a) <$> yieldExpr space
 
     returnSt =
       (\(tkReturn, retSpaces) -> Return (pyTokenAnn tkReturn) retSpaces) <$>
@@ -793,10 +797,10 @@ smallStatement =
     exprOrAssignSt =
       (\a ->
          maybe
-           (Expr (_exprAnn a) a)
+           (Expr (a ^. exprAnn) a)
            (either
-              (Assign (_exprAnn a) a)
-              (uncurry $ AugAssign (_exprAnn a) a))) <$>
+              (Assign (a ^. exprAnn) a)
+              (uncurry $ AugAssign (a ^. exprAnn) a))) <$>
       exprList space <*>
       optional
         (Left <$> some1 ((,) <$> (snd <$> token space (TkEq ())) <*> (yieldExpr space <!> exprList space)) <!>
@@ -1049,13 +1053,13 @@ arg =
         Ident ident -> do
           eqSpaces <- optional $ snd <$> token anySpace (TkEq ())
           case eqSpaces of
-            Nothing -> pure $ PositionalArg (_exprAnn e) e
-            Just s -> KeywordArg (_exprAnn e) ident s <$> expr anySpace
-        _ -> pure $ PositionalArg (_exprAnn e) e)
+            Nothing -> pure $ PositionalArg (e ^. exprAnn) e
+            Just s -> KeywordArg (e ^. exprAnn) ident s <$> expr anySpace
+        _ -> pure $ PositionalArg (e ^. exprAnn) e)
 
   <!>
 
-  (\a -> PositionalArg (_exprAnn a) a) <$> expr anySpace
+  (\a -> PositionalArg (a ^. exprAnn) a) <$> expr anySpace
 
   <!>
 
@@ -1080,13 +1084,13 @@ decoratorValue = do
   let
     derefs =
       foldl
-        (\b (ws, a) -> Deref (_exprAnn b) b ws a)
+        (\b (ws, a) -> Deref (b ^. exprAnn) b ws a)
         (Ident id1)
         ids
   pure $
     case args of
       Nothing -> derefs
-      Just (l, x, r) -> Call (_exprAnn derefs) derefs l x r
+      Just (l, x, r) -> Call (derefs ^. exprAnn) derefs l x r
 
 decorator :: Parser ann (Decorator ann)
 decorator =
@@ -1150,7 +1154,7 @@ compoundStatement =
       suite
 
     exceptAs =
-      (\a -> ExceptAs (_exprAnn a) a) <$>
+      (\a -> ExceptAs (a ^. exprAnn) a) <$>
       expr space <*>
       optional ((,) <$> (snd <$> token space (TkAs())) <*> identifier space)
 
@@ -1227,7 +1231,7 @@ compoundStatement =
          token space (TkWith ())) <*>
       commaSep1
         space
-        ((\a -> WithItem (_exprAnn a) a) <$>
+        ((\a -> WithItem (a ^. exprAnn) a) <$>
          expr space <*>
          optional ((,) <$> (snd <$> token space (TkAs ())) <*> orExpr space)) <*>
       suite
@@ -1256,7 +1260,8 @@ compoundStatement =
 module_ :: Parser ann (Module ann)
 module_ =
   Module <$>
-  many (Left <$> maybeComment <!> Right <$> statement)
+  many (Left <$> maybeComment <!> Right <$> statement) <*
+  eof
   where
     maybeComment =
       (\ws cmt nl -> (ws, cmt, nl)) <$>

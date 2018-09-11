@@ -57,7 +57,7 @@ import Control.Lens.Wrapped (_Wrapped)
 import Control.Monad (when)
 import Control.Monad.State (State, put, modify, get, evalState)
 import Control.Monad.Reader (ReaderT, local, ask, runReaderT)
-import Data.Char (isAscii)
+import Data.Char (isAscii, ord)
 import Data.Coerce (coerce)
 import Data.Foldable (toList, traverse_)
 import Data.Bitraversable (bitraverse)
@@ -208,6 +208,28 @@ validateComprehensionSyntax f (Comprehension a b c d) =
     validateCompIfSyntax (CompIf a b c) =
       CompIf a b <$> validateExprSyntax c
 
+validateStringPyChar
+  :: ( AsSyntaxError e v a
+     )
+  => a
+  -> PyChar
+  -> ValidateSyntax e PyChar
+validateStringPyChar a (Char_lit '\0') =
+  errorVM [ _NullByte # a ]
+validateStringPyChar _ a = pure a
+
+validateBytesPyChar
+  :: ( AsSyntaxError e v a
+     )
+  => a
+  -> PyChar
+  -> ValidateSyntax e PyChar
+validateBytesPyChar a (Char_lit '\0') =
+  errorVM [ _NullByte # a ]
+validateBytesPyChar a (Char_lit c) | ord c >= 128 =
+  errorVM [ _NonAsciiInBytes # (a, c) ]
+validateBytesPyChar _ a = pure a
+
 validateStringLiteralSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
@@ -215,13 +237,25 @@ validateStringLiteralSyntax
   => StringLiteral a
   -> ValidateSyntax e (StringLiteral a)
 validateStringLiteralSyntax (StringLiteral a b c d e f) =
-  StringLiteral a b c d e <$> validateWhitespace a f
+  StringLiteral a b c d <$>
+  traverse (validateStringPyChar a) e <*>
+  validateWhitespace a f
 validateStringLiteralSyntax (BytesLiteral a b c d e f) =
-  BytesLiteral a b c d e <$> validateWhitespace a f
-validateStringLiteralSyntax (RawStringLiteral a b c d e f) =
-  RawStringLiteral a b c d e <$> validateWhitespace a f
-validateStringLiteralSyntax (RawBytesLiteral a b c d e f) =
-  RawBytesLiteral a b c d e <$> validateWhitespace a f
+  BytesLiteral a b c d <$>
+  traverse (validateBytesPyChar a) e <*>
+  validateWhitespace a f
+validateStringLiteralSyntax (LongRawStringLiteral a b c d e) =
+  LongRawStringLiteral a b c d <$>
+  validateWhitespace a e
+validateStringLiteralSyntax (ShortRawStringLiteral a b c d e) =
+  ShortRawStringLiteral a b c d <$>
+  validateWhitespace a e
+validateStringLiteralSyntax (LongRawBytesLiteral a b c d e) =
+  LongRawBytesLiteral a b c d <$>
+  validateWhitespace a e
+validateStringLiteralSyntax (ShortRawBytesLiteral a b c d e) =
+  ShortRawBytesLiteral a b c d <$>
+  validateWhitespace a e
 
 validateDictItemSyntax
   :: ( AsSyntaxError e v a
@@ -366,8 +400,21 @@ validateExprSyntax (UnOp a op expr) =
   UnOp a op <$> validateExprSyntax expr
 validateExprSyntax (String a strLits) =
   if
-    all (\case; StringLiteral{} -> True; RawStringLiteral{} -> True; _ -> False) strLits ||
-    all (\case; BytesLiteral{} -> True; RawBytesLiteral{} -> True; _ -> False) strLits
+    all
+      (\case
+          StringLiteral{} -> True
+          LongRawStringLiteral{} -> True
+          ShortRawStringLiteral{} -> True
+          _ -> False)
+      strLits
+      ||
+    all
+      (\case
+          BytesLiteral{} -> True
+          LongRawBytesLiteral{} -> True
+          ShortRawBytesLiteral{} -> True
+          _ -> False)
+      strLits
   then
     String a <$> traverse validateStringLiteralSyntax strLits
   else
@@ -782,13 +829,53 @@ validateSmallStatementSyntax (Nonlocal a ws ids) =
         [] -> Nonlocal a ws <$> traverse validateIdentSyntax ids
         bad -> errorVM [_ParametersNonlocal # (a, bad)]
 validateSmallStatementSyntax (Del a ws ids) =
-  Del a ws <$> traverse validateExprSyntax ids
+  Del a ws <$>
+  traverse
+    (\x ->
+       validateExprSyntax x <*
+       if canDelete x
+       then pure ()
+       else errorVM [_CannotDelete # (a, x)])
+    ids
 validateSmallStatementSyntax (Import a ws mns) =
   Import a ws <$> traverse (pure . coerce) mns
 validateSmallStatementSyntax (From a ws1 mn ws2 ts) =
   From a ws1 (coerce mn) <$>
   validateWhitespace a ws2 <*>
   validateImportTargetsSyntax ts
+
+canDelete :: Expr v a -> Bool
+canDelete None{} = False
+canDelete Ellipsis{} = False
+canDelete UnOp{} = False
+canDelete Int{} = False
+canDelete Call{} = False
+canDelete BinOp{} = False
+canDelete Bool{} = False
+canDelete Unit{} = False
+canDelete Yield{} = False
+canDelete YieldFrom{} = False
+canDelete Ternary{} = False
+canDelete ListComp{} = False
+canDelete DictComp{} = False
+canDelete Dict{} = False
+canDelete SetComp{} = False
+canDelete Set{} = False
+canDelete Lambda{} = False
+canDelete Float{} = False
+canDelete Imag{} = False
+canDelete Not{} = False
+canDelete Generator{} = False
+canDelete Await{} = False
+canDelete String{} = False
+canDelete (Parens _ _ a _) = canDelete a
+canDelete (List _ _ a _) =
+  all (allOf (folded.getting _Exprs) canDelete) a
+canDelete (Tuple _ a _ b) =
+  all canDelete $ (a ^?! getting _Exprs) : toListOf (folded.folded.getting _Exprs) b
+canDelete Deref{} = True
+canDelete Subscript{} = True
+canDelete Ident{} = True
 
 validateStatementSyntax
   :: ( AsSyntaxError e v a
@@ -813,13 +900,30 @@ canAssignTo Int{} = False
 canAssignTo Call{} = False
 canAssignTo BinOp{} = False
 canAssignTo Bool{} = False
-canAssignTo (Parens _ _ a _) = canAssignTo a
+canAssignTo Unit{} = False
+canAssignTo Yield{} = False
+canAssignTo YieldFrom{} = False
+canAssignTo Ternary{} = False
+canAssignTo ListComp{} = False
+canAssignTo DictComp{} = False
+canAssignTo Dict{} = False
+canAssignTo SetComp{} = False
+canAssignTo Set{} = False
+canAssignTo Lambda{} = False
+canAssignTo Float{} = False
+canAssignTo Imag{} = False
+canAssignTo Not{} = False
+canAssignTo Generator{} = False
+canAssignTo Await{} = False
 canAssignTo String{} = False
+canAssignTo (Parens _ _ a _) = canAssignTo a
 canAssignTo (List _ _ a _) =
   all (allOf (folded.getting _Exprs) canAssignTo) a
 canAssignTo (Tuple _ a _ b) =
   all canAssignTo $ (a ^?! getting _Exprs) : toListOf (folded.folded.getting _Exprs) b
-canAssignTo _ = True
+canAssignTo Deref{} = True
+canAssignTo Subscript{} = True
+canAssignTo Ident{} = True
 
 validateArgsSyntax
   :: ( AsSyntaxError e v a

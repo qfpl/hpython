@@ -340,8 +340,8 @@ genStringLiterals = do
   b <- Gen.bool_
   String () <$> go b n
   where
-    ss = Gen.choice [genStringLiteral genPyChar, genRawStringLiteral]
-    bs = Gen.choice [genBytesLiteral genPyChar, genRawBytesLiteral]
+    ss = Gen.choice [genStringLiteral $ genPyChar Gen.latin1, genRawStringLiteral]
+    bs = Gen.choice [genBytesLiteral $ genPyChar Gen.ascii, genRawBytesLiteral]
     go True 1 = pure <$> ss
     go False 1 = pure <$> bs
     go b n =
@@ -449,6 +449,18 @@ genSubscript =
     genExpr
     (genSizedCommaSep1' genSubscriptItem)
 
+genDeletable :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
+genDeletable =
+  sizedRecursive
+    [ Ident <$> genIdent
+    ]
+    [ genList genDeletable
+    , genParens genDeletable
+    , genTuple genDeletable
+    , genDeref
+    , genSubscript
+    ]
+
 genAssignable :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genAssignable =
   sizedRecursive
@@ -495,7 +507,7 @@ genSmallStatement = do
        genSizedCommaSep1 genIdent
      , Del () <$>
        genWhitespaces1 <*>
-       genSizedCommaSep1' genExpr
+       genSizedCommaSep1' genDeletable
      , Import () <$>
        genWhitespaces1 <*>
        genSizedCommaSep1 (genImportAs genModuleName genIdent)
@@ -740,8 +752,8 @@ genImportAs me genIdent =
     (set (mapped.trailingWhitespace) [Space] me)
     (sizedMaybe $ (,) <$> genWhitespaces1 <*> genIdent)
 
-genPyChar :: MonadGen m => m PyChar
-genPyChar =
+genPyChar :: MonadGen m => m Char -> m PyChar
+genPyChar mlit =
   Gen.choice
   [ pure Char_newline
   , Char_octal <$> Gen.element enumOctal <*> Gen.element enumOctal
@@ -771,5 +783,5 @@ genPyChar =
   , pure Char_esc_r
   , pure Char_esc_t
   , pure Char_esc_v
-  , Char_lit <$> Gen.filter (/='\0') Gen.latin1
+  , Char_lit <$> mlit
   ]

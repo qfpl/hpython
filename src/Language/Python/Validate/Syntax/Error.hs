@@ -14,6 +14,7 @@ data SyntaxError (v :: [*]) a
   | PositionalAfterKeywordParam a String
   | UnexpectedDoubleStarParam a String
   | CannotAssignTo a (Expr v a)
+  | CannotDelete a (Expr v a)
   | CannotAugAssignTo a (Expr v a)
   | DuplicateArgument a String
   | ExpectedNewlineAfter (a, [Whitespace], Statement v a, Maybe Newline)
@@ -39,60 +40,51 @@ data SyntaxError (v :: [*]) a
   | AsyncForOutsideCoroutine a
   | YieldFromInsideCoroutine a
   | AwaitOutsideCoroutine a
+  | NullByte a
+  | NonAsciiInBytes a Char
   deriving (Eq, Show)
 
 -- makeClassyPrisms ''SyntaxError
-class AsSyntaxError r_abzOd v_abztz a_abztA | r_abzOd -> v_abztz
-                                                          a_abztA where
-  _SyntaxError ::
-    Control.Lens.Type.Prism' r_abzOd (SyntaxError v_abztz a_abztA)
+class AsSyntaxError r_anSy v_aj2D a_aj2E | r_anSy -> v_aj2D
+                                                      a_aj2E where
+  _SyntaxError :: Prism' r_anSy (SyntaxError v_aj2D a_aj2E)
   _PositionalAfterKeywordArg ::
-    Control.Lens.Type.Prism' r_abzOd (a_abztA, Expr v_abztz a_abztA)
+    Prism' r_anSy (a_aj2E, Expr v_aj2D a_aj2E)
   _PositionalAfterKeywordUnpacking ::
-    Control.Lens.Type.Prism' r_abzOd (a_abztA, Expr v_abztz a_abztA)
-  _PositionalAfterKeywordParam ::
-    Control.Lens.Type.Prism' r_abzOd (a_abztA, String)
-  _UnexpectedDoubleStarParam ::
-    Control.Lens.Type.Prism' r_abzOd (a_abztA, String)
-  _CannotAssignTo ::
-    Control.Lens.Type.Prism' r_abzOd (a_abztA, Expr v_abztz a_abztA)
-  _CannotAugAssignTo ::
-    Control.Lens.Type.Prism' r_abzOd (a_abztA, Expr v_abztz a_abztA)
-  _DuplicateArgument ::
-    Control.Lens.Type.Prism' r_abzOd (a_abztA, String)
+    Prism' r_anSy (a_aj2E, Expr v_aj2D a_aj2E)
+  _PositionalAfterKeywordParam :: Prism' r_anSy (a_aj2E, String)
+  _UnexpectedDoubleStarParam :: Prism' r_anSy (a_aj2E, String)
+  _CannotAssignTo :: Prism' r_anSy (a_aj2E, Expr v_aj2D a_aj2E)
+  _CannotDelete :: Prism' r_anSy (a_aj2E, Expr v_aj2D a_aj2E)
+  _CannotAugAssignTo :: Prism' r_anSy (a_aj2E, Expr v_aj2D a_aj2E)
+  _DuplicateArgument :: Prism' r_anSy (a_aj2E, String)
   _ExpectedNewlineAfter ::
-    Control.Lens.Type.Prism' r_abzOd (a_abztA, [Whitespace],
-                                      Statement v_abztz a_abztA, Maybe Newline)
-  _UnexpectedNewline :: Control.Lens.Type.Prism' r_abzOd a_abztA
-  _IdentifierReservedWord ::
-    Control.Lens.Type.Prism' r_abzOd (a_abztA, String)
-  _EmptyIdentifier :: Control.Lens.Type.Prism' r_abzOd a_abztA
-  _BadCharacter :: Control.Lens.Type.Prism' r_abzOd (a_abztA, String)
-  _BreakOutsideLoop :: Control.Lens.Type.Prism' r_abzOd a_abztA
-  _ContinueOutsideLoop :: Control.Lens.Type.Prism' r_abzOd a_abztA
-  _ReturnOutsideFunction :: Control.Lens.Type.Prism' r_abzOd a_abztA
-  _NonlocalOutsideFunction ::
-    Control.Lens.Type.Prism' r_abzOd a_abztA
-  _ParametersNonlocal ::
-    Control.Lens.Type.Prism' r_abzOd (a_abztA, [String])
-  _NoBindingNonlocal ::
-    Control.Lens.Type.Prism' r_abzOd (Ident v_abztz a_abztA)
-  _Can'tJoinStringAndBytes ::
-    Control.Lens.Type.Prism' r_abzOd a_abztA
-  _InvalidYield :: Control.Lens.Type.Prism' r_abzOd a_abztA
-  _CommentAfterBackslash :: Control.Lens.Type.Prism' r_abzOd a_abztA
-  _MalformedDecorator :: Control.Lens.Type.Prism' r_abzOd a_abztA
-  _InvalidDictUnpacking :: Control.Lens.Type.Prism' r_abzOd a_abztA
-  _InvalidSetUnpacking :: Control.Lens.Type.Prism' r_abzOd a_abztA
-  _TypedParamInLambda :: Control.Lens.Type.Prism' r_abzOd a_abztA
-  _TypedUnnamedStarParam :: Control.Lens.Type.Prism' r_abzOd a_abztA
-  _AsyncWithOutsideCoroutine ::
-    Control.Lens.Type.Prism' r_abzOd a_abztA
-  _AsyncForOutsideCoroutine ::
-    Control.Lens.Type.Prism' r_abzOd a_abztA
-  _YieldFromInsideCoroutine ::
-    Control.Lens.Type.Prism' r_abzOd a_abztA
-  _AwaitOutsideCoroutine :: Control.Lens.Type.Prism' r_abzOd a_abztA
+    Prism' r_anSy (a_aj2E, [Whitespace], Statement v_aj2D a_aj2E,
+                    Maybe Newline)
+  _UnexpectedNewline :: Prism' r_anSy a_aj2E
+  _IdentifierReservedWord :: Prism' r_anSy (a_aj2E, String)
+  _EmptyIdentifier :: Prism' r_anSy a_aj2E
+  _BadCharacter :: Prism' r_anSy (a_aj2E, String)
+  _BreakOutsideLoop :: Prism' r_anSy a_aj2E
+  _ContinueOutsideLoop :: Prism' r_anSy a_aj2E
+  _ReturnOutsideFunction :: Prism' r_anSy a_aj2E
+  _NonlocalOutsideFunction :: Prism' r_anSy a_aj2E
+  _ParametersNonlocal :: Prism' r_anSy (a_aj2E, [String])
+  _NoBindingNonlocal :: Prism' r_anSy (Ident v_aj2D a_aj2E)
+  _Can'tJoinStringAndBytes :: Prism' r_anSy a_aj2E
+  _InvalidYield :: Prism' r_anSy a_aj2E
+  _CommentAfterBackslash :: Prism' r_anSy a_aj2E
+  _MalformedDecorator :: Prism' r_anSy a_aj2E
+  _InvalidDictUnpacking :: Prism' r_anSy a_aj2E
+  _InvalidSetUnpacking :: Prism' r_anSy a_aj2E
+  _TypedParamInLambda :: Prism' r_anSy a_aj2E
+  _TypedUnnamedStarParam :: Prism' r_anSy a_aj2E
+  _AsyncWithOutsideCoroutine :: Prism' r_anSy a_aj2E
+  _AsyncForOutsideCoroutine :: Prism' r_anSy a_aj2E
+  _YieldFromInsideCoroutine :: Prism' r_anSy a_aj2E
+  _AwaitOutsideCoroutine :: Prism' r_anSy a_aj2E
+  _NullByte :: Prism' r_anSy a_aj2E
+  _NonAsciiInBytes :: Prism' r_anSy (a_aj2E, Char)
   _PositionalAfterKeywordArg
     = ((.) _SyntaxError) _PositionalAfterKeywordArg
   _PositionalAfterKeywordUnpacking
@@ -102,6 +94,7 @@ class AsSyntaxError r_abzOd v_abztz a_abztA | r_abzOd -> v_abztz
   _UnexpectedDoubleStarParam
     = ((.) _SyntaxError) _UnexpectedDoubleStarParam
   _CannotAssignTo = ((.) _SyntaxError) _CannotAssignTo
+  _CannotDelete = ((.) _SyntaxError) _CannotDelete
   _CannotAugAssignTo = ((.) _SyntaxError) _CannotAugAssignTo
   _DuplicateArgument = ((.) _SyntaxError) _DuplicateArgument
   _ExpectedNewlineAfter = ((.) _SyntaxError) _ExpectedNewlineAfter
@@ -133,224 +126,223 @@ class AsSyntaxError r_abzOd v_abztz a_abztA | r_abzOd -> v_abztz
   _YieldFromInsideCoroutine
     = ((.) _SyntaxError) _YieldFromInsideCoroutine
   _AwaitOutsideCoroutine = ((.) _SyntaxError) _AwaitOutsideCoroutine
-instance AsSyntaxError (SyntaxError v_abztz a_abztA) v_abztz a_abztA where
+  _NullByte = ((.) _SyntaxError) _NullByte
+  _NonAsciiInBytes = ((.) _SyntaxError) _NonAsciiInBytes
+instance AsSyntaxError (SyntaxError v_aj2D a_aj2E) v_aj2D a_aj2E where
   _SyntaxError = id
   _PositionalAfterKeywordArg
-    = (Control.Lens.Prism.prism
-          (\ (x1_abzOe, x2_abzOf)
-            -> (PositionalAfterKeywordArg x1_abzOe) x2_abzOf))
-        (\ x_abzOg
-            -> case x_abzOg of
-                PositionalAfterKeywordArg y1_abzOh y2_abzOi
-                  -> Right (y1_abzOh, y2_abzOi)
-                _ -> Left x_abzOg)
+    = (prism
+          (\ (x1_anSz, x2_anSA)
+            -> (PositionalAfterKeywordArg x1_anSz) x2_anSA))
+        (\ x_anSB
+            -> case x_anSB of
+                PositionalAfterKeywordArg y1_anSC y2_anSD
+                  -> Right (y1_anSC, y2_anSD)
+                _ -> Left x_anSB)
   _PositionalAfterKeywordUnpacking
-    = (Control.Lens.Prism.prism
-          (\ (x1_abzOj, x2_abzOk)
-            -> (PositionalAfterKeywordUnpacking x1_abzOj) x2_abzOk))
-        (\ x_abzOl
-            -> case x_abzOl of
-                PositionalAfterKeywordUnpacking y1_abzOm y2_abzOn
-                  -> Right (y1_abzOm, y2_abzOn)
-                _ -> Left x_abzOl)
+    = (prism
+          (\ (x1_anSE, x2_anSF)
+            -> (PositionalAfterKeywordUnpacking x1_anSE) x2_anSF))
+        (\ x_anSG
+            -> case x_anSG of
+                PositionalAfterKeywordUnpacking y1_anSH y2_anSI
+                  -> Right (y1_anSH, y2_anSI)
+                _ -> Left x_anSG)
   _PositionalAfterKeywordParam
-    = (Control.Lens.Prism.prism
-          (\ (x1_abzOo, x2_abzOp)
-            -> (PositionalAfterKeywordParam x1_abzOo) x2_abzOp))
-        (\ x_abzOq
-            -> case x_abzOq of
-                PositionalAfterKeywordParam y1_abzOr y2_abzOs
-                  -> Right (y1_abzOr, y2_abzOs)
-                _ -> Left x_abzOq)
+    = (prism
+          (\ (x1_anSJ, x2_anSK)
+            -> (PositionalAfterKeywordParam x1_anSJ) x2_anSK))
+        (\ x_anSL
+            -> case x_anSL of
+                PositionalAfterKeywordParam y1_anSM y2_anSN
+                  -> Right (y1_anSM, y2_anSN)
+                _ -> Left x_anSL)
   _UnexpectedDoubleStarParam
-    = (Control.Lens.Prism.prism
-          (\ (x1_abzOt, x2_abzOu)
-            -> (UnexpectedDoubleStarParam x1_abzOt) x2_abzOu))
-        (\ x_abzOv
-            -> case x_abzOv of
-                UnexpectedDoubleStarParam y1_abzOw y2_abzOx
-                  -> Right (y1_abzOw, y2_abzOx)
-                _ -> Left x_abzOv)
+    = (prism
+          (\ (x1_anSO, x2_anSP)
+            -> (UnexpectedDoubleStarParam x1_anSO) x2_anSP))
+        (\ x_anSQ
+            -> case x_anSQ of
+                UnexpectedDoubleStarParam y1_anSR y2_anSS
+                  -> Right (y1_anSR, y2_anSS)
+                _ -> Left x_anSQ)
   _CannotAssignTo
-    = (Control.Lens.Prism.prism
-          (\ (x1_abzOy, x2_abzOz) -> (CannotAssignTo x1_abzOy) x2_abzOz))
-        (\ x_abzOA
-            -> case x_abzOA of
-                CannotAssignTo y1_abzOB y2_abzOC -> Right (y1_abzOB, y2_abzOC)
-                _ -> Left x_abzOA)
+    = (prism
+          (\ (x1_anST, x2_anSU) -> (CannotAssignTo x1_anST) x2_anSU))
+        (\ x_anSV
+            -> case x_anSV of
+                CannotAssignTo y1_anSW y2_anSX -> Right (y1_anSW, y2_anSX)
+                _ -> Left x_anSV)
+  _CannotDelete
+    = (prism (\ (x1_anSY, x2_anSZ) -> (CannotDelete x1_anSY) x2_anSZ))
+        (\ x_anT0
+            -> case x_anT0 of
+                CannotDelete y1_anT1 y2_anT2 -> Right (y1_anT1, y2_anT2)
+                _ -> Left x_anT0)
   _CannotAugAssignTo
-    = (Control.Lens.Prism.prism
-          (\ (x1_abzOD, x2_abzOE) -> (CannotAugAssignTo x1_abzOD) x2_abzOE))
-        (\ x_abzOF
-            -> case x_abzOF of
-                CannotAugAssignTo y1_abzOG y2_abzOH -> Right (y1_abzOG, y2_abzOH)
-                _ -> Left x_abzOF)
+    = (prism
+          (\ (x1_anT3, x2_anT4) -> (CannotAugAssignTo x1_anT3) x2_anT4))
+        (\ x_anT5
+            -> case x_anT5 of
+                CannotAugAssignTo y1_anT6 y2_anT7 -> Right (y1_anT6, y2_anT7)
+                _ -> Left x_anT5)
   _DuplicateArgument
-    = (Control.Lens.Prism.prism
-          (\ (x1_abzOI, x2_abzOJ) -> (DuplicateArgument x1_abzOI) x2_abzOJ))
-        (\ x_abzOK
-            -> case x_abzOK of
-                DuplicateArgument y1_abzOL y2_abzOM -> Right (y1_abzOL, y2_abzOM)
-                _ -> Left x_abzOK)
+    = (prism
+          (\ (x1_anT8, x2_anT9) -> (DuplicateArgument x1_anT8) x2_anT9))
+        (\ x_anTa
+            -> case x_anTa of
+                DuplicateArgument y1_anTb y2_anTc -> Right (y1_anTb, y2_anTc)
+                _ -> Left x_anTa)
   _ExpectedNewlineAfter
-    = (Control.Lens.Prism.prism
-          (\ x1_abzON -> ExpectedNewlineAfter x1_abzON))
-        (\ x_abzOO
-            -> case x_abzOO of
-                ExpectedNewlineAfter y1_abzOP -> Right y1_abzOP
-                _ -> Left x_abzOO)
+    = (prism (\ x1_anTd -> ExpectedNewlineAfter x1_anTd))
+        (\ x_anTe
+            -> case x_anTe of
+                ExpectedNewlineAfter y1_anTf -> Right y1_anTf
+                _ -> Left x_anTe)
   _UnexpectedNewline
-    = (Control.Lens.Prism.prism
-          (\ x1_abzOQ -> UnexpectedNewline x1_abzOQ))
-        (\ x_abzOR
-            -> case x_abzOR of
-                UnexpectedNewline y1_abzOS -> Right y1_abzOS
-                _ -> Left x_abzOR)
+    = (prism (\ x1_anTg -> UnexpectedNewline x1_anTg))
+        (\ x_anTh
+            -> case x_anTh of
+                UnexpectedNewline y1_anTi -> Right y1_anTi
+                _ -> Left x_anTh)
   _IdentifierReservedWord
-    = (Control.Lens.Prism.prism
-          (\ (x1_abzOT, x2_abzOU)
-            -> (IdentifierReservedWord x1_abzOT) x2_abzOU))
-        (\ x_abzOV
-            -> case x_abzOV of
-                IdentifierReservedWord y1_abzOW y2_abzOX
-                  -> Right (y1_abzOW, y2_abzOX)
-                _ -> Left x_abzOV)
+    = (prism
+          (\ (x1_anTj, x2_anTk) -> (IdentifierReservedWord x1_anTj) x2_anTk))
+        (\ x_anTl
+            -> case x_anTl of
+                IdentifierReservedWord y1_anTm y2_anTn -> Right (y1_anTm, y2_anTn)
+                _ -> Left x_anTl)
   _EmptyIdentifier
-    = (Control.Lens.Prism.prism
-          (\ x1_abzOY -> EmptyIdentifier x1_abzOY))
-        (\ x_abzOZ
-            -> case x_abzOZ of
-                EmptyIdentifier y1_abzP0 -> Right y1_abzP0
-                _ -> Left x_abzOZ)
+    = (prism (\ x1_anTo -> EmptyIdentifier x1_anTo))
+        (\ x_anTp
+            -> case x_anTp of
+                EmptyIdentifier y1_anTq -> Right y1_anTq
+                _ -> Left x_anTp)
   _BadCharacter
-    = (Control.Lens.Prism.prism
-          (\ (x1_abzP1, x2_abzP2) -> (BadCharacter x1_abzP1) x2_abzP2))
-        (\ x_abzP3
-            -> case x_abzP3 of
-                BadCharacter y1_abzP4 y2_abzP5 -> Right (y1_abzP4, y2_abzP5)
-                _ -> Left x_abzP3)
+    = (prism (\ (x1_anTr, x2_anTs) -> (BadCharacter x1_anTr) x2_anTs))
+        (\ x_anTt
+            -> case x_anTt of
+                BadCharacter y1_anTu y2_anTv -> Right (y1_anTu, y2_anTv)
+                _ -> Left x_anTt)
   _BreakOutsideLoop
-    = (Control.Lens.Prism.prism
-          (\ x1_abzP6 -> BreakOutsideLoop x1_abzP6))
-        (\ x_abzP7
-            -> case x_abzP7 of
-                BreakOutsideLoop y1_abzP8 -> Right y1_abzP8
-                _ -> Left x_abzP7)
+    = (prism (\ x1_anTw -> BreakOutsideLoop x1_anTw))
+        (\ x_anTx
+            -> case x_anTx of
+                BreakOutsideLoop y1_anTy -> Right y1_anTy
+                _ -> Left x_anTx)
   _ContinueOutsideLoop
-    = (Control.Lens.Prism.prism
-          (\ x1_abzP9 -> ContinueOutsideLoop x1_abzP9))
-        (\ x_abzPa
-            -> case x_abzPa of
-                ContinueOutsideLoop y1_abzPb -> Right y1_abzPb
-                _ -> Left x_abzPa)
+    = (prism (\ x1_anTz -> ContinueOutsideLoop x1_anTz))
+        (\ x_anTA
+            -> case x_anTA of
+                ContinueOutsideLoop y1_anTB -> Right y1_anTB
+                _ -> Left x_anTA)
   _ReturnOutsideFunction
-    = (Control.Lens.Prism.prism
-          (\ x1_abzPc -> ReturnOutsideFunction x1_abzPc))
-        (\ x_abzPd
-            -> case x_abzPd of
-                ReturnOutsideFunction y1_abzPe -> Right y1_abzPe
-                _ -> Left x_abzPd)
+    = (prism (\ x1_anTC -> ReturnOutsideFunction x1_anTC))
+        (\ x_anTD
+            -> case x_anTD of
+                ReturnOutsideFunction y1_anTE -> Right y1_anTE
+                _ -> Left x_anTD)
   _NonlocalOutsideFunction
-    = (Control.Lens.Prism.prism
-          (\ x1_abzPf -> NonlocalOutsideFunction x1_abzPf))
-        (\ x_abzPg
-            -> case x_abzPg of
-                NonlocalOutsideFunction y1_abzPh -> Right y1_abzPh
-                _ -> Left x_abzPg)
+    = (prism (\ x1_anTF -> NonlocalOutsideFunction x1_anTF))
+        (\ x_anTG
+            -> case x_anTG of
+                NonlocalOutsideFunction y1_anTH -> Right y1_anTH
+                _ -> Left x_anTG)
   _ParametersNonlocal
-    = (Control.Lens.Prism.prism
-          (\ (x1_abzPi, x2_abzPj) -> (ParametersNonlocal x1_abzPi) x2_abzPj))
-        (\ x_abzPk
-            -> case x_abzPk of
-                ParametersNonlocal y1_abzPl y2_abzPm -> Right (y1_abzPl, y2_abzPm)
-                _ -> Left x_abzPk)
+    = (prism
+          (\ (x1_anTI, x2_anTJ) -> (ParametersNonlocal x1_anTI) x2_anTJ))
+        (\ x_anTK
+            -> case x_anTK of
+                ParametersNonlocal y1_anTL y2_anTM -> Right (y1_anTL, y2_anTM)
+                _ -> Left x_anTK)
   _NoBindingNonlocal
-    = (Control.Lens.Prism.prism
-          (\ x1_abzPn -> NoBindingNonlocal x1_abzPn))
-        (\ x_abzPo
-            -> case x_abzPo of
-                NoBindingNonlocal y1_abzPp -> Right y1_abzPp
-                _ -> Left x_abzPo)
+    = (prism (\ x1_anTN -> NoBindingNonlocal x1_anTN))
+        (\ x_anTO
+            -> case x_anTO of
+                NoBindingNonlocal y1_anTP -> Right y1_anTP
+                _ -> Left x_anTO)
   _Can'tJoinStringAndBytes
-    = (Control.Lens.Prism.prism
-          (\ x1_abzPq -> Can'tJoinStringAndBytes x1_abzPq))
-        (\ x_abzPr
-            -> case x_abzPr of
-                Can'tJoinStringAndBytes y1_abzPs -> Right y1_abzPs
-                _ -> Left x_abzPr)
+    = (prism (\ x1_anTQ -> Can'tJoinStringAndBytes x1_anTQ))
+        (\ x_anTR
+            -> case x_anTR of
+                Can'tJoinStringAndBytes y1_anTS -> Right y1_anTS
+                _ -> Left x_anTR)
   _InvalidYield
-    = (Control.Lens.Prism.prism (\ x1_abzPt -> InvalidYield x1_abzPt))
-        (\ x_abzPu
-            -> case x_abzPu of
-                InvalidYield y1_abzPv -> Right y1_abzPv
-                _ -> Left x_abzPu)
+    = (prism (\ x1_anTT -> InvalidYield x1_anTT))
+        (\ x_anTU
+            -> case x_anTU of
+                InvalidYield y1_anTV -> Right y1_anTV
+                _ -> Left x_anTU)
   _CommentAfterBackslash
-    = (Control.Lens.Prism.prism
-          (\ x1_abzPw -> CommentAfterBackslash x1_abzPw))
-        (\ x_abzPx
-            -> case x_abzPx of
-                CommentAfterBackslash y1_abzPy -> Right y1_abzPy
-                _ -> Left x_abzPx)
+    = (prism (\ x1_anTW -> CommentAfterBackslash x1_anTW))
+        (\ x_anTX
+            -> case x_anTX of
+                CommentAfterBackslash y1_anTY -> Right y1_anTY
+                _ -> Left x_anTX)
   _MalformedDecorator
-    = (Control.Lens.Prism.prism
-          (\ x1_abzPz -> MalformedDecorator x1_abzPz))
-        (\ x_abzPA
-            -> case x_abzPA of
-                MalformedDecorator y1_abzPB -> Right y1_abzPB
-                _ -> Left x_abzPA)
+    = (prism (\ x1_anTZ -> MalformedDecorator x1_anTZ))
+        (\ x_anU0
+            -> case x_anU0 of
+                MalformedDecorator y1_anU1 -> Right y1_anU1
+                _ -> Left x_anU0)
   _InvalidDictUnpacking
-    = (Control.Lens.Prism.prism
-          (\ x1_abzPC -> InvalidDictUnpacking x1_abzPC))
-        (\ x_abzPD
-            -> case x_abzPD of
-                InvalidDictUnpacking y1_abzPE -> Right y1_abzPE
-                _ -> Left x_abzPD)
+    = (prism (\ x1_anU2 -> InvalidDictUnpacking x1_anU2))
+        (\ x_anU3
+            -> case x_anU3 of
+                InvalidDictUnpacking y1_anU4 -> Right y1_anU4
+                _ -> Left x_anU3)
   _InvalidSetUnpacking
-    = (Control.Lens.Prism.prism
-          (\ x1_abzPF -> InvalidSetUnpacking x1_abzPF))
-        (\ x_abzPG
-            -> case x_abzPG of
-                InvalidSetUnpacking y1_abzPH -> Right y1_abzPH
-                _ -> Left x_abzPG)
+    = (prism (\ x1_anU5 -> InvalidSetUnpacking x1_anU5))
+        (\ x_anU6
+            -> case x_anU6 of
+                InvalidSetUnpacking y1_anU7 -> Right y1_anU7
+                _ -> Left x_anU6)
   _TypedParamInLambda
-    = (Control.Lens.Prism.prism
-          (\ x1_abzPI -> TypedParamInLambda x1_abzPI))
-        (\ x_abzPJ
-            -> case x_abzPJ of
-                TypedParamInLambda y1_abzPK -> Right y1_abzPK
-                _ -> Left x_abzPJ)
+    = (prism (\ x1_anU8 -> TypedParamInLambda x1_anU8))
+        (\ x_anU9
+            -> case x_anU9 of
+                TypedParamInLambda y1_anUa -> Right y1_anUa
+                _ -> Left x_anU9)
   _TypedUnnamedStarParam
-    = (Control.Lens.Prism.prism
-          (\ x1_abzPL -> TypedUnnamedStarParam x1_abzPL))
-        (\ x_abzPM
-            -> case x_abzPM of
-                TypedUnnamedStarParam y1_abzPN -> Right y1_abzPN
-                _ -> Left x_abzPM)
+    = (prism (\ x1_anUb -> TypedUnnamedStarParam x1_anUb))
+        (\ x_anUc
+            -> case x_anUc of
+                TypedUnnamedStarParam y1_anUd -> Right y1_anUd
+                _ -> Left x_anUc)
   _AsyncWithOutsideCoroutine
-    = (Control.Lens.Prism.prism
-          (\ x1_abzPO -> AsyncWithOutsideCoroutine x1_abzPO))
-        (\ x_abzPP
-            -> case x_abzPP of
-                AsyncWithOutsideCoroutine y1_abzPQ -> Right y1_abzPQ
-                _ -> Left x_abzPP)
+    = (prism (\ x1_anUe -> AsyncWithOutsideCoroutine x1_anUe))
+        (\ x_anUf
+            -> case x_anUf of
+                AsyncWithOutsideCoroutine y1_anUg -> Right y1_anUg
+                _ -> Left x_anUf)
   _AsyncForOutsideCoroutine
-    = (Control.Lens.Prism.prism
-          (\ x1_abzPR -> AsyncForOutsideCoroutine x1_abzPR))
-        (\ x_abzPS
-            -> case x_abzPS of
-                AsyncForOutsideCoroutine y1_abzPT -> Right y1_abzPT
-                _ -> Left x_abzPS)
+    = (prism (\ x1_anUh -> AsyncForOutsideCoroutine x1_anUh))
+        (\ x_anUi
+            -> case x_anUi of
+                AsyncForOutsideCoroutine y1_anUj -> Right y1_anUj
+                _ -> Left x_anUi)
   _YieldFromInsideCoroutine
-    = (Control.Lens.Prism.prism
-          (\ x1_abzPU -> YieldFromInsideCoroutine x1_abzPU))
-        (\ x_abzPV
-            -> case x_abzPV of
-                YieldFromInsideCoroutine y1_abzPW -> Right y1_abzPW
-                _ -> Left x_abzPV)
+    = (prism (\ x1_anUk -> YieldFromInsideCoroutine x1_anUk))
+        (\ x_anUl
+            -> case x_anUl of
+                YieldFromInsideCoroutine y1_anUm -> Right y1_anUm
+                _ -> Left x_anUl)
   _AwaitOutsideCoroutine
-    = (Control.Lens.Prism.prism
-          (\ x1_abzPX -> AwaitOutsideCoroutine x1_abzPX))
-        (\ x_abzPY
-            -> case x_abzPY of
-                AwaitOutsideCoroutine y1_abzPZ -> Right y1_abzPZ
-                _ -> Left x_abzPY)
+    = (prism (\ x1_anUn -> AwaitOutsideCoroutine x1_anUn))
+        (\ x_anUo
+            -> case x_anUo of
+                AwaitOutsideCoroutine y1_anUp -> Right y1_anUp
+                _ -> Left x_anUo)
+  _NullByte
+    = (prism (\ x1_anUq -> NullByte x1_anUq))
+        (\ x_anUr
+            -> case x_anUr of
+                NullByte y1_anUs -> Right y1_anUs
+                _ -> Left x_anUr)
+  _NonAsciiInBytes
+    = (prism
+          (\ (x1_anUt, x2_anUu) -> (NonAsciiInBytes x1_anUt) x2_anUu))
+        (\ x_anUv
+            -> case x_anUv of
+                NonAsciiInBytes y1_anUw y2_anUx -> Right (y1_anUw, y2_anUx)
+                _ -> Left x_anUv)

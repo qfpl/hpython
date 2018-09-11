@@ -5,6 +5,7 @@
 {-# language FlexibleContexts #-}
 {-# language TypeFamilies #-}
 {-# language OverloadedStrings #-}
+{-# language LambdaCase #-}
 module Language.Python.Internal.Lexer where
 
 import Control.Applicative ((<**>), (<|>), many, optional)
@@ -109,14 +110,29 @@ stringOrBytesPrefix =
   (Left (Right Prefix_u) <$ char 'u') <|>
   (Left (Right Prefix_U) <$ char 'U')
 
-rawStringChars :: (Monad m, CharParsing m) => m a -> m (RawString String)
-rawStringChars mc = do
+longRawStringChars :: (Monad m, CharParsing m) => m a -> m (LongRawString String)
+longRawStringChars mc = do
   str <-
     manyTill
       ((\x y -> [x, y]) <$> char '\\' <*> noneOf "\0" <|>
-       pure <$> noneOf "\0")
+       pure <$> noneOf "\0" <|>
+       char '\0' *> unexpected "null byte in string")
       mc
-  case concat str ^? _RawString of
+  case concat str ^? _LongRawString of
+    Nothing -> unexpected "odd number of backslashes terminating raw string"
+    Just str' -> pure str'
+
+shortRawStringChars :: (Monad m, CharParsing m) => m a -> m (ShortRawString String)
+shortRawStringChars mc = do
+  str <-
+    manyTill
+      ((\x y -> [x, y]) <$> char '\\' <*> noneOf "\0" <|>
+       pure <$> noneOf "\0\r\n" <|>
+       char '\r' *> unexpected "carriage return in string" <|>
+       char '\n' *> unexpected "line feed in string" <|>
+       char '\0' *> unexpected "null byte in string")
+      mc
+  case concat str ^? _ShortRawString of
     Nothing -> unexpected "odd number of backslashes terminating raw string"
     Just str' -> pure str'
 
@@ -353,11 +369,11 @@ parseToken =
             <|>
             TkString Nothing DoubleQuote ShortString <$> manyTill stringChar (char '"')
           Just (Left (Left prefix)) ->
-            TkRawString prefix DoubleQuote LongString <$
+            TkLongRawString prefix DoubleQuote <$
             text "\"\"" <*>
-            rawStringChars (text "\"\"\"")
+            longRawStringChars (text "\"\"\"")
             <|>
-            TkRawString prefix DoubleQuote ShortString <$> rawStringChars (char '"')
+            TkShortRawString prefix DoubleQuote <$> shortRawStringChars (char '"')
           Just (Left (Right prefix)) ->
             TkString (Just prefix) DoubleQuote LongString <$
             text "\"\"" <*>
@@ -365,11 +381,11 @@ parseToken =
             <|>
             TkString (Just prefix) DoubleQuote ShortString <$> manyTill stringChar (char '"')
           Just (Right (Left prefix)) ->
-            TkRawBytes prefix DoubleQuote LongString <$
+            TkLongRawBytes prefix DoubleQuote <$
             text "\"\"" <*>
-            rawStringChars (text "\"\"\"")
+            longRawStringChars (text "\"\"\"")
             <|>
-            TkRawBytes prefix DoubleQuote ShortString <$> rawStringChars (char '"')
+            TkShortRawBytes prefix DoubleQuote <$> shortRawStringChars (char '"')
           Just (Right (Right prefix)) ->
             TkBytes prefix DoubleQuote LongString <$
             text "\"\"" <*>
@@ -386,11 +402,11 @@ parseToken =
             <|>
             TkString Nothing SingleQuote ShortString <$> manyTill stringChar (char '\'')
           Just (Left (Left prefix)) ->
-            TkRawString prefix SingleQuote LongString <$
+            TkLongRawString prefix SingleQuote <$
             text "''" <*>
-            rawStringChars (text "'''")
+            longRawStringChars (text "'''")
             <|>
-            TkRawString prefix SingleQuote ShortString <$> rawStringChars (char '\'')
+            TkShortRawString prefix SingleQuote <$> shortRawStringChars (char '\'')
           Just (Left (Right prefix)) ->
             TkString (Just prefix) SingleQuote LongString <$
             text "''" <*>
@@ -398,11 +414,11 @@ parseToken =
             <|>
             TkString (Just prefix) SingleQuote ShortString <$> manyTill stringChar (char '\'')
           Just (Right (Left prefix)) ->
-            TkRawBytes prefix SingleQuote LongString <$
+            TkLongRawBytes prefix SingleQuote <$
             text "''" <*>
-            rawStringChars (text "'''")
+            longRawStringChars (text "'''")
             <|>
-            TkRawBytes prefix SingleQuote ShortString <$> rawStringChars (char '\'')
+            TkShortRawBytes prefix SingleQuote <$> shortRawStringChars (char '\'')
           Just (Right (Right prefix)) ->
             TkBytes prefix SingleQuote LongString <$
             text "''" <*>
@@ -545,7 +561,8 @@ indentation ann lls =
 
     go :: LogicalLine a -> StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
     go ll@(LogicalLine ann spcs line nl)
-      | all isBlankToken line = pure [IndentedLine ll]
+      | not $ any (\case; Continued{} -> True; _ -> False) $ spcs ^. indentWhitespaces
+      , all isBlankToken line = pure [IndentedLine ll]
       | otherwise = do
           (_, i) :| is <- get
           let
@@ -633,7 +650,8 @@ nested = fmap Nested . go FingerTree.empty []
            (Seq (Either (Nested a) (Line a)))
     go leaps [] [] = pure mempty
     go leaps ((ann, a) : as) [] = foldr (\_ _ -> Left $ ExpectedDedent ann) (pure a) as
-    go leaps ctxt (Indent n a : is) = go (leaps FingerTree.|> Summed n) ((a, mempty) : ctxt) is
+    go leaps ctxt (Indent n a : is) =
+      go (leaps FingerTree.|> Summed n) ((a, mempty) : ctxt) is
     go leaps [] (Dedent a : is) = Left $ UnexpectedDedent a
     go leaps ((ann, a) : as) (Dedent _ : is) =
       case FingerTree.viewr leaps of
@@ -642,5 +660,7 @@ nested = fmap Nested . go FingerTree.empty []
           case as of
             (ann', x) : xs -> go leaps' ((ann', x |> Left (Nested a)) : xs) is
             [] -> go leaps' [(ann, Sequence.singleton $ Left (Nested a))] is
-    go leaps [] (IndentedLine ll : is) = go leaps [(llAnn ll, Sequence.singleton (Right $ logicalToLine leaps ll))] is
-    go leaps ((ann, a) : as) (IndentedLine ll : is) = go leaps ((ann, a |> Right (logicalToLine leaps ll)) : as) is
+    go leaps [] (IndentedLine ll : is) =
+      go leaps [(llAnn ll, Sequence.singleton (Right $ logicalToLine leaps ll))] is
+    go leaps ((ann, a) : as) (IndentedLine ll : is) =
+      go leaps ((ann, a |> Right (logicalToLine leaps ll)) : as) is

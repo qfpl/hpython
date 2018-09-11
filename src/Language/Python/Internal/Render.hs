@@ -189,25 +189,38 @@ showToken t =
         quote <>
         renderPyChars qt st s <>
         quote
-    TkRawString sp qt st s _ ->
+    TkLongRawString sp qt s _ ->
       let
-        quote =
-          Text.pack $
-          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
+        quote = Text.pack . replicate 3 $ showQuoteType qt
       in
         showRawStringPrefix sp <>
         quote <>
-        renderRawPyChars qt st (_RawString # s) <>
+        renderRawPyChars qt LongString (_LongRawString # s) <>
         quote
-    TkRawBytes sp qt st s _ ->
+    TkShortRawString sp qt s _ ->
+      let
+        quote = Text.pack [showQuoteType qt]
+      in
+        showRawStringPrefix sp <>
+        quote <>
+        renderRawPyChars qt ShortString (_ShortRawString # s) <>
+        quote
+    TkLongRawBytes sp qt s _ ->
       let
         quote =
-          Text.pack $
-          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
+          Text.pack . replicate 3 $ showQuoteType qt
       in
         showRawBytesPrefix sp <>
         quote <>
-        renderRawPyChars qt st (_RawString # s) <>
+        renderRawPyChars qt LongString (_LongRawString # s) <>
+        quote
+    TkShortRawBytes sp qt s _ ->
+      let
+        quote = Text.pack [showQuoteType qt]
+      in
+        showRawBytesPrefix sp <>
+        quote <>
+        renderRawPyChars qt ShortString (_ShortRawString # s) <>
         quote
     TkSpace{} -> " "
     TkTab{} -> "\t"
@@ -559,7 +572,9 @@ renderCompFor :: CompFor v a -> RenderOutput
 renderCompFor (CompFor _ ws1 ex1 ws2 ex2) =
   TkFor () `cons`
   foldMap renderWhitespace ws1 <>
-  bracketGenerator ex1 <>
+  (case ex1 of
+     Not{} -> bracket $ renderExpr ex1
+     _ -> bracketGenerator ex1) <>
   singleton (TkIn ()) <>
   foldMap renderWhitespace ws2 <>
   bracketTernaryLambda bracketTupleGenerator ex2
@@ -644,12 +659,18 @@ renderStringLiteral (StringLiteral _ a b c d e) =
 renderStringLiteral (BytesLiteral _ a b c d e) =
   TkBytes a b c d () `cons`
   foldMap renderWhitespace e
-renderStringLiteral (RawStringLiteral _ a b c d e) =
-  TkRawString a b c d () `cons`
-  foldMap renderWhitespace e
-renderStringLiteral (RawBytesLiteral _ a b c d e) =
-  TkRawBytes a b c d () `cons`
-  foldMap renderWhitespace e
+renderStringLiteral (LongRawStringLiteral _ a b c d) =
+  TkLongRawString a b c () `cons`
+  foldMap renderWhitespace d
+renderStringLiteral (ShortRawStringLiteral _ a b c d) =
+  TkShortRawString a b c () `cons`
+  foldMap renderWhitespace d
+renderStringLiteral (LongRawBytesLiteral _ a b c d) =
+  TkLongRawBytes a b c () `cons`
+  foldMap renderWhitespace d
+renderStringLiteral (ShortRawBytesLiteral _ a b c d) =
+  TkShortRawBytes a b c () `cons`
+  foldMap renderWhitespace d
 
 renderSubscript :: Subscript v a -> RenderOutput
 renderSubscript (SubscriptExpr a) = bracketTupleGenerator a

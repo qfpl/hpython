@@ -1,4 +1,5 @@
 {-# language DataKinds, TypeOperators, FlexibleContexts #-}
+{-# language OverloadedStrings #-}
 module Main where
 
 import Language.Python.Internal.Optics.Validated (unvalidated)
@@ -20,7 +21,7 @@ import Control.Lens
 import Control.Monad.IO.Class
 import Control.Monad.State
 import Data.Functor
-import Data.List
+-- import Data.List (isInfixOf)
 import Data.Text (Text)
 import Data.Validate (Validate(..), validate)
 import System.Directory
@@ -31,6 +32,7 @@ import qualified Data.Text.IO as StrictText
 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 
 validateExprSyntax'
   :: Expr '[Indentation] a
@@ -68,6 +70,7 @@ runPython3 :: (MonadTest m, MonadIO m) => FilePath -> Bool -> Text -> m ()
 runPython3 path shouldSucceed str = do
   () <- liftIO $ StrictText.writeFile path str
   (ec, sto, ste) <- liftIO $ readProcessWithExitCode "python3" ["-m", "py_compile", path] ""
+  annotateShow str
   annotateShow shouldSucceed
   annotateShow ec
   annotate sto
@@ -78,9 +81,9 @@ runPython3 path shouldSucceed str = do
     -- If the python repl would fail, then validation should fail
     -- If validation succeeds, then the python repl should succeed
     (True, ExitSuccess) -> success
-    (True, ExitFailure{})
-      | "SyntaxError" `isInfixOf` last (lines ste) -> failure
-      | otherwise -> success
+    (True, ExitFailure{}) -> failure
+      -- | "SyntaxError" `isInfixOf` last (lines ste) -> failure
+      -- | otherwise -> success
     (False, ExitSuccess) -> success
     (False, ExitFailure{}) -> success
 
@@ -135,16 +138,20 @@ syntax_module path =
     annotateShow rst
     runPython3 path shouldSucceed rst
 
+goodExpr :: FilePath -> Expr '[] () -> PropertyT IO ()
+goodExpr path ex =
+  case validateExprIndentation' ex of
+    Failure errs -> annotateShow errs *> failure
+    Success res ->
+      case validateExprSyntax' res of
+        Failure errs' -> annotateShow errs' *> failure
+        Success res' -> runPython3 path True (showExpr ex)
+
 correct_syntax_expr :: FilePath -> Property
 correct_syntax_expr path =
   property $ do
     ex <- forAll $ evalStateT Correct.genExpr Correct.initialGenState
-    case validateExprIndentation' ex of
-      Failure errs -> annotateShow errs *> failure
-      Success res ->
-        case validateExprSyntax' res of
-          Failure errs' -> annotateShow errs' *> failure
-          Success res' -> runPython3 path True (showExpr ex)
+    goodExpr path ex
 
 correct_syntax_statement :: FilePath -> Property
 correct_syntax_statement path =
@@ -192,17 +199,38 @@ statement_printparseprint_print =
             showStatement (res' ^. unvalidated) ===
               showStatement (py $> ())
 
+string_correct :: FilePath -> Property
+string_correct path =
+  property $ do
+    str <- forAll $ Gen.list (Range.constant 0 100) Gen.unicode
+    qt <- forAll $ Gen.element [SingleQuote, DoubleQuote]
+    st <- forAll $ Gen.element [ShortString, LongString]
+    let ex = String () . pure $ StringLiteral () Nothing qt st (fromHaskellString str) []
+    goodExpr path ex
+
+    let ex' = showExpr ex
+    py <-
+      validate (\e -> annotateShow e *> failure) pure $
+      parseExpr "test" ex'
+
+    goodExpr path $ () <$ py
+    ex' === showExpr py
+
 main = do
   checkParallel lexerParserTests
   traverse checkParallel dslTests
   checkParallel scopeTests
   checkParallel roundtripTests
   let file = "hedgehog-test.py"
-  check . withTests 200 $ syntax_expr file
-  check . withTests 200 $ syntax_statement file
-  check . withTests 200 $ syntax_module file
-  check . withTests 200 $ correct_syntax_expr file
-  check . withTests 200 $ correct_syntax_statement file
-  check expr_printparseprint_print
-  check . withShrinks 2000 $ statement_printparseprint_print
+  checkParallel $
+    Group "Main tests"
+      [ ("Haskell String to Python String", string_correct file)
+      , ("Syntax checking for expressions", withTests 200 $ syntax_expr file)
+      , ("Syntax checking for statements", withTests 200 $ syntax_statement file)
+      , ("Syntax checking for modules", withTests 200 $ syntax_module file)
+      , ("Correct generator for expressions", withTests 200 $ correct_syntax_expr file)
+      , ("Correct generator for statements", withTests 200 $ correct_syntax_statement file)
+      , ("Print/Parse idempotent expressions", expr_printparseprint_print)
+      , ("Print/Parse idempotent statements", withShrinks 2000 $ statement_printparseprint_print)
+      ]
   removeFile "hedgehog-test.py"

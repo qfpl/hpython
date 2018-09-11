@@ -238,6 +238,8 @@ module Language.Python.Syntax
   , await_
     -- ** @... if ... else ...@
   , ifThenElse_
+    -- ** Generators
+  , gen_
     -- ** @yield@
   , yield_
     -- ** @yield from ...@
@@ -831,6 +833,12 @@ comp_ val cfor guards =
      then cfor
      else cfor & trailingWhitespace .~ [Space])
     (unGuard <$> guards)
+
+-- |
+-- >>> gen_ $ comp_ (var_ "a") (for_ $ var_ "a" `in_` list_ [li_ $ int_ 1, li_ $ int_ 2, li_ $ int_ 3]) [if_ $ var_ "a" .== 2]
+-- (a for a in [1, 2, 3] if a == 2)
+gen_ :: Raw (Comprehension Expr) -> Raw Expr
+gen_ = Generator ()
 
 -- |
 -- >>> dict_ [var_ "a" .: 1]

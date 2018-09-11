@@ -14,7 +14,6 @@ import Control.Lens.Lens (Lens, Lens', lens)
 import Control.Lens.Plated (Plated(..), gplate)
 import Control.Lens.Prism (_Just, _Left, _Right)
 import Control.Lens.Setter ((.~), mapped, over)
-import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (Traversal, failing, traverseOf)
 import Control.Lens.Tuple (_2)
 import Data.Bifunctor (bimap)
@@ -357,30 +356,30 @@ instance HasTrailingWhitespace (TupleItem v a) where
 
 data Expr (v :: [*]) a
   = Unit
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeUnitWhitespaceInner :: [Whitespace]
   , _unsafeUnitWhitespaceRight :: [Whitespace]
   }
   | Lambda
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeLambdaWhitespace :: [Whitespace]
   , _unsafeLambdaArgs :: CommaSep (Param v a)
   , _unsafeLambdaColon :: [Whitespace]
   , _unsafeLambdaBody :: Expr v a
   }
   | Yield
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeYieldWhitespace :: [Whitespace]
   , _unsafeYieldValue :: Maybe (Expr v a)
   }
   | YieldFrom
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeYieldWhitespace :: [Whitespace]
   , _unsafeFromWhitespace :: [Whitespace]
   , _unsafeYieldFromValue :: Expr v a
   }
   | Ternary
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   -- expr
   , _unsafeTernaryValue :: Expr v a
   -- 'if' spaces
@@ -393,7 +392,7 @@ data Expr (v :: [*]) a
   , _unsafeTernaryElse :: Expr v a
   }
   | ListComp
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   -- [ spaces
   , _unsafeListCompWhitespaceLeft :: [Whitespace]
   -- comprehension
@@ -402,7 +401,7 @@ data Expr (v :: [*]) a
   , _unsafeListCompWhitespaceRight :: [Whitespace]
   }
   | List
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   -- [ spaces
   , _unsafeListWhitespaceLeft :: [Whitespace]
   -- exprs
@@ -411,7 +410,7 @@ data Expr (v :: [*]) a
   , _unsafeListWhitespaceRight :: [Whitespace]
   }
   | DictComp
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   -- { spaces
   , _unsafeDictCompWhitespaceLeft :: [Whitespace]
   -- comprehension
@@ -420,13 +419,13 @@ data Expr (v :: [*]) a
   , _unsafeDictCompWhitespaceRight :: [Whitespace]
   }
   | Dict
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeDictWhitespaceLeft :: [Whitespace]
   , _unsafeDictValues :: Maybe (CommaSep1' (DictItem v a))
   , _unsafeDictWhitespaceRight :: [Whitespace]
   }
   | SetComp
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   -- { spaces
   , _unsafeSetCompWhitespaceLeft :: [Whitespace]
   -- comprehension
@@ -435,13 +434,13 @@ data Expr (v :: [*]) a
   , _unsafeSetCompWhitespaceRight :: [Whitespace]
   }
   | Set
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeSetWhitespaceLeft :: [Whitespace]
   , _unsafeSetValues :: CommaSep1' (SetItem v a)
   , _unsafeSetWhitespaceRight :: [Whitespace]
   }
   | Deref
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   -- expr
   , _unsafeDerefValueLeft :: Expr v a
   -- . spaces
@@ -450,7 +449,7 @@ data Expr (v :: [*]) a
   , _unsafeDerefValueRight :: Ident v a
   }
   | Subscript
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   -- expr
   , _unsafeSubscriptValueLeft :: Expr v a
   -- [ spaces
@@ -461,7 +460,7 @@ data Expr (v :: [*]) a
   , _unsafeSubscriptWhitespaceRight :: [Whitespace]
   }
   | Call
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   -- expr
   , _unsafeCallFunction :: Expr v a
   -- ( spaces
@@ -472,26 +471,26 @@ data Expr (v :: [*]) a
   , _unsafeCallWhitespaceRight :: [Whitespace]
   }
   | None
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeNoneWhitespace :: [Whitespace]
   }
   | Ellipsis
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeEllipsisWhitespace :: [Whitespace]
   }
   | BinOp
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeBinOpExprLeft :: Expr v a
   , _unsafeBinOpOp :: BinOp a
   , _unsafeBinOpExprRight :: Expr v a
   }
   | UnOp
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeUnOpOp :: UnOp a
   , _unsafeUnOpValue :: Expr v a
   }
   | Parens
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   -- ( spaces
   , _unsafeParensWhitespaceLeft :: [Whitespace]
   -- expr
@@ -503,31 +502,31 @@ data Expr (v :: [*]) a
   { _unsafeIdentValue :: Ident v a
   }
   | Int
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeIntValue :: IntLiteral a
   , _unsafeIntWhitespace :: [Whitespace]
   }
   | Float
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeFloatValue :: FloatLiteral a
   , _unsafeFloatWhitespace :: [Whitespace]
   }
   | Imag
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeImagValue :: ImagLiteral a
   , _unsafeImagWhitespace :: [Whitespace]
   }
   | Bool
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeBoolValue :: Bool
   , _unsafeBoolWhitespace :: [Whitespace]
   }
   | String
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeStringValue :: NonEmpty (StringLiteral a)
   }
   | Tuple
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   -- expr
   , _unsafeTupleHead :: TupleItem v a
   -- , spaces
@@ -536,20 +535,85 @@ data Expr (v :: [*]) a
   , _unsafeTupleTail :: Maybe (CommaSep1' (TupleItem v a))
   }
   | Not
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeNotWhitespace :: [Whitespace]
   , _unsafeNotValue :: Expr v a
   }
   | Generator
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _generatorValue :: Comprehension Expr v a
   }
   | Await
-  { _exprAnn :: a
+  { _unsafeExprAnn :: a
   , _unsafeAwaitWhitespace :: [Whitespace]
   , _unsafeAwaitValue :: Expr v a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+exprAnn :: Lens' (Expr v a) a
+exprAnn =
+  lens
+    (\case
+        Unit a _ _ -> a
+        Lambda a _ _ _ _ -> a
+        Yield a _ _ -> a
+        YieldFrom a _ _ _ -> a
+        Ternary a _ _ _ _ _ -> a
+        None a _ -> a
+        Ellipsis a _ -> a
+        List a _ _ _ -> a
+        ListComp a _ _ _ -> a
+        Deref a _ _ _ -> a
+        Subscript a _ _ _ _ -> a
+        Call a _ _ _ _ -> a
+        BinOp a _ _ _ -> a
+        UnOp a _ _ -> a
+        Parens a _ _ _ -> a
+        Ident a -> a ^. identAnn
+        Int a _ _ -> a
+        Float a _ _ -> a
+        Imag a _ _ -> a
+        Bool a _ _ -> a
+        String a _ -> a
+        Not a _ _ -> a
+        Tuple a _ _ _ -> a
+        DictComp a _ _ _ -> a
+        Dict a _ _ _ -> a
+        SetComp a _ _ _ -> a
+        Set a _ _ _ -> a
+        Generator a _ -> a
+        Await a _ _ -> a)
+    (\e ann ->
+      case e of
+        Unit _ a b -> Unit ann a b
+        Lambda _ a b c d -> Lambda ann a b c d
+        Yield _ a b -> Yield ann a b
+        YieldFrom ann a b c -> YieldFrom ann a b c
+        Ternary ann a b c d e -> Ternary ann a b c d e
+        None _ a -> None ann a
+        Ellipsis _ a -> Ellipsis ann a
+        List _ a b c -> List ann a b c
+        ListComp _ a b c -> ListComp ann a b c
+        Deref _ a b c -> Deref ann a b c
+        Subscript _ a b c d -> Subscript ann a b c d
+        Call _ a b c d -> Call ann a b c d
+        BinOp _ a b c -> BinOp ann a b c
+        UnOp _ a b -> UnOp ann a b
+        Parens _ a b c -> Parens ann a b c
+        Ident a -> Ident $ a & identAnn .~ ann
+        Int _ a b -> Int ann a b
+        Float _ a b -> Float ann a b
+        Imag _ a b -> Imag ann a b
+        Bool _ a b -> Bool ann a b
+        String _ a -> String ann a
+        Not _ a b -> Not ann a b
+        Tuple _ a b c -> Tuple ann a b c
+        DictComp _ a b c -> DictComp ann a b c
+        Dict _ a b c -> Dict ann a b c
+        SetComp _ a b c -> SetComp ann a b c
+        Set _ a b c -> Set ann a b c
+        Generator _ a -> Generator ann a
+        Await _ a b -> Not ann a b)
 
 instance HasTrailingWhitespace (Expr v a) where
   trailingWhitespace =
@@ -696,5 +760,3 @@ shouldBracketRight op right =
         _ -> maybe False (\p -> p < entry ^. opPrec) (rEntry ^? _Just.opPrec)
   in
     rightf || rightf'
-
-makeLenses ''Expr

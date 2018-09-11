@@ -19,7 +19,11 @@ backslash characters"
 -}
 
 {-# language BangPatterns, FlexibleContexts, PatternSynonyms, UndecidableInstances #-}
-module Language.Python.Internal.Syntax.Strings.Raw (RawString, _RawString) where
+module Language.Python.Internal.Syntax.Strings.Raw
+  ( LongRawString, _LongRawString
+  , ShortRawString, _ShortRawString
+  )
+where
 
 import Control.Lens.Cons (Cons, uncons)
 import Control.Lens.Empty (AsEmpty, pattern Empty)
@@ -48,8 +52,15 @@ instance (AsEmpty s, Cons s s Char Char, Semigroup s, Monoid s) => Monoid (RawSt
   mempty = RawString Empty 0
   mappend = (<>)
 
-_RawString :: (AsEmpty s, Cons s s Char Char) => Prism' s (RawString s)
-_RawString = prism' (\(RawString s _) -> s) toRaw
+newtype LongRawString s = LongRawString (RawString s)
+  deriving (Eq, Show)
+
+instance (AsEmpty s, Cons s s Char Char, Semigroup s, Monoid s) => Monoid (LongRawString s) where
+  mempty = LongRawString mempty
+  mappend (LongRawString a) (LongRawString b) = LongRawString $ mappend a b
+
+_LongRawString :: (AsEmpty s, Cons s s Char Char) => Prism' s (LongRawString s)
+_LongRawString = prism' (\(LongRawString (RawString s _)) -> s) toRaw
   where
     toRaw whole = go whole 0
       where
@@ -58,10 +69,39 @@ _RawString = prism' (\(RawString s _) -> s) toRaw
             Just (c, rest) ->
               case c of
                 '\\' -> go rest (n+1)
+                '\0' -> Nothing
                 _ -> go rest 0
             Nothing ->
               let (q, r) = quotRem n 2
               in
                 if r == 0
-                then Just $ RawString whole q
+                then Just . LongRawString $ RawString whole q
+                else Nothing
+
+newtype ShortRawString s = ShortRawString (RawString s)
+  deriving (Eq, Show)
+
+instance (AsEmpty s, Cons s s Char Char, Semigroup s, Monoid s) => Monoid (ShortRawString s) where
+  mempty = ShortRawString mempty
+  mappend (ShortRawString a) (ShortRawString b) = ShortRawString $ mappend a b
+
+_ShortRawString :: (AsEmpty s, Cons s s Char Char) => Prism' s (ShortRawString s)
+_ShortRawString = prism' (\(ShortRawString (RawString s _)) -> s) toRaw
+  where
+    toRaw whole = go whole 0
+      where
+        go a !n =
+          case uncons a of
+            Just (c, rest) ->
+              case c of
+                '\\' -> go rest (n+1)
+                '\n' -> Nothing
+                '\r' -> Nothing
+                '\0' -> Nothing
+                _ -> go rest 0
+            Nothing ->
+              let (q, r) = quotRem n 2
+              in
+                if r == 0
+                then Just . ShortRawString $ RawString whole q
                 else Nothing

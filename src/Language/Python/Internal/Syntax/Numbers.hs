@@ -2,7 +2,7 @@
 {-# language TemplateHaskell #-}
 module Language.Python.Internal.Syntax.Numbers where
 
-import Data.Deriving (deriveEq1)
+import Data.Deriving (deriveEq1, deriveOrd1)
 import Data.Digit.Binary (BinDigit)
 import Data.Digit.Octal (OctDigit)
 import Data.Digit.Decimal (DecDigit)
@@ -32,11 +32,12 @@ data IntLiteral a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 deriveEq1 ''IntLiteral
+deriveOrd1 ''IntLiteral
 
-data Sign = Pos | Neg deriving (Eq, Show)
+data Sign = Pos | Neg deriving (Eq, Ord, Show)
 
 data FloatExponent = FloatExponent Bool (Maybe Sign) (NonEmpty DecDigit)
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data FloatLiteral a
   = FloatLiteralFull
@@ -61,6 +62,7 @@ data FloatLiteral a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 deriveEq1 ''FloatLiteral
+deriveOrd1 ''FloatLiteral
 
 data ImagLiteral a
   = ImagLiteralInt
@@ -75,3 +77,4 @@ data ImagLiteral a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 deriveEq1 ''ImagLiteral
+deriveOrd1 ''ImagLiteral

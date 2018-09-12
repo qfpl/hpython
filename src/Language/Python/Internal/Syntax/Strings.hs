@@ -12,27 +12,27 @@ import Language.Python.Internal.Syntax.Strings.Raw
 data QuoteType
   = SingleQuote
   | DoubleQuote
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data StringType
   = ShortString
   | LongString
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data StringPrefix
   = Prefix_u
   | Prefix_U
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data RawStringPrefix
   = Prefix_r
   | Prefix_R
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data BytesPrefix
   = Prefix_b
   | Prefix_B
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data RawBytesPrefix
   = Prefix_br
@@ -43,7 +43,7 @@ data RawBytesPrefix
   | Prefix_rB
   | Prefix_Rb
   | Prefix_RB
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data StringLiteral a
   = LongRawStringLiteral
@@ -90,7 +90,7 @@ data StringLiteral a
   , _unsafeBytesLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 instance HasTrailingWhitespace (StringLiteral a) where
   trailingWhitespace =
@@ -139,7 +139,7 @@ data PyChar
   | Char_esc_t
   | Char_esc_v
   | Char_lit Char
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 fromHaskellString :: String -> [PyChar]
 fromHaskellString "" = []

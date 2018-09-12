@@ -4,12 +4,13 @@
 {-# language TemplateHaskell #-}
 module Language.Python.Internal.Syntax.IR where
 
+import Control.Lens.Fold (foldMapOf)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Lens (Lens', lens)
-import Control.Lens.Setter ((.~))
+import Control.Lens.Setter ((.~), over)
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (traverseOf)
-import Control.Lens.Tuple (_2, _3)
+import Control.Lens.Tuple (_1, _2, _3)
 import Control.Lens.Prism (_Right)
 import Data.Bifoldable (bifoldMap)
 import Data.Bifunctor (bimap)
@@ -578,8 +579,17 @@ data ExceptAs a
 
 newtype Module a
   = Module
-  { unModule :: [Either (Indents a, Maybe Comment, Maybe Newline) (Statement a)]
+  { unModule :: [Either (a, [Whitespace], Maybe Comment, Maybe Newline) (Statement a)]
   } deriving (Eq, Show)
+
+instance Functor Module where
+  fmap f = Module . fmap (bimap (over _1 f) (fmap f)) . unModule
+
+instance Foldable Module where
+  foldMap f = foldMap (bifoldMap (foldMapOf _1 f) (foldMap f)) . unModule
+
+instance Traversable Module where
+  traverse f = fmap Module . traverse (bitraverse (traverseOf _1 f) (traverse f)) . unModule
 
 data FromIRContext
   = FromIRContext

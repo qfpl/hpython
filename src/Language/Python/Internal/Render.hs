@@ -130,6 +130,9 @@ showQuoteType qt =
 showToken :: PyToken a -> Text
 showToken t =
   case t of
+    TkIndent{} -> error "trying to show indent token"
+    TkLevel{} -> error "trying to show level token"
+    TkDedent{} -> error "trying to show dedent token"
     TkIf{} -> "if"
     TkElse{} -> "else"
     TkElif{} -> "elif"
@@ -1323,8 +1326,8 @@ renderModule :: Module v a -> RenderOutput
 renderModule (Module ms) =
   foldMap
     (either
-       (\(a, b, c) ->
-          renderIndents a <>
+       (\(_, a, b, c) ->
+          foldMap renderWhitespace a <>
           maybe mempty (\a -> singleton $ TkComment (Text.unpack $ renderComment a) ()) b <>
           maybe mempty (singleton . renderNewline) c)
        renderStatement)

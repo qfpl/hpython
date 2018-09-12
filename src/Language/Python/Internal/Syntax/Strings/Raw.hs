@@ -31,7 +31,7 @@ import Control.Lens.Prism (Prism', prism')
 import Data.Semigroup (Semigroup(..))
 
 data RawString s = RawString s !Int
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 instance (AsEmpty s, Cons s s Char Char, Semigroup s) => Semigroup (RawString s) where
   RawString s n <> RawString s' n' | onlyNSlashes s' (2 * n') = RawString (s <> s') (n + n')
@@ -53,7 +53,7 @@ instance (AsEmpty s, Cons s s Char Char, Semigroup s, Monoid s) => Monoid (RawSt
   mappend = (<>)
 
 newtype LongRawString s = LongRawString (RawString s)
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 instance (AsEmpty s, Cons s s Char Char, Semigroup s, Monoid s) => Monoid (LongRawString s) where
   mempty = LongRawString mempty
@@ -79,7 +79,7 @@ _LongRawString = prism' (\(LongRawString (RawString s _)) -> s) toRaw
                 else Nothing
 
 newtype ShortRawString s = ShortRawString (RawString s)
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 instance (AsEmpty s, Cons s s Char Char, Semigroup s, Monoid s) => Monoid (ShortRawString s) where
   mempty = ShortRawString mempty

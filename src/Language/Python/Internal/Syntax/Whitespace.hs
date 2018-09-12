@@ -17,6 +17,7 @@ import Control.Lens.Getter (view)
 import Control.Lens.Lens (Lens', lens)
 import Control.Lens.Setter ((.~))
 import Control.Lens.TH (makeLenses)
+import Data.Deriving (deriveEq1, deriveOrd1)
 import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.FingerTree (FingerTree, Measured(..), fromList)
@@ -34,14 +35,14 @@ data Newline
   = CR { _commentBefore :: Maybe Comment }
   | LF { _commentBefore :: Maybe Comment }
   | CRLF { _commentBefore :: Maybe Comment }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data Whitespace
   = Space
   | Tab
   | Continued Newline [Whitespace]
   | Newline Newline
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 class HasTrailingWhitespace s where
   trailingWhitespace :: Lens' s [Whitespace]
@@ -89,7 +90,7 @@ instance Measured IndentLevel Whitespace where
 newtype Indent
   = MkIndent
   { unIndent :: FingerTree IndentLevel Whitespace
-  } deriving (Eq, Show, Semigroup, Monoid)
+  } deriving (Eq, Ord, Show, Semigroup, Monoid)
 
 instance IsList Indent where
   type Item Indent = Whitespace
@@ -111,3 +112,5 @@ data Indents a
   } deriving (Eq, Show, Functor, Foldable, Traversable)
 
 makeLenses ''Indents
+deriveEq1 ''Indents
+deriveOrd1 ''Indents

@@ -6,9 +6,15 @@
 {-# language TypeFamilies #-}
 {-# language OverloadedStrings #-}
 {-# language LambdaCase #-}
-module Language.Python.Internal.Lexer where
+module Language.Python.Internal.Lexer
+  ( SrcInfo(..), initialSrcInfo, withSrcInfo
+  , tokenize
+  , TabError(..)
+  , insertTabs
+  )
+where
 
-import Control.Applicative ((<**>), (<|>), many, optional)
+import Control.Applicative ((<|>), many, optional)
 import Control.Lens.Fold ((^?))
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
@@ -26,17 +32,15 @@ import Data.Foldable (asum)
 import Data.Functor.Identity (Identity)
 import Data.List.NonEmpty (NonEmpty(..), some1)
 import Data.Monoid (Sum(..))
-import Data.Semigroup ((<>))
-import Data.Sequence ((!?), (|>), Seq)
+import Data.Semigroup (Semigroup, (<>))
+import Data.Semigroup.Foldable (foldMap1)
 import Data.These (These(..))
 import Data.Void (Void)
-import Text.Megaparsec
-  (MonadParsec, ParseError, parse, unPos)
+import Text.Megaparsec (MonadParsec, ParseError, parse, unPos)
 import Text.Megaparsec.Parsers
 
 import qualified Data.FingerTree as FingerTree
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Data.Sequence as Sequence
 import qualified Data.Text as Text
 import qualified Text.Megaparsec as Parsec
 
@@ -46,25 +50,30 @@ import Language.Python.Internal.Token (PyToken(..), pyTokenAnn)
 data SrcInfo
   = SrcInfo
   { _srcInfoName :: FilePath
-  , _srcInfoLine :: !Int
-  , _srcInfoCol :: !Int
-  , _srcInfoOffset :: !(Maybe Int)
+  , _srcInfoLineStart :: !Int
+  , _srcInfoLineEnd :: !Int
+  , _srcInfoColStart :: !Int
+  , _srcInfoColEnd :: !Int
+  , _srcInfoOffsetStart :: !Int
+  , _srcInfoOffsetEnd :: !Int
   }
   deriving (Eq, Show)
 
-initialSrcInfo :: FilePath -> SrcInfo
-initialSrcInfo fp =
-  SrcInfo
-  { _srcInfoName = fp
-  , _srcInfoLine = 0
-  , _srcInfoCol = 0
-  , _srcInfoOffset = Just 0
-  }
+instance Semigroup SrcInfo where
+  SrcInfo _ ls le cs ce os oe <> SrcInfo n' ls' le' cs' ce' os' oe' =
+    SrcInfo n' (min ls ls') (max le le') (min cs cs') (max ce ce') (min os os') (max oe oe')
 
-{-# inline getSrcInfo #-}
-getSrcInfo :: MonadParsec e s m => m SrcInfo
-getSrcInfo =
-  (\(Parsec.SourcePos name l c) -> SrcInfo name (unPos l) (unPos c) . Just) <$>
+initialSrcInfo :: FilePath -> SrcInfo
+initialSrcInfo fp = SrcInfo fp 0 0 0 0 0 0
+
+{-# inline withSrcInfo #-}
+withSrcInfo :: MonadParsec e s m => m (SrcInfo -> a) -> m a
+withSrcInfo m =
+  (\(Parsec.SourcePos name l c) o f (Parsec.SourcePos _ l' c') o' ->
+     f $ SrcInfo name (unPos l) (unPos l') (unPos c) (unPos c') o o') <$>
+  Parsec.getPosition <*>
+  Parsec.getTokensProcessed <*>
+  m <*>
   Parsec.getPosition <*>
   Parsec.getTokensProcessed
 
@@ -276,7 +285,7 @@ parseToken
   :: (Monad m, CharParsing m, MonadParsec e s m)
   => m (PyToken SrcInfo)
 parseToken =
-  (<**>) getSrcInfo $
+  withSrcInfo $
   try
     (asum
      [ TkIf <$ text "if"
@@ -441,10 +450,13 @@ tokenize fp = parse (unParsecT tokens) fp
 data LogicalLine a
   = LogicalLine
   { llAnn :: a
-  , llSpaces :: Indent
+  , llSpaces :: ([PyToken a], Indent)
   , llLine :: [PyToken a]
   , llEnd :: Maybe (PyToken a, Newline)
   } deriving (Eq, Show)
+
+logicalLineToTokens :: LogicalLine a -> [PyToken a]
+logicalLineToTokens (LogicalLine _ _ ts m) = ts <> maybe [] (pure . fst) m
 
 spaceToken :: PyToken a -> Maybe Whitespace
 spaceToken TkSpace{} = Just Space
@@ -505,19 +517,21 @@ logicalLines tks =
   let
     (spaces, rest) = spanMaybe (\a -> (,) a <$> spaceToken a) tks
     (line, rest') = breakOnNewline rest
+    spaces' = collapseContinue spaces
   in
     LogicalLine
       (case tks of
          [] -> error "couldn't generate annotation for logical line"
          tk : _ -> pyTokenAnn tk)
-      (fmap snd (collapseContinue spaces) ^. from indentWhitespaces)
+      (spaces' >>= fst, fmap snd spaces' ^. from indentWhitespaces)
       line
       (fst <$> rest')
       :
     logicalLines (maybe [] snd rest') 
 
 data IndentedLine a
-  = Indent Int a
+  = Indent Int Indent a
+  | Level (NonEmpty Whitespace) a
   | Dedent a
   | IndentedLine (LogicalLine a)
   deriving (Eq, Show)
@@ -534,7 +548,7 @@ data TabError a
   | IncorrectDedent a
   deriving (Eq, Show)
 
-indentation :: a -> [LogicalLine a] -> Either (TabError a) [IndentedLine a]
+indentation :: Semigroup a => a -> [LogicalLine a] -> Either (TabError a) [IndentedLine a]
 indentation ann lls =
   flip evalStateT (pure (ann, mempty)) $
   (<>) <$> (concat <$> traverse go lls) <*> finalDedents
@@ -559,8 +573,11 @@ indentation ann lls =
         x : xs -> x :| xs
       pure $ replicate (length popped) (Dedent ann)
 
-    go :: LogicalLine a -> StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
-    go ll@(LogicalLine ann spcs line nl)
+    go
+      :: Semigroup a
+      => LogicalLine a
+      -> StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
+    go ll@(LogicalLine ann (spTks, spcs) line nl)
       | not $ any (\case; Continued{} -> True; _ -> False) $ spcs ^. indentWhitespaces
       , all isBlankToken line = pure [IndentedLine ll]
       | otherwise = do
@@ -580,10 +597,16 @@ indentation ann lls =
             ili = indentLevel i
           case compare ilSpcs ili of
             LT -> (<> [IndentedLine ll]) <$> dedents ann ilSpcs
-            EQ -> pure [IndentedLine ll]
+            EQ ->
+              pure $
+                (case (spTks, spcs ^. indentWhitespaces) of
+                   ([], []) -> []
+                   (x:xs, y:ys) -> [ Level (y:|ys) (foldMap1 pyTokenAnn $ x:|xs) ]
+                   _ -> error "impossible") <>
+                [ IndentedLine ll ]
             GT -> do
               modify $ NonEmpty.cons (ann, spcs)
-              pure [Indent (ilSpcs - ili) ann, IndentedLine ll]
+              pure [Indent (ilSpcs - ili) spcs ann, IndentedLine ll]
 
 data Line a
   = Line
@@ -594,21 +617,8 @@ data Line a
   } deriving (Eq, Show)
 
 logicalToLine :: FingerTree (Sum Int) (Summed Int) -> LogicalLine a -> Line a
-logicalToLine leaps (LogicalLine a b c d) =
+logicalToLine leaps (LogicalLine a (_, b) c d) =
   Line a (if all isBlankToken c then [b] else splitIndents leaps b) c (snd <$> d)
-
-newtype Nested a
-  = Nested
-  { unNested :: Seq (Either (Nested a) (Line a))
-  } deriving (Eq, Show)
-
-nestedAnn :: Nested a -> Maybe a
-nestedAnn (Nested s) = s !? 0 >>= either nestedAnn (pure . lineAnn)
-
-data IndentationError a
-  = UnexpectedDedent a
-  | ExpectedDedent a
-  deriving (Eq, Show)
 
 newtype Summed a
   = Summed
@@ -638,29 +648,23 @@ splitIndents ns ws = go ns ws []
                 then error $ "could not carve out " <> show n <> " from " <> show ws
                 else go ns' (MkIndent befores) .  (MkIndent afters :)
 
-nested :: [IndentedLine a] -> Either (IndentationError a) (Nested a)
-nested = fmap Nested . go FingerTree.empty []
+chunked :: [IndentedLine a] -> [PyToken a]
+chunked = go FingerTree.empty
   where
     go
       :: FingerTree (Sum Int) (Summed Int)
-      -> [(a, Seq (Either (Nested a) (Line a)))]
       -> [IndentedLine a]
-      -> Either
-           (IndentationError a)
-           (Seq (Either (Nested a) (Line a)))
-    go leaps [] [] = pure mempty
-    go leaps ((ann, a) : as) [] = foldr (\_ _ -> Left $ ExpectedDedent ann) (pure a) as
-    go leaps ctxt (Indent n a : is) =
-      go (leaps FingerTree.|> Summed n) ((a, mempty) : ctxt) is
-    go leaps [] (Dedent a : is) = Left $ UnexpectedDedent a
-    go leaps ((ann, a) : as) (Dedent _ : is) =
+      -> [PyToken a]
+    go leaps [] = []
+    go leaps (Indent n i a : is) =
+      TkIndent a (Indents (splitIndents leaps i) a) : go (leaps FingerTree.|> Summed n) is
+    go leaps (Dedent a : is) =
       case FingerTree.viewr leaps of
         FingerTree.EmptyR -> error "impossible"
-        leaps' FingerTree.:> _ ->
-          case as of
-            (ann', x) : xs -> go leaps' ((ann', x |> Left (Nested a)) : xs) is
-            [] -> go leaps' [(ann, Sequence.singleton $ Left (Nested a))] is
-    go leaps [] (IndentedLine ll : is) =
-      go leaps [(llAnn ll, Sequence.singleton (Right $ logicalToLine leaps ll))] is
-    go leaps ((ann, a) : as) (IndentedLine ll : is) =
-      go leaps ((ann, a |> Right (logicalToLine leaps ll)) : as) is
+        leaps' FingerTree.:> _ -> TkDedent a : go leaps' is
+    go leaps (IndentedLine ll : is) = logicalLineToTokens ll <> go leaps is
+    go leaps (Level i a : is) =
+      TkLevel a (Indents (splitIndents leaps $ NonEmpty.toList i ^. from indentWhitespaces) a) : go leaps is
+
+insertTabs :: Semigroup a => a -> [PyToken a] -> Either (TabError a) [PyToken a]
+insertTabs a = fmap chunked . indentation a . logicalLines

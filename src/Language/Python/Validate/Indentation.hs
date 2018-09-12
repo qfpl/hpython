@@ -21,8 +21,9 @@ module Language.Python.Validate.Indentation
   )
 where
 
-import Control.Lens.Fold ((^?!), anyOf, folded)
+import Control.Lens.Fold ((^?!), folded)
 import Control.Lens.Getter ((^.))
+import Control.Lens.Iso (from)
 import Control.Lens.Prism (_Right)
 import Control.Lens.Review ((#))
 import Control.Lens.Setter (over, mapped)
@@ -320,13 +321,9 @@ validateModuleIndentation =
   traverseOf
     (_Wrapped.traverse)
     (bitraverse
-      (\(a, b, c) ->
-         (a, b, c) <$
-         if
-           anyOf
-             (indentsValue.folded.indentWhitespaces.folded)
-             (\case; Continued{} -> True; _ -> False)
-             a
-         then setNextIndent EqualTo [] <* checkIndent a
+      (\(a, b, c, d) ->
+         (a, b, c, d) <$
+         if any (\case; Continued{} -> True; _ -> False) b
+         then errorVM [_ExpectedEqualTo # ([], Indents [b ^. from indentWhitespaces] a)]
          else pure ())
       (\a -> setNextIndent EqualTo [] *> validateStatementIndentation a))

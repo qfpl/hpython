@@ -2,7 +2,8 @@
 {-# language TemplateHaskell #-}
 module Language.Python.Internal.Token where
 
-import Data.Deriving (deriveEq1)
+import Data.Deriving (deriveEq1, deriveOrd1)
+import Data.Functor.Classes (liftCompare, liftEq)
 
 import Language.Python.Internal.Syntax.Numbers (IntLiteral(..), FloatLiteral(..), ImagLiteral(..))
 import Language.Python.Internal.Syntax.Strings
@@ -11,7 +12,7 @@ import Language.Python.Internal.Syntax.Strings
   , QuoteType(..), StringType(..), PyChar(..)
   )
 import Language.Python.Internal.Syntax.Strings.Raw (LongRawString(..), ShortRawString(..))
-import Language.Python.Internal.Syntax.Whitespace (Newline(..))
+import Language.Python.Internal.Syntax.Whitespace (Newline(..), Indents)
 
 data PyToken a
   = TkIf a
@@ -108,8 +109,18 @@ data PyToken a
   | TkPipe a
   | TkCaret a
   | TkAmpersand a
-  deriving (Eq, Show, Functor)
+  | TkIndent a (Indents a)
+  | TkLevel a (Indents a)
+  | TkDedent a
+  deriving (Show, Functor)
 deriveEq1 ''PyToken
+deriveOrd1 ''PyToken
+
+instance Eq (PyToken a) where
+  (==) = liftEq (\_ _ -> True)
+
+instance Ord (PyToken a) where
+  compare = liftCompare (\_ _ -> EQ)
 
 pyTokenAnn :: PyToken a -> a
 pyTokenAnn tk =
@@ -117,6 +128,9 @@ pyTokenAnn tk =
     TkPipe a -> a
     TkCaret a -> a
     TkAmpersand a -> a
+    TkIndent a _ -> a
+    TkLevel a _ -> a
+    TkDedent a -> a
     TkDef a -> a
     TkReturn a -> a
     TkPass a -> a

@@ -421,7 +421,7 @@ instance HasNewlines Statement where
     SmallStatements idnts s ss sc <$> traverse f nl
 
 instance HasNewlines Module where
-  _Newlines = _Wrapped.traverse.failing (_Left._3.traverse) (_Right._Newlines)
+  _Newlines = _Wrapped.traverse.failing (_Left._4.traverse) (_Right._Newlines)
 
 assignTargets :: Traversal (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
 assignTargets f e =

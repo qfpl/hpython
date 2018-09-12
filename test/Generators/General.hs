@@ -470,7 +470,11 @@ genModule =
   Module <$>
   sizedList
     (Gen.choice
-    [ fmap Left $ (,,) <$> genIndents <*> Gen.maybe genComment <*> Gen.maybe genNewline
+    [ fmap Left $
+      (,,,) () <$>
+      genWhitespaces <*>
+      Gen.maybe genComment <*>
+      Gen.maybe genNewline
     , Right <$> genStatement
     ])
 

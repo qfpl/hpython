@@ -1,28 +1,20 @@
 {-# language OverloadedStrings, OverloadedLists #-}
 module LexerParser (lexerParserTests) where
 
-import Control.Monad.Except (throwError)
-import Data.Functor.Alt ((<!>))
 import Data.Validate (Validate(..), validate)
 import qualified Data.Text as Text
-import qualified Data.Functor.Alt as Alt (many)
 import Hedgehog
 
-import Language.Python.Internal.Lexer
-import Language.Python.Internal.Parse
-import Language.Python.Internal.Render
-import Language.Python.Internal.Syntax.Whitespace
-import Language.Python.Internal.Token
-import Language.Python.Parse (parseModule, parseStatement, parseExpr)
+import Helpers (doTokenize, doTabs)
+import Language.Python.Internal.Lexer (initialSrcInfo)
 
-import Helpers (doParse, doNested)
+import Language.Python.Internal.Render
+import Language.Python.Parse (parseModule, parseStatement, parseExpr)
 
 lexerParserTests :: Group
 lexerParserTests =
   Group "Lexer/Parser tests"
-  [ ("Test parse 1", test_parse_1)
-  , ("Test parse 2", test_parse_2)
-  , ("Test full trip 1", test_fulltrip_1)
+  [ ("Test full trip 1", test_fulltrip_1)
   , ("Test full trip 2", test_fulltrip_2)
   , ("Test full trip 3", test_fulltrip_3)
   , ("Test full trip 4", test_fulltrip_4)
@@ -50,7 +42,11 @@ test_fulltrip_1 =
   withTests 1 . property $ do
     let str = "def a(x, y=2, *z, **w):\n   return 2 + 3"
 
-    tree <- validate (const failure) pure $ parseStatement "test" str
+    tks <- doTokenize str
+    tks' <- doTabs (initialSrcInfo "test") tks
+    annotateShow tks'
+
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseStatement "test" str
     annotateShow tree
 
     showStatement tree === str
@@ -60,7 +56,7 @@ test_fulltrip_2 =
   withTests 1 . property $ do
     let str = "(   1\n       *\n  3\n    )"
 
-    tree <- validate (const failure) pure $ parseExpr "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseExpr "test" str
     annotateShow tree
 
     showExpr tree === str
@@ -70,7 +66,7 @@ test_fulltrip_3 =
   withTests 1 . property $ do
     let str = "pass;"
 
-    tree <- validate (const failure) pure $ parseStatement "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseStatement "test" str
     annotateShow tree
 
     showStatement tree === str
@@ -80,7 +76,7 @@ test_fulltrip_4 =
   withTests 1 . property $ do
     let str = "def a():\n pass\n #\n pass\n"
 
-    tree <- validate (const failure) pure $ parseStatement "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseStatement "test" str
     annotateShow tree
 
     showStatement tree === str
@@ -90,7 +86,7 @@ test_fulltrip_5 =
   withTests 1 . property $ do
     let str = "if False:\n pass\n pass\nelse:\n pass\n pass\n"
 
-    tree <- validate (const failure) pure $ parseStatement "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseStatement "test" str
     annotateShow tree
 
     showStatement tree === str
@@ -100,7 +96,7 @@ test_fulltrip_6 =
   withTests 1 . property $ do
     let str = "# blah\ndef boo():\n    pass\n       #bing\n    #   bop\n"
 
-    tree <- validate (const failure) pure $ parseModule "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" str
     annotateShow tree
 
     showModule tree === str
@@ -110,7 +106,7 @@ test_fulltrip_7 =
   withTests 1 . property $ do
     let str = "if False:\n pass\nelse \\\n      \\\r\n:\n pass\n"
 
-    tree <- validate (const failure) pure $ parseModule "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" str
     annotateShow tree
 
     showModule tree === str
@@ -120,7 +116,7 @@ test_fulltrip_8 =
   withTests 1 . property $ do
     let str = "def a():\n \n pass\n pass\n"
 
-    tree <- validate (const failure) pure $ parseModule "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" str
     annotateShow tree
 
     showModule tree === str
@@ -132,7 +128,7 @@ test_fulltrip_9 =
       str =
         "try:\n pass\nexcept False:\n pass\nelse:\n pass\nfinally:\n pass\n def a():\n  pass\n pass\n"
 
-    tree <- validate (const failure) pure $ parseModule "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" str
     annotateShow tree
 
     showModule tree === str
@@ -156,7 +152,7 @@ test_fulltrip_10 =
         , "    pass"
         ]
 
-    tree <- validate (const failure) pure $ parseModule "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -175,7 +171,7 @@ test_fulltrip_11 =
         , " \tpass"
         ]
 
-    tree <- validate (const failure) pure $ parseModule "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -195,7 +191,7 @@ test_fulltrip_12 =
         , " pass"
         ]
 
-    tree <- validate (const failure) pure $ parseModule "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -217,7 +213,7 @@ test_fulltrip_13 =
         , " pass"
         ]
 
-    tree <- validate (const failure) pure $ parseModule "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -228,7 +224,7 @@ test_fulltrip_14 =
     let
       str = "not ((False for a in False) if False else False or False)"
 
-    tree <- validate (const failure) pure $ parseModule "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -239,7 +235,7 @@ test_fulltrip_15 =
     let
       str = "01."
 
-    tree <- validate (const failure) pure $ parseModule "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -250,7 +246,7 @@ test_fulltrip_16 =
     let
       str = "def a():\n  return ~i"
 
-    tree <- validate (const failure) pure $ parseModule "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -260,7 +256,7 @@ test_fulltrip_17 =
   withTests 1 . property $ do
     let str = "r\"\\\"\""
 
-    tree <- validate (const failure) pure $ parseModule "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -270,7 +266,7 @@ test_fulltrip_18 =
   withTests 1 . property $ do
     let str = "\"\0\""
 
-    tree <- validate (const failure) pure $ parseModule "test" str
+    tree <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" str
     annotateShow $! tree
 
     showModule tree === str
@@ -304,70 +300,9 @@ test_fulltrip_21 =
   withTests 1 . property $ do
     let str = "if a:\n  \\\n\n  pass"
 
-    tks <-
-      case tokenize "test" str of
-        Left{} -> failure
-        Right a -> pure a
-    let lls = logicalLines tks
-    annotateShow lls
-    failure
-
     let res = parseModule "test" str
     case res of
       Failure{} -> success
       Success a -> do
         annotateShow a
         failure
-
-parseTab :: Parser ann Whitespace
-parseTab = do
-  curTk <- currentToken
-  case curTk of
-    TkTab{} -> pure Tab
-    _ -> throwError $ ExpectedToken (TkTab ()) curTk
-
-parseSpace :: Parser ann Whitespace
-parseSpace = do
-  curTk <- currentToken
-  case curTk of
-    TkSpace{} -> pure Space
-    _ -> throwError $ ExpectedToken (TkSpace ()) curTk
-
-test_parse_1 :: Property
-test_parse_1 =
-  withTests 1 . property $ do
-    let
-      line =
-        [ IndentedLine
-            LogicalLine
-            { llAnn = ()
-            , llSpaces = []
-            , llLine = [ TkTab () ]
-            , llEnd = Nothing
-            }
-        ]
-
-    nested <- doNested line
-
-    res <- doParse () (parseSpace <!> parseTab) nested
-    case res of
-      Tab -> success
-      _ -> annotateShow res *> failure
-
-test_parse_2 :: Property
-test_parse_2 =
-  withTests 1 . property $ do
-    let
-      line =
-        [ IndentedLine
-            LogicalLine
-            { llAnn = ()
-            , llSpaces = []
-            , llLine = [ TkSpace (), TkSpace (), TkSpace (), TkSpace () ]
-            , llEnd = Nothing
-            }
-        ]
-
-    nested <- doNested line
-
-    () <$ doParse () (Alt.many space) nested

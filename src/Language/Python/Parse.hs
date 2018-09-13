@@ -17,11 +17,12 @@ import Data.Set (Set)
 import Data.Text (Text)
 import Data.Validate (Validate, bindValidate, fromEither)
 import Data.Void (Void)
+import Text.Megaparsec (eof)
 import Text.Megaparsec.Error (ErrorItem(..))
 import Text.Megaparsec.Pos (SourcePos(..))
 
 import Language.Python.Internal.Lexer
-  (SrcInfo(..), initialSrcInfo, tokenize, insertTabs)
+  (SrcInfo(..), initialSrcInfo, withSrcInfo, tokenize, insertTabs)
 import Language.Python.Internal.Token (PyToken)
 import Language.Python.Internal.Syntax (Module, Statement, Expr, Indents(..))
 
@@ -76,7 +77,8 @@ parseStatement fp input =
     ir = do
       tokens <- first fromLexicalError $ tokenize fp input
       tabbed <- first fromTabError $ insertTabs si tokens
-      first fromParseError $ Parse.runParser fp Parse.statement tabbed
+      first fromParseError $
+        Parse.runParser fp (Parse.statement (withSrcInfo . pure $ Indents []) <* eof) tabbed
   in
     fromEither (first pure ir) `bindValidate`
     (first (fmap fromIRError) . IR.fromIR_statement . ($ Indents [] si))
@@ -88,6 +90,6 @@ parseExpr fp input =
     ir = do
       tokens <- first fromLexicalError $ tokenize fp input
       tabbed <- first fromTabError $ insertTabs si tokens
-      first fromParseError $ Parse.runParser fp (Parse.exprList Parse.space) tabbed
+      first fromParseError $ Parse.runParser fp (Parse.exprList Parse.space <* eof) tabbed
   in
     fromEither (first pure ir) `bindValidate` (first (fmap fromIRError) . IR.fromIR_expr)

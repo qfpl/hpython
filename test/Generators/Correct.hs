@@ -340,8 +340,14 @@ genStringLiterals = do
   b <- Gen.bool_
   String () <$> go b n
   where
-    ss = Gen.choice [genStringLiteral $ genPyChar Gen.latin1, genRawStringLiteral]
-    bs = Gen.choice [genBytesLiteral $ genPyChar Gen.ascii, genRawBytesLiteral]
+    ss = Gen.choice
+      [ genStringLiteral $ genPyChar (Gen.filter (/='\0') Gen.latin1)
+      , genRawStringLiteral
+      ]
+    bs = Gen.choice
+      [ genBytesLiteral $ genPyChar (Gen.filter (/='\0') Gen.ascii)
+      , genRawBytesLiteral
+      ]
     go True 1 = pure <$> ss
     go False 1 = pure <$> bs
     go b n =

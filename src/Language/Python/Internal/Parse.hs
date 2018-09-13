@@ -8,6 +8,8 @@
 {-# language TypeFamilies #-}
 module Language.Python.Internal.Parse where
 
+import Debug.Trace
+
 import Control.Applicative (Alternative, (<**>), (<|>), optional, many, some)
 import Control.Lens.Getter ((^.))
 import Data.Bifunctor (first)
@@ -891,11 +893,14 @@ sepBy1' val sep = go
       val <*>
       optional ((,) <$> sep <*> optional go)
 
-statement :: (Alternative m, MonadParsec e PyTokens m) => m (Indents SrcInfo -> Statement SrcInfo)
-statement =
+statement
+  :: (Alternative m, MonadParsec e PyTokens m)
+  => m (Indents SrcInfo)
+  -> m (Indents SrcInfo -> Statement SrcInfo)
+statement pIndent =
   -- It's important to parse compound statements first, because the 'async' keyword
   -- is actually an identifier and we'll have to backtrack
-  (\c i -> CompoundStatement $ c i) <$> compoundStatement <|>
+  (\c i -> CompoundStatement $ c i) <$> compoundStatement pIndent <|>
 
   (\(a, b, c) d idnt -> SmallStatements idnt a b c d) <$>
   sepBy1' smallStatement (snd <$> semicolon space) <*>
@@ -931,7 +936,7 @@ suite =
 
     line i =
       Left <$> commentOrEmpty <|>
-      Right <$> (i <**> statement)
+      Right <$> (i <**> statement level)
 
 comma :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, [Whitespace])
 comma ws = token ws (\case; TkComma{} -> True; _ -> False) ","
@@ -1091,8 +1096,9 @@ decorator =
 
 compoundStatement
   :: MonadParsec e PyTokens m
-  => m (Indents SrcInfo -> CompoundStatement SrcInfo)
-compoundStatement =
+  => m (Indents SrcInfo)
+  -> m (Indents SrcInfo -> CompoundStatement SrcInfo)
+compoundStatement pIndent =
   ifSt <|>
   whileSt <|>
   trySt <|>
@@ -1105,7 +1111,7 @@ compoundStatement =
   where
     decorated = do
       d <- decorator
-      ds <- some $ level <**> decorator
+      ds <- some $ pIndent <**> decorator
       (do; a <- doAsync; fundef (Just a) (Just d) ds) <|>
         fundef Nothing (Just d) ds <|>
         classSt (Just d) ds
@@ -1129,14 +1135,14 @@ compoundStatement =
       suite <*>
       many
         ((,,,) <$>
-         level <*>
+         pIndent <*>
          (snd <$> token space (\case; TkElif{} -> True; _ -> False) "elif") <*>
          expr space <*>
          suite) <*>
       optional
         ((,,) <$>
-         level <*>
-         (snd <$> token space (\case; TkElse{} -> True; _ -> False) "else") <*>
+         pIndent <*>
+         (snd <$> token space (\case; TkElse{} -> trace "test" True; _ -> False) "else") <*>
          suite)
 
     whileSt =
@@ -1162,7 +1168,7 @@ compoundStatement =
       suite <*>
       (fmap Left
          ((,,) <$>
-          level <*>
+          pIndent <*>
           (snd <$> token space (\case; TkFinally{} -> True; _ -> False) "finally") <*>
           suite)
 
@@ -1172,18 +1178,18 @@ compoundStatement =
           ((,,) <$>
            some1
              ((,,,) <$>
-              level <*>
+              pIndent <*>
               (snd <$> token space (\case; TkExcept{} -> True; _ -> False) "except") <*>
               optional exceptAs <*>
               suite) <*>
            optional
              ((,,) <$>
-              level <*>
+              pIndent <*>
               (snd <$> token space (\case; TkElse{} -> True; _ -> False) "else") <*>
               suite) <*>
            optional
              ((,,) <$>
-              level <*>
+              pIndent <*>
               (snd <$> token space (\case; TkFinally{} -> True; _ -> False) "finally") <*>
               suite)))
 
@@ -1246,7 +1252,7 @@ compoundStatement =
       suite <*>
       optional
         ((,,) <$>
-         level <*>
+         pIndent <*>
          (snd <$> token space (\case; TkElse{} -> True; _ -> False) "else") <*>
          suite)
 
@@ -1255,12 +1261,14 @@ module_ =
   Module <$>
   many
     (Left <$> maybeComment <|>
-     withSrcInfo ((\s ann -> Right $ s (Indents [] ann)) <$> statement)) <*
+     withSrcInfo
+       ((\s ann -> Right $ s (Indents [] ann)) <$>
+        statement (withSrcInfo . pure $ Indents []))) <*
   eof
   where
     maybeComment =
       withSrcInfo $
-      (\ws cmt nl a -> (a, ws, cmt, nl)) <$>
+      (\ws (cmt, nl) a -> (a, ws, cmt, nl)) <$>
       many space <*>
-      optional comment <*>
-      (Just <$> eol <|> Nothing <$ eof)
+      ((,) <$> fmap Just comment <*> optional eol <|>
+       (,) <$> pure Nothing <*> fmap Just eol)

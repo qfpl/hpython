@@ -452,11 +452,16 @@ data LogicalLine a
   { llAnn :: a
   , llSpaces :: ([PyToken a], Indent)
   , llLine :: [PyToken a]
-  , llEnd :: Maybe (PyToken a, Newline)
+  , llEnd :: Maybe (PyToken a)
+  }
+  | BlankLine
+  { llLine :: [PyToken a]
+  , llEnd :: Maybe (PyToken a)
   } deriving (Eq, Show)
 
 logicalLineToTokens :: LogicalLine a -> [PyToken a]
-logicalLineToTokens (LogicalLine _ _ ts m) = ts <> maybe [] (pure . fst) m
+logicalLineToTokens (LogicalLine _ _ ts m) = ts <> maybe [] pure m
+logicalLineToTokens (BlankLine ts m) = ts <> maybe [] pure m
 
 spaceToken :: PyToken a -> Maybe Whitespace
 spaceToken TkSpace{} = Just Space
@@ -494,7 +499,7 @@ spanMaybe f as =
 
 -- | Acts like break, but encodes the "insignificant whitespace" rule for parens, braces
 -- and brackets
-breakOnNewline :: [PyToken a] -> ([PyToken a], Maybe ((PyToken a, Newline), [PyToken a]))
+breakOnNewline :: [PyToken a] -> ([PyToken a], Maybe (PyToken a, [PyToken a]))
 breakOnNewline = go 0
   where
     go _ [] = ([], Nothing)
@@ -507,7 +512,7 @@ breakOnNewline = go 0
         TkRightBracket{} -> first (tk :) $ go (max 0 $ careWhen0 - 1) tks
         TkRightBrace{} -> first (tk :) $ go (max 0 $ careWhen0 - 1) tks
         TkNewline nl _
-          | careWhen0 == 0 -> ([], Just ((tk, nl), tks))
+          | careWhen0 == 0 -> ([], Just (tk, tks))
           | otherwise -> first (tk :) $ go careWhen0 tks
         _ -> first (tk :) $ go careWhen0 tks
 
@@ -519,15 +524,20 @@ logicalLines tks =
     (line, rest') = breakOnNewline rest
     spaces' = collapseContinue spaces
   in
-    LogicalLine
-      (case tks of
-         [] -> error "couldn't generate annotation for logical line"
-         tk : _ -> pyTokenAnn tk)
-      (spaces' >>= fst, fmap snd spaces' ^. from indentWhitespaces)
-      line
-      (fst <$> rest')
-      :
-    logicalLines (maybe [] snd rest') 
+    (if
+       not (any (\case; Continued{} -> True; _ -> False) $ snd <$> spaces) &&
+       all isBlankToken line
+     then
+       BlankLine (fmap fst spaces <> line) (fst <$> rest')
+     else
+       LogicalLine
+         (case tks of
+           [] -> error "couldn't generate annotation for logical line"
+           tk : _ -> pyTokenAnn tk)
+         (spaces' >>= fst, fmap snd spaces' ^. from indentWhitespaces)
+         line
+         (fst <$> rest')) :
+    logicalLines (maybe [] snd rest')
 
 data IndentedLine a
   = Indent Int Indent a
@@ -562,7 +572,10 @@ indentation ann lls =
           put $ i' :| is'
           (Dedent ann :) <$> finalDedents
 
-    dedents :: a -> Int -> StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
+    dedents
+      :: a
+      -> Int
+      -> StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
     dedents ann n = do
       is <- get
       let (popped, remainder) = NonEmpty.span ((> n) . indentLevel . snd) is
@@ -577,48 +590,51 @@ indentation ann lls =
       :: Semigroup a
       => LogicalLine a
       -> StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
-    go ll@(LogicalLine ann (spTks, spcs) line nl)
-      | not $ any (\case; Continued{} -> True; _ -> False) $ spcs ^. indentWhitespaces
-      , all isBlankToken line = pure [IndentedLine ll]
-      | otherwise = do
-          (_, i) :| is <- get
-          let
-            et8 = absoluteIndentLevel 8 spcs
-            et1 = absoluteIndentLevel 1 spcs
-            et8i = absoluteIndentLevel 8 i
-            et1i = absoluteIndentLevel 1 i
-          when
-            (not (et8 < et8i && et1 < et1i) &&
-             not (et8 > et8i && et1 > et1i) &&
-             not (et8 == et8i && et1 == et1i))
-            (throwError $ TabError ann)
-          let
-            ilSpcs = indentLevel spcs
-            ili = indentLevel i
-          case compare ilSpcs ili of
-            LT -> (<> [IndentedLine ll]) <$> dedents ann ilSpcs
-            EQ ->
-              pure $
-                (case (spTks, spcs ^. indentWhitespaces) of
-                   ([], []) -> []
-                   (x:xs, y:ys) -> [ Level (y:|ys) (foldMap1 pyTokenAnn $ x:|xs) ]
-                   _ -> error "impossible") <>
-                [ IndentedLine ll ]
-            GT -> do
-              modify $ NonEmpty.cons (ann, spcs)
-              pure [Indent (ilSpcs - ili) spcs ann, IndentedLine ll]
+    go ll@BlankLine{} = pure [IndentedLine ll]
+    go ll@(LogicalLine ann (spTks, spcs) line nl) = do
+      (_, i) :| is <- get
+      let
+        et8 = absoluteIndentLevel 8 spcs
+        et1 = absoluteIndentLevel 1 spcs
+        et8i = absoluteIndentLevel 8 i
+        et1i = absoluteIndentLevel 1 i
+      when
+        (not (et8 < et8i && et1 < et1i) &&
+          not (et8 > et8i && et1 > et1i) &&
+          not (et8 == et8i && et1 == et1i))
+        (throwError $ TabError ann)
+      let
+        ilSpcs = indentLevel spcs
+        ili = indentLevel i
+        levelIndent =
+          case (spTks, spcs ^. indentWhitespaces) of
+            ([], []) -> []
+            (x:xs, y:ys) -> [ Level (y:|ys) (foldMap1 pyTokenAnn $ x:|xs) ]
+            _ -> error "impossible"
+      case compare ilSpcs ili of
+        LT -> (<> (levelIndent <> [IndentedLine ll])) <$> dedents ann ilSpcs
+        EQ ->
+          pure $ levelIndent <> [ IndentedLine ll ]
+        GT -> do
+          modify $ NonEmpty.cons (ann, spcs)
+          pure [Indent (ilSpcs - ili) spcs ann, IndentedLine ll]
 
 data Line a
-  = Line
+  = Blank
+  { lineLine :: [PyToken a]
+  , lineEnd :: Maybe (PyToken a)
+  }
+  | Line
   { lineAnn :: a
   , lineSpaces :: [Indent]
   , lineLine :: [PyToken a]
-  , lineEnd :: Maybe Newline
+  , lineEnd :: Maybe (PyToken a)
   } deriving (Eq, Show)
 
 logicalToLine :: FingerTree (Sum Int) (Summed Int) -> LogicalLine a -> Line a
+logicalToLine leaps (BlankLine c d) = Blank c d
 logicalToLine leaps (LogicalLine a (_, b) c d) =
-  Line a (if all isBlankToken c then [b] else splitIndents leaps b) c (snd <$> d)
+  Line a (splitIndents leaps b) c d
 
 newtype Summed a
   = Summed

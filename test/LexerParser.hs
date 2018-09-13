@@ -42,10 +42,6 @@ test_fulltrip_1 =
   withTests 1 . property $ do
     let str = "def a(x, y=2, *z, **w):\n   return 2 + 3"
 
-    tks <- doTokenize str
-    tks' <- doTabs (initialSrcInfo "test") tks
-    annotateShow tks'
-
     tree <- validate (\e -> annotateShow e *> failure) pure $ parseStatement "test" str
     annotateShow tree
 
@@ -127,6 +123,9 @@ test_fulltrip_9 =
     let
       str =
         "try:\n pass\nexcept False:\n pass\nelse:\n pass\nfinally:\n pass\n def a():\n  pass\n pass\n"
+
+    tks <- doTokenize str
+    tks' <- doTabs (initialSrcInfo "test") tks
 
     tree <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" str
     annotateShow tree

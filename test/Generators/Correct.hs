@@ -89,6 +89,13 @@ genIdent = do
       (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_'])) <*>
     genWhitespaces
 
+genDeletableTuple :: (MonadGen m, MonadState GenState m) => m (Expr '[] ()) -> m (Expr '[] ())
+genDeletableTuple expr =
+  Tuple () <$>
+  (TupleItem () <$> expr) <*>
+  genWhitespaces <*>
+  Gen.maybe (genSizedCommaSep1' $ TupleItem () <$> expr)
+
 genTuple :: (MonadGen m, MonadState GenState m) => m (Expr '[] ()) -> m (Expr '[] ())
 genTuple expr =
   Tuple () <$>
@@ -254,6 +261,17 @@ genParams isLambda =
     appendCommaSep
       (pparams `appendCommaSep` maybe CommaSepNone CommaSepOne sp)
       (kwparams `appendCommaSep` maybe CommaSepNone CommaSepOne dsp)
+
+genDeletableList :: (MonadState GenState m, MonadGen m) => m (Expr '[] ()) -> m (Expr '[] ())
+genDeletableList genExpr' =
+  Gen.shrink
+    (\case
+        List _ _ (Just (CommaSepOne1' e _)) _ -> e ^.. _Exprs
+        _ -> []) $
+  List () <$>
+  genWhitespaces <*>
+  Gen.maybe (genSizedCommaSep1' $ ListItem () <$> genExpr') <*>
+  genWhitespaces
 
 genList :: (MonadState GenState m, MonadGen m) => m (Expr '[] ()) -> m (Expr '[] ())
 genList genExpr' =
@@ -461,9 +479,9 @@ genDeletable =
   sizedRecursive
     [ Ident <$> genIdent
     ]
-    [ genList genDeletable
+    [ genDeletableList genDeletable
     , genParens genDeletable
-    , genTuple genDeletable
+    , genDeletableTuple genDeletable
     , genDeref
     , genSubscript
     ]

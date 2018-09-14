@@ -79,10 +79,12 @@ parseStatement fp input =
       tokens <- first fromLexicalError $ tokenize fp input
       tabbed <- first fromTabError $ insertTabs si tokens
       first fromParseError $
-        Parse.runParser fp (Parse.statement (Parse.level <|> withSrcInfo (pure $ Indents [])) <* eof) tabbed
+        Parse.runParser fp ((Parse.statement tlIndent =<< tlIndent) <* eof) tabbed
   in
     fromEither (first pure ir) `bindValidate`
-    (first (fmap fromIRError) . IR.fromIR_statement . ($ Indents [] si))
+    (first (fmap fromIRError) . IR.fromIR_statement)
+  where
+    tlIndent = Parse.level <|> withSrcInfo (pure $ Indents [])
 
 parseExpr :: FilePath -> Text -> Validate [ParseError SrcInfo] (Expr '[] SrcInfo)
 parseExpr fp input =

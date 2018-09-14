@@ -8,14 +8,13 @@
 {-# language TypeFamilies #-}
 module Language.Python.Internal.Parse where
 
-import Control.Applicative (Alternative, (<**>), (<|>), optional, many, some)
+import Control.Applicative (Alternative, (<|>), optional, many, some)
 import Control.Lens.Getter ((^.))
 import Data.Bifunctor (first)
 import Data.Coerce (coerce)
 import Data.Function ((&))
 import Data.List (foldl')
 import Data.List.NonEmpty (some1)
-import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy(..))
 import Data.Void (Void)
 import Text.Megaparsec
@@ -895,13 +894,14 @@ sepBy1' val sep = go
 statement
   :: (Alternative m, MonadParsec e PyTokens m)
   => m (Indents SrcInfo)
-  -> m (Indents SrcInfo -> Statement SrcInfo)
-statement pIndent =
+  -> Indents SrcInfo
+  -> m (Statement SrcInfo)
+statement pIndent indentBefore =
   -- It's important to parse compound statements first, because the 'async' keyword
   -- is actually an identifier and we'll have to backtrack
-  (\c i -> CompoundStatement $ c i) <$> compoundStatement pIndent <|>
+  CompoundStatement <$> compoundStatement pIndent indentBefore <|>
 
-  (\(a, b, c) d idnt -> SmallStatements idnt a b c d) <$>
+  (\(a, b, c) d -> SmallStatements indentBefore a b c d) <$>
   sepBy1' smallStatement (snd <$> semicolon space) <*>
   (Right <$> eol <|> Left <$> optional comment)
 
@@ -924,7 +924,7 @@ suite =
     eol <*>
     (Block <$>
      many commentOrEmpty <*>
-     (indent <**> statement level) <*>
+     (statement level =<< indent) <*>
      many (line level)) <*
     dedent))
   where
@@ -942,7 +942,7 @@ suite =
 
     line i =
       Left <$> commentOrEmpty <|>
-      Right <$> (i <**> statement level)
+      Right <$> (statement level =<< i)
 
 comma :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, [Whitespace])
 comma ws = token ws (\case; TkComma{} -> True; _ -> False) ","
@@ -1093,9 +1093,12 @@ decoratorValue = do
       Nothing -> derefs
       Just (l, x, r) -> Call (derefs ^. exprAnn) derefs l x r
 
-decorator :: MonadParsec e PyTokens m => m (Indents SrcInfo -> Decorator SrcInfo)
-decorator =
-  (\(tk, spcs) a b i -> Decorator (pyTokenAnn tk) i spcs a b) <$>
+decorator
+  :: MonadParsec e PyTokens m
+  => Indents SrcInfo
+  -> m (Decorator SrcInfo)
+decorator indentBefore =
+  (\(tk, spcs) a b -> Decorator (pyTokenAnn tk) indentBefore spcs a b) <$>
   token space (\case; TkAt{} -> True; _ -> False) "@" <*>
   decoratorValue <*>
   eol
@@ -1103,36 +1106,37 @@ decorator =
 compoundStatement
   :: MonadParsec e PyTokens m
   => m (Indents SrcInfo)
-  -> m (Indents SrcInfo -> CompoundStatement SrcInfo)
-compoundStatement pIndent =
+  -> Indents SrcInfo
+  -> m (CompoundStatement SrcInfo)
+compoundStatement pIndent indentBefore =
   ifSt <|>
   whileSt <|>
   trySt <|>
   decorated <|>
   asyncSt <|>
-  classSt Nothing [] <|>
-  fundef Nothing Nothing [] <|>
+  classSt indentBefore [] <|>
+  fundef indentBefore Nothing [] <|>
   withSt Nothing <|>
   forSt Nothing
   where
     decorated = do
-      d <- decorator
+      d <- decorator indentBefore
       ds <-
         many $
-        try (pIndent <* lookAhead (token space (\case; TkAt{} -> True; _ -> False) "@")) <**>
+        try (pIndent <* lookAhead (token space (\case; TkAt{} -> True; _ -> False) "@")) >>=
         decorator
-      (do; a <- doAsync; fundef (Just a) (Just d) ds) <|>
-        fundef Nothing (Just d) ds <|>
-        classSt (Just d) ds
+      i <- pIndent
+      (do; a <- doAsync; fundef i (Just a) (d:ds)) <|>
+        fundef i Nothing (d:ds) <|>
+        classSt i (d:ds)
 
-    classSt dec1 decs =
-      (\ii (tk, s) a b c idnt ->
-         ClassDef
-           (pyTokenAnn tk)
-           (maybe decs (\x -> x idnt : decs) dec1)
-           (fromMaybe idnt ii)
-           (NonEmpty.fromList s) a b c) <$>
-      maybe (pure Nothing) (\_ -> Just <$> pIndent) dec1 <*>
+    classSt ib decs =
+      (\(tk, s) a b c ->
+        ClassDef
+          (pyTokenAnn tk)
+          decs
+          ib
+          (NonEmpty.fromList s) a b c) <$>
       token space (\case; TkClass{} -> True; _ -> False) "class" <*>
       identifier space <*>
       optional
@@ -1143,7 +1147,7 @@ compoundStatement pIndent =
       suite
 
     ifSt =
-      (\(tk, s) a b c d idnt -> If (pyTokenAnn tk) idnt s a b c d) <$>
+      (\(tk, s) a b c d -> If (pyTokenAnn tk) indentBefore s a b c d) <$>
       token space (\case; TkIf{} -> True; _ -> False) "if" <*>
       expr space <*>
       suite <*>
@@ -1162,7 +1166,7 @@ compoundStatement pIndent =
          suite)
 
     whileSt =
-      (\(tk, s) a b idnt -> While (pyTokenAnn tk) idnt s a b) <$>
+      (\(tk, s) a b -> While (pyTokenAnn tk) indentBefore s a b) <$>
       token space (\case; TkWhile{} -> True; _ -> False) "while" <*>
       expr space <*>
       suite
@@ -1176,10 +1180,10 @@ compoundStatement pIndent =
          identifier space)
 
     trySt =
-      (\(tk, s) a d idnt ->
+      (\(tk, s) a d ->
          case d of
-           Left (e, f, g) -> TryFinally (pyTokenAnn tk) idnt s a e f g
-           Right (e, f, g) -> TryExcept (pyTokenAnn tk) idnt s a e f g) <$>
+           Left (e, f, g) -> TryFinally (pyTokenAnn tk) indentBefore s a e f g
+           Right (e, f, g) -> TryExcept (pyTokenAnn tk) indentBefore s a e f g) <$>
       token space (\case; TkTry{} -> True; _ -> False) "try" <*>
       suite <*>
       (fmap Left
@@ -1217,27 +1221,25 @@ compoundStatement pIndent =
 
     asyncSt = do
       a <-
-        -- doAsync
         try $
         doAsync <*
         lookAhead
           (token space (\case; TkDef{} -> True; _ -> False) "def" <|>
            token space (\case; TkWith{} -> True; _ -> False) "with" <|>
            token space (\case; TkFor{} -> True; _ -> False) "for")
-      fundef (Just a) Nothing [] <|>
+      fundef indentBefore (Just a) [] <|>
         withSt (Just a) <|>
         forSt (Just a)
 
-    fundef async dec1 decs =
-      (\ii (tkDef, defSpaces) a b c d e f idnt ->
-        Fundef
-          (maybe (pyTokenAnn tkDef) (pyTokenAnn . fst) async)
-          (maybe decs (\x -> x idnt : decs) dec1)
-          (fromMaybe idnt ii)
-          (NonEmpty.fromList . snd <$> async)
-          (NonEmpty.fromList defSpaces)
-          a b c d e f) <$>
-      maybe (pure Nothing) (\_ -> Just <$> pIndent) dec1 <*>
+    fundef ib async decs =
+      (\(tkDef, defSpaces) a b c d e f ->
+         Fundef
+         (maybe (pyTokenAnn tkDef) (pyTokenAnn . fst) async)
+         decs
+         ib
+         (NonEmpty.fromList . snd <$> async)
+         (NonEmpty.fromList defSpaces)
+         a b c d e f) <$>
       token space (\case; TkDef{} -> True; _ -> False) "def" <*>
       identifier space <*>
       fmap snd (token anySpace (\case; TkLeftParen{} -> True; _ -> False) "(") <*>
@@ -1250,10 +1252,10 @@ compoundStatement pIndent =
       suite
 
     withSt async =
-      (\(tk, s) a b idnt ->
+      (\(tk, s) a b ->
           With
             (maybe (pyTokenAnn tk) (pyTokenAnn . fst) async)
-            idnt
+            indentBefore
             (NonEmpty.fromList . snd <$> async)
             s a b) <$>
       token space (\case; TkWith{} -> True; _ -> False) "with" <*>
@@ -1268,10 +1270,10 @@ compoundStatement pIndent =
       suite
 
     forSt async =
-      (\(tk, s) a b c d e idnt ->
+      (\(tk, s) a b c d e ->
         For
           (maybe (pyTokenAnn tk) (pyTokenAnn . fst) async)
-          idnt
+          indentBefore
           (NonEmpty.fromList . snd <$> async)
           s a b c d e) <$>
       token space (\case; TkFor{} -> True; _ -> False) "for" <*>
@@ -1291,11 +1293,11 @@ module_ =
   Module <$>
   many
     (Left <$> maybeComment <|>
-     Right <$>
-     ((level <|> withSrcInfo (pure $ Indents [])) <**>
-      statement (level <|> withSrcInfo (pure $ Indents [])))) <*
+     Right <$> (statement tlIndent =<< tlIndent)) <*
   eof
   where
+    tlIndent = level <|> withSrcInfo (pure $ Indents [])
+
     maybeComment =
       withSrcInfo $
       (\ws (cmt, nl) a -> (a, ws, cmt, nl)) <$>

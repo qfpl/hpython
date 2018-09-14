@@ -873,9 +873,13 @@ canDelete Await{} = False
 canDelete String{} = False
 canDelete (Parens _ _ a _) = canDelete a
 canDelete (List _ _ a _) =
-  all (allOf (folded.getting _Exprs) canDelete) a
+  all (allOf (folded.getting _Exprs) canDelete) a &&
+  not (any (\case; ListUnpack{} -> True; _ -> False) $ a ^.. folded.folded)
 canDelete (Tuple _ a _ b) =
-  all canDelete $ (a ^?! getting _Exprs) : toListOf (folded.folded.getting _Exprs) b
+  all
+    canDelete
+    ((a ^?! getting _Exprs) : toListOf (folded.folded.getting _Exprs) b) &&
+  not (any (\case; TupleUnpack{} -> True; _ -> False) $ a : toListOf (folded.folded) b)
 canDelete Deref{} = True
 canDelete Subscript{} = True
 canDelete Ident{} = True

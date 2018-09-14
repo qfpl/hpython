@@ -18,6 +18,14 @@ import Language.Python.Internal.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax.Types
 
+_TupleUnpack :: Prism (TupleItem v a) (TupleItem '[] a) (TupleUnpack v a) (TupleUnpack '[] a)
+_TupleUnpack =
+  prism
+    (\(MkTupleUnpack a b c d) -> TupleUnpack a b c d)
+    (\case
+       TupleUnpack a b c d -> Right $ MkTupleUnpack a b c d
+       a -> Left $ a ^. unvalidated)
+
 _Tuple :: Prism (Expr v a) (Expr '[] a) (Tuple v a) (Tuple '[] a)
 _Tuple =
   prism

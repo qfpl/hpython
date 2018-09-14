@@ -182,3 +182,12 @@ data None (v :: [*]) a
   , _noneWhitespace :: [Whitespace]
   } deriving (Eq, Show)
 makeLenses ''None
+
+data TupleUnpack v a
+  = MkTupleUnpack
+  { _tupleUnpackAnn :: a
+  , _tupleUnpackParens :: [([Whitespace], [Whitespace])]
+  , _tupleUnpackWhitespace :: [Whitespace]
+  , _tupleUnpackValue :: Expr v a
+  } deriving (Eq, Show)
+makeLenses ''TupleUnpack

@@ -44,8 +44,9 @@ module Language.Python.Validate.Syntax
 where
 
 import Control.Applicative ((<|>), liftA2)
-import Control.Lens.Cons (snoc)
-import Control.Lens.Fold ((^..), (^?), (^?!), folded, allOf, toListOf)
+import Control.Lens.Cons (snoc, _init)
+import Control.Lens.Fold
+  ((^..), (^?), (^?!), folded, allOf, toListOf, anyOf, lengthOf, has)
 import Control.Lens.Getter ((^.), getting, view)
 import Control.Lens.Prism (_Right, _Just)
 import Control.Lens.Review ((#))
@@ -64,7 +65,7 @@ import Data.Bitraversable (bitraverse)
 import Data.Functor.Compose (Compose(..))
 import Data.List (intersect, union)
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Maybe (isJust, fromMaybe)
+import Data.Maybe (isJust, isNothing, fromMaybe)
 import Data.Semigroup (Semigroup(..))
 import Data.Type.Set (Nub, Member)
 import Data.Validate (Validate(..))
@@ -100,6 +101,7 @@ data SyntaxContext
   { _inLoop :: Bool
   , _inFunction :: Maybe FunctionInfo
   , _inGenerator :: Bool
+  , _inClass :: Bool
   , _inParens :: Bool
   }
 makeLenses ''SyntaxContext
@@ -127,6 +129,7 @@ initialSyntaxContext =
   { _inLoop = False
   , _inFunction = Nothing
   , _inGenerator = False
+  , _inClass = False
   , _inParens = False
   }
 
@@ -611,7 +614,10 @@ validateCompoundStatementSyntax (TryExcept a idnts b e f k l) =
        validateWhitespace a f <*>
        traverse validateExceptAsSyntax g <*>
        validateSuiteSyntax j)
-    f <*>
+    f <*
+  (if anyOf (_init.folded._3) isNothing $ NonEmpty.toList f
+   then errorVM [_DefaultExceptMustBeLast # a]
+   else pure ()) <*>
   traverse
     (\(idnts, x, w) ->
        (,,) idnts <$>
@@ -644,7 +650,7 @@ validateCompoundStatementSyntax (ClassDef a decos idnts b c d g) =
          y <*>
        validateWhitespace a z)
     d <*>
-  validateSuiteSyntax g
+  liftVM1 (local $ inClass .~ True) (validateSuiteSyntax g)
 validateCompoundStatementSyntax (For a idnts asyncWs b c d e h i) =
   bindVM ask $ \ctxt ->
   For a idnts <$
@@ -717,7 +723,11 @@ validateImportTargetsSyntax
      )
   => ImportTargets v a
   -> ValidateSyntax e (ImportTargets (Nub (Syntax ': v)) a)
-validateImportTargetsSyntax (ImportAll a ws) = ImportAll a <$> validateWhitespace a ws
+validateImportTargetsSyntax (ImportAll a ws) =
+  bindVM ask $ \ctxt ->
+  if ctxt ^. inClass && has (inFunction._Just) ctxt
+    then errorVM [_WildcardImportInDefinition # a]
+    else ImportAll a <$> validateWhitespace a ws
 validateImportTargetsSyntax (ImportSome a cs) =
   ImportSome a <$> traverse (validateImportAsSyntax validateIdentSyntax) cs
 validateImportTargetsSyntax (ImportSomeParens a ws1 cs ws2) =
@@ -927,7 +937,8 @@ canAssignTo (Parens _ _ a _) = canAssignTo a
 canAssignTo (List _ _ a _) =
   all (allOf (folded.getting _Exprs) canAssignTo) a
 canAssignTo (Tuple _ a _ b) =
-  all canAssignTo $ (a ^?! getting _Exprs) : toListOf (folded.folded.getting _Exprs) b
+  all canAssignTo ((a ^?! getting _Exprs) : toListOf (folded.folded.getting _Exprs) b) &&
+  lengthOf (folded.getting _TupleUnpack) (a : toListOf (folded.folded) b) <= 1
 canAssignTo Deref{} = True
 canAssignTo Subscript{} = True
 canAssignTo Ident{} = True

@@ -42,49 +42,53 @@ data SyntaxError (v :: [*]) a
   | AwaitOutsideCoroutine a
   | NullByte a
   | NonAsciiInBytes a Char
+  | DefaultExceptMustBeLast a
+  | WildcardImportInDefinition a
   deriving (Eq, Show)
 
 -- makeClassyPrisms ''SyntaxError
-class AsSyntaxError r_anSy v_aj2D a_aj2E | r_anSy -> v_aj2D
-                                                      a_aj2E where
-  _SyntaxError :: Prism' r_anSy (SyntaxError v_aj2D a_aj2E)
+class AsSyntaxError r_anlX v_aivb a_aivc | r_anlX -> v_aivb
+                                                      a_aivc where
+  _SyntaxError :: Prism' r_anlX (SyntaxError v_aivb a_aivc)
   _PositionalAfterKeywordArg ::
-    Prism' r_anSy (a_aj2E, Expr v_aj2D a_aj2E)
+    Prism' r_anlX (a_aivc, Expr v_aivb a_aivc)
   _PositionalAfterKeywordUnpacking ::
-    Prism' r_anSy (a_aj2E, Expr v_aj2D a_aj2E)
-  _PositionalAfterKeywordParam :: Prism' r_anSy (a_aj2E, String)
-  _UnexpectedDoubleStarParam :: Prism' r_anSy (a_aj2E, String)
-  _CannotAssignTo :: Prism' r_anSy (a_aj2E, Expr v_aj2D a_aj2E)
-  _CannotDelete :: Prism' r_anSy (a_aj2E, Expr v_aj2D a_aj2E)
-  _CannotAugAssignTo :: Prism' r_anSy (a_aj2E, Expr v_aj2D a_aj2E)
-  _DuplicateArgument :: Prism' r_anSy (a_aj2E, String)
+    Prism' r_anlX (a_aivc, Expr v_aivb a_aivc)
+  _PositionalAfterKeywordParam :: Prism' r_anlX (a_aivc, String)
+  _UnexpectedDoubleStarParam :: Prism' r_anlX (a_aivc, String)
+  _CannotAssignTo :: Prism' r_anlX (a_aivc, Expr v_aivb a_aivc)
+  _CannotDelete :: Prism' r_anlX (a_aivc, Expr v_aivb a_aivc)
+  _CannotAugAssignTo :: Prism' r_anlX (a_aivc, Expr v_aivb a_aivc)
+  _DuplicateArgument :: Prism' r_anlX (a_aivc, String)
   _ExpectedNewlineAfter ::
-    Prism' r_anSy (a_aj2E, [Whitespace], Statement v_aj2D a_aj2E,
+    Prism' r_anlX (a_aivc, [Whitespace], Statement v_aivb a_aivc,
                     Maybe Newline)
-  _UnexpectedNewline :: Prism' r_anSy a_aj2E
-  _IdentifierReservedWord :: Prism' r_anSy (a_aj2E, String)
-  _EmptyIdentifier :: Prism' r_anSy a_aj2E
-  _BadCharacter :: Prism' r_anSy (a_aj2E, String)
-  _BreakOutsideLoop :: Prism' r_anSy a_aj2E
-  _ContinueOutsideLoop :: Prism' r_anSy a_aj2E
-  _ReturnOutsideFunction :: Prism' r_anSy a_aj2E
-  _NonlocalOutsideFunction :: Prism' r_anSy a_aj2E
-  _ParametersNonlocal :: Prism' r_anSy (a_aj2E, [String])
-  _NoBindingNonlocal :: Prism' r_anSy (Ident v_aj2D a_aj2E)
-  _Can'tJoinStringAndBytes :: Prism' r_anSy a_aj2E
-  _InvalidYield :: Prism' r_anSy a_aj2E
-  _CommentAfterBackslash :: Prism' r_anSy a_aj2E
-  _MalformedDecorator :: Prism' r_anSy a_aj2E
-  _InvalidDictUnpacking :: Prism' r_anSy a_aj2E
-  _InvalidSetUnpacking :: Prism' r_anSy a_aj2E
-  _TypedParamInLambda :: Prism' r_anSy a_aj2E
-  _TypedUnnamedStarParam :: Prism' r_anSy a_aj2E
-  _AsyncWithOutsideCoroutine :: Prism' r_anSy a_aj2E
-  _AsyncForOutsideCoroutine :: Prism' r_anSy a_aj2E
-  _YieldFromInsideCoroutine :: Prism' r_anSy a_aj2E
-  _AwaitOutsideCoroutine :: Prism' r_anSy a_aj2E
-  _NullByte :: Prism' r_anSy a_aj2E
-  _NonAsciiInBytes :: Prism' r_anSy (a_aj2E, Char)
+  _UnexpectedNewline :: Prism' r_anlX a_aivc
+  _IdentifierReservedWord :: Prism' r_anlX (a_aivc, String)
+  _EmptyIdentifier :: Prism' r_anlX a_aivc
+  _BadCharacter :: Prism' r_anlX (a_aivc, String)
+  _BreakOutsideLoop :: Prism' r_anlX a_aivc
+  _ContinueOutsideLoop :: Prism' r_anlX a_aivc
+  _ReturnOutsideFunction :: Prism' r_anlX a_aivc
+  _NonlocalOutsideFunction :: Prism' r_anlX a_aivc
+  _ParametersNonlocal :: Prism' r_anlX (a_aivc, [String])
+  _NoBindingNonlocal :: Prism' r_anlX (Ident v_aivb a_aivc)
+  _Can'tJoinStringAndBytes :: Prism' r_anlX a_aivc
+  _InvalidYield :: Prism' r_anlX a_aivc
+  _CommentAfterBackslash :: Prism' r_anlX a_aivc
+  _MalformedDecorator :: Prism' r_anlX a_aivc
+  _InvalidDictUnpacking :: Prism' r_anlX a_aivc
+  _InvalidSetUnpacking :: Prism' r_anlX a_aivc
+  _TypedParamInLambda :: Prism' r_anlX a_aivc
+  _TypedUnnamedStarParam :: Prism' r_anlX a_aivc
+  _AsyncWithOutsideCoroutine :: Prism' r_anlX a_aivc
+  _AsyncForOutsideCoroutine :: Prism' r_anlX a_aivc
+  _YieldFromInsideCoroutine :: Prism' r_anlX a_aivc
+  _AwaitOutsideCoroutine :: Prism' r_anlX a_aivc
+  _NullByte :: Prism' r_anlX a_aivc
+  _NonAsciiInBytes :: Prism' r_anlX (a_aivc, Char)
+  _DefaultExceptMustBeLast :: Prism' r_anlX a_aivc
+  _WildcardImportInDefinition :: Prism' r_anlX a_aivc
   _PositionalAfterKeywordArg
     = ((.) _SyntaxError) _PositionalAfterKeywordArg
   _PositionalAfterKeywordUnpacking
@@ -128,221 +132,237 @@ class AsSyntaxError r_anSy v_aj2D a_aj2E | r_anSy -> v_aj2D
   _AwaitOutsideCoroutine = ((.) _SyntaxError) _AwaitOutsideCoroutine
   _NullByte = ((.) _SyntaxError) _NullByte
   _NonAsciiInBytes = ((.) _SyntaxError) _NonAsciiInBytes
-instance AsSyntaxError (SyntaxError v_aj2D a_aj2E) v_aj2D a_aj2E where
+  _DefaultExceptMustBeLast
+    = ((.) _SyntaxError) _DefaultExceptMustBeLast
+  _WildcardImportInDefinition
+    = ((.) _SyntaxError) _WildcardImportInDefinition
+instance AsSyntaxError (SyntaxError v_aivb a_aivc) v_aivb a_aivc where
   _SyntaxError = id
   _PositionalAfterKeywordArg
     = (prism
-          (\ (x1_anSz, x2_anSA)
-            -> (PositionalAfterKeywordArg x1_anSz) x2_anSA))
-        (\ x_anSB
-            -> case x_anSB of
-                PositionalAfterKeywordArg y1_anSC y2_anSD
-                  -> Right (y1_anSC, y2_anSD)
-                _ -> Left x_anSB)
+          (\ (x1_anlY, x2_anlZ)
+            -> (PositionalAfterKeywordArg x1_anlY) x2_anlZ))
+        (\ x_anm0
+            -> case x_anm0 of
+                PositionalAfterKeywordArg y1_anm1 y2_anm2
+                  -> Right (y1_anm1, y2_anm2)
+                _ -> Left x_anm0)
   _PositionalAfterKeywordUnpacking
     = (prism
-          (\ (x1_anSE, x2_anSF)
-            -> (PositionalAfterKeywordUnpacking x1_anSE) x2_anSF))
-        (\ x_anSG
-            -> case x_anSG of
-                PositionalAfterKeywordUnpacking y1_anSH y2_anSI
-                  -> Right (y1_anSH, y2_anSI)
-                _ -> Left x_anSG)
+          (\ (x1_anm3, x2_anm4)
+            -> (PositionalAfterKeywordUnpacking x1_anm3) x2_anm4))
+        (\ x_anm5
+            -> case x_anm5 of
+                PositionalAfterKeywordUnpacking y1_anm6 y2_anm7
+                  -> Right (y1_anm6, y2_anm7)
+                _ -> Left x_anm5)
   _PositionalAfterKeywordParam
     = (prism
-          (\ (x1_anSJ, x2_anSK)
-            -> (PositionalAfterKeywordParam x1_anSJ) x2_anSK))
-        (\ x_anSL
-            -> case x_anSL of
-                PositionalAfterKeywordParam y1_anSM y2_anSN
-                  -> Right (y1_anSM, y2_anSN)
-                _ -> Left x_anSL)
+          (\ (x1_anm8, x2_anm9)
+            -> (PositionalAfterKeywordParam x1_anm8) x2_anm9))
+        (\ x_anma
+            -> case x_anma of
+                PositionalAfterKeywordParam y1_anmb y2_anmc
+                  -> Right (y1_anmb, y2_anmc)
+                _ -> Left x_anma)
   _UnexpectedDoubleStarParam
     = (prism
-          (\ (x1_anSO, x2_anSP)
-            -> (UnexpectedDoubleStarParam x1_anSO) x2_anSP))
-        (\ x_anSQ
-            -> case x_anSQ of
-                UnexpectedDoubleStarParam y1_anSR y2_anSS
-                  -> Right (y1_anSR, y2_anSS)
-                _ -> Left x_anSQ)
+          (\ (x1_anmd, x2_anme)
+            -> (UnexpectedDoubleStarParam x1_anmd) x2_anme))
+        (\ x_anmf
+            -> case x_anmf of
+                UnexpectedDoubleStarParam y1_anmg y2_anmh
+                  -> Right (y1_anmg, y2_anmh)
+                _ -> Left x_anmf)
   _CannotAssignTo
     = (prism
-          (\ (x1_anST, x2_anSU) -> (CannotAssignTo x1_anST) x2_anSU))
-        (\ x_anSV
-            -> case x_anSV of
-                CannotAssignTo y1_anSW y2_anSX -> Right (y1_anSW, y2_anSX)
-                _ -> Left x_anSV)
+          (\ (x1_anmi, x2_anmj) -> (CannotAssignTo x1_anmi) x2_anmj))
+        (\ x_anmk
+            -> case x_anmk of
+                CannotAssignTo y1_anml y2_anmm -> Right (y1_anml, y2_anmm)
+                _ -> Left x_anmk)
   _CannotDelete
-    = (prism (\ (x1_anSY, x2_anSZ) -> (CannotDelete x1_anSY) x2_anSZ))
-        (\ x_anT0
-            -> case x_anT0 of
-                CannotDelete y1_anT1 y2_anT2 -> Right (y1_anT1, y2_anT2)
-                _ -> Left x_anT0)
+    = (prism (\ (x1_anmn, x2_anmo) -> (CannotDelete x1_anmn) x2_anmo))
+        (\ x_anmp
+            -> case x_anmp of
+                CannotDelete y1_anmq y2_anmr -> Right (y1_anmq, y2_anmr)
+                _ -> Left x_anmp)
   _CannotAugAssignTo
     = (prism
-          (\ (x1_anT3, x2_anT4) -> (CannotAugAssignTo x1_anT3) x2_anT4))
-        (\ x_anT5
-            -> case x_anT5 of
-                CannotAugAssignTo y1_anT6 y2_anT7 -> Right (y1_anT6, y2_anT7)
-                _ -> Left x_anT5)
+          (\ (x1_anms, x2_anmt) -> (CannotAugAssignTo x1_anms) x2_anmt))
+        (\ x_anmu
+            -> case x_anmu of
+                CannotAugAssignTo y1_anmv y2_anmw -> Right (y1_anmv, y2_anmw)
+                _ -> Left x_anmu)
   _DuplicateArgument
     = (prism
-          (\ (x1_anT8, x2_anT9) -> (DuplicateArgument x1_anT8) x2_anT9))
-        (\ x_anTa
-            -> case x_anTa of
-                DuplicateArgument y1_anTb y2_anTc -> Right (y1_anTb, y2_anTc)
-                _ -> Left x_anTa)
+          (\ (x1_anmx, x2_anmy) -> (DuplicateArgument x1_anmx) x2_anmy))
+        (\ x_anmz
+            -> case x_anmz of
+                DuplicateArgument y1_anmA y2_anmB -> Right (y1_anmA, y2_anmB)
+                _ -> Left x_anmz)
   _ExpectedNewlineAfter
-    = (prism (\ x1_anTd -> ExpectedNewlineAfter x1_anTd))
-        (\ x_anTe
-            -> case x_anTe of
-                ExpectedNewlineAfter y1_anTf -> Right y1_anTf
-                _ -> Left x_anTe)
+    = (prism (\ x1_anmC -> ExpectedNewlineAfter x1_anmC))
+        (\ x_anmD
+            -> case x_anmD of
+                ExpectedNewlineAfter y1_anmE -> Right y1_anmE
+                _ -> Left x_anmD)
   _UnexpectedNewline
-    = (prism (\ x1_anTg -> UnexpectedNewline x1_anTg))
-        (\ x_anTh
-            -> case x_anTh of
-                UnexpectedNewline y1_anTi -> Right y1_anTi
-                _ -> Left x_anTh)
+    = (prism (\ x1_anmF -> UnexpectedNewline x1_anmF))
+        (\ x_anmG
+            -> case x_anmG of
+                UnexpectedNewline y1_anmH -> Right y1_anmH
+                _ -> Left x_anmG)
   _IdentifierReservedWord
     = (prism
-          (\ (x1_anTj, x2_anTk) -> (IdentifierReservedWord x1_anTj) x2_anTk))
-        (\ x_anTl
-            -> case x_anTl of
-                IdentifierReservedWord y1_anTm y2_anTn -> Right (y1_anTm, y2_anTn)
-                _ -> Left x_anTl)
+          (\ (x1_anmI, x2_anmJ) -> (IdentifierReservedWord x1_anmI) x2_anmJ))
+        (\ x_anmK
+            -> case x_anmK of
+                IdentifierReservedWord y1_anmL y2_anmM -> Right (y1_anmL, y2_anmM)
+                _ -> Left x_anmK)
   _EmptyIdentifier
-    = (prism (\ x1_anTo -> EmptyIdentifier x1_anTo))
-        (\ x_anTp
-            -> case x_anTp of
-                EmptyIdentifier y1_anTq -> Right y1_anTq
-                _ -> Left x_anTp)
+    = (prism (\ x1_anmN -> EmptyIdentifier x1_anmN))
+        (\ x_anmO
+            -> case x_anmO of
+                EmptyIdentifier y1_anmP -> Right y1_anmP
+                _ -> Left x_anmO)
   _BadCharacter
-    = (prism (\ (x1_anTr, x2_anTs) -> (BadCharacter x1_anTr) x2_anTs))
-        (\ x_anTt
-            -> case x_anTt of
-                BadCharacter y1_anTu y2_anTv -> Right (y1_anTu, y2_anTv)
-                _ -> Left x_anTt)
+    = (prism (\ (x1_anmQ, x2_anmR) -> (BadCharacter x1_anmQ) x2_anmR))
+        (\ x_anmS
+            -> case x_anmS of
+                BadCharacter y1_anmT y2_anmU -> Right (y1_anmT, y2_anmU)
+                _ -> Left x_anmS)
   _BreakOutsideLoop
-    = (prism (\ x1_anTw -> BreakOutsideLoop x1_anTw))
-        (\ x_anTx
-            -> case x_anTx of
-                BreakOutsideLoop y1_anTy -> Right y1_anTy
-                _ -> Left x_anTx)
+    = (prism (\ x1_anmV -> BreakOutsideLoop x1_anmV))
+        (\ x_anmW
+            -> case x_anmW of
+                BreakOutsideLoop y1_anmX -> Right y1_anmX
+                _ -> Left x_anmW)
   _ContinueOutsideLoop
-    = (prism (\ x1_anTz -> ContinueOutsideLoop x1_anTz))
-        (\ x_anTA
-            -> case x_anTA of
-                ContinueOutsideLoop y1_anTB -> Right y1_anTB
-                _ -> Left x_anTA)
+    = (prism (\ x1_anmY -> ContinueOutsideLoop x1_anmY))
+        (\ x_anmZ
+            -> case x_anmZ of
+                ContinueOutsideLoop y1_ann0 -> Right y1_ann0
+                _ -> Left x_anmZ)
   _ReturnOutsideFunction
-    = (prism (\ x1_anTC -> ReturnOutsideFunction x1_anTC))
-        (\ x_anTD
-            -> case x_anTD of
-                ReturnOutsideFunction y1_anTE -> Right y1_anTE
-                _ -> Left x_anTD)
+    = (prism (\ x1_ann1 -> ReturnOutsideFunction x1_ann1))
+        (\ x_ann2
+            -> case x_ann2 of
+                ReturnOutsideFunction y1_ann3 -> Right y1_ann3
+                _ -> Left x_ann2)
   _NonlocalOutsideFunction
-    = (prism (\ x1_anTF -> NonlocalOutsideFunction x1_anTF))
-        (\ x_anTG
-            -> case x_anTG of
-                NonlocalOutsideFunction y1_anTH -> Right y1_anTH
-                _ -> Left x_anTG)
+    = (prism (\ x1_ann4 -> NonlocalOutsideFunction x1_ann4))
+        (\ x_ann5
+            -> case x_ann5 of
+                NonlocalOutsideFunction y1_ann6 -> Right y1_ann6
+                _ -> Left x_ann5)
   _ParametersNonlocal
     = (prism
-          (\ (x1_anTI, x2_anTJ) -> (ParametersNonlocal x1_anTI) x2_anTJ))
-        (\ x_anTK
-            -> case x_anTK of
-                ParametersNonlocal y1_anTL y2_anTM -> Right (y1_anTL, y2_anTM)
-                _ -> Left x_anTK)
+          (\ (x1_ann7, x2_ann8) -> (ParametersNonlocal x1_ann7) x2_ann8))
+        (\ x_ann9
+            -> case x_ann9 of
+                ParametersNonlocal y1_anna y2_annb -> Right (y1_anna, y2_annb)
+                _ -> Left x_ann9)
   _NoBindingNonlocal
-    = (prism (\ x1_anTN -> NoBindingNonlocal x1_anTN))
-        (\ x_anTO
-            -> case x_anTO of
-                NoBindingNonlocal y1_anTP -> Right y1_anTP
-                _ -> Left x_anTO)
+    = (prism (\ x1_annc -> NoBindingNonlocal x1_annc))
+        (\ x_annd
+            -> case x_annd of
+                NoBindingNonlocal y1_anne -> Right y1_anne
+                _ -> Left x_annd)
   _Can'tJoinStringAndBytes
-    = (prism (\ x1_anTQ -> Can'tJoinStringAndBytes x1_anTQ))
-        (\ x_anTR
-            -> case x_anTR of
-                Can'tJoinStringAndBytes y1_anTS -> Right y1_anTS
-                _ -> Left x_anTR)
+    = (prism (\ x1_annf -> Can'tJoinStringAndBytes x1_annf))
+        (\ x_anng
+            -> case x_anng of
+                Can'tJoinStringAndBytes y1_annh -> Right y1_annh
+                _ -> Left x_anng)
   _InvalidYield
-    = (prism (\ x1_anTT -> InvalidYield x1_anTT))
-        (\ x_anTU
-            -> case x_anTU of
-                InvalidYield y1_anTV -> Right y1_anTV
-                _ -> Left x_anTU)
+    = (prism (\ x1_anni -> InvalidYield x1_anni))
+        (\ x_annj
+            -> case x_annj of
+                InvalidYield y1_annk -> Right y1_annk
+                _ -> Left x_annj)
   _CommentAfterBackslash
-    = (prism (\ x1_anTW -> CommentAfterBackslash x1_anTW))
-        (\ x_anTX
-            -> case x_anTX of
-                CommentAfterBackslash y1_anTY -> Right y1_anTY
-                _ -> Left x_anTX)
+    = (prism (\ x1_annl -> CommentAfterBackslash x1_annl))
+        (\ x_annm
+            -> case x_annm of
+                CommentAfterBackslash y1_annn -> Right y1_annn
+                _ -> Left x_annm)
   _MalformedDecorator
-    = (prism (\ x1_anTZ -> MalformedDecorator x1_anTZ))
-        (\ x_anU0
-            -> case x_anU0 of
-                MalformedDecorator y1_anU1 -> Right y1_anU1
-                _ -> Left x_anU0)
+    = (prism (\ x1_anno -> MalformedDecorator x1_anno))
+        (\ x_annp
+            -> case x_annp of
+                MalformedDecorator y1_annq -> Right y1_annq
+                _ -> Left x_annp)
   _InvalidDictUnpacking
-    = (prism (\ x1_anU2 -> InvalidDictUnpacking x1_anU2))
-        (\ x_anU3
-            -> case x_anU3 of
-                InvalidDictUnpacking y1_anU4 -> Right y1_anU4
-                _ -> Left x_anU3)
+    = (prism (\ x1_annr -> InvalidDictUnpacking x1_annr))
+        (\ x_anns
+            -> case x_anns of
+                InvalidDictUnpacking y1_annt -> Right y1_annt
+                _ -> Left x_anns)
   _InvalidSetUnpacking
-    = (prism (\ x1_anU5 -> InvalidSetUnpacking x1_anU5))
-        (\ x_anU6
-            -> case x_anU6 of
-                InvalidSetUnpacking y1_anU7 -> Right y1_anU7
-                _ -> Left x_anU6)
+    = (prism (\ x1_annu -> InvalidSetUnpacking x1_annu))
+        (\ x_annv
+            -> case x_annv of
+                InvalidSetUnpacking y1_annw -> Right y1_annw
+                _ -> Left x_annv)
   _TypedParamInLambda
-    = (prism (\ x1_anU8 -> TypedParamInLambda x1_anU8))
-        (\ x_anU9
-            -> case x_anU9 of
-                TypedParamInLambda y1_anUa -> Right y1_anUa
-                _ -> Left x_anU9)
+    = (prism (\ x1_annx -> TypedParamInLambda x1_annx))
+        (\ x_anny
+            -> case x_anny of
+                TypedParamInLambda y1_annz -> Right y1_annz
+                _ -> Left x_anny)
   _TypedUnnamedStarParam
-    = (prism (\ x1_anUb -> TypedUnnamedStarParam x1_anUb))
-        (\ x_anUc
-            -> case x_anUc of
-                TypedUnnamedStarParam y1_anUd -> Right y1_anUd
-                _ -> Left x_anUc)
+    = (prism (\ x1_annA -> TypedUnnamedStarParam x1_annA))
+        (\ x_annB
+            -> case x_annB of
+                TypedUnnamedStarParam y1_annC -> Right y1_annC
+                _ -> Left x_annB)
   _AsyncWithOutsideCoroutine
-    = (prism (\ x1_anUe -> AsyncWithOutsideCoroutine x1_anUe))
-        (\ x_anUf
-            -> case x_anUf of
-                AsyncWithOutsideCoroutine y1_anUg -> Right y1_anUg
-                _ -> Left x_anUf)
+    = (prism (\ x1_annD -> AsyncWithOutsideCoroutine x1_annD))
+        (\ x_annE
+            -> case x_annE of
+                AsyncWithOutsideCoroutine y1_annF -> Right y1_annF
+                _ -> Left x_annE)
   _AsyncForOutsideCoroutine
-    = (prism (\ x1_anUh -> AsyncForOutsideCoroutine x1_anUh))
-        (\ x_anUi
-            -> case x_anUi of
-                AsyncForOutsideCoroutine y1_anUj -> Right y1_anUj
-                _ -> Left x_anUi)
+    = (prism (\ x1_annG -> AsyncForOutsideCoroutine x1_annG))
+        (\ x_annH
+            -> case x_annH of
+                AsyncForOutsideCoroutine y1_annI -> Right y1_annI
+                _ -> Left x_annH)
   _YieldFromInsideCoroutine
-    = (prism (\ x1_anUk -> YieldFromInsideCoroutine x1_anUk))
-        (\ x_anUl
-            -> case x_anUl of
-                YieldFromInsideCoroutine y1_anUm -> Right y1_anUm
-                _ -> Left x_anUl)
+    = (prism (\ x1_annJ -> YieldFromInsideCoroutine x1_annJ))
+        (\ x_annK
+            -> case x_annK of
+                YieldFromInsideCoroutine y1_annL -> Right y1_annL
+                _ -> Left x_annK)
   _AwaitOutsideCoroutine
-    = (prism (\ x1_anUn -> AwaitOutsideCoroutine x1_anUn))
-        (\ x_anUo
-            -> case x_anUo of
-                AwaitOutsideCoroutine y1_anUp -> Right y1_anUp
-                _ -> Left x_anUo)
+    = (prism (\ x1_annM -> AwaitOutsideCoroutine x1_annM))
+        (\ x_annN
+            -> case x_annN of
+                AwaitOutsideCoroutine y1_annO -> Right y1_annO
+                _ -> Left x_annN)
   _NullByte
-    = (prism (\ x1_anUq -> NullByte x1_anUq))
-        (\ x_anUr
-            -> case x_anUr of
-                NullByte y1_anUs -> Right y1_anUs
-                _ -> Left x_anUr)
+    = (prism (\ x1_annP -> NullByte x1_annP))
+        (\ x_annQ
+            -> case x_annQ of
+                NullByte y1_annR -> Right y1_annR
+                _ -> Left x_annQ)
   _NonAsciiInBytes
     = (prism
-          (\ (x1_anUt, x2_anUu) -> (NonAsciiInBytes x1_anUt) x2_anUu))
-        (\ x_anUv
-            -> case x_anUv of
-                NonAsciiInBytes y1_anUw y2_anUx -> Right (y1_anUw, y2_anUx)
-                _ -> Left x_anUv)
+          (\ (x1_annS, x2_annT) -> (NonAsciiInBytes x1_annS) x2_annT))
+        (\ x_annU
+            -> case x_annU of
+                NonAsciiInBytes y1_annV y2_annW -> Right (y1_annV, y2_annW)
+                _ -> Left x_annU)
+  _DefaultExceptMustBeLast
+    = (prism (\ x1_annX -> DefaultExceptMustBeLast x1_annX))
+        (\ x_annY
+            -> case x_annY of
+                DefaultExceptMustBeLast y1_annZ -> Right y1_annZ
+                _ -> Left x_annY)
+  _WildcardImportInDefinition
+    = (prism (\ x1_ano0 -> WildcardImportInDefinition x1_ano0))
+        (\ x_ano1
+            -> case x_ano1 of
+                WildcardImportInDefinition y1_ano2 -> Right y1_ano2
+                _ -> Left x_ano1)

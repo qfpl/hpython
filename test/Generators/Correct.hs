@@ -668,19 +668,46 @@ genCompoundStatement = do
           pure e1 <*>
           pure e2)
         (genSuite genSmallStatement genBlock)
-        (sizedNonEmpty $
-         sized2M
-           (\a b -> 
-            (,,,) <$>
-            use currentIndentation <*>
-            (NonEmpty.toList <$> genWhitespaces1) <*>
-            Gen.maybe
-              (ExceptAs ()
-                 (a & trailingWhitespace .~ [Space]) <$>
-                 Gen.maybe ((,) <$> (NonEmpty.toList <$> genWhitespaces1) <*> genIdent)) <*>
-            pure b)
-           genExpr
-           (genSuite genSmallStatement genBlock))
+        (do
+           ls <- sizedList $
+             sized2M
+             (\a b -> 
+                (,,,) <$>
+                use currentIndentation <*>
+                (NonEmpty.toList <$> genWhitespaces1) <*>
+                (Just .
+                 ExceptAs ()
+                  (a & trailingWhitespace .~ [Space]) <$>
+                  Gen.maybe ((,) <$> (NonEmpty.toList <$> genWhitespaces1) <*> genIdent)) <*>
+                pure b)
+             genExpr
+             (genSuite genSmallStatement genBlock)
+           l <-
+             sized2M
+               (\a b -> 
+                   (,,,) <$>
+                   use currentIndentation <*>
+                   (NonEmpty.toList <$> genWhitespaces1) <*>
+                   (case ls of
+                      [] ->
+                        Gen.maybe
+                          (ExceptAs ()
+                           (a & trailingWhitespace .~ [Space]) <$>
+                           Gen.maybe
+                             ((,) <$>
+                              (NonEmpty.toList <$> genWhitespaces1) <*>
+                              genIdent))
+                      _ ->
+                        Just . ExceptAs ()
+                          (a & trailingWhitespace .~ [Space]) <$>
+                          Gen.maybe
+                            ((,) <$>
+                            (NonEmpty.toList <$> genWhitespaces1) <*>
+                            genIdent)) <*>
+                   pure b)
+               genExpr
+               (genSuite genSmallStatement genBlock)
+           pure . NonEmpty.fromList $ ls ++ [l])
         (sizedMaybe $
          sizedBind (genSuite genSmallStatement genBlock) $ \a ->
          (,,) <$>

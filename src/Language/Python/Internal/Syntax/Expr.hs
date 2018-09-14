@@ -49,6 +49,7 @@ as a phantom in 'Expr', so 'unsafeCoerce :: Expr v a -> Expr '[]' is safe.
 instance Validated Expr where; unvalidated = to unsafeCoerce
 instance Validated Param where; unvalidated = to unsafeCoerce
 instance Validated Arg where; unvalidated = to unsafeCoerce
+instance Validated TupleItem where; unvalidated = to unsafeCoerce
 
 -- | 'Traversal' over all the expressions in a term
 class HasExprs s where

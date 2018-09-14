@@ -508,7 +508,10 @@ validateBlockSyntax
      )
   => Block v a
   -> ValidateSyntax e (Block (Nub (Syntax ': v)) a)
-validateBlockSyntax = traverseOf (_Wrapped.traverse._Right) validateStatementSyntax
+validateBlockSyntax (Block x b bs) =
+  Block x <$>
+  validateStatementSyntax b <*>
+  traverseOf (traverse._Right) validateStatementSyntax bs
 
 validateSuiteSyntax
   :: ( AsSyntaxError e v a

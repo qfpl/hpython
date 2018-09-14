@@ -93,12 +93,14 @@ genImportTargets =
 
 genBlock :: MonadGen m => m (Block '[] ())
 genBlock =
-  fmap Block .
-  sizedNonEmpty $
-  Gen.choice
-    [ Right <$> genStatement
-    , fmap Left $ (,) <$> genWhitespaces <*> genNewline
-    ]
+  Block <$>
+  Gen.list (Range.constant 0 10) ((,,) () <$> genWhitespaces <*> genNewline) <*>
+  genStatement <*>
+  sizedList
+    (Gen.choice
+     [ Right <$> genStatement
+     , fmap Left $ (,,) () <$> genWhitespaces <*> genNewline
+     ])
 
 genCompFor :: MonadGen m => m (CompFor '[] ())
 genCompFor =

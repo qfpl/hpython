@@ -19,8 +19,6 @@ module Language.Python.Internal.Render
   )
 where
 
-import Control.Lens.Getter (view)
-import Control.Lens.Wrapped (_Wrapped)
 import Control.Lens.Plated (transform)
 import Control.Lens.Review ((#))
 import Data.Bifoldable (bifoldMap)
@@ -1072,14 +1070,20 @@ renderSmallStatement (From _ ws1 name ws3 ns) =
   renderImportTargets ns
 
 renderBlock :: Block v a -> RenderOutput
-renderBlock =
+renderBlock (Block a b c) =
+  foldMap
+    (\(_, x, z) ->
+        foldMap renderWhitespace x <>
+        singleton (renderNewline z))
+    a <>
+  renderStatement b <>
   foldMap
     (either
-       (\(x, z) ->
+       (\(_, x, z) ->
           foldMap renderWhitespace x <>
           singleton (renderNewline z))
-        renderStatement) .
-  view _Wrapped
+        renderStatement)
+    c
 
 renderSuite :: Suite v a -> RenderOutput
 renderSuite (SuiteMany _ a c d) =

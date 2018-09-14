@@ -63,12 +63,12 @@ doRoundtripFile name =
 
 doRoundtrip :: Text -> PropertyT IO ()
 doRoundtrip file = do
-    py <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" file
-    case runValidateIndentation $ validateModuleIndentation py of
-      Failure errs -> annotateShow (errs :: [IndentationError '[] SrcInfo]) *> failure
-      Success res ->
-        case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
-          Failure errs' -> do
-            annotateShow res
-            annotateShow (errs' :: [SyntaxError '[Indentation] SrcInfo]) *> failure
-          Success _ -> Strict.lines (showModule py) === Strict.lines file
+  py <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" file
+  case runValidateIndentation $ validateModuleIndentation py of
+    Failure errs -> annotateShow (errs :: [IndentationError '[] SrcInfo]) *> failure
+    Success res ->
+      case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
+        Failure errs' -> do
+          annotateShow res
+          annotateShow (errs' :: [SyntaxError '[Indentation] SrcInfo]) *> failure
+        Success _ -> Strict.lines (showModule py) === Strict.lines file

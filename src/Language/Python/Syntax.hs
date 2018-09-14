@@ -345,8 +345,6 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe)
 import Data.Semigroup ((<>))
 
-import qualified Data.List.NonEmpty as NonEmpty
-
 import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax hiding (Fundef, While, Call)
 import Language.Python.Syntax.Types
@@ -359,7 +357,7 @@ toNonEmptyLines (a:as) = a :| as
 
 -- | Create a blank 'Line'
 blank_ :: Raw Line
-blank_ = Line $ Left ([], LF Nothing)
+blank_ = Line $ Left ((), [], LF Nothing)
 
 -- | 'Ident' has an 'Data.String.IsString' instance, but when a type class dispatches on
 -- an 'Ident' we will run into ambiguity if we try to use @OverloadedStrings@. In these
@@ -368,8 +366,11 @@ id_ :: String -> Raw Ident
 id_ = fromString
 
 -- | One or more lines of Python code
-newtype Line v a = Line { unLine :: Either ([Whitespace], Newline) (Statement v a) }
-  deriving (Eq, Show)
+newtype Line v a
+  = Line
+  { unLine
+    :: Either (a, [Whitespace], Newline) (Statement v a)
+  } deriving (Eq, Show)
 
 -- | Convert some data to a 'Line'
 class AsLine s where
@@ -602,7 +603,7 @@ mkSetBody bodyField indentsField ws new code =
     over
       (_Indents.indentsValue)
       ((indentsField code ^. indentsValue <>) . doIndent ws)
-      (SuiteMany () [] (LF Nothing) . Block $ unLine <$> toNonEmptyLines new)
+      (SuiteMany () [] (LF Nothing) $ toBlock new)
 
 mkGetBody
   :: HasIndents s
@@ -616,7 +617,8 @@ mkGetBody thing bodyField indentsField code =
       SuiteOne a b c d ->
         [ line_ $ SmallStatements (Indents [] ()) c [] Nothing (Right d) ]
       SuiteMany a b c d ->
-        NonEmpty.toList $ Line <$> unBlock d) $
+        case d of
+          Block x y z -> fmap (Line . Left) x <> (Line (Right y) : fmap Line z)) $
   fromMaybe
     (error $ "malformed indentation in " <> thing <> " body")
     (traverseOf _Indents (fmap doDedent . subtractStart (indentsField code)) (bodyField code))
@@ -1000,7 +1002,15 @@ toBlock =
   over
     (_Indents.indentsValue)
     (doIndent $ replicate 4 Space) .
-    Block . fmap unLine . toNonEmptyLines
+    go
+  where
+    go [] = Block [] pass_ []
+    go (y:ys) =
+      case unLine y of
+        Left l ->
+          case go ys of
+            Block a b c -> Block (l:a) b c
+        Right st -> Block [] st (unLine <$> ys)
 
 instance HasBody While where
   body = whileBody

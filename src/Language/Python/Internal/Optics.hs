@@ -372,9 +372,11 @@ class HasNewlines s where
   _Newlines :: Traversal' (s v a) Newline
 
 instance HasNewlines Block where
-  _Newlines f (Block b) =
+  _Newlines f (Block a b c) =
     Block <$>
-    (traverse._Right._Newlines) f b
+    (traverse._3) f a <*>
+    _Newlines f b <*>
+    (traverse._Right._Newlines) f c
 
 instance HasNewlines Suite where
   _Newlines f (SuiteOne a b d e) = pure $ SuiteOne a b d e

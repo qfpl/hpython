@@ -20,7 +20,6 @@ import Data.Digit.HeXaDeCiMaL
 import Data.Digit.Enum
 import Data.Function
 import Data.List
-import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
 import Data.Semigroup ((<>))
 import Hedgehog
@@ -130,24 +129,26 @@ genImportTargets =
   ]
 
 genBlock :: (MonadGen m, MonadState GenState m) => m (Block '[] ())
-genBlock =
-  doIndent *>
-  Gen.shrink (\(Block (a :| as)) -> Block . (a :|) <$> Shrink.list as) go <*
-  doDedent
+genBlock = doIndent *> go <* doDedent
   where
+    genBlank =
+      (,,) () <$>
+      Gen.list (Range.constant 0 10) (Gen.element [Space, Tab]) <*>
+      genNewline
+
     genLine =
       Gen.choice
         [ Right <$> genStatement
-        , fmap Left $
-          (,) <$>
-          genWhitespaces <*>
-          genNewline
+        , Left <$> genBlank
         ]
 
     go =
-      sizedBind (Right <$> genStatement) $ \st ->
+      sizedBind genStatement $ \st ->
       sizedBind (sizedList genLine) $ \sts ->
-      Block . foldr NonEmpty.cons (st :| sts) <$> sizedList genLine
+      Block <$>
+        Gen.list (Range.constant 0 10) genBlank <*>
+        pure st <*>
+        sizedList genLine
 
 genPositionalArg :: (MonadGen m, MonadState GenState m) => m (Arg '[] ())
 genPositionalArg =

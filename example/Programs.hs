@@ -29,10 +29,9 @@ append_to =
     )
     []
     Nothing
-    (SuiteMany () [] (LF Nothing) .
-     Block $
-     ( Right $
-       SmallStatements
+    (SuiteMany () [] (LF Nothing) $
+     Block []
+     ( SmallStatements
          (Indents [replicate 4 Space ^. from indentWhitespaces] ())
          (Expr () $
           Call ()
@@ -43,7 +42,7 @@ append_to =
          []
          Nothing
          (Right $ LF Nothing)
-     ) :|
+     )
      [ Right $
          SmallStatements
            (Indents [replicate 4 Space ^. from indentWhitespaces] ())
@@ -110,12 +109,12 @@ yes =
 everything =
   Module
     [ Right append_to
-    , Left (Indents [] (), Nothing, Just $ LF Nothing)
+    , Left ((), [], Nothing, Just $ LF Nothing)
     , Right append_to'
-    , Left (Indents [] (), Nothing, Just $ LF Nothing)
+    , Left ((), [], Nothing, Just $ LF Nothing)
     , Right fact_tr
-    , Left (Indents [] (), Nothing, Just $ LF Nothing)
+    , Left ((), [], Nothing, Just $ LF Nothing)
     , Right spin
-    , Left (Indents [] (), Nothing, Just $ LF Nothing)
+    , Left ((), [], Nothing, Just $ LF Nothing)
     , Right yes
     ]

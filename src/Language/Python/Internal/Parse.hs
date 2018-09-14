@@ -8,19 +8,18 @@
 {-# language TypeFamilies #-}
 module Language.Python.Internal.Parse where
 
-import Debug.Trace
-
 import Control.Applicative (Alternative, (<**>), (<|>), optional, many, some)
 import Control.Lens.Getter ((^.))
 import Data.Bifunctor (first)
 import Data.Coerce (coerce)
 import Data.Function ((&))
 import Data.List (foldl')
-import Data.List.NonEmpty (NonEmpty(..), some1)
+import Data.List.NonEmpty (some1)
+import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy(..))
 import Data.Void (Void)
 import Text.Megaparsec
-  ((<?>), MonadParsec, Parsec, ParseError, Stream(..), SourcePos(..), eof, try)
+  ((<?>), MonadParsec, Parsec, ParseError, Stream(..), SourcePos(..), eof, try, lookAhead)
 import Text.Megaparsec.Char (satisfy)
 
 
@@ -548,7 +547,7 @@ orExpr ws =
       (\a b c d -> Call (d ^. exprAnn) d a b c) <$>
       (snd <$> token anySpace (\case; TkLeftParen{} -> True; _ -> False) "(") <*>
       optional (commaSep1' anySpace arg) <*>
-      (snd <$> token anySpace (\case; TkRightParen{} -> True; _ -> False) ")")
+      (snd <$> token ws (\case; TkRightParen{} -> True; _ -> False) ")")
 
       <|>
 
@@ -581,7 +580,7 @@ orExpr ws =
     list =
       (\(tk, sp1) ->
          maybe (List (pyTokenAnn tk) sp1 Nothing) (\f -> f (pyTokenAnn tk) sp1)) <$>
-      token anySpace (\case; TkLeftBracket{} -> True; _ -> False) "["<*>
+      token anySpace (\case; TkLeftBracket{} -> True; _ -> False) "[" <*>
       optional
         ((\e a ann ws1 ->
           case a of
@@ -923,14 +922,21 @@ suite =
    (fmap Right $
     (,) <$>
     eol <*>
-    ((\cmts l1 rest -> Block $ foldr NonEmpty.cons (l1 :| rest) cmts) <$>
-      cmts <*>
-      line indent <*>
-      many (line level)) <*
+    (Block <$>
+     many commentOrEmpty <*>
+     (indent <**> statement level) <*>
+     many (line level)) <*
     dedent))
   where
     commentOrEmpty =
-      ((,) <$> some space <*> eol) <|> (,) [] <$> eol
+      withSrcInfo $
+      (\b c a -> (a, b, c)) <$>
+      some space <*>
+      eol
+
+      <|>
+
+      (\b a -> (a, [], b)) <$> eol
 
     cmts = many (Left <$> commentOrEmpty)
 
@@ -1111,14 +1117,22 @@ compoundStatement pIndent =
   where
     decorated = do
       d <- decorator
-      ds <- some $ pIndent <**> decorator
+      ds <-
+        many $
+        try (pIndent <* lookAhead (token space (\case; TkAt{} -> True; _ -> False) "@")) <**>
+        decorator
       (do; a <- doAsync; fundef (Just a) (Just d) ds) <|>
         fundef Nothing (Just d) ds <|>
         classSt (Just d) ds
 
     classSt dec1 decs =
-      (\(tk, s) a b c idnt ->
-         ClassDef (pyTokenAnn tk) (maybe decs (\x -> x idnt : decs) dec1) idnt (NonEmpty.fromList s) a b c) <$>
+      (\ii (tk, s) a b c idnt ->
+         ClassDef
+           (pyTokenAnn tk)
+           (maybe decs (\x -> x idnt : decs) dec1)
+           (fromMaybe idnt ii)
+           (NonEmpty.fromList s) a b c) <$>
+      maybe (pure Nothing) (\_ -> Just <$> pIndent) dec1 <*>
       token space (\case; TkClass{} -> True; _ -> False) "class" <*>
       identifier space <*>
       optional
@@ -1134,15 +1148,17 @@ compoundStatement pIndent =
       expr space <*>
       suite <*>
       many
-        ((,,,) <$>
-         pIndent <*>
-         (snd <$> token space (\case; TkElif{} -> True; _ -> False) "elif") <*>
+        (try
+           ((,,,) <$>
+            pIndent <*>
+            (snd <$> token space (\case; TkElif{} -> True; _ -> False) "elif")) <*>
          expr space <*>
          suite) <*>
       optional
-        ((,,) <$>
-         pIndent <*>
-         (snd <$> token space (\case; TkElse{} -> trace "test" True; _ -> False) "else") <*>
+        (try
+           ((,,) <$>
+            pIndent <*>
+            (snd <$> token space (\case; TkElse{} -> True; _ -> False) "else")) <*>
          suite)
 
     whileSt =
@@ -1167,9 +1183,10 @@ compoundStatement pIndent =
       token space (\case; TkTry{} -> True; _ -> False) "try" <*>
       suite <*>
       (fmap Left
-         ((,,) <$>
-          pIndent <*>
-          (snd <$> token space (\case; TkFinally{} -> True; _ -> False) "finally") <*>
+         (try
+            ((,,) <$>
+             pIndent <*>
+             (snd <$> token space (\case; TkFinally{} -> True; _ -> False) "finally")) <*>
           suite)
 
         <|>
@@ -1177,38 +1194,50 @@ compoundStatement pIndent =
         fmap Right
           ((,,) <$>
            some1
-             ((,,,) <$>
-              pIndent <*>
-              (snd <$> token space (\case; TkExcept{} -> True; _ -> False) "except") <*>
+             (try
+                ((,,,) <$>
+                 pIndent <*>
+                 (snd <$> token space (\case; TkExcept{} -> True; _ -> False) "except")) <*>
               optional exceptAs <*>
               suite) <*>
            optional
-             ((,,) <$>
-              pIndent <*>
-              (snd <$> token space (\case; TkElse{} -> True; _ -> False) "else") <*>
+             (try
+                ((,,) <$>
+                 pIndent <*>
+                 (snd <$> token space (\case; TkElse{} -> True; _ -> False) "else")) <*>
               suite) <*>
            optional
-             ((,,) <$>
-              pIndent <*>
-              (snd <$> token space (\case; TkFinally{} -> True; _ -> False) "finally") <*>
+             (try
+                ((,,) <$>
+                 pIndent <*>
+                 (snd <$> token space (\case; TkFinally{} -> True; _ -> False) "finally")) <*>
               suite)))
 
     doAsync = token space (\case; TkIdent "async" _ -> True; _ -> False) "async"
+
     asyncSt = do
-      a <- doAsync
+      a <-
+        -- doAsync
+        try $
+        doAsync <*
+        lookAhead
+          (token space (\case; TkDef{} -> True; _ -> False) "def" <|>
+           token space (\case; TkWith{} -> True; _ -> False) "with" <|>
+           token space (\case; TkFor{} -> True; _ -> False) "for")
       fundef (Just a) Nothing [] <|>
         withSt (Just a) <|>
         forSt (Just a)
 
     fundef async dec1 decs =
-      (\(tkDef, defSpaces) a b c d e f idnt ->
+      (\ii (tkDef, defSpaces) a b c d e f idnt ->
         Fundef
           (maybe (pyTokenAnn tkDef) (pyTokenAnn . fst) async)
           (maybe decs (\x -> x idnt : decs) dec1)
-          idnt
+          (fromMaybe idnt ii)
           (NonEmpty.fromList . snd <$> async)
           (NonEmpty.fromList defSpaces)
           a b c d e f) <$>
+      maybe (pure Nothing) (\_ -> Just <$> pIndent) dec1 <*>
       token space (\case; TkDef{} -> True; _ -> False) "def" <*>
       identifier space <*>
       fmap snd (token anySpace (\case; TkLeftParen{} -> True; _ -> False) "(") <*>
@@ -1251,9 +1280,10 @@ compoundStatement pIndent =
       exprList space <*>
       suite <*>
       optional
-        ((,,) <$>
-         pIndent <*>
-         (snd <$> token space (\case; TkElse{} -> True; _ -> False) "else") <*>
+        (try
+           ((,,) <$>
+            pIndent <*>
+            (snd <$> token space (\case; TkElse{} -> True; _ -> False) "else")) <*>
          suite)
 
 module_ :: MonadParsec e PyTokens m => m (Module SrcInfo)
@@ -1261,9 +1291,9 @@ module_ =
   Module <$>
   many
     (Left <$> maybeComment <|>
-     withSrcInfo
-       ((\s ann -> Right $ s (Indents [] ann)) <$>
-        statement (withSrcInfo . pure $ Indents []))) <*
+     Right <$>
+     ((level <|> withSrcInfo (pure $ Indents [])) <**>
+      statement (level <|> withSrcInfo (pure $ Indents [])))) <*
   eof
   where
     maybeComment =

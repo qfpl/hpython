@@ -7,16 +7,20 @@
 {-# language UndecidableInstances #-}
 module Language.Python.Internal.Syntax.Statement where
 
+import Control.Lens.Fold (foldMapOf, folded)
 import Control.Lens.Getter ((^.), to, view)
 import Control.Lens.Plated (Plated(..), gplate)
 import Control.Lens.Prism (_Right)
 import Control.Lens.Setter (over, mapped)
-import Control.Lens.TH (makeLenses, makeWrapped)
+import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (Traversal, traverseOf)
-import Control.Lens.Tuple (_2, _3, _4)
-import Control.Lens.Wrapped (_Wrapped)
+import Control.Lens.Tuple (_1, _2, _3, _4)
+import Data.Bifoldable (bifoldMap)
+import Data.Bifunctor (bimap)
+import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
 import Data.List.NonEmpty (NonEmpty)
+import Data.Monoid ((<>))
 import GHC.Generics (Generic)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -43,14 +47,35 @@ instance Validated Decorator where; unvalidated = to unsafeCoerce
 class HasStatements s where
   _Statements :: Traversal (s v a) (s '[] a) (Statement v a) (Statement '[] a)
 
-newtype Block (v :: [*]) a
+data Block (v :: [*]) a
   = Block
-  { unBlock
-    :: NonEmpty
-         (Either
-            ([Whitespace], Newline)
-            (Statement v a))
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
+  { _blockBlankLines :: [(a, [Whitespace], Newline)]
+  , _blockHead :: Statement v a
+  , _blockTail
+    :: [Either (a, [Whitespace], Newline) (Statement v a)]
+  } deriving (Eq, Show)
+
+instance Functor (Block v) where
+  fmap f (Block a b c) =
+    Block
+      (over (mapped._1) f a)
+      (fmap f b)
+      (fmap (bimap (over _1 f) (fmap f)) c)
+
+instance Foldable (Block v) where
+  foldMap f (Block a b c) =
+    foldMapOf (folded._1) f a <>
+    foldMap f b <>
+    foldMap (bifoldMap (foldMapOf _1 f) (foldMap f)) c
+
+instance Traversable (Block v) where
+  traverse f (Block a b c) =
+    Block <$>
+    traverseOf (traverse._1) f a <*>
+    traverse f b <*>
+    traverse
+      (bitraverse (traverseOf _1 f) (traverse f))
+      c
 
 class HasBlocks s where
   _Blocks :: Traversal (s v a) (s '[] a) (Block v a) (Block '[] a)
@@ -99,7 +124,8 @@ instance HasBlocks CompoundStatement where
     With a b asyncWs c (view unvalidated <$> d) <$> _Blocks fun e
 
 instance HasStatements Block where
-  _Statements = _Wrapped.traverse._Right
+  _Statements f (Block a b c) =
+    Block a <$> f b <*> (traverse._Right) f c
 
 instance HasStatements Suite where
   _Statements f (SuiteOne a b c d) = pure $ SuiteOne a b (c ^. unvalidated) d
@@ -330,7 +356,8 @@ instance HasExprs ExceptAs where
   _Exprs f (ExceptAs ann e a) = ExceptAs ann <$> f e <*> pure (coerce a)
 
 instance HasExprs Block where
-  _Exprs = _Wrapped.traverse._Right._Exprs
+  _Exprs f (Block a b c) =
+    Block a <$> _Exprs f b <*> (traverse._Right._Exprs) f c
 
 instance HasExprs Suite where
   _Exprs f (SuiteOne a b c d) = SuiteOne a b <$> _Exprs f c <*> pure d
@@ -392,5 +419,5 @@ instance HasExprs CompoundStatement where
   _Exprs fun (With a b asyncWs c d e) =
     With a b asyncWs c <$> traverseOf (traverse._Exprs) fun d <*> _Exprs fun e
 
-makeWrapped ''Block
 makeLenses ''ExceptAs
+makeLenses ''Block

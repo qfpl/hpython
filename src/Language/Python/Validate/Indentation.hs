@@ -21,6 +21,7 @@ module Language.Python.Validate.Indentation
   )
 where
 
+import Control.Lens.Cons (_head)
 import Control.Lens.Fold ((^?!), folded)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
@@ -127,15 +128,25 @@ validateBlockIndentation
   :: AsIndentationError e v a
   => Block v a
   -> ValidateIndentation e (Block (Nub (Indentation ': v)) a)
-validateBlockIndentation (Block (b :| bs)) =
-  Block <$> go False b bs
+validateBlockIndentation (Block x b bs) =
+  (\x' (b' :| bs') ->
+     case b' of
+       Right b'' -> Block x' b'' bs'
+       _ -> error "impossible") <$>
+  traverseOf _head checkBlankIndents x <*>
+  go False (Right b) bs
   where
-    is = (b:|bs) ^?! folded._Right.unvalidated._Indents.indentsValue
+    checkBlankIndents (a, b, c) =
+      if any (\case; Continued{} -> True; _ -> False) b
+      then errorVM [_EmptyContinuedLine # a]
+      else pure (a, b, c)
+
+    is = (Right b:|bs) ^?! folded._Right.unvalidated._Indents.indentsValue
 
     go flag (Left e) rest =
-      case rest of
-        [] -> pure $ Left e :| []
-        r : rs -> NonEmpty.cons (Left e) <$> go flag r rs
+        case rest of
+          [] -> pure . Left <$> checkBlankIndents e
+          r : rs -> NonEmpty.cons . Left <$> checkBlankIndents e <*> go flag r rs
     go flag (Right st) rest =
       let
         validated =

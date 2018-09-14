@@ -406,8 +406,10 @@ validateBlockScope
   :: AsScopeError e v a
   => Block v a
   -> ValidateScope a e (Block (Nub (Scope ': v)) a)
-validateBlockScope (Block b) =
-  Block <$> traverseOf (traverse._Right) validateStatementScope b
+validateBlockScope (Block x b bs) =
+  Block x <$>
+  validateStatementScope b <*>
+  traverseOf (traverse._Right) validateStatementScope bs
 
 validateComprehensionScope
   :: AsScopeError e v a

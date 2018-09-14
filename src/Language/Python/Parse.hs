@@ -11,6 +11,7 @@ module Language.Python.Parse
   )
 where
 
+import Control.Applicative ((<|>))
 import Data.Bifunctor (first)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Set (Set)
@@ -78,7 +79,7 @@ parseStatement fp input =
       tokens <- first fromLexicalError $ tokenize fp input
       tabbed <- first fromTabError $ insertTabs si tokens
       first fromParseError $
-        Parse.runParser fp (Parse.statement (withSrcInfo . pure $ Indents []) <* eof) tabbed
+        Parse.runParser fp (Parse.statement (Parse.level <|> withSrcInfo (pure $ Indents [])) <* eof) tabbed
   in
     fromEither (first pure ir) `bindValidate`
     (first (fmap fromIRError) . IR.fromIR_statement . ($ Indents [] si))

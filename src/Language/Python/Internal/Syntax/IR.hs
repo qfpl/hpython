@@ -4,10 +4,10 @@
 {-# language TemplateHaskell #-}
 module Language.Python.Internal.Syntax.IR where
 
-import Control.Lens.Fold (foldMapOf)
+import Control.Lens.Fold (foldMapOf, folded)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Lens (Lens', lens)
-import Control.Lens.Setter ((.~), over)
+import Control.Lens.Setter ((.~), over, mapped)
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (traverseOf)
 import Control.Lens.Tuple (_1, _2, _3)
@@ -542,14 +542,35 @@ data Suite a
       (Block a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-newtype Block a
+data Block a
   = Block
-  { unBlock
-    :: NonEmpty
-         (Either
-            ([Whitespace], Newline)
-            (Statement a))
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
+  { _blockBlankLines :: [(a, [Whitespace], Newline)]
+  , _blockHead :: Statement a
+  , _blockTail
+    :: [Either (a, [Whitespace], Newline) (Statement a)]
+  } deriving (Eq, Show)
+
+instance Functor Block where
+  fmap f (Block a b c) =
+    Block
+      (over (mapped._1) f a)
+      (fmap f b)
+      (fmap (bimap (over _1 f) (fmap f)) c)
+
+instance Foldable Block where
+  foldMap f (Block a b c) =
+    foldMapOf (folded._1) f a <>
+    foldMap f b <>
+    foldMap (bifoldMap (foldMapOf _1 f) (foldMap f)) c
+
+instance Traversable Block where
+  traverse f (Block a b c) =
+    Block <$>
+    traverseOf (traverse._1) f a <*>
+    traverse f b <*>
+    traverse
+      (bitraverse (traverseOf _1 f) (traverse f))
+      c
 
 data WithItem a
   = WithItem
@@ -748,8 +769,10 @@ fromIR_subscript s =
       traverseOf (traverse._2.traverse) fromIR_expr d
 
 fromIR_block :: Block a -> Validate [IRError a] (Syntax.Block '[] a)
-fromIR_block (Block a) =
-  Syntax.Block <$> traverseOf (traverse.traverse) fromIR_statement a
+fromIR_block (Block a b c) =
+  Syntax.Block a <$>
+  fromIR_statement b <*>
+  traverseOf (traverse.traverse) fromIR_statement c
 
 fromIR_compFor :: CompFor a -> Validate [IRError a] (Syntax.CompFor '[] a)
 fromIR_compFor (CompFor a b c d e) =

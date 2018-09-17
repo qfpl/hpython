@@ -1,4 +1,4 @@
-{ mkDerivation, base, bytestring-trie, containers, criterion
+{ mkDerivation, base, bifunctors, bytestring, containers, criterion
 , deepseq, deriving-compat, digit, directory, dlist, filepath
 , fingertree, hedgehog, lens, megaparsec, mtl, parsers
 , parsers-megaparsec, process, semigroupoids, stdenv, text, these
@@ -11,7 +11,7 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    base bytestring-trie containers deriving-compat digit dlist
+    base bifunctors bytestring containers deriving-compat digit dlist
     fingertree lens megaparsec mtl parsers parsers-megaparsec
     semigroupoids text these type-level-sets
   ];

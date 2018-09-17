@@ -52,15 +52,15 @@ library
                      , Language.Python.Validate.Indentation.Error
   build-depends:       base >=4.9 && <5
                      , bifunctors
+                     , bytestring
                      , digit >=0.6 && < 0.7
                      , dlist >=0.8 && <0.9
                      , lens
-                     , type-level-sets >=0.8.6.0
+                     , type-level-sets >=0.8.7 && < 0.9
                      , parsers
                      , megaparsec >=6.3 && <7.1
                      , fingertree >=0.1 && <0.2
                      , mtl
-                     , bytestring-trie >=0.2
                      , containers >=0.5.8 && <0.7
                      , deriving-compat >=0.4 && <0.6
                      , semigroupoids >=5.2.2 && <5.4

@@ -15,12 +15,13 @@ mkDerivation {
     fingertree lens megaparsec mtl parsers parsers-megaparsec
     semigroupoids text these type-level-sets
   ];
-  executableHaskellDepends = [
-    base criterion deepseq lens megaparsec text
-  ];
+  executableHaskellDepends = [ base lens text ];
   testHaskellDepends = [
     base digit directory filepath hedgehog lens megaparsec mtl process
     semigroupoids text these transformers
+  ];
+  benchmarkHaskellDepends = [
+    base criterion deepseq megaparsec text
   ];
   license = stdenv.lib.licenses.bsd3;
 }

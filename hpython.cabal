@@ -90,8 +90,9 @@ executable example
                        -Wunused-imports
                        -Werror
 
-executable bench
+benchmark bench
   main-is:             Main.hs
+  type:                exitcode-stdio-1.0
   hs-source-dirs:      benchmarks
   build-depends:       base >=4.9 && <5
                      , hpython

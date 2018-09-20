@@ -49,6 +49,10 @@ source-repository    head
   type:              git
   location:          git@github.com/qfpl/hpython.git
 
+flag development
+  default: False
+  manual: True
+
 library
   exposed-modules:     Data.Type.Set
                      , Data.Validate.Monadic
@@ -106,7 +110,8 @@ library
   ghc-options:         -Wincomplete-patterns
                        -Wincomplete-record-updates
                        -Wunused-imports
-                       -Werror
+  if flag(development)
+    ghc-options:       -Werror
 
 executable example
   main-is:             Main.hs
@@ -120,7 +125,9 @@ executable example
   ghc-options:         -Wincomplete-patterns
                        -Wincomplete-record-updates
                        -Wunused-imports
-                       -Werror
+  if flag(development)
+    ghc-options:       -Werror
+
 
 benchmark bench
   main-is:             Main.hs
@@ -137,7 +144,9 @@ benchmark bench
   ghc-options:         -Wincomplete-patterns
                        -Wincomplete-record-updates
                        -Wunused-imports
-                       -Werror
+  if flag(development)
+    ghc-options:       -Werror
+
 
 test-suite hpython-tests
   main-is:             Main.hs
@@ -168,8 +177,8 @@ test-suite hpython-tests
                      , these >=0.7.4 && <0.8
                      , validation >= 1 && < 1.1
   default-language:    Haskell2010
-  ghc-options:         -O
-                       -Wincomplete-patterns
+  ghc-options:         -Wincomplete-patterns
                        -Wincomplete-record-updates
                        -Wunused-imports
-                       -Werror
+  if flag(development)
+    ghc-options:       -Werror

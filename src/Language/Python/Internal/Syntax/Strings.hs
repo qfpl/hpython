@@ -4,7 +4,7 @@ module Language.Python.Internal.Syntax.Strings where
 
 import Control.Lens.Lens (lens)
 import Data.Digit.Octal (OctDigit)
-import Data.Digit.HeXaDeCiMaL (HeXDigit(..))
+import Data.Digit.Hexadecimal.MixedCase (HeXDigit(..))
 
 import Language.Python.Internal.Syntax.Whitespace
 import Language.Python.Internal.Syntax.Strings.Raw

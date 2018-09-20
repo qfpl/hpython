@@ -9,7 +9,7 @@ import Control.Lens.Fold ((^?!), preview)
 import Control.Lens.Prism (_Right)
 import Control.Monad ((<=<))
 import Data.Digit.Enum (enumDecimal)
-import Data.Digit.HeXaDeCiMaL
+import Data.Digit.Hexadecimal.MixedCase
 import Data.Digit.Integral
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.These (These(..))

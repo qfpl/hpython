@@ -16,7 +16,7 @@ import Control.Lens.Tuple
 import Control.Lens.TH
 import Control.Monad.State
 import Data.Bifunctor (bimap)
-import Data.Digit.HeXaDeCiMaL
+import Data.Digit.Hexadecimal.MixedCase
 import Data.Digit.Enum
 import Data.Function
 import Data.List

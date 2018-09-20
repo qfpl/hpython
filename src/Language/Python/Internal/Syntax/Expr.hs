@@ -50,6 +50,7 @@ instance Validated Expr where; unvalidated = to unsafeCoerce
 instance Validated Param where; unvalidated = to unsafeCoerce
 instance Validated Arg where; unvalidated = to unsafeCoerce
 instance Validated TupleItem where; unvalidated = to unsafeCoerce
+instance Validated ListItem where; unvalidated = to unsafeCoerce
 
 -- | 'Traversal' over all the expressions in a term
 class HasExprs s where

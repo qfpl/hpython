@@ -176,6 +176,23 @@ validateWhitespace ann ws =
         Continued a ws -> isJust (_commentBefore a) || continuedBad ws
         _ -> False
 
+validateAssignmentSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => a
+  -> Expr v a
+  -> ValidateSyntax e (Expr (Nub (Syntax ': v)) a)
+validateAssignmentSyntax a ex =
+  (if
+     lengthOf (getting $ _Tuple.tupleItems._TupleUnpack) ex > 1 ||
+     lengthOf (getting $ _List.listItems._ListUnpack) ex > 1
+   then errorVM [_ManyStarredTargets # a]
+   else pure ()) *>
+  (if canAssignTo ex
+   then validateExprSyntax ex
+   else errorVM [_CannotAssignTo # (a, ex)])
+
 validateComprehensionSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
@@ -197,9 +214,7 @@ validateComprehensionSyntax f (Comprehension a b c d) =
       -> ValidateSyntax e (CompFor (Nub (Syntax ': v)) a)
     validateCompForSyntax (CompFor a b c d e) =
       (\c' -> CompFor a b c' d) <$>
-      (if canAssignTo c
-        then validateExprSyntax c
-        else errorVM [_CannotAssignTo # (a, c)]) <*>
+      validateAssignmentSyntax a c <*>
       validateExprSyntax e
 
     validateCompIfSyntax
@@ -659,9 +674,7 @@ validateCompoundStatementSyntax (For a idnts asyncWs b c d e h i) =
    else pure ()) <*>
   traverse (validateWhitespace a) asyncWs <*>
   validateWhitespace a b <*>
-  (if canAssignTo c
-   then validateExprSyntax c
-   else errorVM [_CannotAssignTo # (a, c)]) <*>
+  validateAssignmentSyntax a c <*>
   validateWhitespace a d <*>
   validateExprSyntax e <*>
   liftVM1 (local $ inLoop .~ True) (validateSuiteSyntax h) <*>
@@ -785,17 +798,13 @@ validateSmallStatementSyntax (Assign a lvalue rs) =
         else []
     in
       Assign a <$>
-      (if canAssignTo lvalue
-        then validateExprSyntax lvalue
-        else errorVM [_CannotAssignTo # (a, lvalue)]) <*>
+      validateAssignmentSyntax a lvalue <*>
       ((\a b -> case a of; [] -> pure b; a : as -> a :| (snoc as b)) <$>
        traverse
          (\(ws, b) ->
             (,) <$>
             validateWhitespace a ws <*>
-            (if canAssignTo b
-              then validateExprSyntax lvalue
-              else errorVM [_CannotAssignTo # (a, b)]))
+            validateAssignmentSyntax a b)
          (NonEmpty.init rs) <*>
        (\(ws, b) -> (,) <$> validateWhitespace a ws <*> validateExprSyntax b)
          (NonEmpty.last rs)) <*
@@ -937,8 +946,7 @@ canAssignTo (Parens _ _ a _) = canAssignTo a
 canAssignTo (List _ _ a _) =
   all (allOf (folded.getting _Exprs) canAssignTo) a
 canAssignTo (Tuple _ a _ b) =
-  all canAssignTo ((a ^?! getting _Exprs) : toListOf (folded.folded.getting _Exprs) b) &&
-  lengthOf (folded.getting _TupleUnpack) (a : toListOf (folded.folded) b) <= 1
+  all canAssignTo ((a ^?! getting _Exprs) : toListOf (folded.folded.getting _Exprs) b)
 canAssignTo Deref{} = True
 canAssignTo Subscript{} = True
 canAssignTo Ident{} = True

@@ -34,6 +34,33 @@ _Tuple =
         Tuple a b c d -> Right (MkTuple a b c d)
         a -> Left $ a ^. unvalidated)
 
+tupleItems :: Traversal (Tuple v a) (Tuple '[] a) (TupleItem v a) (TupleItem '[] a)
+tupleItems f (MkTuple a b c d) =
+  (\b' d' -> MkTuple a b' c d') <$>
+  f b <*>
+  (traverse.traverse) f d
+
+_ListUnpack :: Prism (ListItem v a) (ListItem '[] a) (ListUnpack v a) (ListUnpack '[] a)
+_ListUnpack =
+  prism
+    (\(MkListUnpack a b c d) -> ListUnpack a b c d)
+    (\case
+       ListUnpack a b c d -> Right $ MkListUnpack a b c d
+       a -> Left $ a ^. unvalidated)
+
+_List :: Prism (Expr v a) (Expr '[] a) (List v a) (List '[] a)
+_List =
+  prism
+    (\(MkList a b c d) -> List a b c d)
+    (\case
+        List a b c d -> Right (MkList a b c d)
+        a -> Left $ a ^. unvalidated)
+
+listItems :: Traversal (List v a) (List '[] a) (ListItem v a) (ListItem '[] a)
+listItems f (MkList a b c d) =
+  (\c' -> MkList a b c' d) <$>
+  (traverse.traverse) f c
+
 _None :: Prism (Expr v a) (Expr '[] a) (None v a) (None '[] a)
 _None =
   prism

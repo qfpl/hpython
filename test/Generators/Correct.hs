@@ -104,6 +104,35 @@ genTuple expr =
   genWhitespaces <*>
   Gen.maybe (genSizedCommaSep1' $ genTupleItem genWhitespaces expr)
 
+genAssignableTuple :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
+genAssignableTuple =
+  Tuple () <$>
+  genTupleItem genWhitespaces genAssignable <*>
+  genWhitespaces <*>
+  genTupleItems
+  where
+    genTupleItems =
+      Gen.sized $ \n ->
+      if n == 0
+      then pure Nothing
+      else
+        sizedBind
+          (genTupleItem genWhitespaces genAssignable)
+          (\ti -> Just . view _CommaSep1' <$> genTupleItemsRest (has _TupleUnpack ti) ti [])
+
+    genTupleItemsRest seen a as =
+      Gen.sized $ \n ->
+      if n == 0
+      then (,,) a as <$> Gen.maybe genWhitespaces
+      else
+        sizedBind
+          (if seen
+           then TupleItem () <$> genAssignable
+           else genTupleItem genWhitespaces genAssignable)
+          (\ti -> do
+              ws <- genWhitespaces
+              genTupleItemsRest (seen || has _TupleUnpack ti) ti ((ws, a) : as))
+
 genModuleName :: (MonadGen m, MonadState GenState m) => m (ModuleName '[] ())
 genModuleName =
   Gen.recursive Gen.choice
@@ -292,6 +321,17 @@ genList genExpr' =
   List () <$>
   genWhitespaces <*>
   Gen.maybe (genSizedCommaSep1' $ genListItem genWhitespaces genExpr') <*>
+  genWhitespaces
+
+genAssignableList :: (MonadState GenState m, MonadGen m) => m (Expr '[] ())
+genAssignableList =
+  Gen.shrink
+    (\case
+        List _ _ (Just (CommaSepOne1' e _)) _ -> e ^.. _Exprs
+        _ -> []) $
+  List () <$>
+  genWhitespaces <*>
+  Gen.maybe (genSizedCommaSep1' $ genListItem genWhitespaces genAssignable) <*>
   genWhitespaces
 
 genParens :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
@@ -501,9 +541,9 @@ genAssignable =
   sizedRecursive
     [ Ident <$> genIdent
     ]
-    [ genList genAssignable
+    [ genAssignableList
+    , genAssignableTuple
     , genParens genAssignable
-    , genTuple genAssignable
     , genDeref
     , genSubscript
     ]

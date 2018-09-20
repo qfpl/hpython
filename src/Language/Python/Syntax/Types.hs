@@ -185,6 +185,24 @@ data Tuple v a
   } deriving (Eq, Show)
 makeLenses ''Tuple
 
+data List v a
+  = MkList
+  { _listAnn :: a
+  , _listWhitespaceLeft :: [Whitespace]
+  , _listBody :: Maybe (CommaSep1' (ListItem v a))
+  , _listWhitespaceRight :: [Whitespace]
+  } deriving (Eq, Show)
+makeLenses ''List
+
+data ListUnpack v a
+  = MkListUnpack
+  { _listUnpackAnn :: a
+  , _listUnpackParens :: [([Whitespace], [Whitespace])]
+  , _listUnpackWhitespace :: [Whitespace]
+  , _listUnpackValue :: Expr v a
+  } deriving (Eq, Show)
+makeLenses ''ListUnpack
+
 data None (v :: [*]) a
   = MkNone
   { _noneAnn :: a

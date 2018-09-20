@@ -4,13 +4,13 @@ module Data.Validate.Monadic where
 
 import Data.Functor.Compose (Compose(..))
 import Data.Semigroup (Semigroup)
-import Data.Validate (Validate(..))
+import Data.Validation (Validation(..))
 
 -- | This is not a monad transformer
-newtype ValidateM e m a = ValidateM { unValidateM :: Compose m (Validate e) a }
+newtype ValidateM e m a = ValidateM { unValidateM :: Compose m (Validation e) a }
   deriving (Functor, Applicative)
 
-runValidateM :: ValidateM e m a -> m (Validate e a)
+runValidateM :: ValidateM e m a -> m (Validation e a)
 runValidateM = getCompose . unValidateM
 
 bindVM :: Monad m => m a -> (a -> ValidateM e m b) -> ValidateM e m b

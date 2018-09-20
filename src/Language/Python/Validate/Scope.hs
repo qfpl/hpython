@@ -63,7 +63,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Map.Strict (Map)
 import Data.String (fromString)
 import Data.Type.Set (Nub)
-import Data.Validate (Validate)
+import Data.Validation (Validation)
 import Data.Validate.Monadic (ValidateM(..), runValidateM, bindVM, liftVM0, errorVM)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -94,7 +94,7 @@ initialScopeContext = ScopeContext Map.empty Map.empty Map.empty
 
 type ValidateScope ann e = ValidateM [e] (State (ScopeContext ann))
 
-runValidateScope :: ScopeContext ann -> ValidateScope ann e a -> Validate [e] a
+runValidateScope :: ScopeContext ann -> ValidateScope ann e a -> Validation [e] a
 runValidateScope s = flip evalState s . runValidateM
 
 extendScope

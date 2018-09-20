@@ -4,7 +4,7 @@ module Main where
 
 import Criterion.Main
 
-import Data.Validate (Validate(..))
+import Data.Validation (Validation(..))
 import System.Exit (exitFailure)
 
 import qualified Data.Text.IO as StrictText

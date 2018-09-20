@@ -67,7 +67,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (isJust, fromMaybe)
 import Data.Semigroup (Semigroup(..))
 import Data.Type.Set (Nub, Member)
-import Data.Validate (Validate(..))
+import Data.Validation (Validation(..))
 import Data.Validate.Monadic (ValidateM(..), bindVM, liftVM0, liftVM1, errorVM)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -106,7 +106,7 @@ makeLenses ''SyntaxContext
 
 type ValidateSyntax e = ValidateM [e] (ReaderT SyntaxContext (State [String]))
 
-runValidateSyntax :: SyntaxContext -> [String] -> ValidateSyntax e a -> Validate [e] a
+runValidateSyntax :: SyntaxContext -> [String] -> ValidateSyntax e a -> Validation [e] a
 runValidateSyntax ctxt nlscope =
   flip evalState nlscope .
   flip runReaderT ctxt . getCompose .

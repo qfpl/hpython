@@ -30,7 +30,7 @@ import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Type.Set
 import Unsafe.Coerce (unsafeCoerce)
-import Data.Validate (Validate(..))
+import Data.Validation (Validation(..))
 import Data.Validate.Monadic (ValidateM(..), liftVM0, errorVM)
 import qualified Data.List.NonEmpty as NonEmpty
 
@@ -49,10 +49,10 @@ data NextIndent
 
 type ValidateIndentation e = ValidateM [e] (State (NextIndent, [Indent]))
 
-runValidateIndentation :: ValidateIndentation e a -> Validate [e] a
+runValidateIndentation :: ValidateIndentation e a -> Validation [e] a
 runValidateIndentation = runValidateIndentation' EqualTo []
 
-runValidateIndentation' :: NextIndent -> [Indent] -> ValidateIndentation e a -> Validate [e] a
+runValidateIndentation' :: NextIndent -> [Indent] -> ValidateIndentation e a -> Validation [e] a
 runValidateIndentation' ni is =
   flip evalState (ni, is) .
   getCompose .

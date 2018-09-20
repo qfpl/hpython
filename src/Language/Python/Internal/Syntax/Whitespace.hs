@@ -60,7 +60,7 @@ newtype IndentLevel
   { appIndentLevel
     :: Maybe Int -> Dual (Endo (Bool, Int))
   }
-  deriving Monoid
+  deriving (Semigroup, Monoid)
 
 indentLevel :: Indent -> Int
 indentLevel = getIndentLevel . measure . unIndent

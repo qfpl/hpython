@@ -55,19 +55,20 @@ import Control.Lens.Traversal (traverseOf)
 import Control.Lens.Wrapped (_Wrapped)
 import Control.Monad.State (MonadState, State, evalState, modify)
 import Data.Bitraversable (bitraverse)
+import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Foldable (traverse_)
 import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty (NonEmpty(..))
+import Data.Map.Strict (Map)
 import Data.String (fromString)
 import Data.Type.Set (Nub)
-import Data.Trie (Trie)
 import Data.Validate (Validate)
 import Data.Validate.Monadic (ValidateM(..), runValidateM, bindVM, liftVM0, errorVM)
 import Unsafe.Coerce (unsafeCoerce)
 
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Data.Trie as Trie
+import qualified Data.Map.Strict as Map
 
 import Language.Python.Internal.Optics
 import Language.Python.Internal.Optics.Validated (unvalidated)
@@ -81,15 +82,15 @@ data Binding = Clean | Dirty
 
 data ScopeContext a
   = ScopeContext
-  { _scGlobalScope :: !(Trie a)
-  , _scLocalScope :: !(Trie a)
-  , _scImmediateScope :: !(Trie a)
+  { _scGlobalScope :: !(Map ByteString a)
+  , _scLocalScope :: !(Map ByteString a)
+  , _scImmediateScope :: !(Map ByteString a)
   }
   deriving (Eq, Show)
 makeLenses ''ScopeContext
 
 initialScopeContext :: ScopeContext a
-initialScopeContext = ScopeContext Trie.empty Trie.empty Trie.empty
+initialScopeContext = ScopeContext Map.empty Map.empty Map.empty
 
 type ValidateScope ann e = ValidateM [e] (State (ScopeContext ann))
 
@@ -97,24 +98,24 @@ runValidateScope :: ScopeContext ann -> ValidateScope ann e a -> Validate [e] a
 runValidateScope s = flip evalState s . runValidateM
 
 extendScope
-  :: Setter' (ScopeContext ann) (Trie ann)
+  :: Setter' (ScopeContext ann) (Map ByteString ann)
   -> [(ann, String)]
   -> ValidateScope ann e ()
 extendScope l s =
   liftVM0 $ do
     gs <- use scGlobalScope
-    let t = buildTrie gs Trie.empty
-    modify (over l (t `Trie.unionL`))
+    let t = buildMap gs Map.empty
+    modify (over l (t `unionL`))
   where
-    buildTrie gs t =
+    buildMap gs t =
       foldr
       (\(ann, a) b ->
           let
             a' = fromString a
           in
-            if Trie.member a' gs
+            if Map.member a' gs
             then b
-            else Trie.insert a' ann b)
+            else Map.insert a' ann b)
       t
       s
 
@@ -130,7 +131,7 @@ locallyOver l f m =
     getCompose (unValidateM m) <* modify (l .~ before)
 
 locallyExtendOver
-  :: Lens' (ScopeContext ann) (Trie ann)
+  :: Lens' (ScopeContext ann) (Map ByteString ann)
   -> [(ann, String)]
   -> ValidateScope ann e a
   -> ValidateScope ann e a
@@ -146,10 +147,10 @@ inScope s = do
   is <- use scImmediateScope
   let
     s' = fromString s
-    inls = Trie.lookup s' ls
-    ings = Trie.lookup s' gs
+    inls = Map.lookup s' ls
+    ings = Map.lookup s' gs
   pure $
-    ((,) Clean <$> Trie.lookup s' is) <|>
+    ((,) Clean <$> Map.lookup s' is) <|>
     (ings *> ((,) Clean <$> inls)) <|>
     ((,) Clean <$> ings) <|>
     ((,) Dirty <$> inls)
@@ -186,8 +187,8 @@ validateCompoundStatementScope
   => CompoundStatement v a
   -> ValidateScope a e (CompoundStatement (Nub (Scope ': v)) a)
 validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params ws3 mty s) =
-  (locallyOver scLocalScope (const Trie.empty) $
-   locallyOver scImmediateScope (const Trie.empty) $
+  (locallyOver scLocalScope (const Map.empty) $
+   locallyOver scImmediateScope (const Map.empty) $
      (\decos' -> Fundef a decos' idnts asyncWs ws1 (coerce name) ws2) <$>
      traverse validateDecoratorScope decos <*>
      traverse validateParamScope params <*>
@@ -203,8 +204,8 @@ validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params
 validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
-  locallyOver scImmediateScope (const Trie.empty)
+  locallyOver scGlobalScope (`unionR` unionR ls is) $
+  locallyOver scImmediateScope (const Map.empty)
     (If idnts a ws1 <$>
      validateExprScope e <*>
      validateSuiteScope b <*>
@@ -218,16 +219,16 @@ validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
 validateCompoundStatementScope (While idnts a ws1 e b) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
-  locallyOver scImmediateScope (const Trie.empty)
+  locallyOver scGlobalScope (`unionR` unionR ls is) $
+  locallyOver scImmediateScope (const Map.empty)
     (While idnts a ws1 <$>
      validateExprScope e <*>
      validateSuiteScope b)))
 validateCompoundStatementScope (TryExcept idnts a b e f k l) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
-  locallyOver scImmediateScope (const Trie.empty)
+  locallyOver scGlobalScope (`unionR` unionR ls is) $
+  locallyOver scImmediateScope (const Map.empty)
     (TryExcept idnts a b <$>
      validateSuiteScope e <*>
      traverse
@@ -244,8 +245,8 @@ validateCompoundStatementScope (TryExcept idnts a b e f k l) =
 validateCompoundStatementScope (TryFinally idnts a b e idnts2 f i) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
-  locallyOver scImmediateScope (const Trie.empty)
+  locallyOver scGlobalScope (`unionR` unionR ls is) $
+  locallyOver scImmediateScope (const Map.empty)
     (TryFinally idnts a b <$>
      validateSuiteScope e <*>
      pure idnts2 <*>
@@ -254,8 +255,8 @@ validateCompoundStatementScope (TryFinally idnts a b e idnts2 f i) =
 validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`Trie.unionR` Trie.unionR ls is) $
-  locallyOver scImmediateScope (const Trie.empty) $
+  locallyOver scGlobalScope (`unionR` unionR ls is) $
+  locallyOver scImmediateScope (const Map.empty) $
     For @(Nub (Scope ': v)) idnts a asyncWs b <$>
     (unsafeCoerce c <$
      traverse
@@ -630,3 +631,9 @@ validateModuleScope
   -> ValidateScope a e (Module (Nub (Scope ': v)) a)
 validateModuleScope =
   traverseOf (_Wrapped.traverse._Right) validateStatementScope
+
+unionL :: Ord k => Map k v -> Map k v -> Map k v
+unionL = Map.unionWith const
+
+unionR :: Ord k => Map k v -> Map k v -> Map k v
+unionR = Map.unionWith (const id)

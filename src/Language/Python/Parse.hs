@@ -14,7 +14,7 @@ import Data.Bifunctor (first)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Set (Set)
 import Data.Text (Text)
-import Data.Validate (Validate, bindValidate, fromEither)
+import Data.Validation (Validation, bindValidation, fromEither)
 import Data.Void (Void)
 import Text.Megaparsec.Error (ErrorItem(..))
 import Text.Megaparsec.Pos (SourcePos(..), unPos)
@@ -98,7 +98,7 @@ fromIRError e =
   case e of
     IR.InvalidUnpacking a -> InvalidUnpacking a
 
-parseModule :: FilePath -> Text -> Validate [ParseError SrcInfo] (Module '[] SrcInfo)
+parseModule :: FilePath -> Text -> Validation [ParseError SrcInfo] (Module '[] SrcInfo)
 parseModule fp input =
   let
     si = initialSrcInfo fp
@@ -109,9 +109,9 @@ parseModule fp input =
       nst <- first fromIndentationError $ nested ils
       first fromParseError $ Parse.runParser si Parse.module_ nst
   in
-    fromEither (first pure ir) `bindValidate` (first (fmap fromIRError) . IR.fromIR)
+    fromEither (first pure ir) `bindValidation` (first (fmap fromIRError) . IR.fromIR)
 
-parseStatement :: FilePath -> Text -> Validate [ParseError SrcInfo] (Statement '[] SrcInfo)
+parseStatement :: FilePath -> Text -> Validation [ParseError SrcInfo] (Statement '[] SrcInfo)
 parseStatement fp input =
   let
     si = initialSrcInfo fp
@@ -122,9 +122,9 @@ parseStatement fp input =
       nst <- first fromIndentationError $ nested ils
       first fromParseError $ Parse.runParser si Parse.statement nst
   in
-    fromEither (first pure ir) `bindValidate` (first (fmap fromIRError) . IR.fromIR_statement)
+    fromEither (first pure ir) `bindValidation` (first (fmap fromIRError) . IR.fromIR_statement)
 
-parseExpr :: FilePath -> Text -> Validate [ParseError SrcInfo] (Expr '[] SrcInfo)
+parseExpr :: FilePath -> Text -> Validation [ParseError SrcInfo] (Expr '[] SrcInfo)
 parseExpr fp input =
   let
     si = initialSrcInfo fp
@@ -135,4 +135,4 @@ parseExpr fp input =
       nst <- first fromIndentationError $ nested ils
       first fromParseError $ Parse.runParser si (Parse.exprList Parse.space) nst
   in
-    fromEither (first pure ir) `bindValidate` (first (fmap fromIRError) . IR.fromIR_expr)
+    fromEither (first pure ir) `bindValidation` (first (fmap fromIRError) . IR.fromIR_expr)

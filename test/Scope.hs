@@ -4,7 +4,7 @@ module Scope (scopeTests) where
 import Control.Lens (has)
 import Data.Function ((&))
 import Data.Functor (($>))
-import Data.Validate (Validate(..), _Success)
+import Data.Validation (Validation(..), _Success)
 
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Indentation
@@ -33,7 +33,7 @@ scopeTests =
 fullyValidate
   :: Statement '[] ()
   -> PropertyT IO
-       (Validate
+       (Validation
           [ScopeError '[Syntax, Indentation] ()]
           (Statement '[Scope, Syntax, Indentation] ()))
 fullyValidate x =

@@ -129,6 +129,7 @@ benchmark bench
                      , criterion >= 1 && < 1.6
                      , deepseq
                      , text
+                     , validation >= 1 && < 1.1
   default-language:    Haskell2010
   ghc-options:         -O
                        -Wincomplete-patterns

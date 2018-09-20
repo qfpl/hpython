@@ -14,6 +14,9 @@ maintainer:          isaace71295@gmail.com
 build-type:          Simple
 extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
+tested-with:           GHC == 8.0.2
+                     , GHC == 8.2.2
+                     , GHC == 8.4.3
 
 library
   exposed-modules:     Data.Type.Set

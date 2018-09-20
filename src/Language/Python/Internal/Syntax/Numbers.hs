@@ -6,7 +6,7 @@ import Data.Deriving (deriveEq1)
 import Data.Digit.Binary (BinDigit)
 import Data.Digit.Octal (OctDigit)
 import Data.Digit.Decimal (DecDigit)
-import Data.Digit.HeXaDeCiMaL (HeXDigit)
+import Data.Digit.Hexadecimal.MixedCase (HeXDigit)
 import Data.List.NonEmpty (NonEmpty)
 import Data.These (These)
 

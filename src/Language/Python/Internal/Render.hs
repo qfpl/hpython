@@ -844,6 +844,7 @@ renderExpr (Ternary _ a b c d e) =
 renderExpr (Subscript _ a b c d) =
   (case a of
      BinOp{} -> bracket $ renderExpr a
+     UnOp{} -> bracket $ renderExpr a
      Not{} -> bracket $ renderExpr a
      Ternary{} -> bracket $ renderExpr a
      Lambda{} -> bracket $ renderExpr a

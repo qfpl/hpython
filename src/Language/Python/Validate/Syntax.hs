@@ -996,6 +996,9 @@ validateArgsSyntax e = unsafeCoerce e <$ go [] False False (toList e)
          validateExprSyntax expr)
         (go names seenKeyword True args)
 
+newtype HaveSeenKeywordArg = HaveSeenKeywordArg Bool
+newtype HaveSeenEmptyStarArg a = HaveSeenEmptyStarArg (Maybe a)
+
 validateParamsSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
@@ -1004,33 +1007,60 @@ validateParamsSyntax
   -> CommaSep (Param v a)
   -> ValidateSyntax e (CommaSep (Param (Nub (Syntax ': v)) a))
 validateParamsSyntax isLambda e =
-  unsafeCoerce e <$ go [] False (toList e)
+  unsafeCoerce e <$
+  go [] (HaveSeenEmptyStarArg Nothing) (HaveSeenKeywordArg False) (toList e)
   where
+    checkTy
+      :: ( AsSyntaxError e v a
+         , Member Indentation v
+         )
+      => a
+      -> Maybe ([Whitespace], Expr v a)
+      -> ValidateSyntax e (Maybe ([Whitespace], Expr (Nub (Syntax ': v)) a))
     checkTy a mty =
       if isLambda
       then traverse (\_ -> errorVM [_TypedParamInLambda # a]) mty
       else traverseOf (traverse._2) validateExprSyntax mty
 
-    go _ _ [] = pure []
-    go names False (PositionalParam a name mty : params)
+    go
+      :: ( AsSyntaxError e v a
+         , Member Indentation v
+         )
+      => [String] -- identifiers that we've seen
+      -> HaveSeenEmptyStarArg a -- have we seen an empty star argument?
+      -> HaveSeenKeywordArg -- have we seen a keyword parameter?
+      -> [Param v a]
+      -> ValidateSyntax e [Param (Nub (Syntax ': v)) a]
+    go _ (HaveSeenEmptyStarArg b) (HaveSeenKeywordArg c) [] =
+      case b of
+        Nothing -> pure []
+        Just b' ->
+          if not c
+          then errorVM [_NoKeywordsAfterEmptyStarArg # b']
+          else pure []
+    go names bsa bkw@(HaveSeenKeywordArg False) (PositionalParam a name mty : params)
       | _identValue name `elem` names =
           errorVM [_DuplicateArgument # (a, _identValue name)] <*>
           validateIdentSyntax name <*>
           checkTy a mty <*>
-          go (_identValue name:names) False params
+          go (_identValue name:names) bsa bkw params
       | otherwise =
           liftA2
             (:)
             (PositionalParam a <$>
              validateIdentSyntax name <*>
              checkTy a mty)
-            (go (_identValue name:names) False params)
-    go names seen (StarParam a ws mname mty : params)
+            (go (_identValue name:names) bsa bkw params)
+    go names bsa bkw (StarParam a ws mname mty : params)
       | Just name <- mname, _identValue name `elem` names =
           errorVM [_DuplicateArgument # (a, _identValue name)] <*>
           validateIdentSyntax name <*>
           checkTy a mty <*>
-          go (_identValue name:names) seen params
+          go
+            (_identValue name:names)
+            (maybe bsa (const $ HaveSeenEmptyStarArg Nothing) mname)
+            bkw
+            params
       | otherwise =
           liftA2
             (:)
@@ -1040,8 +1070,12 @@ validateParamsSyntax isLambda e =
                 (Nothing, Just{}) -> errorVM [_TypedUnnamedStarParam # a]
                 _ -> pure ()) <*>
              checkTy a mty)
-            (go (maybe names (\n -> _identValue n : names) mname) seen params)
-    go names True (PositionalParam a name mty : params) =
+            (go
+               (maybe names (\n -> _identValue n : names) mname)
+               (maybe bsa (const $ HaveSeenEmptyStarArg Nothing) mname)
+               bkw
+               params)
+    go names bsa bkw@(HaveSeenKeywordArg True) (PositionalParam a name mty : params) =
       let
         name' = _identValue name
         errs =
@@ -1050,12 +1084,12 @@ validateParamsSyntax isLambda e =
       in
         errorVM errs <*>
         checkTy a mty <*>
-        go (name':names) True params
-    go names _ (KeywordParam a name mty ws2 expr : params)
+        go (name':names) bsa bkw params
+    go names bsa _ (KeywordParam a name mty ws2 expr : params)
       | _identValue name `elem` names =
           errorVM [_DuplicateArgument # (a, _identValue name)] <*>
           checkTy a mty <*>
-          go names True params
+          go names bsa (HaveSeenKeywordArg True) params
       | otherwise =
           liftA2 (:)
             (KeywordParam a <$>
@@ -1063,8 +1097,8 @@ validateParamsSyntax isLambda e =
              checkTy a mty <*>
              pure ws2 <*>
              validateExprSyntax expr)
-            (go (_identValue name:names) True params)
-    go names _ [DoubleStarParam a ws name mty]
+            (go (_identValue name:names) bsa (HaveSeenKeywordArg True) params)
+    go names bsa _ [DoubleStarParam a ws name mty]
       | _identValue name `elem` names =
           errorVM [_DuplicateArgument # (a, _identValue name)] <*>
           checkTy a mty
@@ -1073,7 +1107,7 @@ validateParamsSyntax isLambda e =
           DoubleStarParam a ws <$>
           validateIdentSyntax name <*>
           checkTy a mty
-    go names _ (DoubleStarParam a ws name mty : _) =
+    go names bsa _ (DoubleStarParam a ws name mty : _) =
       (if _identValue name `elem` names
        then errorVM [_DuplicateArgument # (a, _identValue name)]
        else pure ()) *>

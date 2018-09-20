@@ -10,7 +10,7 @@ import Control.Lens.Fold
 import Control.Lens.Getter
 import Control.Lens.Iso (from)
 import Control.Lens.Plated
-import Control.Lens.Prism (_Just)
+import Control.Lens.Prism (_Just, _Nothing)
 import Control.Lens.Setter
 import Control.Lens.Tuple
 import Control.Lens.TH
@@ -31,6 +31,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 
 import GHC.Stack
 
+import Language.Python.Syntax.Types (spType)
 import Language.Python.Internal.Optics
 import Language.Python.Internal.Syntax
 
@@ -251,16 +252,25 @@ genParams
 genParams isLambda =
   sizedBind (genPositionalParams isLambda) $ \pparams ->
   let pparamNames = pparams ^.. folded.paramName.identValue in
+
   sizedBind (sizedMaybe $ genStarParam isLambda pparamNames) $ \sp ->
   let pparamNames' = pparamNames <> (sp ^.. _Just.paramName.identValue) in
-  sizedBind (genSizedCommaSep (genKeywordParam isLambda pparamNames')) $ \kwparams ->
-  let pparamNames'' = pparamNames' <> kwparams ^.. folded.paramName.identValue in
-  sizedBind (sizedMaybe $ genDoubleStarParam isLambda pparamNames'') $ \dsp ->
 
-  pure $
-    appendCommaSep
-      (pparams `appendCommaSep` maybe CommaSepNone CommaSepOne sp)
-      (kwparams `appendCommaSep` maybe CommaSepNone CommaSepOne dsp)
+  sizedBind (genSizedCommaSep (genKeywordParam isLambda pparamNames')) $ \kwparams ->
+  let
+    pparamNames'' = pparamNames' <> kwparams ^.. folded.paramName.identValue
+  in do
+    kwparams' <-
+      if has (folded._StarParam.spType._Nothing) sp && null kwparams
+      then CommaSepOne <$> genKeywordParam isLambda pparamNames'
+      else pure kwparams
+
+    sizedBind (sizedMaybe $ genDoubleStarParam isLambda pparamNames'') $ \dsp ->
+
+      pure $
+        appendCommaSep
+          (pparams `appendCommaSep` maybe CommaSepNone CommaSepOne sp)
+          (kwparams' `appendCommaSep` maybe CommaSepNone CommaSepOne dsp)
 
 genDeletableList :: (MonadState GenState m, MonadGen m) => m (Expr '[] ()) -> m (Expr '[] ())
 genDeletableList genExpr' =

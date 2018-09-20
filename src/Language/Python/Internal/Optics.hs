@@ -68,6 +68,19 @@ _PositionalParam =
         PositionalParam a b c -> Right (MkPositionalParam a b c)
         a -> Left $ a ^. unvalidated)
 
+_StarParam
+  :: Prism
+       (Param v a)
+       (Param '[] a)
+       (StarParam v a)
+       (StarParam '[] a)
+_StarParam =
+  prism
+    (\(MkStarParam a b c d) -> StarParam a b c d)
+    (\case
+        StarParam a b c d -> Right (MkStarParam a b c d)
+        a -> Left $ a ^. unvalidated)
+
 _Fundef
   :: Prism
        (Statement v a)

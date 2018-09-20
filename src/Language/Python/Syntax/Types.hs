@@ -52,6 +52,15 @@ data PositionalParam v a
   } deriving (Eq, Show)
 makeLenses ''PositionalParam
 
+data StarParam v a
+  = MkStarParam
+  { _spAnn :: a
+  , _spWhitespace :: [Whitespace]
+  , _spName :: Maybe (Ident v a)
+  , _spType :: Maybe ([Whitespace], Expr v a)
+  } deriving (Eq, Show)
+makeLenses ''StarParam
+
 data Call v a
   = MkCall
   { _callAnn :: a

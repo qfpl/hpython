@@ -1,10 +1,10 @@
 {-# language LambdaCase #-}
 {-# language DataKinds, KindSignatures #-}
-{-# language TemplateHaskell #-}
 {-# language ScopedTypeVariables #-}
 {-# language MultiParamTypeClasses, FlexibleInstances #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language ExistentialQuantification #-}
+{-# language TemplateHaskell #-}
 module Language.Python.Internal.Syntax.Expr where
 
 import Control.Lens.Cons (_last)
@@ -90,6 +90,15 @@ data Param (v :: [*]) a
 
 paramAnn :: Lens' (Param v a) a
 paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
+
+paramType
+  :: Lens
+       (Param v a)
+       (Param '[] a)
+       (Maybe ([Whitespace], Expr v a))
+       (Maybe ([Whitespace], Expr '[] a))
+paramType =
+  lens _paramType (\s a -> (s ^. unvalidated) { _paramType = a})
 
 paramName :: Traversal (Param v a) (Param '[] a) (Ident v a) (Ident '[] a)
 paramName f (PositionalParam a b c) =

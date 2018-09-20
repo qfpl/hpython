@@ -6,6 +6,7 @@
 /dist-newstyle
 /.cabal-sandbox
 /cabal.sandbox.config
+.ghc.environment*
 
 # Haskell Program Coverage
 /.hpc

@@ -13,6 +13,32 @@ maintainer:          isaace71295@gmail.com
 -- category:            
 build-type:          Simple
 extra-source-files:  ChangeLog.md
+                     benchmarks/pypy.py
+                     test/files/ansible.py
+                     test/files/asyncstatements.py
+                     test/files/comments.py
+                     test/files/dictcomp.py
+                     test/files/django.py
+                     test/files/django2.py
+                     test/files/imaginary.py
+                     test/files/joblib.py
+                     test/files/joblib2.py
+                     test/files/mypy.py
+                     test/files/mypy2.py
+                     test/files/numpy.py
+                     test/files/numpy2.py
+                     test/files/pandas.py
+                     test/files/pandas2.py
+                     test/files/pypy.py
+                     test/files/pypy2.py
+                     test/files/requests.py
+                     test/files/requests2.py
+                     test/files/sqlalchemy.py
+                     test/files/test.py
+                     test/files/typeann.py
+                     test/files/weird.py
+                     test/files/weird2.py
+
 cabal-version:       >=1.10
 tested-with:           GHC == 8.0.2
                      , GHC == 8.2.2

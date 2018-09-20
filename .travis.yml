@@ -55,7 +55,7 @@ install:
   - TEST=${TEST---enable-tests}
   - HADDOCK=${HADDOCK-true}
   - UNCONSTRAINED=${UNCONSTRAINED-true}
-  - NOINSTALLEDCONSTRAINTS=${NOINSTALLEDCONSTRAINTS-false}
+  - NOINSTALLEDCONSTRAINTS=${NOINSTALLEDCONSTRAINTS-true}
   - GHCHEAD=${GHCHEAD-false}
   - travis_retry cabal update -v
   - "sed -i.bak 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config"

@@ -1,3 +1,4 @@
+{-# options_ghc -fno-warn-unused-do-bind #-}
 {-# language DataKinds, TypeOperators, FlexibleContexts #-}
 module Main where
 
@@ -96,7 +97,7 @@ syntax_expr path =
           case validateExprSyntax' res of
             Failure [] -> pure True
             Failure errs'' -> annotateShow errs'' $> False
-            Success res' -> pure True
+            Success _ -> pure True
     annotateShow rex
     runPython3
       path
@@ -115,7 +116,7 @@ syntax_statement path =
           case validateStatementSyntax' res of
             Failure [] -> pure True
             Failure errs'' -> annotateShow errs'' $> False
-            Success res' -> pure True
+            Success _ -> pure True
     annotateShow rst
     runPython3 path shouldSucceed rst
 
@@ -131,7 +132,7 @@ syntax_module path =
           case validateModuleSyntax' res of
             Failure [] -> pure True
             Failure errs'' -> annotateShow errs'' $> False
-            Success res' -> pure True
+            Success _ -> pure True
     annotateShow rst
     runPython3 path shouldSucceed rst
 
@@ -144,7 +145,7 @@ correct_syntax_expr path =
       Success res ->
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
-          Success res' -> runPython3 path True (showExpr ex)
+          Success _ -> runPython3 path True (showExpr ex)
 
 correct_syntax_statement :: FilePath -> Property
 correct_syntax_statement path =
@@ -156,7 +157,7 @@ correct_syntax_statement path =
       Success res ->
         case validateStatementSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
-          Success res' -> runPython3 path True $ showStatement st
+          Success _ -> runPython3 path True $ showStatement st
 
 expr_printparseprint_print :: Property
 expr_printparseprint_print =
@@ -169,7 +170,7 @@ expr_printparseprint_print =
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <-
+            _ <-
               validation (\e -> annotateShow e *> failure) pure $
               parseExpr "test" (showExpr res')
             showExpr (res' ^. unvalidated) === showExpr (res $> ())
@@ -192,6 +193,7 @@ statement_printparseprint_print =
             showStatement (res' ^. unvalidated) ===
               showStatement (py $> ())
 
+main :: IO ()
 main = do
   checkParallel lexerParserTests
   traverse checkParallel dslTests

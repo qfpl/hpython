@@ -10,7 +10,7 @@ import Language.Python.Internal.Syntax.Strings
   , RawStringPrefix(..), RawBytesPrefix(..)
   , QuoteType(..), StringType(..), PyChar(..)
   )
-import Language.Python.Internal.Syntax.Strings.Raw (RawString(..))
+import Language.Python.Internal.Syntax.Strings.Raw (RawString)
 import Language.Python.Internal.Syntax.Whitespace (Newline(..))
 
 data PyToken a

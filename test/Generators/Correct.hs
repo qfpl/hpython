@@ -38,6 +38,7 @@ import Language.Python.Internal.Syntax
 import Generators.Common
 import Generators.Sized
 
+initialGenState :: GenState
 initialGenState =
   GenState
   { _inFunction = Nothing
@@ -182,7 +183,7 @@ genPositionalParams isLambda =
   Gen.scale (max 0 . subtract 1) $
   Gen.sized $ fmap (listToCommaSep . fmap (uncurry $ PositionalParam ())) . go []
   where
-    go seen 0 = pure []
+    go _    0 = pure []
     go seen n = do
       i <- Gen.filter ((`notElem` seen) . _identValue) genIdent
       mty <-
@@ -336,7 +337,7 @@ genExpr = genExpr' False
 
 genStringLiterals :: MonadGen m => m (Expr '[] ())
 genStringLiterals = do
-  n <- Gen.integral (Range.constant 1 5)
+  n <- Gen.integral (Range.constant 1 5) :: MonadGen m => m Integer
   b <- Gen.bool_
   String () <$> go b n
   where

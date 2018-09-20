@@ -3,17 +3,55 @@
 
 name:                hpython
 version:             0.1.0.0
--- synopsis:            
--- description:         
+synopsis:            Syntax tree and DSL for Python
+description:         Syntax tree and DSL for Python.
 license:             BSD3
 license-file:        LICENCE
 author:              Isaac Elliott
 maintainer:          isaace71295@gmail.com
--- copyright:           
--- category:            
+copyright:           Copyright (c) 2017-2018, Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230.
+category:            Python, Language Tools
 build-type:          Simple
 extra-source-files:  ChangeLog.md
+                     benchmarks/pypy.py
+                     test/files/ansible.py
+                     test/files/asyncstatements.py
+                     test/files/comments.py
+                     test/files/dictcomp.py
+                     test/files/django.py
+                     test/files/django2.py
+                     test/files/imaginary.py
+                     test/files/joblib.py
+                     test/files/joblib2.py
+                     test/files/mypy.py
+                     test/files/mypy2.py
+                     test/files/numpy.py
+                     test/files/numpy2.py
+                     test/files/pandas.py
+                     test/files/pandas2.py
+                     test/files/pypy.py
+                     test/files/pypy2.py
+                     test/files/requests.py
+                     test/files/requests2.py
+                     test/files/sqlalchemy.py
+                     test/files/test.py
+                     test/files/typeann.py
+                     test/files/weird.py
+                     test/files/weird2.py
+
 cabal-version:       >=1.10
+tested-with:           GHC == 8.0.2
+                     , GHC == 8.2.2
+                     , GHC == 8.4.3
+
+
+source-repository    head
+  type:              git
+  location:          git@github.com/qfpl/hpython.git
+
+flag development
+  default: False
+  manual: True
 
 library
   exposed-modules:     Data.Type.Set
@@ -69,11 +107,11 @@ library
                      , parsers-megaparsec >=0.1 && <0.2
   hs-source-dirs:      src
   default-language:    Haskell2010
-  ghc-options:         -O
-                       -Wincomplete-patterns
+  ghc-options:         -Wincomplete-patterns
                        -Wincomplete-record-updates
                        -Wunused-imports
-                       -Werror
+  if flag(development)
+    ghc-options:       -Werror
 
 executable example
   main-is:             Main.hs
@@ -84,11 +122,12 @@ executable example
   hs-source-dirs:      example
   build-depends:       base >=4.9 && <5, lens, hpython, text
   default-language:    Haskell2010
-  ghc-options:         -O
-                       -Wincomplete-patterns
+  ghc-options:         -Wincomplete-patterns
                        -Wincomplete-record-updates
                        -Wunused-imports
-                       -Werror
+  if flag(development)
+    ghc-options:       -Werror
+
 
 benchmark bench
   main-is:             Main.hs
@@ -100,12 +139,14 @@ benchmark bench
                      , criterion >= 1 && < 1.6
                      , deepseq
                      , text
+                     , validation >= 1 && < 1.1
   default-language:    Haskell2010
-  ghc-options:         -O
-                       -Wincomplete-patterns
+  ghc-options:         -Wincomplete-patterns
                        -Wincomplete-record-updates
                        -Wunused-imports
-                       -Werror
+  if flag(development)
+    ghc-options:       -Werror
+
 
 test-suite hpython-tests
   main-is:             Main.hs
@@ -136,8 +177,8 @@ test-suite hpython-tests
                      , these >=0.7.4 && <0.8
                      , validation >= 1 && < 1.1
   default-language:    Haskell2010
-  ghc-options:         -O
-                       -Wincomplete-patterns
+  ghc-options:         -Wincomplete-patterns
                        -Wincomplete-record-updates
                        -Wunused-imports
-                       -Werror
+  if flag(development)
+    ghc-options:       -Werror

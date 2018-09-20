@@ -16,7 +16,8 @@ extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Data.Validate
+  exposed-modules:     Data.Type.Set
+                     , Data.Validate
                      , Data.Validate.Monadic
                      , Language.Python.Internal.Lexer
                      , Language.Python.Internal.Optics
@@ -56,7 +57,6 @@ library
                      , digit >=0.7 && < 0.8
                      , dlist >=0.8 && <0.9
                      , lens >= 4 && < 4.18
-                     , type-level-sets >=0.8.7 && < 0.9
                      , parsers >= 0.10 && < 0.13
                      , megaparsec >=6.3 && <7.1
                      , fingertree >=0.1 && <0.2

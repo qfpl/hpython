@@ -98,7 +98,7 @@ fromIRError e =
   case e of
     IR.InvalidUnpacking a -> InvalidUnpacking a
 
-parseModule :: FilePath -> Text -> Validation [ParseError SrcInfo] (Module '[] SrcInfo)
+parseModule :: FilePath -> Text -> Validation (NonEmpty (ParseError SrcInfo)) (Module '[] SrcInfo)
 parseModule fp input =
   let
     si = initialSrcInfo fp
@@ -111,7 +111,7 @@ parseModule fp input =
   in
     fromEither (first pure ir) `bindValidation` (first (fmap fromIRError) . IR.fromIR)
 
-parseStatement :: FilePath -> Text -> Validation [ParseError SrcInfo] (Statement '[] SrcInfo)
+parseStatement :: FilePath -> Text -> Validation (NonEmpty (ParseError SrcInfo)) (Statement '[] SrcInfo)
 parseStatement fp input =
   let
     si = initialSrcInfo fp
@@ -124,7 +124,7 @@ parseStatement fp input =
   in
     fromEither (first pure ir) `bindValidation` (first (fmap fromIRError) . IR.fromIR_statement)
 
-parseExpr :: FilePath -> Text -> Validation [ParseError SrcInfo] (Expr '[] SrcInfo)
+parseExpr :: FilePath -> Text -> Validation (NonEmpty (ParseError SrcInfo)) (Expr '[] SrcInfo)
 parseExpr fp input =
   let
     si = initialSrcInfo fp

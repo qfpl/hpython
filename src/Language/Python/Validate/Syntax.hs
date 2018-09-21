@@ -839,11 +839,11 @@ validateArgsSyntax e = unsafeCoerce e <$ go [] False False (toList e)
       -> [Arg v a]
       -> ValidateSyntax e [Arg (Nub (Syntax ': v)) a]
     go _ _ _ [] = pure []
-    go names False False (arg@(PositionalArg a expr) : args) =
+    go names False False (PositionalArg a expr : args) =
       liftA2 (:)
         (PositionalArg a <$> validateExprSyntax expr)
         (go names False False args)
-    go names seenKeyword seenUnpack (arg@(PositionalArg a expr) : args) =
+    go names seenKeyword seenUnpack (PositionalArg a expr : args) =
       when seenKeyword (errorVM1 (_PositionalAfterKeywordArg # (a, expr))) *>
       when seenUnpack (errorVM1 (_PositionalAfterKeywordUnpacking # (a, expr))) *>
       go names seenKeyword seenUnpack args
@@ -851,7 +851,7 @@ validateArgsSyntax e = unsafeCoerce e <$ go [] False False (toList e)
       liftA2 (:)
         (StarArg a <$> validateWhitespace a ws <*> validateExprSyntax expr)
         (go names seenKeyword False args)
-    go names seenKeyword seenUnpack (StarArg a ws expr : args) =
+    go names seenKeyword seenUnpack (StarArg a _ expr : args) =
       when seenKeyword (errorVM1 (_PositionalAfterKeywordArg # (a, expr))) *>
       when seenUnpack (errorVM1 (_PositionalAfterKeywordUnpacking # (a, expr))) *>
       go names seenKeyword seenUnpack args
@@ -951,7 +951,7 @@ validateParamsSyntax isLambda e =
           DoubleStarParam a ws <$>
           validateIdentSyntax name <*>
           checkTy a mty
-    go names _ (DoubleStarParam a ws name mty : _) =
+    go names _ (DoubleStarParam a _ name mty : _) =
       (if _identValue name `elem` names
        then errorVM1 (_DuplicateArgument # (a, _identValue name))
        else pure ()) *>

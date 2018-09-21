@@ -5,6 +5,7 @@
 {-# language FlexibleContexts #-}
 {-# language TypeFamilies #-}
 {-# language OverloadedStrings #-}
+{-# language ScopedTypeVariables #-}
 module Language.Python.Internal.Lexer where
 
 import Control.Applicative ((<**>), (<|>), many, optional)
@@ -466,9 +467,10 @@ spanMaybe f as =
 
 -- | Acts like break, but encodes the "insignificant whitespace" rule for parens, braces
 -- and brackets
-breakOnNewline :: [PyToken a] -> ([PyToken a], Maybe ((PyToken a, Newline), [PyToken a]))
+breakOnNewline :: forall a. [PyToken a] -> ([PyToken a], Maybe ((PyToken a, Newline), [PyToken a]))
 breakOnNewline = go 0
   where
+    go :: Integer -> [PyToken a] -> ([PyToken a], Maybe ((PyToken a, Newline), [PyToken a]))
     go _ [] = ([], Nothing)
     go !careWhen0 (tk : tks) =
       case tk of
@@ -525,7 +527,7 @@ indentation ann lls =
   where
     finalDedents :: StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
     finalDedents = do
-      (ann, i) :| is <- get
+      (ann, _) :| is <- get
       case is of
         [] -> pure []
         i' : is' -> do
@@ -544,10 +546,10 @@ indentation ann lls =
       pure $ replicate (length popped) (Dedent ann)
 
     go :: LogicalLine a -> StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
-    go ll@(LogicalLine ann spcs line nl)
+    go ll@(LogicalLine ann spcs line _)
       | all isBlankToken line = pure [IndentedLine ll]
       | otherwise = do
-          (_, i) :| is <- get
+          (_, i) :| _ <- get
           let
             et8 = absoluteIndentLevel 8 spcs
             et1 = absoluteIndentLevel 1 spcs
@@ -631,10 +633,10 @@ nested = fmap Nested . go FingerTree.empty []
       -> Either
            (IndentationError a)
            (Seq (Either (Nested a) (Line a)))
-    go leaps [] [] = pure mempty
-    go leaps ((ann, a) : as) [] = foldr (\_ _ -> Left $ ExpectedDedent ann) (pure a) as
+    go _     [] [] = pure mempty
+    go _     ((ann, a) : as) [] = foldr (\_ _ -> Left $ ExpectedDedent ann) (pure a) as
     go leaps ctxt (Indent n a : is) = go (leaps FingerTree.|> Summed n) ((a, mempty) : ctxt) is
-    go leaps [] (Dedent a : is) = Left $ UnexpectedDedent a
+    go _     [] (Dedent a : _) = Left $ UnexpectedDedent a
     go leaps ((ann, a) : as) (Dedent _ : is) =
       case FingerTree.viewr leaps of
         FingerTree.EmptyR -> error "impossible"

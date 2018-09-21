@@ -127,7 +127,7 @@ instance Alt (Parser ann) where
   {-# inline (<!>) #-}
   Parser ma <!> Parser mb =
     Parser $ \st btf err bts succ ->
-    ma st (\e -> mb st btf err bts succ) err bts succ
+    ma st (\_ -> mb st btf err bts succ) err bts succ
 
 {-# inline try #-}
 try :: Parser ann a -> Parser ann a
@@ -143,7 +143,7 @@ instance MonadState (ParseState ann) (Parser ann) where
 
 instance MonadError (ParseError ann) (Parser ann) where
   {-# inline throwError #-}
-  throwError e = Parser $ \st btf _ _ _ -> btf e
+  throwError e = Parser $ \_ btf _ _ _ -> btf e
   {-# inline catchError #-}
   catchError (Parser ma) f =
     Parser $ \st btf err bts succ ->
@@ -197,7 +197,7 @@ eol = do
       case current of
         [] -> throwError $ UnexpectedEndOfBlock ann
         Left _ : _ -> throwError $ UnexpectedIndent ann
-        Right ll@(Line _ _ tks nl) : rest' ->
+        Right (Line _ _ tks nl) : rest' ->
           case tks of
             _ : _ -> throwError $ ExpectedEndOfLine tks
             [] ->
@@ -377,11 +377,11 @@ indents = do
   ann <- use parseLocation
   case ctxt of
     [] -> throwError $ UnexpectedEndOfInput ann
-    current : rest ->
+    current : _ ->
       case current of
         [] -> throwError $ UnexpectedEndOfBlock ann
-        Right ll@(Line a is _ _) : rest' -> pure $ Indents is a
-        Left l : _ -> throwError $ UnexpectedIndent ann
+        Right (Line a is _ _) : _ -> pure $ Indents is a
+        Left _ : _ -> throwError $ UnexpectedIndent ann
 
 exprList :: Parser ann Whitespace -> Parser ann (Expr ann)
 exprList ws =
@@ -909,20 +909,6 @@ statement =
   indents <*>
   sepBy1' smallStatement (snd <$> semicolon space) <*>
   (Right <$> try eol <!> Left <$> optional comment <* eof)
-  where
-    smallst1 =
-      (\a b ->
-         case b of
-           Nothing -> (a, [], Nothing)
-           Just (sc, b') ->
-             case b' of
-               Nothing -> (a, [], Just sc)
-               Just (a', ls, sc') -> (a, (sc, a') : ls, sc')) <$>
-      smallStatement <*>
-      smallst2
-
-    smallst2 =
-      optional ((,) <$> (snd <$> semicolon space) <*> optional smallst1)
 
 suite :: Parser ann (Suite ann)
 suite =

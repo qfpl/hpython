@@ -1,3 +1,4 @@
+{-# options_ghc -fno-warn-type-defaults #-}
 {-# language DataKinds #-}
 module Generators.Common where
 
@@ -348,16 +349,7 @@ genAnyWhitespaces1 = do
 
 genWhitespaces1 :: MonadGen m => m (NonEmpty Whitespace)
 genWhitespaces1 = do
-  n <- Gen.integral (Range.constant 0 9)
   (:|) <$> Gen.element [Space, Tab] <*> genWhitespaces
-  where
-    go 0 = pure []
-    go n =
-      Gen.choice
-      [ (Space :) <$> go (n-1)
-      , (Tab :) <$> go (n-1)
-      , fmap pure $ Continued <$> genNewline' <*> go (n-1)
-      ]
 
 genNone :: MonadGen m => m (Expr '[] ())
 genNone = None () <$> genWhitespaces

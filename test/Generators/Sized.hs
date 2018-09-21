@@ -101,7 +101,7 @@ sizedList ma =
 sizedNonEmpty :: MonadGen m => m a -> m (NonEmpty a)
 sizedNonEmpty ma =
   Gen.shrink (\(x :| xs) -> (x :|) <$> Shrink.list xs) $
-  Gen.sized $ \n -> do
+  Gen.sized $ \_ -> do
     sized2 (:|)
       ma
       (sizedList ma)

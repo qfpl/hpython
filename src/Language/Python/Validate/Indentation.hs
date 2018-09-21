@@ -17,6 +17,7 @@ module Language.Python.Validate.Indentation
   , validateExceptAsIndentation
   , validateParamsIndentation
   , validateSuiteIndentation
+  , equivalentIndentation
   )
 where
 
@@ -100,11 +101,11 @@ setNextIndent ni is = liftVM0 $ put (ni, is)
 
 equivalentIndentation :: [Whitespace] -> [Whitespace] -> Bool
 equivalentIndentation [] [] = True
-equivalentIndentation (x:xs) [] =
+equivalentIndentation (x:_) [] =
   case x of
     Continued _ _ -> True
     _ -> False
-equivalentIndentation [] (y:ys) =
+equivalentIndentation [] (y:_) =
   case y of
     Continued _ _ -> True
     _ -> False
@@ -148,7 +149,7 @@ validateSuiteIndentation idnt (SuiteMany ann a c d) =
   SuiteMany ann a c <$
   setNextIndent GreaterThan (idnt ^. indentsValue) <*>
   validateBlockIndentation d
-validateSuiteIndentation idnt (SuiteOne ann a c d) = pure $ SuiteOne ann a (unsafeCoerce c) d
+validateSuiteIndentation _ (SuiteOne ann a c d) = pure $ SuiteOne ann a (unsafeCoerce c) d
 
 validateExprIndentation
   :: AsIndentationError e v a

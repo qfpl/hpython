@@ -15,7 +15,7 @@ module Language.Python.Internal.Render
   , renderImportAs, renderImportTargets, renderSmallStatement, renderCompoundStatement
   , renderBlock, renderIndent, renderIndents, renderExceptAs, renderArg, renderParam
   , renderCompFor, renderCompIf, renderComprehension, renderBinOp, renderUnOp
-  , renderSubscript, renderPyChars
+  , renderSubscript, renderPyChars, escapeChars, intToHex
   )
 where
 
@@ -330,7 +330,7 @@ renderRawPyChars qt st = Text.pack . go
     endSingleQuotesShort a =
       transform
         (\x -> case x of
-           '\\' : '\'' : as -> x
+           '\\' : '\'' : _ -> x
            c : '\'' : as -> c : '\\' : '\'' : as
            _ -> x)
         (case a of
@@ -351,7 +351,7 @@ renderRawPyChars qt st = Text.pack . go
     endDoubleQuotesShort a =
       transform
         (\x -> case x of
-           '\\' : '\"' : as -> x
+           '\\' : '\"' : _ -> x
            c : '\"' : as -> c : '\\' : '\"' : as
            _ -> x)
         (case a of
@@ -857,9 +857,9 @@ renderExpr (UnOp _ op expr) =
     Lambda{} -> bracket $ renderExpr expr
     _ -> bracketTupleGenerator expr
 renderExpr (String _ vs) = foldMap renderStringLiteral vs
-renderExpr (Int a n ws) = TkInt (() <$ n) `cons` foldMap renderWhitespace ws
-renderExpr (Float a n ws) = TkFloat (() <$ n) `cons` foldMap renderWhitespace ws
-renderExpr (Imag a n ws) = TkImag (() <$ n) `cons` foldMap renderWhitespace ws
+renderExpr (Int _ n ws) = TkInt (() <$ n) `cons` foldMap renderWhitespace ws
+renderExpr (Float _ n ws) = TkFloat (() <$ n) `cons` foldMap renderWhitespace ws
+renderExpr (Imag _ n ws) = TkImag (() <$ n) `cons` foldMap renderWhitespace ws
 renderExpr (Ident name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) =
   TkLeftBracket () `cons`
@@ -989,7 +989,7 @@ renderAugAssign aa =
   foldMap renderWhitespace (_augAssignWhitespace aa)
 
 renderSmallStatement :: SmallStatement v a -> RenderOutput
-renderSmallStatement (Assert a b c d) =
+renderSmallStatement (Assert _ b c d) =
   TkAssert () `cons`
   foldMap renderWhitespace b <>
   bracketTupleGenerator c <>
@@ -1213,15 +1213,15 @@ renderArgs e = renderCommaSep1' (renderArg bracketTupleGenerator) e
 
 renderArg :: (Expr v a -> RenderOutput) -> Arg v a -> RenderOutput
 renderArg re (PositionalArg _ expr) = re expr
-renderArg re (KeywordArg _ name ws2 expr) =
+renderArg _ (KeywordArg _ name ws2 expr) =
   renderIdent name <> singleton (TkEq ()) <>
   foldMap renderWhitespace ws2 <>
   bracketTupleGenerator expr
-renderArg re (StarArg _ ws expr) =
+renderArg _ (StarArg _ ws expr) =
   TkStar () `cons`
   foldMap renderWhitespace ws <>
   bracketTupleGenerator expr
-renderArg re (DoubleStarArg _ ws expr) =
+renderArg _ (DoubleStarArg _ ws expr) =
   TkDoubleStar () `cons`
   foldMap renderWhitespace ws <>
   bracketTupleGenerator expr

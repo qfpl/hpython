@@ -11,7 +11,7 @@ import Language.Python.Internal.Syntax.Strings
   , RawStringPrefix(..), RawBytesPrefix(..)
   , QuoteType(..), StringType(..), PyChar(..)
   )
-import Language.Python.Internal.Syntax.Strings.Raw (LongRawString(..), ShortRawString(..))
+import Language.Python.Internal.Syntax.Strings.Raw (LongRawString, ShortRawString)
 import Language.Python.Internal.Syntax.Whitespace (Newline(..), Indents)
 
 data PyToken a

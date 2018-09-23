@@ -1,3 +1,4 @@
+{-# options_ghc -fno-warn-unused-do-bind #-}
 {-# language DataKinds, TypeOperators, FlexibleContexts #-}
 {-# language OverloadedStrings #-}
 module Main where
@@ -21,9 +22,9 @@ import Control.Lens
 import Control.Monad.IO.Class
 import Control.Monad.State
 import Data.Functor
--- import Data.List (isInfixOf)
+import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
-import Data.Validate (Validate(..), validate)
+import Data.Validation (Validation(..), validation)
 import System.Directory
 import System.Exit
 import System.Process
@@ -36,34 +37,34 @@ import qualified Hedgehog.Range as Range
 
 validateExprSyntax'
   :: Expr '[Indentation] a
-  -> Validate [SyntaxError '[Indentation] a] (Expr '[Syntax, Indentation] a)
+  -> Validation (NonEmpty (SyntaxError '[Indentation] a)) (Expr '[Syntax, Indentation] a)
 validateExprSyntax' = runValidateSyntax initialSyntaxContext [] . validateExprSyntax
 
 validateExprIndentation'
   :: Expr '[] a
-  -> Validate [IndentationError '[] a] (Expr '[Indentation] a)
+  -> Validation (NonEmpty (IndentationError '[] a)) (Expr '[Indentation] a)
 validateExprIndentation' = runValidateIndentation . validateExprIndentation
 
 validateStatementSyntax'
   :: Statement '[Indentation] a
-  -> Validate [SyntaxError '[Indentation] a] (Statement '[Syntax, Indentation] a)
+  -> Validation (NonEmpty (SyntaxError '[Indentation] a)) (Statement '[Syntax, Indentation] a)
 validateStatementSyntax' =
   runValidateSyntax initialSyntaxContext [] . validateStatementSyntax
 
 validateStatementIndentation'
   :: Statement '[] a
-  -> Validate [IndentationError '[] a] (Statement '[Indentation] a)
+  -> Validation (NonEmpty (IndentationError '[] a)) (Statement '[Indentation] a)
 validateStatementIndentation' = runValidateIndentation . validateStatementIndentation
 
 validateModuleSyntax'
   :: Module '[Indentation] a
-  -> Validate [SyntaxError '[Indentation] a] (Module '[Syntax, Indentation] a)
+  -> Validation (NonEmpty (SyntaxError '[Indentation] a)) (Module '[Syntax, Indentation] a)
 validateModuleSyntax' =
   runValidateSyntax initialSyntaxContext [] . validateModuleSyntax
 
 validateModuleIndentation'
   :: Module '[] a
-  -> Validate [IndentationError '[] a] (Module '[Indentation] a)
+  -> Validation (NonEmpty (IndentationError '[] a)) (Module '[Indentation] a)
 validateModuleIndentation' = runValidateIndentation . validateModuleIndentation
 
 runPython3 :: (MonadTest m, MonadIO m) => FilePath -> Bool -> Text -> m ()
@@ -97,9 +98,8 @@ syntax_expr path =
         Failure errs -> annotateShow errs $> False
         Success res ->
           case validateExprSyntax' res of
-            Failure [] -> pure True
             Failure errs'' -> annotateShow errs'' $> False
-            Success res' -> pure True
+            Success _ -> pure True
     annotateShow rex
     runPython3
       path
@@ -116,9 +116,8 @@ syntax_statement path =
         Failure errs -> annotateShow errs $> False
         Success res ->
           case validateStatementSyntax' res of
-            Failure [] -> pure True
             Failure errs'' -> annotateShow errs'' $> False
-            Success res' -> pure True
+            Success _ -> pure True
     annotateShow rst
     runPython3 path shouldSucceed rst
 
@@ -132,9 +131,8 @@ syntax_module path =
         Failure errs -> annotateShow errs $> False
         Success res ->
           case validateModuleSyntax' res of
-            Failure [] -> pure True
             Failure errs'' -> annotateShow errs'' $> False
-            Success res' -> pure True
+            Success _ -> pure True
     annotateShow rst
     runPython3 path shouldSucceed rst
 
@@ -145,7 +143,7 @@ goodExpr path ex =
     Success res ->
       case validateExprSyntax' res of
         Failure errs' -> annotateShow errs' *> failure
-        Success res' -> runPython3 path True (showExpr ex)
+        Success res' -> runPython3 path True (showExpr res')
 
 correct_syntax_expr :: FilePath -> Property
 correct_syntax_expr path =
@@ -163,7 +161,7 @@ correct_syntax_statement path =
       Success res ->
         case validateStatementSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
-          Success res' -> runPython3 path True $ showStatement st
+          Success _ -> runPython3 path True $ showStatement st
 
 expr_printparseprint_print :: Property
 expr_printparseprint_print =
@@ -176,8 +174,8 @@ expr_printparseprint_print =
         case validateExprSyntax' res of
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
-            py <-
-              validate (\e -> annotateShow e *> failure) pure $
+            _ <-
+              validation (\e -> annotateShow e *> failure) pure $
               parseExpr "test" (showExpr res')
             showExpr (res' ^. unvalidated) === showExpr (res $> ())
 
@@ -193,7 +191,7 @@ statement_printparseprint_print =
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
             py <-
-              validate (\e -> annotateShow e *> failure) pure $
+              validation (\e -> annotateShow e *> failure) pure $
               parseStatement "test" (showStatement res')
             annotateShow py
             showStatement (res' ^. unvalidated) ===
@@ -210,12 +208,13 @@ string_correct path =
 
     let ex' = showExpr ex
     py <-
-      validate (\e -> annotateShow e *> failure) pure $
+      validation (\e -> annotateShow e *> failure) pure $
       parseExpr "test" ex'
 
     goodExpr path $ () <$ py
     ex' === showExpr py
 
+main :: IO ()
 main = do
   checkParallel lexerParserTests
   traverse checkParallel dslTests

@@ -4,7 +4,8 @@ module Main where
 
 import Criterion.Main
 
-import Data.Validate (Validate(..))
+import Data.List.NonEmpty (NonEmpty)
+import Data.Validation (Validation(..))
 import System.Exit (exitFailure)
 
 import qualified Data.Text.IO as StrictText
@@ -23,11 +24,11 @@ parseCheckSeq name = do
       Success a -> pure a
   case runValidateIndentation $ validateModuleIndentation py of
     Failure errs ->
-      print (errs :: [IndentationError '[] SrcInfo]) *> exitFailure
+      print (errs :: (NonEmpty (IndentationError '[] SrcInfo))) *> exitFailure
     Success res ->
       case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
         Failure errs' ->
-          print (errs' :: [SyntaxError '[Indentation] SrcInfo]) *> exitFailure
+          print (errs' :: (NonEmpty (SyntaxError '[Indentation] SrcInfo))) *> exitFailure
         Success a -> pure $ seq a ()
 
 tokenizeSeq :: FilePath -> IO ()

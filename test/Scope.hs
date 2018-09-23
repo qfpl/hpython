@@ -4,7 +4,8 @@ module Scope (scopeTests) where
 import Control.Lens (has)
 import Data.Function ((&))
 import Data.Functor (($>))
-import Data.Validate (Validate(..), _Success)
+import Data.List.NonEmpty (NonEmpty ((:|)))
+import Data.Validation (Validation(..), _Success)
 
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Indentation
@@ -33,18 +34,18 @@ scopeTests =
 fullyValidate
   :: Statement '[] ()
   -> PropertyT IO
-       (Validate
-          [ScopeError '[Syntax, Indentation] ()]
+       (Validation
+          (NonEmpty (ScopeError '[Syntax, Indentation] ()))
           (Statement '[Scope, Syntax, Indentation] ()))
 fullyValidate x =
   case runValidateIndentation $ validateStatementIndentation x of
     Failure errs -> do
-      annotateShow (errs :: [IndentationError '[] ()])
+      annotateShow (errs :: NonEmpty (IndentationError '[] ()))
       failure
     Success a ->
       case runValidateSyntax initialSyntaxContext [] (validateStatementSyntax a) of
         Failure errs -> do
-          annotateShow (errs :: [SyntaxError '[Indentation] ()])
+          annotateShow (errs :: NonEmpty (SyntaxError '[Indentation] ()))
           failure
         Success a' -> pure $ runValidateScope initialScopeContext (validateStatementScope a')
 
@@ -58,7 +59,7 @@ test_1 =
           , line_ . return_ $ var_ "a" .+ var_ "b" .+ var_ "c"
           ]
     res <- fullyValidate expr
-    res === Failure [FoundDynamic () (MkIdent () "c" [])]
+    res === Failure (FoundDynamic () (MkIdent () "c" []) :| [])
 
 test_2 :: Property
 test_2 =
@@ -83,7 +84,7 @@ test_3 =
           [ line_ . return_ $ var_ "a" .+ var_ "b" .+ var_ "c" ]
     res <- fullyValidate expr
     annotateShow res
-    res === Failure [NotInScope (MkIdent () "c" [])]
+    res === Failure (NotInScope (MkIdent () "c" []) :| [])
 
 test_4 :: Property
 test_4 =
@@ -95,7 +96,7 @@ test_4 =
           , line_ $ call_ (var_ "g") []
           ]
     res <- fullyValidate expr
-    res === Failure [NotInScope (MkIdent () "g" [])]
+    res === Failure (NotInScope (MkIdent () "g" []) :| [])
 
 test_5 :: Property
 test_5 =
@@ -107,7 +108,7 @@ test_5 =
           ]
     res <- fullyValidate expr
     annotateShow res
-    res === Failure [NotInScope (MkIdent () "c" [])]
+    res === Failure (NotInScope (MkIdent () "c" []) :| [])
 
 test_6 :: Property
 test_6 =
@@ -122,7 +123,7 @@ test_6 =
           ]
     res <- fullyValidate expr
     annotateShow res
-    res === Failure [FoundDynamic () (MkIdent () "x" [])]
+    res === Failure (FoundDynamic () (MkIdent () "x" []) :| [])
 
 test_7 :: Property
 test_7 =
@@ -137,7 +138,7 @@ test_7 =
           ]
     res <- fullyValidate expr
     annotateShow res
-    res === Failure [FoundDynamic () (MkIdent () "x" [])]
+    res === Failure (FoundDynamic () (MkIdent () "x" []) :| [])
 
 test_8 :: Property
 test_8 =
@@ -166,7 +167,7 @@ test_9 =
           ]
     res <- fullyValidate expr
     annotateShow res
-    res === Failure [FoundDynamic () (MkIdent () "x" [])]
+    res === Failure (FoundDynamic () (MkIdent () "x" []) :| [])
 
 test_10 :: Property
 test_10 =
@@ -191,4 +192,4 @@ test_11 =
           ]
     res <- fullyValidate expr
     annotateShow res
-    res === Failure [BadShadowing (MkIdent () "x" [Space])]
+    res === Failure (BadShadowing (MkIdent () "x" [Space]) :| [])

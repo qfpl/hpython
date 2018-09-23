@@ -1,7 +1,5 @@
 {-# language DataKinds #-}
 {-# language FlexibleContexts #-}
-{-# language GeneralizedNewtypeDeriving #-}
-{-# language TemplateHaskell #-}
 {-# language LambdaCase #-}
 {-# language RankNTypes #-}
 {-# language MultiParamTypeClasses #-}
@@ -70,7 +68,7 @@ instance Stream PyTokens where
             (_srcInfoName ann)
             (Megaparsec.mkPos $ _srcInfoLineStart ann)
             (Megaparsec.mkPos $ _srcInfoColStart ann)
-  advance1 Proxy pos spos tk =
+  advance1 Proxy _ _ tk =
     let
       ann = pyTokenAnn tk
     in
@@ -78,7 +76,7 @@ instance Stream PyTokens where
         (_srcInfoName ann)
         (Megaparsec.mkPos $ _srcInfoLineEnd ann)
         (Megaparsec.mkPos $ _srcInfoColEnd ann)
-  advanceN Proxy pos spos (PyTokens tks) =
+  advanceN Proxy _ spos (PyTokens tks) =
     case tks of
       [] -> spos
       _ ->
@@ -221,7 +219,7 @@ stringOrBytes ws =
 
 comment :: MonadParsec e PyTokens m => m Comment
 comment =
-  (\(TkComment str ann) -> Comment str) <$>
+  (\(TkComment str _) -> Comment str) <$>
   satisfy (\case; TkComment{} -> True; _ -> False) <?> "comment"
 
 indent :: MonadParsec e PyTokens m => m (Indents SrcInfo)
@@ -937,8 +935,6 @@ suite =
       <|>
 
       (\b a -> (a, [], b)) <$> eol
-
-    cmts = many (Left <$> commentOrEmpty)
 
     line i =
       Left <$> commentOrEmpty <|>

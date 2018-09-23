@@ -18,7 +18,7 @@ import Data.Bitraversable (bitraverse)
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty)
 import Data.Monoid ((<>))
-import Data.Validate (Validate(..))
+import Data.Validation (Validation(..))
 
 import Language.Python.Internal.Syntax.AugAssign
 import Language.Python.Internal.Syntax.BinOp
@@ -619,10 +619,10 @@ data FromIRContext
 
 makeLenses ''FromIRContext
 
-fromIR_expr :: Expr a -> Validate [IRError a] (Syntax.Expr '[] a)
+fromIR_expr :: Expr a -> Validation (NonEmpty (IRError a)) (Syntax.Expr '[] a)
 fromIR_expr ex =
   case ex of
-    StarExpr{} -> Failure [InvalidUnpacking $ ex ^. exprAnn]
+    StarExpr{} -> Failure (pure (InvalidUnpacking $ ex ^. exprAnn))
     Unit a b c -> pure $ Syntax.Unit a b c
     Lambda a b c d e ->
       (\c' -> Syntax.Lambda a b c' d) <$>
@@ -689,7 +689,7 @@ fromIR_expr ex =
     Generator a b -> Syntax.Generator a <$> fromIR_comprehension fromIR_expr b
     Await a b c -> Syntax.Await a b <$> fromIR_expr c
 
-fromIR_suite :: Suite a -> Validate [IRError a] (Syntax.Suite '[] a)
+fromIR_suite :: Suite a -> Validation (NonEmpty (IRError a)) (Syntax.Suite '[] a)
 fromIR_suite s =
   case s of
     SuiteOne a b c d ->
@@ -699,7 +699,7 @@ fromIR_suite s =
       Syntax.SuiteMany a b c <$>
       fromIR_block d
 
-fromIR_param :: Param a -> Validate [IRError a] (Syntax.Param '[] a)
+fromIR_param :: Param a -> Validation (NonEmpty (IRError a)) (Syntax.Param '[] a)
 fromIR_param p =
   case p of
     PositionalParam a b c ->
@@ -714,7 +714,7 @@ fromIR_param p =
     DoubleStarParam a b c d ->
       Syntax.DoubleStarParam a b c <$> traverseOf (traverse._2) fromIR_expr d
 
-fromIR_arg :: Arg a -> Validate [IRError a] (Syntax.Arg '[] a)
+fromIR_arg :: Arg a -> Validation (NonEmpty (IRError a)) (Syntax.Arg '[] a)
 fromIR_arg a =
   case a of
     PositionalArg a b -> Syntax.PositionalArg a <$> fromIR_expr b
@@ -722,33 +722,33 @@ fromIR_arg a =
     StarArg a b c -> Syntax.StarArg a b <$> fromIR_expr c
     DoubleStarArg a b c -> Syntax.DoubleStarArg a b <$> fromIR_expr c
 
-fromIR_decorator :: Decorator a -> Validate [IRError a] (Syntax.Decorator '[] a)
+fromIR_decorator :: Decorator a -> Validation (NonEmpty (IRError a)) (Syntax.Decorator '[] a)
 fromIR_decorator (Decorator a b c d e) =
   (\d' -> Syntax.Decorator a b c d' e) <$>
   fromIR_expr d
 
-fromIR_exceptAs :: ExceptAs a -> Validate [IRError a] (Syntax.ExceptAs '[] a)
+fromIR_exceptAs :: ExceptAs a -> Validation (NonEmpty (IRError a)) (Syntax.ExceptAs '[] a)
 fromIR_exceptAs (ExceptAs a b c) =
   (\b' -> Syntax.ExceptAs a b' c) <$>
   fromIR_expr b
 
-fromIR_withItem :: WithItem a -> Validate [IRError a] (Syntax.WithItem '[] a)
+fromIR_withItem :: WithItem a -> Validation (NonEmpty (IRError a)) (Syntax.WithItem '[] a)
 fromIR_withItem (WithItem a b c) =
   Syntax.WithItem a <$>
   fromIR_expr b <*>
   traverseOf (traverse._2) fromIR_expr c
 
 fromIR_comprehension
-  :: (e a -> Validate [IRError a] (e' '[] a))
+  :: (e a -> Validation (NonEmpty (IRError a)) (e' '[] a))
   -> Comprehension e a
-  -> Validate [IRError a] (Syntax.Comprehension e' '[] a)
+  -> Validation (NonEmpty (IRError a)) (Syntax.Comprehension e' '[] a)
 fromIR_comprehension f (Comprehension a b c d) =
   Syntax.Comprehension a <$>
   f b <*>
   fromIR_compFor c <*>
   traverse (bitraverse fromIR_compFor fromIR_compIf) d
 
-fromIR_dictItem :: DictItem a -> Validate [IRError a] (Syntax.DictItem '[] a)
+fromIR_dictItem :: DictItem a -> Validation (NonEmpty (IRError a)) (Syntax.DictItem '[] a)
 fromIR_dictItem di =
   case di of
     DictItem a b c d ->
@@ -758,7 +758,7 @@ fromIR_dictItem di =
     DictUnpack a b c ->
       Syntax.DictUnpack a b <$> fromIR_expr c
 
-fromIR_subscript :: Subscript a -> Validate [IRError a] (Syntax.Subscript '[] a)
+fromIR_subscript :: Subscript a -> Validation (NonEmpty (IRError a)) (Syntax.Subscript '[] a)
 fromIR_subscript s =
   case s of
     SubscriptExpr a -> Syntax.SubscriptExpr <$> fromIR_expr a
@@ -768,23 +768,23 @@ fromIR_subscript s =
       traverse fromIR_expr c <*>
       traverseOf (traverse._2.traverse) fromIR_expr d
 
-fromIR_block :: Block a -> Validate [IRError a] (Syntax.Block '[] a)
+fromIR_block :: Block a -> Validation (NonEmpty (IRError a)) (Syntax.Block '[] a)
 fromIR_block (Block a b c) =
   Syntax.Block a <$>
   fromIR_statement b <*>
   traverseOf (traverse.traverse) fromIR_statement c
 
-fromIR_compFor :: CompFor a -> Validate [IRError a] (Syntax.CompFor '[] a)
+fromIR_compFor :: CompFor a -> Validation (NonEmpty (IRError a)) (Syntax.CompFor '[] a)
 fromIR_compFor (CompFor a b c d e) =
   (\c' -> Syntax.CompFor a b c' d) <$>
   fromIR_expr c <*>
   fromIR_expr e
 
-fromIR_compIf :: CompIf a -> Validate [IRError a] (Syntax.CompIf '[] a)
+fromIR_compIf :: CompIf a -> Validation (NonEmpty (IRError a)) (Syntax.CompIf '[] a)
 fromIR_compIf (CompIf a b c) =
   Syntax.CompIf a b <$> fromIR_expr c
 
-fromIR_statement :: Statement a -> Validate [IRError a] (Syntax.Statement '[] a)
+fromIR_statement :: Statement a -> Validation (NonEmpty (IRError a)) (Syntax.Statement '[] a)
 fromIR_statement ex =
   case ex of
     SmallStatements a b c d e ->
@@ -794,7 +794,7 @@ fromIR_statement ex =
     CompoundStatement a ->
       Syntax.CompoundStatement <$> fromIR_compoundStatement a
 
-fromIR_smallStatement :: SmallStatement a -> Validate [IRError a] (Syntax.SmallStatement '[] a)
+fromIR_smallStatement :: SmallStatement a -> Validation (NonEmpty (IRError a)) (Syntax.SmallStatement '[] a)
 fromIR_smallStatement ex =
   case ex of
     Assign a b c ->
@@ -829,7 +829,7 @@ fromIR_smallStatement ex =
 
 fromIR_compoundStatement
   :: CompoundStatement a
-  -> Validate [IRError a] (Syntax.CompoundStatement '[] a)
+  -> Validation (NonEmpty (IRError a)) (Syntax.CompoundStatement '[] a)
 fromIR_compoundStatement st =
   case st of
     Fundef a b asyncWs c d e f g h i j ->
@@ -872,7 +872,7 @@ fromIR_compoundStatement st =
       traverse fromIR_withItem d <*>
       fromIR_suite e
 
-fromIR_listItem :: Expr a -> Validate [IRError a] (Syntax.ListItem '[] a)
+fromIR_listItem :: Expr a -> Validation (NonEmpty (IRError a)) (Syntax.ListItem '[] a)
 fromIR_listItem (StarExpr a b c) =
   Syntax.ListUnpack a [] b <$> fromIR_expr c
 fromIR_listItem (Parens a b c d) =
@@ -882,7 +882,7 @@ fromIR_listItem (Parens a b c d) =
   fromIR_listItem c
 fromIR_listItem e = (\x -> Syntax.ListItem (x ^. Syntax.exprAnn) x) <$> fromIR_expr e
 
-fromIR_tupleItem :: Expr a -> Validate [IRError a] (Syntax.TupleItem '[] a)
+fromIR_tupleItem :: Expr a -> Validation (NonEmpty (IRError a)) (Syntax.TupleItem '[] a)
 fromIR_tupleItem (StarExpr a b c) =
   Syntax.TupleUnpack a [] b <$> fromIR_expr c
 fromIR_tupleItem (Parens a b c d) =
@@ -893,7 +893,7 @@ fromIR_tupleItem (Parens a b c d) =
 fromIR_tupleItem e =
   (\x -> Syntax.TupleItem (x ^. Syntax.exprAnn) x) <$> fromIR_expr e
 
-fromIR_setItem :: Expr a -> Validate [IRError a] (Syntax.SetItem '[] a)
+fromIR_setItem :: Expr a -> Validation (NonEmpty (IRError a)) (Syntax.SetItem '[] a)
 fromIR_setItem (StarExpr a b c) =
   Syntax.SetUnpack a [] b <$> fromIR_expr c
 fromIR_setItem (Parens a b c d) =
@@ -903,6 +903,6 @@ fromIR_setItem (Parens a b c d) =
   fromIR_setItem c
 fromIR_setItem e = (\x -> Syntax.SetItem (x ^. Syntax.exprAnn) x) <$> fromIR_expr e
 
-fromIR :: Module a -> Validate [IRError a] (Syntax.Module '[] a)
+fromIR :: Module a -> Validation (NonEmpty (IRError a)) (Syntax.Module '[] a)
 fromIR (Module ms) =
   Syntax.Module <$> traverseOf (traverse._Right) fromIR_statement ms

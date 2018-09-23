@@ -442,22 +442,21 @@ parseToken =
 
 {-# noinline tokenize #-}
 tokenize :: FilePath -> Text.Text -> Either (ParseError Char Void) [PyToken SrcInfo]
-tokenize fp = parse (unParsecT tokens) fp
+tokenize = parse (unParsecT tokens)
   where
     tokens :: ParsecT Void Text.Text Identity [PyToken SrcInfo]
     tokens = many parseToken <* Parsec.eof
 
 data LogicalLine a
   = LogicalLine
-  { llAnn :: a
-  , llSpaces :: ([PyToken a], Indent)
-  , llLine :: [PyToken a]
-  , llEnd :: Maybe (PyToken a)
-  }
+      a -- annotation
+      ([PyToken a], Indent) -- spaces
+      [PyToken a] -- line
+      (Maybe (PyToken a)) -- end
   | BlankLine
-  { llLine :: [PyToken a]
-  , llEnd :: Maybe (PyToken a)
-  } deriving (Eq, Show)
+      [PyToken a] -- line
+      (Maybe (PyToken a)) -- end
+  deriving (Eq, Show)
 
 logicalLineToTokens :: LogicalLine a -> [PyToken a]
 logicalLineToTokens (LogicalLine _ _ ts m) = ts <> maybe [] pure m
@@ -484,10 +483,6 @@ collapseContinue ((tk@TkContinued{}, Continued nl ws) : xs) =
     [(tk : (xs' >>= fst), Continued nl $ ws <> fmap snd xs')]
 collapseContinue _ = error "invalid token/whitespace pair in collapseContinue"
 
-newlineToken :: PyToken a -> Maybe Newline
-newlineToken (TkNewline nl _) = Just nl
-newlineToken _ = Nothing
-
 spanMaybe :: (a -> Maybe b) -> [a] -> ([b], [a])
 spanMaybe f as =
   case as of
@@ -502,6 +497,7 @@ spanMaybe f as =
 breakOnNewline :: [PyToken a] -> ([PyToken a], Maybe (PyToken a, [PyToken a]))
 breakOnNewline = go 0
   where
+    go :: Int -> [PyToken a] -> ([PyToken a], Maybe (PyToken a, [PyToken a]))
     go _ [] = ([], Nothing)
     go !careWhen0 (tk : tks) =
       case tk of
@@ -511,7 +507,7 @@ breakOnNewline = go 0
         TkRightParen{} -> first (tk :) $ go (max 0 $ careWhen0 - 1) tks
         TkRightBracket{} -> first (tk :) $ go (max 0 $ careWhen0 - 1) tks
         TkRightBrace{} -> first (tk :) $ go (max 0 $ careWhen0 - 1) tks
-        TkNewline nl _
+        TkNewline{}
           | careWhen0 == 0 -> ([], Just (tk, tks))
           | otherwise -> first (tk :) $ go careWhen0 tks
         _ -> first (tk :) $ go careWhen0 tks
@@ -565,7 +561,7 @@ indentation ann lls =
   where
     finalDedents :: StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
     finalDedents = do
-      (ann, i) :| is <- get
+      (ann, _) :| is <- get
       case is of
         [] -> pure []
         i' : is' -> do
@@ -591,8 +587,8 @@ indentation ann lls =
       => LogicalLine a
       -> StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
     go ll@BlankLine{} = pure [IndentedLine ll]
-    go ll@(LogicalLine ann (spTks, spcs) line nl) = do
-      (_, i) :| is <- get
+    go ll@(LogicalLine ann (spTks, spcs) _ _) = do
+      (_, i) :| _ <- get
       let
         et8 = absoluteIndentLevel 8 spcs
         et1 = absoluteIndentLevel 1 spcs
@@ -619,26 +615,7 @@ indentation ann lls =
           modify $ NonEmpty.cons (ann, spcs)
           pure [Indent (ilSpcs - ili) spcs ann, IndentedLine ll]
 
-data Line a
-  = Blank
-  { lineLine :: [PyToken a]
-  , lineEnd :: Maybe (PyToken a)
-  }
-  | Line
-  { lineAnn :: a
-  , lineSpaces :: [Indent]
-  , lineLine :: [PyToken a]
-  , lineEnd :: Maybe (PyToken a)
-  } deriving (Eq, Show)
-
-logicalToLine :: FingerTree (Sum Int) (Summed Int) -> LogicalLine a -> Line a
-logicalToLine leaps (BlankLine c d) = Blank c d
-logicalToLine leaps (LogicalLine a (_, b) c d) =
-  Line a (splitIndents leaps b) c d
-
-newtype Summed a
-  = Summed
-  { getSummed :: a }
+newtype Summed a = Summed a
   deriving (Eq, Show, Ord, Num)
 
 instance Num a => Measured (Sum a) (Summed a) where
@@ -671,7 +648,7 @@ chunked = go FingerTree.empty
       :: FingerTree (Sum Int) (Summed Int)
       -> [IndentedLine a]
       -> [PyToken a]
-    go leaps [] = []
+    go _ [] = []
     go leaps (Indent n i a : is) =
       TkIndent a (Indents (splitIndents leaps i) a) : go (leaps FingerTree.|> Summed n) is
     go leaps (Dedent a : is) =

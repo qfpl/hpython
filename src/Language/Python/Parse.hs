@@ -16,7 +16,7 @@ import Data.Bifunctor (first)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Set (Set)
 import Data.Text (Text)
-import Data.Validate (Validate, bindValidate, fromEither)
+import Data.Validation (Validation, bindValidation, fromEither)
 import Data.Void (Void)
 import Text.Megaparsec (eof)
 import Text.Megaparsec.Error (ErrorItem(..))
@@ -60,7 +60,7 @@ fromIRError e =
   case e of
     IR.InvalidUnpacking a -> InvalidUnpacking a
 
-parseModule :: FilePath -> Text -> Validate [ParseError SrcInfo] (Module '[] SrcInfo)
+parseModule :: FilePath -> Text -> Validation (NonEmpty (ParseError SrcInfo)) (Module '[] SrcInfo)
 parseModule fp input =
   let
     si = initialSrcInfo fp
@@ -69,9 +69,9 @@ parseModule fp input =
       tabbed <- first fromTabError $ insertTabs si tokens
       first fromParseError $ Parse.runParser fp Parse.module_ tabbed
   in
-    fromEither (first pure ir) `bindValidate` (first (fmap fromIRError) . IR.fromIR)
+    fromEither (first pure ir) `bindValidation` (first (fmap fromIRError) . IR.fromIR)
 
-parseStatement :: FilePath -> Text -> Validate [ParseError SrcInfo] (Statement '[] SrcInfo)
+parseStatement :: FilePath -> Text -> Validation (NonEmpty (ParseError SrcInfo)) (Statement '[] SrcInfo)
 parseStatement fp input =
   let
     si = initialSrcInfo fp
@@ -81,12 +81,12 @@ parseStatement fp input =
       first fromParseError $
         Parse.runParser fp ((Parse.statement tlIndent =<< tlIndent) <* eof) tabbed
   in
-    fromEither (first pure ir) `bindValidate`
+    fromEither (first pure ir) `bindValidation`
     (first (fmap fromIRError) . IR.fromIR_statement)
   where
     tlIndent = Parse.level <|> withSrcInfo (pure $ Indents [])
 
-parseExpr :: FilePath -> Text -> Validate [ParseError SrcInfo] (Expr '[] SrcInfo)
+parseExpr :: FilePath -> Text -> Validation (NonEmpty (ParseError SrcInfo)) (Expr '[] SrcInfo)
 parseExpr fp input =
   let
     si = initialSrcInfo fp
@@ -95,4 +95,4 @@ parseExpr fp input =
       tabbed <- first fromTabError $ insertTabs si tokens
       first fromParseError $ Parse.runParser fp (Parse.exprList Parse.space <* eof) tabbed
   in
-    fromEither (first pure ir) `bindValidate` (first (fmap fromIRError) . IR.fromIR_expr)
+    fromEither (first pure ir) `bindValidation` (first (fmap fromIRError) . IR.fromIR_expr)

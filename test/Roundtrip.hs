@@ -3,9 +3,10 @@
 module Roundtrip (roundtripTests) where
 
 import Control.Monad.IO.Class (liftIO)
+import Data.List.NonEmpty (NonEmpty)
 import Data.String (fromString)
 import Data.Text (Text)
-import Data.Validate (Validate(..), validate)
+import Data.Validation (Validation(..), validation)
 import Hedgehog
   ( (===), Group(..), Property, PropertyT, annotateShow, failure, property
   , withTests, withShrinks
@@ -63,12 +64,12 @@ doRoundtripFile name =
 
 doRoundtrip :: Text -> PropertyT IO ()
 doRoundtrip file = do
-  py <- validate (\e -> annotateShow e *> failure) pure $ parseModule "test" file
+  py <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" file
   case runValidateIndentation $ validateModuleIndentation py of
-    Failure errs -> annotateShow (errs :: [IndentationError '[] SrcInfo]) *> failure
+    Failure errs -> annotateShow (errs :: NonEmpty (IndentationError '[] SrcInfo)) *> failure
     Success res ->
       case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
         Failure errs' -> do
           annotateShow res
-          annotateShow (errs' :: [SyntaxError '[Indentation] SrcInfo]) *> failure
+          annotateShow (errs' :: NonEmpty (SyntaxError '[Indentation] SrcInfo)) *> failure
         Success _ -> Strict.lines (showModule py) === Strict.lines file

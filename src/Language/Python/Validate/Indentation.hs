@@ -18,6 +18,7 @@ module Language.Python.Validate.Indentation
   , validateExceptAsIndentation
   , validateParamsIndentation
   , validateSuiteIndentation
+  , equivalentIndentation
   )
 where
 
@@ -39,8 +40,8 @@ import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Type.Set
 import Unsafe.Coerce (unsafeCoerce)
-import Data.Validate (Validate(..))
-import Data.Validate.Monadic (ValidateM(..), liftVM0, errorVM)
+import Data.Validation (Validation(..))
+import Data.Validate.Monadic (ValidateM(..), liftVM0, errorVM, errorVM1)
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Optics
@@ -56,12 +57,12 @@ data NextIndent
   | EqualTo
   deriving (Eq, Show)
 
-type ValidateIndentation e = ValidateM [e] (State (NextIndent, [Indent]))
+type ValidateIndentation e = ValidateM (NonEmpty e) (State (NextIndent, [Indent]))
 
-runValidateIndentation :: ValidateIndentation e a -> Validate [e] a
+runValidateIndentation :: ValidateIndentation e a -> Validation (NonEmpty e) a
 runValidateIndentation = runValidateIndentation' EqualTo []
 
-runValidateIndentation' :: NextIndent -> [Indent] -> ValidateIndentation e a -> Validate [e] a
+runValidateIndentation' :: NextIndent -> [Indent] -> ValidateIndentation e a -> Validation (NonEmpty e) a
 runValidateIndentation' ni is =
   flip evalState (ni, is) .
   getCompose .
@@ -88,32 +89,32 @@ checkIndent i =
       GreaterThan ->
         case (absolute1Comparison, absolute8Comparison) of
           (GT, GT) -> pure i
-          (GT, _) -> errorVM [_TabError # a]
-          (_, GT) -> errorVM [_TabError # a]
-          (EQ, EQ) -> errorVM [_ExpectedGreaterThan # (i', i)]
-          (_, EQ) -> errorVM [_TabError # a]
-          (EQ, _) -> errorVM [_TabError # a]
-          (LT, LT) -> errorVM [_ExpectedGreaterThan # (i', i)]
+          (GT, _) -> errorVM $ pure (_TabError # a)
+          (_, GT) -> errorVM $ pure (_TabError # a)
+          (EQ, EQ) -> errorVM $ pure (_ExpectedGreaterThan # (i', i))
+          (_, EQ) -> errorVM $ pure (_TabError # a)
+          (EQ, _) -> errorVM $ pure (_TabError # a)
+          (LT, LT) -> errorVM $ pure (_ExpectedGreaterThan # (i', i))
       EqualTo ->
         case (absolute1Comparison, absolute8Comparison) of
           (EQ, EQ) -> pure i
-          (EQ, _) -> errorVM [_TabError # a]
-          (_, EQ) -> errorVM [_TabError # a]
-          (GT, GT) -> errorVM [_ExpectedEqualTo # (i', i)]
-          (_, GT) -> errorVM [_TabError # a]
-          (GT, _) -> errorVM [_TabError # a]
-          (LT, LT) -> errorVM [_ExpectedEqualTo # (i', i)]
+          (EQ, _) -> errorVM $ pure (_TabError # a)
+          (_, EQ) -> errorVM $ pure (_TabError # a)
+          (GT, GT) -> errorVM $ pure (_ExpectedEqualTo # (i', i))
+          (_, GT) -> errorVM $ pure (_TabError # a)
+          (GT, _) -> errorVM $ pure (_TabError # a)
+          (LT, LT) -> errorVM $ pure (_ExpectedEqualTo # (i', i))
 
 setNextIndent :: NextIndent -> [Indent] -> ValidateIndentation e ()
 setNextIndent ni is = liftVM0 $ put (ni, is)
 
 equivalentIndentation :: [Whitespace] -> [Whitespace] -> Bool
 equivalentIndentation [] [] = True
-equivalentIndentation (x:xs) [] =
+equivalentIndentation (x:_) [] =
   case x of
     Continued _ _ -> True
     _ -> False
-equivalentIndentation [] (y:ys) =
+equivalentIndentation [] (y:_) =
   case y of
     Continued _ _ -> True
     _ -> False
@@ -138,7 +139,7 @@ validateBlockIndentation (Block x b bs) =
   where
     checkBlankIndents (a, b, c) =
       if any (\case; Continued{} -> True; _ -> False) b
-      then errorVM [_EmptyContinuedLine # a]
+      then errorVM1 $ _EmptyContinuedLine # a
       else pure (a, b, c)
 
     is = (Right b:|bs) ^?! folded._Right.unvalidated._Indents.indentsValue
@@ -167,7 +168,7 @@ validateSuiteIndentation idnt (SuiteMany ann a c d) =
   SuiteMany ann a c <$
   setNextIndent GreaterThan (idnt ^. indentsValue) <*>
   validateBlockIndentation d
-validateSuiteIndentation idnt (SuiteOne ann a c d) = pure $ SuiteOne ann a (unsafeCoerce c) d
+validateSuiteIndentation _ (SuiteOne ann a c d) = pure $ SuiteOne ann a (unsafeCoerce c) d
 
 validateExprIndentation
   :: AsIndentationError e v a
@@ -335,6 +336,6 @@ validateModuleIndentation =
       (\(a, b, c, d) ->
          (a, b, c, d) <$
          if any (\case; Continued{} -> True; _ -> False) b
-         then errorVM [_ExpectedEqualTo # ([], Indents [b ^. from indentWhitespaces] a)]
+         then errorVM1 $ _ExpectedEqualTo # ([], Indents [b ^. from indentWhitespaces] a)
          else pure ())
       (\a -> setNextIndent EqualTo [] *> validateStatementIndentation a))

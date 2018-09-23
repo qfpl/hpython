@@ -81,7 +81,7 @@ class HasBlocks s where
   _Blocks :: Traversal (s v a) (s '[] a) (Block v a) (Block '[] a)
 
 instance HasBlocks Suite where
-  _Blocks f (SuiteOne a b c d) = pure $ SuiteOne a b (c ^. unvalidated) d
+  _Blocks _ (SuiteOne a b c d) = pure $ SuiteOne a b (c ^. unvalidated) d
   _Blocks f (SuiteMany a b c e) = SuiteMany a b c <$> f e
 
 instance HasBlocks CompoundStatement where
@@ -128,7 +128,7 @@ instance HasStatements Block where
     Block a <$> f b <*> (traverse._Right) f c
 
 instance HasStatements Suite where
-  _Statements f (SuiteOne a b c d) = pure $ SuiteOne a b (c ^. unvalidated) d
+  _Statements _ (SuiteOne a b c d) = pure $ SuiteOne a b (c ^. unvalidated) d
   _Statements f (SuiteMany a b c e) = SuiteMany a b c <$> _Statements f e
 
 data Statement (v :: [*]) a

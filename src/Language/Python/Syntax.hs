@@ -235,6 +235,8 @@ module Language.Python.Syntax
   , expr_
   , var_
     -- ** @await@
+  , and_
+  , or_
   , await_
     -- ** @... if ... else ...@
   , ifThenElse_
@@ -271,6 +273,7 @@ module Language.Python.Syntax
   , noneWhitespace
     -- *** Strings 
   , str_
+  , longStr_
     -- *** Integers
   , int_
     -- *** Booleans
@@ -300,6 +303,8 @@ module Language.Python.Syntax
   , sliceTS_
   , sliceFT_
   , sliceFTS_
+  , sliceS_
+  , fullSlice_
   , slice_
     -- ** Dereferencing
   , (/>)
@@ -350,10 +355,6 @@ import Language.Python.Internal.Syntax hiding (Fundef, While, Call)
 import Language.Python.Syntax.Types
 
 type Raw f = f '[] ()
-
-toNonEmptyLines :: [Raw Line] -> NonEmpty (Raw Line)
-toNonEmptyLines [] = pure (line_ pass_)
-toNonEmptyLines (a:as) = a :| as
 
 -- | Create a blank 'Line'
 blank_ :: Raw Line
@@ -476,7 +477,7 @@ doIndent ws a = ws ^. from indentWhitespaces : a
 
 doDedent :: Indents a -> Indents a
 doDedent i@(Indents [] _) = i
-doDedent (Indents (a:b) c) = Indents b c
+doDedent (Indents (_:b) c) = Indents b c
 
 -- | Modify the block body of some code
 modifyBody
@@ -614,9 +615,9 @@ mkGetBody
   -> [Raw Line]
 mkGetBody thing bodyField indentsField code =
   (\case
-      SuiteOne a b c d ->
+      SuiteOne _ _ c d ->
         [ line_ $ SmallStatements (Indents [] ()) c [] Nothing (Right d) ]
-      SuiteMany a b c d ->
+      SuiteMany _ _ _ d ->
         case d of
           Block x y z -> fmap (Line . Left) x <> (Line (Right y) : fmap Line z)) $
   fromMaybe
@@ -1132,7 +1133,7 @@ mkSetElse
   -> Maybe (Raw Else)
   -> Raw s
   -> Raw s
-mkSetElse indentLevel elseField ws new code =
+mkSetElse indentLevel elseField _ new code =
   code &
   elseField .~
     fmap (elseIndents .~ indentLevel code)

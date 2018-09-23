@@ -48,12 +48,12 @@ data NextIndent
   | EqualTo
   deriving (Eq, Show)
 
-type ValidateIndentation e = ValidateM [e] (State (NextIndent, [Indent]))
+type ValidateIndentation e = ValidateM (NonEmpty e) (State (NextIndent, [Indent]))
 
-runValidateIndentation :: ValidateIndentation e a -> Validation [e] a
+runValidateIndentation :: ValidateIndentation e a -> Validation (NonEmpty e) a
 runValidateIndentation = runValidateIndentation' EqualTo []
 
-runValidateIndentation' :: NextIndent -> [Indent] -> ValidateIndentation e a -> Validation [e] a
+runValidateIndentation' :: NextIndent -> [Indent] -> ValidateIndentation e a -> Validation (NonEmpty e) a
 runValidateIndentation' ni is =
   flip evalState (ni, is) .
   getCompose .
@@ -80,21 +80,21 @@ checkIndent i =
       GreaterThan ->
         case (absolute1Comparison, absolute8Comparison) of
           (GT, GT) -> pure i
-          (GT, _) -> errorVM [_TabError # a]
-          (_, GT) -> errorVM [_TabError # a]
-          (EQ, EQ) -> errorVM [_ExpectedGreaterThan # (i', i)]
-          (_, EQ) -> errorVM [_TabError # a]
-          (EQ, _) -> errorVM [_TabError # a]
-          (LT, LT) -> errorVM [_ExpectedGreaterThan # (i', i)]
+          (GT, _) -> errorVM $ pure (_TabError # a)
+          (_, GT) -> errorVM $ pure (_TabError # a)
+          (EQ, EQ) -> errorVM $ pure (_ExpectedGreaterThan # (i', i))
+          (_, EQ) -> errorVM $ pure (_TabError # a)
+          (EQ, _) -> errorVM $ pure (_TabError # a)
+          (LT, LT) -> errorVM $ pure (_ExpectedGreaterThan # (i', i))
       EqualTo ->
         case (absolute1Comparison, absolute8Comparison) of
           (EQ, EQ) -> pure i
-          (EQ, _) -> errorVM [_TabError # a]
-          (_, EQ) -> errorVM [_TabError # a]
-          (GT, GT) -> errorVM [_ExpectedEqualTo # (i', i)]
-          (_, GT) -> errorVM [_TabError # a]
-          (GT, _) -> errorVM [_TabError # a]
-          (LT, LT) -> errorVM [_ExpectedEqualTo # (i', i)]
+          (EQ, _) -> errorVM $ pure (_TabError # a)
+          (_, EQ) -> errorVM $ pure (_TabError # a)
+          (GT, GT) -> errorVM $ pure (_ExpectedEqualTo # (i', i))
+          (_, GT) -> errorVM $ pure (_TabError # a)
+          (GT, _) -> errorVM $ pure (_TabError # a)
+          (LT, LT) -> errorVM $ pure (_ExpectedEqualTo # (i', i))
 
 setNextIndent :: NextIndent -> [Indent] -> ValidateIndentation e ()
 setNextIndent ni is = liftVM0 $ put (ni, is)

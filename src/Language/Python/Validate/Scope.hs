@@ -64,7 +64,7 @@ import Data.Map.Strict (Map)
 import Data.String (fromString)
 import Data.Type.Set (Nub)
 import Data.Validation (Validation)
-import Data.Validate.Monadic (ValidateM(..), runValidateM, bindVM, liftVM0, errorVM)
+import Data.Validate.Monadic (ValidateM(..), runValidateM, bindVM, liftVM0, errorVM1)
 import Unsafe.Coerce (unsafeCoerce)
 
 import qualified Data.List.NonEmpty as NonEmpty
@@ -92,9 +92,9 @@ makeLenses ''ScopeContext
 initialScopeContext :: ScopeContext a
 initialScopeContext = ScopeContext Map.empty Map.empty Map.empty
 
-type ValidateScope ann e = ValidateM [e] (State (ScopeContext ann))
+type ValidateScope ann e = ValidateM (NonEmpty e) (State (ScopeContext ann))
 
-runValidateScope :: ScopeContext ann -> ValidateScope ann e a -> Validation [e] a
+runValidateScope :: ScopeContext ann -> ValidateScope ann e a -> Validation (NonEmpty e) a
 runValidateScope s = flip evalState s . runValidateM
 
 extendScope
@@ -262,7 +262,7 @@ validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
      traverse
        (\s ->
           inScope (s ^. identValue) `bindVM` \res ->
-          maybe (pure ()) (\_ -> errorVM [_BadShadowing # coerce s]) res)
+          maybe (pure ()) (\_ -> errorVM1 (_BadShadowing # coerce s)) res)
        (c ^.. unvalidated.cosmos._Ident)) <*>
     pure d <*>
     validateExprScope e <*>
@@ -332,12 +332,12 @@ validateSmallStatementScope (AugAssign a l aa r) =
   (\l' -> AugAssign a l' aa) <$>
   validateExprScope l <*>
   validateExprScope r
-validateSmallStatementScope (Global a _ _) = errorVM [_FoundGlobal # a]
-validateSmallStatementScope (Nonlocal a _ _) = errorVM [_FoundNonlocal # a]
+validateSmallStatementScope (Global a _ _) = errorVM1 (_FoundGlobal # a)
+validateSmallStatementScope (Nonlocal a _ _) = errorVM1 (_FoundNonlocal # a)
 validateSmallStatementScope (Del a ws cs) =
   Del a ws <$
   traverse_
-    (\case; Ident a -> errorVM [_DeletedIdent # (a ^. identAnn)]; _ -> pure ())
+    (\case; Ident a -> errorVM1 (_DeletedIdent # (a ^. identAnn)); _ -> pure ())
     cs <*>
   traverse validateExprScope cs
 validateSmallStatementScope s@Pass{} = pure $ unsafeCoerce s
@@ -368,8 +368,8 @@ validateIdentScope i =
   \context ->
   case context of
     Just (Clean, _) -> pure $ coerce i
-    Just (Dirty, ann)-> errorVM [_FoundDynamic # (ann, i)]
-    Nothing -> errorVM [_NotInScope # i]
+    Just (Dirty, ann)-> errorVM1 (_FoundDynamic # (ann, i))
+    Nothing -> errorVM1 (_NotInScope # i)
 
 validateArgScope
   :: AsScopeError e v a

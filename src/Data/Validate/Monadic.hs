@@ -24,3 +24,6 @@ liftVM1 f = ValidateM . Compose . f . getCompose . unValidateM
 
 errorVM :: Applicative m => e -> ValidateM e m a
 errorVM = ValidateM . Compose . pure . Failure
+
+errorVM1 :: (Applicative f, Applicative m) => e -> ValidateM (f e) m a
+errorVM1 = errorVM . pure

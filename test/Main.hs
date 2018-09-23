@@ -22,6 +22,7 @@ import Control.Monad.IO.Class
 import Control.Monad.State
 import Data.Functor
 import Data.List
+import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import Data.Validation (Validation(..), validation)
 import System.Directory
@@ -35,34 +36,34 @@ import qualified Hedgehog.Gen as Gen
 
 validateExprSyntax'
   :: Expr '[Indentation] a
-  -> Validation [SyntaxError '[Indentation] a] (Expr '[Syntax, Indentation] a)
+  -> Validation (NonEmpty (SyntaxError '[Indentation] a)) (Expr '[Syntax, Indentation] a)
 validateExprSyntax' = runValidateSyntax initialSyntaxContext [] . validateExprSyntax
 
 validateExprIndentation'
   :: Expr '[] a
-  -> Validation [IndentationError '[] a] (Expr '[Indentation] a)
+  -> Validation (NonEmpty (IndentationError '[] a)) (Expr '[Indentation] a)
 validateExprIndentation' = runValidateIndentation . validateExprIndentation
 
 validateStatementSyntax'
   :: Statement '[Indentation] a
-  -> Validation [SyntaxError '[Indentation] a] (Statement '[Syntax, Indentation] a)
+  -> Validation (NonEmpty (SyntaxError '[Indentation] a)) (Statement '[Syntax, Indentation] a)
 validateStatementSyntax' =
   runValidateSyntax initialSyntaxContext [] . validateStatementSyntax
 
 validateStatementIndentation'
   :: Statement '[] a
-  -> Validation [IndentationError '[] a] (Statement '[Indentation] a)
+  -> Validation (NonEmpty (IndentationError '[] a)) (Statement '[Indentation] a)
 validateStatementIndentation' = runValidateIndentation . validateStatementIndentation
 
 validateModuleSyntax'
   :: Module '[Indentation] a
-  -> Validation [SyntaxError '[Indentation] a] (Module '[Syntax, Indentation] a)
+  -> Validation (NonEmpty (SyntaxError '[Indentation] a)) (Module '[Syntax, Indentation] a)
 validateModuleSyntax' =
   runValidateSyntax initialSyntaxContext [] . validateModuleSyntax
 
 validateModuleIndentation'
   :: Module '[] a
-  -> Validation [IndentationError '[] a] (Module '[Indentation] a)
+  -> Validation (NonEmpty (IndentationError '[] a)) (Module '[Indentation] a)
 validateModuleIndentation' = runValidateIndentation . validateModuleIndentation
 
 runPython3 :: (MonadTest m, MonadIO m) => FilePath -> Bool -> Text -> m ()
@@ -95,7 +96,6 @@ syntax_expr path =
         Failure errs -> annotateShow errs $> False
         Success res ->
           case validateExprSyntax' res of
-            Failure [] -> pure True
             Failure errs'' -> annotateShow errs'' $> False
             Success _ -> pure True
     annotateShow rex
@@ -114,7 +114,6 @@ syntax_statement path =
         Failure errs -> annotateShow errs $> False
         Success res ->
           case validateStatementSyntax' res of
-            Failure [] -> pure True
             Failure errs'' -> annotateShow errs'' $> False
             Success _ -> pure True
     annotateShow rst
@@ -130,7 +129,6 @@ syntax_module path =
         Failure errs -> annotateShow errs $> False
         Success res ->
           case validateModuleSyntax' res of
-            Failure [] -> pure True
             Failure errs'' -> annotateShow errs'' $> False
             Success _ -> pure True
     annotateShow rst

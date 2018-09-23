@@ -228,7 +228,7 @@ main = do
       , ("Syntax checking for expressions", withTests 200 $ syntax_expr file)
       , ("Syntax checking for statements", withTests 200 $ syntax_statement file)
       , ("Syntax checking for modules", withTests 200 $ syntax_module file)
-      , ("Correct generator for expressions", withTests 200 $ correct_syntax_expr file)
+      , ("Correct generator for expressions", withShrinks 2500 . withTests 200 $ correct_syntax_expr file)
       , ("Correct generator for statements", withTests 200 $ correct_syntax_statement file)
       , ("Print/Parse idempotent expressions", expr_printparseprint_print)
       , ("Print/Parse idempotent statements", withShrinks 2000 $ statement_printparseprint_print)

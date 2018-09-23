@@ -106,10 +106,14 @@ genTuple expr =
 
 genAssignableTuple :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genAssignableTuple =
-  Tuple () <$>
-  genTupleItem genWhitespaces genAssignable <*>
-  genWhitespaces <*>
-  genTupleItems
+  sized2M
+    (\ti tis ->
+      Tuple () <$>
+      pure ti <*>
+      genWhitespaces <*>
+      pure tis)
+    (genTupleItem genWhitespaces genAssignable)
+    genTupleItems
   where
     genTupleItems =
       Gen.sized $ \n ->

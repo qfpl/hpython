@@ -29,7 +29,7 @@ import Language.Python.Validate.Syntax.Error (SyntaxError)
 roundtripTests :: Group
 roundtripTests =
   Group "Roundtrip tests" $
-  (\name -> (fromString name, withTests 1 . withShrinks 1 $ doRoundtripFile name)) <$>
+  (\name -> (fromString name, withTests 1 . withShrinks 0 $ doRoundtripFile name)) <$>
   [ "asyncstatements.py"
   , "typeann.py"
   , "dictcomp.py"
@@ -66,10 +66,12 @@ doRoundtrip :: Text -> PropertyT IO ()
 doRoundtrip file = do
   py <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" file
   case runValidateIndentation $ validateModuleIndentation py of
-    Failure errs -> annotateShow (errs :: NonEmpty (IndentationError '[] SrcInfo)) *> failure
+    Failure errs -> do
+      annotateShow (errs :: NonEmpty (IndentationError '[] SrcInfo))
+      failure
     Success res ->
       case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
         Failure errs' -> do
-          annotateShow res
-          annotateShow (errs' :: NonEmpty (SyntaxError '[Indentation] SrcInfo)) *> failure
+          annotateShow (errs' :: NonEmpty (SyntaxError '[Indentation] SrcInfo))
+          failure
         Success _ -> Strict.lines (showModule py) === Strict.lines file

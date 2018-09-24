@@ -46,6 +46,7 @@ initialGenState =
   , _willBeNonlocals = []
   , _inLoop = False
   , _inClass = False
+  , _inFinally = False
   , _currentIndentation = Indents [] ()
   }
 
@@ -57,6 +58,7 @@ data GenState
   , _willBeNonlocals :: [String]
   , _inLoop :: Bool
   , _inClass :: Bool
+  , _inFinally :: Bool
   , _currentIndentation :: Indents ()
   }
 makeLenses ''GenState
@@ -404,8 +406,9 @@ genGeneratorComprehension
 genGeneratorComprehension =
   sized3
     (Comprehension ())
-    (localState (modify (\ctxt -> ctxt { _inGenerator = True })) *>
-     Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
+    (do
+        localState $ modify (inGenerator .~ True)
+        Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
@@ -608,7 +611,7 @@ genSmallStatement = do
   sizedRecursive
     ([Pass () <$> genWhitespaces] <>
      [Break () <$> genWhitespaces | _inLoop ctxt] <>
-     [Continue () <$> genWhitespaces | _inLoop ctxt])
+     [Continue () <$> genWhitespaces | _inLoop ctxt && not (_inFinally ctxt)])
     ([ Expr () <$> genExpr
      , sizedBind (sizedNonEmpty $ (,) <$> genWhitespaces <*> genAssignable) $ \a -> do
          isInFunction <- use inFunction
@@ -690,191 +693,195 @@ genCompoundStatement
   :: (HasCallStack, MonadGen m, MonadState GenState m)
   => m (CompoundStatement '[] ())
 genCompoundStatement =
-  sizedRecursive
-    [ do
-        asyncWs <- Gen.maybe genWhitespaces1
-        sizedBind (genParams False) $ \a ->
-          let paramIdents = a ^.. folded.paramName.identValue in
-          sizedBind
-            (localState $ do
-              (modify $
-                \ctxt ->
-                ctxt
-                { _inLoop = False
-                , _inFunction =
-                    fmap
-                      (bimap (`union` paramIdents) (|| isJust asyncWs))
-                      (_inFunction ctxt) <|>
-                    Just (paramIdents, isJust asyncWs)
-                , _currentNonlocals = _willBeNonlocals ctxt <> _currentNonlocals ctxt
-                })
-              (genSuite genSmallStatement genBlock)) $
-            \b ->
-          sizedBind (sizedList genDecorator) $ \c ->
-          sizedBind (sizedMaybe $ (,) <$> genWhitespaces <*> genExpr) $ \d ->
-          Fundef () c <$>
-            use currentIndentation <*>
-            pure asyncWs <*>
-            genWhitespaces1 <*>
-            genIdent <*> genWhitespaces <*> pure a <*>
-            genWhitespaces <*> pure d <*> pure b
-    , sized4M
-        (\a b c d -> 
-           If <$>
-             pure () <*>
-             use currentIndentation <*>
-             fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
-             pure b <*> pure c <*> pure d)
-        genExpr
-        (localState $ genSuite genSmallStatement genBlock)
-        (sizedList $
-         sized2M
-           (\a b ->
-            (,,,) <$>
+  localState $ do
+    modify $ inFinally .~ False
+    sizedRecursive
+      [ do
+          asyncWs <- Gen.maybe genWhitespaces1
+          sizedBind (genParams False) $ \a ->
+            let paramIdents = a ^.. folded.paramName.identValue in
+            sizedBind
+              (localState $ do
+                (modify $
+                  \ctxt ->
+                  ctxt
+                  { _inLoop = False
+                  , _inFunction =
+                      fmap
+                        (bimap (`union` paramIdents) (|| isJust asyncWs))
+                        (_inFunction ctxt) <|>
+                      Just (paramIdents, isJust asyncWs)
+                  , _currentNonlocals = _willBeNonlocals ctxt <> _currentNonlocals ctxt
+                  })
+                (genSuite genSmallStatement genBlock)) $
+              \b ->
+            sizedBind (sizedList genDecorator) $ \c ->
+            sizedBind (sizedMaybe $ (,) <$> genWhitespaces <*> genExpr) $ \d ->
+            Fundef () c <$>
               use currentIndentation <*>
-              genWhitespaces <*>
-              pure a <*>
-              pure b)
-            genExpr
-            (localState $ genSuite genSmallStatement genBlock))
-        (sizedMaybe $
-         sizedBind (localState $ genSuite genSmallStatement genBlock) $ \a ->
+              pure asyncWs <*>
+              genWhitespaces1 <*>
+              genIdent <*> genWhitespaces <*> pure a <*>
+              genWhitespaces <*> pure d <*> pure b
+      , sized4M
+          (\a b c d -> 
+            If <$>
+              pure () <*>
+              use currentIndentation <*>
+              fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
+              pure b <*> pure c <*> pure d)
+          genExpr
+          (localState $ genSuite genSmallStatement genBlock)
+          (sizedList $
+          sized2M
+            (\a b ->
+              (,,,) <$>
+                use currentIndentation <*>
+                genWhitespaces <*>
+                pure a <*>
+                pure b)
+              genExpr
+              (localState $ genSuite genSmallStatement genBlock))
+          (sizedMaybe $
+          sizedBind (localState $ genSuite genSmallStatement genBlock) $ \a ->
+            (,,) <$>
+            use currentIndentation <*>
+            genWhitespaces <*>
+            pure a)
+      , sized2M
+          (\a b ->
+            While <$>
+            pure () <*>
+            use currentIndentation <*>
+            fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
+            pure b)
+          genExpr
+          (localState $ (inLoop .= True) *> genSuite genSmallStatement genBlock)
+      , sized4M
+          (\a b e1 e2 ->
+            TryExcept <$>
+            pure () <*>
+            use currentIndentation <*>
+            genWhitespaces <*>
+            pure a <*>
+            pure b <*>
+            pure e1 <*>
+            pure e2)
+          (genSuite genSmallStatement genBlock)
+          (do
+            ls <- sizedList $
+              sized2M
+              (\a b -> 
+                  (,,,) <$>
+                  use currentIndentation <*>
+                  (NonEmpty.toList <$> genWhitespaces1) <*>
+                  (Just .
+                  ExceptAs ()
+                    (a & trailingWhitespace .~ [Space]) <$>
+                    Gen.maybe ((,) <$> (NonEmpty.toList <$> genWhitespaces1) <*> genIdent)) <*>
+                  pure b)
+              genExpr
+              (genSuite genSmallStatement genBlock)
+            l <-
+              sized2M
+                (\a b -> 
+                    (,,,) <$>
+                    use currentIndentation <*>
+                    (NonEmpty.toList <$> genWhitespaces1) <*>
+                    (case ls of
+                        [] ->
+                          Gen.maybe
+                            (ExceptAs ()
+                            (a & trailingWhitespace .~ [Space]) <$>
+                            Gen.maybe
+                              ((,) <$>
+                                (NonEmpty.toList <$> genWhitespaces1) <*>
+                                genIdent))
+                        _ ->
+                          Just . ExceptAs ()
+                            (a & trailingWhitespace .~ [Space]) <$>
+                            Gen.maybe
+                              ((,) <$>
+                              (NonEmpty.toList <$> genWhitespaces1) <*>
+                              genIdent)) <*>
+                    pure b)
+                genExpr
+                (genSuite genSmallStatement genBlock)
+            pure . NonEmpty.fromList $ ls ++ [l])
+          (sizedMaybe $
+          sizedBind (genSuite genSmallStatement genBlock) $ \a ->
           (,,) <$>
           use currentIndentation <*>
-          genWhitespaces <*>
+          (NonEmpty.toList <$> genWhitespaces1) <*>
           pure a)
-    , sized2M
-        (\a b ->
-          While <$>
-          pure () <*>
-          use currentIndentation <*>
-          fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
-          pure b)
-        genExpr
-        (localState $ (inLoop .= True) *> genSuite genSmallStatement genBlock)
-    , sized4M
-        (\a b e1 e2 ->
-          TryExcept <$>
-          pure () <*>
-          use currentIndentation <*>
-          genWhitespaces <*>
-          pure a <*>
-          pure b <*>
-          pure e1 <*>
-          pure e2)
-        (genSuite genSmallStatement genBlock)
-        (do
-           ls <- sizedList $
-             sized2M
-             (\a b -> 
-                (,,,) <$>
-                use currentIndentation <*>
-                (NonEmpty.toList <$> genWhitespaces1) <*>
-                (Just .
-                 ExceptAs ()
-                  (a & trailingWhitespace .~ [Space]) <$>
-                  Gen.maybe ((,) <$> (NonEmpty.toList <$> genWhitespaces1) <*> genIdent)) <*>
-                pure b)
-             genExpr
-             (genSuite genSmallStatement genBlock)
-           l <-
-             sized2M
-               (\a b -> 
-                   (,,,) <$>
-                   use currentIndentation <*>
-                   (NonEmpty.toList <$> genWhitespaces1) <*>
-                   (case ls of
-                      [] ->
-                        Gen.maybe
-                          (ExceptAs ()
-                           (a & trailingWhitespace .~ [Space]) <$>
-                           Gen.maybe
-                             ((,) <$>
-                              (NonEmpty.toList <$> genWhitespaces1) <*>
-                              genIdent))
-                      _ ->
-                        Just . ExceptAs ()
-                          (a & trailingWhitespace .~ [Space]) <$>
-                          Gen.maybe
-                            ((,) <$>
-                            (NonEmpty.toList <$> genWhitespaces1) <*>
-                            genIdent)) <*>
-                   pure b)
-               genExpr
-               (genSuite genSmallStatement genBlock)
-           pure . NonEmpty.fromList $ ls ++ [l])
-        (sizedMaybe $
-         sizedBind (genSuite genSmallStatement genBlock) $ \a ->
-         (,,) <$>
-         use currentIndentation <*>
-         (NonEmpty.toList <$> genWhitespaces1) <*>
-         pure a)
-        (sizedMaybe $
-         sizedBind (genSuite genSmallStatement genBlock) $ \a ->
-         (,,) <$>
-         use currentIndentation <*>
-         (NonEmpty.toList <$> genWhitespaces1) <*>
-         pure a)
-    , sized2M
-        (\a b ->
-           TryFinally <$>
-           pure () <*> use currentIndentation <*>
-           (NonEmpty.toList <$> genWhitespaces1) <*>
-           pure a <*>
-           use currentIndentation <*>
-           (NonEmpty.toList <$> genWhitespaces1) <*>
-           pure b)
-        (genSuite genSmallStatement genBlock)
-        (genSuite genSmallStatement genBlock)
-    , sized3M
-        (\a b c ->
-           ClassDef () a <$>
-           use currentIndentation <*>
-           genWhitespaces1 <*> genIdent <*>
-           pure b <*>
-           pure c)
-        (sizedList genDecorator)
-        (do
-          localState $ modify (inClass .~ True)
-          sizedMaybe $
-            (,,) <$>
-            genWhitespaces <*>
-            sizedMaybe genArgs <*>
-            genWhitespaces)
-        (genSuite genSmallStatement genBlock)
-    , do
-        inAsync <- maybe False snd <$> use inFunction
-        sized2M
-          (\a b ->
-            With <$> pure () <*> use currentIndentation <*>
-            (if inAsync then Gen.maybe genWhitespaces1 else pure Nothing) <*>
-            (NonEmpty.toList <$> genWhitespaces1) <*>
-            pure a <*> pure b)
-          (genSizedCommaSep1 $
-           WithItem () <$>
-           genExpr <*>
-           sizedMaybe ((,) <$> genWhitespaces <*> genAssignable))
-          (genSuite genSmallStatement genBlock)
-    , do
-        inAsync <- maybe False snd <$> use inFunction
-        sized4M
-          (\a b c d ->
-            For <$> pure () <*> use currentIndentation <*>
-            (if inAsync then Gen.maybe genWhitespaces1 else pure Nothing) <*>
-            (NonEmpty.toList <$> genWhitespaces1) <*> pure a <*>
-            (NonEmpty.toList <$> genWhitespaces1) <*> pure b <*>
-            pure c <*>
-            pure d)
-          genAssignable
-          genExpr
-          (genSuite genSmallStatement genBlock)
           (sizedMaybe $
-           (,,) <$>
-           use currentIndentation <*>
-           (NonEmpty.toList <$> genWhitespaces1) <*>
-           (genSuite genSmallStatement genBlock))
-    ]
-    []
+          sizedBind (genSuite genSmallStatement genBlock) $ \a ->
+          (,,) <$>
+          use currentIndentation <*>
+          (NonEmpty.toList <$> genWhitespaces1) <*>
+          pure a)
+      , sized2M
+          (\a b ->
+            TryFinally <$>
+            pure () <*> use currentIndentation <*>
+            (NonEmpty.toList <$> genWhitespaces1) <*>
+            pure a <*>
+            use currentIndentation <*>
+            (NonEmpty.toList <$> genWhitespaces1) <*>
+            pure b)
+          (genSuite genSmallStatement genBlock)
+          (localState $ do
+            modify (inFinally .~ True)
+            genSuite genSmallStatement genBlock)
+      , sized3M
+          (\a b c ->
+            ClassDef () a <$>
+            use currentIndentation <*>
+            genWhitespaces1 <*> genIdent <*>
+            pure b <*>
+            pure c)
+          (sizedList genDecorator)
+          (localState $ do
+              modify (inClass .~ True)
+              sizedMaybe $
+                (,,) <$>
+                genWhitespaces <*>
+                sizedMaybe genArgs <*>
+                genWhitespaces)
+          (genSuite genSmallStatement genBlock)
+      , do
+          inAsync <- maybe False snd <$> use inFunction
+          sized2M
+            (\a b ->
+              With <$> pure () <*> use currentIndentation <*>
+              (if inAsync then Gen.maybe genWhitespaces1 else pure Nothing) <*>
+              (NonEmpty.toList <$> genWhitespaces1) <*>
+              pure a <*> pure b)
+            (genSizedCommaSep1 $
+            WithItem () <$>
+            genExpr <*>
+            sizedMaybe ((,) <$> genWhitespaces <*> genAssignable))
+            (genSuite genSmallStatement genBlock)
+      , do
+          inAsync <- maybe False snd <$> use inFunction
+          sized4M
+            (\a b c d ->
+              For <$> pure () <*> use currentIndentation <*>
+              (if inAsync then Gen.maybe genWhitespaces1 else pure Nothing) <*>
+              (NonEmpty.toList <$> genWhitespaces1) <*> pure a <*>
+              (NonEmpty.toList <$> genWhitespaces1) <*> pure b <*>
+              pure c <*>
+              pure d)
+            genAssignable
+            genExpr
+            (genSuite genSmallStatement genBlock)
+            (sizedMaybe $
+            (,,) <$>
+            use currentIndentation <*>
+            (NonEmpty.toList <$> genWhitespaces1) <*>
+            (genSuite genSmallStatement genBlock))
+      ]
+      []
 
 genStatement
   :: (HasCallStack, MonadGen m, MonadState GenState m)

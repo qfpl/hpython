@@ -99,6 +99,7 @@ makeLenses ''FunctionInfo
 data SyntaxContext
   = SyntaxContext
   { _inLoop :: Bool
+  , _inFinally :: Bool
   , _inFunction :: Maybe FunctionInfo
   , _inGenerator :: Bool
   , _inClass :: Bool
@@ -127,6 +128,7 @@ initialSyntaxContext :: SyntaxContext
 initialSyntaxContext =
   SyntaxContext
   { _inLoop = False
+  , _inFinally = False
   , _inFunction = Nothing
   , _inGenerator = False
   , _inClass = False
@@ -664,7 +666,7 @@ validateCompoundStatementSyntax (TryFinally a idnts b e idnts2 f i) =
   validateWhitespace a b <*>
   validateSuiteSyntax e <*> pure idnts2 <*>
   validateWhitespace a f <*>
-  validateSuiteSyntax i
+  liftVM1 (local $ inFinally .~ True) (validateSuiteSyntax i)
 validateCompoundStatementSyntax (ClassDef a decos idnts b c d g) =
   (\decos' -> ClassDef a decos' idnts) <$>
   traverse validateDecoratorSyntax decos <*>
@@ -846,9 +848,12 @@ validateSmallStatementSyntax (Break a ws) =
 validateSmallStatementSyntax (Continue a ws) =
   Continue a <$
   (ask `bindVM` \sctxt ->
-     if _inLoop sctxt
-     then pure ()
-     else errorVM1 (_ContinueOutsideLoop # a)) <*>
+     (if _inLoop sctxt
+      then pure ()
+      else errorVM1 (_ContinueOutsideLoop # a)) *>
+     (if _inFinally sctxt
+      then errorVM1 (_ContinueInsideFinally # a)
+      else pure ())) <*>
   validateWhitespace a ws
 validateSmallStatementSyntax (Global a ws ids) =
   Global a ws <$> traverse validateIdentSyntax ids
@@ -924,6 +929,7 @@ validateStatementSyntax
   => Statement v a
   -> ValidateSyntax e (Statement (Nub (Syntax ': v)) a)
 validateStatementSyntax (CompoundStatement c) =
+  liftVM1 (local $ inFinally .~ False) $
   CompoundStatement <$> validateCompoundStatementSyntax c
 validateStatementSyntax (SmallStatements idnts s ss sc nl) =
   SmallStatements idnts <$>

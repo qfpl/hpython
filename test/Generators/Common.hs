@@ -302,7 +302,7 @@ genWhitespaces = do
       Gen.choice
       [ (Space :) <$> go (n-1)
       , (Tab :) <$> go (n-1)
-      , Gen.shrink (\_ -> [[Space]]) . fmap pure $ Continued <$> genNewline' <*> go (n-1)
+      , fmap pure $ Continued <$> genNewline' <*> go (n-1)
       ]
 
 genAnyWhitespaces :: MonadGen m => m [Whitespace]
@@ -315,7 +315,7 @@ genAnyWhitespaces = do
       Gen.choice
       [ (Space :) <$> go (n-1)
       , (Tab :) <$> go (n-1)
-      , Gen.shrink (\_ -> [[Space]]) . fmap pure $ Continued <$> genNewline' <*> go (n-1)
+      , fmap pure $ Continued <$> genNewline' <*> go (n-1)
       , (:) <$> (Newline <$> genNewline) <*> go (n-1)
       ]
 
@@ -501,8 +501,7 @@ genRawBytesLiteral =
 genTupleItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (TupleItem v ())
 genTupleItem ws ge =
   Gen.choice
-  [ TupleItem () <$>
-    ge
+  [ TupleItem () <$> ge
   , TupleUnpack () <$>
     Gen.list (Range.constant 0 10) ((,) <$> genAnyWhitespaces <*> ws) <*>
     ws <*>

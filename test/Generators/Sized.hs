@@ -7,7 +7,6 @@ import Data.Semigroup ((<>))
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
-import qualified Hedgehog.Internal.Shrink as Shrink
 
 import GHC.Stack (HasCallStack)
 
@@ -82,8 +81,7 @@ sized4
 sized4 f = sized4M (\a b c d -> pure $ f a b c d)
 
 sizedList :: MonadGen m => m a -> m [a]
-sizedList ma =
-  Gen.shrink Shrink.list go
+sizedList ma = go
   where
     go =
       sized2 (:)

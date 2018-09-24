@@ -25,7 +25,6 @@ import Data.Semigroup ((<>))
 import Hedgehog
 
 import qualified Hedgehog.Gen as Gen
-import qualified Hedgehog.Internal.Shrink as Shrink
 import qualified Hedgehog.Range as Range
 import qualified Data.List.NonEmpty as NonEmpty
 
@@ -107,23 +106,14 @@ genTuple expr =
 
 genAssignableTuple :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genAssignableTuple =
-  sized2M
-    (\ti tis ->
-      Tuple () <$>
-      pure ti <*>
-      genWhitespaces <*>
-      pure tis)
-    (genTupleItem genWhitespaces genAssignable)
-    genTupleItems
+  genTupleItems >>= \(ti, tis) -> (\ws -> Tuple () ti ws tis) <$> genWhitespaces
   where
     genTupleItems =
-      Gen.sized $ \n ->
-      if n == 0
-      then pure Nothing
-      else
-        sizedBind
-          (genTupleItem genWhitespaces genAssignable)
-          (\ti -> Just . view _CommaSep1' <$> genTupleItemsRest (has _TupleUnpack ti) ti [])
+      sizedBind
+        (genTupleItem genWhitespaces genAssignable)
+        (\ti ->
+           (,) ti <$>
+           sizedMaybe (view _CommaSep1' <$> genTupleItemsRest (has _TupleUnpack ti) ti []))
 
     genTupleItemsRest seen a as =
       Gen.sized $ \n ->
@@ -335,8 +325,30 @@ genAssignableList =
         _ -> []) $
   List () <$>
   genWhitespaces <*>
-  Gen.maybe (genSizedCommaSep1' $ genListItem genWhitespaces genAssignable) <*>
+  genListItems <*>
   genWhitespaces
+  where
+    genListItems =
+      Gen.sized $ \n ->
+      if n == 0
+      then pure Nothing
+      else
+        sizedBind
+          (genListItem genWhitespaces genAssignable)
+          (\ti -> Just . view _CommaSep1' <$> genListItemsRest (has _ListUnpack ti) ti [])
+
+    genListItemsRest seen a as =
+      Gen.sized $ \n ->
+      if n == 0
+      then (,,) a as <$> Gen.maybe genWhitespaces
+      else
+        sizedBind
+          (if seen
+           then ListItem () <$> genAssignable
+           else genListItem genWhitespaces genAssignable)
+          (\ti -> do
+              ws <- genWhitespaces
+              genListItemsRest (seen || has _ListUnpack ti) ti ((ws, a) : as))
 
 genParens :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
 genParens genExpr' = Parens () <$> genWhitespaces <*> genExpr' <*> genWhitespaces
@@ -847,10 +859,6 @@ genStatement
   :: (HasCallStack, MonadGen m, MonadState GenState m)
   => m (Statement '[] ())
 genStatement =
-  Gen.shrink
-    (\case
-        SmallStatements a b c e f -> (\c' -> SmallStatements a b c' e f) <$> Shrink.list c
-        _ -> []) $
   sizedRecursive
     [ sizedBind (localState genSmallStatement) $ \st ->
       sizedBind (sizedList $ (,) <$> genWhitespaces <*> localState genSmallStatement) $ \sts ->

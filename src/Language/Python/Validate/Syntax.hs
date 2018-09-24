@@ -475,11 +475,14 @@ validateExprSyntax (Generator a comp) =
   Generator a <$>
   validateGeneratorComprehensionSyntax validateExprSyntax comp
 validateExprSyntax (Await a ws expr) =
-  bindVM (view inFunction) $ \fi ->
+  bindVM ask $ \ctxt ->
   Await a <$>
   validateWhitespace a ws <*
-  (if not $ fromMaybe False (fi ^? _Just.asyncFunction)
-   then errorVM1 (_AwaitOutsideCoroutine # a)
+  (if not $ fromMaybe False (ctxt ^? inFunction._Just.asyncFunction)
+   then errorVM1 $ _AwaitOutsideCoroutine # a
+   else pure () *>
+   if ctxt^.inGenerator
+   then errorVM1 $ _AwaitInsideComprehension # a
    else pure ()) <*>
   validateExprSyntax expr
 validateExprSyntax (Deref a expr ws1 name) =
@@ -659,7 +662,7 @@ validateCompoundStatementSyntax (TryExcept a idnts b e f k l) =
     (\(idnts, x, w) ->
        (,,) idnts <$>
        validateWhitespace a x <*>
-       validateSuiteSyntax w)
+       liftVM1 (local $ inFinally .~ True) (validateSuiteSyntax w))
     l
 validateCompoundStatementSyntax (TryFinally a idnts b e idnts2 f i) =
   TryFinally a idnts <$>
@@ -668,6 +671,7 @@ validateCompoundStatementSyntax (TryFinally a idnts b e idnts2 f i) =
   validateWhitespace a f <*>
   liftVM1 (local $ inFinally .~ True) (validateSuiteSyntax i)
 validateCompoundStatementSyntax (ClassDef a decos idnts b c d g) =
+  liftVM1 (local $ inLoop .~ False) $
   (\decos' -> ClassDef a decos' idnts) <$>
   traverse validateDecoratorSyntax decos <*>
   validateWhitespace a b <*>

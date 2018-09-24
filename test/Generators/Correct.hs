@@ -563,7 +563,7 @@ genExpr' isExp = do
             Await () <$>
             (NonEmpty.toList <$> genWhitespaces1) <*>
             pure a)
-     | isAsync
+     | isAsync && not isInGenerator
      ])
 
 genSubscript :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
@@ -810,17 +810,18 @@ genCompoundStatement =
                 (genSuite genSmallStatement genBlock)
             pure . NonEmpty.fromList $ ls ++ [l])
           (sizedMaybe $
-          sizedBind (genSuite genSmallStatement genBlock) $ \a ->
-          (,,) <$>
-          use currentIndentation <*>
-          (NonEmpty.toList <$> genWhitespaces1) <*>
-          pure a)
-          (sizedMaybe $
-          sizedBind (genSuite genSmallStatement genBlock) $ \a ->
-          (,,) <$>
-          use currentIndentation <*>
-          (NonEmpty.toList <$> genWhitespaces1) <*>
-          pure a)
+           sizedBind (genSuite genSmallStatement genBlock) $ \a ->
+           (,,) <$>
+           use currentIndentation <*>
+           (NonEmpty.toList <$> genWhitespaces1) <*>
+           pure a)
+          (sizedMaybe . localState $ do
+             modify $ inFinally .~ True
+             sizedBind (genSuite genSmallStatement genBlock) $ \a ->
+               (,,) <$>
+               use currentIndentation <*>
+               (NonEmpty.toList <$> genWhitespaces1) <*>
+               pure a)
       , sized2M
           (\a b ->
             TryFinally <$>
@@ -849,6 +850,7 @@ genCompoundStatement =
              genWhitespaces)
           (localState $ do
              modify (inClass .~ True)
+             modify (inLoop .~ False)
              genSuite genSmallStatement genBlock)
       , do
           inAsync <- maybe False snd <$> use inFunction

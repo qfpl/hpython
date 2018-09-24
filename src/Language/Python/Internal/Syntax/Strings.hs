@@ -155,6 +155,6 @@ fromHaskellString (c:cs) =
     '\r' -> Char_esc_r
     '\t' -> Char_esc_t
     '\v' -> Char_esc_v
-    -- '\0' -> Char_hex HeXDigit0 HeXDigit0
+    '\0' -> Char_hex HeXDigit0 HeXDigit0
     _ -> Char_lit c) :
   fromHaskellString cs

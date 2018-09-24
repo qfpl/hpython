@@ -393,7 +393,10 @@ validateExprSyntax (Yield a b c) =
         Nothing
           | _inGenerator ctxt -> pure ()
           | otherwise -> errorVM1 (_InvalidYield # a)
-        Just{} -> pure ()) <*>
+        Just info ->
+          if info^.asyncFunction
+          then errorVM1 $ _YieldInsideCoroutine # a
+          else pure ()) <*>
   traverse validateExprSyntax c
 validateExprSyntax (YieldFrom a b c d) =
   YieldFrom a <$>

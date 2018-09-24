@@ -464,6 +464,7 @@ genStringLiterals = do
 genExpr' :: (MonadGen m, MonadState GenState m) => Bool -> m (Expr '[] ())
 genExpr' isExp = do
   isInFunction <- isJust <$> use inFunction
+  isInAsyncFunction <- maybe False snd <$> use inFunction
   isAsync <- maybe False snd <$> use inFunction
   isInGenerator <- use inGenerator
   sizedRecursive
@@ -537,7 +538,7 @@ genExpr' isExp = do
      [ Yield () <$>
          (NonEmpty.toList <$> genWhitespaces1) <*>
          sizedMaybe genExpr
-     | isInFunction || isInGenerator
+     | (isInFunction || isInGenerator) && not isInAsyncFunction
      ] ++
      [ YieldFrom () <$>
          (NonEmpty.toList <$> genWhitespaces1) <*>

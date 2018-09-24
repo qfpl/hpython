@@ -14,7 +14,7 @@ module Language.Python.Internal.Render
   , renderIdent, renderComment, renderModuleName, renderDot, renderRelativeModuleName
   , renderImportAs, renderImportTargets, renderSmallStatement, renderCompoundStatement
   , renderBlock, renderIndent, renderIndents, renderExceptAs, renderArg, renderParam
-  , renderCompFor, renderCompIf, renderComprehension, renderBinOp, renderUnOp
+  , renderParams, renderCompFor, renderCompIf, renderComprehension, renderBinOp, renderUnOp
   , renderSubscript, renderPyChars, escapeChars, intToHex
   )
 where
@@ -405,7 +405,13 @@ renderPyChars qt st = Text.pack . go
                  then '\\' : (case b of; '\\' : _ -> '\\' : b; _ -> b)
                  else '\\' : '\\' : b
                )
-             Char_lit c -> (True, c : b)
+             Char_lit c ->
+               ( True
+               , case c of
+                   '\n' -> go [Char_esc_n]
+                   '\r' -> go [Char_esc_r]
+                   _ -> c : b
+               )
              _ -> (True, go [a] <> b))
         (False, [])
 
@@ -436,7 +442,13 @@ renderPyChars qt st = Text.pack . go
                , if bl
                  then '\\' : (case b of; '\\' : _ -> '\\' : b; _ -> b)
                  else '\\' : '\\' : b)
-             Char_lit c -> (True, c : b)
+             Char_lit c ->
+               ( True
+               , case c of
+                   '\n' -> go [Char_esc_n]
+                   '\r' -> go [Char_esc_r]
+                   _ -> c : b
+               )
              _ -> (True, go [a] <> b))
         (False, [])
 
@@ -826,7 +838,7 @@ renderExpr (Unit _ a b) =
 renderExpr (Lambda _ a b c d) =
   TkLambda () `cons`
   foldMap renderWhitespace a <>
-  renderCommaSep renderParam b <>
+  renderParams b <>
   singleton (TkColon ()) <> foldMap renderWhitespace c <>
   bracketTupleGenerator d
 renderExpr e@Yield{} = bracket $ renderYield bracketTupleGenerator e
@@ -1112,7 +1124,7 @@ renderCompoundStatement (Fundef _ decos idnt asyncWs ws1 name ws2 params ws3 mty
   renderIndents idnt <>
   foldMap (\ws -> TkIdent "async" () `cons` foldMap renderWhitespace ws) asyncWs <>
   singleton (TkDef ()) <> foldMap renderWhitespace ws1 <> renderIdent name <>
-  bracket (foldMap renderWhitespace ws2 <> renderCommaSep renderParam params) <>
+  bracket (foldMap renderWhitespace ws2 <> renderParams params) <>
   foldMap renderWhitespace ws3 <>
   foldMap
     (\(ws, ty) -> TkRightArrow () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
@@ -1255,6 +1267,21 @@ renderArg _ (DoubleStarArg _ ws expr) =
   foldMap renderWhitespace ws <>
   bracketTupleGenerator expr
 
+renderParams :: CommaSep (Param v a) -> RenderOutput
+renderParams = go False
+  where
+    go :: Bool -> CommaSep (Param v a) -> RenderOutput
+    go _ CommaSepNone = mempty
+    go _ (CommaSepOne a) = renderParam a
+    go sawStar (CommaSepMany a ws2 b) =
+      renderParam a <>
+      (case b of
+         CommaSepNone | sawStar -> mempty
+         _ ->
+           singleton (TkComma ()) <>
+           foldMap renderWhitespace ws2) <>
+      go (case a of; StarParam{} -> True; DoubleStarParam{} -> True; _ -> sawStar) b
+
 renderParam :: Param v a -> RenderOutput
 renderParam (PositionalParam _ name mty) =
   renderIdent name <>
@@ -1281,7 +1308,8 @@ renderParam (KeywordParam _ name mty ws2 expr) =
     (\(ws, ty) -> TkColon () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
     mty <>
   singleton (TkEq ()) <>
-  foldMap renderWhitespace ws2 <> bracketTupleGenerator expr
+  foldMap renderWhitespace ws2 <>
+  bracketTupleGenerator expr
 
 renderUnOp :: UnOp a -> RenderOutput
 renderUnOp (Negate _ ws) = singleton (TkMinus ()) <> foldMap renderWhitespace ws

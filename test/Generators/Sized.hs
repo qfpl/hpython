@@ -29,11 +29,9 @@ sized2M
   -> m b
   -> m c
 sized2M f ma mb =
-  Gen.sized $ \n -> do
-    aSize <- Gen.integral (Range.constant 0 n)
-    a <- Gen.resize aSize ma
-    b <- Gen.resize (max 0 $ n - aSize) mb
-    f a b
+  sizedBind ma $ \a ->
+  sizedBind mb $ \b ->
+  f a b
 
 sized2
   :: MonadGen m
@@ -51,11 +49,7 @@ sized3M
   -> m c
   -> m d
 sized3M f ma mb mc =
-  Gen.sized $ \n -> do
-    abSize <- Gen.integral (Range.constant 0 n)
-    cd <- Gen.resize abSize $ sized2 f ma mb
-    c <- Gen.resize (max 0 $ n - abSize) mc
-    cd c
+  sized2M (\a b -> sizedBind mc $ \c -> f a b c) ma mb
 
 sized3
   :: MonadGen m
@@ -75,11 +69,7 @@ sized4M
   -> m d
   -> m e
 sized4M f ma mb mc md =
-  Gen.sized $ \n -> do
-    abcSize <- Gen.integral (Range.constant 0 n)
-    de <- Gen.resize abcSize $ sized3 f ma mb mc
-    d <- Gen.resize (max 0 $ n - abcSize) md
-    de d
+  sized3M (\a b c -> sizedBind md $ \d -> f a b c d) ma mb mc
 
 sized4
   :: MonadGen m
@@ -93,18 +83,15 @@ sized4 f = sized4M (\a b c d -> pure $ f a b c d)
 
 sizedList :: MonadGen m => m a -> m [a]
 sizedList ma =
-  Gen.shrink Shrink.list $
-  sized2 (:)
-    ma
-    (Gen.sized $ \n -> if n == 0 then pure [] else sizedList ma)
+  Gen.shrink Shrink.list go
+  where
+    go =
+      sized2 (:)
+        ma
+        (Gen.sized $ \n -> if n == 0 then pure [] else go)
 
 sizedNonEmpty :: MonadGen m => m a -> m (NonEmpty a)
-sizedNonEmpty ma =
-  Gen.shrink (\(x :| xs) -> (x :|) <$> Shrink.list xs) $
-  Gen.sized $ \_ -> do
-    sized2 (:|)
-      ma
-      (sizedList ma)
+sizedNonEmpty ma = sized2 (:|) ma (sizedList ma)
 
 sizedMaybe :: MonadGen m => m a -> m (Maybe a)
 sizedMaybe ma =

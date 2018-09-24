@@ -374,6 +374,16 @@ genComprehension =
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
+genGeneratorComprehension
+  :: (MonadGen m, MonadState GenState m) => m (Comprehension Expr '[] ())
+genGeneratorComprehension =
+  sized3
+    (Comprehension ())
+    (localState (modify (\ctxt -> ctxt { _inGenerator = True })) *>
+     Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
+    genCompFor
+    (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
+
 genSubscriptItem :: (MonadGen m, MonadState GenState m) => m (Subscript '[] ())
 genSubscriptItem =
   sizedRecursive
@@ -450,7 +460,7 @@ genExpr' isExp = do
      , DictComp () <$> genWhitespaces <*> genDictComp <*> genWhitespaces
      , SetComp () <$> genWhitespaces <*> genSetComp <*> genWhitespaces
      , Generator () <$>
-       localState (modify (\ctxt -> ctxt { _inGenerator = True }) *> genComprehension)
+       genGeneratorComprehension
      , Dict () <$>
        genAnyWhitespaces <*>
        sizedMaybe (genSizedCommaSep1' $ genDictItem genExpr) <*>
@@ -648,7 +658,7 @@ genDecorator =
 genCompoundStatement
   :: (HasCallStack, MonadGen m, MonadState GenState m)
   => m (CompoundStatement '[] ())
-genCompoundStatement = do
+genCompoundStatement =
   sizedRecursive
     [ do
         asyncWs <- Gen.maybe genWhitespaces1

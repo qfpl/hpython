@@ -24,7 +24,6 @@ data CommaSep a
 listToCommaSep :: [a] -> CommaSep a
 listToCommaSep [] = CommaSepNone
 listToCommaSep [a] = CommaSepOne a
-  
 listToCommaSep (a:as) = CommaSepMany a [Space] $ listToCommaSep as
 
 appendCommaSep :: CommaSep a -> CommaSep a -> CommaSep a

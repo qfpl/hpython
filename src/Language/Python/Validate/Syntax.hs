@@ -193,6 +193,39 @@ validateAssignmentSyntax a ex =
    then validateExprSyntax ex
    else errorVM1 $ _CannotAssignTo # (a, ex))
 
+validateCompForSyntax
+  :: ( AsSyntaxError e v a
+    , Member Indentation v
+    )
+  => CompFor v a
+  -> ValidateSyntax e (CompFor (Nub (Syntax ': v)) a)
+validateCompForSyntax (CompFor a b c d e) =
+  (\c' -> CompFor a b c' d) <$>
+  validateAssignmentSyntax a c <*>
+  validateExprSyntax e
+
+validateCompIfSyntax
+  :: ( AsSyntaxError e v a
+    , Member Indentation v
+    )
+  => CompIf v a
+  -> ValidateSyntax e (CompIf (Nub (Syntax ': v)) a)
+validateCompIfSyntax (CompIf a b c) =
+  CompIf a b <$> validateExprSyntax c
+
+validateGeneratorComprehensionSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => (ex v a -> ValidateSyntax e (ex (Nub (Syntax ': v)) a))
+  -> Comprehension ex v a
+  -> ValidateSyntax e (Comprehension ex (Nub (Syntax ': v)) a)
+validateGeneratorComprehensionSyntax f (Comprehension a b c d) =
+  Comprehension a <$>
+  liftVM1 (local $ inGenerator .~ True) (f b) <*>
+  validateCompForSyntax c <*>
+  traverse (bitraverse validateCompForSyntax validateCompIfSyntax) d
+
 validateComprehensionSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
@@ -205,26 +238,6 @@ validateComprehensionSyntax f (Comprehension a b c d) =
   f b <*>
   validateCompForSyntax c <*>
   traverse (bitraverse validateCompForSyntax validateCompIfSyntax) d
-  where
-    validateCompForSyntax
-      :: ( AsSyntaxError e v a
-        , Member Indentation v
-        )
-      => CompFor v a
-      -> ValidateSyntax e (CompFor (Nub (Syntax ': v)) a)
-    validateCompForSyntax (CompFor a b c d e) =
-      (\c' -> CompFor a b c' d) <$>
-      validateAssignmentSyntax a c <*>
-      validateExprSyntax e
-
-    validateCompIfSyntax
-      :: ( AsSyntaxError e v a
-        , Member Indentation v
-        )
-      => CompIf v a
-      -> ValidateSyntax e (CompIf (Nub (Syntax ': v)) a)
-    validateCompIfSyntax (CompIf a b c) =
-      CompIf a b <$> validateExprSyntax c
 
 validateStringPyChar
   :: ( AsSyntaxError e v a
@@ -455,9 +468,7 @@ validateExprSyntax (ListComp a ws1 comp ws2) =
   validateWhitespace a ws2
 validateExprSyntax (Generator a comp) =
   Generator a <$>
-  liftVM1
-    (local $ inGenerator .~ True)
-    (validateComprehensionSyntax validateExprSyntax comp)
+  validateGeneratorComprehensionSyntax validateExprSyntax comp
 validateExprSyntax (Await a ws expr) =
   bindVM (view inFunction) $ \fi ->
   Await a <$>

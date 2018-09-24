@@ -686,7 +686,10 @@ renderStringLiteral (ShortRawBytesLiteral _ a b c d) =
   foldMap renderWhitespace d
 
 renderSubscript :: Subscript v a -> RenderOutput
-renderSubscript (SubscriptExpr a) = bracketTupleGenerator a
+renderSubscript (SubscriptExpr a) =
+  case a of
+    Await{} -> bracket $ renderExpr a
+    _ -> bracketTupleGenerator a
 renderSubscript (SubscriptSlice a b c d) =
   foldMap bracketTupleGenerator a <>
   singleton (TkColon ()) <>

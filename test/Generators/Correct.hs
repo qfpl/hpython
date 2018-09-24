@@ -45,6 +45,7 @@ initialGenState =
   , _currentNonlocals = []
   , _willBeNonlocals = []
   , _inLoop = False
+  , _inClass = False
   , _currentIndentation = Indents [] ()
   }
 
@@ -55,6 +56,7 @@ data GenState
   , _currentNonlocals :: [String]
   , _willBeNonlocals :: [String]
   , _inLoop :: Bool
+  , _inClass :: Bool
   , _currentIndentation :: Indents ()
   }
 makeLenses ''GenState
@@ -600,6 +602,9 @@ genSmallStatement
 genSmallStatement = do
   ctxt <- get
   nonlocals <- use currentNonlocals
+  let
+    isInFunction = isJust $ _inFunction ctxt
+    isInClass = _inClass ctxt
   sizedRecursive
     ([Pass () <$> genWhitespaces] <>
      [Break () <$> genWhitespaces | _inLoop ctxt] <>
@@ -624,11 +629,6 @@ genSmallStatement = do
      , Import () <$>
        genWhitespaces1 <*>
        genSizedCommaSep1 (genImportAs genModuleName genIdent)
-     , From () <$>
-       genWhitespaces <*>
-       (genRelativeModuleName & mapped.trailingWhitespace .~ [Space]) <*>
-       (NonEmpty.toList <$> genWhitespaces1) <*>
-       genImportTargets
      , Raise () <$>
        fmap NonEmpty.toList genWhitespaces1 <*>
        sizedMaybe
@@ -639,6 +639,13 @@ genSmallStatement = do
         (\a b -> (\ws -> Assert () ws a b) <$> genWhitespaces)
         genExpr
         (sizedMaybe ((,) <$> genWhitespaces <*> genExpr))
+     ] ++
+     [ From () <$>
+       genWhitespaces <*>
+       (genRelativeModuleName & mapped.trailingWhitespace .~ [Space]) <*>
+       (NonEmpty.toList <$> genWhitespaces1) <*>
+       genImportTargets
+     | not isInClass && not isInFunction
      ] ++
      [ do
          nonlocals <- use currentNonlocals
@@ -827,11 +834,13 @@ genCompoundStatement =
            pure b <*>
            pure c)
         (sizedList genDecorator)
-        (sizedMaybe $
-         (,,) <$>
-         genWhitespaces <*>
-         sizedMaybe genArgs <*>
-         genWhitespaces)
+        (do
+          localState $ modify (inClass .~ True)
+          sizedMaybe $
+            (,,) <$>
+            genWhitespaces <*>
+            sizedMaybe genArgs <*>
+            genWhitespaces)
         (genSuite genSmallStatement genBlock)
     , do
         inAsync <- maybe False snd <$> use inFunction

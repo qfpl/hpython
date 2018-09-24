@@ -752,7 +752,7 @@ validateImportTargetsSyntax
   -> ValidateSyntax e (ImportTargets (Nub (Syntax ': v)) a)
 validateImportTargetsSyntax (ImportAll a ws) =
   bindVM ask $ \ctxt ->
-  if ctxt ^. inClass && has (inFunction._Just) ctxt
+  if ctxt ^. inClass || has (inFunction._Just) ctxt
     then errorVM1 $ _WildcardImportInDefinition # a
     else ImportAll a <$> validateWhitespace a ws
 validateImportTargetsSyntax (ImportSome a cs) =

@@ -106,16 +106,27 @@ genTuple expr =
 
 genAssignableTuple :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genAssignableTuple =
-  genTupleItems >>= \(ti, tis) -> (\ws -> Tuple () ti ws tis) <$> genWhitespaces
+  (\(ti, tis) ws -> Tuple () ti ws tis) <$> genTupleItems <*> genWhitespaces
   where
     genTupleItems =
       sizedBind
         (genTupleItem genWhitespaces genAssignable)
-        (\ti ->
-           (,) ti <$>
-           sizedMaybe (view _CommaSep1' <$> genTupleItemsRest (has _TupleUnpack ti) ti []))
+        (\ti -> (,) ti <$> genTupleItemsRest (has _TupleUnpack ti))
 
-    genTupleItemsRest seen a as =
+    genTupleItemsRest seen =
+      Gen.sized $ \n ->
+      if n == 0
+      then pure Nothing
+      else
+        sizedBind
+          (if seen
+           then TupleItem () <$> genAssignable
+           else genTupleItem genWhitespaces genAssignable)
+          (\ti ->
+             sizedMaybe
+               (view _CommaSep1' <$> genTupleItemsRest' (seen || has _TupleUnpack ti) ti []))
+
+    genTupleItemsRest' seen a as =
       Gen.sized $ \n ->
       if n == 0
       then (,,) a as <$> Gen.maybe genWhitespaces
@@ -126,7 +137,7 @@ genAssignableTuple =
            else genTupleItem genWhitespaces genAssignable)
           (\ti -> do
               ws <- genWhitespaces
-              genTupleItemsRest (seen || has _TupleUnpack ti) ti ((ws, a) : as))
+              genTupleItemsRest' (seen || has _TupleUnpack ti) ti ((ws, a) : as))
 
 genModuleName :: (MonadGen m, MonadState GenState m) => m (ModuleName '[] ())
 genModuleName =
@@ -567,9 +578,9 @@ genAssignable =
   sizedRecursive
     [ Ident <$> genIdent
     ]
-    [ genAssignableList
+    [ genParens genAssignable
+    , genAssignableList
     , genAssignableTuple
-    , genParens genAssignable
     , genDeref
     , genSubscript
     ]

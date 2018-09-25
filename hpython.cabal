@@ -161,9 +161,10 @@ test-suite hpython-tests
                      , DSL
                      , Helpers
                      , LexerParser
-                     , Scope
+                     , Printer
                      , Roundtrip
-                     , Negative
+                     , Scope
+                     , Syntax
   hs-source-dirs:      test
   build-depends:       base >=4.9 && <5
                      , directory

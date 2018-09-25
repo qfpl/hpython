@@ -12,9 +12,10 @@ import Language.Python.Validate.Syntax
 
 import DSL
 import LexerParser
-import Scope
+import Printer
 import Roundtrip
-import Negative
+import Scope
+import Syntax
 
 import qualified Generators.General as General
 import qualified Generators.Correct as Correct
@@ -222,8 +223,9 @@ main :: IO ()
 main = do
   checkParallel lexerParserTests
   traverse checkParallel dslTests
+  checkParallel printerTests
   checkParallel scopeTests
-  checkParallel negativeTests
+  checkParallel syntaxTests
   checkParallel roundtripTests
   let file = "hedgehog-test.py"
   checkParallel $

@@ -19,12 +19,16 @@ module Language.Python.Internal.Render
   )
 where
 
+import Control.Lens.Getter ((^.))
 import Control.Lens.Plated (transform)
 import Control.Lens.Review ((#))
+import Control.Lens.Setter ((.~))
 import Data.Bifoldable (bifoldMap)
 import Data.Digit.Char (charHeXaDeCiMaL, charOctal, charBinary, charDecimal)
 import Data.DList (DList)
 import Data.Foldable (toList)
+import Data.Function ((&))
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Semigroup (Semigroup(..))
 import Data.Text (Text)
 import Data.These (These(..))
@@ -67,8 +71,6 @@ showRenderOutput =
           | isIdentifierChar (Text.last $ showToken a)
           , isIdentifierChar (Text.head $ showToken b)
           -> a : TkSpace () : b : rest
-        a@(TkString _ qt _ _ _) : b@(TkString _ qt' _ _ _) : rest
-          | qt == qt' -> a : TkSpace () : b : rest
         a@(TkFloat (FloatLiteralFull _ _ Nothing)) : b : rest
           | isIdentifierChar (Text.head $ showToken b) -> a : TkSpace () : b : rest
         a -> a
@@ -896,7 +898,28 @@ renderExpr (UnOp _ op expr) =
     Ternary{} -> bracket $ renderExpr expr
     Lambda{} -> bracket $ renderExpr expr
     _ -> bracketTupleGenerator expr
-renderExpr (String _ vs) = foldMap renderStringLiteral vs
+renderExpr (String _ vs) =
+  foldMap renderStringLiteral $
+  correctAdjacentStrings vs
+  where
+    -- two non-typed single-quoted strings cannot be lexically
+    -- adjacent, because this would be a parse error
+    --
+    -- eg. '''' or """"
+    --
+    -- we correct for this by inserting a single space where required
+    -- '' '' or "" ""
+    correctAdjacentStrings (a :| []) = a :| []
+    correctAdjacentStrings (a:|b:cs) =
+      if
+        quoteType a == quoteType b &&
+        stringType a == stringType b &&
+        null (a ^. trailingWhitespace) &&
+        not (hasStringPrefix b)
+      then
+        NonEmpty.cons (a & trailingWhitespace .~ [Space]) (correctAdjacentStrings $ b :| cs)
+      else
+        NonEmpty.cons a (correctAdjacentStrings $ b :| cs)
 renderExpr (Int _ n ws) = TkInt (() <$ n) `cons` foldMap renderWhitespace ws
 renderExpr (Float _ n ws) = TkFloat (() <$ n) `cons` foldMap renderWhitespace ws
 renderExpr (Imag _ n ws) = TkImag (() <$ n) `cons` foldMap renderWhitespace ws
@@ -909,7 +932,12 @@ renderExpr (List _ ws1 exprs ws2) =
 renderExpr (ListComp _ ws1 comp ws2) =
   TkLeftBracket () `cons`
   foldMap renderWhitespace ws1 <>
-  renderComprehension bracketTupleGenerator comp <>
+  renderComprehension
+    (\e -> case e of
+        Yield{} -> bracket $ renderExpr e
+        YieldFrom{} -> bracket $ renderExpr e
+        _ -> bracketTupleGenerator e)
+    comp <>
   singleton (TkRightBracket ()) <> foldMap renderWhitespace ws2
 renderExpr (Call _ expr ws args ws2) =
   (case expr of
@@ -968,7 +996,13 @@ renderExpr (Set _ a b c) =
   renderSetItems b <>
   singleton (TkRightBrace ()) <>
   foldMap renderWhitespace c
-renderExpr (Generator _ a) = renderComprehension bracketTupleGenerator a
+renderExpr (Generator _ a) =
+  renderComprehension
+    (\e -> case e of
+        Yield{} -> bracket $ renderExpr e
+        YieldFrom{} -> bracket $ renderExpr e
+        _ -> bracketTupleGenerator e)
+    a
 renderExpr (Await _ ws expr) =
   TkIdent "await" () `cons`
   foldMap renderWhitespace ws <>

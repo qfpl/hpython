@@ -1,5 +1,5 @@
 {-# language OverloadedStrings #-}
-module Negative (negativeTests) where
+module Syntax (syntaxTests) where
 
 import Hedgehog
 import Data.Validation (Validation(..))
@@ -10,10 +10,10 @@ import Language.Python.Internal.Syntax.Whitespace
 
 import Helpers (syntaxValidateExpr)
 
-negativeTests :: Group
-negativeTests =
-  Group "Negative tests"
-  [ ("Negative test 1", withTests 1 test_1)
+syntaxTests :: Group
+syntaxTests =
+  Group "Syntax tests"
+  [ ("Syntax test 1", withTests 1 test_1)
   ]
 
 shouldBeFailure :: Validation e a -> PropertyT IO ()

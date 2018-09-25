@@ -5,6 +5,7 @@ module Language.Python.Internal.Syntax.Strings where
 import Control.Lens.Lens (lens)
 import Data.Digit.Octal (OctDigit)
 import Data.Digit.Hexadecimal.MixedCase (HeXDigit(..))
+import Data.Maybe (isJust)
 
 import Language.Python.Internal.Syntax.Whitespace
 import Language.Python.Internal.Syntax.Strings.Raw
@@ -45,6 +46,25 @@ data RawBytesPrefix
   | Prefix_RB
   deriving (Eq, Ord, Show)
 
+stringType :: StringLiteral a -> StringType
+stringType LongRawStringLiteral{} = LongString
+stringType ShortRawStringLiteral{} = ShortString
+stringType LongRawBytesLiteral{} = LongString
+stringType ShortRawBytesLiteral{} = ShortString
+stringType (StringLiteral _ _ _ a _ _) = a
+stringType (BytesLiteral _ _ _ a _ _) = a
+
+quoteType :: StringLiteral a -> QuoteType
+quoteType = _stringLiteralQuoteType
+
+hasStringPrefix :: StringLiteral a -> Bool
+hasStringPrefix LongRawStringLiteral{} = True
+hasStringPrefix ShortRawStringLiteral{} = True
+hasStringPrefix LongRawBytesLiteral{} = True
+hasStringPrefix ShortRawBytesLiteral{} = True
+hasStringPrefix (StringLiteral _ a _ _ _ _) = isJust a
+hasStringPrefix BytesLiteral{} = True
+
 data StringLiteral a
   = LongRawStringLiteral
   { _stringLiteralAnn :: a
@@ -64,7 +84,7 @@ data StringLiteral a
   { _stringLiteralAnn :: a
   , _unsafeStringLiteralPrefix :: Maybe StringPrefix
   , _stringLiteralQuoteType :: QuoteType
-  , _stringLiteralType :: StringType
+  , _unsafeStringLiteralType :: StringType
   , _unsafeStringLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }
@@ -86,7 +106,7 @@ data StringLiteral a
   { _stringLiteralAnn :: a
   , _unsafeBytesLiteralPrefix :: BytesPrefix
   , _stringLiteralQuoteType :: QuoteType
-  , _stringLiteralType :: StringType
+  , _unsafeBytesLiteralType :: StringType
   , _unsafeBytesLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }

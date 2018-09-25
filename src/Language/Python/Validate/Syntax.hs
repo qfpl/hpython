@@ -716,7 +716,7 @@ validateCompoundStatementSyntax (With a b asyncWs c d e) =
         WithItem a <$>
         validateExprSyntax b <*>
         traverse
-          (\(ws, b) -> (,) <$> validateWhitespace a ws <*> validateExprSyntax b)
+          (\(ws, b) -> (,) <$> validateWhitespace a ws <*> validateAssignmentSyntax a b)
           c)
     d <*>
   validateSuiteSyntax e
@@ -1062,13 +1062,10 @@ validateParamsSyntax isLambda e =
       -> HaveSeenKeywordArg -- have we seen a keyword parameter?
       -> [Param v a]
       -> ValidateSyntax e [Param (Nub (Syntax ': v)) a]
-    go _ (HaveSeenEmptyStarArg b) (HaveSeenKeywordArg c) [] =
+    go _ (HaveSeenEmptyStarArg b) _ [] =
       case b of
         Nothing -> pure []
-        Just b' ->
-          if not c
-          then errorVM1 $ _NoKeywordsAfterEmptyStarArg # b'
-          else pure []
+        Just b' -> errorVM1 $ _NoKeywordsAfterEmptyStarArg # b'
     go names bsa bkw@(HaveSeenKeywordArg False) (PositionalParam a name mty : params)
       | _identValue name `elem` names =
           errorVM1 (_DuplicateArgument # (a, _identValue name)) <*>
@@ -1089,7 +1086,7 @@ validateParamsSyntax isLambda e =
           checkTy a mty <*>
           go
             (_identValue name:names)
-            (maybe bsa (const $ HaveSeenEmptyStarArg Nothing) mname)
+            (if isNothing mname then HaveSeenEmptyStarArg (Just a) else bsa)
             bkw
             params
       | otherwise =
@@ -1103,24 +1100,25 @@ validateParamsSyntax isLambda e =
              checkTy a mty)
             (go
                (maybe names (\n -> _identValue n : names) mname)
-               (maybe bsa (const $ HaveSeenEmptyStarArg Nothing) mname)
+               (if isNothing mname then HaveSeenEmptyStarArg (Just a) else bsa)
                bkw
                params)
     go names bsa bkw@(HaveSeenKeywordArg True) (PositionalParam a name mty : params) =
       let
         name' = _identValue name
         errs =
-            foldr (<|) (_PositionalAfterKeywordParam # (a, name') :| [])
-              [_DuplicateArgument # (a, name') | name' `elem` names]            
+          foldr (<|)
+            (_PositionalAfterKeywordParam # (a, name') :| [])
+            [_DuplicateArgument # (a, name') | name' `elem` names]
       in
         errorVM errs <*>
         checkTy a mty <*>
         go (name':names) bsa bkw params
-    go names bsa _ (KeywordParam a name mty ws2 expr : params)
+    go names _ _ (KeywordParam a name mty ws2 expr : params)
       | _identValue name `elem` names =
           errorVM1 (_DuplicateArgument # (a, _identValue name)) <*>
           checkTy a mty <*>
-          go names bsa (HaveSeenKeywordArg True) params
+          go names (HaveSeenEmptyStarArg Nothing) (HaveSeenKeywordArg True) params
       | otherwise =
           liftA2 (:)
             (KeywordParam a <$>
@@ -1128,7 +1126,11 @@ validateParamsSyntax isLambda e =
              checkTy a mty <*>
              pure ws2 <*>
              validateExprSyntax expr)
-            (go (_identValue name:names) bsa (HaveSeenKeywordArg True) params)
+            (go
+               (_identValue name:names)
+               (HaveSeenEmptyStarArg Nothing)
+               (HaveSeenKeywordArg True)
+               params)
     go names bsa bkw [DoubleStarParam a ws name mty]
       | _identValue name `elem` names =
           errorVM1 (_DuplicateArgument # (a, _identValue name)) <*>

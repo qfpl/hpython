@@ -1279,13 +1279,20 @@ renderParams = go False
     go _ CommaSepNone = mempty
     go _ (CommaSepOne a) = renderParam a
     go sawStar (CommaSepMany a ws2 b) =
-      renderParam a <>
-      (case b of
-         CommaSepNone | sawStar -> mempty
-         _ ->
-           singleton (TkComma ()) <>
-           foldMap renderWhitespace ws2) <>
-      go (case a of; StarParam{} -> True; DoubleStarParam{} -> True; _ -> sawStar) b
+      let
+        sawStar' =
+          case a of
+            StarParam{} -> True;
+            DoubleStarParam{} -> True
+            _ -> sawStar
+      in
+        renderParam a <>
+        (case b of
+           CommaSepNone | sawStar' -> mempty
+           _ ->
+             singleton (TkComma ()) <>
+             foldMap renderWhitespace ws2) <>
+      go sawStar' b
 
 renderParam :: Param v a -> RenderOutput
 renderParam (PositionalParam _ name mty) =

@@ -399,11 +399,13 @@ genCompIf =
     [ Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr ]
     []
 
-genComprehension :: (MonadGen m, MonadState GenState m) => m (Comprehension Expr '[] ())
-genComprehension =
+genListComprehension :: (MonadGen m, MonadState GenState m) => m (Comprehension Expr '[] ())
+genListComprehension =
   sized3
     (Comprehension ())
-    (Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
+    (do
+       localState $ modify (inGenerator .~ True)
+       Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
@@ -503,11 +505,10 @@ genExpr' isExp = do
     ]
     ([ genList genExpr
      , genStringLiterals
-     , ListComp () <$> genWhitespaces <*> genComprehension <*> genWhitespaces
+     , ListComp () <$> genWhitespaces <*> genListComprehension <*> genWhitespaces
      , DictComp () <$> genWhitespaces <*> genDictComp <*> genWhitespaces
      , SetComp () <$> genWhitespaces <*> genSetComp <*> genWhitespaces
-     , Generator () <$>
-       genGeneratorComprehension
+     , Generator () <$> genGeneratorComprehension
      , Dict () <$>
        genAnyWhitespaces <*>
        sizedMaybe (genSizedCommaSep1' $ genDictItem genExpr) <*>

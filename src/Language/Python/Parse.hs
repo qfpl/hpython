@@ -8,6 +8,7 @@ module Language.Python.Parse
   , parseModule
   , parseStatement
   , parseExpr
+  , parseExprList
   )
 where
 
@@ -86,6 +87,17 @@ parseStatement fp input =
   where
     tlIndent = Parse.level <|> withSrcInfo (pure $ Indents [])
 
+parseExprList :: FilePath -> Text -> Validation (NonEmpty (ParseError SrcInfo)) (Expr '[] SrcInfo)
+parseExprList fp input =
+  let
+    si = initialSrcInfo fp
+    ir = do
+      tokens <- first fromLexicalError $ tokenize fp input
+      tabbed <- first fromTabError $ insertTabs si tokens
+      first fromParseError $ Parse.runParser fp (Parse.exprList Parse.space <* eof) tabbed
+  in
+    fromEither (first pure ir) `bindValidation` (first (fmap fromIRError) . IR.fromIR_expr)
+
 parseExpr :: FilePath -> Text -> Validation (NonEmpty (ParseError SrcInfo)) (Expr '[] SrcInfo)
 parseExpr fp input =
   let
@@ -93,6 +105,6 @@ parseExpr fp input =
     ir = do
       tokens <- first fromLexicalError $ tokenize fp input
       tabbed <- first fromTabError $ insertTabs si tokens
-      first fromParseError $ Parse.runParser fp (Parse.exprList Parse.space <* eof) tabbed
+      first fromParseError $ Parse.runParser fp (Parse.expr Parse.space <* eof) tabbed
   in
     fromEither (first pure ir) `bindValidation` (first (fmap fromIRError) . IR.fromIR_expr)

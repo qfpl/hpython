@@ -434,7 +434,9 @@ genDictComp :: (MonadGen m, MonadState GenState m) => m (Comprehension DictItem 
 genDictComp =
   sized3
     (Comprehension ())
-    (DictItem () <$> genExpr <*> genAnyWhitespaces <*> genExpr)
+    (do
+       localState $ modify (inGenerator .~ True)
+       DictItem () <$> genExpr <*> genAnyWhitespaces <*> genExpr)
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
@@ -442,9 +444,19 @@ genSetComp :: (MonadGen m, MonadState GenState m) => m (Comprehension SetItem '[
 genSetComp =
   sized3
     (Comprehension ())
-    (SetItem () <$> genExpr)
+    (do
+       localState $ modify (inGenerator .~ True)
+       SetItem () <$> genExpr)
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
+
+genExprList :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
+genExprList =
+  sizedBind genExpr $ \e -> do
+    mes <- Gen.maybe $ sizedMaybe (genSizedCommaSep1' $ TupleItem () <$> genExpr)
+    case mes of
+      Nothing -> pure e
+      Just es -> (\ws -> Tuple () (TupleItem () e) ws es) <$> genWhitespaces
 
 -- | This is necessary to prevent generating exponentials that will take forever to evaluate
 -- when python does constant folding

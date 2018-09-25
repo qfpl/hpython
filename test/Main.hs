@@ -6,7 +6,7 @@ module Main where
 import Language.Python.Internal.Optics.Validated (unvalidated)
 import Language.Python.Internal.Render
 import Language.Python.Internal.Syntax
-import Language.Python.Parse (parseStatement, parseExpr)
+import Language.Python.Parse (parseStatement, parseExpr, parseExprList)
 import Language.Python.Validate.Indentation
 import Language.Python.Validate.Syntax
 
@@ -169,7 +169,7 @@ correct_syntax_statement path =
 expr_printparseprint_print :: Property
 expr_printparseprint_print =
   property $ do
-    ex <- forAll $ evalStateT Correct.genExpr Correct.initialGenState
+    ex <- forAll $ evalStateT Correct.genExprList Correct.initialGenState
     annotateShow $ showExpr ex
     case validateExprIndentation' ex of
       Failure errs -> annotateShow errs *> failure
@@ -179,7 +179,7 @@ expr_printparseprint_print =
           Success res' -> do
             _ <-
               validation (\e -> annotateShow e *> failure) pure $
-              parseExpr "test" (showExpr res')
+              parseExprList "test" (showExpr res')
             showExpr (res' ^. unvalidated) === showExpr (res $> ())
 
 statement_printparseprint_print :: Property

@@ -163,6 +163,7 @@ test-suite hpython-tests
                      , LexerParser
                      , Scope
                      , Roundtrip
+                     , Negative
   hs-source-dirs:      test
   build-depends:       base >=4.9 && <5
                      , directory

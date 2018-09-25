@@ -1,7 +1,10 @@
+{-# language DataKinds #-}
 module Helpers where
 
+import Data.List.NonEmpty (NonEmpty)
 import Data.Semigroup (Semigroup)
 import Data.Text (Text)
+import Data.Validation (Validation(..))
 import Hedgehog
 
 import Language.Python.Internal.Lexer
@@ -9,6 +12,9 @@ import Language.Python.Internal.Lexer
   )
 import Language.Python.Internal.Token (PyToken)
 import Language.Python.Internal.Parse (Parser, runParser)
+import Language.Python.Internal.Syntax (Statement, Expr)
+import Language.Python.Validate.Syntax
+import Language.Python.Validate.Indentation
 
 doTokenize :: Monad m => Text -> PropertyT m [PyToken SrcInfo]
 doTokenize input =
@@ -34,3 +40,31 @@ doParse pa input = do
       annotateShow err
       failure
     Right a -> pure a
+
+syntaxValidateStatement
+  :: Statement '[] ()
+  -> PropertyT IO
+       (Validation
+          (NonEmpty (SyntaxError '[Indentation] ()))
+          (Statement '[Syntax, Indentation] ()))
+syntaxValidateStatement x =
+  case runValidateIndentation $ validateStatementIndentation x of
+    Failure errs -> do
+      annotateShow (errs :: NonEmpty (IndentationError '[] ()))
+      failure
+    Success a ->
+      pure $ runValidateSyntax initialSyntaxContext [] (validateStatementSyntax a)
+
+syntaxValidateExpr
+  :: Expr '[] ()
+  -> PropertyT IO
+       (Validation
+          (NonEmpty (SyntaxError '[Indentation] ()))
+          (Expr '[Syntax, Indentation] ()))
+syntaxValidateExpr x =
+  case runValidateIndentation $ validateExprIndentation x of
+    Failure errs -> do
+      annotateShow (errs :: NonEmpty (IndentationError '[] ()))
+      failure
+    Success a ->
+      pure $ runValidateSyntax initialSyntaxContext [] (validateExprSyntax a)

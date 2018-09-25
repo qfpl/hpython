@@ -14,6 +14,7 @@ import DSL
 import LexerParser
 import Scope
 import Roundtrip
+import Negative
 
 import qualified Generators.General as General
 import qualified Generators.Correct as Correct
@@ -222,6 +223,7 @@ main = do
   checkParallel lexerParserTests
   traverse checkParallel dslTests
   checkParallel scopeTests
+  checkParallel negativeTests
   checkParallel roundtripTests
   let file = "hedgehog-test.py"
   checkParallel $

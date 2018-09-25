@@ -55,6 +55,9 @@ instance (AsEmpty s, Cons s s Char Char, Semigroup s, Monoid s) => Monoid (RawSt
 newtype LongRawString s = LongRawString (RawString s)
   deriving (Eq, Ord, Show)
 
+instance (AsEmpty s, Cons s s Char Char, Semigroup s) => Semigroup (LongRawString s) where
+  LongRawString a <> LongRawString b = LongRawString $ a <> b
+
 instance (AsEmpty s, Cons s s Char Char, Semigroup s, Monoid s) => Monoid (LongRawString s) where
   mempty = LongRawString mempty
   mappend (LongRawString a) (LongRawString b) = LongRawString $ mappend a b
@@ -80,6 +83,9 @@ _LongRawString = prism' (\(LongRawString (RawString s _)) -> s) toRaw
 
 newtype ShortRawString s = ShortRawString (RawString s)
   deriving (Eq, Ord, Show)
+
+instance (AsEmpty s, Cons s s Char Char, Semigroup s) => Semigroup (ShortRawString s) where
+  ShortRawString a <> ShortRawString b = ShortRawString $ a <> b
 
 instance (AsEmpty s, Cons s s Char Char, Semigroup s, Monoid s) => Monoid (ShortRawString s) where
   mempty = ShortRawString mempty

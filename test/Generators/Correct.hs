@@ -399,24 +399,13 @@ genCompIf =
     [ Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr ]
     []
 
-genListComprehension :: (MonadGen m, MonadState GenState m) => m (Comprehension Expr '[] ())
-genListComprehension =
+genComprehension :: (MonadGen m, MonadState GenState m) => m (Comprehension Expr '[] ())
+genComprehension =
   sized3
     (Comprehension ())
-    (do
-       localState $ modify (inGenerator .~ True)
+    (localState $ do
+       modify (inGenerator .~ True)
        Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
-    genCompFor
-    (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
-
-genGeneratorComprehension
-  :: (MonadGen m, MonadState GenState m) => m (Comprehension Expr '[] ())
-genGeneratorComprehension =
-  sized3
-    (Comprehension ())
-    (do
-        localState $ modify (inGenerator .~ True)
-        Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
@@ -436,8 +425,8 @@ genDictComp :: (MonadGen m, MonadState GenState m) => m (Comprehension DictItem 
 genDictComp =
   sized3
     (Comprehension ())
-    (do
-       localState $ modify (inGenerator .~ True)
+    (localState $ do
+       modify (inGenerator .~ True)
        DictItem () <$> genExpr <*> genAnyWhitespaces <*> genExpr)
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
@@ -446,8 +435,8 @@ genSetComp :: (MonadGen m, MonadState GenState m) => m (Comprehension SetItem '[
 genSetComp =
   sized3
     (Comprehension ())
-    (do
-       localState $ modify (inGenerator .~ True)
+    (localState $ do
+       modify (inGenerator .~ True)
        SetItem () <$> genExpr)
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
@@ -505,10 +494,10 @@ genExpr' isExp = do
     ]
     ([ genList genExpr
      , genStringLiterals
-     , ListComp () <$> genWhitespaces <*> genListComprehension <*> genWhitespaces
+     , Generator () <$> genComprehension
+     , ListComp () <$> genWhitespaces <*> genComprehension <*> genWhitespaces
      , DictComp () <$> genWhitespaces <*> genDictComp <*> genWhitespaces
      , SetComp () <$> genWhitespaces <*> genSetComp <*> genWhitespaces
-     , Generator () <$> genGeneratorComprehension
      , Dict () <$>
        genAnyWhitespaces <*>
        sizedMaybe (genSizedCommaSep1' $ genDictItem genExpr) <*>
@@ -716,18 +705,18 @@ genCompoundStatement =
             let paramIdents = a ^.. folded.paramName.identValue in
             sizedBind
               (localState $ do
-                (modify $
-                  \ctxt ->
-                  ctxt
-                  { _inLoop = False
-                  , _inFunction =
-                      fmap
-                        (bimap (`union` paramIdents) (|| isJust asyncWs))
-                        (_inFunction ctxt) <|>
-                      Just (paramIdents, isJust asyncWs)
-                  , _currentNonlocals = _willBeNonlocals ctxt <> _currentNonlocals ctxt
-                  })
-                (genSuite genSmallStatement genBlock)) $
+                 modify $
+                   \ctxt ->
+                   ctxt
+                   { _inLoop = False
+                   , _inFunction =
+                       fmap
+                         (bimap (`union` paramIdents) (|| isJust asyncWs))
+                         (_inFunction ctxt) <|>
+                       Just (paramIdents, isJust asyncWs)
+                   , _currentNonlocals = _willBeNonlocals ctxt <> _currentNonlocals ctxt
+                   }
+                 genSuite genSmallStatement genBlock) $
               \b ->
             sizedBind (sizedList genDecorator) $ \c ->
             sizedBind (sizedMaybe $ (,) <$> genWhitespaces <*> genExpr) $ \d ->

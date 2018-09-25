@@ -107,14 +107,16 @@ yes =
   ]
 
 everything =
-  Module
-    [ Right append_to
-    , Left ((), [], Nothing, Just $ LF Nothing)
-    , Right append_to'
-    , Left ((), [], Nothing, Just $ LF Nothing)
-    , Right fact_tr
-    , Left ((), [], Nothing, Just $ LF Nothing)
-    , Right spin
-    , Left ((), [], Nothing, Just $ LF Nothing)
-    , Right yes
-    ]
+  ModuleStatement append_to $
+  ModuleBlank () [] (LF Nothing) $
+
+  ModuleStatement append_to' $
+  ModuleBlank () [] (LF Nothing) $
+
+  ModuleStatement fact_tr $
+  ModuleBlank () [] (LF Nothing) $
+
+  ModuleStatement spin $
+  ModuleBlank () [] (LF Nothing) $
+
+  ModuleStatement yes ModuleEmpty

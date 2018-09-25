@@ -11,7 +11,6 @@ import Control.Lens.Setter ((.~), over, mapped)
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (traverseOf)
 import Control.Lens.Tuple (_1, _2, _3)
-import Control.Lens.Prism (_Right)
 import Data.Bifoldable (bifoldMap)
 import Data.Bifunctor (bimap)
 import Data.Bitraversable (bitraverse)
@@ -598,19 +597,12 @@ data ExceptAs a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-newtype Module a
-  = Module
-  { unModule :: [Either (a, [Whitespace], Maybe Comment, Maybe Newline) (Statement a)]
-  } deriving (Eq, Show)
-
-instance Functor Module where
-  fmap f = Module . fmap (bimap (over _1 f) (fmap f)) . unModule
-
-instance Foldable Module where
-  foldMap f = foldMap (bifoldMap (foldMapOf _1 f) (foldMap f)) . unModule
-
-instance Traversable Module where
-  traverse f = fmap Module . traverse (bitraverse (traverseOf _1 f) (traverse f)) . unModule
+data Module a
+  = ModuleEmpty
+  | ModuleBlankFinal a [Whitespace] (Maybe Comment)
+  | ModuleBlank a [Whitespace] Newline (Module a)
+  | ModuleStatement (Statement a) (Module a)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data FromIRContext
   = FromIRContext
@@ -904,5 +896,7 @@ fromIR_setItem (Parens a b c d) =
 fromIR_setItem e = (\x -> Syntax.SetItem (x ^. Syntax.exprAnn) x) <$> fromIR_expr e
 
 fromIR :: Module a -> Validation (NonEmpty (IRError a)) (Syntax.Module '[] a)
-fromIR (Module ms) =
-  Syntax.Module <$> traverseOf (traverse._Right) fromIR_statement ms
+fromIR ModuleEmpty = pure Syntax.ModuleEmpty
+fromIR (ModuleBlankFinal a b c) = pure $ Syntax.ModuleBlankFinal a b c
+fromIR (ModuleBlank a b c d) = Syntax.ModuleBlank a b c <$> fromIR d
+fromIR (ModuleStatement a b) = Syntax.ModuleStatement <$> fromIR_statement a <*> fromIR b

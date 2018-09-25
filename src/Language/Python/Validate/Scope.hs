@@ -52,7 +52,6 @@ import Control.Lens.Setter ((%~), (.~), Setter', mapped, over)
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Tuple (_2, _3)
 import Control.Lens.Traversal (traverseOf)
-import Control.Lens.Wrapped (_Wrapped)
 import Control.Monad.State (MonadState, State, evalState, modify)
 import Data.Bitraversable (bitraverse)
 import Data.ByteString (ByteString)
@@ -631,8 +630,15 @@ validateModuleScope
   :: AsScopeError e v a
   => Module v a
   -> ValidateScope a e (Module (Nub (Scope ': v)) a)
-validateModuleScope =
-  traverseOf (_Wrapped.traverse._Right) validateStatementScope
+validateModuleScope m =
+  case m of
+    ModuleEmpty -> pure ModuleEmpty
+    ModuleBlankFinal a b c -> pure $ ModuleBlankFinal a b c
+    ModuleBlank a b c d -> ModuleBlank a b c <$> validateModuleScope d
+    ModuleStatement a b ->
+     ModuleStatement <$>
+     validateStatementScope a <*>
+     validateModuleScope b
 
 unionL :: Ord k => Map k v -> Map k v -> Map k v
 unionL = Map.unionWith const

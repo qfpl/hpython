@@ -92,7 +92,7 @@ parseCommentNewline = do
         TkNewline
         (LF (Just $ Comment c) <$ char '\n' <|>
          char '\r' *> (CRLF (Just $ Comment c) <$ char '\n' <|> pure (CR . Just $ Comment c))) <|>
-      pure (TkComment c)
+      pure (TkComment $ Comment c)
 
 stringOrBytesPrefix
   :: CharParsing m

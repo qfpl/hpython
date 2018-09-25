@@ -7,10 +7,9 @@ import Control.Lens.Fold (Fold)
 import Control.Lens.Getter ((^.), view)
 import Control.Lens.Iso (Iso', iso, from)
 import Control.Lens.Setter ((.~))
-import Control.Lens.Traversal (Traversal, Traversal', traverseOf, failing)
+import Control.Lens.Traversal (Traversal, Traversal', traverseOf)
 import Control.Lens.Tuple (_3, _4)
-import Control.Lens.Prism (Prism, _Right, _Left, prism)
-import Control.Lens.Wrapped (_Wrapped)
+import Control.Lens.Prism (Prism, _Right, prism)
 import Data.Coerce (coerce)
 import Data.Function ((&))
 
@@ -471,7 +470,14 @@ instance HasNewlines Statement where
     SmallStatements idnts s ss sc <$> traverse f nl
 
 instance HasNewlines Module where
-  _Newlines = _Wrapped.traverse.failing (_Left._4.traverse) (_Right._Newlines)
+  _Newlines f = go
+    where
+      go ModuleEmpty = pure ModuleEmpty
+      go (ModuleBlankFinal a b c) = pure $ ModuleBlankFinal a b c
+      go (ModuleBlank a b c d) =
+        ModuleBlank a b <$> f c <*> go d
+      go (ModuleStatement a b) =
+        ModuleStatement <$> _Newlines f a <*> go b
 
 assignTargets :: Traversal (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
 assignTargets f e =

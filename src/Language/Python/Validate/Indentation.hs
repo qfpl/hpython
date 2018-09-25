@@ -31,9 +31,7 @@ import Control.Lens.Review ((#))
 import Control.Lens.Setter (over, mapped)
 import Control.Lens.Traversal (traverseOf)
 import Control.Lens.Tuple (_2)
-import Control.Lens.Wrapped (_Wrapped)
 import Control.Monad.State (State, evalState, get, put)
-import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
 import Data.Foldable (fold)
 import Data.Functor.Compose (Compose(..))
@@ -329,13 +327,25 @@ validateModuleIndentation
   :: AsIndentationError e v a
   => Module v a
   -> ValidateIndentation e (Module (Nub (Indentation ': v)) a)
-validateModuleIndentation =
-  traverseOf
-    (_Wrapped.traverse)
-    (bitraverse
-      (\(a, b, c, d) ->
-         (a, b, c, d) <$
-         if any (\case; Continued{} -> True; _ -> False) b
-         then errorVM1 $ _ExpectedEqualTo # ([], Indents [b ^. from indentWhitespaces] a)
-         else pure ())
-      (\a -> setNextIndent EqualTo [] *> validateStatementIndentation a))
+validateModuleIndentation m =
+  case m of
+    ModuleEmpty -> pure ModuleEmpty
+    ModuleBlankFinal a b c ->
+      ModuleBlankFinal a <$>
+      checkBlankWs a b <*>
+      pure c
+    ModuleBlank a b c d ->
+      ModuleBlank a <$>
+      checkBlankWs a b <*>
+      pure c <*>
+      validateModuleIndentation d
+    ModuleStatement a b ->
+     ModuleStatement <$
+     setNextIndent EqualTo [] <*>
+     validateStatementIndentation a <*>
+     validateModuleIndentation b
+  where
+    checkBlankWs a ws =
+      if any (\case; Continued{} -> True; _ -> False) ws
+      then errorVM1 $ _ExpectedEqualTo # ([], Indents [ws ^. from indentWhitespaces] a)
+      else pure ws

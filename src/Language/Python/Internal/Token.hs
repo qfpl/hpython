@@ -11,6 +11,7 @@ import Language.Python.Internal.Syntax.Strings
   , RawStringPrefix(..), RawBytesPrefix(..)
   , QuoteType(..), StringType(..), PyChar(..)
   )
+import Language.Python.Internal.Syntax.Comment (Comment)
 import Language.Python.Internal.Syntax.Strings.Raw (LongRawString, ShortRawString)
 import Language.Python.Internal.Syntax.Whitespace (Newline(..), Indents)
 
@@ -84,7 +85,7 @@ data PyToken a
   | TkPlus a
   | TkMinus a
   | TkTilde a
-  | TkComment String a
+  | TkComment Comment a
   | TkStar a
   | TkDoubleStar a
   | TkSlash a

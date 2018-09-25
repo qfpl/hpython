@@ -54,7 +54,6 @@ import Control.Lens.Setter ((.~), (%~))
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Tuple (_2, _3)
 import Control.Lens.Traversal (traverseOf)
-import Control.Lens.Wrapped (_Wrapped)
 import Control.Monad (when)
 import Control.Monad.State (State, put, modify, get, evalState)
 import Control.Monad.Reader (ReaderT, local, ask, runReaderT)
@@ -1155,5 +1154,14 @@ validateModuleSyntax
      )
   => Module v a
   -> ValidateSyntax e (Module (Nub (Syntax ': v)) a)
-validateModuleSyntax =
-  traverseOf (_Wrapped.traverse._Right) validateStatementSyntax
+validateModuleSyntax m =
+  case m of
+    ModuleEmpty -> pure ModuleEmpty
+    ModuleBlankFinal a b c ->
+      ModuleBlankFinal a <$> validateWhitespace a b <*> pure c
+    ModuleBlank a b c d ->
+      ModuleBlank a <$> validateWhitespace a b <*> pure c <*> validateModuleSyntax d
+    ModuleStatement a b ->
+     ModuleStatement <$>
+     validateStatementSyntax a <*>
+     validateModuleSyntax b

@@ -25,7 +25,6 @@ import Data.Bifoldable (bifoldMap)
 import Data.Digit.Char (charHeXaDeCiMaL, charOctal, charBinary, charDecimal)
 import Data.DList (DList)
 import Data.Foldable (toList)
-import Data.Maybe (maybe)
 import Data.Semigroup (Semigroup(..))
 import Data.Text (Text)
 import Data.These (These(..))
@@ -124,6 +123,12 @@ showQuoteType qt =
   case qt of
     DoubleQuote -> '\"'
     SingleQuote -> '\''
+
+renderComment :: Comment -> RenderOutput
+renderComment c = singleton $ TkComment c ()
+
+showComment :: Comment -> Text
+showComment (Comment s) = Text.pack $ "#" <> s
 
 showToken :: PyToken a -> Text
 showToken t =
@@ -227,9 +232,9 @@ showToken t =
     TkTab{} -> "\t"
     TkNewline nl _ ->
       case nl of
-        CR cmt -> foldMap (("#" <>) . renderComment) cmt <> "\r"
-        LF cmt -> foldMap (("#" <>) . renderComment) cmt <> "\n"
-        CRLF cmt -> foldMap (("#" <>) . renderComment) cmt <> "\r\n"
+        CR cmt -> foldMap showComment cmt <> "\r"
+        LF cmt -> foldMap showComment cmt <> "\n"
+        CRLF cmt -> foldMap showComment cmt <> "\r\n"
     TkLeftBracket{} -> "["
     TkRightBracket{} -> "]"
     TkLeftParen{} -> "("
@@ -246,9 +251,9 @@ showToken t =
     TkContinued nl _ ->
       "\\" <>
       case nl of
-        CR cmt -> foldMap (("#" <>) . renderComment) cmt <> "\r"
-        LF cmt -> foldMap (("#" <>) . renderComment) cmt <> "\n"
-        CRLF cmt -> foldMap (("#" <>) . renderComment) cmt <> "\r\n"
+        CR cmt -> foldMap showComment cmt <> "\r"
+        LF cmt -> foldMap showComment cmt <> "\n"
+        CRLF cmt -> foldMap showComment cmt <> "\r\n"
     TkColon{} -> ":"
     TkSemicolon{} -> ";"
     TkComma{} -> ","
@@ -256,7 +261,7 @@ showToken t =
     TkPlus{} -> "+"
     TkMinus{} -> "-"
     TkTilde{} -> "~"
-    TkComment s _ -> "#" <> Text.pack s
+    TkComment c _ -> showComment c
     TkStar{} -> "*"
     TkDoubleStar{} -> "**"
     TkSlash{} -> "/"
@@ -572,9 +577,6 @@ renderCommaSep1' f (CommaSepMany1' a ws2 c) =
 
 renderIdent :: Ident v a -> RenderOutput
 renderIdent (MkIdent _ a b) = TkIdent a () `cons` foldMap renderWhitespace b
-
-renderComment :: Comment -> Text
-renderComment (Comment s) = Text.pack s
 
 bracketTernaryLambda :: (Expr v a -> RenderOutput) -> Expr v a -> RenderOutput
 bracketTernaryLambda _ e@Ternary{} = bracket $ renderExpr e
@@ -1359,15 +1361,17 @@ renderIndents :: Indents a -> RenderOutput
 renderIndents (Indents is _) = foldMap renderIndent is
 
 renderModule :: Module v a -> RenderOutput
-renderModule (Module ms) =
-  foldMap
-    (either
-       (\(_, a, b, c) ->
-          foldMap renderWhitespace a <>
-          maybe mempty (\a -> singleton $ TkComment (Text.unpack $ renderComment a) ()) b <>
-          maybe mempty (singleton . renderNewline) c)
-       renderStatement)
-    ms
+renderModule ModuleEmpty = mempty
+renderModule (ModuleBlankFinal _ a b) =
+  foldMap renderWhitespace a <>
+  foldMap renderComment b
+renderModule (ModuleBlank _ a b c) =
+  foldMap renderWhitespace a <>
+  singleton (renderNewline b) <>
+  renderModule c
+renderModule (ModuleStatement a b) =
+  renderStatement a <>
+  renderModule b
 
 showModule :: Module v a -> Text
 showModule = showRenderOutput . renderModule

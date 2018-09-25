@@ -219,7 +219,7 @@ stringOrBytes ws =
 
 comment :: MonadParsec e PyTokens m => m Comment
 comment =
-  (\(TkComment str _) -> Comment str) <$>
+  (\(TkComment str _) -> str) <$>
   satisfy (\case; TkComment{} -> True; _ -> False) <?> "comment"
 
 indent :: MonadParsec e PyTokens m => m (Indents SrcInfo)
@@ -1286,17 +1286,21 @@ compoundStatement pIndent indentBefore =
 
 module_ :: MonadParsec e PyTokens m => m (Module SrcInfo)
 module_ =
-  Module <$>
-  many
-    (Left <$> maybeComment <|>
-     Right <$> (statement tlIndent =<< tlIndent)) <*
-  eof
+  ModuleStatement <$> (statement tlIndent =<< tlIndent) <*> module_
+
+  <|>
+
+  withSrcInfo
+  ((\ws rest a ->
+      case rest of
+        Left (nl, md) -> ModuleBlank a ws nl md
+        Right cmt -> ModuleBlankFinal a ws cmt) <$>
+   many space <*>
+   (Left <$> ((,) <$> newline <*> module_) <|> Right <$> optional comment <* eof))
+
+  <|>
+
+  ModuleEmpty <$ eof
+
   where
     tlIndent = level <|> withSrcInfo (pure $ Indents [])
-
-    maybeComment =
-      withSrcInfo $
-      (\ws (cmt, nl) a -> (a, ws, cmt, nl)) <$>
-      many space <*>
-      ((,) <$> fmap Just comment <*> optional eol <|>
-       (,) <$> pure Nothing <*> fmap Just eol)

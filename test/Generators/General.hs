@@ -469,16 +469,16 @@ genIndents = (\is -> Indents is ()) <$> Gen.list (Range.constant 0 10) genIndent
 
 genModule :: MonadGen m => m (Module '[] ())
 genModule =
-  Module <$>
-  sizedList
-    (Gen.choice
-    [ fmap Left $
-      (,,,) () <$>
-      genWhitespaces <*>
-      Gen.maybe genComment <*>
-      Gen.maybe genNewline
-    , Right <$> genStatement
-    ])
+  sizedRecursive
+    [ pure ModuleEmpty
+    , ModuleBlankFinal () <$> genWhitespaces <*> Gen.maybe genComment
+    ]
+    [ ModuleBlank () <$> genWhitespaces <*> genNewline <*> genModule
+    , sized2
+        ModuleStatement
+        genStatement
+        genModule
+    ]
 
 genImportAs :: MonadGen m => m (e ()) -> m (Ident '[] ()) -> m (ImportAs e '[] ())
 genImportAs me genIdent =

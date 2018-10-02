@@ -1168,12 +1168,12 @@ or_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolOr () [Space])
 str_ :: String -> Raw Expr
 str_ s =
   String () . pure $
-  StringLiteral () Nothing DoubleQuote ShortString (Char_lit <$> s) []
+  StringLiteral () Nothing ShortString DoubleQuote (Char_lit <$> s) []
 
 longStr_ :: String -> Raw Expr
 longStr_ s =
   String () . pure $
-  StringLiteral () Nothing DoubleQuote LongString (Char_lit <$> s) []
+  StringLiteral () Nothing LongString DoubleQuote (Char_lit <$> s) []
 
 mkAugAssign :: ([Whitespace] -> AugAssign ()) -> Raw Expr -> Raw Expr -> Raw Statement
 mkAugAssign as a b =

@@ -6,7 +6,7 @@ import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
-import Control.Lens.Fold ((^?!), preview)
+import Control.Lens.Fold ((^?!))
 import Control.Lens.Prism (_Right)
 import Control.Monad ((<=<))
 import Data.Digit.Enum (enumDecimal)
@@ -438,8 +438,8 @@ genStringLiteral :: MonadGen m => m PyChar -> m (StringLiteral ())
 genStringLiteral gChar =
   StringLiteral () <$>
   Gen.maybe genStringPrefix <*>
-  genQuoteType <*>
   genStringType <*>
+  genQuoteType <*>
   genString gChar <*>
   genWhitespaces
 
@@ -447,56 +447,10 @@ genBytesLiteral :: MonadGen m => m PyChar -> m (StringLiteral ())
 genBytesLiteral gChar =
   BytesLiteral () <$>
   genBytesPrefix <*>
-  genQuoteType <*>
   genStringType <*>
+  genQuoteType <*>
   genString gChar <*>
   genWhitespaces
-
-genLongRawString :: MonadGen m => m (LongRawString String)
-genLongRawString =
-  Gen.just .
-  fmap (preview _LongRawString) $
-  Gen.string
-    (Range.constant 0 100)
-    (Gen.filter (/= '\0') Gen.ascii)
-
-genShortRawString :: MonadGen m => m (ShortRawString String)
-genShortRawString =
-  Gen.just .
-  fmap (preview _ShortRawString) $
-  Gen.string
-    (Range.constant 0 100)
-    (Gen.filter (`notElem` "\0\r\n") Gen.ascii)
-
-genRawStringLiteral :: MonadGen m => m (StringLiteral ())
-genRawStringLiteral =
-  Gen.choice
-  [ LongRawStringLiteral () <$>
-    genRawStringPrefix <*>
-    genQuoteType <*>
-    genLongRawString <*>
-    genWhitespaces
-  , ShortRawStringLiteral () <$>
-    genRawStringPrefix <*>
-    genQuoteType <*>
-    genShortRawString <*>
-    genWhitespaces
-  ]
-
-genRawBytesLiteral :: MonadGen m => m (StringLiteral ())
-genRawBytesLiteral =
-  Gen.choice
-  [ LongRawBytesLiteral () <$>
-    genRawBytesPrefix <*>
-    genQuoteType <*>
-    genLongRawString <*>
-    genWhitespaces
-  , ShortRawBytesLiteral () <$>
-    genRawBytesPrefix <*>
-    genQuoteType <*>
-    genShortRawString <*>
-    genWhitespaces
-  ]
 
 genTupleItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (TupleItem v ())
 genTupleItem ws ge =

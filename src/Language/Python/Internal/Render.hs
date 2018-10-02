@@ -19,16 +19,12 @@ module Language.Python.Internal.Render
   )
 where
 
-import Control.Lens.Getter ((^.))
 import Control.Lens.Plated (transform)
 import Control.Lens.Review ((#))
-import Control.Lens.Setter ((.~))
 import Data.Bifoldable (bifoldMap)
 import Data.Digit.Char (charHeXaDeCiMaL, charOctal, charBinary, charDecimal)
 import Data.DList (DList)
 import Data.Foldable (toList)
-import Data.Function ((&))
-import Data.List.NonEmpty (NonEmpty(..))
 import Data.Semigroup (Semigroup(..))
 import Data.Text (Text)
 import Data.These (These(..))
@@ -40,6 +36,7 @@ import qualified Data.Text.Lazy as Lazy
 import qualified Data.Text.Lazy.Builder as Builder
 
 import Language.Python.Internal.Syntax
+import Language.Python.Internal.Render.Correction
 import Language.Python.Internal.Token (PyToken(..))
 
 newtype RenderOutput
@@ -177,7 +174,7 @@ showToken t =
     TkFloat i -> renderFloatLiteral i
     TkImag i -> renderImagLiteral i
     TkIdent s _ -> Text.pack s
-    TkString sp qt st s _ ->
+    TkString sp st qt s _ ->
       let
         quote =
           Text.pack $
@@ -187,7 +184,7 @@ showToken t =
         quote <>
         renderPyChars qt st s <>
         quote
-    TkBytes sp qt st s _ ->
+    TkBytes sp st qt s _ ->
       let
         quote =
           Text.pack $
@@ -197,38 +194,27 @@ showToken t =
         quote <>
         renderPyChars qt st s <>
         quote
-    TkLongRawString sp qt s _ ->
-      let
-        quote = Text.pack . replicate 3 $ showQuoteType qt
-      in
-        showRawStringPrefix sp <>
-        quote <>
-        renderRawPyChars qt LongString (_LongRawString # s) <>
-        quote
-    TkShortRawString sp qt s _ ->
-      let
-        quote = Text.pack [showQuoteType qt]
-      in
-        showRawStringPrefix sp <>
-        quote <>
-        renderRawPyChars qt ShortString (_ShortRawString # s) <>
-        quote
-    TkLongRawBytes sp qt s _ ->
+    TkRawString sp st qt s _ ->
       let
         quote =
-          Text.pack . replicate 3 $ showQuoteType qt
+          case st of
+            LongString -> Text.pack . replicate 3 $ showQuoteType qt
+            ShortString -> Text.singleton $ showQuoteType qt
       in
-        showRawBytesPrefix sp <>
+        showRawStringPrefix sp <>
         quote <>
-        renderRawPyChars qt LongString (_LongRawString # s) <>
+        renderRawPyChars qt st s <>
         quote
-    TkShortRawBytes sp qt s _ ->
+    TkRawBytes sp st qt s _ ->
       let
-        quote = Text.pack [showQuoteType qt]
+        quote =
+          case st of
+            LongString -> Text.pack . replicate 3 $ showQuoteType qt
+            ShortString -> Text.singleton $ showQuoteType qt
       in
         showRawBytesPrefix sp <>
         quote <>
-        renderRawPyChars qt ShortString (_ShortRawString # s) <>
+        renderRawPyChars qt st s <>
         quote
     TkSpace{} -> " "
     TkTab{} -> "\t"
@@ -345,143 +331,12 @@ intToHex n = Text.pack $ go n []
     go 15 = (++"F")
     go b = let (q, r) = quotRem b 16 in go r . go q
 
-renderRawPyChars :: QuoteType -> StringType -> [Char] -> Text
-renderRawPyChars qt st = Text.pack . go
-  where
-    endSingleQuotesShort a =
-      transform
-        (\x -> case x of
-           '\\' : '\'' : _ -> x
-           c : '\'' : as -> c : '\\' : '\'' : as
-           _ -> x)
-        (case a of
-           '\'' : cs -> '\\' : '\'' : cs
-           _ -> a)
-
-    endSingleQuotesLong a =
-      transform
-        (\x -> case x of
-           '\'' : '\'' : '\'' : as -> "\\\'\\\'\\\'" ++ as
-           ['\\', '\''] -> ['\\', '\'']
-           [c, '\''] -> [c, '\\', '\'']
-           _ -> x)
-        (case a of
-           '\'' : cs -> '\\' : '\'' : cs
-           _ -> a)
-
-    endDoubleQuotesShort a =
-      transform
-        (\x -> case x of
-           '\\' : '\"' : _ -> x
-           c : '\"' : as -> c : '\\' : '\"' : as
-           _ -> x)
-        (case a of
-           '\"' : cs -> '\\' : '\"' : cs
-           _ -> a)
-
-    endDoubleQuotesLong a =
-      transform
-        (\x -> case x of
-           '\"' : '\"' : '\"' : as -> "\\\"\\\"\\\"" ++ as
-           ['\\', '\"']  -> x
-           [c, '\"'] -> [c, '\\', '\"']
-           _ -> x)
-        (case a of
-           '\"' : cs -> '\\' : '\"' : cs
-           _ -> a)
-
-    go s =
-      case (qt, st) of
-        (SingleQuote, ShortString) -> endSingleQuotesShort s
-        (SingleQuote, LongString) -> endSingleQuotesLong s
-        (DoubleQuote, ShortString) -> endDoubleQuotesShort s
-        (DoubleQuote, LongString) -> endDoubleQuotesLong s
+renderRawPyChars :: QuoteType -> StringType -> [PyChar] -> Text
+renderRawPyChars = renderPyChars
 
 renderPyChars :: QuoteType -> StringType -> [PyChar] -> Text
-renderPyChars qt st = Text.pack . go
+renderPyChars _ _ = Text.pack . go
   where
-    endSingleQuotesShort =
-      snd .
-      foldr
-        (\a (bl, b) ->
-           case a of
-             Char_lit '\'' -> (bl, '\\' : '\'' : b)
-             Char_lit '\\' ->
-               ( bl
-               , if bl
-                 then '\\' : (case b of; '\\' : _ -> '\\' : b; _ -> b)
-                 else '\\' : '\\' : b
-               )
-             Char_lit c ->
-               ( True
-               , case c of
-                   '\n' -> go [Char_esc_n]
-                   '\r' -> go [Char_esc_r]
-                   _ -> c : b
-               )
-             _ -> (True, go [a] <> b))
-        (False, [])
-
-    endSingleQuotesLong =
-      snd .
-      foldr
-        (\a (bl, b) ->
-           case a of
-             Char_lit '\'' -> (bl, if bl then '\'' : b else '\\' : '\'' : b)
-             Char_lit '\\' ->
-               ( bl
-               , if bl
-                 then '\\' : (case b of; '\\' : _ -> '\\' : b; _ -> b)
-                 else '\\' : '\\' : b
-               )
-             Char_lit c -> (True, c : b)
-             _ -> (True, go [a] <> b))
-        (False, [])
-
-    endDoubleQuotesShort =
-      snd .
-      foldr
-        (\a (bl, b) ->
-           case a of
-             Char_lit '\"' -> (bl, '\\' : '\"' : b)
-             Char_lit '\\' ->
-               ( bl
-               , if bl
-                 then '\\' : (case b of; '\\' : _ -> '\\' : b; _ -> b)
-                 else '\\' : '\\' : b)
-             Char_lit c ->
-               ( True
-               , case c of
-                   '\n' -> go [Char_esc_n]
-                   '\r' -> go [Char_esc_r]
-                   _ -> c : b
-               )
-             _ -> (True, go [a] <> b))
-        (False, [])
-
-    endDoubleQuotesLong =
-      snd .
-      foldr
-        (\a (bl, b) ->
-           case a of
-             Char_lit '\"' -> (bl, if bl then '\"' : b else '\\' : '\"' : b)
-             Char_lit '\\' ->
-               ( bl
-               , if bl
-                 then '\\' : (case b of; '\\' : _ -> '\\' : b; _ -> b)
-                 else '\\' : '\\' : b)
-             Char_lit c -> (True, c : b)
-             _ -> (True, go [a] <> b))
-        (False, [])
-
-    escapeTripleDoubleQuotes (Char_lit '"' : Char_lit '"' : Char_lit '"' : cs) =
-      Char_esc_doublequote : Char_esc_doublequote : Char_esc_doublequote : cs
-    escapeTripleDoubleQuotes cs = cs
-
-    escapeTripleSingleQuotes (Char_lit '\'' : Char_lit '\'' : Char_lit '\'' : cs) =
-      Char_esc_singlequote : Char_esc_singlequote : Char_esc_singlequote : cs
-    escapeTripleSingleQuotes cs = cs
-
     go s =
       case s of
         [] -> ""
@@ -522,24 +377,7 @@ renderPyChars qt st = Text.pack . go
         Char_esc_r : cs -> '\\' : 'r' : go cs
         Char_esc_t : cs -> '\\' : 't' : go cs
         Char_esc_v : cs -> '\\' : 'v' : go cs
-        Char_lit c : cs ->
-          case (qt, st) of
-            (SingleQuote, ShortString) ->
-              case c of
-                '\'' -> '\\' : '\'' : go cs
-                _ -> endSingleQuotesShort s
-            (SingleQuote, LongString) ->
-              case c of
-                '\'' -> '\\' : '\'' : go cs
-                _ -> endSingleQuotesLong (transform escapeTripleSingleQuotes s)
-            (DoubleQuote, ShortString) ->
-              case c of
-                '"' -> '\\' : '"' : go cs
-                _ -> endDoubleQuotesShort s
-            (DoubleQuote, LongString) ->
-              case c of
-                '"' -> '\\' : '"' : go cs
-                _ -> endDoubleQuotesLong (transform escapeTripleDoubleQuotes s)
+        Char_lit c : cs -> c : go cs
 
 renderWhitespace :: Whitespace -> RenderOutput
 renderWhitespace Space = singleton $ TkSpace ()
@@ -676,18 +514,12 @@ renderStringLiteral (StringLiteral _ a b c d e) =
 renderStringLiteral (BytesLiteral _ a b c d e) =
   TkBytes a b c d () `cons`
   foldMap renderWhitespace e
-renderStringLiteral (LongRawStringLiteral _ a b c d) =
-  TkLongRawString a b c () `cons`
-  foldMap renderWhitespace d
-renderStringLiteral (ShortRawStringLiteral _ a b c d) =
-  TkShortRawString a b c () `cons`
-  foldMap renderWhitespace d
-renderStringLiteral (LongRawBytesLiteral _ a b c d) =
-  TkLongRawBytes a b c () `cons`
-  foldMap renderWhitespace d
-renderStringLiteral (ShortRawBytesLiteral _ a b c d) =
-  TkShortRawBytes a b c () `cons`
-  foldMap renderWhitespace d
+renderStringLiteral (RawStringLiteral _ a b c d e) =
+  TkRawString a b c d () `cons`
+  foldMap renderWhitespace e
+renderStringLiteral (RawBytesLiteral _ a b c d e) =
+  TkRawBytes a b c d () `cons`
+  foldMap renderWhitespace e
 
 renderSubscript :: Subscript v a -> RenderOutput
 renderSubscript (SubscriptExpr a) =
@@ -899,27 +731,7 @@ renderExpr (UnOp _ op expr) =
     Lambda{} -> bracket $ renderExpr expr
     _ -> bracketTupleGenerator expr
 renderExpr (String _ vs) =
-  foldMap renderStringLiteral $
-  correctAdjacentStrings vs
-  where
-    -- two non-typed single-quoted strings cannot be lexically
-    -- adjacent, because this would be a parse error
-    --
-    -- eg. '''' or """"
-    --
-    -- we correct for this by inserting a single space where required
-    -- '' '' or "" ""
-    correctAdjacentStrings (a :| []) = a :| []
-    correctAdjacentStrings (a:|b:cs) =
-      if
-        quoteType a == quoteType b &&
-        stringType a == stringType b &&
-        null (a ^. trailingWhitespace) &&
-        not (hasStringPrefix b)
-      then
-        NonEmpty.cons (a & trailingWhitespace .~ [Space]) (correctAdjacentStrings $ b :| cs)
-      else
-        NonEmpty.cons a (correctAdjacentStrings $ b :| cs)
+  foldMap renderStringLiteral $ correctAdjacentStrings vs
 renderExpr (Int _ n ws) = TkInt (() <$ n) `cons` foldMap renderWhitespace ws
 renderExpr (Float _ n ws) = TkFloat (() <$ n) `cons` foldMap renderWhitespace ws
 renderExpr (Imag _ n ws) = TkImag (() <$ n) `cons` foldMap renderWhitespace ws

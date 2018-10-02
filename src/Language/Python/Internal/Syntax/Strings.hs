@@ -8,7 +8,6 @@ import Data.Digit.Hexadecimal.MixedCase (HeXDigit(..))
 import Data.Maybe (isJust)
 
 import Language.Python.Internal.Syntax.Whitespace
-import Language.Python.Internal.Syntax.Strings.Raw
 
 data QuoteType
   = SingleQuote
@@ -46,67 +45,42 @@ data RawBytesPrefix
   | Prefix_RB
   deriving (Eq, Ord, Show)
 
-stringType :: StringLiteral a -> StringType
-stringType LongRawStringLiteral{} = LongString
-stringType ShortRawStringLiteral{} = ShortString
-stringType LongRawBytesLiteral{} = LongString
-stringType ShortRawBytesLiteral{} = ShortString
-stringType (StringLiteral _ _ _ a _ _) = a
-stringType (BytesLiteral _ _ _ a _ _) = a
-
-quoteType :: StringLiteral a -> QuoteType
-quoteType = _stringLiteralQuoteType
-
 hasStringPrefix :: StringLiteral a -> Bool
-hasStringPrefix LongRawStringLiteral{} = True
-hasStringPrefix ShortRawStringLiteral{} = True
-hasStringPrefix LongRawBytesLiteral{} = True
-hasStringPrefix ShortRawBytesLiteral{} = True
+hasStringPrefix RawStringLiteral{} = True
+hasStringPrefix RawBytesLiteral{} = True
 hasStringPrefix (StringLiteral _ a _ _ _ _) = isJust a
 hasStringPrefix BytesLiteral{} = True
 
 data StringLiteral a
-  = LongRawStringLiteral
+  = RawStringLiteral
   { _stringLiteralAnn :: a
   , _unsafeRawStringLiteralPrefix :: RawStringPrefix
+  , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
-  , _unsafeLongRawStringLiteralValue :: LongRawString [Char]
-  , _stringLiteralWhitespace :: [Whitespace]
-  }
-  | ShortRawStringLiteral
-  { _stringLiteralAnn :: a
-  , _unsafeRawStringLiteralPrefix :: RawStringPrefix
-  , _stringLiteralQuoteType :: QuoteType
-  , _unsafeShortRawStringLiteralValue :: ShortRawString [Char]
+  , _unsafeRawStringLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }
   | StringLiteral
   { _stringLiteralAnn :: a
   , _unsafeStringLiteralPrefix :: Maybe StringPrefix
+  , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
-  , _unsafeStringLiteralType :: StringType
   , _unsafeStringLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }
-  | LongRawBytesLiteral
+  | RawBytesLiteral
   { _stringLiteralAnn :: a
   , _unsafeRawBytesLiteralPrefix :: RawBytesPrefix
+  , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
-  , _unsafeLongRawBytesLiteralValue :: LongRawString [Char]
-  , _stringLiteralWhitespace :: [Whitespace]
-  }
-  | ShortRawBytesLiteral
-  { _stringLiteralAnn :: a
-  , _unsafeRawBytesLiteralPrefix :: RawBytesPrefix
-  , _stringLiteralQuoteType :: QuoteType
-  , _unsafeShortRawBytesLiteralValue :: ShortRawString [Char]
+  , _unsafeRawBytesLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }
   | BytesLiteral
   { _stringLiteralAnn :: a
   , _unsafeBytesLiteralPrefix :: BytesPrefix
+  , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
-  , _unsafeBytesLiteralType :: StringType
   , _unsafeBytesLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }
@@ -116,19 +90,15 @@ instance HasTrailingWhitespace (StringLiteral a) where
   trailingWhitespace =
     lens
       (\case
-          LongRawStringLiteral _ _ _ _ ws -> ws
-          ShortRawStringLiteral _ _ _ _ ws -> ws
+          RawStringLiteral _ _ _ _ _ ws -> ws
           StringLiteral _ _ _ _ _ ws -> ws
-          LongRawBytesLiteral _ _ _ _ ws -> ws
-          ShortRawBytesLiteral _ _ _ _ ws -> ws
+          RawBytesLiteral _ _ _ _ _ ws -> ws
           BytesLiteral _ _ _ _ _ ws -> ws)
       (\s ws -> case s of
           StringLiteral a b c d e _ -> StringLiteral a b c d e ws
-          LongRawStringLiteral a b c d _ -> LongRawStringLiteral a b c d ws
-          ShortRawStringLiteral a b c d _ -> ShortRawStringLiteral a b c d ws
+          RawStringLiteral a b c d e _ -> RawStringLiteral a b c d e ws
           BytesLiteral a b c d e _ -> BytesLiteral a b c d e ws
-          LongRawBytesLiteral a b c d _ -> LongRawBytesLiteral a b c d ws
-          ShortRawBytesLiteral a b c d _ -> ShortRawBytesLiteral a b c d ws)
+          RawBytesLiteral a b c d e _ -> RawBytesLiteral a b c d e ws)
 
 data PyChar
   = Char_newline

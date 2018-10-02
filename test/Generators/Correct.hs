@@ -454,6 +454,44 @@ genExprList =
 genExpr :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genExpr = genExpr' False
 
+genRawStringLiteral :: MonadGen m => m (StringLiteral ())
+genRawStringLiteral =
+  Gen.choice
+  [ RawStringLiteral () <$>
+    genRawStringPrefix <*>
+    pure LongString <*>
+    genQuoteType <*>
+    Gen.list (Range.constant 0 100) (genPyChar $ Gen.filter (/='\0') Gen.latin1)<*>
+    genWhitespaces
+  , RawStringLiteral () <$>
+    genRawStringPrefix <*>
+    pure ShortString <*>
+    genQuoteType <*>
+    Gen.list
+      (Range.constant 0 100)
+      (genPyChar $ Gen.filter (`notElem` "\0\n\r") Gen.latin1) <*>
+    genWhitespaces
+  ]
+
+genRawBytesLiteral :: MonadGen m => m (StringLiteral ())
+genRawBytesLiteral =
+  Gen.choice
+  [ RawBytesLiteral () <$>
+    genRawBytesPrefix <*>
+    pure LongString <*>
+    genQuoteType <*>
+    Gen.list (Range.constant 0 100) (genPyChar $ Gen.filter (/='\0') Gen.latin1) <*>
+    genWhitespaces
+  , RawBytesLiteral () <$>
+    genRawBytesPrefix <*>
+    pure ShortString <*>
+    genQuoteType <*>
+    Gen.list
+      (Range.constant 0 100)
+      (genPyChar $ Gen.filter (`notElem` "\0\n\r") Gen.latin1) <*>
+    genWhitespaces
+  ]
+
 genStringLiterals :: MonadGen m => m (Expr '[] ())
 genStringLiterals = do
   n <- Gen.integral (Range.constant 1 5) :: MonadGen m => m Integer

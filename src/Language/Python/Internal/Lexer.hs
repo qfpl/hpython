@@ -15,7 +15,6 @@ module Language.Python.Internal.Lexer
 where
 
 import Control.Applicative ((<|>), many, optional)
-import Control.Lens.Fold ((^?))
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
 import Control.Monad (when, replicateM)
@@ -119,31 +118,25 @@ stringOrBytesPrefix =
   (Left (Right Prefix_u) <$ char 'u') <|>
   (Left (Right Prefix_U) <$ char 'U')
 
-longRawStringChars :: (Monad m, CharParsing m) => m a -> m (LongRawString String)
-longRawStringChars mc = do
-  str <-
-    manyTill
-      ((\x y -> [x, y]) <$> char '\\' <*> noneOf "\0" <|>
-       pure <$> noneOf "\0" <|>
-       char '\0' *> unexpected "null byte in string")
-      mc
-  case concat str ^? _LongRawString of
-    Nothing -> unexpected "odd number of backslashes terminating raw string"
-    Just str' -> pure str'
+longRawStringChars :: (Monad m, CharParsing m) => m a -> m [PyChar]
+longRawStringChars mc =
+  concat <$>
+  manyTill
+    ((\x y -> [Char_lit x, Char_lit y]) <$> char '\\' <*> noneOf "\0" <|>
+      pure . Char_lit <$> noneOf "\0" <|>
+      char '\0' *> unexpected "null byte in string")
+    mc
 
-shortRawStringChars :: (Monad m, CharParsing m) => m a -> m (ShortRawString String)
-shortRawStringChars mc = do
-  str <-
-    manyTill
-      ((\x y -> [x, y]) <$> char '\\' <*> noneOf "\0" <|>
-       pure <$> noneOf "\0\r\n" <|>
-       char '\r' *> unexpected "carriage return in string" <|>
-       char '\n' *> unexpected "line feed in string" <|>
-       char '\0' *> unexpected "null byte in string")
-      mc
-  case concat str ^? _ShortRawString of
-    Nothing -> unexpected "odd number of backslashes terminating raw string"
-    Just str' -> pure str'
+shortRawStringChars :: (Monad m, CharParsing m) => m a -> m [PyChar]
+shortRawStringChars mc =
+  concat <$>
+  manyTill
+    ((\x y -> [Char_lit x, Char_lit y]) <$> char '\\' <*> noneOf "\0" <|>
+     pure . Char_lit <$> noneOf "\0\r\n" <|>
+     char '\r' *> unexpected "carriage return in string" <|>
+     char '\n' *> unexpected "line feed in string" <|>
+     char '\0' *> unexpected "null byte in string")
+    mc
 
 stringChar :: CharParsing m => m PyChar
 stringChar =
@@ -372,68 +365,68 @@ parseToken =
         sp <- try $ optional stringOrBytesPrefix <* char '"'
         case sp of
           Nothing ->
-            TkString Nothing DoubleQuote LongString <$
+            TkString Nothing LongString DoubleQuote <$
             text "\"\"" <*>
             manyTill stringChar (text "\"\"\"")
             <|>
-            TkString Nothing DoubleQuote ShortString <$> manyTill stringChar (char '"')
+            TkString Nothing ShortString DoubleQuote <$> manyTill stringChar (char '"')
           Just (Left (Left prefix)) ->
-            TkLongRawString prefix DoubleQuote <$
+            TkRawString prefix LongString DoubleQuote <$
             text "\"\"" <*>
             longRawStringChars (text "\"\"\"")
             <|>
-            TkShortRawString prefix DoubleQuote <$> shortRawStringChars (char '"')
+            TkRawString prefix ShortString DoubleQuote <$> shortRawStringChars (char '"')
           Just (Left (Right prefix)) ->
-            TkString (Just prefix) DoubleQuote LongString <$
+            TkString (Just prefix) LongString DoubleQuote <$
             text "\"\"" <*>
             manyTill stringChar (text "\"\"\"")
             <|>
-            TkString (Just prefix) DoubleQuote ShortString <$> manyTill stringChar (char '"')
+            TkString (Just prefix) ShortString DoubleQuote <$> manyTill stringChar (char '"')
           Just (Right (Left prefix)) ->
-            TkLongRawBytes prefix DoubleQuote <$
+            TkRawBytes prefix LongString DoubleQuote <$
             text "\"\"" <*>
             longRawStringChars (text "\"\"\"")
             <|>
-            TkShortRawBytes prefix DoubleQuote <$> shortRawStringChars (char '"')
+            TkRawBytes prefix ShortString DoubleQuote <$> shortRawStringChars (char '"')
           Just (Right (Right prefix)) ->
-            TkBytes prefix DoubleQuote LongString <$
+            TkBytes prefix LongString DoubleQuote <$
             text "\"\"" <*>
             manyTill stringChar (text "\"\"\"")
             <|>
-            TkBytes prefix DoubleQuote ShortString <$> manyTill stringChar (char '"')
+            TkBytes prefix ShortString DoubleQuote <$> manyTill stringChar (char '"')
     , do
         sp <- try $ optional stringOrBytesPrefix <* char '\''
         case sp of
           Nothing ->
-            TkString Nothing SingleQuote LongString <$
+            TkString Nothing LongString SingleQuote <$
             text "''" <*>
             manyTill stringChar (text "'''")
             <|>
-            TkString Nothing SingleQuote ShortString <$> manyTill stringChar (char '\'')
+            TkString Nothing ShortString SingleQuote <$> manyTill stringChar (char '\'')
           Just (Left (Left prefix)) ->
-            TkLongRawString prefix SingleQuote <$
+            TkRawString prefix LongString SingleQuote <$
             text "''" <*>
             longRawStringChars (text "'''")
             <|>
-            TkShortRawString prefix SingleQuote <$> shortRawStringChars (char '\'')
+            TkRawString prefix ShortString SingleQuote <$> shortRawStringChars (char '\'')
           Just (Left (Right prefix)) ->
-            TkString (Just prefix) SingleQuote LongString <$
+            TkString (Just prefix) LongString SingleQuote <$
             text "''" <*>
             manyTill stringChar (text "'''")
             <|>
-            TkString (Just prefix) SingleQuote ShortString <$> manyTill stringChar (char '\'')
+            TkString (Just prefix) ShortString SingleQuote <$> manyTill stringChar (char '\'')
           Just (Right (Left prefix)) ->
-            TkLongRawBytes prefix SingleQuote <$
+            TkRawBytes prefix LongString SingleQuote <$
             text "''" <*>
             longRawStringChars (text "'''")
             <|>
-            TkShortRawBytes prefix SingleQuote <$> shortRawStringChars (char '\'')
+            TkRawBytes prefix ShortString SingleQuote <$> shortRawStringChars (char '\'')
           Just (Right (Right prefix)) ->
-            TkBytes prefix SingleQuote LongString <$
+            TkBytes prefix LongString SingleQuote <$
             text "''" <*>
             manyTill stringChar (text "'''")
             <|>
-            TkBytes prefix SingleQuote ShortString <$> manyTill stringChar (char '\'')
+            TkBytes prefix ShortString SingleQuote <$> manyTill stringChar (char '\'')
     , fmap TkIdent $
       (:) <$>
       satisfy isIdentifierStart <*>

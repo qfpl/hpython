@@ -276,18 +276,12 @@ validateStringLiteralSyntax (BytesLiteral a b c d e f) =
   BytesLiteral a b c d <$>
   traverse (validateBytesPyChar a) e <*>
   validateWhitespace a f
-validateStringLiteralSyntax (LongRawStringLiteral a b c d e) =
-  LongRawStringLiteral a b c d <$>
-  validateWhitespace a e
-validateStringLiteralSyntax (ShortRawStringLiteral a b c d e) =
-  ShortRawStringLiteral a b c d <$>
-  validateWhitespace a e
-validateStringLiteralSyntax (LongRawBytesLiteral a b c d e) =
-  LongRawBytesLiteral a b c d <$>
-  validateWhitespace a e
-validateStringLiteralSyntax (ShortRawBytesLiteral a b c d e) =
-  ShortRawBytesLiteral a b c d <$>
-  validateWhitespace a e
+validateStringLiteralSyntax (RawStringLiteral a b c d e f) =
+  RawStringLiteral a b c d e <$>
+  validateWhitespace a f
+validateStringLiteralSyntax (RawBytesLiteral a b c d e f) =
+  RawBytesLiteral a b c d e <$>
+  validateWhitespace a f
 
 validateDictItemSyntax
   :: ( AsSyntaxError e v a
@@ -438,16 +432,14 @@ validateExprSyntax (String a strLits) =
     all
       (\case
           StringLiteral{} -> True
-          LongRawStringLiteral{} -> True
-          ShortRawStringLiteral{} -> True
+          RawStringLiteral{} -> True
           _ -> False)
       strLits
       ||
     all
       (\case
           BytesLiteral{} -> True
-          LongRawBytesLiteral{} -> True
-          ShortRawBytesLiteral{} -> True
+          RawBytesLiteral{} -> True
           _ -> False)
       strLits
   then

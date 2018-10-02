@@ -192,6 +192,41 @@ genPyChar =
   , head . fromHaskellString . pure <$> Gen.latin1
   ]
 
+genRawStringLiteral :: MonadGen m => m (StringLiteral ())
+genRawStringLiteral =
+  Gen.choice
+  [ RawStringLiteral () <$>
+    genRawStringPrefix <*>
+    pure LongString <*>
+    genQuoteType <*>
+    Gen.list (Range.constant 0 100) genPyChar <*>
+    genWhitespaces
+  , RawStringLiteral () <$>
+    genRawStringPrefix <*>
+    pure ShortString <*>
+    genQuoteType <*>
+    Gen.list (Range.constant 0 100) genPyChar <*>
+    genWhitespaces
+  ]
+
+genRawBytesLiteral :: MonadGen m => m (StringLiteral ())
+genRawBytesLiteral =
+  Gen.choice
+  [ RawBytesLiteral () <$>
+    genRawBytesPrefix <*>
+    pure LongString <*>
+    genQuoteType <*>
+    Gen.list (Range.constant 0 100) genPyChar <*>
+    genWhitespaces
+  , RawBytesLiteral () <$>
+    genRawBytesPrefix <*>
+    pure ShortString <*>
+    genQuoteType <*>
+    Gen.list (Range.constant 0 100) genPyChar <*>
+    genWhitespaces
+  ]
+
+
 genExpr' :: MonadGen m => Bool -> m (Expr '[] ())
 genExpr' isExp =
   sizedRecursive

@@ -61,6 +61,7 @@ library
                      , Language.Python.Internal.Optics.Validated
                      , Language.Python.Internal.Parse
                      , Language.Python.Internal.Render
+                     , Language.Python.Internal.Render.Correction
                      , Language.Python.Internal.Syntax
                      , Language.Python.Internal.Token
                      , Language.Python.Internal.Syntax.AugAssign

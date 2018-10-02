@@ -20,31 +20,31 @@ test_1 =
     let
       e1 =
         String () $
-        StringLiteral () Nothing SingleQuote ShortString [] [] :|
-        [StringLiteral () Nothing SingleQuote ShortString [] []]
+        StringLiteral () Nothing ShortString SingleQuote [] [] :|
+        [StringLiteral () Nothing ShortString SingleQuote [] []]
 
     showExpr e1 === "'' ''"
 
     let
       e2 =
         String () $
-        StringLiteral () Nothing DoubleQuote ShortString [] [] :|
-        [StringLiteral () Nothing DoubleQuote ShortString [] []]
+        StringLiteral () Nothing ShortString DoubleQuote [] [] :|
+        [StringLiteral () Nothing ShortString DoubleQuote [] []]
 
     showExpr e2 === "\"\" \"\""
 
     let
       e3 =
         String () $
-        StringLiteral () Nothing SingleQuote ShortString [] [] :|
-        [StringLiteral () Nothing DoubleQuote ShortString [] []]
+        StringLiteral () Nothing ShortString SingleQuote [] [] :|
+        [StringLiteral () Nothing ShortString DoubleQuote [] []]
 
     showExpr e3 === "''\"\""
 
     let
       e4 =
         String () $
-        StringLiteral () Nothing SingleQuote ShortString [] [] :|
-        [StringLiteral () (Just Prefix_u) SingleQuote ShortString [] []]
+        StringLiteral () Nothing ShortString SingleQuote [] [] :|
+        [StringLiteral () (Just Prefix_u) ShortString SingleQuote [] []]
 
     showExpr e4 === "''u''"

@@ -124,7 +124,8 @@ equivalentIndentation (x:xs) (y:ys) =
     _ -> False
 
 validateBlockIndentation
-  :: AsIndentationError e v a
+  :: forall e v a.
+     AsIndentationError e v a
   => Block v a
   -> ValidateIndentation e (Block (Nub (Indentation ': v)) a)
 validateBlockIndentation (Block x b bs) =
@@ -135,6 +136,7 @@ validateBlockIndentation (Block x b bs) =
   traverseOf _head checkBlankIndents x <*>
   go False (Right b) bs
   where
+    checkBlankIndents :: (a, [Whitespace], Newline) -> ValidateIndentation e (a, [Whitespace], Newline)
     checkBlankIndents (a, b, c) =
       if any (\case; Continued{} -> True; _ -> False) b
       then errorVM1 $ _EmptyContinuedLine # a

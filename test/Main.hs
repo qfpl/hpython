@@ -12,6 +12,7 @@ import Language.Python.Validate.Syntax
 
 import DSL
 import LexerParser
+import Optics
 import Printer
 import Roundtrip
 import Scope
@@ -223,6 +224,7 @@ main :: IO ()
 main = do
   checkParallel lexerParserTests
   traverse checkParallel dslTests
+  checkParallel opticsTests
   checkParallel printerTests
   checkParallel scopeTests
   checkParallel syntaxTests

@@ -639,7 +639,7 @@ splitIndents ns ws = go ns ws []
               in
                 if FingerTree.null afters
                 then error $ "could not carve out " <> show n <> " from " <> show ws
-                else go ns' (MkIndent befores) .  (MkIndent afters :)
+                else go ns' (MkIndent befores) . (MkIndent afters :)
 
 chunked :: [IndentedLine a] -> [PyToken a]
 chunked = go FingerTree.empty
@@ -650,7 +650,10 @@ chunked = go FingerTree.empty
       -> [PyToken a]
     go _ [] = []
     go leaps (Indent n i a : is) =
-      TkIndent a (Indents (splitIndents leaps i) a) : go (leaps FingerTree.|> Summed n) is
+      let
+        leaps' = leaps FingerTree.|> Summed n
+      in
+        TkIndent a (Indents (splitIndents leaps' i) a) : go leaps' is
     go leaps (Dedent a : is) =
       case FingerTree.viewr leaps of
         FingerTree.EmptyR -> error "impossible"

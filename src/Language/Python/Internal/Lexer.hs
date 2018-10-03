@@ -118,26 +118,6 @@ stringOrBytesPrefix =
   (Left (Right Prefix_u) <$ char 'u') <|>
   (Left (Right Prefix_U) <$ char 'U')
 
-longRawStringChars :: (Monad m, CharParsing m) => m a -> m [PyChar]
-longRawStringChars mc =
-  concat <$>
-  manyTill
-    ((\x y -> [Char_lit x, Char_lit y]) <$> char '\\' <*> noneOf "\0" <|>
-      pure . Char_lit <$> noneOf "\0" <|>
-      char '\0' *> unexpected "null byte in string")
-    mc
-
-shortRawStringChars :: (Monad m, CharParsing m) => m a -> m [PyChar]
-shortRawStringChars mc =
-  concat <$>
-  manyTill
-    ((\x y -> [Char_lit x, Char_lit y]) <$> char '\\' <*> noneOf "\0" <|>
-     pure . Char_lit <$> noneOf "\0\r\n" <|>
-     char '\r' *> unexpected "carriage return in string" <|>
-     char '\n' *> unexpected "line feed in string" <|>
-     char '\0' *> unexpected "null byte in string")
-    mc
-
 stringChar :: CharParsing m => m PyChar
 stringChar =
   (char '\\' *>
@@ -373,9 +353,9 @@ parseToken =
           Just (Left (Left prefix)) ->
             TkRawString prefix LongString DoubleQuote <$
             text "\"\"" <*>
-            longRawStringChars (text "\"\"\"")
+            manyTill stringChar (text "\"\"\"")
             <|>
-            TkRawString prefix ShortString DoubleQuote <$> shortRawStringChars (char '"')
+            TkRawString prefix ShortString DoubleQuote <$> manyTill stringChar (char '"')
           Just (Left (Right prefix)) ->
             TkString (Just prefix) LongString DoubleQuote <$
             text "\"\"" <*>
@@ -385,9 +365,9 @@ parseToken =
           Just (Right (Left prefix)) ->
             TkRawBytes prefix LongString DoubleQuote <$
             text "\"\"" <*>
-            longRawStringChars (text "\"\"\"")
+            manyTill stringChar (text "\"\"\"")
             <|>
-            TkRawBytes prefix ShortString DoubleQuote <$> shortRawStringChars (char '"')
+            TkRawBytes prefix ShortString DoubleQuote <$> manyTill stringChar (char '"')
           Just (Right (Right prefix)) ->
             TkBytes prefix LongString DoubleQuote <$
             text "\"\"" <*>
@@ -406,9 +386,9 @@ parseToken =
           Just (Left (Left prefix)) ->
             TkRawString prefix LongString SingleQuote <$
             text "''" <*>
-            longRawStringChars (text "'''")
+            manyTill stringChar (text "'''")
             <|>
-            TkRawString prefix ShortString SingleQuote <$> shortRawStringChars (char '\'')
+            TkRawString prefix ShortString SingleQuote <$> manyTill stringChar (char '\'')
           Just (Left (Right prefix)) ->
             TkString (Just prefix) LongString SingleQuote <$
             text "''" <*>
@@ -418,9 +398,9 @@ parseToken =
           Just (Right (Left prefix)) ->
             TkRawBytes prefix LongString SingleQuote <$
             text "''" <*>
-            longRawStringChars (text "'''")
+            manyTill stringChar (text "'''")
             <|>
-            TkRawBytes prefix ShortString SingleQuote <$> shortRawStringChars (char '\'')
+            TkRawBytes prefix ShortString SingleQuote <$> manyTill stringChar (char '\'')
           Just (Right (Right prefix)) ->
             TkBytes prefix LongString SingleQuote <$
             text "''" <*>

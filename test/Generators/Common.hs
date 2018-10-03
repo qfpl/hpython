@@ -9,7 +9,7 @@ import qualified Hedgehog.Range as Range
 import Control.Lens.Fold ((^?!))
 import Control.Lens.Prism (_Right)
 import Control.Monad ((<=<))
-import Data.Digit.Enum (enumDecimal)
+import Data.Digit.Enum (enumOctal, enumDecimal)
 import Data.Digit.Hexadecimal.MixedCase
 import Data.Digit.Integral
 import Data.List.NonEmpty (NonEmpty(..))
@@ -521,4 +521,38 @@ genHexDigit =
   , HeXDigitE
   , HeXDigitf
   , HeXDigitF
+  ]
+
+genPyChar :: MonadGen m => m Char -> m PyChar
+genPyChar mlit =
+  Gen.choice
+  [ pure Char_newline
+  , Char_octal <$> Gen.element enumOctal <*> Gen.element enumOctal
+  , Char_hex <$> genHexDigit <*> genHexDigit
+  , Char_uni16 <$>
+    genHexDigit <*>
+    genHexDigit <*>
+    genHexDigit <*>
+    genHexDigit
+  , do
+      a <- genHexDigit
+      b <- case a of
+        HeXDigit1 -> pure HeXDigit0
+        _ -> genHexDigit
+      Char_uni32 HeXDigit0 HeXDigit0 a b <$>
+        genHexDigit <*>
+        genHexDigit <*>
+        genHexDigit <*>
+        genHexDigit
+  , pure Char_esc_bslash
+  , pure Char_esc_singlequote
+  , pure Char_esc_doublequote
+  , pure Char_esc_a
+  , pure Char_esc_b
+  , pure Char_esc_f
+  , pure Char_esc_n
+  , pure Char_esc_r
+  , pure Char_esc_t
+  , pure Char_esc_v
+  , Char_lit <$> mlit
   ]

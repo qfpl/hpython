@@ -22,7 +22,9 @@ where
 import Control.Lens.Plated (transform)
 import Control.Lens.Review ((#))
 import Data.Bifoldable (bifoldMap)
+import Data.Char (ord)
 import Data.Digit.Char (charHeXaDeCiMaL, charOctal, charBinary, charDecimal)
+import Data.Digit.Hexadecimal.MixedCase (HeXDigit(..))
 import Data.DList (DList)
 import Data.Foldable (toList)
 import Data.Semigroup (Semigroup(..))
@@ -192,7 +194,7 @@ showToken t =
       in
         showBytesPrefix sp <>
         quote <>
-        renderPyChars qt st s <>
+        renderPyCharsBytes qt st s <>
         quote
     TkRawString sp st qt s _ ->
       let
@@ -214,7 +216,7 @@ showToken t =
       in
         showRawBytesPrefix sp <>
         quote <>
-        renderRawPyChars qt st s <>
+        renderRawPyCharsBytes qt st s <>
         quote
     TkSpace{} -> " "
     TkTab{} -> "\t"
@@ -334,8 +336,35 @@ intToHex n = Text.pack $ go n []
 renderRawPyChars :: QuoteType -> StringType -> [PyChar] -> Text
 renderRawPyChars = renderPyChars
 
-renderPyChars :: QuoteType -> StringType -> [PyChar] -> Text
-renderPyChars _ _ = Text.pack . go
+renderRawPyCharsBytes :: QuoteType -> StringType -> [PyChar] -> Text
+renderRawPyCharsBytes = renderPyCharsBytes
+
+intToHexH :: Int -> [HeXDigit]
+intToHexH n = go n []
+  where
+    go 0 = (++[HeXDigit0])
+    go 1 = (++[HeXDigit1])
+    go 2 = (++[HeXDigit2])
+    go 3 = (++[HeXDigit3])
+    go 4 = (++[HeXDigit4])
+    go 5 = (++[HeXDigit5])
+    go 6 = (++[HeXDigit6])
+    go 7 = (++[HeXDigit7])
+    go 8 = (++[HeXDigit8])
+    go 9 = (++[HeXDigit9])
+    go 10 = (++[HeXDigitA])
+    go 11 = (++[HeXDigitB])
+    go 12 = (++[HeXDigitC])
+    go 13 = (++[HeXDigitD])
+    go 14 = (++[HeXDigitE])
+    go 15 = (++[HeXDigitF])
+    go b = let (q, r) = quotRem b 16 in go r . go q
+
+renderPyCharsBytes :: QuoteType -> StringType -> [PyChar] -> Text
+renderPyCharsBytes qt st =
+  case st of
+    LongString -> Text.pack . go . correctFinalBackslashes . correctInitialFinalQuotes qt
+    ShortString -> Text.pack . go . correctFinalBackslashes . correctQuotes qt
   where
     go s =
       case s of
@@ -377,7 +406,81 @@ renderPyChars _ _ = Text.pack . go
         Char_esc_r : cs -> '\\' : 'r' : go cs
         Char_esc_t : cs -> '\\' : 't' : go cs
         Char_esc_v : cs -> '\\' : 'v' : go cs
-        Char_lit c : cs -> c : go cs
+        Char_lit c : cs
+          | o <- ord c, o > 127 ->
+            let
+              h = intToHexH o
+            in
+            case replicate (8 - length h) HeXDigit0 <> h of
+              [a, b, c, d, e, f, g, h] -> go $ Char_uni32 a b c d e f g h : cs
+              _ -> error $ "character " <> show c <> " out of unicode range"
+          | otherwise ->
+              case st of
+                LongString -> c : go cs
+                ShortString ->
+                  case c of
+                    '\r' -> go $ Char_esc_r : cs
+                    '\n' -> go $ Char_esc_n : cs
+                    '\'' | SingleQuote <- qt -> go $ Char_esc_singlequote : cs
+                    '\"' | DoubleQuote <- qt -> go $ Char_esc_singlequote : cs
+                    _ -> c : go cs
+
+renderPyChars :: QuoteType -> StringType -> [PyChar] -> Text
+renderPyChars qt st =
+  case st of
+    LongString -> Text.pack . go . correctFinalBackslashes . correctInitialFinalQuotes qt
+    ShortString -> Text.pack . go . correctFinalBackslashes . correctQuotes qt
+  where
+    go s =
+      case s of
+        [] -> ""
+        Char_newline : cs -> "\\newline" <> go cs
+        Char_octal a b : cs ->
+          "\\o" <>
+          [charOctal # a, charOctal # b] <>
+          go cs
+        Char_hex a b : cs ->
+          "\\x" <> [charHeXaDeCiMaL # a, charHeXaDeCiMaL # b] <> go cs
+        Char_uni16 a b c d : cs ->
+          "\\u" <>
+          [ charHeXaDeCiMaL # a
+          , charHeXaDeCiMaL # b
+          , charHeXaDeCiMaL # c
+          , charHeXaDeCiMaL # d
+          ] <>
+          go cs
+        Char_uni32 a b c d e f g h : cs ->
+          "\\u" <>
+          [ charHeXaDeCiMaL # a
+          , charHeXaDeCiMaL # b
+          , charHeXaDeCiMaL # c
+          , charHeXaDeCiMaL # d
+          , charHeXaDeCiMaL # e
+          , charHeXaDeCiMaL # f
+          , charHeXaDeCiMaL # g
+          , charHeXaDeCiMaL # h
+          ] <>
+          go cs
+        Char_esc_bslash : cs -> '\\' : '\\' : go cs
+        Char_esc_singlequote : cs -> '\\' : '\'' : go cs
+        Char_esc_doublequote : cs -> '\\' : '"' : go cs
+        Char_esc_a : cs -> '\\' : 'a' : go cs
+        Char_esc_b : cs -> '\\' : 'b' : go cs
+        Char_esc_f : cs -> '\\' : 'f' : go cs
+        Char_esc_n : cs -> '\\' : 'n' : go cs
+        Char_esc_r : cs -> '\\' : 'r' : go cs
+        Char_esc_t : cs -> '\\' : 't' : go cs
+        Char_esc_v : cs -> '\\' : 'v' : go cs
+        Char_lit c : cs ->
+          case st of
+            LongString -> c : go cs
+            ShortString ->
+              case c of
+                '\r' -> go $ Char_esc_r : cs
+                '\n' -> go $ Char_esc_n : cs
+                '\'' | SingleQuote <- qt -> go $ Char_esc_singlequote : cs
+                '\"' | DoubleQuote <- qt -> go $ Char_esc_singlequote : cs
+                _ -> c : go cs
 
 renderWhitespace :: Whitespace -> RenderOutput
 renderWhitespace Space = singleton $ TkSpace ()
@@ -541,13 +644,19 @@ renderYield :: (Expr v a -> RenderOutput) -> Expr v a -> RenderOutput
 renderYield re (Yield _ a b) =
   singleton (TkYield ()) <>
   foldMap renderWhitespace a <>
-  foldMap re b
+  foldMap
+    (\x -> case x of
+       Generator{} -> bracket $ renderExpr x
+       _ -> re x)
+    b
 renderYield re (YieldFrom _ a b c) =
   singleton (TkYield ()) <>
   foldMap renderWhitespace a <>
   singleton (TkFrom ()) <>
   foldMap renderWhitespace b <>
-  re c
+  case c of
+    Generator{} -> bracket $ renderExpr c
+    _ -> re c
 renderYield re e = re e
 
 renderUnpackTarget :: Expr v a -> RenderOutput

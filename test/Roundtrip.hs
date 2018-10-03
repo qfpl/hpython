@@ -30,7 +30,8 @@ roundtripTests :: Group
 roundtripTests =
   Group "Roundtrip tests" $
   (\name -> (fromString name, withTests 1 . withShrinks 0 $ doRoundtripFile name)) <$>
-  [ "asyncstatements.py"
+  [ "regex.py"
+  , "asyncstatements.py"
   , "typeann.py"
   , "dictcomp.py"
   , "imaginary.py"
@@ -74,4 +75,6 @@ doRoundtrip file = do
         Failure errs' -> do
           annotateShow (errs' :: NonEmpty (SyntaxError '[Indentation] SrcInfo))
           failure
-        Success _ -> Strict.lines (showModule py) === Strict.lines file
+        Success _ -> do
+          annotateShow py
+          Strict.lines (showModule py) === Strict.lines file

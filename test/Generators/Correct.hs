@@ -16,8 +16,6 @@ import Control.Lens.Tuple
 import Control.Lens.TH
 import Control.Monad.State
 import Data.Bifunctor (bimap)
-import Data.Digit.Hexadecimal.MixedCase
-import Data.Digit.Enum
 import Data.Function
 import Data.List
 import Data.Maybe
@@ -946,37 +944,3 @@ genImportAs me genIdent =
     (ImportAs ())
     (set (mapped.trailingWhitespace) [Space] me)
     (sizedMaybe $ (,) <$> genWhitespaces1 <*> genIdent)
-
-genPyChar :: MonadGen m => m Char -> m PyChar
-genPyChar mlit =
-  Gen.choice
-  [ pure Char_newline
-  , Char_octal <$> Gen.element enumOctal <*> Gen.element enumOctal
-  , Char_hex <$> genHexDigit <*> genHexDigit
-  , Char_uni16 <$>
-    genHexDigit <*>
-    genHexDigit <*>
-    genHexDigit <*>
-    genHexDigit
-  , do
-      a <- genHexDigit
-      b <- case a of
-        HeXDigit1 -> pure HeXDigit0
-        _ -> genHexDigit
-      Char_uni32 HeXDigit0 HeXDigit0 a b <$>
-        genHexDigit <*>
-        genHexDigit <*>
-        genHexDigit <*>
-        genHexDigit
-  , pure Char_esc_bslash
-  , pure Char_esc_singlequote
-  , pure Char_esc_doublequote
-  , pure Char_esc_a
-  , pure Char_esc_b
-  , pure Char_esc_f
-  , pure Char_esc_n
-  , pure Char_esc_r
-  , pure Char_esc_t
-  , pure Char_esc_v
-  , Char_lit <$> mlit
-  ]

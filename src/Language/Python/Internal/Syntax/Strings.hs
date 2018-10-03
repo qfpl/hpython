@@ -131,6 +131,26 @@ data PyChar
   | Char_lit Char
   deriving (Eq, Ord, Show)
 
+isEscape :: PyChar -> Bool
+isEscape c =
+  case c of
+    Char_newline -> True
+    Char_octal{} -> True
+    Char_hex{} -> True
+    Char_uni16{} -> True
+    Char_uni32{} -> True
+    Char_esc_bslash -> True
+    Char_esc_singlequote -> True
+    Char_esc_doublequote -> True
+    Char_esc_a -> True
+    Char_esc_b -> True
+    Char_esc_f -> True
+    Char_esc_n -> True
+    Char_esc_r -> True
+    Char_esc_t -> True
+    Char_esc_v -> True
+    Char_lit{} -> False
+
 fromHaskellString :: String -> [PyChar]
 fromHaskellString "" = []
 fromHaskellString (c:cs) =

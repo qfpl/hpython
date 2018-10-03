@@ -14,8 +14,6 @@ import Language.Python.Internal.Render (showModule)
 import Language.Python.Internal.Syntax (Whitespace(..), _Statements)
 import Language.Python.Internal.Optics (_Indent)
 
-import Helpers (doTokenize)
-
 opticsTests :: Group
 opticsTests =
   Group "Optics Tests"

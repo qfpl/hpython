@@ -65,7 +65,7 @@ test_2 =
     let
       e1 = [Char_lit '\\']
 
-    correctFinalBackslashes e1 === [Char_esc_bslash]
+    correctInitialFinalBackslashes e1 === [Char_esc_bslash]
 
 test_3 :: Property
 test_3 =
@@ -73,7 +73,7 @@ test_3 =
     let
       e2 = [Char_lit '\\', Char_lit ' ']
 
-    correctFinalBackslashes e2 === [Char_lit '\\', Char_lit ' ']
+    correctInitialFinalBackslashes e2 === [Char_lit '\\', Char_lit ' ']
 
 test_4 :: Property
 test_4 =
@@ -81,12 +81,14 @@ test_4 =
     ls <- forAll $ Gen.list (Range.constant 0 100) $ genPyChar Gen.unicode
     let
       bs = takeWhile (\x -> x == Char_lit '\\' || isEscape x) $ reverse ls
-      bs' = takeWhile (\x -> x == Char_lit '\\' || isEscape x) . reverse $ correctFinalBackslashes ls
+      bs' =
+        takeWhile (\x -> x == Char_lit '\\' || isEscape x) . reverse $
+        correctInitialFinalBackslashes ls
     if not (null bs)
       then do
         length bs === length bs'
         traverse_ (/== Char_lit '\\') bs'
-      else correctFinalBackslashes ls === ls
+      else correctInitialFinalBackslashes ls === ls
 
 test_5 :: Property
 test_5 =

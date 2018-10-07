@@ -363,8 +363,10 @@ intToHexH n = go n []
 renderPyCharsBytes :: QuoteType -> StringType -> [PyChar] -> Text
 renderPyCharsBytes qt st =
   case st of
-    LongString -> Text.pack . go . correctFinalBackslashes . correctInitialFinalQuotes qt
-    ShortString -> Text.pack . go . correctFinalBackslashes . correctQuotes qt
+    LongString ->
+      Text.pack . go . correctInitialFinalBackslashes . correctInitialFinalQuotes qt
+    ShortString ->
+      Text.pack . go . correctInitialFinalBackslashes . correctQuotes qt
   where
     go s =
       case s of
@@ -428,8 +430,10 @@ renderPyCharsBytes qt st =
 renderPyChars :: QuoteType -> StringType -> [PyChar] -> Text
 renderPyChars qt st =
   case st of
-    LongString -> Text.pack . go . correctFinalBackslashes . correctInitialFinalQuotes qt
-    ShortString -> Text.pack . go . correctFinalBackslashes . correctQuotes qt
+    LongString ->
+      Text.pack . go . correctInitialFinalBackslashes . correctInitialFinalQuotes qt
+    ShortString ->
+      Text.pack . go . correctInitialFinalBackslashes . correctQuotes qt
   where
     go s =
       case s of

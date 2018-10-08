@@ -1150,7 +1150,9 @@ renderCompoundStatement (For _ idnt asyncWs a b c d s h) =
   renderIndents idnt <>
   foldMap (\ws -> TkIdent "async" () `cons` foldMap renderWhitespace ws) asyncWs <>
   singleton (TkFor ()) <> foldMap renderWhitespace a <> bracketGenerator b <>
-  singleton (TkIn ()) <> foldMap renderWhitespace c <> bracketGenerator d <>
+  singleton (TkIn ()) <>
+  foldMap renderWhitespace c <>
+  renderCommaSep1' bracketTupleGenerator d <>
   renderSuite s <>
   foldMap
     (\(idnt, x, s) ->

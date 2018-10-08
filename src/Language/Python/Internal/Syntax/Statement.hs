@@ -112,7 +112,7 @@ instance HasBlocks CompoundStatement where
     pure e <*>
     _Blocks fun f
   _Blocks fun (For idnt a asyncWs b c d e f g) =
-    For idnt a asyncWs b (c ^. unvalidated) d (e ^. unvalidated) <$>
+    For idnt a asyncWs b (c ^. unvalidated) d (view unvalidated <$> e) <$>
     _Blocks fun f <*>
     (traverse._3._Blocks) fun g
   _Blocks fun (ClassDef a decos idnt b c d e) =
@@ -329,7 +329,7 @@ data CompoundStatement (v :: [*]) a
   , _unsafeCsForFor :: [Whitespace] -- ^ @\'for\' \<spaces\>@
   , _unsafeCsForBinder :: Expr v a -- ^ @\<expr\>@
   , _unsafeCsForIn :: [Whitespace] -- ^ @\'in\' \<spaces\>@
-  , _unsafeCsForCollection :: Expr v a -- ^ @\<expr\>@
+  , _unsafeCsForCollection :: CommaSep1' (Expr v a) -- ^ @\<exprs\>@
   , _unsafeCsForBody :: Suite v a -- ^ @\<suite\>@
   , _unsafeCsForElse :: Maybe (Indents a, [Whitespace], Suite v a) -- ^ @[\'else\' \<spaces\> \<suite\>]@
   }
@@ -405,7 +405,7 @@ instance HasExprs CompoundStatement where
     TryFinally idnt a b <$> _Exprs fun c <*> pure d <*>
     pure e <*> _Exprs fun f
   _Exprs fun (For idnt a asyncWs b c d e f g) =
-    For idnt a asyncWs b <$> fun c <*> pure d <*> fun e <*>
+    For idnt a asyncWs b <$> fun c <*> pure d <*> traverse fun e <*>
     _Exprs fun f <*>
     (traverse._3._Exprs) fun g
   _Exprs fun (ClassDef a decos idnt b c d e) =

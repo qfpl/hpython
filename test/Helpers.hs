@@ -1,11 +1,15 @@
 {-# language DataKinds #-}
 module Helpers where
 
-import Data.List.NonEmpty (NonEmpty)
+import Hedgehog
+
+import Control.Lens.Fold ((^?), folded)
+import Control.Monad (void)
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Semigroup (Semigroup)
 import Data.Text (Text)
-import Data.Validation (Validation(..))
-import Hedgehog
+import Data.Validation (Validation(..), _Failure)
+import Text.Megaparsec.Pos (SourcePos(..), mkPos)
 
 import Language.Python.Internal.Lexer
   (SrcInfo, insertTabs, tokenize
@@ -13,6 +17,7 @@ import Language.Python.Internal.Lexer
 import Language.Python.Internal.Token (PyToken)
 import Language.Python.Internal.Parse (Parser, runParser)
 import Language.Python.Internal.Syntax (Statement, Expr)
+import Language.Python.Parse (ParseError, ErrorItem(..), _ParseError)
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Indentation
 
@@ -68,3 +73,27 @@ syntaxValidateExpr x =
       failure
     Success a ->
       pure $ runValidateSyntax initialSyntaxContext [] (validateExprSyntax a)
+
+shouldBeFailure :: Validation e a -> PropertyT IO ()
+shouldBeFailure res =
+  case res of
+    Success{} -> failure
+    Failure{} -> success
+
+shouldBeParseError
+  :: (MonadTest m, Show e, Show a)
+  => Int
+  -> Int
+  -> PyToken ()
+  -> Validation (NonEmpty (ParseError e)) a
+  -> m ()
+shouldBeParseError line col tk res =
+  case res ^? _Failure.folded._ParseError of
+    Just (srcPos :| _, Just (Tokens (errorItem :| [])), _) -> do
+      sourceLine srcPos === mkPos line
+      sourceColumn srcPos === mkPos col
+
+      void errorItem === tk
+    _ -> do
+      annotateShow res
+      failure

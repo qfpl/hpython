@@ -102,7 +102,7 @@ data CompoundStatement a
   , _unsafeCsForFor :: [Whitespace] -- ^ @\'for\' \<spaces\>@
   , _unsafeCsForBinder :: Expr a -- ^ @\<expr\>@
   , _unsafeCsForIn :: [Whitespace] -- ^ @\'in\' \<spaces\>@
-  , _unsafeCsForCollection :: Expr a -- ^ @\<expr\>@
+  , _unsafeCsForCollection :: CommaSep1' (Expr a) -- ^ @\<exprs\>@
   , _unsafeCsForBody :: Suite a -- ^ @\<suite\>@
   , _unsafeCsForElse :: Maybe (Indents a, [Whitespace], Suite a) -- ^ @[\'else\' \<spaces\> \<suite\>]@
   }
@@ -851,7 +851,7 @@ fromIR_compoundStatement st =
     For a b asyncWs c d e f g h ->
       (\d' -> Syntax.For a b asyncWs c d' e) <$>
       fromIR_expr d <*>
-      fromIR_expr f <*>
+      traverse fromIR_expr f <*>
       fromIR_suite g <*>
       traverseOf (traverse._3) fromIR_suite h
     ClassDef a b c d e f g ->

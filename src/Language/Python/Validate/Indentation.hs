@@ -286,7 +286,7 @@ validateCompoundStatementIndentation (For a idnt asyncWs b c d e h i) =
   (\idnt' c' -> For a idnt' asyncWs b c' d) <$>
   checkIndent idnt <*>
   validateExprIndentation c <*>
-  validateExprIndentation e <*>
+  traverse validateExprIndentation e <*>
   validateSuiteIndentation idnt h <*
   setNextIndent EqualTo (idnt ^. indentsValue) <*>
   traverse

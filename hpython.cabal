@@ -163,6 +163,7 @@ test-suite hpython-tests
                      , Helpers
                      , LexerParser
                      , Optics
+                     , Parser
                      , Printer
                      , Roundtrip
                      , Scope

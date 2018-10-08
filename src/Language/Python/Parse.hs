@@ -1,4 +1,5 @@
-{-# language ApplicativeDo, DataKinds #-}
+{-# language DataKinds #-}
+{-# language TemplateHaskell #-}
 module Language.Python.Parse
   ( SrcInfo(..)
   , initialSrcInfo
@@ -9,10 +10,18 @@ module Language.Python.Parse
   , parseStatement
   , parseExpr
   , parseExprList
+    -- * Optics
+  , _LexicalError
+  , _ParseError
+  , _TabError
+  , _IncorrectDedent
+  , _ExpectedDedent
+  , _InvalidUnpacking
   )
 where
 
 import Control.Applicative ((<|>))
+import Control.Lens.TH (makePrisms)
 import Data.Bifunctor (first)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Set (Set)
@@ -34,13 +43,20 @@ import qualified Language.Python.Internal.Parse as Parse
 import qualified Language.Python.Internal.Syntax.IR as IR
 
 data ParseError a
-  = LexicalError (NonEmpty SourcePos) (Maybe (ErrorItem Char)) (Set (ErrorItem Char))
-  | ParseError (NonEmpty SourcePos) (Maybe (ErrorItem (PyToken a))) (Set (ErrorItem (PyToken a)))
+  = LexicalError
+      (NonEmpty SourcePos)
+      (Maybe (ErrorItem Char))
+      (Set (ErrorItem Char))
+  | ParseError
+      (NonEmpty SourcePos)
+      (Maybe (ErrorItem (PyToken a)))
+      (Set (ErrorItem (PyToken a)))
   | TabError a
   | IncorrectDedent a
   | ExpectedDedent a
   | InvalidUnpacking a
   deriving (Eq, Show)
+makePrisms ''ParseError
 
 fromLexicalError :: Megaparsec.ParseError Char Void -> ParseError SrcInfo
 fromLexicalError Megaparsec.FancyError{} = error "there are none of these"

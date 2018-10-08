@@ -695,7 +695,7 @@ validateCompoundStatementSyntax (For a idnts asyncWs b c d e h i) =
   validateWhitespace a b <*>
   validateAssignmentSyntax a c <*>
   validateWhitespace a d <*>
-  validateExprSyntax e <*>
+  traverse validateExprSyntax e <*>
   liftVM1 (local $ inLoop .~ True) (validateSuiteSyntax h) <*>
   traverse
     (\(idnts, x, w) ->

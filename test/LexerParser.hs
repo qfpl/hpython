@@ -32,6 +32,7 @@ lexerParserTests =
   , ("Test full trip 19", test_fulltrip_19)
   , ("Test full trip 20", test_fulltrip_20)
   , ("Test full trip 21", test_fulltrip_21)
+  , ("Test full trip 22", test_fulltrip_22)
   ]
 
 test_fulltrip_1 :: Property
@@ -292,6 +293,18 @@ test_fulltrip_21 :: Property
 test_fulltrip_21 =
   withTests 1 . property $ do
     let str = "if a:\n  \\\n\n  pass"
+
+    let res = parseModule "test" str
+    case res of
+      Failure{} -> success
+      Success a -> do
+        annotateShow a
+        failure
+
+test_fulltrip_22 :: Property
+test_fulltrip_22 =
+  withTests 1 . property $ do
+    let str = "for a in (b, *c): pass"
 
     let res = parseModule "test" str
     case res of

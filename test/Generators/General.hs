@@ -430,7 +430,7 @@ genCompoundStatement =
            genWhitespaces <*> pure b <*>
            pure c <*> pure d)
         genExpr
-        genExpr
+        (genSizedCommaSep1' genExpr)
         (genSuite genSmallStatement genBlock)
         (sizedMaybe $
          (,,) <$>

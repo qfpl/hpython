@@ -6,11 +6,13 @@ passing @['line_' 'pass_']@
 -}
 
 {-# language DataKinds #-}
+{-# language GeneralizedNewtypeDeriving #-}
 {-# language MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 {-# language LambdaCase #-}
 {-# language RankNTypes #-}
 {-# language RecordWildCards #-}
 {-# language TypeFamilies #-}
+{-# language UndecidableInstances #-}
 module Language.Python.Syntax
   ( (&)
   , Raw
@@ -761,12 +763,15 @@ instance e ~ Comprehension Expr => AsList (Raw e) where
 
 newtype Guard v a = MkGuard { unGuard :: Either (CompFor v a) (CompIf v a) }
 
+class HasFor a x | a -> x where
+  for_ :: Raw x -> a
+
 -- |
 -- @'for_' :: 'Raw' 'In' -> 'Raw' 'CompFor'@
 --
 -- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") []
 -- a for a in b
-instance HasFor (Raw CompFor) where
+instance HasFor (Raw CompFor) In where
   for_ (MkIn a b) = CompFor () [Space] a [Space] b
 
 -- |
@@ -774,7 +779,7 @@ instance HasFor (Raw CompFor) where
 --
 -- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") [for_ $ var_ "c" \`in_\` var_ "d"]
 -- a for a in b for c in d
-instance HasFor (Raw Guard) where
+instance HasFor (Raw Guard) In where
   for_ (MkIn a b) = MkGuard . Left $ CompFor () [Space] a [Space] b
 
 class HasIf a where
@@ -882,21 +887,22 @@ is_ = mkBinOp $ Is ()
 infixl 1 `is_`
 
 data In v a = MkIn (Expr v a) (Expr v a)
+data InList v a = MkInList (Expr v a) [Expr v a]
 
-class HasIn a where
-  in_ :: Raw Expr -> Raw Expr -> Raw a
+class HasIn a x | a -> x where
+  in_ :: Raw Expr -> x -> Raw a
 
 infixl 1 `in_`
 
 -- |
 -- >>> var_ "a" `in_` var_ "b"
 -- a in b
-instance HasIn Expr where
+instance HasIn Expr (Raw Expr) where
   in_ = mkBinOp $ In ()
 
 -- | See 'for_'
-instance HasIn In where
-  in_ = MkIn
+instance e ~ Raw Expr => HasIn InList [e] where
+  in_ = MkInList
 
 notIn_ :: Raw Expr -> Raw Expr -> Raw Expr
 notIn_ = mkBinOp $ NotIn () [Space]
@@ -1263,7 +1269,7 @@ infix 0 .**=
 (.//=) = mkAugAssign (DoubleSlashEq ())
 infix 0 .//=
 
-mkFor :: Raw Expr -> Raw Expr -> [Raw Line] -> Raw For
+mkFor :: Raw Expr -> [Raw Expr] -> [Raw Line] -> Raw For
 mkFor binder collection body =
   MkFor
   { _forAnn = ()
@@ -1272,13 +1278,13 @@ mkFor binder collection body =
   , _forFor = [Space]
   , _forBinder = binder & trailingWhitespace .~ [Space]
   , _forIn = [Space]
-  , _forCollection = collection
+  , _forCollection =
+      fromMaybe
+        (CommaSepOne1' (Unit () [] []) Nothing)
+        (listToCommaSep1' collection)
   , _forBody = SuiteMany () [] (LF Nothing) $ toBlock body
   , _forElse = Nothing
   }
-
-class HasFor a where
-  for_ :: Raw In -> a
 
 -- |
 -- @'for_' :: 'Raw' 'In' -> ['Raw' 'Line'] -> 'Raw' 'Statement'@
@@ -1286,10 +1292,10 @@ class HasFor a where
 -- >>> for_ (var_ "a" `in_` var_ "b") [line_ (var_ "c" .+= var_ "a")]
 -- for a in b:
 --     c += a
-instance (l ~ Raw Line, s ~ Raw Statement) => HasFor ([l] -> s) where
-  for_ (MkIn a b) = forSt_ a b
+instance (l ~ Raw Line, s ~ Raw Statement) => HasFor ([l] -> s) InList where
+  for_ (MkInList a b) = forSt_ a b
 
-forSt_ :: Raw Expr -> Raw Expr -> [Raw Line] -> Raw Statement
+forSt_ :: Raw Expr -> [Raw Expr] -> [Raw Line] -> Raw Statement
 forSt_ val vals block = _For # mkFor val vals block
 
 instance HasBody For where

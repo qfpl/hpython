@@ -264,7 +264,7 @@ validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
           maybe (pure ()) (\_ -> errorVM1 (_BadShadowing # coerce s)) res)
        (c ^.. unvalidated.cosmos._Ident)) <*>
     pure d <*>
-    validateExprScope e <*>
+    traverse validateExprScope e <*>
     (let
        ls = c ^.. unvalidated.cosmos._Ident.to (_identAnn &&& _identValue)
      in

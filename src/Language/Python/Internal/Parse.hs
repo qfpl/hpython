@@ -1275,7 +1275,7 @@ compoundStatement pIndent indentBefore =
       token space (\case; TkFor{} -> True; _ -> False) "for" <*>
       orExprList space <*>
       (snd <$> token space (\case; TkIn{} -> True; _ -> False) "in") <*>
-      exprList space <*>
+      commaSep1' space (expr space) <*>
       suite <*>
       optional
         (try

@@ -108,7 +108,7 @@ data For v a
   , _forFor :: [Whitespace]
   , _forBinder :: Expr v a
   , _forIn :: [Whitespace]
-  , _forCollection :: Expr v a
+  , _forCollection :: CommaSep1' (Expr v a)
   , _forBody :: Suite v a
   , _forElse :: Maybe (Else v a)
   } deriving (Eq, Show)

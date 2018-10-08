@@ -878,7 +878,7 @@ genCompoundStatement =
               pure c <*>
               pure d)
             genAssignable
-            genExpr
+            (genSizedCommaSep1' genExpr)
             (genSuite genSmallStatement genBlock)
             (sizedMaybe $
             (,,) <$>

@@ -364,9 +364,9 @@ renderPyCharsBytes :: QuoteType -> StringType -> [PyChar] -> Text
 renderPyCharsBytes qt st =
   case st of
     LongString ->
-      Text.pack . go . correctInitialFinalBackslashes . correctInitialFinalQuotes qt
+      Text.pack . go . correctBackslashes . correctInitialFinalQuotes qt
     ShortString ->
-      Text.pack . go . correctInitialFinalBackslashes . correctQuotes qt
+      Text.pack . go . correctBackslashes . correctQuotes qt
   where
     go s =
       case s of
@@ -431,9 +431,9 @@ renderPyChars :: QuoteType -> StringType -> [PyChar] -> Text
 renderPyChars qt st =
   case st of
     LongString ->
-      Text.pack . go . correctInitialFinalBackslashes . correctInitialFinalQuotes qt
+      Text.pack . go . correctBackslashes . correctInitialFinalQuotes qt
     ShortString ->
-      Text.pack . go . correctInitialFinalBackslashes . correctQuotes qt
+      Text.pack . go . correctBackslashes . correctQuotes qt
   where
     go s =
       case s of

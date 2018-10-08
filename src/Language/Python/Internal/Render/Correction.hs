@@ -45,30 +45,18 @@ quote qt =
     DoubleQuote -> '\"'
     SingleQuote -> '\''
 
-correctInitialFinalBackslashes :: [PyChar] -> [PyChar]
-correctInitialFinalBackslashes = correctFinalBackslashes . correctInitialBackslashes
-  where
-    correctInitialBackslashes :: [PyChar] -> [PyChar]
-    correctInitialBackslashes [] = []
-    correctInitialBackslashes [x] = [x]
-    correctInitialBackslashes (x:y:ys) =
-      case x of
-        Char_lit '\\'
-          | isEscape y -> Char_esc_bslash : y : correctInitialBackslashes ys
-          | Char_lit '\\' <- y -> Char_esc_bslash : y : correctInitialBackslashes ys
-        _ -> x : y : correctInitialBackslashes ys
-
-    correctFinalBackslashes :: [PyChar] -> [PyChar]
-    correctFinalBackslashes =
-      snd .
-      foldr
-        (\a (b, as) ->
-          ( b && a == Char_lit '\\'
-          , case a of
-              Char_lit '\\' | b -> Char_esc_bslash : as
-              _ -> a : as
-          ))
-        (True, [])
+correctBackslashes :: [PyChar] -> [PyChar]
+correctBackslashes [] = []
+correctBackslashes [x] =
+  case x of
+    Char_lit '\\' -> [Char_esc_bslash]
+    _ -> [x]
+correctBackslashes (x:y:ys) =
+  case x of
+    Char_lit '\\'
+      | isEscape y -> Char_esc_bslash : y : correctBackslashes ys
+      | Char_lit '\\' <- y -> Char_esc_bslash : y : correctBackslashes ys
+    _ -> x : correctBackslashes (y : ys)
 
 -- | Every quote in a string of a particular quote type should be escaped
 correctQuotes :: QuoteType -> [PyChar] -> [PyChar]

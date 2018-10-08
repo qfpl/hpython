@@ -22,6 +22,8 @@ printerTests =
   , ("Printer test 3", withTests 1 test_3)
   , ("Printer test 4", test_4)
   , ("Printer test 5", test_5)
+  , ("Printer test 6", withTests 1 test_6)
+  , ("Printer test 7", withTests 1 test_7)
   ]
 
 test_1 :: Property
@@ -65,7 +67,7 @@ test_2 =
     let
       e1 = [Char_lit '\\']
 
-    correctInitialFinalBackslashes e1 === [Char_esc_bslash]
+    correctBackslashes e1 === [Char_esc_bslash]
 
 test_3 :: Property
 test_3 =
@@ -73,7 +75,7 @@ test_3 =
     let
       e2 = [Char_lit '\\', Char_lit ' ']
 
-    correctInitialFinalBackslashes e2 === [Char_lit '\\', Char_lit ' ']
+    correctBackslashes e2 === [Char_lit '\\', Char_lit ' ']
 
 test_4 :: Property
 test_4 =
@@ -83,12 +85,12 @@ test_4 =
       bs = takeWhile (\x -> x == Char_lit '\\' || isEscape x) $ reverse ls
       bs' =
         takeWhile (\x -> x == Char_lit '\\' || isEscape x) . reverse $
-        correctInitialFinalBackslashes ls
+        correctBackslashes ls
     if not (null bs)
       then do
         length bs === length bs'
         traverse_ (/== Char_lit '\\') bs'
-      else correctInitialFinalBackslashes ls === ls
+      else correctBackslashes ls === ls
 
 test_5 :: Property
 test_5 =
@@ -118,3 +120,29 @@ test_5 =
       e4 = [q, q, q, q, Char_lit ' ']
 
     correctInitialFinalQuotes qt e4 === [q, q, esc, q, Char_lit ' ']
+
+test_6 :: Property
+test_6 =
+  property $ do
+    let
+      s = [Char_lit '\\', Char_esc_bslash]
+      e =
+        String () $
+        RawBytesLiteral () Prefix_br ShortString SingleQuote s [] :|
+        []
+
+    correctBackslashes s === [Char_esc_bslash, Char_esc_bslash]
+    showExpr e === "br'\\\\\\\\'"
+
+test_7 :: Property
+test_7 =
+  property $ do
+    let
+      s = [Char_newline, Char_lit '\\', Char_esc_doublequote]
+      e =
+        String () $
+        StringLiteral () Nothing ShortString DoubleQuote s [] :|
+        []
+
+    correctBackslashes s === [Char_newline, Char_esc_bslash, Char_esc_doublequote]
+    showExpr e === "\"\\newline\\\\\\\"\""

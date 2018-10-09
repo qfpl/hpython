@@ -16,8 +16,6 @@ import Control.Lens.Tuple
 import Control.Lens.TH
 import Control.Monad.State
 import Data.Bifunctor (bimap)
-import Data.Digit.Hexadecimal.MixedCase
-import Data.Digit.Enum
 import Data.Function
 import Data.List
 import Data.Maybe
@@ -388,26 +386,56 @@ genCompFor =
        (\ws1 ws2 -> CompFor () ws1 a ws2 b) <$>
        genWhitespaces <*>
        genWhitespaces)
-    genAssignable
+    (localState $ do
+        inGenerator .= True
+        genAssignable)
     (Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
 
 genCompIf :: (MonadGen m, MonadState GenState m) => m (CompIf '[] ())
 genCompIf =
-  CompIf () <$>
-  genWhitespaces <*>
-  sizedRecursive
-    [ Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr ]
-    []
+  localState $ do
+    inGenerator .= True
+    CompIf () <$>
+      genWhitespaces <*>
+      sizedRecursive
+        [ Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr ]
+        []
 
 genComprehension :: (MonadGen m, MonadState GenState m) => m (Comprehension Expr '[] ())
 genComprehension =
   sized3
     (Comprehension ())
     (localState $ do
-       modify (inGenerator .~ True)
-       Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
+        inGenerator .= True
+        Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
     genCompFor
-    (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
+    (localState $ do
+        inGenerator .= True
+        sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
+
+genDictComp :: (MonadGen m, MonadState GenState m) => m (Comprehension DictItem '[] ())
+genDictComp =
+  sized3
+    (Comprehension ())
+    (localState $ do
+        inGenerator .= True
+        DictItem () <$> genExpr <*> genAnyWhitespaces <*> genExpr)
+    genCompFor
+    (localState $ do
+        inGenerator .= True
+        sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
+
+genSetComp :: (MonadGen m, MonadState GenState m) => m (Comprehension SetItem '[] ())
+genSetComp =
+  sized3
+    (Comprehension ())
+    (localState $ do
+        inGenerator .= True
+        SetItem () <$> genExpr)
+    genCompFor
+    (localState $ do
+        inGenerator .= True
+        sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
 genSubscriptItem :: (MonadGen m, MonadState GenState m) => m (Subscript '[] ())
 genSubscriptItem =
@@ -421,26 +449,6 @@ genSubscriptItem =
     ]
     []
 
-genDictComp :: (MonadGen m, MonadState GenState m) => m (Comprehension DictItem '[] ())
-genDictComp =
-  sized3
-    (Comprehension ())
-    (localState $ do
-       modify (inGenerator .~ True)
-       DictItem () <$> genExpr <*> genAnyWhitespaces <*> genExpr)
-    genCompFor
-    (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
-
-genSetComp :: (MonadGen m, MonadState GenState m) => m (Comprehension SetItem '[] ())
-genSetComp =
-  sized3
-    (Comprehension ())
-    (localState $ do
-       modify (inGenerator .~ True)
-       SetItem () <$> genExpr)
-    genCompFor
-    (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
-
 genExprList :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genExprList =
   sizedBind genExpr $ \e -> do
@@ -453,6 +461,44 @@ genExprList =
 -- when python does constant folding
 genExpr :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genExpr = genExpr' False
+
+genRawStringLiteral :: MonadGen m => m (StringLiteral ())
+genRawStringLiteral =
+  Gen.choice
+  [ RawStringLiteral () <$>
+    genRawStringPrefix <*>
+    pure LongString <*>
+    genQuoteType <*>
+    Gen.list (Range.constant 0 100) (genPyChar $ Gen.filter (/='\0') Gen.latin1)<*>
+    genWhitespaces
+  , RawStringLiteral () <$>
+    genRawStringPrefix <*>
+    pure ShortString <*>
+    genQuoteType <*>
+    Gen.list
+      (Range.constant 0 100)
+      (genPyChar $ Gen.filter (`notElem` "\0\n\r") Gen.latin1) <*>
+    genWhitespaces
+  ]
+
+genRawBytesLiteral :: MonadGen m => m (StringLiteral ())
+genRawBytesLiteral =
+  Gen.choice
+  [ RawBytesLiteral () <$>
+    genRawBytesPrefix <*>
+    pure LongString <*>
+    genQuoteType <*>
+    Gen.list (Range.constant 0 100) (genPyChar $ Gen.filter (/='\0') Gen.latin1) <*>
+    genWhitespaces
+  , RawBytesLiteral () <$>
+    genRawBytesPrefix <*>
+    pure ShortString <*>
+    genQuoteType <*>
+    Gen.list
+      (Range.constant 0 100)
+      (genPyChar $ Gen.filter (`notElem` "\0\n\r") Gen.latin1) <*>
+    genWhitespaces
+  ]
 
 genStringLiterals :: MonadGen m => m (Expr '[] ())
 genStringLiterals = do
@@ -908,37 +954,3 @@ genImportAs me genIdent =
     (ImportAs ())
     (set (mapped.trailingWhitespace) [Space] me)
     (sizedMaybe $ (,) <$> genWhitespaces1 <*> genIdent)
-
-genPyChar :: MonadGen m => m Char -> m PyChar
-genPyChar mlit =
-  Gen.choice
-  [ pure Char_newline
-  , Char_octal <$> Gen.element enumOctal <*> Gen.element enumOctal
-  , Char_hex <$> genHexDigit <*> genHexDigit
-  , Char_uni16 <$>
-    genHexDigit <*>
-    genHexDigit <*>
-    genHexDigit <*>
-    genHexDigit
-  , do
-      a <- genHexDigit
-      b <- case a of
-        HeXDigit1 -> pure HeXDigit0
-        _ -> genHexDigit
-      Char_uni32 HeXDigit0 HeXDigit0 a b <$>
-        genHexDigit <*>
-        genHexDigit <*>
-        genHexDigit <*>
-        genHexDigit
-  , pure Char_esc_bslash
-  , pure Char_esc_singlequote
-  , pure Char_esc_doublequote
-  , pure Char_esc_a
-  , pure Char_esc_b
-  , pure Char_esc_f
-  , pure Char_esc_n
-  , pure Char_esc_r
-  , pure Char_esc_t
-  , pure Char_esc_v
-  , Char_lit <$> mlit
-  ]

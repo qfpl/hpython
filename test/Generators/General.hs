@@ -4,7 +4,6 @@ module Generators.General where
 import Control.Applicative
 import Control.Lens.Getter
 import Control.Lens.Iso (from)
-import Data.Digit.Enum
 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -159,38 +158,43 @@ genSetComp =
 genExpr :: MonadGen m => m (Expr '[] ())
 genExpr = genExpr' False
 
-genPyChar :: MonadGen m => m PyChar
-genPyChar =
+genPyChar' :: MonadGen m => m PyChar
+genPyChar' = genPyChar Gen.unicode
+
+genRawStringLiteral :: MonadGen m => m (StringLiteral ())
+genRawStringLiteral =
   Gen.choice
-  [ pure Char_newline
-  , Char_octal <$> Gen.element enumOctal <*> Gen.element enumOctal
-  , Char_hex <$> genHexDigit <*> genHexDigit
-  , Char_uni16 <$>
-      genHexDigit <*>
-      genHexDigit <*>
-      genHexDigit <*>
-      genHexDigit
-  , Char_uni32 <$>
-      genHexDigit <*>
-      genHexDigit <*>
-      genHexDigit <*>
-      genHexDigit <*>
-      genHexDigit <*>
-      genHexDigit <*>
-      genHexDigit <*>
-      genHexDigit
-  , pure Char_esc_bslash
-  , pure Char_esc_singlequote
-  , pure Char_esc_doublequote
-  , pure Char_esc_a
-  , pure Char_esc_b
-  , pure Char_esc_f
-  , pure Char_esc_n
-  , pure Char_esc_r
-  , pure Char_esc_t
-  , pure Char_esc_v
-  , head . fromHaskellString . pure <$> Gen.latin1
+  [ RawStringLiteral () <$>
+    genRawStringPrefix <*>
+    pure LongString <*>
+    genQuoteType <*>
+    Gen.list (Range.constant 0 100) genPyChar' <*>
+    genWhitespaces
+  , RawStringLiteral () <$>
+    genRawStringPrefix <*>
+    pure ShortString <*>
+    genQuoteType <*>
+    Gen.list (Range.constant 0 100) genPyChar' <*>
+    genWhitespaces
   ]
+
+genRawBytesLiteral :: MonadGen m => m (StringLiteral ())
+genRawBytesLiteral =
+  Gen.choice
+  [ RawBytesLiteral () <$>
+    genRawBytesPrefix <*>
+    pure LongString <*>
+    genQuoteType <*>
+    Gen.list (Range.constant 0 100) genPyChar' <*>
+    genWhitespaces
+  , RawBytesLiteral () <$>
+    genRawBytesPrefix <*>
+    pure ShortString <*>
+    genQuoteType <*>
+    Gen.list (Range.constant 0 100) genPyChar' <*>
+    genWhitespaces
+  ]
+
 
 genExpr' :: MonadGen m => Bool -> m (Expr '[] ())
 genExpr' isExp =
@@ -207,8 +211,8 @@ genExpr' isExp =
       Gen.nonEmpty
         (Range.constant 1 5)
         (Gen.choice
-           [ genStringLiteral genPyChar
-           , genBytesLiteral genPyChar
+           [ genStringLiteral genPyChar'
+           , genBytesLiteral genPyChar'
            , genRawStringLiteral
            , genRawBytesLiteral
            ])

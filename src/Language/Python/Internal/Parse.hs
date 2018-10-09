@@ -201,19 +201,15 @@ stringOrBytes ws =
   (\case
      TkString sp qt st val ann -> StringLiteral ann sp qt st val
      TkBytes sp qt st val ann -> BytesLiteral ann sp qt st val
-     TkLongRawString sp qt val ann -> LongRawStringLiteral ann sp qt val
-     TkShortRawString sp qt val ann -> ShortRawStringLiteral ann sp qt val
-     TkLongRawBytes sp qt val ann -> LongRawBytesLiteral ann sp qt val
-     TkShortRawBytes sp qt val ann -> ShortRawBytesLiteral ann sp qt val
+     TkRawString sp st qt val ann -> RawStringLiteral ann sp st qt val
+     TkRawBytes sp st qt val ann -> RawBytesLiteral ann sp st qt val
      _ -> error "impossible") <$>
   satisfy
     (\case
         TkString{} -> True
         TkBytes{} -> True
-        TkLongRawString{} -> True
-        TkShortRawString{} -> True
-        TkLongRawBytes{} -> True
-        TkShortRawBytes{} -> True
+        TkRawString{} -> True
+        TkRawBytes{} -> True
         _ -> False) <*>
   many ws
 

@@ -80,6 +80,14 @@ shouldBeFailure res =
     Success{} -> failure
     Failure{} -> success
 
+shouldBeSuccess :: (MonadTest m, Show e) => Validation e a -> m a
+shouldBeSuccess res =
+  case res of
+    Success a -> pure a
+    Failure err -> do
+      annotateShow err
+      failure
+
 shouldBeParseError
   :: (MonadTest m, Show e, Show a)
   => Int
@@ -94,6 +102,18 @@ shouldBeParseError line col tk res =
       sourceColumn srcPos === mkPos col
 
       void errorItem === tk
+    _ -> do
+      annotateShow res
+      failure
+
+shouldBeSyntaxError
+  :: (MonadTest m, Show a)
+  => SyntaxError v ()
+  -> Validation (NonEmpty (SyntaxError v ())) a
+  -> m ()
+shouldBeSyntaxError err res =
+  case res ^? _Failure.folded of
+    Just err' -> err === err'
     _ -> do
       annotateShow res
       failure

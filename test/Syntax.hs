@@ -1,4 +1,4 @@
-{-# language OverloadedStrings #-}
+{-# language OverloadedStrings, TemplateHaskell #-}
 module Syntax (syntaxTests) where
 
 import Hedgehog
@@ -10,14 +10,11 @@ import Language.Python.Internal.Syntax.Whitespace
 import Helpers (shouldBeFailure, syntaxValidateExpr)
 
 syntaxTests :: Group
-syntaxTests =
-  Group "Syntax tests"
-  [ ("Syntax test 1", withTests 1 test_1)
-  ]
+syntaxTests = $$discover
 
-test_1 :: Property
-test_1 =
-  property $ do
+prop_syntax_1 :: Property
+prop_syntax_1 =
+  withTests 1 . property $ do
     let
       e =
         -- lambda *: None

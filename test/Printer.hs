@@ -1,9 +1,10 @@
-{-# language OverloadedStrings #-}
+{-# language OverloadedStrings, TemplateHaskell #-}
 module Printer (printerTests) where
 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
+
 import Data.Foldable (traverse_)
 import Data.List.NonEmpty (NonEmpty(..))
 
@@ -15,20 +16,11 @@ import Language.Python.Internal.Syntax.Strings
 import Generators.Common
 
 printerTests :: Group
-printerTests =
-  Group "Printer tests"
-  [ ("Printer test 1", withTests 1 test_1)
-  , ("Printer test 2", withTests 1 test_2)
-  , ("Printer test 3", withTests 1 test_3)
-  , ("Printer test 4", test_4)
-  , ("Printer test 5", test_5)
-  , ("Printer test 6", withTests 1 test_6)
-  , ("Printer test 7", withTests 1 test_7)
-  ]
+printerTests = $$discover
 
-test_1 :: Property
-test_1 =
-  property $ do
+prop_printer_1 :: Property
+prop_printer_1 =
+  withTests 1 . property $ do
     let
       e1 =
         String () $
@@ -61,25 +53,25 @@ test_1 =
 
     showExpr e4 === "''u''"
 
-test_2 :: Property
-test_2 =
-  property $ do
+prop_printer_2 :: Property
+prop_printer_2 =
+  withTests 1 . property $ do
     let
       e1 = [Char_lit '\\']
 
     correctBackslashes e1 === [Char_esc_bslash]
 
-test_3 :: Property
-test_3 =
-  property $ do
+prop_printer_3 :: Property
+prop_printer_3 =
+  withTests 1 . property $ do
     let
       e2 = [Char_lit '\\', Char_lit ' ']
 
     correctBackslashes e2 === [Char_lit '\\', Char_lit ' ']
 
-test_4 :: Property
-test_4 =
-  property $ do
+prop_printer_4 :: Property
+prop_printer_4 =
+  withTests 1 . property $ do
     ls <- forAll $ Gen.list (Range.constant 0 100) $ genPyChar Gen.unicode
     let
       bs = takeWhile (\x -> x == Char_lit '\\' || isEscape x) $ reverse ls
@@ -92,9 +84,9 @@ test_4 =
         traverse_ (/== Char_lit '\\') bs'
       else correctBackslashes ls === ls
 
-test_5 :: Property
-test_5 =
-  property $ do
+prop_printer_5 :: Property
+prop_printer_5 =
+  withTests 1 . property $ do
     (q, qt, esc) <-
       forAll $
       Gen.element
@@ -121,9 +113,9 @@ test_5 =
 
     correctInitialFinalQuotes qt e4 === [q, q, esc, q, Char_lit ' ']
 
-test_6 :: Property
-test_6 =
-  property $ do
+prop_printer_6 :: Property
+prop_printer_6 =
+  withTests 1 . property $ do
     let
       s = [Char_lit '\\', Char_esc_bslash]
       e =
@@ -134,9 +126,9 @@ test_6 =
     correctBackslashes s === [Char_esc_bslash, Char_esc_bslash]
     showExpr e === "br'\\\\\\\\'"
 
-test_7 :: Property
-test_7 =
-  property $ do
+prop_printer_7 :: Property
+prop_printer_7 =
+  withTests 1 . property $ do
     let
       s = [Char_newline, Char_lit '\\', Char_esc_doublequote]
       e =

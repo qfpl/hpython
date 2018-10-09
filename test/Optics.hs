@@ -1,4 +1,4 @@
-{-# language OverloadedStrings #-}
+{-# language OverloadedStrings, TemplateHaskell #-}
 module Optics (opticsTests) where
 
 import Hedgehog
@@ -15,14 +15,10 @@ import Language.Python.Internal.Syntax (Whitespace(..), _Statements)
 import Language.Python.Internal.Optics (_Indent)
 
 opticsTests :: Group
-opticsTests =
-  Group "Optics Tests"
-  [ ("Optics test 1", test_optics_1)
-  , ("Optics test 2", test_optics_2)
-  ]
+opticsTests = $$discover
 
-test_optics_1 :: Property
-test_optics_1 =
+prop_optics_1 :: Property
+prop_optics_1 =
   withTests 1 . property $ do
     str <- liftIO $ Text.readFile "test/files/indent_optics_in.py"
 
@@ -33,8 +29,8 @@ test_optics_1 =
     showModule
       (transformOn _Statements (_Indent .~ [Space, Space, Space, Space]) tree) === str'
 
-test_optics_2 :: Property
-test_optics_2 =
+prop_optics_2 :: Property
+prop_optics_2 =
   withTests 1 . property $ do
     str <- liftIO $ Text.readFile "test/files/indent_optics_in2.py"
 

@@ -224,7 +224,7 @@ string_correct path =
 main :: IO ()
 main = do
   checkParallel lexerParserTests
-  traverse checkParallel dslTests
+  checkParallel dslTests
   checkParallel parserTests
   checkParallel opticsTests
   checkParallel printerTests

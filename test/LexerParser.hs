@@ -1,42 +1,18 @@
-{-# language OverloadedStrings, OverloadedLists #-}
+{-# language OverloadedStrings, OverloadedLists, TemplateHaskell #-}
 module LexerParser (lexerParserTests) where
 
+import Hedgehog
 import Data.Validation (Validation(..), validation)
 import qualified Data.Text as Text
-import Hedgehog
 
 import Language.Python.Internal.Render
 import Language.Python.Parse (parseModule, parseStatement, parseExpr)
 
 lexerParserTests :: Group
-lexerParserTests =
-  Group "Lexer/Parser tests"
-  [ ("Test full trip 1", test_fulltrip_1)
-  , ("Test full trip 2", test_fulltrip_2)
-  , ("Test full trip 3", test_fulltrip_3)
-  , ("Test full trip 4", test_fulltrip_4)
-  , ("Test full trip 5", test_fulltrip_5)
-  , ("Test full trip 6", test_fulltrip_6)
-  , ("Test full trip 7", test_fulltrip_7)
-  , ("Test full trip 8", test_fulltrip_8)
-  , ("Test full trip 9", test_fulltrip_9)
-  , ("Test full trip 10", test_fulltrip_10)
-  , ("Test full trip 11", test_fulltrip_11)
-  , ("Test full trip 12", test_fulltrip_12)
-  , ("Test full trip 13", test_fulltrip_13)
-  , ("Test full trip 14", test_fulltrip_14)
-  , ("Test full trip 15", test_fulltrip_15)
-  , ("Test full trip 16", test_fulltrip_16)
-  , ("Test full trip 17", test_fulltrip_17)
-  , ("Test full trip 18", test_fulltrip_18)
-  , ("Test full trip 19", test_fulltrip_19)
-  , ("Test full trip 20", test_fulltrip_20)
-  , ("Test full trip 21", test_fulltrip_21)
-  , ("Test full trip 22", test_fulltrip_22)
-  ]
+lexerParserTests = $$discover
 
-test_fulltrip_1 :: Property
-test_fulltrip_1 =
+prop_fulltrip_1 :: Property
+prop_fulltrip_1 =
   withTests 1 . property $ do
     let str = "def a(x, y=2, *z, **w):\n   return 2 + 3"
 
@@ -45,8 +21,8 @@ test_fulltrip_1 =
 
     showStatement tree === str
 
-test_fulltrip_2 :: Property
-test_fulltrip_2 =
+prop_fulltrip_2 :: Property
+prop_fulltrip_2 =
   withTests 1 . property $ do
     let str = "(   1\n       *\n  3\n    )"
 
@@ -55,8 +31,8 @@ test_fulltrip_2 =
 
     showExpr tree === str
 
-test_fulltrip_3 :: Property
-test_fulltrip_3 =
+prop_fulltrip_3 :: Property
+prop_fulltrip_3 =
   withTests 1 . property $ do
     let str = "pass;"
 
@@ -65,8 +41,8 @@ test_fulltrip_3 =
 
     showStatement tree === str
 
-test_fulltrip_4 :: Property
-test_fulltrip_4 =
+prop_fulltrip_4 :: Property
+prop_fulltrip_4 =
   withTests 1 . property $ do
     let str = "def a():\n pass\n #\n pass\n"
 
@@ -75,8 +51,8 @@ test_fulltrip_4 =
 
     showStatement tree === str
 
-test_fulltrip_5 :: Property
-test_fulltrip_5 =
+prop_fulltrip_5 :: Property
+prop_fulltrip_5 =
   withTests 1 . property $ do
     let str = "if False:\n pass\n pass\nelse:\n pass\n pass\n"
 
@@ -85,8 +61,8 @@ test_fulltrip_5 =
 
     showStatement tree === str
 
-test_fulltrip_6 :: Property
-test_fulltrip_6 =
+prop_fulltrip_6 :: Property
+prop_fulltrip_6 =
   withTests 1 . property $ do
     let str = "# blah\ndef boo():\n    pass\n       #bing\n    #   bop\n"
 
@@ -95,8 +71,8 @@ test_fulltrip_6 =
 
     showModule tree === str
 
-test_fulltrip_7 :: Property
-test_fulltrip_7 =
+prop_fulltrip_7 :: Property
+prop_fulltrip_7 =
   withTests 1 . property $ do
     let str = "if False:\n pass\nelse \\\n      \\\r\n:\n pass\n"
 
@@ -105,8 +81,8 @@ test_fulltrip_7 =
 
     showModule tree === str
 
-test_fulltrip_8 :: Property
-test_fulltrip_8 =
+prop_fulltrip_8 :: Property
+prop_fulltrip_8 =
   withTests 1 . property $ do
     let str = "def a():\n \n pass\n pass\n"
 
@@ -115,8 +91,8 @@ test_fulltrip_8 =
 
     showModule tree === str
 
-test_fulltrip_9 :: Property
-test_fulltrip_9 =
+prop_fulltrip_9 :: Property
+prop_fulltrip_9 =
   withTests 1 . property $ do
     let
       str =
@@ -127,8 +103,8 @@ test_fulltrip_9 =
 
     showModule tree === str
 
-test_fulltrip_10 :: Property
-test_fulltrip_10 =
+prop_fulltrip_10 :: Property
+prop_fulltrip_10 =
   withTests 1 . property $ do
     let
       str =
@@ -151,8 +127,8 @@ test_fulltrip_10 =
 
     showModule tree === str
 
-test_fulltrip_11 :: Property
-test_fulltrip_11 =
+prop_fulltrip_11 :: Property
+prop_fulltrip_11 =
   withTests 1 . property $ do
     let
       str =
@@ -170,8 +146,8 @@ test_fulltrip_11 =
 
     showModule tree === str
 
-test_fulltrip_12 :: Property
-test_fulltrip_12 =
+prop_fulltrip_12 :: Property
+prop_fulltrip_12 =
   withTests 1 . property $ do
     let
       str =
@@ -190,8 +166,8 @@ test_fulltrip_12 =
 
     showModule tree === str
 
-test_fulltrip_13 :: Property
-test_fulltrip_13 =
+prop_fulltrip_13 :: Property
+prop_fulltrip_13 =
   withTests 1 . property $ do
     let
       str =
@@ -212,8 +188,8 @@ test_fulltrip_13 =
 
     showModule tree === str
 
-test_fulltrip_14 :: Property
-test_fulltrip_14 =
+prop_fulltrip_14 :: Property
+prop_fulltrip_14 =
   withTests 1 . property $ do
     let
       str = "not ((False for a in False) if False else False or False)"
@@ -223,8 +199,8 @@ test_fulltrip_14 =
 
     showModule tree === str
 
-test_fulltrip_15 :: Property
-test_fulltrip_15 =
+prop_fulltrip_15 :: Property
+prop_fulltrip_15 =
   withTests 1 . property $ do
     let
       str = "01."
@@ -234,8 +210,8 @@ test_fulltrip_15 =
 
     showModule tree === str
 
-test_fulltrip_16 :: Property
-test_fulltrip_16 =
+prop_fulltrip_16 :: Property
+prop_fulltrip_16 =
   withTests 1 . property $ do
     let
       str = "def a():\n  return ~i"
@@ -245,8 +221,8 @@ test_fulltrip_16 =
 
     showModule tree === str
 
-test_fulltrip_17 :: Property
-test_fulltrip_17 =
+prop_fulltrip_17 :: Property
+prop_fulltrip_17 =
   withTests 1 . property $ do
     let str = "r\"\\\"\""
 
@@ -255,8 +231,8 @@ test_fulltrip_17 =
 
     showModule tree === str
 
-test_fulltrip_18 :: Property
-test_fulltrip_18 =
+prop_fulltrip_18 :: Property
+prop_fulltrip_18 =
   withTests 1 . property $ do
     let str = "\"\0\""
 
@@ -265,8 +241,8 @@ test_fulltrip_18 =
 
     showModule tree === str
 
-test_fulltrip_19 :: Property
-test_fulltrip_19 =
+prop_fulltrip_19 :: Property
+prop_fulltrip_19 =
   withTests 1 . property $ do
     let str = " \\\n"
 
@@ -277,8 +253,8 @@ test_fulltrip_19 =
         annotateShow a
         failure
 
-test_fulltrip_20 :: Property
-test_fulltrip_20 =
+prop_fulltrip_20 :: Property
+prop_fulltrip_20 =
   withTests 1 . property $ do
     let str = " pass"
 
@@ -289,8 +265,8 @@ test_fulltrip_20 =
         annotateShow a
         failure
 
-test_fulltrip_21 :: Property
-test_fulltrip_21 =
+prop_fulltrip_21 :: Property
+prop_fulltrip_21 =
   withTests 1 . property $ do
     let str = "if a:\n  \\\n\n  pass"
 
@@ -301,10 +277,22 @@ test_fulltrip_21 =
         annotateShow a
         failure
 
-test_fulltrip_22 :: Property
-test_fulltrip_22 =
+prop_fulltrip_22 :: Property
+prop_fulltrip_22 =
   withTests 1 . property $ do
     let str = "for a in (b, *c): pass"
+
+    let res = parseModule "test" str
+    case res of
+      Failure{} -> success
+      Success a -> do
+        annotateShow a
+        failure
+
+prop_fulltrip_23 :: Property
+prop_fulltrip_23 =
+  withTests 1 . property $ do
+    let str = "None,*None"
 
     let res = parseModule "test" str
     case res of

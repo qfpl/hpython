@@ -77,7 +77,6 @@ library
                      , Language.Python.Internal.Syntax.Numbers
                      , Language.Python.Internal.Syntax.Statement
                      , Language.Python.Internal.Syntax.Strings
-                     , Language.Python.Internal.Syntax.Strings.Raw
                      , Language.Python.Internal.Syntax.UnOp
                      , Language.Python.Internal.Syntax.Whitespace
                      , Language.Python.Parse

@@ -205,7 +205,7 @@ showToken t =
       in
         showRawStringPrefix sp <>
         quote <>
-        renderRawPyChars qt st s <>
+        renderPyChars qt st s <>
         quote
     TkRawBytes sp st qt s _ ->
       let
@@ -216,7 +216,7 @@ showToken t =
       in
         showRawBytesPrefix sp <>
         quote <>
-        renderRawPyCharsBytes qt st s <>
+        renderPyCharsBytes qt st s <>
         quote
     TkSpace{} -> " "
     TkTab{} -> "\t"
@@ -332,12 +332,6 @@ intToHex n = Text.pack $ go n []
     go 14 = (++"E")
     go 15 = (++"F")
     go b = let (q, r) = quotRem b 16 in go r . go q
-
-renderRawPyChars :: QuoteType -> StringType -> [PyChar] -> Text
-renderRawPyChars = renderPyChars
-
-renderRawPyCharsBytes :: QuoteType -> StringType -> [PyChar] -> Text
-renderRawPyCharsBytes = renderPyCharsBytes
 
 intToHexH :: Int -> [HeXDigit]
 intToHexH n = go n []

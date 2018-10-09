@@ -29,7 +29,7 @@ data SyntaxError (v :: [*]) a
   | ParametersNonlocal a [String]
   | NoBindingNonlocal (Ident v a)
   | Can'tJoinStringAndBytes a
-  | InvalidYield a
+  | YieldOutsideGenerator a
   | CommentAfterBackslash a
   | MalformedDecorator a
   | InvalidDictUnpacking a
@@ -80,7 +80,7 @@ class AsSyntaxError r_adm2s v_adlB2 a_adlB3 | r_adm2s -> v_adlB2
   _ParametersNonlocal :: Prism' r_adm2s (a_adlB3, [String])
   _NoBindingNonlocal :: Prism' r_adm2s (Ident v_adlB2 a_adlB3)
   _Can'tJoinStringAndBytes :: Prism' r_adm2s a_adlB3
-  _InvalidYield :: Prism' r_adm2s a_adlB3
+  _YieldOutsideGenerator :: Prism' r_adm2s a_adlB3
   _CommentAfterBackslash :: Prism' r_adm2s a_adlB3
   _MalformedDecorator :: Prism' r_adm2s a_adlB3
   _InvalidDictUnpacking :: Prism' r_adm2s a_adlB3
@@ -127,7 +127,7 @@ class AsSyntaxError r_adm2s v_adlB2 a_adlB3 | r_adm2s -> v_adlB2
   _NoBindingNonlocal = ((.) _SyntaxError) _NoBindingNonlocal
   _Can'tJoinStringAndBytes
     = ((.) _SyntaxError) _Can'tJoinStringAndBytes
-  _InvalidYield = ((.) _SyntaxError) _InvalidYield
+  _YieldOutsideGenerator = ((.) _SyntaxError) _YieldOutsideGenerator
   _CommentAfterBackslash = ((.) _SyntaxError) _CommentAfterBackslash
   _MalformedDecorator = ((.) _SyntaxError) _MalformedDecorator
   _InvalidDictUnpacking = ((.) _SyntaxError) _InvalidDictUnpacking
@@ -297,11 +297,11 @@ instance AsSyntaxError (SyntaxError v_adlB2 a_adlB3) v_adlB2 a_adlB3 where
             -> case x_adm3L of
                 Can'tJoinStringAndBytes y1_adm3M -> Right y1_adm3M
                 _ -> Left x_adm3L)
-  _InvalidYield
-    = (prism (\ x1_adm3N -> InvalidYield x1_adm3N))
+  _YieldOutsideGenerator
+    = (prism (\ x1_adm3N -> YieldOutsideGenerator x1_adm3N))
         (\ x_adm3O
             -> case x_adm3O of
-                InvalidYield y1_adm3P -> Right y1_adm3P
+                YieldOutsideGenerator y1_adm3P -> Right y1_adm3P
                 _ -> Left x_adm3O)
   _CommentAfterBackslash
     = (prism (\ x1_adm3Q -> CommentAfterBackslash x1_adm3Q))

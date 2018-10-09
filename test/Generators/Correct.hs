@@ -386,26 +386,56 @@ genCompFor =
        (\ws1 ws2 -> CompFor () ws1 a ws2 b) <$>
        genWhitespaces <*>
        genWhitespaces)
-    genAssignable
+    (localState $ do
+        inGenerator .= True
+        genAssignable)
     (Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
 
 genCompIf :: (MonadGen m, MonadState GenState m) => m (CompIf '[] ())
 genCompIf =
-  CompIf () <$>
-  genWhitespaces <*>
-  sizedRecursive
-    [ Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr ]
-    []
+  localState $ do
+    inGenerator .= True
+    CompIf () <$>
+      genWhitespaces <*>
+      sizedRecursive
+        [ Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr ]
+        []
 
 genComprehension :: (MonadGen m, MonadState GenState m) => m (Comprehension Expr '[] ())
 genComprehension =
   sized3
     (Comprehension ())
     (localState $ do
-       modify (inGenerator .~ True)
-       Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
+        inGenerator .= True
+        Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
     genCompFor
-    (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
+    (localState $ do
+        inGenerator .= True
+        sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
+
+genDictComp :: (MonadGen m, MonadState GenState m) => m (Comprehension DictItem '[] ())
+genDictComp =
+  sized3
+    (Comprehension ())
+    (localState $ do
+        inGenerator .= True
+        DictItem () <$> genExpr <*> genAnyWhitespaces <*> genExpr)
+    genCompFor
+    (localState $ do
+        inGenerator .= True
+        sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
+
+genSetComp :: (MonadGen m, MonadState GenState m) => m (Comprehension SetItem '[] ())
+genSetComp =
+  sized3
+    (Comprehension ())
+    (localState $ do
+        inGenerator .= True
+        SetItem () <$> genExpr)
+    genCompFor
+    (localState $ do
+        inGenerator .= True
+        sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
 genSubscriptItem :: (MonadGen m, MonadState GenState m) => m (Subscript '[] ())
 genSubscriptItem =
@@ -418,26 +448,6 @@ genSubscriptItem =
         (sizedMaybe $ (,) <$> genWhitespaces <*> sizedMaybe genExpr)
     ]
     []
-
-genDictComp :: (MonadGen m, MonadState GenState m) => m (Comprehension DictItem '[] ())
-genDictComp =
-  sized3
-    (Comprehension ())
-    (localState $ do
-       modify (inGenerator .~ True)
-       DictItem () <$> genExpr <*> genAnyWhitespaces <*> genExpr)
-    genCompFor
-    (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
-
-genSetComp :: (MonadGen m, MonadState GenState m) => m (Comprehension SetItem '[] ())
-genSetComp =
-  sized3
-    (Comprehension ())
-    (localState $ do
-       modify (inGenerator .~ True)
-       SetItem () <$> genExpr)
-    genCompFor
-    (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
 genExprList :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genExprList =

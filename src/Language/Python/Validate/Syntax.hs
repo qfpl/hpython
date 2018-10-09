@@ -202,7 +202,7 @@ validateCompForSyntax
   -> ValidateSyntax e (CompFor (Nub (Syntax ': v)) a)
 validateCompForSyntax (CompFor a b c d e) =
   (\c' -> CompFor a b c' d) <$>
-  validateAssignmentSyntax a c <*>
+  liftVM1 (local $ inGenerator .~ True) (validateAssignmentSyntax a c) <*>
   validateExprSyntax e
 
 validateCompIfSyntax
@@ -212,20 +212,7 @@ validateCompIfSyntax
   => CompIf v a
   -> ValidateSyntax e (CompIf (Nub (Syntax ': v)) a)
 validateCompIfSyntax (CompIf a b c) =
-  CompIf a b <$> validateExprSyntax c
-
-validateGeneratorComprehensionSyntax
-  :: ( AsSyntaxError e v a
-     , Member Indentation v
-     )
-  => (ex v a -> ValidateSyntax e (ex (Nub (Syntax ': v)) a))
-  -> Comprehension ex v a
-  -> ValidateSyntax e (Comprehension ex (Nub (Syntax ': v)) a)
-validateGeneratorComprehensionSyntax f (Comprehension a b c d) =
-  Comprehension a <$>
-  liftVM1 (local $ inGenerator .~ True) (f b) <*>
-  validateCompForSyntax c <*>
-  traverse (bitraverse validateCompForSyntax validateCompIfSyntax) d
+  CompIf a b <$> liftVM1 (local $ inGenerator .~ True) (validateExprSyntax c)
 
 validateComprehensionSyntax
   :: ( AsSyntaxError e v a
@@ -236,9 +223,13 @@ validateComprehensionSyntax
   -> ValidateSyntax e (Comprehension ex (Nub (Syntax ': v)) a)
 validateComprehensionSyntax f (Comprehension a b c d) =
   Comprehension a <$>
-  f b <*>
+  liftVM1 (local $ inGenerator .~ True) (f b) <*>
   validateCompForSyntax c <*>
-  traverse (bitraverse validateCompForSyntax validateCompIfSyntax) d
+  liftVM1
+    (local $ inGenerator .~ True)
+    (traverse
+      (bitraverse validateCompForSyntax validateCompIfSyntax)
+      d)
 
 validateStringPyChar
   :: ( AsSyntaxError e v a
@@ -387,7 +378,7 @@ validateExprSyntax (Yield a b c) =
       case _inFunction ctxt of
         Nothing
           | _inGenerator ctxt -> pure ()
-          | otherwise -> errorVM1 (_InvalidYield # a)
+          | otherwise -> errorVM1 (_YieldOutsideGenerator # a)
         Just info ->
           if info^.asyncFunction
           then errorVM1 $ _YieldInsideCoroutine # a
@@ -401,7 +392,7 @@ validateExprSyntax (YieldFrom a b c d) =
       case _inFunction ctxt of
         Nothing
           | _inGenerator ctxt -> pure ()
-          | otherwise -> errorVM1 (_InvalidYield # a)
+          | otherwise -> errorVM1 (_YieldOutsideGenerator # a)
         Just fi ->
           if fi ^. asyncFunction
           then errorVM1 (_YieldFromInsideCoroutine # a)
@@ -457,14 +448,13 @@ validateExprSyntax (List a ws1 exprs ws2) =
     (traverseOf (traverse.traverse) validateListItemSyntax exprs) <*>
   validateWhitespace a ws2
 validateExprSyntax (ListComp a ws1 comp ws2) =
-  ListComp a ws1 <$>
   liftVM1
-    (local $ (inParens .~ True) . (inGenerator .~ True))
-    (validateComprehensionSyntax validateExprSyntax comp) <*>
+    (local $ inParens .~ True)
+    (ListComp a ws1 <$>
+     validateComprehensionSyntax validateExprSyntax comp) <*>
   validateWhitespace a ws2
 validateExprSyntax (Generator a comp) =
-  Generator a <$>
-  validateGeneratorComprehensionSyntax validateExprSyntax comp
+  Generator a <$> validateComprehensionSyntax validateExprSyntax comp
 validateExprSyntax (Await a ws expr) =
   bindVM ask $ \ctxt ->
   Await a <$>
@@ -500,10 +490,10 @@ validateExprSyntax (Tuple a b ws d) =
   validateWhitespace a ws <*>
   traverseOf (traverse.traverse) validateTupleItemSyntax d
 validateExprSyntax (DictComp a ws1 comp ws2) =
-  DictComp a ws1 <$>
   liftVM1
-    (local $ (inParens .~ True) . (inGenerator .~ True))
-    (validateComprehensionSyntax dictItem comp) <*>
+    (local $ inParens .~ True)
+    (DictComp a ws1 <$>
+     validateComprehensionSyntax dictItem comp) <*>
   validateWhitespace a ws2
   where
     dictItem (DictUnpack a _ _) = errorVM1 (_InvalidDictUnpacking # a)
@@ -515,10 +505,10 @@ validateExprSyntax (Dict a b c d) =
     (traverseOf (traverse.traverse) validateDictItemSyntax c) <*>
   validateWhitespace a d
 validateExprSyntax (SetComp a ws1 comp ws2) =
-  SetComp a ws1 <$>
   liftVM1
-    (local $ (inParens .~ True) . (inGenerator .~ True))
-    (validateComprehensionSyntax setItem comp) <*>
+    (local $ inParens .~ True)
+    (SetComp a ws1 <$>
+     validateComprehensionSyntax setItem comp) <*>
   validateWhitespace a ws2
   where
     setItem (SetUnpack a _ _ _) = errorVM1 (_InvalidSetUnpacking # a)

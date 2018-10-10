@@ -10,7 +10,7 @@ import Control.Lens.Lens (Lens', lens)
 import Control.Lens.Setter ((.~), over, mapped)
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (traverseOf)
-import Control.Lens.Tuple (_1, _2, _3)
+import Control.Lens.Tuple (_2, _3)
 import Data.Bifoldable (bifoldMap)
 import Data.Bifunctor (bimap)
 import Data.Bitraversable (bitraverse)
@@ -42,7 +42,8 @@ data Statement a
       (SmallStatement a)
       [([Whitespace], SmallStatement a)]
       (Maybe [Whitespace])
-      (Either (Maybe Comment) Newline)
+      (Maybe (Comment a))
+      (Maybe Newline)
   | CompoundStatement
       (CompoundStatement a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
@@ -533,42 +534,48 @@ exprAnn =
 
 data Suite a
   -- ':' <space> smallstatement
-  = SuiteOne a [Whitespace] (SmallStatement a) Newline
+  = SuiteOne a [Whitespace] (SmallStatement a) (Maybe (Comment a)) Newline
   | SuiteMany a
       -- ':' <spaces> [comment] <newline>
-      [Whitespace] Newline
+      [Whitespace] (Maybe (Comment a)) Newline
       -- <block>
       (Block a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Block a
   = Block
-  { _blockBlankLines :: [(a, [Whitespace], Newline)]
+  { _blockBlankLines :: [(a, [Whitespace], Maybe (Comment a), Newline)]
   , _blockHead :: Statement a
   , _blockTail
-    :: [Either (a, [Whitespace], Newline) (Statement a)]
+    :: [Either (a, [Whitespace], Maybe (Comment a), Newline) (Statement a)]
   } deriving (Eq, Show)
 
 instance Functor Block where
   fmap f (Block a b c) =
     Block
-      (over (mapped._1) f a)
+      ((\(w, x, y, z) -> (f w, x, over (mapped.mapped) f y, z)) <$> a)
       (fmap f b)
-      (fmap (bimap (over _1 f) (fmap f)) c)
+      (bimap (\(w, x, y, z) -> (f w, x, over (mapped.mapped) f y, z)) (fmap f) <$> c)
 
 instance Foldable Block where
   foldMap f (Block a b c) =
-    foldMapOf (folded._1) f a <>
+    foldMap (\(w, _, y, _) -> f w <> foldMapOf (folded.folded) f y) a <>
     foldMap f b <>
-    foldMap (bifoldMap (foldMapOf _1 f) (foldMap f)) c
+    foldMap
+      (bifoldMap (\(w, _, y, _) -> f w <> foldMapOf (folded.folded) f y) (foldMap f))
+      c
 
 instance Traversable Block where
   traverse f (Block a b c) =
     Block <$>
-    traverseOf (traverse._1) f a <*>
+    traverse
+      (\(w, x, y, z) -> (\w' y' -> (w', x, y', z)) <$> f w <*> traverseOf (traverse.traverse) f y)
+      a <*>
     traverse f b <*>
     traverse
-      (bitraverse (traverseOf _1 f) (traverse f))
+      (bitraverse
+         (\(w, x, y, z) -> (\w' y' -> (w', x, y', z)) <$> f w <*> traverseOf (traverse.traverse) f y)
+         (traverse f))
       c
 
 data WithItem a
@@ -585,6 +592,7 @@ data Decorator a
   , _decoratorIndents :: Indents a
   , _decoratorWhitespaceLeft :: [Whitespace]
   , _decoratorExpr :: Expr a
+  , _decoratorComment :: Maybe (Comment a)
   , _decoratorNewline :: Newline
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
@@ -599,8 +607,8 @@ data ExceptAs a
 
 data Module a
   = ModuleEmpty
-  | ModuleBlankFinal a [Whitespace] (Maybe Comment)
-  | ModuleBlank a [Whitespace] Newline (Module a)
+  | ModuleBlankFinal a [Whitespace] (Maybe (Comment a))
+  | ModuleBlank a [Whitespace] (Maybe (Comment a)) Newline (Module a)
   | ModuleStatement (Statement a) (Module a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -684,12 +692,12 @@ fromIR_expr ex =
 fromIR_suite :: Suite a -> Validation (NonEmpty (IRError a)) (Syntax.Suite '[] a)
 fromIR_suite s =
   case s of
-    SuiteOne a b c d ->
-      (\c' -> Syntax.SuiteOne a b c' d) <$>
+    SuiteOne a b c d e ->
+      (\c' -> Syntax.SuiteOne a b c' d e) <$>
       fromIR_smallStatement c
-    SuiteMany a b c d ->
-      Syntax.SuiteMany a b c <$>
-      fromIR_block d
+    SuiteMany a b c d e ->
+      Syntax.SuiteMany a b c d <$>
+      fromIR_block e
 
 fromIR_param :: Param a -> Validation (NonEmpty (IRError a)) (Syntax.Param '[] a)
 fromIR_param p =
@@ -715,8 +723,8 @@ fromIR_arg a =
     DoubleStarArg a b c -> Syntax.DoubleStarArg a b <$> fromIR_expr c
 
 fromIR_decorator :: Decorator a -> Validation (NonEmpty (IRError a)) (Syntax.Decorator '[] a)
-fromIR_decorator (Decorator a b c d e) =
-  (\d' -> Syntax.Decorator a b c d' e) <$>
+fromIR_decorator (Decorator a b c d e f) =
+  (\d' -> Syntax.Decorator a b c d' e f) <$>
   fromIR_expr d
 
 fromIR_exceptAs :: ExceptAs a -> Validation (NonEmpty (IRError a)) (Syntax.ExceptAs '[] a)
@@ -779,8 +787,8 @@ fromIR_compIf (CompIf a b c) =
 fromIR_statement :: Statement a -> Validation (NonEmpty (IRError a)) (Syntax.Statement '[] a)
 fromIR_statement ex =
   case ex of
-    SmallStatements a b c d e ->
-      (\b' c' -> Syntax.SmallStatements a b' c' d e) <$>
+    SmallStatements a b c d e f ->
+      (\b' c' -> Syntax.SmallStatements a b' c' d e f) <$>
       fromIR_smallStatement b <*>
       traverseOf (traverse._2) fromIR_smallStatement c
     CompoundStatement a ->
@@ -898,5 +906,5 @@ fromIR_setItem e = (\x -> Syntax.SetItem (x ^. Syntax.exprAnn) x) <$> fromIR_exp
 fromIR :: Module a -> Validation (NonEmpty (IRError a)) (Syntax.Module '[] a)
 fromIR ModuleEmpty = pure Syntax.ModuleEmpty
 fromIR (ModuleBlankFinal a b c) = pure $ Syntax.ModuleBlankFinal a b c
-fromIR (ModuleBlank a b c d) = Syntax.ModuleBlank a b c <$> fromIR d
+fromIR (ModuleBlank a b c d e) = Syntax.ModuleBlank a b c d <$> fromIR e
 fromIR (ModuleStatement a b) = Syntax.ModuleStatement <$> fromIR_statement a <*> fromIR b

@@ -136,11 +136,13 @@ validateBlockIndentation (Block x b bs) =
   traverseOf _head checkBlankIndents x <*>
   go False (Right b) bs
   where
-    checkBlankIndents :: (a, [Whitespace], Newline) -> ValidateIndentation e (a, [Whitespace], Newline)
-    checkBlankIndents (a, b, c) =
+    checkBlankIndents
+      :: (a, [Whitespace], Maybe (Comment a), Newline)
+      -> ValidateIndentation e (a, [Whitespace], Maybe (Comment a), Newline)
+    checkBlankIndents (a, b, c, d) =
       if any (\case; Continued{} -> True; _ -> False) b
       then errorVM1 $ _EmptyContinuedLine # a
-      else pure (a, b, c)
+      else pure (a, b, c, d)
 
     is = (Right b:|bs) ^?! folded._Right.unvalidated._Indents.indentsValue
 
@@ -164,11 +166,11 @@ validateSuiteIndentation
   => Indents a
   -> Suite v a
   -> ValidateIndentation e (Suite (Nub (Indentation ': v)) a)
-validateSuiteIndentation idnt (SuiteMany ann a c d) =
-  SuiteMany ann a c <$
+validateSuiteIndentation idnt (SuiteMany ann a b c d) =
+  SuiteMany ann a b c <$
   setNextIndent GreaterThan (idnt ^. indentsValue) <*>
   validateBlockIndentation d
-validateSuiteIndentation _ (SuiteOne ann a c d) = pure $ SuiteOne ann a (unsafeCoerce c) d
+validateSuiteIndentation _ (SuiteOne ann a b c d) = pure $ SuiteOne ann a (unsafeCoerce b) c d
 
 validateExprIndentation
   :: AsIndentationError e v a
@@ -201,12 +203,9 @@ validateDecoratorIndentation
   :: AsIndentationError e v a
   => Decorator v a
   -> ValidateIndentation e (Decorator (Nub (Indentation ': v)) a)
-validateDecoratorIndentation (Decorator a b c d e) =
-  Decorator a <$>
-  checkIndent b <*>
-  pure c <*>
-  pure (unsafeCoerce d) <*>
-  pure e
+validateDecoratorIndentation (Decorator a b c d e f) =
+  (\b' -> Decorator a b' c (unsafeCoerce d) e f) <$>
+  checkIndent b
 
 validateCompoundStatementIndentation
   :: forall e v a
@@ -320,9 +319,9 @@ validateStatementIndentation
   -> ValidateIndentation e (Statement (Nub (Indentation ': v)) a)
 validateStatementIndentation (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementIndentation c
-validateStatementIndentation (SmallStatements idnt a b c d) =
+validateStatementIndentation (SmallStatements idnt a b c d e) =
   (\idnt' ->
-     SmallStatements idnt' (unsafeCoerce a) (over (mapped._2) unsafeCoerce b) c d) <$>
+     SmallStatements idnt' (unsafeCoerce a) (over (mapped._2) unsafeCoerce b) c d e) <$>
   checkIndent idnt
 
 validateModuleIndentation
@@ -336,11 +335,10 @@ validateModuleIndentation m =
       ModuleBlankFinal a <$>
       checkBlankWs a b <*>
       pure c
-    ModuleBlank a b c d ->
-      ModuleBlank a <$>
+    ModuleBlank a b c d e ->
+      (\b' e' -> ModuleBlank a b' c d e') <$>
       checkBlankWs a b <*>
-      pure c <*>
-      validateModuleIndentation d
+      validateModuleIndentation e
     ModuleStatement a b ->
      ModuleStatement <$
      setNextIndent EqualTo [] <*>

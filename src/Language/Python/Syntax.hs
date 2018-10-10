@@ -358,10 +358,6 @@ import Language.Python.Syntax.Types
 
 type Raw f = f '[] ()
 
--- | Create a blank 'Line'
-blank_ :: Raw Line
-blank_ = Line $ Left ((), [], LF Nothing)
-
 -- | 'Ident' has an 'Data.String.IsString' instance, but when a type class dispatches on
 -- an 'Ident' we will run into ambiguity if we try to use @OverloadedStrings@. In these
 -- cases we can use 'id_' to provide the extra type information
@@ -371,9 +367,12 @@ id_ = fromString
 -- | One or more lines of Python code
 newtype Line v a
   = Line
-  { unLine
-    :: Either (a, [Whitespace], Newline) (Statement v a)
+  { unLine :: Either (a, [Whitespace], Maybe (Comment a), Newline) (Statement v a)
   } deriving (Eq, Show)
+
+-- | Create a blank 'Line'
+blank_ :: Raw Line
+blank_ = Line $ Left ((), [], Nothing, LF)
 
 -- | Convert some data to a 'Line'
 class AsLine s where
@@ -381,7 +380,7 @@ class AsLine s where
 
 instance AsLine SmallStatement where
   line_ ss =
-    Line . Right $ SmallStatements (Indents [] ()) ss [] Nothing (Right $ LF Nothing)
+    Line . Right $ SmallStatements (Indents [] ()) ss [] Nothing Nothing (Just LF)
 
 instance AsLine CompoundStatement where
   line_ = Line . Right . CompoundStatement
@@ -586,11 +585,11 @@ instance HasDecorators Fundef where
 
   setDecorators new code =
     code
-    { _fdDecorators = (\e -> Decorator () (_fdIndents code) [] e $ LF Nothing) <$> new
+    { _fdDecorators = (\e -> Decorator () (_fdIndents code) [] e Nothing LF) <$> new
     }
 
   getDecorators code =
-    (\(Decorator () _ _ e _) -> e) <$> _fdDecorators code
+    (\(Decorator () _ _ e _ _) -> e) <$> _fdDecorators code
 
 mkSetBody
   :: HasIndents s
@@ -606,7 +605,7 @@ mkSetBody bodyField indentsField ws new code =
     over
       (_Indents.indentsValue)
       ((indentsField code ^. indentsValue <>) . doIndent ws)
-      (SuiteMany () [] (LF Nothing) $ toBlock new)
+      (SuiteMany () [] Nothing LF $ toBlock new)
 
 mkGetBody
   :: HasIndents s
@@ -617,9 +616,9 @@ mkGetBody
   -> [Raw Line]
 mkGetBody thing bodyField indentsField code =
   (\case
-      SuiteOne _ _ c d ->
-        [ line_ $ SmallStatements (Indents [] ()) c [] Nothing (Right d) ]
-      SuiteMany _ _ _ d ->
+      SuiteOne _ _ c d e ->
+        [ line_ $ SmallStatements (Indents [] ()) c [] Nothing d (Just e) ]
+      SuiteMany _ _ _ _ d ->
         case d of
           Block x y z -> fmap (Line . Left) x <> (Line (Right y) : fmap Line z)) $
   fromMaybe
@@ -649,7 +648,7 @@ mkFundef name body =
   , _fdParameters = CommaSepNone
   , _fdRightParenSpaces = []
   , _fdReturnType = Nothing
-  , _fdBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _fdBody = SuiteMany () [] Nothing LF $ toBlock body
   }
 
 -- |
@@ -722,10 +721,10 @@ call_ expr args =
 
 return_ :: Raw Expr -> Raw Statement
 return_ e =
-  SmallStatements (Indents [] ()) (Return () [Space] $ Just e) [] Nothing (Right (LF Nothing))
+  SmallStatements (Indents [] ()) (Return () [Space] $ Just e) [] Nothing Nothing (Just LF)
 
 expr_ :: Raw Expr -> Raw Statement
-expr_ e = SmallStatements (Indents [] ()) (Expr () e) [] Nothing (Right (LF Nothing))
+expr_ e = SmallStatements (Indents [] ()) (Expr () e) [] Nothing Nothing (Just LF)
 
 -- |
 -- >>> list_ [li_ $ var_ "a"]
@@ -1032,7 +1031,7 @@ mkWhile cond body =
   , _whileIndents = Indents [] ()
   , _whileWhile = [Space]
   , _whileCond = cond
-  , _whileBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _whileBody = SuiteMany () [] Nothing LF $ toBlock body
   }
 
 while_ :: Raw Expr -> [Raw Line] -> Raw Statement
@@ -1046,7 +1045,7 @@ mkIf cond body =
   , _ifIndents = Indents [] ()
   , _ifIf = [Space]
   , _ifCond = cond
-  , _ifBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _ifBody = SuiteMany () [] Nothing LF $ toBlock body
   , _ifElifs = []
   , _ifElse = Nothing
   }
@@ -1088,7 +1087,7 @@ int_ :: Integer -> Raw Expr
 int_ = fromInteger
 
 pass_ :: Raw Statement
-pass_ = SmallStatements (Indents [] ()) (Pass () []) [] Nothing (Right (LF Nothing))
+pass_ = SmallStatements (Indents [] ()) (Pass () []) [] Nothing Nothing (Just LF)
 
 -- | Create a minimal valid 'Elif'
 mkElif :: Raw Expr -> [Raw Line] -> Raw Elif
@@ -1097,7 +1096,7 @@ mkElif cond body =
   { _elifIndents = Indents [] ()
   , _elifElif = [Space]
   , _elifCond = cond
-  , _elifBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _elifBody = SuiteMany () [] Nothing LF $ toBlock body
   }
 
 elif_ :: Raw Expr -> [Raw Line] -> Raw If -> Raw If
@@ -1109,7 +1108,7 @@ mkElse body =
   MkElse
   { _elseIndents = Indents [] ()
   , _elseElse = []
-  , _elseBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _elseBody = SuiteMany () [] Nothing LF $ toBlock body
   }
 
 class HasElse s where
@@ -1157,7 +1156,7 @@ instance HasElse If where
   setElse = mkSetElse _ifIndents ifElse
 
 break_ :: Raw Statement
-break_ = SmallStatements (Indents [] ()) (Break () []) [] Nothing (Right (LF Nothing))
+break_ = SmallStatements (Indents [] ()) (Break () []) [] Nothing Nothing (Just LF)
 
 true_ :: Raw Expr
 true_ = Bool () True []
@@ -1188,7 +1187,8 @@ mkAugAssign as a b =
     (AugAssign () (a & trailingWhitespace .~ [Space]) (as [Space]) b)
     []
     Nothing
-    (Right (LF Nothing))
+    Nothing
+    (Just LF)
 
 -- | Chained assignment
 --
@@ -1205,7 +1205,8 @@ chainEq t (a:as) =
     (Assign () t $ (,) [Space] <$> (a :| as))
     []
     Nothing
-    (Right $ LF Nothing)
+    Nothing
+    (Just LF)
 
 (.=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.=) a b =
@@ -1214,7 +1215,8 @@ chainEq t (a:as) =
     (Assign () (a & trailingWhitespace .~ [Space]) $ pure ([Space], b))
     []
     Nothing
-    (Right $ LF Nothing)
+    Nothing
+    (Just LF)
 infix 0 .=
 
 (.+=) :: Raw Expr -> Raw Expr -> Raw Statement
@@ -1282,7 +1284,7 @@ mkFor binder collection body =
       fromMaybe
         (CommaSepOne1' (Unit () [] []) Nothing)
         (listToCommaSep1' collection)
-  , _forBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _forBody = SuiteMany () [] Nothing LF $ toBlock body
   , _forElse = Nothing
   }
 
@@ -1321,7 +1323,7 @@ mkFinally body =
   MkFinally
   { _finallyIndents = Indents [] ()
   , _finallyFinally = []
-  , _finallyBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _finallyBody = SuiteMany () [] Nothing LF $ toBlock body
   }
 
 -- | Create a minimal valid 'Except'
@@ -1331,7 +1333,7 @@ mkExcept body =
   { _exceptIndents = Indents [] ()
   , _exceptExcept = []
   , _exceptExceptAs = Nothing
-  , _exceptBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _exceptBody = SuiteMany () [] Nothing LF $ toBlock body
   }
 
 -- | Create a minimal valid 'TryExcept'
@@ -1341,7 +1343,7 @@ mkTryExcept body except =
   { _teAnn = ()
   , _teIndents = Indents [] ()
   , _teTry = [Space]
-  , _teBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _teBody = SuiteMany () [] Nothing LF $ toBlock body
   , _teExcepts = pure except
   , _teElse = Nothing
   , _teFinally = Nothing
@@ -1354,7 +1356,7 @@ mkTryFinally body fBody =
   { _tfAnn = ()
   , _tfIndents = Indents [] ()
   , _tfTry = [Space]
-  , _tfBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _tfBody = SuiteMany () [] Nothing LF $ toBlock body
   , _tfFinally = mkFinally fBody
   }
 
@@ -1528,7 +1530,7 @@ mkClassDef name body =
   , _cdClass = Space :| []
   , _cdName = name
   , _cdArguments = Nothing
-  , _cdBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _cdBody = SuiteMany () [] Nothing LF $ toBlock body
   }
 
 instance HasBody ClassDef where
@@ -1541,11 +1543,11 @@ instance HasDecorators ClassDef where
 
   setDecorators new code =
     code
-    { _cdDecorators = (\e -> Decorator () (_cdIndents code) [] e $ LF Nothing) <$> new
+    { _cdDecorators = (\e -> Decorator () (_cdIndents code) [] e Nothing LF) <$> new
     }
 
   getDecorators code =
-    (\(Decorator () _ _ e _) -> e) <$> _cdDecorators code
+    (\(Decorator () _ _ e _ _) -> e) <$> _cdDecorators code
 
 instance HasArguments ClassDef where
   setArguments args code =
@@ -1567,7 +1569,7 @@ mkWith items body =
   , _withAsync = Nothing
   , _withWith = [Space]
   , _withItems = listToCommaSep1 items
-  , _withBody = SuiteMany () [] (LF Nothing) $ toBlock body
+  , _withBody = SuiteMany () [] Nothing LF $ toBlock body
   }
 
 -- |

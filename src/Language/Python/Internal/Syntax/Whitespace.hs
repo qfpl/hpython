@@ -29,19 +29,16 @@ import GHC.Exts (IsList(..))
 
 import qualified Data.List.NonEmpty as NonEmpty
 
-import Language.Python.Internal.Syntax.Comment
+import Language.Python.Internal.Syntax.Comment (Comment)
 
-data Newline
-  = CR { _commentBefore :: Maybe Comment }
-  | LF { _commentBefore :: Maybe Comment }
-  | CRLF { _commentBefore :: Maybe Comment }
-  deriving (Eq, Ord, Show)
+data Newline = CR | LF | CRLF deriving (Eq, Ord, Show)
 
 data Whitespace
   = Space
   | Tab
   | Continued Newline [Whitespace]
   | Newline Newline
+  | Comment (Comment ())
   deriving (Eq, Ord, Show)
 
 class HasTrailingWhitespace s where
@@ -86,6 +83,7 @@ instance Measured IndentLevel Whitespace where
       Tab -> (b, if b then i else maybe (i + 8 - rem i 8) (+i) absolute)
       Continued{} -> (True, i)
       Newline{} -> error "Newline does not have an IndentLevel"
+      Comment{} -> error "Comment does not have an IndentLevel"
 
 newtype Indent
   = MkIndent

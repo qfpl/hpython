@@ -77,10 +77,10 @@ showRenderOutput =
     correctNewlines =
       transform $
       \case
-        TkNewline (CR cmt) () : TkNewline (LF cmt') () : rest ->
-          TkNewline (CRLF cmt) () : TkNewline (LF cmt') () : rest
-        TkContinued (CR cmt) () : TkNewline (LF cmt') () : rest ->
-          TkContinued (CRLF cmt) () : TkNewline (LF cmt') () : rest
+        TkNewline CR () : TkNewline LF () : rest ->
+          TkNewline CRLF () : TkNewline LF () : rest
+        TkContinued CR () : TkNewline LF () : rest ->
+          TkContinued CRLF () : TkNewline LF () : rest
         a -> a
 
 showTokens :: [PyToken a] -> Text
@@ -125,11 +125,11 @@ showQuoteType qt =
     DoubleQuote -> '\"'
     SingleQuote -> '\''
 
-renderComment :: Comment -> RenderOutput
-renderComment c = singleton $ TkComment c ()
+renderComment :: Comment a -> RenderOutput
+renderComment c = singleton $ TkComment (() <$ c)
 
-showComment :: Comment -> Text
-showComment (Comment s) = Text.pack $ "#" <> s
+showComment :: Comment a -> Text
+showComment (MkComment _ s) = Text.pack $ "#" <> s
 
 showToken :: PyToken a -> Text
 showToken t =
@@ -222,9 +222,9 @@ showToken t =
     TkTab{} -> "\t"
     TkNewline nl _ ->
       case nl of
-        CR cmt -> foldMap showComment cmt <> "\r"
-        LF cmt -> foldMap showComment cmt <> "\n"
-        CRLF cmt -> foldMap showComment cmt <> "\r\n"
+        CR -> "\r"
+        LF -> "\n"
+        CRLF -> "\r\n"
     TkLeftBracket{} -> "["
     TkRightBracket{} -> "]"
     TkLeftParen{} -> "("
@@ -241,9 +241,9 @@ showToken t =
     TkContinued nl _ ->
       "\\" <>
       case nl of
-        CR cmt -> foldMap showComment cmt <> "\r"
-        LF cmt -> foldMap showComment cmt <> "\n"
-        CRLF cmt -> foldMap showComment cmt <> "\r\n"
+        CR -> "\r"
+        LF -> "\n"
+        CRLF -> "\r\n"
     TkColon{} -> ":"
     TkSemicolon{} -> ";"
     TkComma{} -> ","
@@ -251,7 +251,7 @@ showToken t =
     TkPlus{} -> "+"
     TkMinus{} -> "-"
     TkTilde{} -> "~"
-    TkComment c _ -> showComment c
+    TkComment c -> showComment c
     TkStar{} -> "*"
     TkDoubleStar{} -> "**"
     TkSlash{} -> "/"
@@ -485,6 +485,7 @@ renderWhitespace Space = singleton $ TkSpace ()
 renderWhitespace Tab = singleton $ TkTab ()
 renderWhitespace (Continued nl ws) = TkContinued nl () `cons` foldMap renderWhitespace ws
 renderWhitespace (Newline nl) = singleton $ TkNewline nl ()
+renderWhitespace (Comment cmt) = renderComment cmt
 
 renderNewline :: Newline -> PyToken ()
 renderNewline nl = TkNewline nl ()
@@ -1043,38 +1044,43 @@ renderSmallStatement (From _ ws1 name ws3 ns) =
 renderBlock :: Block v a -> RenderOutput
 renderBlock (Block a b c) =
   foldMap
-    (\(_, x, z) ->
+    (\(_, x, y, z) ->
         foldMap renderWhitespace x <>
+        foldMap renderComment y <>
         singleton (renderNewline z))
     a <>
   renderStatement b <>
   foldMap
     (either
-       (\(_, x, z) ->
+       (\(_, x, y, z) ->
           foldMap renderWhitespace x <>
+          foldMap renderComment y <>
           singleton (renderNewline z))
         renderStatement)
     c
 
 renderSuite :: Suite v a -> RenderOutput
-renderSuite (SuiteMany _ a c d) =
+renderSuite (SuiteMany _ a b c d) =
   TkColon () `cons`
   foldMap renderWhitespace a <>
+  foldMap renderComment b <>
   singleton (renderNewline c) <>
   renderBlock d
-renderSuite (SuiteOne _ a c d) =
+renderSuite (SuiteOne _ a b c d) =
   TkColon () `cons`
   foldMap renderWhitespace a <>
-  renderSmallStatement c <>
+  renderSmallStatement b <>
+  foldMap renderComment c <>
   singleton (renderNewline d)
 
 renderDecorator :: Decorator v a -> RenderOutput
-renderDecorator (Decorator _ a b c d) =
+renderDecorator (Decorator _ a b c d e) =
   renderIndents a <>
   singleton (TkAt ()) <>
   foldMap renderWhitespace b <>
   renderExpr c <>
-  singleton (renderNewline d)
+  foldMap renderComment d <>
+  singleton (renderNewline e)
 
 renderCompoundStatement :: CompoundStatement v a -> RenderOutput
 renderCompoundStatement (Fundef _ decos idnt asyncWs ws1 name ws2 params ws3 mty s) =
@@ -1189,7 +1195,7 @@ renderIndent (MkIndent ws) = foldMap renderWhitespace $ toList ws
 
 renderStatement :: Statement v a -> RenderOutput
 renderStatement (CompoundStatement c) = renderCompoundStatement c
-renderStatement (SmallStatements idnts s ss sc nl) =
+renderStatement (SmallStatements idnts s ss sc cmt nl) =
   renderIndents idnts <>
   renderSmallStatement s <>
   foldMap
@@ -1201,6 +1207,7 @@ renderStatement (SmallStatements idnts s ss sc nl) =
   foldMap
     (\b -> TkSemicolon () `cons` foldMap renderWhitespace b)
     sc <>
+  foldMap renderComment cmt <>
   foldMap (singleton . renderNewline) nl
 
 renderExceptAs :: ExceptAs v a -> RenderOutput
@@ -1327,10 +1334,11 @@ renderModule ModuleEmpty = mempty
 renderModule (ModuleBlankFinal _ a b) =
   foldMap renderWhitespace a <>
   foldMap renderComment b
-renderModule (ModuleBlank _ a b c) =
+renderModule (ModuleBlank _ a b c d) =
   foldMap renderWhitespace a <>
-  singleton (renderNewline b) <>
-  renderModule c
+  foldMap renderComment b <>
+  singleton (renderNewline c) <>
+  renderModule d
 renderModule (ModuleStatement a b) =
   renderStatement a <>
   renderModule b

@@ -183,8 +183,9 @@ genBlock :: (MonadGen m, MonadState GenState m) => m (Block '[] ())
 genBlock = doIndent *> go <* doDedent
   where
     genBlank =
-      (,,) () <$>
+      (,,,) () <$>
       Gen.list (Range.constant 0 10) (Gen.element [Space, Tab]) <*>
+      Gen.maybe genComment <*>
       genNewline
 
     genLine =
@@ -718,6 +719,7 @@ genDecorator =
   use currentIndentation <*>
   genWhitespaces <*>
   genDecoratorValue <*>
+  Gen.maybe genComment <*>
   genNewline
   where
     genDecoratorValue =
@@ -941,10 +943,11 @@ genStatement =
   sizedRecursive
     [ sizedBind (localState genSmallStatement) $ \st ->
       sizedBind (sizedList $ (,) <$> genWhitespaces <*> localState genSmallStatement) $ \sts ->
-      (\a c -> SmallStatements a st sts c . Right) <$>
+      (\a c -> SmallStatements a st sts c) <$>
       use currentIndentation <*>
       Gen.maybe genWhitespaces <*>
-      genNewline
+      Gen.maybe genComment <*>
+      (Just <$> genNewline)
     ]
     [ CompoundStatement <$> localState genCompoundStatement ]
 

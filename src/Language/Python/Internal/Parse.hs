@@ -8,6 +8,7 @@ module Language.Python.Internal.Parse where
 
 import Control.Applicative (Alternative, (<|>), optional, many, some)
 import Control.Lens.Getter ((^.))
+import Control.Monad (void)
 import Data.Bifunctor (first)
 import Data.Coerce (coerce)
 import Data.Function ((&))
@@ -138,7 +139,8 @@ anySpace =
   Space <$ satisfy (\case; TkSpace{} -> True; _ -> False) <|>
   Tab <$ satisfy (\case; TkTab{} -> True; _ -> False) <|>
   continued <|>
-  Newline <$> newline
+  Newline <$> newline <|>
+  Comment . void <$> comment
 
 token
   :: MonadParsec e PyTokens m
@@ -213,9 +215,9 @@ stringOrBytes ws =
         _ -> False) <*>
   many ws
 
-comment :: MonadParsec e PyTokens m => m Comment
+comment :: MonadParsec e PyTokens m => m (Comment SrcInfo)
 comment =
-  (\(TkComment str _) -> str) <$>
+  (\(TkComment c) -> c) <$>
   satisfy (\case; TkComment{} -> True; _ -> False) <?> "comment"
 
 indent :: MonadParsec e PyTokens m => m (Indents SrcInfo)
@@ -897,24 +899,27 @@ statement pIndent indentBefore =
 
   (\(a, b, c) d -> SmallStatements indentBefore a b c d) <$>
   sepBy1' smallStatement (snd <$> semicolon space) <*>
-  (Right <$> eol <|> Left <$> optional comment)
+  optional comment <*>
+  optional eol
 
 suite :: MonadParsec e PyTokens m => m (Suite SrcInfo)
 suite =
   (\(tk, s) ->
      either
-       (uncurry $ SuiteOne (pyTokenAnn tk) s)
-       (uncurry $ SuiteMany (pyTokenAnn tk) s)) <$>
+       (\(a, b, c) -> SuiteOne (pyTokenAnn tk) s a b c)
+       (\(a, b,c ) -> SuiteMany (pyTokenAnn tk) s a b c)) <$>
   colon space <*>
   ((fmap Left $
-    (,) <$>
+    (,,) <$>
     smallStatement <*>
+    optional comment <*>
     eol)
 
     <|>
 
    (fmap Right $
-    (,) <$>
+    (,,) <$>
+    optional comment <*>
     eol <*>
     (Block <$>
      many commentOrEmpty <*>
@@ -924,13 +929,14 @@ suite =
   where
     commentOrEmpty =
       withSrcInfo $
-      (\b c a -> (a, b, c)) <$>
+      (\b c d a -> (a, b, c, d)) <$>
       some space <*>
+      optional comment <*>
       eol
 
       <|>
 
-      (\b a -> (a, [], b)) <$> eol
+      (\b c a -> (a, [], b, c)) <$> optional comment <*> eol
 
     line i =
       Left <$> commentOrEmpty <|>
@@ -1093,6 +1099,7 @@ decorator indentBefore =
   (\(tk, spcs) a b -> Decorator (pyTokenAnn tk) indentBefore spcs a b) <$>
   token space (\case; TkAt{} -> True; _ -> False) "@" <*>
   decoratorValue <*>
+  optional comment <*>
   eol
 
 compoundStatement
@@ -1289,10 +1296,11 @@ module_ =
   withSrcInfo
   ((\ws rest a ->
       case rest of
-        Left (nl, md) -> ModuleBlank a ws nl md
+        Left (cmt, nl, md) -> ModuleBlank a ws cmt nl md
         Right cmt -> ModuleBlankFinal a ws cmt) <$>
    many space <*>
-   (Left <$> ((,) <$> newline <*> module_) <|> Right <$> optional comment <* eof))
+   (Left <$> ((,,) <$> optional comment <*> newline <*> module_) <|>
+    Right <$> optional comment <* eof))
 
   <|>
 

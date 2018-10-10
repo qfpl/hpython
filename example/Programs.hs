@@ -29,7 +29,7 @@ append_to =
     )
     []
     Nothing
-    (SuiteMany () [] (LF Nothing) $
+    (SuiteMany () [] Nothing LF $
      Block []
      ( SmallStatements
          (Indents [replicate 4 Space ^. from indentWhitespaces] ())
@@ -41,7 +41,8 @@ append_to =
             [])
          []
          Nothing
-         (Right $ LF Nothing)
+         Nothing
+         (Just LF)
      )
      [ Right $
          SmallStatements
@@ -49,7 +50,8 @@ append_to =
            (Return () [Space] (Just $ Ident "to"))
            []
            Nothing
-           (Right $ LF Nothing)
+           Nothing
+           (Just LF)
      ])
 
 -- |
@@ -108,15 +110,15 @@ yes =
 
 everything =
   ModuleStatement append_to $
-  ModuleBlank () [] (LF Nothing) $
+  ModuleBlank () [] Nothing LF $
 
   ModuleStatement append_to' $
-  ModuleBlank () [] (LF Nothing) $
+  ModuleBlank () [] Nothing LF $
 
   ModuleStatement fact_tr $
-  ModuleBlank () [] (LF Nothing) $
+  ModuleBlank () [] Nothing LF $
 
   ModuleStatement spin $
-  ModuleBlank () [] (LF Nothing) $
+  ModuleBlank () [] Nothing LF $
 
   ModuleStatement yes ModuleEmpty

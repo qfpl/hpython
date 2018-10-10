@@ -14,7 +14,7 @@ import Control.Lens.Prism (_Right)
 import Control.Lens.Setter (over, mapped)
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (Traversal, traverseOf)
-import Control.Lens.Tuple (_1, _2, _3, _4)
+import Control.Lens.Tuple (_2, _3, _4)
 import Data.Bifoldable (bifoldMap)
 import Data.Bifunctor (bimap)
 import Data.Bitraversable (bitraverse)
@@ -49,40 +49,45 @@ class HasStatements s where
 
 data Block (v :: [*]) a
   = Block
-  { _blockBlankLines :: [(a, [Whitespace], Newline)]
+  { _blockBlankLines :: [(a, [Whitespace], Maybe (Comment a), Newline)]
   , _blockHead :: Statement v a
-  , _blockTail
-    :: [Either (a, [Whitespace], Newline) (Statement v a)]
+  , _blockTail :: [Either (a, [Whitespace], Maybe (Comment a), Newline) (Statement v a)]
   } deriving (Eq, Show)
 
 instance Functor (Block v) where
   fmap f (Block a b c) =
     Block
-      (over (mapped._1) f a)
+      ((\(w, x, y, z) -> (f w, x, over (mapped.mapped) f y, z)) <$> a)
       (fmap f b)
-      (fmap (bimap (over _1 f) (fmap f)) c)
+      (bimap (\(w, x, y, z) -> (f w, x, over (mapped.mapped) f y, z)) (fmap f) <$> c)
 
 instance Foldable (Block v) where
   foldMap f (Block a b c) =
-    foldMapOf (folded._1) f a <>
+    foldMap (\(w, _, y, _) -> f w <> foldMapOf (folded.folded) f y) a <>
     foldMap f b <>
-    foldMap (bifoldMap (foldMapOf _1 f) (foldMap f)) c
+    foldMap
+      (bifoldMap (\(w, _, y, _) -> f w <> foldMapOf (folded.folded) f y) (foldMap f))
+      c
 
 instance Traversable (Block v) where
   traverse f (Block a b c) =
     Block <$>
-    traverseOf (traverse._1) f a <*>
+    traverse
+      (\(w, x, y, z) -> (\w' y' -> (w', x, y', z)) <$> f w <*> traverseOf (traverse.traverse) f y)
+      a <*>
     traverse f b <*>
     traverse
-      (bitraverse (traverseOf _1 f) (traverse f))
+      (bitraverse
+         (\(w, x, y, z) -> (\w' y' -> (w', x, y', z)) <$> f w <*> traverseOf (traverse.traverse) f y)
+         (traverse f))
       c
 
 class HasBlocks s where
   _Blocks :: Traversal (s v a) (s '[] a) (Block v a) (Block '[] a)
 
 instance HasBlocks Suite where
-  _Blocks _ (SuiteOne a b c d) = pure $ SuiteOne a b (c ^. unvalidated) d
-  _Blocks f (SuiteMany a b c e) = SuiteMany a b c <$> f e
+  _Blocks _ (SuiteOne a b c d e) = pure $ SuiteOne a b (c ^. unvalidated) d e
+  _Blocks f (SuiteMany a b c d e) = SuiteMany a b c d <$> f e
 
 instance HasBlocks CompoundStatement where
   _Blocks f (Fundef a decos idnt asyncWs ws1 name ws2 params ws3 mty s) =
@@ -128,8 +133,8 @@ instance HasStatements Block where
     Block a <$> f b <*> (traverse._Right) f c
 
 instance HasStatements Suite where
-  _Statements _ (SuiteOne a b c d) = pure $ SuiteOne a b (c ^. unvalidated) d
-  _Statements f (SuiteMany a b c e) = SuiteMany a b c <$> _Statements f e
+  _Statements _ (SuiteOne a b c d e) = pure $ SuiteOne a b (c ^. unvalidated) d e
+  _Statements f (SuiteMany a b c d e) = SuiteMany a b c d <$> _Statements f e
 
 data Statement (v :: [*]) a
   = SmallStatements
@@ -137,24 +142,27 @@ data Statement (v :: [*]) a
       (SmallStatement v a)
       [([Whitespace], SmallStatement v a)]
       (Maybe [Whitespace])
-      (Either (Maybe Comment) Newline)
+      (Maybe (Comment a))
+      (Maybe Newline)
   | CompoundStatement
       (CompoundStatement v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasExprs Statement where
-  _Exprs f (SmallStatements idnt s ss a c) =
+  _Exprs f (SmallStatements idnt s ss a b c) =
     SmallStatements idnt <$>
     _Exprs f s <*>
     (traverse._2._Exprs) f ss <*>
     pure a <*>
+    pure b <*>
     pure c
   _Exprs f (CompoundStatement c) = CompoundStatement <$> _Exprs f c
 
 instance HasBlocks Statement where
   _Blocks f (CompoundStatement c) = CompoundStatement <$> _Blocks f c
-  _Blocks _ (SmallStatements idnt a b c d) =
-    pure $ SmallStatements idnt (a ^. unvalidated) (over (mapped._2) (view unvalidated) b) c d
+  _Blocks _ (SmallStatements idnt a b c d e) =
+    pure $
+    SmallStatements idnt (a ^. unvalidated) (over (mapped._2) (view unvalidated) b) c d e
 
 instance Plated (Statement '[] a) where
   plate _ s@SmallStatements{} = pure s
@@ -248,10 +256,10 @@ data ExceptAs (v :: [*]) a
 
 data Suite (v :: [*]) a
   -- ':' <space> smallstatement
-  = SuiteOne a [Whitespace] (SmallStatement v a) Newline
+  = SuiteOne a [Whitespace] (SmallStatement v a) (Maybe (Comment a)) Newline
   | SuiteMany a
       -- ':' <spaces> [comment] <newline>
-      [Whitespace] Newline
+      [Whitespace] (Maybe (Comment a)) Newline
       -- <block>
       (Block v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
@@ -270,6 +278,7 @@ data Decorator (v :: [*]) a
   , _decoratorIndents :: Indents a
   , _decoratorWhitespaceLeft :: [Whitespace]
   , _decoratorExpr :: Expr v a
+  , _decoratorComment :: Maybe (Comment a)
   , _decoratorNewline :: Newline
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
@@ -360,16 +369,14 @@ instance HasExprs Block where
     Block a <$> _Exprs f b <*> (traverse._Right._Exprs) f c
 
 instance HasExprs Suite where
-  _Exprs f (SuiteOne a b c d) = SuiteOne a b <$> _Exprs f c <*> pure d
-  _Exprs f (SuiteMany a b c e) = SuiteMany a b c <$> _Exprs f e
+  _Exprs f (SuiteOne a b c d e) = (\c' -> SuiteOne a b c' d e) <$> _Exprs f c
+  _Exprs f (SuiteMany a b c d e) = SuiteMany a b c d <$> _Exprs f e
 
 instance HasExprs WithItem where
   _Exprs f (WithItem a b c) = WithItem a <$> f b <*> traverseOf (traverse._2) f c
 
 instance HasExprs Decorator where
-  _Exprs fun (Decorator a b c d e) =
-    Decorator a b c <$>
-    _Exprs fun d <*> pure e
+  _Exprs fun (Decorator a b c d e f) = (\d' -> Decorator a b c d' e f) <$> _Exprs fun d
 
 instance HasExprs CompoundStatement where
   _Exprs f (Fundef a decos idnt asyncWs ws1 name ws2 params ws3 mty s) =

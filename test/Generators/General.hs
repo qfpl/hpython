@@ -93,12 +93,14 @@ genImportTargets =
 genBlock :: MonadGen m => m (Block '[] ())
 genBlock =
   Block <$>
-  Gen.list (Range.constant 0 10) ((,,) () <$> genWhitespaces <*> genNewline) <*>
+  Gen.list
+    (Range.constant 0 10)
+    ((,,,) () <$> genWhitespaces <*> Gen.maybe genComment <*> genNewline) <*>
   genStatement <*>
   sizedList
     (Gen.choice
      [ Right <$> genStatement
-     , fmap Left $ (,,) () <$> genWhitespaces <*> genNewline
+     , fmap Left $ (,,,) () <$> genWhitespaces <*> Gen.maybe genComment <*> genNewline
      ])
 
 genCompFor :: MonadGen m => m (CompFor '[] ())
@@ -347,6 +349,7 @@ genDecorator =
   genIndents <*>
   genWhitespaces <*>
   genExpr <*>
+  Gen.maybe genComment <*>
   genNewline
 
 genCompoundStatement
@@ -460,7 +463,8 @@ genStatement =
       (\a -> SmallStatements a st sts) <$>
       genIndents <*>
       Gen.maybe genWhitespaces <*>
-      Gen.choice [ Left <$> Gen.maybe genComment, Right <$> genNewline ]
+      Gen.maybe genComment <*>
+      Gen.maybe genNewline
     ]
     [ CompoundStatement <$> genCompoundStatement ]
 
@@ -477,7 +481,11 @@ genModule =
     [ pure ModuleEmpty
     , ModuleBlankFinal () <$> genWhitespaces <*> Gen.maybe genComment
     ]
-    [ ModuleBlank () <$> genWhitespaces <*> genNewline <*> genModule
+    [ ModuleBlank () <$>
+      genWhitespaces <*>
+      Gen.maybe genComment <*>
+      genNewline <*>
+      genModule
     , sized2
         ModuleStatement
         genStatement

@@ -310,20 +310,20 @@ instance HasIndents Else where
   _Indents f (MkElse a b c) = MkElse <$> f a <*> pure b <*> _Indents f c
 
 instance HasIndents Statement where
-  _Indents f (SmallStatements idnt a b c e) =
-    (\idnt' -> SmallStatements idnt' a b c e) <$> f idnt
+  _Indents f (SmallStatements idnt a b c d e) =
+    (\idnt' -> SmallStatements idnt' a b c d e) <$> f idnt
   _Indents f (CompoundStatement c) = CompoundStatement <$> _Indents f c
 
 instance HasIndents Block where
   _Indents = _Statements._Indents
 
 instance HasIndents Suite where
-  _Indents _ (SuiteOne a b c d) = pure $ SuiteOne a b c d
-  _Indents f (SuiteMany a b c e) = SuiteMany a b c <$> _Indents f e
+  _Indents _ (SuiteOne a b c d e) = pure $ SuiteOne a b c d e
+  _Indents f (SuiteMany a b c d e) = SuiteMany a b c d <$> _Indents f e
 
 instance HasIndents Decorator where
-  _Indents fun (Decorator a b c d e) =
-    (\b' -> Decorator a b' c d e) <$>
+  _Indents fun (Decorator a b c d e f) =
+    (\b' -> Decorator a b' c d e f) <$>
     fun b
 
 instance HasIndents ClassDef where
@@ -421,17 +421,17 @@ class HasNewlines s where
 instance HasNewlines Block where
   _Newlines f (Block a b c) =
     Block <$>
-    (traverse._3) f a <*>
+    (traverse._4) f a <*>
     _Newlines f b <*>
     (traverse._Right._Newlines) f c
 
 instance HasNewlines Suite where
-  _Newlines _ (SuiteOne a b d e) = pure $ SuiteOne a b d e
-  _Newlines f (SuiteMany a b d e) = SuiteMany a b <$> f d <*> _Newlines f e
+  _Newlines fun (SuiteOne a b d e f) = SuiteOne a b d e <$> fun f
+  _Newlines f (SuiteMany a b c d e) = SuiteMany a b c <$> f d <*> _Newlines f e
 
 instance HasNewlines Decorator where
-  _Newlines fun (Decorator a b c d e) =
-    Decorator a b c d <$> fun e
+  _Newlines fun (Decorator a b c d e f) =
+    Decorator a b c d e <$> fun f
 
 instance HasNewlines CompoundStatement where
   _Newlines fun s =
@@ -466,16 +466,16 @@ instance HasNewlines CompoundStatement where
 instance HasNewlines Statement where
   _Newlines f (CompoundStatement c) =
     CompoundStatement <$> _Newlines f c
-  _Newlines f (SmallStatements idnts s ss sc nl) =
-    SmallStatements idnts s ss sc <$> traverse f nl
+  _Newlines f (SmallStatements idnts s ss sc cmt nl) =
+    SmallStatements idnts s ss sc cmt <$> traverse f nl
 
 instance HasNewlines Module where
   _Newlines f = go
     where
       go ModuleEmpty = pure ModuleEmpty
       go (ModuleBlankFinal a b c) = pure $ ModuleBlankFinal a b c
-      go (ModuleBlank a b c d) =
-        ModuleBlank a b <$> f c <*> go d
+      go (ModuleBlank a b c d e) =
+        ModuleBlank a b c <$> f d <*> go e
       go (ModuleStatement a b) =
         ModuleStatement <$> _Newlines f a <*> go b
 

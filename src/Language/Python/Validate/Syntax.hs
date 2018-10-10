@@ -165,17 +165,27 @@ validateWhitespace ann ws =
   ask `bindVM` \ctxt ->
   if _inParens ctxt
   then pure ws
-  else if any (\case; Newline{} -> True; _ -> False) ws
+  else if
+    any
+      (\case
+          Newline{} -> True
+          Comment{} -> False
+          Continued{} -> False
+          Tab -> False
+          Space -> False)
+      ws
   then errorVM1 (_UnexpectedNewline # ann)
-  else if continuedBad ws
-  then errorVM1 (_CommentAfterBackslash # ann)
+  else if
+    any
+      (\case
+          Newline{} -> False
+          Comment{} -> True
+          Continued{} -> False
+          Tab -> False
+          Space -> False)
+      ws
+  then errorVM1 (_UnexpectedComment # ann)
   else pure ws
-  where
-    continuedBad :: Foldable f => f Whitespace -> Bool
-    continuedBad =
-      any $ \case
-        Continued a ws -> isJust (_commentBefore a) || continuedBad ws
-        _ -> False
 
 validateAssignmentSyntax
   :: ( AsSyntaxError e v a
@@ -537,16 +547,14 @@ validateSuiteSyntax
      )
   => Suite v a
   -> ValidateSyntax e (Suite (Nub (Syntax ': v)) a)
-validateSuiteSyntax (SuiteMany a b c e) =
-  SuiteMany a <$>
+validateSuiteSyntax (SuiteMany a b c d e) =
+  (\b' -> SuiteMany a b' c d) <$>
   validateWhitespace a b <*>
-  pure c <*>
   validateBlockSyntax e
-validateSuiteSyntax (SuiteOne a b c d) =
-  SuiteOne a <$>
+validateSuiteSyntax (SuiteOne a b c d e) =
+  (\b' c' -> SuiteOne a b' c' d e) <$>
   validateWhitespace a b <*>
-  validateSmallStatementSyntax c <*>
-  pure d
+  validateSmallStatementSyntax c
 
 validateDecoratorSyntax
   :: ( AsSyntaxError e v a
@@ -554,11 +562,10 @@ validateDecoratorSyntax
      )
   => Decorator v a
   -> ValidateSyntax e (Decorator (Nub (Syntax ': v)) a)
-validateDecoratorSyntax (Decorator a b c d e) =
-  Decorator a b <$>
+validateDecoratorSyntax (Decorator a b c d e f) =
+  (\c' d' -> Decorator a b c' d' e f) <$>
   validateWhitespace a c <*>
-  isDecoratorValue d <*>
-  pure e
+  isDecoratorValue d
   where
     someDerefs Ident{} = True
     someDerefs (Deref _ a _ _) = someDerefs a
@@ -916,12 +923,10 @@ validateStatementSyntax
 validateStatementSyntax (CompoundStatement c) =
   liftVM1 (local $ inFinally .~ False) $
   CompoundStatement <$> validateCompoundStatementSyntax c
-validateStatementSyntax (SmallStatements idnts s ss sc nl) =
-  SmallStatements idnts <$>
+validateStatementSyntax (SmallStatements idnts s ss sc cmt nl) =
+  (\s' ss' -> SmallStatements idnts s' ss' sc cmt nl) <$>
   validateSmallStatementSyntax s <*>
-  traverseOf (traverse._2) validateSmallStatementSyntax ss <*>
-  pure sc <*>
-  pure nl
+  traverseOf (traverse._2) validateSmallStatementSyntax ss
 
 canAssignTo :: Expr v a -> Bool
 canAssignTo None{} = False
@@ -1143,8 +1148,10 @@ validateModuleSyntax m =
     ModuleEmpty -> pure ModuleEmpty
     ModuleBlankFinal a b c ->
       ModuleBlankFinal a <$> validateWhitespace a b <*> pure c
-    ModuleBlank a b c d ->
-      ModuleBlank a <$> validateWhitespace a b <*> pure c <*> validateModuleSyntax d
+    ModuleBlank a b c d e ->
+      (\b' -> ModuleBlank a b' c d) <$>
+      validateWhitespace a b <*>
+      validateModuleSyntax e
     ModuleStatement a b ->
      ModuleStatement <$>
      validateStatementSyntax a <*>

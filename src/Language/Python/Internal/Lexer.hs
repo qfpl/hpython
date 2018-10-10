@@ -37,6 +37,9 @@ import Data.These (These(..))
 import Data.Void (Void)
 import Text.Megaparsec (MonadParsec, ParseError, parse, unPos)
 import Text.Megaparsec.Parsers
+  ( ParsecT, CharParsing, unParsecT, satisfy, text, char, manyTill, try
+  , notFollowedBy, anyChar, digit
+  )
 
 import qualified Data.FingerTree as FingerTree
 import qualified Data.List.NonEmpty as NonEmpty
@@ -76,22 +79,15 @@ withSrcInfo m =
   Parsec.getPosition <*>
   Parsec.getTokensProcessed
 
-parseNewline :: CharParsing m => m Newline
-parseNewline =
-  LF Nothing <$ char '\n' <|> char '\r' *>
-  (CRLF Nothing <$ char '\n' <|> pure (CR Nothing))
+newline :: CharParsing m => m Newline
+newline = LF <$ char '\n' <|> char '\r' *> (CRLF <$ char '\n' <|> pure CR)
 
-parseCommentNewline :: (CharParsing m, Monad m) => m (SrcInfo -> PyToken SrcInfo)
-parseCommentNewline = do
-  n <- optional (char '#' *> many (satisfy (`notElem` ['\r', '\n'])))
-  case n of
-    Nothing -> TkNewline <$> (LF Nothing <$ char '\n' <|> char '\r' *> (CRLF Nothing <$ char '\n' <|> pure (CR Nothing)))
-    Just c ->
-      fmap
-        TkNewline
-        (LF (Just $ Comment c) <$ char '\n' <|>
-         char '\r' *> (CRLF (Just $ Comment c) <$ char '\n' <|> pure (CR . Just $ Comment c))) <|>
-      pure (TkComment $ Comment c)
+parseNewline :: (CharParsing m, Monad m) => m (SrcInfo -> PyToken SrcInfo)
+parseNewline = TkNewline <$> newline
+
+parseComment :: (CharParsing m, Monad m) => m (SrcInfo -> PyToken SrcInfo)
+parseComment =
+  (\a b -> TkComment (MkComment b a)) <$ char '#' <*> many (satisfy (`notElem` ['\r', '\n']))
 
 stringOrBytesPrefix
   :: CharParsing m
@@ -335,10 +331,11 @@ parseToken =
     , char '-' *> (TkMinusEq <$ char '=' <|> pure TkMinus)
     , char '%' *> (TkPercentEq <$ char '=' <|> pure TkPercent)
     , TkTilde <$ char '~'
-    , TkContinued <$ char '\\' <*> parseNewline
+    , TkContinued <$ char '\\' <*> newline
     , TkColon <$ char ':'
     , TkSemicolon <$ char ';'
-    , parseCommentNewline
+    , parseComment
+    , parseNewline
     , TkComma <$ char ','
     , TkDot <$ char '.'
     , do

@@ -18,22 +18,18 @@ import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax
 
-whitespaceSize :: Whitespace -> Size
-whitespaceSize Space = 1
-whitespaceSize Tab = 1
-whitespaceSize (Continued _ ws) = 1 + sum (fmap whitespaceSize ws)
-whitespaceSize (Newline _) = 1
-
 genSuite :: MonadGen m => m (SmallStatement '[] ()) -> m (Block '[] ()) -> m (Suite '[] ())
 genSuite gss gb =
   Gen.choice
   [ SuiteMany () <$>
     genWhitespaces <*>
+    Gen.maybe genComment <*>
     genNewline <*>
     gb
   , SuiteOne () <$>
     genWhitespaces <*>
     gss <*>
+    Gen.maybe genComment <*>
     genNewline
   ]
 
@@ -185,21 +181,8 @@ genFloat =
 genString :: MonadGen m => m PyChar -> m [PyChar]
 genString = Gen.list (Range.constant 0 50)
 
-genNewline' :: MonadGen m => m Newline
-genNewline' =
-  Gen.element
-    [ LF Nothing
-    , CR Nothing
-    , CRLF Nothing
-    ]
-
 genNewline :: MonadGen m => m Newline
-genNewline =
-  Gen.choice
-    [ LF <$> Gen.maybe genComment
-    , CR <$> Gen.maybe genComment
-    , CRLF <$> Gen.maybe genComment
-    ]
+genNewline = Gen.element [LF, CR, CRLF]
 
 genStringType :: MonadGen m => m StringType
 genStringType = Gen.element [ShortString, LongString]
@@ -221,7 +204,7 @@ genAnyWhitespace = Gen.sized $ \n ->
             n' <- Gen.integral (Range.constant 1 (n-1))
             Gen.resize n' $
               Continued <$>
-              genNewline' <*>
+              genNewline <*>
               genSizedWhitespace genAnyWhitespace
         ]
 
@@ -239,7 +222,7 @@ genNormalWhitespace = Gen.sized $ \n ->
             n' <- Gen.integral (Range.constant 1 (n-1))
             Gen.resize n' $
               Continued <$>
-              genNewline' <*>
+              genNewline <*>
               genSizedWhitespace genNormalWhitespace
         ]
 
@@ -277,9 +260,9 @@ genRawBytesPrefix =
     , Prefix_RB
     ]
 
-genComment :: MonadGen m => m Comment
+genComment :: MonadGen m => m (Comment ())
 genComment =
-  Comment <$> Gen.list (Range.linear 0 100) (Gen.filter (`notElem` "\0\r\n") Gen.ascii)
+  MkComment () <$> Gen.list (Range.linear 0 100) (Gen.filter (`notElem` "\0\r\n") Gen.ascii)
 
 genSizedWhitespace :: MonadGen m => m Whitespace -> m [Whitespace]
 genSizedWhitespace ws =
@@ -302,7 +285,7 @@ genWhitespaces = do
       Gen.choice
       [ (Space :) <$> go (n-1)
       , (Tab :) <$> go (n-1)
-      , fmap pure $ Continued <$> genNewline' <*> go (n-1)
+      , fmap pure $ Continued <$> genNewline <*> go (n-1)
       ]
 
 genAnyWhitespaces :: MonadGen m => m [Whitespace]
@@ -315,7 +298,7 @@ genAnyWhitespaces = do
       Gen.choice
       [ (Space :) <$> go (n-1)
       , (Tab :) <$> go (n-1)
-      , fmap pure $ Continued <$> genNewline' <*> go (n-1)
+      , fmap pure $ Continued <$> genNewline <*> go (n-1)
       , (:) <$> (Newline <$> genNewline) <*> go (n-1)
       ]
 
@@ -328,7 +311,7 @@ genAnyWhitespaces1 = do
       Gen.choice
       [ pure $ pure Space
       , pure $ pure Tab
-      , fmap pure $ Continued <$> genNewline' <*> pure []
+      , fmap pure $ Continued <$> genNewline <*> pure []
       , fmap pure $ Newline <$> genNewline
       ]
     go n =
@@ -337,7 +320,7 @@ genAnyWhitespaces1 = do
       , (Tab `NonEmpty.cons`) <$> go (n-1)
       , fmap pure $
         Continued <$>
-        genNewline' <*>
+        genNewline <*>
         ((:) <$>
          Gen.choice
            [ pure Space

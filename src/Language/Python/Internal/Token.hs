@@ -11,7 +11,7 @@ import Language.Python.Internal.Syntax.Strings
   , RawStringPrefix(..), RawBytesPrefix(..)
   , QuoteType(..), StringType(..), PyChar(..)
   )
-import Language.Python.Internal.Syntax.Comment (Comment)
+import Language.Python.Internal.Syntax.Comment (Comment(..))
 import Language.Python.Internal.Syntax.Whitespace (Newline(..), Indents)
 
 data PyToken a
@@ -82,7 +82,7 @@ data PyToken a
   | TkPlus a
   | TkMinus a
   | TkTilde a
-  | TkComment Comment a
+  | TkComment (Comment a)
   | TkStar a
   | TkDoubleStar a
   | TkSlash a
@@ -196,7 +196,7 @@ pyTokenAnn tk =
     TkSemicolon a -> a
     TkComma a -> a
     TkDot a -> a
-    TkComment _ a -> a
+    TkComment a -> _commentAnn a
     TkStar a -> a
     TkDoubleStar a -> a
     TkSlash a -> a

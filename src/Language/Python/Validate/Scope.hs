@@ -167,18 +167,18 @@ validateSuiteScope
   :: AsScopeError e v a
   => Suite v a
   -> ValidateScope a e (Suite (Nub (Scope ': v)) a)
-validateSuiteScope (SuiteMany ann a b d) = SuiteMany ann a b <$> validateBlockScope d
-validateSuiteScope (SuiteOne ann a b d) =
-  SuiteOne ann a <$> validateSmallStatementScope b <*> pure d
+validateSuiteScope (SuiteMany ann a b c d) = SuiteMany ann a b c <$> validateBlockScope d
+validateSuiteScope (SuiteOne ann a b c d) =
+  (\b' -> SuiteOne ann a b' c d) <$>
+  validateSmallStatementScope b
 
 validateDecoratorScope
   :: AsScopeError e v a
   => Decorator v a
   -> ValidateScope a e (Decorator (Nub (Scope ': v)) a)
-validateDecoratorScope (Decorator a b c d e) =
-  Decorator a b c <$>
-  validateExprScope d <*>
-  pure e
+validateDecoratorScope (Decorator a b c d e f) =
+  (\d' -> Decorator a b c d' e f) <$>
+  validateExprScope d
 
 validateCompoundStatementScope
   :: forall e v a
@@ -351,12 +351,10 @@ validateStatementScope
   -> ValidateScope a e (Statement (Nub (Scope ': v)) a)
 validateStatementScope (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementScope c
-validateStatementScope (SmallStatements idnts s ss sc nl) =
-  SmallStatements idnts <$>
+validateStatementScope (SmallStatements idnts s ss sc cmt nl) =
+  (\s' ss' -> SmallStatements idnts s' ss' sc cmt nl) <$>
   validateSmallStatementScope s <*>
-  traverseOf (traverse._2) validateSmallStatementScope ss <*>
-  pure sc <*>
-  pure nl
+  traverseOf (traverse._2) validateSmallStatementScope ss
 
 validateIdentScope
   :: AsScopeError e v a
@@ -634,7 +632,7 @@ validateModuleScope m =
   case m of
     ModuleEmpty -> pure ModuleEmpty
     ModuleBlankFinal a b c -> pure $ ModuleBlankFinal a b c
-    ModuleBlank a b c d -> ModuleBlank a b c <$> validateModuleScope d
+    ModuleBlank a b c d e -> ModuleBlank a b c d <$> validateModuleScope e
     ModuleStatement a b ->
      ModuleStatement <$>
      validateStatementScope a <*>

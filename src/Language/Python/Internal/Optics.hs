@@ -309,16 +309,19 @@ instance HasIndents Elif where
 instance HasIndents Else where
   _Indents f (MkElse a b c) = MkElse <$> f a <*> pure b <*> _Indents f c
 
+instance HasIndents SimpleStatement where
+  _Indents _ (MkSimpleStatement a b c d e) =
+    pure $ MkSimpleStatement a b c d e
+
 instance HasIndents Statement where
-  _Indents f (SmallStatements idnt a b c d e) =
-    (\idnt' -> SmallStatements idnt' a b c d e) <$> f idnt
+  _Indents f (SimpleStatement idnt a) = SimpleStatement <$> f idnt <*> _Indents f a
   _Indents f (CompoundStatement c) = CompoundStatement <$> _Indents f c
 
 instance HasIndents Block where
   _Indents = _Statements._Indents
 
 instance HasIndents Suite where
-  _Indents _ (SuiteOne a b c d e) = pure $ SuiteOne a b c d e
+  _Indents _ (SuiteOne a b c) = pure $ SuiteOne a b c
   _Indents f (SuiteMany a b c d e) = SuiteMany a b c d <$> _Indents f e
 
 instance HasIndents Decorator where
@@ -426,7 +429,7 @@ instance HasNewlines Block where
     (traverse._Right._Newlines) f c
 
 instance HasNewlines Suite where
-  _Newlines fun (SuiteOne a b d e f) = SuiteOne a b d e <$> fun f
+  _Newlines fun (SuiteOne a b c) = SuiteOne a b <$> _Newlines fun c
   _Newlines f (SuiteMany a b c d e) = SuiteMany a b c <$> f d <*> _Newlines f e
 
 instance HasNewlines Decorator where
@@ -463,11 +466,14 @@ instance HasNewlines CompoundStatement where
         _Newlines fun e
       With a b asyncWs c d e -> With a b asyncWs c (coerce d) <$> _Newlines fun e
 
+instance HasNewlines SimpleStatement where
+  _Newlines f (MkSimpleStatement s ss sc cmt nl) =
+    MkSimpleStatement s ss sc cmt <$> traverse f nl
+
 instance HasNewlines Statement where
   _Newlines f (CompoundStatement c) =
     CompoundStatement <$> _Newlines f c
-  _Newlines f (SmallStatements idnts s ss sc cmt nl) =
-    SmallStatements idnts s ss sc cmt <$> traverse f nl
+  _Newlines f (SimpleStatement i a) = SimpleStatement i <$> _Newlines f a
 
 instance HasNewlines Module where
   _Newlines f = go

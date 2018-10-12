@@ -31,27 +31,29 @@ append_to =
     Nothing
     (SuiteMany () [] Nothing LF $
      Block []
-     ( SmallStatements
+     ( SimpleStatement
          (Indents [replicate 4 Space ^. from indentWhitespaces] ())
-         (Expr () $
-          Call ()
-            (Deref () (Ident "to") [] "append")
-            []
-            (Just $ CommaSepOne1' (PositionalArg () (Ident "element")) Nothing)
-            [])
-         []
-         Nothing
-         Nothing
-         (Just LF)
+         (MkSimpleStatement
+          (Expr () $
+           Call ()
+             (Deref () (Ident "to") [] "append")
+             []
+             (Just $ CommaSepOne1' (PositionalArg () (Ident "element")) Nothing)
+             [])
+          []
+          Nothing
+          Nothing
+          (Just LF))
      )
      [ Right $
-         SmallStatements
+         SimpleStatement
            (Indents [replicate 4 Space ^. from indentWhitespaces] ())
-           (Return () [Space] (Just $ Ident "to"))
-           []
-           Nothing
-           Nothing
-           (Just LF)
+           (MkSimpleStatement
+            (Return () [Space] (Just $ Ident "to"))
+            []
+            Nothing
+            Nothing
+            (Just LF))
      ])
 
 -- |

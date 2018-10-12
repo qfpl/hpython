@@ -168,9 +168,8 @@ validateSuiteScope
   => Suite v a
   -> ValidateScope a e (Suite (Nub (Scope ': v)) a)
 validateSuiteScope (SuiteMany ann a b c d) = SuiteMany ann a b c <$> validateBlockScope d
-validateSuiteScope (SuiteOne ann a b c d) =
-  (\b' -> SuiteOne ann a b' c d) <$>
-  validateSmallStatementScope b
+validateSuiteScope (SuiteOne ann a b) =
+  SuiteOne ann a <$> validateSimpleStatementScope b
 
 validateDecoratorScope
   :: AsScopeError e v a
@@ -345,16 +344,23 @@ validateSmallStatementScope s@Continue{} = pure $ unsafeCoerce s
 validateSmallStatementScope s@Import{} = pure $ unsafeCoerce s
 validateSmallStatementScope s@From{} = pure $ unsafeCoerce s
 
+validateSimpleStatementScope
+  :: AsScopeError e v a
+  => SimpleStatement v a
+  -> ValidateScope a e (SimpleStatement (Nub (Scope ': v)) a)
+validateSimpleStatementScope (MkSimpleStatement s ss sc cmt nl) =
+  (\s' ss' -> MkSimpleStatement s' ss' sc cmt nl) <$>
+  validateSmallStatementScope s <*>
+  traverseOf (traverse._2) validateSmallStatementScope ss
+
 validateStatementScope
   :: AsScopeError e v a
   => Statement v a
   -> ValidateScope a e (Statement (Nub (Scope ': v)) a)
 validateStatementScope (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementScope c
-validateStatementScope (SmallStatements idnts s ss sc cmt nl) =
-  (\s' ss' -> SmallStatements idnts s' ss' sc cmt nl) <$>
-  validateSmallStatementScope s <*>
-  traverseOf (traverse._2) validateSmallStatementScope ss
+validateStatementScope (SimpleStatement idnts a) =
+  SimpleStatement idnts <$> validateSimpleStatementScope a
 
 validateIdentScope
   :: AsScopeError e v a

@@ -458,14 +458,7 @@ genCompoundStatement =
 genStatement :: MonadGen m => m (Statement '[] ())
 genStatement =
   sizedRecursive
-    [ sizedBind genSmallStatement $ \st ->
-      sizedBind (sizedList $ (,) <$> genWhitespaces <*> genSmallStatement) $ \sts ->
-      (\a -> SmallStatements a st sts) <$>
-      genIndents <*>
-      Gen.maybe genWhitespaces <*>
-      Gen.maybe genComment <*>
-      Gen.maybe genNewline
-    ]
+    [ SimpleStatement <$> genIndents <*> genSimpleStatement genSmallStatement ]
     [ CompoundStatement <$> genCompoundStatement ]
 
 genIndent :: MonadGen m => m Indent

@@ -896,6 +896,15 @@ sepBy1' val sep = go
       val <*>
       optional ((,) <$> sep <*> optional go)
 
+simpleStatement
+  :: MonadParsec e PyTokens m
+  => m (SimpleStatement SrcInfo)
+simpleStatement =
+  (\(a, b, c) d -> MkSimpleStatement a b c d) <$>
+  sepBy1' smallStatement (snd <$> semicolon space) <*>
+  optional comment <*>
+  optional eol
+
 statement
   :: (Alternative m, MonadParsec e PyTokens m)
   => m (Indents SrcInfo)
@@ -905,24 +914,16 @@ statement pIndent indentBefore =
   -- It's important to parse compound statements first, because the 'async' keyword
   -- is actually an identifier and we'll have to backtrack
   CompoundStatement <$> compoundStatement pIndent indentBefore <|>
-
-  (\(a, b, c) d -> SmallStatements indentBefore a b c d) <$>
-  sepBy1' smallStatement (snd <$> semicolon space) <*>
-  optional comment <*>
-  optional eol
+  SimpleStatement indentBefore <$> simpleStatement
 
 suite :: MonadParsec e PyTokens m => m (Suite SrcInfo)
 suite =
   (\(tk, s) ->
      either
-       (\(a, b, c) -> SuiteOne (pyTokenAnn tk) s a b c)
+       (SuiteOne (pyTokenAnn tk) s)
        (\(a, b,c ) -> SuiteMany (pyTokenAnn tk) s a b c)) <$>
   colon space <*>
-  ((fmap Left $
-    (,,) <$>
-    smallStatement <*>
-    optional comment <*>
-    eol)
+  (Left <$> simpleStatement
 
     <|>
 

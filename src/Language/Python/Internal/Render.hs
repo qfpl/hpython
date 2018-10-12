@@ -1066,12 +1066,10 @@ renderSuite (SuiteMany _ a b c d) =
   foldMap renderComment b <>
   singleton (renderNewline c) <>
   renderBlock d
-renderSuite (SuiteOne _ a b c d) =
+renderSuite (SuiteOne _ a b) =
   TkColon () `cons`
   foldMap renderWhitespace a <>
-  renderSmallStatement b <>
-  foldMap renderComment c <>
-  singleton (renderNewline d)
+  renderSimpleStatement b
 
 renderDecorator :: Decorator v a -> RenderOutput
 renderDecorator (Decorator _ a b c d e) =
@@ -1193,10 +1191,8 @@ renderWithItem (WithItem _ a b) =
 renderIndent :: Indent -> RenderOutput
 renderIndent (MkIndent ws) = foldMap renderWhitespace $ toList ws
 
-renderStatement :: Statement v a -> RenderOutput
-renderStatement (CompoundStatement c) = renderCompoundStatement c
-renderStatement (SmallStatements idnts s ss sc cmt nl) =
-  renderIndents idnts <>
+renderSimpleStatement :: SimpleStatement v a -> RenderOutput
+renderSimpleStatement (MkSimpleStatement s ss sc cmt nl) =
   renderSmallStatement s <>
   foldMap
     (\(b, c) ->
@@ -1209,6 +1205,11 @@ renderStatement (SmallStatements idnts s ss sc cmt nl) =
     sc <>
   foldMap renderComment cmt <>
   foldMap (singleton . renderNewline) nl
+
+renderStatement :: Statement v a -> RenderOutput
+renderStatement (CompoundStatement c) = renderCompoundStatement c
+renderStatement (SimpleStatement idnts s) =
+  renderIndents idnts <> renderSimpleStatement s
 
 renderExceptAs :: ExceptAs v a -> RenderOutput
 renderExceptAs (ExceptAs _ e f) =

@@ -551,10 +551,10 @@ validateSuiteSyntax (SuiteMany a b c d e) =
   (\b' -> SuiteMany a b' c d) <$>
   validateWhitespace a b <*>
   validateBlockSyntax e
-validateSuiteSyntax (SuiteOne a b c d e) =
-  (\b' c' -> SuiteOne a b' c' d e) <$>
+validateSuiteSyntax (SuiteOne a b c) =
+  SuiteOne a <$>
   validateWhitespace a b <*>
-  validateSmallStatementSyntax c
+  validateSimpleStatementSyntax c
 
 validateDecoratorSyntax
   :: ( AsSyntaxError e v a
@@ -914,6 +914,17 @@ canDelete Deref{} = True
 canDelete Subscript{} = True
 canDelete Ident{} = True
 
+validateSimpleStatementSyntax
+  :: ( AsSyntaxError e v a
+     , Member Indentation v
+     )
+  => SimpleStatement v a
+  -> ValidateSyntax e (SimpleStatement (Nub (Syntax ': v)) a)
+validateSimpleStatementSyntax (MkSimpleStatement s ss sc cmt nl) =
+  (\s' ss' -> MkSimpleStatement s' ss' sc cmt nl) <$>
+  validateSmallStatementSyntax s <*>
+  traverseOf (traverse._2) validateSmallStatementSyntax ss
+
 validateStatementSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
@@ -923,10 +934,8 @@ validateStatementSyntax
 validateStatementSyntax (CompoundStatement c) =
   liftVM1 (local $ inFinally .~ False) $
   CompoundStatement <$> validateCompoundStatementSyntax c
-validateStatementSyntax (SmallStatements idnts s ss sc cmt nl) =
-  (\s' ss' -> SmallStatements idnts s' ss' sc cmt nl) <$>
-  validateSmallStatementSyntax s <*>
-  traverseOf (traverse._2) validateSmallStatementSyntax ss
+validateStatementSyntax (SimpleStatement idnts a) =
+  SimpleStatement idnts <$> validateSimpleStatementSyntax a
 
 canAssignTo :: Expr v a -> Bool
 canAssignTo None{} = False

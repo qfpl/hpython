@@ -17,8 +17,27 @@ import Data.These (These(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax
+import Generators.Sized
 
-genSuite :: MonadGen m => m (SmallStatement '[] ()) -> m (Block '[] ()) -> m (Suite '[] ())
+genSimpleStatement
+  :: MonadGen m
+  => m (SmallStatement '[] ())
+  -> m (SimpleStatement '[] ())
+genSimpleStatement gss =
+  sized2M
+    (\a b -> 
+      MkSimpleStatement a b <$>
+      Gen.maybe genWhitespaces <*>
+      Gen.maybe genComment <*>
+      Gen.maybe genNewline)
+    gss
+    (sizedList $ (,) <$> genWhitespaces <*> gss)
+
+genSuite
+  :: MonadGen m
+  => m (SmallStatement '[] ())
+  -> m (Block '[] ())
+  -> m (Suite '[] ())
 genSuite gss gb =
   Gen.choice
   [ SuiteMany () <$>
@@ -26,11 +45,7 @@ genSuite gss gb =
     Gen.maybe genComment <*>
     genNewline <*>
     gb
-  , SuiteOne () <$>
-    genWhitespaces <*>
-    gss <*>
-    Gen.maybe genComment <*>
-    genNewline
+  , SuiteOne () <$> genWhitespaces <*> genSimpleStatement gss
   ]
 
 genUnOp :: MonadGen m => m (UnOp ())

@@ -67,7 +67,7 @@ optimizeTailRecursion st = do
         CompoundStatement (If _ _ _ e sts [] sts') ->
           allOf _last (hasTC name) (sts ^.. _Statements) ||
           allOf _last (hasTC name) (sts' ^.. _Just._3._Statements)
-        SmallStatements _ s ss _ _ _ ->
+        SimpleStatement _ (MkSimpleStatement s ss _ _ _) ->
           case last (s : fmap (^. _2) ss) of
             Return _ _ (Just e) -> isTailCall name e
             -- Return _ _ Nothing -> True
@@ -106,7 +106,7 @@ optimizeTailRecursion st = do
       | otherwise =
           case st of
             CompoundStatement{} -> [line_ st]
-            SmallStatements idnts s ss sc cmt nl ->
+            SimpleStatement idnts (MkSimpleStatement s ss sc cmt nl) ->
               let
                 initExps = foldr (\_ _ -> init ss) [] ss
                 lastExp = foldrOf (folded._2) (\_ _ -> last ss ^. _2) s ss
@@ -117,7 +117,10 @@ optimizeTailRecursion st = do
                       let
                         lss = last ss
                       in
-                        [line_ $ SmallStatements idnts (first ^. _2) rest sc cmt nl]
+                        [ line_ $
+                          SimpleStatement idnts
+                          (MkSimpleStatement (first ^. _2) rest sc cmt nl)
+                        ]
               in
                 case lastExp of
                   Return _ _ e ->

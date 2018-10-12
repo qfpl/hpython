@@ -36,16 +36,18 @@ import qualified Language.Python.Internal.Syntax as Syntax
 data IRError a = InvalidUnpacking a
   deriving (Eq, Show)
 
-data Statement a
-  = SmallStatements
-      (Indents a)
+data SimpleStatement a
+  = MkSimpleStatement
       (SmallStatement a)
       [([Whitespace], SmallStatement a)]
       (Maybe [Whitespace])
       (Maybe (Comment a))
       (Maybe Newline)
-  | CompoundStatement
-      (CompoundStatement a)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+data Statement a
+  = SimpleStatement (Indents a) (SimpleStatement a)
+  | CompoundStatement (CompoundStatement a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data CompoundStatement a
@@ -533,8 +535,8 @@ exprAnn =
         Await _ a b -> Not ann a b)
 
 data Suite a
-  -- ':' <space> smallstatement
-  = SuiteOne a [Whitespace] (SmallStatement a) (Maybe (Comment a)) Newline
+  -- ':' <space> simplestatement
+  = SuiteOne a [Whitespace] (SimpleStatement a)
   | SuiteMany a
       -- ':' <spaces> [comment] <newline>
       [Whitespace] (Maybe (Comment a)) Newline
@@ -692,12 +694,10 @@ fromIR_expr ex =
 fromIR_suite :: Suite a -> Validation (NonEmpty (IRError a)) (Syntax.Suite '[] a)
 fromIR_suite s =
   case s of
-    SuiteOne a b c d e ->
-      (\c' -> Syntax.SuiteOne a b c' d e) <$>
-      fromIR_smallStatement c
+    SuiteOne a b c ->
+      Syntax.SuiteOne a b <$> fromIR_simpleStatement c
     SuiteMany a b c d e ->
-      Syntax.SuiteMany a b c d <$>
-      fromIR_block e
+      Syntax.SuiteMany a b c d <$> fromIR_block e
 
 fromIR_param :: Param a -> Validation (NonEmpty (IRError a)) (Syntax.Param '[] a)
 fromIR_param p =
@@ -784,13 +784,19 @@ fromIR_compIf :: CompIf a -> Validation (NonEmpty (IRError a)) (Syntax.CompIf '[
 fromIR_compIf (CompIf a b c) =
   Syntax.CompIf a b <$> fromIR_expr c
 
+fromIR_simpleStatement
+  :: SimpleStatement a
+  -> Validation (NonEmpty (IRError a)) (Syntax.SimpleStatement '[] a)
+fromIR_simpleStatement (MkSimpleStatement b c d e f) =
+  (\b' c' -> Syntax.MkSimpleStatement b' c' d e f) <$>
+  fromIR_smallStatement b <*>
+  traverseOf (traverse._2) fromIR_smallStatement c
+
 fromIR_statement :: Statement a -> Validation (NonEmpty (IRError a)) (Syntax.Statement '[] a)
 fromIR_statement ex =
   case ex of
-    SmallStatements a b c d e f ->
-      (\b' c' -> Syntax.SmallStatements a b' c' d e f) <$>
-      fromIR_smallStatement b <*>
-      traverseOf (traverse._2) fromIR_smallStatement c
+    SimpleStatement i a ->
+      Syntax.SimpleStatement i <$> fromIR_simpleStatement a
     CompoundStatement a ->
       Syntax.CompoundStatement <$> fromIR_compoundStatement a
 

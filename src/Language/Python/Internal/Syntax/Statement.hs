@@ -36,6 +36,7 @@ import Language.Python.Internal.Syntax.Whitespace
 
 -- See note [unsafeCoerce Validation] in Language.Python.Internal.Syntax.Expr
 instance Validated Statement where; unvalidated = to unsafeCoerce
+instance Validated SimpleStatement where; unvalidated = to unsafeCoerce
 instance Validated SmallStatement where; unvalidated = to unsafeCoerce
 instance Validated Block where; unvalidated = to unsafeCoerce
 instance Validated Suite where; unvalidated = to unsafeCoerce
@@ -86,7 +87,7 @@ class HasBlocks s where
   _Blocks :: Traversal (s v a) (s '[] a) (Block v a) (Block '[] a)
 
 instance HasBlocks Suite where
-  _Blocks _ (SuiteOne a b c d e) = pure $ SuiteOne a b (c ^. unvalidated) d e
+  _Blocks _ (SuiteOne a b c) = pure $ SuiteOne a b (c ^. unvalidated)
   _Blocks f (SuiteMany a b c d e) = SuiteMany a b c d <$> f e
 
 instance HasBlocks CompoundStatement where
@@ -133,39 +134,50 @@ instance HasStatements Block where
     Block a <$> f b <*> (traverse._Right) f c
 
 instance HasStatements Suite where
-  _Statements _ (SuiteOne a b c d e) = pure $ SuiteOne a b (c ^. unvalidated) d e
+  _Statements _ (SuiteOne a b c) = pure $ SuiteOne a b (c ^. unvalidated)
   _Statements f (SuiteMany a b c d e) = SuiteMany a b c d <$> _Statements f e
 
-data Statement (v :: [*]) a
-  = SmallStatements
-      (Indents a)
+data SimpleStatement (v :: [*]) a
+  = MkSimpleStatement
       (SmallStatement v a)
       [([Whitespace], SmallStatement v a)]
       (Maybe [Whitespace])
       (Maybe (Comment a))
       (Maybe Newline)
-  | CompoundStatement
-      (CompoundStatement v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-instance HasExprs Statement where
-  _Exprs f (SmallStatements idnt s ss a b c) =
-    SmallStatements idnt <$>
+data Statement (v :: [*]) a
+  = SimpleStatement (Indents a) (SimpleStatement v a)
+  | CompoundStatement (CompoundStatement v a)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasExprs SimpleStatement where
+  _Exprs f (MkSimpleStatement s ss a b c) =
+    MkSimpleStatement <$>
     _Exprs f s <*>
     (traverse._2._Exprs) f ss <*>
     pure a <*>
     pure b <*>
     pure c
+
+instance HasExprs Statement where
+  _Exprs f (SimpleStatement idnt a) = SimpleStatement idnt <$> _Exprs f a
   _Exprs f (CompoundStatement c) = CompoundStatement <$> _Exprs f c
+
+instance HasBlocks SimpleStatement where
+  _Blocks _ (MkSimpleStatement a b c d e) =
+    pure $
+    MkSimpleStatement
+      (a ^. unvalidated)
+      (over (mapped._2) (view unvalidated) b)
+      c d e
 
 instance HasBlocks Statement where
   _Blocks f (CompoundStatement c) = CompoundStatement <$> _Blocks f c
-  _Blocks _ (SmallStatements idnt a b c d e) =
-    pure $
-    SmallStatements idnt (a ^. unvalidated) (over (mapped._2) (view unvalidated) b) c d e
+  _Blocks f (SimpleStatement idnt a) = SimpleStatement idnt <$> _Blocks f a
 
 instance Plated (Statement '[] a) where
-  plate _ s@SmallStatements{} = pure s
+  plate _ (SimpleStatement idnt s) = pure $ SimpleStatement idnt s
   plate fun (CompoundStatement s) =
     CompoundStatement <$>
     case s of
@@ -255,8 +267,8 @@ data ExceptAs (v :: [*]) a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Suite (v :: [*]) a
-  -- ':' <space> smallstatement
-  = SuiteOne a [Whitespace] (SmallStatement v a) (Maybe (Comment a)) Newline
+  -- ':' <space> simplestatement
+  = SuiteOne a [Whitespace] (SimpleStatement v a)
   | SuiteMany a
       -- ':' <spaces> [comment] <newline>
       [Whitespace] (Maybe (Comment a)) Newline
@@ -369,7 +381,7 @@ instance HasExprs Block where
     Block a <$> _Exprs f b <*> (traverse._Right._Exprs) f c
 
 instance HasExprs Suite where
-  _Exprs f (SuiteOne a b c d e) = (\c' -> SuiteOne a b c' d e) <$> _Exprs f c
+  _Exprs f (SuiteOne a b c) = (\c' -> SuiteOne a b c') <$> _Exprs f c
   _Exprs f (SuiteMany a b c d e) = SuiteMany a b c d <$> _Exprs f e
 
 instance HasExprs WithItem where

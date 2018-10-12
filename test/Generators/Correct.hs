@@ -941,13 +941,9 @@ genStatement
   => m (Statement '[] ())
 genStatement =
   sizedRecursive
-    [ sizedBind (localState genSmallStatement) $ \st ->
-      sizedBind (sizedList $ (,) <$> genWhitespaces <*> localState genSmallStatement) $ \sts ->
-      (\a c -> SmallStatements a st sts c) <$>
+    [ SimpleStatement <$>
       use currentIndentation <*>
-      Gen.maybe genWhitespaces <*>
-      Gen.maybe genComment <*>
-      (Just <$> genNewline)
+      genSimpleStatement (localState genSmallStatement)
     ]
     [ CompoundStatement <$> localState genCompoundStatement ]
 

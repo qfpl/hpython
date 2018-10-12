@@ -170,7 +170,8 @@ validateSuiteIndentation idnt (SuiteMany ann a b c d) =
   SuiteMany ann a b c <$
   setNextIndent GreaterThan (idnt ^. indentsValue) <*>
   validateBlockIndentation d
-validateSuiteIndentation _ (SuiteOne ann a b c d) = pure $ SuiteOne ann a (unsafeCoerce b) c d
+validateSuiteIndentation _ (SuiteOne ann a b) =
+  SuiteOne ann a <$> validateSimpleStatementIndentation b
 
 validateExprIndentation
   :: AsIndentationError e v a
@@ -313,16 +314,23 @@ validateWithItemIndentation
   -> ValidateIndentation e (WithItem (Nub (Indentation ': v)) a)
 validateWithItemIndentation a = pure $ unsafeCoerce a
 
+validateSimpleStatementIndentation
+  :: AsIndentationError e v a
+  => SimpleStatement v a
+  -> ValidateIndentation e (SimpleStatement (Nub (Indentation ': v)) a)
+validateSimpleStatementIndentation (MkSimpleStatement a b c d e) =
+  pure $ MkSimpleStatement (unsafeCoerce a) (over (mapped._2) unsafeCoerce b) c d e
+
 validateStatementIndentation
   :: AsIndentationError e v a
   => Statement v a
   -> ValidateIndentation e (Statement (Nub (Indentation ': v)) a)
 validateStatementIndentation (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementIndentation c
-validateStatementIndentation (SmallStatements idnt a b c d e) =
-  (\idnt' ->
-     SmallStatements idnt' (unsafeCoerce a) (over (mapped._2) unsafeCoerce b) c d e) <$>
-  checkIndent idnt
+validateStatementIndentation (SimpleStatement idnt a) =
+  SimpleStatement <$>
+  checkIndent idnt <*>
+  validateSimpleStatementIndentation a
 
 validateModuleIndentation
   :: AsIndentationError e v a

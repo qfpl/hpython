@@ -237,6 +237,15 @@ exprList ws =
      (snd <$> comma ws) <*>
      optional (commaSep1' ws $ expr ws))
 
+exprOrStarList :: MonadParsec e PyTokens m => m Whitespace -> m (Expr SrcInfo)
+exprOrStarList ws =
+  (\e -> maybe e (uncurry $ Tuple (e ^. exprAnn) e)) <$>
+  (expr ws <|> starExpr ws) <*>
+  optional
+    ((,) <$>
+     (snd <$> comma ws) <*>
+     optional (commaSep1' ws $ expr ws <|> starExpr ws))
+
 compIf :: MonadParsec e PyTokens m => m (CompIf SrcInfo)
 compIf =
   (\(tk, s) -> CompIf (pyTokenAnn tk) s) <$>
@@ -776,13 +785,13 @@ smallStatement =
            (either
               (Assign (a ^. exprAnn) a)
               (uncurry $ AugAssign (a ^. exprAnn) a))) <$>
-      exprList space <*>
+      exprOrStarList space <*>
       optional
         (Left <$>
          some1
            ((,) <$>
             (snd <$> token space (\case; TkEq{} -> True; _ -> False) "=") <*>
-            (yieldExpr space <|> exprList space))
+            (yieldExpr space <|> exprOrStarList space))
 
            <|>
 

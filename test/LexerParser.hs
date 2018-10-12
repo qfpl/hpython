@@ -2,11 +2,14 @@
 module LexerParser (lexerParserTests) where
 
 import Hedgehog
+import Control.Monad (void)
 import Data.Validation (Validation(..), validation)
 import qualified Data.Text as Text
 
 import Language.Python.Internal.Render
 import Language.Python.Parse (parseModule, parseStatement, parseExpr)
+
+import Helpers (shouldBeSuccess)
 
 lexerParserTests :: Group
 lexerParserTests = $$discover
@@ -282,21 +285,11 @@ prop_fulltrip_22 =
   withTests 1 . property $ do
     let str = "for a in (b, *c): pass"
 
-    let res = parseModule "test" str
-    case res of
-      Failure{} -> success
-      Success a -> do
-        annotateShow a
-        failure
+    void . shouldBeSuccess $ parseModule "test" str
 
 prop_fulltrip_23 :: Property
 prop_fulltrip_23 =
   withTests 1 . property $ do
     let str = "None,*None"
 
-    let res = parseModule "test" str
-    case res of
-      Failure{} -> success
-      Success a -> do
-        annotateShow a
-        failure
+    void . shouldBeSuccess $ parseModule "test" str

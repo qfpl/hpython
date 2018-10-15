@@ -1,16 +1,13 @@
 {-# language DeriveFunctor #-}
+{-# language OverloadedStrings #-}
 {-# language TemplateHaskell #-}
 module Language.Python.Internal.Token where
 
 import Data.Deriving (deriveEq1, deriveOrd1)
 import Data.Functor.Classes (liftCompare, liftEq)
 
-import Language.Python.Internal.Syntax.Numbers (IntLiteral(..), FloatLiteral(..), ImagLiteral(..))
+import Language.Python.Internal.Syntax.Numbers
 import Language.Python.Internal.Syntax.Strings
-  ( StringPrefix(..), BytesPrefix(..)
-  , RawStringPrefix(..), RawBytesPrefix(..)
-  , QuoteType(..), StringType(..), PyChar(..)
-  )
 import Language.Python.Internal.Syntax.Comment (Comment(..))
 import Language.Python.Internal.Syntax.Whitespace (Newline(..), Indents)
 

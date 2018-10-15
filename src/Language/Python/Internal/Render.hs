@@ -1,6 +1,5 @@
-{-# language GeneralizedNewtypeDeriving, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language GeneralizedNewtypeDeriving #-}
 {-# language FlexibleInstances, MultiParamTypeClasses #-}
-{-# language LambdaCase #-}
 {-# language OverloadedStrings #-}
 module Language.Python.Internal.Render
   ( -- * Common Functions
@@ -19,20 +18,17 @@ module Language.Python.Internal.Render
   )
 where
 
-import Control.Lens.Plated (transform)
 import Control.Lens.Review ((#))
 import Data.Bifoldable (bifoldMap)
 import Data.Char (ord)
-import Data.Digit.Char (charHeXaDeCiMaL, charOctal, charBinary, charDecimal)
+import Data.Digit.Char (charHeXaDeCiMaL, charOctal)
 import Data.Digit.Hexadecimal.MixedCase (HeXDigit(..))
 import Data.DList (DList)
 import Data.Foldable (toList)
 import Data.Semigroup (Semigroup(..))
 import Data.Text (Text)
-import Data.These (These(..))
 
 import qualified Data.DList as DList
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
 import qualified Data.Text.Lazy as Lazy
 import qualified Data.Text.Lazy.Builder as Builder
@@ -58,224 +54,16 @@ showRenderOutput =
   Lazy.toStrict .
   Builder.toLazyText .
   foldMap (Builder.fromText . showToken) .
-  correctSpaces .
+  correctSpaces showToken .
   correctNewlines .
   DList.toList .
   unRenderOutput
-  where
-    correctSpaces =
-      transform $
-      \case
-        a : b : rest
-          | isIdentifierChar (Text.last $ showToken a)
-          , isIdentifierChar (Text.head $ showToken b)
-          -> a : TkSpace () : b : rest
-        a@(TkFloat (FloatLiteralFull _ _ Nothing)) : b : rest
-          | isIdentifierChar (Text.head $ showToken b) -> a : TkSpace () : b : rest
-        a -> a
-
-    correctNewlines =
-      transform $
-      \case
-        TkNewline CR () : TkNewline LF () : rest ->
-          TkNewline CRLF () : TkNewline LF () : rest
-        TkContinued CR () : TkNewline LF () : rest ->
-          TkContinued CRLF () : TkNewline LF () : rest
-        a -> a
-
-showTokens :: [PyToken a] -> Text
-showTokens =
-  Lazy.toStrict .
-  Builder.toLazyText .
-  foldMap (Builder.fromText . showToken . (() <$))
-
-showStringPrefix :: StringPrefix -> Text
-showStringPrefix sp =
-  case sp of
-    Prefix_u -> "u"
-    Prefix_U -> "U"
-
-showRawStringPrefix :: RawStringPrefix -> Text
-showRawStringPrefix sp =
-  case sp of
-    Prefix_r -> "r"
-    Prefix_R -> "R"
-
-showBytesPrefix :: BytesPrefix -> Text
-showBytesPrefix sp =
-  case sp of
-    Prefix_b -> "b"
-    Prefix_B -> "B"
-
-showRawBytesPrefix :: RawBytesPrefix -> Text
-showRawBytesPrefix sp =
-  case sp of
-    Prefix_br -> "br"
-    Prefix_Br -> "Br"
-    Prefix_bR -> "bR"
-    Prefix_BR -> "BR"
-    Prefix_rb -> "rb"
-    Prefix_rB -> "rB"
-    Prefix_Rb -> "Rb"
-    Prefix_RB -> "RB"
-
-showQuoteType :: QuoteType -> Char
-showQuoteType qt =
-  case qt of
-    DoubleQuote -> '\"'
-    SingleQuote -> '\''
 
 renderComment :: Comment a -> RenderOutput
 renderComment c = singleton $ TkComment (() <$ c)
 
 showComment :: Comment a -> Text
 showComment (MkComment _ s) = Text.pack $ "#" <> s
-
-showToken :: PyToken a -> Text
-showToken t =
-  case t of
-    TkIndent{} -> error "trying to show indent token"
-    TkLevel{} -> error "trying to show level token"
-    TkDedent{} -> error "trying to show dedent token"
-    TkIf{} -> "if"
-    TkElse{} -> "else"
-    TkElif{} -> "elif"
-    TkWhile{} -> "while"
-    TkAssert{} -> "assert"
-    TkDef{} -> "def"
-    TkReturn{} -> "return"
-    TkPass{} -> "pass"
-    TkBreak{} -> "break"
-    TkContinue{} -> "continue"
-    TkTrue{} -> "True"
-    TkFalse{} -> "False"
-    TkNone{} -> "None"
-    TkEllipsis{} -> "..."
-    TkOr{} -> "or"
-    TkAnd{} -> "and"
-    TkIs{} -> "is"
-    TkNot{} -> "not"
-    TkGlobal{} -> "global"
-    TkNonlocal{} -> "nonlocal"
-    TkDel{} -> "del"
-    TkLambda{} -> "lambda"
-    TkImport{} -> "import"
-    TkFrom{} -> "from"
-    TkAs{} -> "as"
-    TkRaise{} -> "raise"
-    TkTry{} -> "try"
-    TkExcept{} -> "except"
-    TkFinally{} -> "finally"
-    TkClass{} -> "class"
-    TkRightArrow{} -> "->"
-    TkWith{} -> "with"
-    TkFor{} -> "for"
-    TkIn{} -> "in"
-    TkYield{} -> "yield"
-    TkInt i -> renderIntLiteral i
-    TkFloat i -> renderFloatLiteral i
-    TkImag i -> renderImagLiteral i
-    TkIdent s _ -> Text.pack s
-    TkString sp st qt s _ ->
-      let
-        quote =
-          Text.pack $
-          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
-      in
-        foldMap showStringPrefix sp <>
-        quote <>
-        renderPyChars qt st s <>
-        quote
-    TkBytes sp st qt s _ ->
-      let
-        quote =
-          Text.pack $
-          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
-      in
-        showBytesPrefix sp <>
-        quote <>
-        renderPyCharsBytes qt st s <>
-        quote
-    TkRawString sp st qt s _ ->
-      let
-        quote =
-          case st of
-            LongString -> Text.pack . replicate 3 $ showQuoteType qt
-            ShortString -> Text.singleton $ showQuoteType qt
-      in
-        showRawStringPrefix sp <>
-        quote <>
-        renderPyChars qt st s <>
-        quote
-    TkRawBytes sp st qt s _ ->
-      let
-        quote =
-          case st of
-            LongString -> Text.pack . replicate 3 $ showQuoteType qt
-            ShortString -> Text.singleton $ showQuoteType qt
-      in
-        showRawBytesPrefix sp <>
-        quote <>
-        renderPyCharsBytes qt st s <>
-        quote
-    TkSpace{} -> " "
-    TkTab{} -> "\t"
-    TkNewline nl _ ->
-      case nl of
-        CR -> "\r"
-        LF -> "\n"
-        CRLF -> "\r\n"
-    TkLeftBracket{} -> "["
-    TkRightBracket{} -> "]"
-    TkLeftParen{} -> "("
-    TkRightParen{} -> ")"
-    TkLeftBrace{} -> "{"
-    TkRightBrace{} -> "}"
-    TkLt{} -> "<"
-    TkLte{} -> "<="
-    TkEq{} -> "="
-    TkDoubleEq{}-> "=="
-    TkBangEq{}-> "!="
-    TkGt{} -> ">"
-    TkGte{} -> ">="
-    TkContinued nl _ ->
-      "\\" <>
-      case nl of
-        CR -> "\r"
-        LF -> "\n"
-        CRLF -> "\r\n"
-    TkColon{} -> ":"
-    TkSemicolon{} -> ";"
-    TkComma{} -> ","
-    TkDot{} -> "."
-    TkPlus{} -> "+"
-    TkMinus{} -> "-"
-    TkTilde{} -> "~"
-    TkComment c -> showComment c
-    TkStar{} -> "*"
-    TkDoubleStar{} -> "**"
-    TkSlash{} -> "/"
-    TkDoubleSlash{} -> "//"
-    TkPercent{} -> "%"
-    TkShiftLeft{} -> "<<"
-    TkShiftRight{} -> ">>"
-    TkPlusEq{} -> "+="
-    TkMinusEq{} -> "-="
-    TkStarEq{} -> "*="
-    TkAtEq{} -> "@="
-    TkAt{} -> "@"
-    TkSlashEq{} -> "/="
-    TkPercentEq{} -> "%="
-    TkAmpersandEq{} -> "&="
-    TkPipeEq{} -> "|="
-    TkCaretEq{} -> "^="
-    TkAmpersand{} -> "&"
-    TkPipe{} -> "|"
-    TkCaret{} -> "^"
-    TkShiftLeftEq{} -> "<<="
-    TkShiftRightEq{} -> ">>="
-    TkDoubleStarEq{} -> "**="
-    TkDoubleSlashEq{} -> "//="
 
 bracket :: RenderOutput -> RenderOutput
 bracket a = TkLeftParen () `cons` a <> singleton (TkRightParen ())
@@ -421,6 +209,158 @@ renderPyCharsBytes qt st =
                     '\"' | DoubleQuote <- qt -> go $ Char_esc_singlequote : cs
                     _ -> c : go cs
 
+showTokens :: [PyToken a] -> Text
+showTokens =
+  Lazy.toStrict .
+  Builder.toLazyText .
+  foldMap (Builder.fromText . showToken . (() <$))
+
+showToken :: PyToken a -> Text
+showToken t =
+  case t of
+    TkIndent{} -> error "trying to show indent token"
+    TkLevel{} -> error "trying to show level token"
+    TkDedent{} -> error "trying to show dedent token"
+    TkIf{} -> "if"
+    TkElse{} -> "else"
+    TkElif{} -> "elif"
+    TkWhile{} -> "while"
+    TkAssert{} -> "assert"
+    TkDef{} -> "def"
+    TkReturn{} -> "return"
+    TkPass{} -> "pass"
+    TkBreak{} -> "break"
+    TkContinue{} -> "continue"
+    TkTrue{} -> "True"
+    TkFalse{} -> "False"
+    TkNone{} -> "None"
+    TkEllipsis{} -> "..."
+    TkOr{} -> "or"
+    TkAnd{} -> "and"
+    TkIs{} -> "is"
+    TkNot{} -> "not"
+    TkGlobal{} -> "global"
+    TkNonlocal{} -> "nonlocal"
+    TkDel{} -> "del"
+    TkLambda{} -> "lambda"
+    TkImport{} -> "import"
+    TkFrom{} -> "from"
+    TkAs{} -> "as"
+    TkRaise{} -> "raise"
+    TkTry{} -> "try"
+    TkExcept{} -> "except"
+    TkFinally{} -> "finally"
+    TkClass{} -> "class"
+    TkRightArrow{} -> "->"
+    TkWith{} -> "with"
+    TkFor{} -> "for"
+    TkIn{} -> "in"
+    TkYield{} -> "yield"
+    TkInt i -> showIntLiteral i
+    TkFloat i -> showFloatLiteral i
+    TkImag i -> showImagLiteral i
+    TkIdent s _ -> Text.pack s
+    TkString sp st qt s _ ->
+      let
+        quote =
+          Text.pack $
+          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
+      in
+        foldMap showStringPrefix sp <>
+        quote <>
+        renderPyChars qt st s <>
+        quote
+    TkBytes sp st qt s _ ->
+      let
+        quote =
+          Text.pack $
+          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
+      in
+        showBytesPrefix sp <>
+        quote <>
+        renderPyCharsBytes qt st s <>
+        quote
+    TkRawString sp st qt s _ ->
+      let
+        quote =
+          case st of
+            LongString -> Text.pack . replicate 3 $ showQuoteType qt
+            ShortString -> Text.singleton $ showQuoteType qt
+      in
+        showRawStringPrefix sp <>
+        quote <>
+        renderPyChars qt st s <>
+        quote
+    TkRawBytes sp st qt s _ ->
+      let
+        quote =
+          case st of
+            LongString -> Text.pack . replicate 3 $ showQuoteType qt
+            ShortString -> Text.singleton $ showQuoteType qt
+      in
+        showRawBytesPrefix sp <>
+        quote <>
+        renderPyCharsBytes qt st s <>
+        quote
+    TkSpace{} -> " "
+    TkTab{} -> "\t"
+    TkNewline nl _ ->
+      case nl of
+        CR -> "\r"
+        LF -> "\n"
+        CRLF -> "\r\n"
+    TkLeftBracket{} -> "["
+    TkRightBracket{} -> "]"
+    TkLeftParen{} -> "("
+    TkRightParen{} -> ")"
+    TkLeftBrace{} -> "{"
+    TkRightBrace{} -> "}"
+    TkLt{} -> "<"
+    TkLte{} -> "<="
+    TkEq{} -> "="
+    TkDoubleEq{}-> "=="
+    TkBangEq{}-> "!="
+    TkGt{} -> ">"
+    TkGte{} -> ">="
+    TkContinued nl _ ->
+      "\\" <>
+      case nl of
+        CR -> "\r"
+        LF -> "\n"
+        CRLF -> "\r\n"
+    TkColon{} -> ":"
+    TkSemicolon{} -> ";"
+    TkComma{} -> ","
+    TkDot{} -> "."
+    TkPlus{} -> "+"
+    TkMinus{} -> "-"
+    TkTilde{} -> "~"
+    TkComment c -> showComment c
+    TkStar{} -> "*"
+    TkDoubleStar{} -> "**"
+    TkSlash{} -> "/"
+    TkDoubleSlash{} -> "//"
+    TkPercent{} -> "%"
+    TkShiftLeft{} -> "<<"
+    TkShiftRight{} -> ">>"
+    TkPlusEq{} -> "+="
+    TkMinusEq{} -> "-="
+    TkStarEq{} -> "*="
+    TkAtEq{} -> "@="
+    TkAt{} -> "@"
+    TkSlashEq{} -> "/="
+    TkPercentEq{} -> "%="
+    TkAmpersandEq{} -> "&="
+    TkPipeEq{} -> "|="
+    TkCaretEq{} -> "^="
+    TkAmpersand{} -> "&"
+    TkPipe{} -> "|"
+    TkCaret{} -> "^"
+    TkShiftLeftEq{} -> "<<="
+    TkShiftRightEq{} -> ">>="
+    TkDoubleStarEq{} -> "**="
+    TkDoubleSlashEq{} -> "//="
+
 renderPyChars :: QuoteType -> StringType -> [PyChar] -> Text
 renderPyChars qt st =
   case st of
@@ -563,51 +503,6 @@ renderDictItem (DictUnpack _ a b) =
     BinOp _ _ op _ | isComparison op -> bracket $ renderExpr b
     Not{} -> bracket $ renderExpr b
     _ -> bracketTernaryLambda bracketTupleGenerator b
-
-renderIntLiteral :: IntLiteral a -> Text
-renderIntLiteral (IntLiteralDec _ n) =
-  Text.pack $
-  (charDecimal #) <$> NonEmpty.toList n
-renderIntLiteral (IntLiteralBin _ b n) =
-  Text.pack $
-  '0' : (if b then 'B' else 'b') : fmap (charBinary #) (NonEmpty.toList n)
-renderIntLiteral (IntLiteralOct _ b n) =
-  Text.pack $
-  '0' : (if b then 'O' else 'o') : fmap (charOctal #) (NonEmpty.toList n)
-renderIntLiteral (IntLiteralHex _ b n) =
-  Text.pack $
-  '0' : (if b then 'X' else 'x') : fmap (charHeXaDeCiMaL #) (NonEmpty.toList n)
-
-renderFloatExponent :: FloatExponent -> Text
-renderFloatExponent (FloatExponent e s ds) =
-  Text.pack $
-  (if e then 'E' else 'e') :
-  foldMap (\case; Pos -> "+"; Neg -> "-") s <>
-  fmap (charDecimal #) (NonEmpty.toList ds)
-
-renderFloatLiteral :: FloatLiteral a -> Text
-renderFloatLiteral (FloatLiteralFull _ a b) =
-  Text.pack (fmap (charDecimal #) (NonEmpty.toList a) <> ".") <>
-  foldMap
-    (\case
-       This x -> Text.pack $ fmap (charDecimal #) (NonEmpty.toList x)
-       That x -> renderFloatExponent x
-       These x y ->
-         Text.pack (fmap (charDecimal #) (NonEmpty.toList x)) <>
-         renderFloatExponent y)
-    b
-renderFloatLiteral (FloatLiteralPoint _ a b) =
-  Text.pack ('.' : fmap (charDecimal #) (NonEmpty.toList a)) <>
-  foldMap renderFloatExponent b
-renderFloatLiteral (FloatLiteralWhole _ a b) =
-  Text.pack (fmap (charDecimal #) (NonEmpty.toList a)) <>
-  renderFloatExponent b
-
-renderImagLiteral :: ImagLiteral a -> Text
-renderImagLiteral (ImagLiteralInt _ ds b) =
-  Text.pack $ fmap (charDecimal #) (NonEmpty.toList ds) ++ [if b then 'J' else 'j']
-renderImagLiteral (ImagLiteralFloat _ f b) =
-  renderFloatLiteral f <> Text.singleton (if b then 'J' else 'j')
 
 renderStringLiteral :: StringLiteral a -> RenderOutput
 renderStringLiteral (StringLiteral _ a b c d e) =
@@ -1042,7 +937,7 @@ renderSmallStatement (From _ ws1 name ws3 ns) =
   renderImportTargets ns
 
 renderBlock :: Block v a -> RenderOutput
-renderBlock (Block a b c) =
+renderBlock bl =
   foldMap
     (\(_, x, y, z) ->
         foldMap renderWhitespace x <>
@@ -1058,6 +953,8 @@ renderBlock (Block a b c) =
           singleton (renderNewline z))
         renderStatement)
     c
+  where
+    Block a b c = correctBlock bl
 
 renderSuite :: Suite v a -> RenderOutput
 renderSuite (SuiteMany _ a b c d) =

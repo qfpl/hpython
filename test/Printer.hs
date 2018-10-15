@@ -7,7 +7,6 @@ import qualified Hedgehog.Range as Range
 
 import Data.Foldable (traverse_)
 import Data.List.NonEmpty (NonEmpty(..))
-
 import Language.Python.Internal.Render
 import Language.Python.Internal.Render.Correction
 import Language.Python.Internal.Syntax.Expr

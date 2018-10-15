@@ -1,4 +1,5 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language OverloadedStrings #-}
 {-# language LambdaCase #-}
 module Language.Python.Internal.Syntax.Strings where
 
@@ -6,6 +7,7 @@ import Control.Lens.Lens (lens)
 import Data.Digit.Octal (OctDigit)
 import Data.Digit.Hexadecimal.MixedCase (HeXDigit(..))
 import Data.Maybe (isJust)
+import Data.Text (Text)
 
 import Language.Python.Internal.Syntax.Whitespace
 
@@ -168,3 +170,39 @@ fromHaskellString (c:cs) =
     '\0' -> Char_hex HeXDigit0 HeXDigit0
     _ -> Char_lit c) :
   fromHaskellString cs
+
+showStringPrefix :: StringPrefix -> Text
+showStringPrefix sp =
+  case sp of
+    Prefix_u -> "u"
+    Prefix_U -> "U"
+
+showRawStringPrefix :: RawStringPrefix -> Text
+showRawStringPrefix sp =
+  case sp of
+    Prefix_r -> "r"
+    Prefix_R -> "R"
+
+showBytesPrefix :: BytesPrefix -> Text
+showBytesPrefix sp =
+  case sp of
+    Prefix_b -> "b"
+    Prefix_B -> "B"
+
+showRawBytesPrefix :: RawBytesPrefix -> Text
+showRawBytesPrefix sp =
+  case sp of
+    Prefix_br -> "br"
+    Prefix_Br -> "Br"
+    Prefix_bR -> "bR"
+    Prefix_BR -> "BR"
+    Prefix_rb -> "rb"
+    Prefix_rB -> "rB"
+    Prefix_Rb -> "Rb"
+    Prefix_RB -> "RB"
+
+showQuoteType :: QuoteType -> Char
+showQuoteType qt =
+  case qt of
+    DoubleQuote -> '\"'
+    SingleQuote -> '\''

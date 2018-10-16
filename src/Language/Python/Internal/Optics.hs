@@ -130,11 +130,11 @@ _While
        (While '[] a)
 _While =
   prism
-    (\(MkWhile a b c d e) ->
-       CompoundStatement (While a b c d e))
+    (\(MkWhile a b c d e f) ->
+       CompoundStatement (While a b c d e $ view _Else <$> f))
     (\case
-        CompoundStatement (While a b c d e) ->
-          Right $ MkWhile a b c d e
+        CompoundStatement (While a b c d e f) ->
+          Right . MkWhile a b c d e $ view (from _Else) <$> f
         a -> Left $ a ^. unvalidated)
 
 _Else :: Iso' (Else v a) (Indents a, [Whitespace], Suite v a)
@@ -295,10 +295,11 @@ instance HasIndents If where
     (traverse._Indents) fun g
 
 instance HasIndents While where
-  _Indents fun (MkWhile a b c d e) =
+  _Indents fun (MkWhile a b c d e f) =
     (\b' -> MkWhile a b' c d) <$>
     fun b <*>
-    _Indents fun e
+    _Indents fun e <*>
+    (traverse._Indents) fun f
 
 instance HasIndents Elif where
   _Indents fun (MkElif a b c d) =
@@ -366,10 +367,16 @@ instance HasIndents CompoundStatement where
              fun idnt <*>
              _Indents fun b)
           e
-      While a idnt b c d ->
+      While a idnt b c d e ->
         (\idnt' -> While a idnt' b c) <$>
         fun idnt <*>
-        _Indents fun d
+        _Indents fun d <*>
+        traverse
+          (\(idnt, a, b) ->
+             (\idnt' -> (,,) idnt' a) <$>
+             fun idnt <*>
+             _Indents fun b)
+          e
       TryExcept a idnt b c d e f ->
         (\idnt' -> TryExcept a idnt' b) <$>
         fun idnt <*>
@@ -448,8 +455,10 @@ instance HasNewlines CompoundStatement where
         _Newlines fun s <*>
         traverseOf (traverse._4._Newlines) fun elifs <*>
         traverseOf (traverse._3._Newlines) fun els
-      While idnt ann ws1 cond s ->
-        While idnt ann ws1 cond <$> _Newlines fun s
+      While idnt ann ws1 cond s els ->
+        While idnt ann ws1 cond <$>
+        _Newlines fun s <*>
+        traverseOf (traverse._3._Newlines) fun els
       TryExcept idnt a b c f k l ->
         TryExcept idnt a b <$> _Newlines fun c <*>
         traverseOf (traverse._4._Newlines) fun f <*>

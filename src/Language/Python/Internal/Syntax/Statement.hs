@@ -101,8 +101,10 @@ instance HasBlocks CompoundStatement where
     _Blocks f s <*>
     traverse (\(a, b, c, d) -> (,,,) a b (c ^. unvalidated) <$> _Blocks f d) elifs <*>
     traverseOf (traverse._3._Blocks) f b'
-  _Blocks f (While idnt a ws1 e1 s) =
-    While idnt a ws1 (e1 ^. unvalidated) <$> _Blocks f s
+  _Blocks f (While idnt a ws1 e1 s els) =
+    While idnt a ws1 (e1 ^. unvalidated) <$>
+    _Blocks f s <*>
+    traverseOf (traverse._3._Blocks) f els
   _Blocks fun (TryExcept idnt a b c d e f) =
     TryExcept idnt a (coerce b) <$>
     _Blocks fun c <*>
@@ -188,8 +190,10 @@ instance Plated (Statement '[] a) where
         _Statements fun s <*>
         (traverse._4._Statements) fun elifs <*>
         (traverse._3._Statements) fun sts'
-      While idnt a ws1 b s ->
-        While idnt a ws1 b <$> _Statements fun s
+      While idnt a ws1 b s els ->
+        While idnt a ws1 b <$>
+        _Statements fun s <*>
+        (traverse._3._Statements) fun els
       TryExcept idnt a b c d e f ->
         TryExcept idnt a b <$> _Statements fun c <*>
         (traverse._4._Statements) fun d <*>
@@ -324,6 +328,8 @@ data CompoundStatement (v :: [*]) a
   , _unsafeCsWhileWhile :: [Whitespace] -- ^ @\'while\' \<spaces\>@
   , _unsafeCsWhileCond :: Expr v a -- ^ @\<expr\>@
   , _unsafeCsWhileBody :: Suite v a -- ^ @\<suite\>@
+  , _unsafeCsWhileElse
+    :: Maybe (Indents a, [Whitespace], Suite v a) -- ^ @[\'else\' \<spaces\> \<suite\>]@
   }
   | TryExcept
   { _csAnn :: a
@@ -411,8 +417,11 @@ instance HasExprs CompoundStatement where
       (\(a, b, c, d) -> (,,,) a b <$> fun c <*> _Exprs fun d)
       elifs <*>
     (traverse._3._Exprs) fun sts'
-  _Exprs f (While idnt a ws1 e s) =
-    While idnt a ws1 <$> f e <*> _Exprs f s
+  _Exprs f (While idnt a ws1 e s els) =
+    While idnt a ws1 <$>
+    f e <*>
+    _Exprs f s <*>
+    (traverse._3._Exprs) f els
   _Exprs fun (TryExcept idnt a b c d e f) =
     TryExcept idnt a b <$> _Exprs fun c <*>
     traverse

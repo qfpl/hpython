@@ -621,11 +621,12 @@ validateCompoundStatementSyntax (If a idnts ws1 expr body elifs body') =
        validateSuiteSyntax d)
     elifs <*>
   traverseOf (traverse._3) validateSuiteSyntax body'
-validateCompoundStatementSyntax (While a idnts ws1 expr body) =
+validateCompoundStatementSyntax (While a idnts ws1 expr body els) =
   While a idnts <$>
   validateWhitespace a ws1 <*>
   validateExprSyntax expr <*>
-  liftVM1 (local $ inLoop .~ True) (validateSuiteSyntax body)
+  liftVM1 (local $ inLoop .~ True) (validateSuiteSyntax body) <*>
+  traverseOf (traverse._3) validateSuiteSyntax els
 validateCompoundStatementSyntax (TryExcept a idnts b e f k l) =
   TryExcept a idnts <$>
   validateWhitespace a b <*>

@@ -1007,10 +1007,18 @@ renderCompoundStatement (If _ idnt ws1 expr s elifs body') =
         singleton (TkElse ()) <> foldMap renderWhitespace ws4 <>
         renderSuite s)
     body'
-renderCompoundStatement (While _ idnt ws1 expr s) =
+renderCompoundStatement (While _ idnt ws1 expr s els) =
   renderIndents idnt <>
-  singleton (TkWhile ()) <> foldMap renderWhitespace ws1 <> bracketTupleGenerator expr <>
-  renderSuite s
+  singleton (TkWhile ()) <>
+  foldMap renderWhitespace ws1 <>
+  bracketTupleGenerator expr <>
+  renderSuite s <>
+  foldMap
+    (\(idnt, ws4, s) ->
+        renderIndents idnt <>
+        singleton (TkElse ()) <> foldMap renderWhitespace ws4 <>
+        renderSuite s)
+    els
 renderCompoundStatement (TryExcept _ idnt a s e f g) =
   renderIndents idnt <>
   singleton (TkTry ()) <> foldMap renderWhitespace a <>

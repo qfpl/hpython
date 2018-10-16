@@ -382,13 +382,16 @@ genCompoundStatement =
         (sizedMaybe $
          (,,) <$>
          genIndents <*> genWhitespaces <*> genSuite genSmallStatement genBlock)
-    , sized2M
-        (\a b ->
+    , sized3M
+        (\a b c ->
            While <$>
            pure () <*> genIndents <*>
-           genWhitespaces <*> pure a <*> pure b)
+           genWhitespaces <*> pure a <*> pure b <*> pure c)
         genExpr
         (genSuite genSmallStatement genBlock)
+        (sizedMaybe $
+         (,,) <$>
+         genIndents <*> genWhitespaces <*> genSuite genSmallStatement genBlock)
     , sized4M
         (\a b c d ->
            TryExcept <$> pure () <*> genIndents <*> genWhitespaces <*>

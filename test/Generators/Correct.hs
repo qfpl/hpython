@@ -794,20 +794,26 @@ genCompoundStatement =
               genExpr
               (localState $ genSuite genSmallStatement genBlock))
           (sizedMaybe $
-          sizedBind (localState $ genSuite genSmallStatement genBlock) $ \a ->
-            (,,) <$>
-            use currentIndentation <*>
-            genWhitespaces <*>
-            pure a)
-      , sized2M
-          (\a b ->
+           sizedBind (localState $ genSuite genSmallStatement genBlock) $ \a ->
+             (,,) <$>
+             use currentIndentation <*>
+             genWhitespaces <*>
+             pure a)
+      , sized3M
+          (\a b c ->
             While <$>
             pure () <*>
             use currentIndentation <*>
             fmap NonEmpty.toList genWhitespaces1 <*> pure a <*>
-            pure b)
+            pure b <*> pure c)
           genExpr
           (localState $ (inLoop .= True) *> genSuite genSmallStatement genBlock)
+          (sizedMaybe $
+           sizedBind (localState $ genSuite genSmallStatement genBlock) $ \a ->
+             (,,) <$>
+             use currentIndentation <*>
+             genWhitespaces <*>
+             pure a)
       , sized4M
           (\a b e1 e2 ->
             TryExcept <$>

@@ -214,14 +214,15 @@ validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
           validateSuiteScope d)
        elifs <*>
      traverseOf (traverse._3) validateSuiteScope melse)))
-validateCompoundStatementScope (While idnts a ws1 e b) =
+validateCompoundStatementScope (While idnts a ws1 e b els) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
   locallyOver scGlobalScope (`unionR` unionR ls is) $
   locallyOver scImmediateScope (const Map.empty)
     (While idnts a ws1 <$>
      validateExprScope e <*>
-     validateSuiteScope b)))
+     validateSuiteScope b <*>
+     traverseOf (traverse._3) validateSuiteScope els)))
 validateCompoundStatementScope (TryExcept idnts a b e f k l) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->

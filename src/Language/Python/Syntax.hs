@@ -1032,6 +1032,10 @@ instance HasBody While where
   setBody = mkSetBody whileBody _whileIndents
   getBody = mkGetBody "while" _whileBody _whileIndents
 
+instance HasElse While where
+  getElse = mkGetElse _whileIndents _whileElse
+  setElse = mkSetElse _whileIndents whileElse
+
 -- | Create a minimal valid 'While'
 mkWhile :: Raw Expr -> [Raw Line] -> Raw While
 mkWhile cond body =
@@ -1041,6 +1045,7 @@ mkWhile cond body =
   , _whileWhile = [Space]
   , _whileCond = cond
   , _whileBody = SuiteMany () [] Nothing LF $ toBlock body
+  , _whileElse = Nothing
   }
 
 while_ :: Raw Expr -> [Raw Line] -> Raw Statement

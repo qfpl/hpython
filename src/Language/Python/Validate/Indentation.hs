@@ -242,11 +242,19 @@ validateCompoundStatementIndentation (If a idnt ws1 expr s elifs body1) =
        pure a <*>
        validateSuiteIndentation idnt b)
     body1
-validateCompoundStatementIndentation (While a idnt ws1 expr s) =
+validateCompoundStatementIndentation (While a idnt ws1 expr s els) =
   (\idnt' expr' -> While a idnt' ws1 expr') <$>
   checkIndent idnt <*>
   validateExprIndentation expr <*>
-  validateSuiteIndentation idnt s
+  validateSuiteIndentation idnt s <*>
+  traverse
+    (\(idnt2, a, b) ->
+       (,,) <$
+       setNextIndent EqualTo (idnt ^. indentsValue) <*>
+       checkIndent idnt2 <*>
+       pure a <*>
+       validateSuiteIndentation idnt b)
+    els
 validateCompoundStatementIndentation (TryExcept a idnt b c d e f) =
   (\idnt' -> TryExcept a idnt' b) <$>
   checkIndent idnt <*>

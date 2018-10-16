@@ -24,6 +24,14 @@ data Fundef v a
   } deriving (Eq, Show)
 makeLenses ''Fundef
 
+data Else v a
+  = MkElse
+  { _elseIndents :: Indents a
+  , _elseElse :: [Whitespace]
+  , _elseBody :: Suite v a
+  } deriving (Eq, Show)
+makeLenses ''Else
+
 data While v a
   = MkWhile
   { _whileAnn :: a
@@ -31,6 +39,7 @@ data While v a
   , _whileWhile :: [Whitespace]
   , _whileCond :: Expr v a
   , _whileBody :: Suite v a
+  , _whileElse :: Maybe (Else v a)
   } deriving (Eq, Show)
 makeLenses ''While
 
@@ -79,14 +88,6 @@ data Elif v a
   , _elifBody :: Suite v a
   } deriving (Eq, Show)
 makeLenses ''Elif
-
-data Else v a
-  = MkElse
-  { _elseIndents :: Indents a
-  , _elseElse :: [Whitespace]
-  , _elseBody :: Suite v a
-  } deriving (Eq, Show)
-makeLenses ''Else
 
 data If v a
   = MkIf

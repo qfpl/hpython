@@ -79,6 +79,8 @@ data CompoundStatement a
   , _unsafeCsWhileWhile :: [Whitespace] -- ^ @\'while\' \<spaces\>@
   , _unsafeCsWhileCond :: Expr a -- ^ @\<expr\>@
   , _unsafeCsWhileBody :: Suite a -- ^ @\<suite\>@
+  , _unsafeCsWhileElse
+    :: Maybe (Indents a, [Whitespace], Suite a) -- ^ @[\'else\' \<spaces\> \<suite\>]@
   }
   | TryExcept
   { _csAnn :: a
@@ -850,8 +852,11 @@ fromIR_compoundStatement st =
       fromIR_suite e <*>
       traverse (\(a, b, c, d) -> (,,,) a b <$> fromIR_expr c <*> fromIR_suite d) f <*>
       traverseOf (traverse._3) fromIR_suite g
-    While a b c d e ->
-      Syntax.While a b c <$> fromIR_expr d <*> fromIR_suite e
+    While a b c d e f ->
+      Syntax.While a b c <$>
+      fromIR_expr d <*>
+      fromIR_suite e <*>
+      traverseOf (traverse._3) fromIR_suite f
     TryExcept a b c d e f g ->
       Syntax.TryExcept a b c <$>
       fromIR_suite d <*>

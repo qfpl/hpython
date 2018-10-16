@@ -1190,7 +1190,13 @@ compoundStatement pIndent indentBefore =
       (\(tk, s) a b -> While (pyTokenAnn tk) indentBefore s a b) <$>
       token space (\case; TkWhile{} -> True; _ -> False) "while" <*>
       expr space <*>
-      suite
+      suite <*>
+      optional
+        (try
+           ((,,) <$>
+            pIndent <*>
+            (snd <$> token space (\case; TkElse{} -> True; _ -> False) "else")) <*>
+         suite)
 
     exceptAs =
       (\a -> ExceptAs (a ^. exprAnn) a) <$>

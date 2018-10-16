@@ -694,6 +694,7 @@ smallStatement =
   breakSt <|>
   continueSt <|>
   globalSt <|>
+  nonlocalSt <|>
   delSt <|>
   importSt <|>
   raiseSt <|>
@@ -812,6 +813,11 @@ smallStatement =
     globalSt =
       (\(tk, s) -> Global (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
       token space (\case; TkGlobal{} -> True; _ -> False) "global" <*>
+      commaSep1 space (identifier space)
+
+    nonlocalSt =
+      (\(tk, s) -> Nonlocal (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
+      token space (\case; TkNonlocal{} -> True; _ -> False) "nonlocal" <*>
       commaSep1 space (identifier space)
 
     delSt =

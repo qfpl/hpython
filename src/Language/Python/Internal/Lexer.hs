@@ -37,8 +37,9 @@ import Data.These (These(..))
 import Data.Void (Void)
 import Text.Megaparsec (MonadParsec, ParseError, parse, unPos)
 import Text.Megaparsec.Parsers
-  ( ParsecT, CharParsing, unParsecT, satisfy, text, char, manyTill, try
-  , notFollowedBy, anyChar, digit
+  ( ParsecT, CharParsing, LookAheadParsing, lookAhead, unParsecT, satisfy, text
+  , char, manyTill, try
+  , notFollowedBy, anyChar, digit, oneOf
   )
 
 import qualified Data.FingerTree as FingerTree
@@ -114,10 +115,10 @@ stringOrBytesPrefix =
   (Left (Right Prefix_u) <$ char 'u') <|>
   (Left (Right Prefix_U) <$ char 'U')
 
-stringChar :: CharParsing m => m PyChar
+stringChar :: (CharParsing m, LookAheadParsing m) => m PyChar
 stringChar =
-  (char '\\' *>
-   (escapeChar <|> unicodeChar <|> octChar <|> hexChar <|> pure (Char_lit '\\'))) <|>
+  (try (char '\\' <* lookAhead (oneOf "\"'U\\abfnftuvx012334567")) *>
+   (escapeChar <|> unicodeChar <|> octChar <|> hexChar)) <|>
   other
   where
     other = Char_lit <$> anyChar
@@ -145,7 +146,7 @@ stringChar =
        replicateM 4 parseHeXaDeCiMaL)
 
     hexChar = Char_hex <$ char 'x' <*> parseHeXaDeCiMaL <*> parseHeXaDeCiMaL
-    octChar = Char_octal <$ char 'o' <*> parseOctal <*> parseOctal
+    octChar = Char_octal <$> parseOctal <*> parseOctal <*> parseOctal
 
 number :: (CharParsing m, Monad m) => m (a -> PyToken a)
 number = do
@@ -251,7 +252,7 @@ number = do
 
 {-# inline parseToken #-}
 parseToken
-  :: (Monad m, CharParsing m, MonadParsec e s m)
+  :: (Monad m, CharParsing m, LookAheadParsing m, MonadParsec e s m)
   => m (PyToken SrcInfo)
 parseToken =
   withSrcInfo $

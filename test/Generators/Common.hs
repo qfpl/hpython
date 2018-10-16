@@ -525,7 +525,10 @@ genPyChar :: MonadGen m => m Char -> m PyChar
 genPyChar mlit =
   Gen.choice
   [ pure Char_newline
-  , Char_octal <$> Gen.element enumOctal <*> Gen.element enumOctal
+  , Char_octal <$>
+    Gen.element enumOctal <*>
+    Gen.element enumOctal <*>
+    Gen.element enumOctal
   , Char_hex <$> genHexDigit <*> genHexDigit
   , Char_uni16 <$>
     genHexDigit <*>

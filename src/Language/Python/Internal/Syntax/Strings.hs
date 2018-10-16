@@ -104,7 +104,7 @@ instance HasTrailingWhitespace (StringLiteral a) where
 
 data PyChar
   = Char_newline
-  | Char_octal OctDigit OctDigit
+  | Char_octal OctDigit OctDigit OctDigit
   | Char_hex HeXDigit HeXDigit
   | Char_uni16
       HeXDigit

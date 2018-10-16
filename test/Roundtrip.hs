@@ -30,7 +30,8 @@ roundtripTests :: Group
 roundtripTests =
   Group "Roundtrip tests" $
   (\name -> (fromString name, withTests 1 . withShrinks 0 $ doRoundtripFile name)) <$>
-  [ "set.py"
+  [ "string.py"
+  , "set.py"
   , "regex.py"
   , "asyncstatements.py"
   , "typeann.py"

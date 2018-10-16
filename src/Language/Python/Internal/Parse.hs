@@ -636,9 +636,12 @@ orExpr ws =
              Nothing ->
                -- The order of this choice matters because commaSepRest is implemented
                -- in a slightly odd way
-               (\(c, d) -> SetComp ann ws1 (Comprehension (ex ^. exprAnn) ex c d)) <$> compRHS
+               (\(c, d) -> SetComp ann ws1 (Comprehension (ex ^. exprAnn) ex c d)) <$>
+               compRHS
                <|>
-               (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$> commaSepRest (expr ws <|> starExpr ws)
+
+               (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$>
+               commaSepRest (expr anySpace <|> starExpr anySpace)
              Just clws ->
                (\ex2 a ->
                  let
@@ -653,14 +656,23 @@ orExpr ws =
                expr anySpace <*>
                (Left <$> compRHS <|> Right <$> commaSepRest dictItem)
          Just (Left (Right ex)) ->
-           ((\(c, d) -> SetComp ann ws1 (Comprehension (ex ^. exprAnn) ex c d)) <$> compRHS
-           <|>
-           (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$> commaSepRest (expr ws <|> starExpr ws))
+           ((\(c, d) -> SetComp ann ws1 (Comprehension (ex ^. exprAnn) ex c d)) <$>
+            compRHS
+
+            <|>
+
+            (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$>
+            commaSepRest (expr anySpace <|> starExpr anySpace))
          Just (Right ex) ->
-           ((\(c, d) -> DictComp ann ws1 (Comprehension (_dictItemAnn ex) ex c d)) <$> compRHS
-           <|>
-           (\(rest, final) -> Dict ann ws1 (Just $ (ex, rest, final) ^. _CommaSep1')) <$> commaSepRest dictItem)) <*>
-         (snd <$> token ws (\case; TkRightBrace{} -> True; _ -> False) "}")
+           ((\(c, d) -> DictComp ann ws1 (Comprehension (_dictItemAnn ex) ex c d)) <$>
+            compRHS
+
+            <|>
+
+            (\(rest, final) -> Dict ann ws1 (Just $ (ex, rest, final) ^. _CommaSep1')) <$>
+            commaSepRest dictItem)) <*>
+
+        (snd <$> token ws (\case; TkRightBrace{} -> True; _ -> False) "}")
 
     atom =
       dictOrSet <|>

@@ -1,9 +1,11 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# language OverloadedStrings #-}
 {-# language LambdaCase #-}
+{-# language TemplateHaskell #-}
 module Language.Python.Internal.Syntax.Strings where
 
 import Control.Lens.Lens (lens)
+import Control.Lens.TH (makeLensesFor)
 import Data.Digit.Octal (OctDigit)
 import Data.Digit.Hexadecimal.MixedCase (HeXDigit(..))
 import Data.Maybe (isJust)
@@ -59,7 +61,7 @@ data StringLiteral a
   , _unsafeRawStringLiteralPrefix :: RawStringPrefix
   , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
-  , _unsafeRawStringLiteralValue :: [PyChar]
+  , _stringLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }
   | StringLiteral
@@ -67,7 +69,7 @@ data StringLiteral a
   , _unsafeStringLiteralPrefix :: Maybe StringPrefix
   , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
-  , _unsafeStringLiteralValue :: [PyChar]
+  , _stringLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }
   | RawBytesLiteral
@@ -75,7 +77,7 @@ data StringLiteral a
   , _unsafeRawBytesLiteralPrefix :: RawBytesPrefix
   , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
-  , _unsafeRawBytesLiteralValue :: [PyChar]
+  , _stringLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }
   | BytesLiteral
@@ -83,7 +85,7 @@ data StringLiteral a
   , _unsafeBytesLiteralPrefix :: BytesPrefix
   , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
-  , _unsafeBytesLiteralValue :: [PyChar]
+  , _stringLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
@@ -206,3 +208,5 @@ showQuoteType qt =
   case qt of
     DoubleQuote -> '\"'
     SingleQuote -> '\''
+
+makeLensesFor [("_stringLiteralValue", "stringLiteralValue")] ''StringLiteral

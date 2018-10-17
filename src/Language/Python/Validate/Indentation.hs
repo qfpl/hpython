@@ -15,7 +15,6 @@ module Language.Python.Validate.Indentation
   , validateBlockIndentation
   , validateCompoundStatementIndentation
   , validateDecoratorIndentation
-  , validateDecoratorsIndentation
   , validateExceptAsIndentation
   , validateParamsIndentation
   , validateSuiteIndentation
@@ -221,34 +220,10 @@ validateDecoratorIndentation
   :: AsIndentationError e v a
   => Decorator v a
   -> ValidateIndentation e (Decorator (Nub (Indentation ': v)) a)
-validateDecoratorIndentation (Decorator a b c d e f) =
+validateDecoratorIndentation (Decorator a b c d e f g) =
   (\b' -> Decorator a b' c (unsafeCoerce d) e f) <$>
-  checkIndent b
-
-validateDecoratorsIndentation
-  :: forall e v a
-   . AsIndentationError e v a
-  => Decorators v a
-  -> ValidateIndentation e (Decorators (Nub (Indentation ': v)) a)
-validateDecoratorsIndentation (DecoratorsValue a b) =
-  DecoratorsValue <$>
-  validateDecoratorIndentation a <*>
-  validateDecoratorsIndentation' b
-  where
-    validateDecoratorsIndentation'
-      :: forall e v a
-      . AsIndentationError e v a
-      => Decorators' v a
-      -> ValidateIndentation e (Decorators' (Nub (Indentation ': v)) a)
-    validateDecoratorsIndentation' (Decorators'Value a b) =
-      Decorators'Value <$>
-      validateDecoratorIndentation a <*>
-      validateDecoratorsIndentation' b
-    validateDecoratorsIndentation' (Decorators'Blank a b c) =
-      (\a' -> Decorators'Blank a' b) <$>
-      validateBlankIndentation a <*>
-      validateDecoratorsIndentation' c
-    validateDecoratorsIndentation' Decorators'Empty = pure Decorators'Empty
+  checkIndent b <*>
+  traverseOf (traverse._1) validateBlankIndentation g
 
 validateCompoundStatementIndentation
   :: forall e v a
@@ -258,7 +233,7 @@ validateCompoundStatementIndentation
 validateCompoundStatementIndentation (Fundef a decos idnt asyncWs ws1 name ws2 params ws3 mty s) =
   (\decos' idnt' params' ->
      Fundef a decos' idnt' asyncWs ws1 (coerce name) ws2 params' ws3 (unsafeCoerce mty)) <$>
-  traverse validateDecoratorsIndentation decos <*>
+  traverse validateDecoratorIndentation decos <*>
   checkIndent idnt <*>
   validateParamsIndentation params <*>
   validateSuiteIndentation idnt s
@@ -349,7 +324,7 @@ validateCompoundStatementIndentation (For a idnt asyncWs b c d e h i) =
 validateCompoundStatementIndentation (ClassDef a decos idnt b c d e) =
   (\decos' idnt' ->
      ClassDef @(Nub (Indentation ': v)) a decos' idnt' b (coerce c) (unsafeCoerce d)) <$>
-  traverse validateDecoratorsIndentation decos <*>
+  traverse validateDecoratorIndentation decos <*>
   checkIndent idnt <*>
   validateSuiteIndentation idnt e
 validateCompoundStatementIndentation (With a idnt asyncWs b c d) =

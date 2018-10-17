@@ -964,31 +964,18 @@ renderSuite (SuiteOne _ a b) =
   renderSimpleStatement b
 
 renderDecorator :: Decorator v a -> RenderOutput
-renderDecorator (Decorator _ a b c d e) =
+renderDecorator (Decorator _ a b c d e f) =
   renderIndents a <>
   singleton (TkAt ()) <>
   foldMap renderWhitespace b <>
   renderExpr c <>
   foldMap renderComment d <>
-  singleton (renderNewline e)
-
-renderDecorators :: Decorators v a -> RenderOutput
-renderDecorators (DecoratorsValue a b) =
-  renderDecorator a <>
-  renderDecorators' b
-  where
-    renderDecorators' Decorators'Empty = mempty
-    renderDecorators' (Decorators'Blank a b c) =
-      renderBlank a <>
-      singleton (renderNewline b) <>
-      renderDecorators' c
-    renderDecorators' (Decorators'Value a b) =
-      renderDecorator a <>
-      renderDecorators' b
+  singleton (renderNewline e) <>
+  foldMap (bifoldMap renderBlank (singleton . renderNewline)) f
 
 renderCompoundStatement :: CompoundStatement v a -> RenderOutput
 renderCompoundStatement (Fundef _ decos idnt asyncWs ws1 name ws2 params ws3 mty s) =
-  foldMap renderDecorators decos <>
+  foldMap renderDecorator decos <>
   renderIndents idnt <>
   foldMap (\ws -> TkIdent "async" () `cons` foldMap renderWhitespace ws) asyncWs <>
   singleton (TkDef ()) <> foldMap renderWhitespace ws1 <> renderIdent name <>
@@ -1073,7 +1060,7 @@ renderCompoundStatement (For _ idnt asyncWs a b c d s h) =
         renderSuite s)
     h
 renderCompoundStatement (ClassDef _ decos idnt a b c s) =
-  foldMap renderDecorators decos <>
+  foldMap renderDecorator decos <>
   renderIndents idnt <>
   singleton (TkClass ()) <> foldMap renderWhitespace a <>
   renderIdent b <>

@@ -11,7 +11,7 @@ import Language.Python.Internal.Syntax hiding (Fundef, While)
 data Fundef v a
   = MkFundef
   { _fdAnn :: a
-  , _fdDecorators :: Maybe (Decorators v a)
+  , _fdDecorators :: [Decorator v a]
   , _fdIndents :: Indents a
   , _fdAsync :: Maybe (NonEmpty Whitespace)
   , _fdDefSpaces :: NonEmpty Whitespace
@@ -157,7 +157,7 @@ makeLenses ''TryFinally
 data ClassDef v a
   = MkClassDef
   { _cdAnn :: a
-  , _cdDecorators :: Maybe (Decorators v a)
+  , _cdDecorators :: [Decorator v a]
   , _cdIndents :: Indents a
   , _cdClass :: NonEmpty Whitespace
   , _cdName :: Ident v a

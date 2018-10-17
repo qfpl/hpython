@@ -26,7 +26,6 @@ module Language.Python.Validate.Syntax
   , validateCompoundStatementSyntax
   , validateComprehensionSyntax
   , validateDecoratorSyntax
-  , validateDecoratorsSyntax
   , validateDictItemSyntax
   , validateExceptAsSyntax
   , validateIdentSyntax
@@ -53,7 +52,7 @@ import Control.Lens.Prism (_Right, _Just)
 import Control.Lens.Review ((#))
 import Control.Lens.Setter ((.~), (%~))
 import Control.Lens.TH (makeLenses)
-import Control.Lens.Tuple (_2, _3)
+import Control.Lens.Tuple (_1, _2, _3)
 import Control.Lens.Traversal (traverseOf)
 import Control.Monad (when)
 import Control.Monad.State (State, put, modify, get, evalState)
@@ -563,10 +562,11 @@ validateDecoratorSyntax
      )
   => Decorator v a
   -> ValidateSyntax e (Decorator (Nub (Syntax ': v)) a)
-validateDecoratorSyntax (Decorator a b c d e f) =
+validateDecoratorSyntax (Decorator a b c d e f g) =
   (\c' d' -> Decorator a b c' d' e f) <$>
   validateWhitespace a c <*>
-  isDecoratorValue d
+  isDecoratorValue d <*>
+  traverseOf (traverse._1) validateBlankSyntax g
   where
     someDerefs Ident{} = True
     someDerefs (Deref _ a _ _) = someDerefs a
@@ -585,31 +585,6 @@ validateBlankSyntax (Blank a ws cmt) =
   (\ws' -> Blank a ws' cmt) <$>
   validateWhitespace a ws
 
-validateDecoratorsSyntax
-  :: forall e v a
-   . (AsSyntaxError e v a, Member Indentation v)
-  => Decorators v a
-  -> ValidateSyntax e (Decorators (Nub (Syntax ': v)) a)
-validateDecoratorsSyntax (DecoratorsValue a b) =
-  DecoratorsValue <$>
-  validateDecoratorSyntax a <*>
-  validateDecoratorsSyntax' b
-  where
-    validateDecoratorsSyntax'
-      :: forall e v a
-      . (AsSyntaxError e v a, Member Indentation v)
-      => Decorators' v a
-      -> ValidateSyntax e (Decorators' (Nub (Syntax ': v)) a)
-    validateDecoratorsSyntax' (Decorators'Value a b) =
-      Decorators'Value <$>
-      validateDecoratorSyntax a <*>
-      validateDecoratorsSyntax' b
-    validateDecoratorsSyntax' (Decorators'Blank a b c) =
-      (\a' -> Decorators'Blank a' b) <$>
-      validateBlankSyntax a <*>
-      validateDecoratorsSyntax' c
-    validateDecoratorsSyntax' Decorators'Empty = pure Decorators'Empty
-
 validateCompoundStatementSyntax
   :: forall e v a
    . ( AsSyntaxError e v a
@@ -622,7 +597,7 @@ validateCompoundStatementSyntax (Fundef a decos idnts asyncWs ws1 name ws2 param
     paramIdents = params ^.. folded.unvalidated.paramName.identValue
   in
     (\decos' -> Fundef a decos' idnts) <$>
-    traverse validateDecoratorsSyntax decos <*>
+    traverse validateDecoratorSyntax decos <*>
     traverse (validateWhitespace a) asyncWs <*>
     validateWhitespace a ws1 <*>
     validateIdentSyntax name <*>
@@ -697,7 +672,7 @@ validateCompoundStatementSyntax (TryFinally a idnts b e idnts2 f i) =
 validateCompoundStatementSyntax (ClassDef a decos idnts b c d g) =
   liftVM1 (local $ inLoop .~ False) $
   (\decos' -> ClassDef a decos' idnts) <$>
-  traverse validateDecoratorsSyntax decos <*>
+  traverse validateDecoratorSyntax decos <*>
   validateWhitespace a b <*>
   validateIdentSyntax c <*>
   traverse

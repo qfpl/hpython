@@ -579,20 +579,13 @@ class HasArguments s where
 class HasDecorators s where
   setDecorators :: [Raw Expr] -> Raw s -> Raw s
   getDecorators :: Raw s -> [Raw Expr]
-  decorators :: Lens' (Raw s) (Maybe (Raw Decorators))
+  decorators :: Lens' (Raw s) [Raw Decorator]
 
 decorated_ :: HasDecorators s => [Raw Expr] -> Raw s -> Raw s
 decorated_ = setDecorators
 
-exprsToDecorators :: Indents () -> [Raw Expr] -> Maybe (Raw Decorators)
-exprsToDecorators _ [] = Nothing
-exprsToDecorators is (e:es) =
-  Just $
-  DecoratorsValue (Decorator () is [] e Nothing LF) (exprsToDecorators' es)
-  where
-    exprsToDecorators' [] = Decorators'Empty
-    exprsToDecorators' (e':es') =
-      Decorators'Value (Decorator () is [] e' Nothing LF) (exprsToDecorators' es')
+exprsToDecorators :: Indents () -> [Raw Expr] -> [Raw Decorator]
+exprsToDecorators is = fmap (\e -> Decorator () is [] e Nothing LF [])
 
 instance HasDecorators Fundef where
   decorators = fdDecorators
@@ -602,7 +595,7 @@ instance HasDecorators Fundef where
     { _fdDecorators = exprsToDecorators (_fdIndents code) new
     }
 
-  getDecorators code = code ^.. fdDecorators._Just._Exprs
+  getDecorators code = code ^.. fdDecorators.folded._Exprs
 
 mkSetBody
   :: HasIndents s
@@ -651,7 +644,7 @@ mkFundef :: Raw Ident -> [Raw Line] -> Raw Fundef
 mkFundef name body =
   MkFundef
   { _fdAnn = ()
-  , _fdDecorators = Nothing
+  , _fdDecorators = []
   , _fdIndents = Indents [] ()
   , _fdAsync = Nothing
   , _fdDefSpaces = pure Space
@@ -1556,7 +1549,7 @@ mkClassDef :: Raw Ident -> [Raw Line] -> Raw ClassDef
 mkClassDef name body =
   MkClassDef
   { _cdAnn = ()
-  , _cdDecorators = Nothing
+  , _cdDecorators = []
   , _cdIndents = Indents [] ()
   , _cdClass = Space :| []
   , _cdName = name
@@ -1577,7 +1570,7 @@ instance HasDecorators ClassDef where
     { _cdDecorators = exprsToDecorators (_cdIndents code) new
     }
 
-  getDecorators code = code ^.. cdDecorators._Just._Exprs
+  getDecorators code = code ^.. cdDecorators.folded._Exprs
 
 instance HasArguments ClassDef where
   setArguments args code =

@@ -137,30 +137,34 @@ correctInitialFinalQuotes qt = correctFinalQuotes . correctInitialQuotes
             else c : go (n+1 `mod` 3) cs
           else c : cs
 
-correctBlock :: Block v a -> Block v a
-correctBlock = correctSimpleStatements
+correctBlock :: Bool -> Block v a -> Block v a
+correctBlock isFinal = correctSimpleStatements isFinal
 
 -- | It's possible that successive 'SimpleStatement's have no newlines in between
 -- them. This would cause them to be displayed on the same line. In every line where
 -- this would be the case, we explicitly insert a line-feed character.
-correctSimpleStatements :: Block v a -> Block v a
-correctSimpleStatements (Block a b c) = Block a b' c'
+correctSimpleStatements :: Bool -> Block v a -> Block v a
+correctSimpleStatements isFinal (Block a b c) = Block a b' c'
   where
     Right b' :| c' = go (Right b) c
 
-    go x [] = x :| []
-    go x (y:ys) =
-      (case x of
-         Right s ->
-           Right $
-           case s of
-             SimpleStatement i a ->
-               SimpleStatement i $
-               case a of
-                 MkSimpleStatement l m n o Nothing ->
-                   MkSimpleStatement l m n o (Just LF)
-                 MkSimpleStatement l m n o (Just p) ->
-                   MkSimpleStatement l m n o (Just p)
-             CompoundStatement c -> CompoundStatement c
-         Left l -> Left l)
-      `NonEmpty.cons` go y ys
+    insertNewline x =
+      case x of
+        Left l -> Left l
+        Right s ->
+          Right $
+          case s of
+            SimpleStatement i a ->
+              SimpleStatement i $
+              case a of
+                MkSimpleStatement l m n o Nothing ->
+                  MkSimpleStatement l m n o (Just LF)
+                MkSimpleStatement l m n o (Just p) ->
+                  MkSimpleStatement l m n o (Just p)
+            CompoundStatement c -> CompoundStatement c
+
+    go x [] =
+      (if isFinal
+       then x
+       else insertNewline x) :| []
+    go x (y:ys) = insertNewline x `NonEmpty.cons` go y ys

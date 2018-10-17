@@ -18,6 +18,8 @@ module Language.Python.Internal.Render
   )
 where
 
+import Control.Lens.Cons (_init, _last)
+import Control.Lens.Fold (foldMapOf, folded)
 import Control.Lens.Review ((#))
 import Data.Bifoldable (bifoldMap)
 import Data.Char (ord)
@@ -25,10 +27,12 @@ import Data.Digit.Char (charHeXaDeCiMaL, charOctal)
 import Data.Digit.Hexadecimal.MixedCase (HeXDigit(..))
 import Data.DList (DList)
 import Data.Foldable (toList)
+import Data.Maybe (isNothing)
 import Data.Semigroup (Semigroup(..))
 import Data.Text (Text)
 
 import qualified Data.DList as DList
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
 import qualified Data.Text.Lazy as Lazy
 import qualified Data.Text.Lazy.Builder as Builder
@@ -939,8 +943,8 @@ renderSmallStatement (From _ ws1 name ws3 ns) =
 renderBlank :: Blank a -> RenderOutput
 renderBlank (Blank _ a b) = foldMap renderWhitespace a <> foldMap renderComment b
 
-renderBlock :: Block v a -> RenderOutput
-renderBlock bl =
+renderBlock :: Bool -> Block v a -> RenderOutput
+renderBlock isFinal bl =
   foldMap (bifoldMap renderBlank (singleton . renderNewline)) a <>
   renderStatement b <>
   foldMap
@@ -949,16 +953,16 @@ renderBlock bl =
       renderStatement)
     c
   where
-    Block a b c = correctBlock bl
+    Block a b c = correctBlock isFinal bl
 
-renderSuite :: Suite v a -> RenderOutput
-renderSuite (SuiteMany _ a b c d) =
+renderSuite :: Bool -> Suite v a -> RenderOutput
+renderSuite isFinal (SuiteMany _ a b c d) =
   TkColon () `cons`
   foldMap renderWhitespace a <>
   foldMap renderComment b <>
   singleton (renderNewline c) <>
-  renderBlock d
-renderSuite (SuiteOne _ a b) =
+  renderBlock isFinal d
+renderSuite _ (SuiteOne _ a b) =
   TkColon () `cons`
   foldMap renderWhitespace a <>
   renderSimpleStatement b
@@ -984,67 +988,85 @@ renderCompoundStatement (Fundef _ decos idnt asyncWs ws1 name ws2 params ws3 mty
   foldMap
     (\(ws, ty) -> TkRightArrow () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
     mty <>
-  renderSuite s
+  renderSuite True s
 renderCompoundStatement (If _ idnt ws1 expr s elifs body') =
   renderIndents idnt <>
   singleton (TkIf ()) <> foldMap renderWhitespace ws1 <>
   bracketTupleGenerator expr <>
-  renderSuite s <>
-  foldMap
+  renderSuite (null elifs && isNothing body') s <>
+  foldMapOf
+    (_init.folded)
     (\(idnt, ws4, ex, s) ->
         renderIndents idnt <>
         singleton (TkElif ()) <> foldMap renderWhitespace ws4 <>
         bracketTupleGenerator ex <>
-        renderSuite s)
+        renderSuite False s)
+    elifs <>
+  foldMapOf
+    _last
+    (\(idnt, ws4, ex, s) ->
+        renderIndents idnt <>
+        singleton (TkElif ()) <> foldMap renderWhitespace ws4 <>
+        bracketTupleGenerator ex <>
+        renderSuite (isNothing body') s)
     elifs <>
   foldMap
     (\(idnt, ws4, s) ->
         renderIndents idnt <>
         singleton (TkElse ()) <> foldMap renderWhitespace ws4 <>
-        renderSuite s)
+        renderSuite True s)
     body'
 renderCompoundStatement (While _ idnt ws1 expr s els) =
   renderIndents idnt <>
   singleton (TkWhile ()) <>
   foldMap renderWhitespace ws1 <>
   bracketTupleGenerator expr <>
-  renderSuite s <>
+  renderSuite (isNothing els) s <>
   foldMap
     (\(idnt, ws4, s) ->
         renderIndents idnt <>
         singleton (TkElse ()) <> foldMap renderWhitespace ws4 <>
-        renderSuite s)
+        renderSuite True s)
     els
 renderCompoundStatement (TryExcept _ idnt a s e f g) =
   renderIndents idnt <>
   singleton (TkTry ()) <> foldMap renderWhitespace a <>
-  renderSuite s <>
+  renderSuite (fEmpty && gEmpty) s <>
   foldMap
     (\(idnt, ws1, eas, s) ->
        renderIndents idnt <>
        singleton (TkExcept ()) <> foldMap renderWhitespace ws1 <>
        foldMap renderExceptAs eas <>
-       renderSuite s)
-    e <>
+       renderSuite False s)
+    (NonEmpty.init e) <>
+  (case NonEmpty.last e of
+     (idnt, ws1, eas, s) ->
+       renderIndents idnt <>
+       singleton (TkExcept ()) <> foldMap renderWhitespace ws1 <>
+       foldMap renderExceptAs eas <>
+       renderSuite (fEmpty && gEmpty) s) <>
   foldMap
     (\(idnt, ws1, s) ->
        renderIndents idnt <>
        singleton (TkElse ()) <> foldMap renderWhitespace ws1 <>
-       renderSuite s)
+       renderSuite gEmpty s)
     f <>
   foldMap
     (\(idnt, ws1, s) ->
        renderIndents idnt <>
        singleton (TkFinally ()) <> foldMap renderWhitespace ws1 <>
-       renderSuite s)
+       renderSuite True s)
     g
+  where
+    fEmpty = isNothing f
+    gEmpty = isNothing g
 renderCompoundStatement (TryFinally _ idnt a s idnt2 e s') =
   renderIndents idnt <>
   singleton (TkTry ()) <> foldMap renderWhitespace a <>
-  renderSuite s <>
+  renderSuite False s <>
   renderIndents idnt2 <>
   singleton (TkFinally ()) <> foldMap renderWhitespace e <>
-  renderSuite s'
+  renderSuite True s'
 renderCompoundStatement (For _ idnt asyncWs a b c d s h) =
   renderIndents idnt <>
   foldMap (\ws -> TkIdent "async" () `cons` foldMap renderWhitespace ws) asyncWs <>
@@ -1052,12 +1074,12 @@ renderCompoundStatement (For _ idnt asyncWs a b c d s h) =
   singleton (TkIn ()) <>
   foldMap renderWhitespace c <>
   renderCommaSep1' bracketTupleGenerator d <>
-  renderSuite s <>
+  renderSuite (isNothing h) s <>
   foldMap
     (\(idnt, x, s) ->
         renderIndents idnt <>
         singleton (TkElse ()) <> foldMap renderWhitespace x <>
-        renderSuite s)
+        renderSuite True s)
     h
 renderCompoundStatement (ClassDef _ decos idnt a b c s) =
   foldMap renderDecorator decos <>
@@ -1071,13 +1093,13 @@ renderCompoundStatement (ClassDef _ decos idnt a b c s) =
          foldMap renderArgs y) <>
       foldMap renderWhitespace z)
     c <>
-  renderSuite s
+  renderSuite True s
 renderCompoundStatement (With _ idnt asyncWs a b s) =
   renderIndents idnt <>
   foldMap (\ws -> TkIdent "async" () `cons` foldMap renderWhitespace ws) asyncWs <>
   singleton (TkWith ()) <> foldMap renderWhitespace a <>
   renderCommaSep1 renderWithItem b <>
-  renderSuite s
+  renderSuite True s
 
 renderWithItem :: WithItem v a -> RenderOutput
 renderWithItem (WithItem _ a b) =

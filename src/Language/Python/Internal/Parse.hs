@@ -1130,6 +1130,32 @@ decorator indentBefore =
   optional comment <*>
   eol
 
+decorators
+  :: MonadParsec e PyTokens m
+  => m (Indents SrcInfo)
+  -> Indents SrcInfo
+  -> m (Decorators SrcInfo)
+decorators pIndent indentBefore =
+  DecoratorsValue <$>
+  decorator indentBefore <*>
+  decorators'
+  where
+    decorators' =
+      Decorators'Value <$>
+      (decorator =<< try i) <*>
+      decorators'
+      <|>
+      Decorators'Blank <$>
+      many space <*>
+      optional comment <*>
+      eol <*>
+      decorators' <|>
+      pure Decorators'Empty
+
+    i =
+      pIndent <*
+      lookAhead (token space (\case; TkAt{} -> True; _ -> False) "@")
+
 compoundStatement
   :: MonadParsec e PyTokens m
   => m (Indents SrcInfo)
@@ -1141,21 +1167,17 @@ compoundStatement pIndent indentBefore =
   trySt <|>
   decorated <|>
   asyncSt <|>
-  classSt indentBefore [] <|>
-  fundef indentBefore Nothing [] <|>
+  classSt indentBefore Nothing <|>
+  fundef indentBefore Nothing Nothing <|>
   withSt Nothing <|>
   forSt Nothing
   where
     decorated = do
-      d <- decorator indentBefore
-      ds <-
-        many $
-        try (pIndent <* lookAhead (token space (\case; TkAt{} -> True; _ -> False) "@")) >>=
-        decorator
+      ds <- decorators pIndent indentBefore
       i <- pIndent
-      (do; a <- doAsync; fundef i (Just a) (d:ds)) <|>
-        fundef i Nothing (d:ds) <|>
-        classSt i (d:ds)
+      (do; a <- doAsync; fundef i (Just a) (Just ds)) <|>
+        fundef i Nothing (Just ds) <|>
+        classSt i (Just ds)
 
     classSt ib decs =
       (\(tk, s) a b c ->
@@ -1260,7 +1282,7 @@ compoundStatement pIndent indentBefore =
           (token space (\case; TkDef{} -> True; _ -> False) "def" <|>
            token space (\case; TkWith{} -> True; _ -> False) "with" <|>
            token space (\case; TkFor{} -> True; _ -> False) "for")
-      fundef indentBefore (Just a) [] <|>
+      fundef indentBefore (Just a) Nothing <|>
         withSt (Just a) <|>
         forSt (Just a)
 

@@ -26,6 +26,7 @@ module Language.Python.Validate.Syntax
   , validateCompoundStatementSyntax
   , validateComprehensionSyntax
   , validateDecoratorSyntax
+  , validateDecoratorsSyntax
   , validateDictItemSyntax
   , validateExceptAsSyntax
   , validateIdentSyntax
@@ -575,6 +576,30 @@ validateDecoratorSyntax (Decorator a b c d e f) =
     isDecoratorValue e | someDerefs e = pure $ unsafeCoerce e
     isDecoratorValue _ = errorVM1 (_MalformedDecorator # a)
 
+validateDecoratorsSyntax
+  :: forall e v a
+   . (AsSyntaxError e v a, Member Indentation v)
+  => Decorators v a
+  -> ValidateSyntax e (Decorators (Nub (Syntax ': v)) a)
+validateDecoratorsSyntax (DecoratorsValue a b) =
+  DecoratorsValue <$>
+  validateDecoratorSyntax a <*>
+  validateDecoratorsSyntax' b
+  where
+    validateDecoratorsSyntax'
+      :: forall e v a
+      . (AsSyntaxError e v a, Member Indentation v)
+      => Decorators' v a
+      -> ValidateSyntax e (Decorators' (Nub (Syntax ': v)) a)
+    validateDecoratorsSyntax' (Decorators'Value a b) =
+      Decorators'Value <$>
+      validateDecoratorSyntax a <*>
+      validateDecoratorsSyntax' b
+    validateDecoratorsSyntax' (Decorators'Blank a b c d) =
+      Decorators'Blank a b c <$>
+      validateDecoratorsSyntax' d
+    validateDecoratorsSyntax' Decorators'Empty = pure Decorators'Empty
+
 validateCompoundStatementSyntax
   :: forall e v a
    . ( AsSyntaxError e v a
@@ -587,7 +612,7 @@ validateCompoundStatementSyntax (Fundef a decos idnts asyncWs ws1 name ws2 param
     paramIdents = params ^.. folded.unvalidated.paramName.identValue
   in
     (\decos' -> Fundef a decos' idnts) <$>
-    traverse validateDecoratorSyntax decos <*>
+    traverse validateDecoratorsSyntax decos <*>
     traverse (validateWhitespace a) asyncWs <*>
     validateWhitespace a ws1 <*>
     validateIdentSyntax name <*>
@@ -662,7 +687,7 @@ validateCompoundStatementSyntax (TryFinally a idnts b e idnts2 f i) =
 validateCompoundStatementSyntax (ClassDef a decos idnts b c d g) =
   liftVM1 (local $ inLoop .~ False) $
   (\decos' -> ClassDef a decos' idnts) <$>
-  traverse validateDecoratorSyntax decos <*>
+  traverse validateDecoratorsSyntax decos <*>
   validateWhitespace a b <*>
   validateIdentSyntax c <*>
   traverse

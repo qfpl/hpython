@@ -6,7 +6,6 @@ passing @['line_' 'pass_']@
 -}
 
 {-# language DataKinds #-}
-{-# language GeneralizedNewtypeDeriving #-}
 {-# language MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 {-# language LambdaCase #-}
 {-# language RankNTypes #-}
@@ -580,21 +579,30 @@ class HasArguments s where
 class HasDecorators s where
   setDecorators :: [Raw Expr] -> Raw s -> Raw s
   getDecorators :: Raw s -> [Raw Expr]
-  decorators :: Lens' (Raw s) [Raw Decorator]
+  decorators :: Lens' (Raw s) (Maybe (Raw Decorators))
 
 decorated_ :: HasDecorators s => [Raw Expr] -> Raw s -> Raw s
 decorated_ = setDecorators
+
+exprsToDecorators :: Indents () -> [Raw Expr] -> Maybe (Raw Decorators)
+exprsToDecorators _ [] = Nothing
+exprsToDecorators is (e:es) =
+  Just $
+  DecoratorsValue (Decorator () is [] e Nothing LF) (exprsToDecorators' es)
+  where
+    exprsToDecorators' [] = Decorators'Empty
+    exprsToDecorators' (e':es') =
+      Decorators'Value (Decorator () is [] e' Nothing LF) (exprsToDecorators' es')
 
 instance HasDecorators Fundef where
   decorators = fdDecorators
 
   setDecorators new code =
     code
-    { _fdDecorators = (\e -> Decorator () (_fdIndents code) [] e Nothing LF) <$> new
+    { _fdDecorators = exprsToDecorators (_fdIndents code) new
     }
 
-  getDecorators code =
-    (\(Decorator () _ _ e _ _) -> e) <$> _fdDecorators code
+  getDecorators code = code ^.. fdDecorators._Just._Exprs
 
 mkSetBody
   :: HasIndents s
@@ -643,7 +651,7 @@ mkFundef :: Raw Ident -> [Raw Line] -> Raw Fundef
 mkFundef name body =
   MkFundef
   { _fdAnn = ()
-  , _fdDecorators = []
+  , _fdDecorators = Nothing
   , _fdIndents = Indents [] ()
   , _fdAsync = Nothing
   , _fdDefSpaces = pure Space
@@ -1548,7 +1556,7 @@ mkClassDef :: Raw Ident -> [Raw Line] -> Raw ClassDef
 mkClassDef name body =
   MkClassDef
   { _cdAnn = ()
-  , _cdDecorators = []
+  , _cdDecorators = Nothing
   , _cdIndents = Indents [] ()
   , _cdClass = Space :| []
   , _cdName = name
@@ -1566,11 +1574,10 @@ instance HasDecorators ClassDef where
 
   setDecorators new code =
     code
-    { _cdDecorators = (\e -> Decorator () (_cdIndents code) [] e Nothing LF) <$> new
+    { _cdDecorators = exprsToDecorators (_cdIndents code) new
     }
 
-  getDecorators code =
-    (\(Decorator () _ _ e _ _) -> e) <$> _cdDecorators code
+  getDecorators code = code ^.. cdDecorators._Just._Exprs
 
 instance HasArguments ClassDef where
   setArguments args code =

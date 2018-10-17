@@ -19,7 +19,7 @@ import Language.Python.Syntax
 -- Written without the DSL
 append_to =
   CompoundStatement $
-  Fundef () [] (Indents [] ())
+  Fundef () Nothing (Indents [] ())
     Nothing
     (Space :| [])
     "append_to"

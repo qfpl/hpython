@@ -15,6 +15,7 @@ module Language.Python.Validate.Indentation
   , validateBlockIndentation
   , validateCompoundStatementIndentation
   , validateDecoratorIndentation
+  , validateDecoratorsIndentation
   , validateExceptAsIndentation
   , validateParamsIndentation
   , validateSuiteIndentation
@@ -123,6 +124,15 @@ equivalentIndentation (x:xs) (y:ys) =
     (Continued _ _, Continued _ _) -> True
     _ -> False
 
+checkBlankIndents
+  :: AsIndentationError e v a
+  => (a, [Whitespace], Maybe (Comment a), Newline)
+  -> ValidateIndentation e (a, [Whitespace], Maybe (Comment a), Newline)
+checkBlankIndents (a, b, c, d) =
+  if any (\case; Continued{} -> True; _ -> False) b
+  then errorVM1 $ _EmptyContinuedLine # a
+  else pure (a, b, c, d)
+
 validateBlockIndentation
   :: forall e v a.
      AsIndentationError e v a
@@ -136,16 +146,19 @@ validateBlockIndentation (Block x b bs) =
   traverseOf _head checkBlankIndents x <*>
   go False (Right b) bs
   where
-    checkBlankIndents
-      :: (a, [Whitespace], Maybe (Comment a), Newline)
-      -> ValidateIndentation e (a, [Whitespace], Maybe (Comment a), Newline)
-    checkBlankIndents (a, b, c, d) =
-      if any (\case; Continued{} -> True; _ -> False) b
-      then errorVM1 $ _EmptyContinuedLine # a
-      else pure (a, b, c, d)
-
     is = (Right b:|bs) ^?! folded._Right.unvalidated._Indents.indentsValue
 
+    go
+      :: Bool
+      -> Either
+           (a, [Whitespace], Maybe (Comment a), Newline)
+           (Statement v a)
+      -> [Either (a, [Whitespace], Maybe (Comment a), Newline) (Statement v a)]
+      -> ValidateIndentation e
+         (NonEmpty
+            (Either
+               (a, [Whitespace], Maybe (Comment a), Newline)
+               (Statement (Nub (Indentation ': v)) a)))
     go flag (Left e) rest =
         case rest of
           [] -> pure . Left <$> checkBlankIndents e
@@ -208,6 +221,30 @@ validateDecoratorIndentation (Decorator a b c d e f) =
   (\b' -> Decorator a b' c (unsafeCoerce d) e f) <$>
   checkIndent b
 
+validateDecoratorsIndentation
+  :: forall e v a
+   . AsIndentationError e v a
+  => Decorators v a
+  -> ValidateIndentation e (Decorators (Nub (Indentation ': v)) a)
+validateDecoratorsIndentation (DecoratorsValue a b) =
+  DecoratorsValue <$>
+  validateDecoratorIndentation a <*>
+  validateDecoratorsIndentation' b
+  where
+    validateDecoratorsIndentation'
+      :: forall e v a
+      . AsIndentationError e v a
+      => Decorators' v a
+      -> ValidateIndentation e (Decorators' (Nub (Indentation ': v)) a)
+    validateDecoratorsIndentation' (Decorators'Value a b) =
+      Decorators'Value <$>
+      validateDecoratorIndentation a <*>
+      validateDecoratorsIndentation' b
+    validateDecoratorsIndentation' (Decorators'Blank a b c d) =
+      Decorators'Blank a b c <$>
+      validateDecoratorsIndentation' d
+    validateDecoratorsIndentation' Decorators'Empty = pure Decorators'Empty
+
 validateCompoundStatementIndentation
   :: forall e v a
    . AsIndentationError e v a
@@ -216,7 +253,7 @@ validateCompoundStatementIndentation
 validateCompoundStatementIndentation (Fundef a decos idnt asyncWs ws1 name ws2 params ws3 mty s) =
   (\decos' idnt' params' ->
      Fundef a decos' idnt' asyncWs ws1 (coerce name) ws2 params' ws3 (unsafeCoerce mty)) <$>
-  traverse validateDecoratorIndentation decos <*>
+  traverse validateDecoratorsIndentation decos <*>
   checkIndent idnt <*>
   validateParamsIndentation params <*>
   validateSuiteIndentation idnt s
@@ -307,7 +344,7 @@ validateCompoundStatementIndentation (For a idnt asyncWs b c d e h i) =
 validateCompoundStatementIndentation (ClassDef a decos idnt b c d e) =
   (\decos' idnt' ->
      ClassDef @(Nub (Indentation ': v)) a decos' idnt' b (coerce c) (unsafeCoerce d)) <$>
-  traverse validateDecoratorIndentation decos <*>
+  traverse validateDecoratorsIndentation decos <*>
   checkIndent idnt <*>
   validateSuiteIndentation idnt e
 validateCompoundStatementIndentation (With a idnt asyncWs b c d) =

@@ -244,6 +244,23 @@ noIndents f s = f $ s & _Indents.indentsValue .~ []
 class HasIndents s where
   _Indents :: Traversal' (s '[] a) (Indents a)
 
+instance HasIndents Decorators where
+  _Indents f (DecoratorsValue a b) =
+    DecoratorsValue <$>
+    _Indents f a <*>
+    _Indents f b
+
+instance HasIndents Decorators' where
+  _Indents f = go
+    where
+      go Decorators'Empty = pure Decorators'Empty
+      go (Decorators'Blank a b c d) =
+        Decorators'Blank a b c <$> go d
+      go (Decorators'Value a b) =
+        Decorators'Value <$>
+        _Indents f a <*>
+        go b
+
 instance HasIndents Fundef where
   _Indents fun (MkFundef a b c d e f g h i j k) =
     (\b' c' -> MkFundef a b' c' d e f g h i j) <$>
@@ -348,7 +365,7 @@ instance HasIndents CompoundStatement where
     case s of
       Fundef a decos idnt asyncWs b c d e f g h ->
         (\decos' idnt' -> Fundef a decos' idnt' asyncWs b c d e f g) <$>
-        traverse (_Indents fun) decos <*>
+        (traverse._Indents) fun decos <*>
         fun idnt <*>
         _Indents fun h
       If a idnt b c d elifs e ->
@@ -439,6 +456,25 @@ instance HasNewlines Suite where
   _Newlines fun (SuiteOne a b c) = SuiteOne a b <$> _Newlines fun c
   _Newlines f (SuiteMany a b c d e) = SuiteMany a b c <$> f d <*> _Newlines f e
 
+instance HasNewlines Decorators where
+  _Newlines f (DecoratorsValue a b) =
+    DecoratorsValue <$>
+    _Newlines f a <*>
+    _Newlines f b
+
+instance HasNewlines Decorators' where
+  _Newlines f = go
+    where
+      go Decorators'Empty = pure Decorators'Empty
+      go (Decorators'Blank a b c d) =
+        Decorators'Blank a b <$>
+        f c <*>
+        go d
+      go (Decorators'Value a b) =
+        Decorators'Value <$>
+        _Newlines f a <*>
+        go b
+
 instance HasNewlines Decorator where
   _Newlines fun (Decorator a b c d e f) =
     Decorator a b c d e <$> fun f
@@ -448,7 +484,7 @@ instance HasNewlines CompoundStatement where
     case s of
       Fundef ann decos idnt asyncWs ws1 name ws2 params ws3 mty s ->
         (\decos' -> Fundef ann decos' idnt asyncWs ws1 name ws2 params ws3 mty) <$>
-        traverse (_Newlines fun) decos <*>
+        (traverse._Newlines) fun decos <*>
         _Newlines fun s
       If idnt ann ws1 cond s elifs els ->
         If idnt ann ws1 cond <$>

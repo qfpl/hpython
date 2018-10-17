@@ -42,7 +42,7 @@ prop_syntax_2 =
       e :: Statement '[] ()
       e =
         CompoundStatement .
-        Fundef () []
+        Fundef () Nothing
           (Indents mempty ())
           Nothing
           (pure Space)

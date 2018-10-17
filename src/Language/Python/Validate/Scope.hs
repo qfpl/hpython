@@ -26,6 +26,7 @@ module Language.Python.Validate.Scope
   , validateCompoundStatementScope
   , validateComprehensionScope
   , validateDecoratorScope
+  , validateDecoratorsScope
   , validateDictItemScope
   , validateExceptAsScope
   , validateIdentScope
@@ -179,6 +180,30 @@ validateDecoratorScope (Decorator a b c d e f) =
   (\d' -> Decorator a b c d' e f) <$>
   validateExprScope d
 
+validateDecoratorsScope
+  :: forall e v a
+   . AsScopeError e v a
+  => Decorators v a
+  -> ValidateScope a e (Decorators (Nub (Scope ': v)) a)
+validateDecoratorsScope (DecoratorsValue a b) =
+  DecoratorsValue <$>
+  validateDecoratorScope a <*>
+  validateDecoratorsScope' b
+  where
+    validateDecoratorsScope'
+      :: forall e v a
+      . AsScopeError e v a
+      => Decorators' v a
+      -> ValidateScope a e (Decorators' (Nub (Scope ': v)) a)
+    validateDecoratorsScope' (Decorators'Value a b) =
+      Decorators'Value <$>
+      validateDecoratorScope a <*>
+      validateDecoratorsScope' b
+    validateDecoratorsScope' (Decorators'Blank a b c d) =
+      Decorators'Blank a b c <$>
+      validateDecoratorsScope' d
+    validateDecoratorsScope' Decorators'Empty = pure Decorators'Empty
+
 validateCompoundStatementScope
   :: forall e v a
    . AsScopeError e v a
@@ -188,7 +213,7 @@ validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params
   (locallyOver scLocalScope (const Map.empty) $
    locallyOver scImmediateScope (const Map.empty) $
      (\decos' -> Fundef a decos' idnts asyncWs ws1 (coerce name) ws2) <$>
-     traverse validateDecoratorScope decos <*>
+     traverse validateDecoratorsScope decos <*>
      traverse validateParamScope params <*>
      pure ws3 <*>
      traverseOf (traverse._2) validateExprScope mty <*>
@@ -274,7 +299,7 @@ validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
     traverseOf (traverse._3) validateSuiteScope i))
 validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
   (\decos' -> ClassDef @(Nub (Scope ': v)) a decos' idnts b (coerce c)) <$>
-  traverse validateDecoratorScope decos <*>
+  traverse validateDecoratorsScope decos <*>
   traverseOf (traverse._2.traverse.traverse) validateArgScope d <*>
   validateSuiteScope g <*
   extendScope scImmediateScope [c ^. to (_identAnn &&& _identValue)]

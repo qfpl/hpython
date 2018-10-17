@@ -53,7 +53,7 @@ data Statement a
 data CompoundStatement a
   = Fundef
   { _csAnn :: a
-  , _unsafeCsFundefDecorators :: [Decorator a]
+  , _unsafeCsFundefDecorators :: Maybe (Decorators a)
   , _csIndents :: Indents a
   , _unsafeCsFundefAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
   , _unsafeCsFundefDef :: NonEmpty Whitespace -- ^ @\'def\' \<spaces\>@
@@ -113,7 +113,7 @@ data CompoundStatement a
   }
   | ClassDef
   { _csAnn :: a
-  , _unsafeCsClassDefDecorators :: [Decorator a]
+  , _unsafeCsClassDefDecorators :: Maybe (Decorators a)
   , _csIndents :: Indents a
   , _unsafeCsClassDefClass :: NonEmpty Whitespace -- ^ @\'class\' \<spaces\>@
   , _unsafeCsClassDefName :: Ident '[] a -- ^ @\<ident\>@
@@ -601,6 +601,16 @@ data Decorator a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+data Decorators' a
+  = Decorators'Empty
+  | Decorators'Blank [Whitespace] (Maybe (Comment a)) Newline (Decorators' a)
+  | Decorators'Value (Decorator a) (Decorators' a)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+data Decorators a
+  = DecoratorsValue (Decorator a) (Decorators' a)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
 data ExceptAs a
   = ExceptAs
   { _exceptAsAnn :: a
@@ -724,10 +734,32 @@ fromIR_arg a =
     StarArg a b c -> Syntax.StarArg a b <$> fromIR_expr c
     DoubleStarArg a b c -> Syntax.DoubleStarArg a b <$> fromIR_expr c
 
-fromIR_decorator :: Decorator a -> Validation (NonEmpty (IRError a)) (Syntax.Decorator '[] a)
+fromIR_decorator
+  :: Decorator a
+  -> Validation (NonEmpty (IRError a)) (Syntax.Decorator '[] a)
 fromIR_decorator (Decorator a b c d e f) =
   (\d' -> Syntax.Decorator a b c d' e f) <$>
   fromIR_expr d
+
+fromIR_decorators
+  :: Decorators a
+  -> Validation (NonEmpty (IRError a)) (Syntax.Decorators '[] a)
+fromIR_decorators (DecoratorsValue a b) =
+  Syntax.DecoratorsValue <$>
+  fromIR_decorator a <*>
+  fromIR_decorators' b
+  where
+    fromIR_decorators'
+      :: Decorators' a
+      -> Validation (NonEmpty (IRError a)) (Syntax.Decorators' '[] a)
+    fromIR_decorators' Decorators'Empty = pure Syntax.Decorators'Empty
+    fromIR_decorators' (Decorators'Blank a b c d) =
+      Syntax.Decorators'Blank a b c <$>
+      fromIR_decorators' d
+    fromIR_decorators' (Decorators'Value a b) =
+      Syntax.Decorators'Value <$>
+      fromIR_decorator a <*>
+      fromIR_decorators' b
 
 fromIR_exceptAs :: ExceptAs a -> Validation (NonEmpty (IRError a)) (Syntax.ExceptAs '[] a)
 fromIR_exceptAs (ExceptAs a b c) =
@@ -842,7 +874,7 @@ fromIR_compoundStatement st =
   case st of
     Fundef a b asyncWs c d e f g h i j ->
       (\b' g' i' -> Syntax.Fundef a b' asyncWs c d e f g' h i') <$>
-      traverse fromIR_decorator b <*>
+      traverse fromIR_decorators b <*>
       traverse fromIR_param g <*>
       traverseOf (traverse._2) fromIR_expr i <*>
       fromIR_suite j
@@ -875,7 +907,7 @@ fromIR_compoundStatement st =
       traverseOf (traverse._3) fromIR_suite h
     ClassDef a b c d e f g ->
       (\b' -> Syntax.ClassDef a b' c d e) <$>
-      traverse fromIR_decorator b <*>
+      traverse fromIR_decorators b <*>
       traverseOf (traverse._2.traverse.traverse) fromIR_arg f <*>
       fromIR_suite g
     With a b asyncWs c d e ->

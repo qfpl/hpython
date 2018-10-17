@@ -352,6 +352,22 @@ genDecorator =
   Gen.maybe genComment <*>
   genNewline
 
+genDecorators :: MonadGen m => m (Decorators '[] ())
+genDecorators =
+  sized2 DecoratorsValue genDecorator genDecorators'
+  where
+    genDecorators' :: MonadGen m => m (Decorators' '[] ())
+    genDecorators' =
+      sizedRecursive
+        [ pure Decorators'Empty ]
+        [ Decorators'Blank <$>
+          genWhitespaces <*>
+          Gen.maybe genComment <*>
+          genNewline <*>
+          genDecorators'
+        , sized2 Decorators'Value genDecorator genDecorators'
+        ]
+
 genCompoundStatement
   :: MonadGen m
   => m (CompoundStatement '[] ())
@@ -364,7 +380,7 @@ genCompoundStatement =
            genWhitespaces1 <*> genIdent <*>
            genWhitespaces <*> pure b <*>
            genWhitespaces <*> pure c <*> pure d)
-        (sizedList genDecorator)
+        (sizedMaybe genDecorators)
         (genSizedCommaSep $ genParam genExpr)
         (sizedMaybe $ (,) <$> genWhitespaces <*> genExpr)
         (genSuite genSmallStatement genBlock)
@@ -429,7 +445,7 @@ genCompoundStatement =
            ClassDef () a <$> genIndents <*> genWhitespaces1 <*> genIdent <*>
            Gen.maybe ((,,) <$> genWhitespaces <*> pure b <*> genWhitespaces) <*>
            pure c)
-        (sizedList genDecorator)
+        (sizedMaybe genDecorators)
         (sizedMaybe $ genSizedCommaSep1' $ genArg genExpr)
         (genSuite genSmallStatement genBlock)
     , sized4M

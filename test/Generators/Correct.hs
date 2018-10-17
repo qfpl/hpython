@@ -740,6 +740,22 @@ genDecorator =
         genIdent
       ]
 
+genDecorators :: (MonadGen m, MonadState GenState m) => m (Decorators '[] ())
+genDecorators =
+  sized2 DecoratorsValue genDecorator genDecorators'
+  where
+    genDecorators' :: (MonadGen m, MonadState GenState m) => m (Decorators' '[] ())
+    genDecorators' =
+      sizedRecursive
+        [ pure Decorators'Empty ]
+        [ Decorators'Blank <$>
+          genWhitespaces <*>
+          Gen.maybe genComment <*>
+          genNewline <*>
+          genDecorators'
+        , sized2 Decorators'Value genDecorator genDecorators'
+        ]
+
 genCompoundStatement
   :: (HasCallStack, MonadGen m, MonadState GenState m)
   => m (CompoundStatement '[] ())
@@ -766,7 +782,7 @@ genCompoundStatement =
                    }
                  genSuite genSmallStatement genBlock) $
               \b ->
-            sizedBind (sizedList genDecorator) $ \c ->
+            sizedBind (sizedMaybe genDecorators) $ \c ->
             sizedBind (sizedMaybe $ (,) <$> genWhitespaces <*> genExpr) $ \d ->
             Fundef () c <$>
               use currentIndentation <*>
@@ -898,7 +914,7 @@ genCompoundStatement =
             genWhitespaces1 <*> genIdent <*>
             pure b <*>
             pure c)
-          (sizedList genDecorator)
+          (sizedMaybe genDecorators)
           (sizedMaybe $
              (,,) <$>
              genWhitespaces <*>

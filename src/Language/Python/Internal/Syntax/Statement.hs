@@ -35,6 +35,7 @@ import Language.Python.Internal.Syntax.ModuleNames
 import Language.Python.Internal.Syntax.Whitespace
 
 -- See note [unsafeCoerce Validation] in Language.Python.Internal.Syntax.Expr
+instance Validated Decorators where; unvalidated = to unsafeCoerce
 instance Validated Statement where; unvalidated = to unsafeCoerce
 instance Validated SimpleStatement where; unvalidated = to unsafeCoerce
 instance Validated SmallStatement where; unvalidated = to unsafeCoerce
@@ -299,10 +300,38 @@ data Decorator (v :: [*]) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+data Decorators' (v :: [*]) a
+  = Decorators'Empty
+  | Decorators'Blank [Whitespace] (Maybe (Comment a)) Newline (Decorators' v a)
+  | Decorators'Value (Decorator v a) (Decorators' v a)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+data Decorators (v :: [*]) a
+  = DecoratorsValue (Decorator v a) (Decorators' v a)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasExprs Decorators where
+  _Exprs f (DecoratorsValue a b) =
+    DecoratorsValue <$>
+    _Exprs f a <*>
+    _Exprs f b
+
+instance HasExprs Decorators' where
+  _Exprs f = go
+    where
+      go Decorators'Empty = pure Decorators'Empty
+      go (Decorators'Blank a b c d) =
+        Decorators'Blank a b c <$>
+        go d
+      go (Decorators'Value a b) =
+        Decorators'Value <$>
+        _Exprs f a <*>
+        go b
+
 data CompoundStatement (v :: [*]) a
   = Fundef
   { _csAnn :: a
-  , _unsafeCsFundefDecorators :: [Decorator v a]
+  , _unsafeCsFundefDecorators :: Maybe (Decorators v a)
   , _csIndents :: Indents a
   , _unsafeCsFundefAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
   , _unsafeCsFundefDef :: NonEmpty Whitespace -- ^ @\'def\' \<spaces\>@
@@ -362,7 +391,7 @@ data CompoundStatement (v :: [*]) a
   }
   | ClassDef
   { _csAnn :: a
-  , _unsafeCsClassDefDecorators :: [Decorator v a]
+  , _unsafeCsClassDefDecorators :: Maybe (Decorators v a)
   , _csIndents :: Indents a
   , _unsafeCsClassDefClass :: NonEmpty Whitespace -- ^ @\'class\' \<spaces\>@
   , _unsafeCsClassDefName :: Ident v a -- ^ @\<ident\>@
@@ -399,7 +428,7 @@ instance HasExprs Decorator where
 instance HasExprs CompoundStatement where
   _Exprs f (Fundef a decos idnt asyncWs ws1 name ws2 params ws3 mty s) =
     Fundef a <$>
-    traverse (_Exprs f) decos <*>
+    (traverse._Exprs) f decos <*>
     pure idnt <*>
     pure asyncWs <*>
     pure ws1 <*>

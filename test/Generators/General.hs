@@ -14,6 +14,9 @@ import Language.Python.Internal.Syntax
 import Generators.Common
 import Generators.Sized
 
+genBlank :: MonadGen m => m (Blank ())
+genBlank = Blank () <$> genWhitespaces <*> Gen.maybe genComment
+
 genTuple :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
 genTuple expr =
   Tuple () <$>
@@ -95,12 +98,12 @@ genBlock =
   Block <$>
   Gen.list
     (Range.constant 0 10)
-    ((,,,) () <$> genWhitespaces <*> Gen.maybe genComment <*> genNewline) <*>
+    ((,) <$> genBlank <*> genNewline) <*>
   genStatement <*>
   sizedList
     (Gen.choice
      [ Right <$> genStatement
-     , fmap Left $ (,,,) () <$> genWhitespaces <*> Gen.maybe genComment <*> genNewline
+     , fmap Left $ (,) <$> genBlank <*> genNewline
      ])
 
 genCompFor :: MonadGen m => m (CompFor '[] ())
@@ -361,8 +364,7 @@ genDecorators =
       sizedRecursive
         [ pure Decorators'Empty ]
         [ Decorators'Blank <$>
-          genWhitespaces <*>
-          Gen.maybe genComment <*>
+          genBlank <*>
           genNewline <*>
           genDecorators'
         , sized2 Decorators'Value genDecorator genDecorators'
@@ -491,11 +493,10 @@ genModule :: MonadGen m => m (Module '[] ())
 genModule =
   sizedRecursive
     [ pure ModuleEmpty
-    , ModuleBlankFinal () <$> genWhitespaces <*> Gen.maybe genComment
+    , ModuleBlankFinal <$> genBlank
     ]
-    [ ModuleBlank () <$>
-      genWhitespaces <*>
-      Gen.maybe genComment <*>
+    [ ModuleBlank <$>
+      genBlank <*>
       genNewline <*>
       genModule
     , sized2

@@ -17,6 +17,7 @@ import Language.Python.Syntax
 -- @
 --
 -- Written without the DSL
+append_to :: Raw Statement
 append_to =
   CompoundStatement $
   Fundef () Nothing (Indents [] ())
@@ -64,6 +65,7 @@ append_to =
 -- @
 --
 -- Written with the DSL
+append_to' :: Raw Statement
 append_to' =
   def_ "append_to" [ p_ "element", k_ "to" (list_ []) ]
     [ line_ $ call_ ("to" /> "append") [ "element" ]
@@ -80,6 +82,7 @@ append_to' =
 --       go(n-1, n*acc)
 --   return go(n, 1)
 -- @
+fact_tr :: Raw Statement
 fact_tr =
   def_ "fact" [p_ "n"]
   [ line_ $
@@ -96,6 +99,7 @@ fact_tr =
 -- def spin():
 --   spin()
 -- @
+spin :: Raw Statement
 spin = def_ "spin" [] [line_ $ call_ "spin" []]
 
 -- |
@@ -104,23 +108,25 @@ spin = def_ "spin" [] [line_ $ call_ "spin" []]
 --   print("yes")
 --   yes()
 -- @
+yes :: Raw Statement
 yes =
   def_ "yes" []
   [ line_ $ call_ "print" [p_ $ str_ "yes"]
   , line_ $ call_ "yes" []
   ]
 
+everything :: Raw Module
 everything =
   ModuleStatement append_to $
-  ModuleBlank () [] Nothing LF $
+  ModuleBlank (Blank () [] Nothing) LF $
 
   ModuleStatement append_to' $
-  ModuleBlank () [] Nothing LF $
+  ModuleBlank (Blank () [] Nothing) LF $
 
   ModuleStatement fact_tr $
-  ModuleBlank () [] Nothing LF $
+  ModuleBlank (Blank () [] Nothing) LF $
 
   ModuleStatement spin $
-  ModuleBlank () [] Nothing LF $
+  ModuleBlank (Blank () [] Nothing) LF $
 
   ModuleStatement yes ModuleEmpty

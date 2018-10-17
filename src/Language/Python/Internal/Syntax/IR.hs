@@ -10,7 +10,7 @@ import Control.Lens.Lens (Lens', lens)
 import Control.Lens.Setter ((.~), over, mapped)
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (traverseOf)
-import Control.Lens.Tuple (_2, _3)
+import Control.Lens.Tuple (_1, _2, _3)
 import Data.Bifoldable (bifoldMap)
 import Data.Bifunctor (bimap)
 import Data.Bitraversable (bitraverse)
@@ -548,39 +548,30 @@ data Suite a
 
 data Block a
   = Block
-  { _blockBlankLines :: [(a, [Whitespace], Maybe (Comment a), Newline)]
+  { _blockBlankLines :: [(Blank a, Newline)]
   , _blockHead :: Statement a
-  , _blockTail
-    :: [Either (a, [Whitespace], Maybe (Comment a), Newline) (Statement a)]
+  , _blockTail :: [Either (Blank a, Newline) (Statement a)]
   } deriving (Eq, Show)
 
 instance Functor Block where
   fmap f (Block a b c) =
     Block
-      ((\(w, x, y, z) -> (f w, x, over (mapped.mapped) f y, z)) <$> a)
+      (over (mapped._1.mapped) f a)
       (fmap f b)
-      (bimap (\(w, x, y, z) -> (f w, x, over (mapped.mapped) f y, z)) (fmap f) <$> c)
+      (bimap (over (_1.mapped) f) (fmap f) <$> c)
 
 instance Foldable Block where
   foldMap f (Block a b c) =
-    foldMap (\(w, _, y, _) -> f w <> foldMapOf (folded.folded) f y) a <>
+    foldMapOf (folded._1.folded) f a <>
     foldMap f b <>
-    foldMap
-      (bifoldMap (\(w, _, y, _) -> f w <> foldMapOf (folded.folded) f y) (foldMap f))
-      c
+    foldMap (bifoldMap (foldMapOf (_1.folded) f) (foldMap f)) c
 
 instance Traversable Block where
   traverse f (Block a b c) =
     Block <$>
-    traverse
-      (\(w, x, y, z) -> (\w' y' -> (w', x, y', z)) <$> f w <*> traverseOf (traverse.traverse) f y)
-      a <*>
+    traverseOf (traverse._1.traverse) f a <*>
     traverse f b <*>
-    traverse
-      (bitraverse
-         (\(w, x, y, z) -> (\w' y' -> (w', x, y', z)) <$> f w <*> traverseOf (traverse.traverse) f y)
-         (traverse f))
-      c
+    traverse (bitraverse (traverseOf (_1.traverse) f) (traverse f)) c
 
 data WithItem a
   = WithItem
@@ -603,7 +594,7 @@ data Decorator a
 
 data Decorators' a
   = Decorators'Empty
-  | Decorators'Blank [Whitespace] (Maybe (Comment a)) Newline (Decorators' a)
+  | Decorators'Blank (Blank a) Newline (Decorators' a)
   | Decorators'Value (Decorator a) (Decorators' a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -621,8 +612,8 @@ data ExceptAs a
 
 data Module a
   = ModuleEmpty
-  | ModuleBlankFinal a [Whitespace] (Maybe (Comment a))
-  | ModuleBlank a [Whitespace] (Maybe (Comment a)) Newline (Module a)
+  | ModuleBlankFinal (Blank a)
+  | ModuleBlank (Blank a) Newline (Module a)
   | ModuleStatement (Statement a) (Module a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -753,9 +744,9 @@ fromIR_decorators (DecoratorsValue a b) =
       :: Decorators' a
       -> Validation (NonEmpty (IRError a)) (Syntax.Decorators' '[] a)
     fromIR_decorators' Decorators'Empty = pure Syntax.Decorators'Empty
-    fromIR_decorators' (Decorators'Blank a b c d) =
-      Syntax.Decorators'Blank a b c <$>
-      fromIR_decorators' d
+    fromIR_decorators' (Decorators'Blank a b c) =
+      Syntax.Decorators'Blank a b <$>
+      fromIR_decorators' c
     fromIR_decorators' (Decorators'Value a b) =
       Syntax.Decorators'Value <$>
       fromIR_decorator a <*>
@@ -948,6 +939,6 @@ fromIR_setItem e = (\x -> Syntax.SetItem (x ^. Syntax.exprAnn) x) <$> fromIR_exp
 
 fromIR :: Module a -> Validation (NonEmpty (IRError a)) (Syntax.Module '[] a)
 fromIR ModuleEmpty = pure Syntax.ModuleEmpty
-fromIR (ModuleBlankFinal a b c) = pure $ Syntax.ModuleBlankFinal a b c
-fromIR (ModuleBlank a b c d e) = Syntax.ModuleBlank a b c d <$> fromIR e
+fromIR (ModuleBlankFinal a) = pure $ Syntax.ModuleBlankFinal a
+fromIR (ModuleBlank a b c) = Syntax.ModuleBlank a b <$> fromIR c
 fromIR (ModuleStatement a b) = Syntax.ModuleStatement <$> fromIR_statement a <*> fromIR b

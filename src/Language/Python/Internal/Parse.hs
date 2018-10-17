@@ -934,6 +934,17 @@ statement pIndent indentBefore =
   CompoundStatement <$> compoundStatement pIndent indentBefore <|>
   SimpleStatement indentBefore <$> simpleStatement
 
+blank :: MonadParsec e PyTokens m => m (Blank SrcInfo)
+blank =
+  withSrcInfo $
+  (\b c a -> Blank a b c) <$>
+  some space <*>
+  optional comment
+
+  <|>
+
+  (\b a -> Blank a [] b) <$> optional comment
+
 suite :: MonadParsec e PyTokens m => m (Suite SrcInfo)
 suite =
   (\(tk, s) ->
@@ -950,24 +961,14 @@ suite =
     optional comment <*>
     eol <*>
     (Block <$>
-     many commentOrEmpty <*>
+     many ((,) <$> blank <*> eol) <*>
      (statement level =<< indent) <*>
      many (line level)) <*
     dedent))
   where
-    commentOrEmpty =
-      withSrcInfo $
-      (\b c d a -> (a, b, c, d)) <$>
-      some space <*>
-      optional comment <*>
-      eol
-
-      <|>
-
-      (\b c a -> (a, [], b, c)) <$> optional comment <*> eol
 
     line i =
-      Left <$> commentOrEmpty <|>
+      Left <$> ((,) <$> blank <*> eol) <|>
       Right <$> (statement level =<< i)
 
 comma :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, [Whitespace])
@@ -1146,8 +1147,7 @@ decorators pIndent indentBefore =
       decorators'
       <|>
       Decorators'Blank <$>
-      many space <*>
-      optional comment <*>
+      blank <*>
       eol <*>
       decorators' <|>
       pure Decorators'Empty
@@ -1349,14 +1349,12 @@ module_ =
 
   <|>
 
-  withSrcInfo
-  ((\ws rest a ->
-      case rest of
-        Left (cmt, nl, md) -> ModuleBlank a ws cmt nl md
-        Right cmt -> ModuleBlankFinal a ws cmt) <$>
-   many space <*>
-   (Left <$> ((,,) <$> optional comment <*> newline <*> module_) <|>
-    Right <$> optional comment <* eof))
+  (\bl rest ->
+     case rest of
+       Left (nl, md) -> ModuleBlank bl nl md
+       Right{} -> ModuleBlankFinal bl) <$>
+  blank <*>
+  (Left <$> ((,) <$> newline <*> module_) <|> Right <$> eof)
 
   <|>
 

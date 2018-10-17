@@ -366,12 +366,12 @@ id_ = fromString
 -- | One or more lines of Python code
 newtype Line v a
   = Line
-  { unLine :: Either (a, [Whitespace], Maybe (Comment a), Newline) (Statement v a)
+  { unLine :: Either (Blank a, Newline) (Statement v a)
   } deriving (Eq, Show)
 
 -- | Create a blank 'Line'
 blank_ :: Raw Line
-blank_ = Line $ Left ((), [], Nothing, LF)
+blank_ = Line $ Left (Blank () [] Nothing, LF)
 
 -- | Convert some data to a 'Line'
 class AsLine s where

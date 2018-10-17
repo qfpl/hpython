@@ -8,7 +8,7 @@ import Control.Lens.Getter ((^.), view)
 import Control.Lens.Iso (Iso', iso, from)
 import Control.Lens.Setter ((.~))
 import Control.Lens.Traversal (Traversal, Traversal', traverseOf)
-import Control.Lens.Tuple (_3, _4)
+import Control.Lens.Tuple (_2, _3, _4)
 import Control.Lens.Prism (Prism, _Right, prism)
 import Data.Coerce (coerce)
 import Data.Function ((&))
@@ -254,8 +254,8 @@ instance HasIndents Decorators' where
   _Indents f = go
     where
       go Decorators'Empty = pure Decorators'Empty
-      go (Decorators'Blank a b c d) =
-        Decorators'Blank a b c <$> go d
+      go (Decorators'Blank a b c) =
+        Decorators'Blank a b <$> go c
       go (Decorators'Value a b) =
         Decorators'Value <$>
         _Indents f a <*>
@@ -448,7 +448,7 @@ class HasNewlines s where
 instance HasNewlines Block where
   _Newlines f (Block a b c) =
     Block <$>
-    (traverse._4) f a <*>
+    (traverse._2) f a <*>
     _Newlines f b <*>
     (traverse._Right._Newlines) f c
 
@@ -466,10 +466,10 @@ instance HasNewlines Decorators' where
   _Newlines f = go
     where
       go Decorators'Empty = pure Decorators'Empty
-      go (Decorators'Blank a b c d) =
-        Decorators'Blank a b <$>
-        f c <*>
-        go d
+      go (Decorators'Blank a b c) =
+        Decorators'Blank a <$>
+        f b <*>
+        go c
       go (Decorators'Value a b) =
         Decorators'Value <$>
         _Newlines f a <*>
@@ -524,9 +524,9 @@ instance HasNewlines Module where
   _Newlines f = go
     where
       go ModuleEmpty = pure ModuleEmpty
-      go (ModuleBlankFinal a b c) = pure $ ModuleBlankFinal a b c
-      go (ModuleBlank a b c d e) =
-        ModuleBlank a b c <$> f d <*> go e
+      go (ModuleBlankFinal a) = pure $ ModuleBlankFinal a
+      go (ModuleBlank a b c) =
+        ModuleBlank a <$> f b <*> go c
       go (ModuleStatement a b) =
         ModuleStatement <$> _Newlines f a <*> go b
 

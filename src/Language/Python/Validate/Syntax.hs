@@ -576,6 +576,15 @@ validateDecoratorSyntax (Decorator a b c d e f) =
     isDecoratorValue e | someDerefs e = pure $ unsafeCoerce e
     isDecoratorValue _ = errorVM1 (_MalformedDecorator # a)
 
+validateBlankSyntax
+  :: forall e v a
+   . (AsSyntaxError e v a, Member Indentation v)
+  => Blank a
+  -> ValidateSyntax e (Blank a)
+validateBlankSyntax (Blank a ws cmt) =
+  (\ws' -> Blank a ws' cmt) <$>
+  validateWhitespace a ws
+
 validateDecoratorsSyntax
   :: forall e v a
    . (AsSyntaxError e v a, Member Indentation v)
@@ -595,9 +604,10 @@ validateDecoratorsSyntax (DecoratorsValue a b) =
       Decorators'Value <$>
       validateDecoratorSyntax a <*>
       validateDecoratorsSyntax' b
-    validateDecoratorsSyntax' (Decorators'Blank a b c d) =
-      Decorators'Blank a b c <$>
-      validateDecoratorsSyntax' d
+    validateDecoratorsSyntax' (Decorators'Blank a b c) =
+      (\a' -> Decorators'Blank a' b) <$>
+      validateBlankSyntax a <*>
+      validateDecoratorsSyntax' c
     validateDecoratorsSyntax' Decorators'Empty = pure Decorators'Empty
 
 validateCompoundStatementSyntax
@@ -1181,12 +1191,11 @@ validateModuleSyntax
 validateModuleSyntax m =
   case m of
     ModuleEmpty -> pure ModuleEmpty
-    ModuleBlankFinal a b c ->
-      ModuleBlankFinal a <$> validateWhitespace a b <*> pure c
-    ModuleBlank a b c d e ->
-      (\b' -> ModuleBlank a b' c d) <$>
-      validateWhitespace a b <*>
-      validateModuleSyntax e
+    ModuleBlankFinal a -> ModuleBlankFinal <$> validateBlankSyntax a
+    ModuleBlank a b c ->
+      (\a' -> ModuleBlank a' b) <$>
+      validateBlankSyntax a <*>
+      validateModuleSyntax c
     ModuleStatement a b ->
      ModuleStatement <$>
      validateStatementSyntax a <*>

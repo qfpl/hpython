@@ -936,22 +936,17 @@ renderSmallStatement (From _ ws1 name ws3 ns) =
   singleton (TkImport ()) <> foldMap renderWhitespace ws3 <>
   renderImportTargets ns
 
+renderBlank :: Blank a -> RenderOutput
+renderBlank (Blank _ a b) = foldMap renderWhitespace a <> foldMap renderComment b
+
 renderBlock :: Block v a -> RenderOutput
 renderBlock bl =
-  foldMap
-    (\(_, x, y, z) ->
-        foldMap renderWhitespace x <>
-        foldMap renderComment y <>
-        singleton (renderNewline z))
-    a <>
+  foldMap (bifoldMap renderBlank (singleton . renderNewline)) a <>
   renderStatement b <>
   foldMap
-    (either
-       (\(_, x, y, z) ->
-          foldMap renderWhitespace x <>
-          foldMap renderComment y <>
-          singleton (renderNewline z))
-        renderStatement)
+    (bifoldMap
+      (bifoldMap renderBlank (singleton . renderNewline))
+      renderStatement)
     c
   where
     Block a b c = correctBlock bl
@@ -983,11 +978,10 @@ renderDecorators (DecoratorsValue a b) =
   renderDecorators' b
   where
     renderDecorators' Decorators'Empty = mempty
-    renderDecorators' (Decorators'Blank a b c d) =
-      foldMap renderWhitespace a <>
-      foldMap renderComment b <>
-      singleton (renderNewline c) <>
-      renderDecorators' d
+    renderDecorators' (Decorators'Blank a b c) =
+      renderBlank a <>
+      singleton (renderNewline b) <>
+      renderDecorators' c
     renderDecorators' (Decorators'Value a b) =
       renderDecorator a <>
       renderDecorators' b
@@ -1252,14 +1246,11 @@ renderIndents (Indents is _) = foldMap renderIndent is
 
 renderModule :: Module v a -> RenderOutput
 renderModule ModuleEmpty = mempty
-renderModule (ModuleBlankFinal _ a b) =
-  foldMap renderWhitespace a <>
-  foldMap renderComment b
-renderModule (ModuleBlank _ a b c d) =
-  foldMap renderWhitespace a <>
-  foldMap renderComment b <>
-  singleton (renderNewline c) <>
-  renderModule d
+renderModule (ModuleBlankFinal a) = renderBlank a
+renderModule (ModuleBlank a b c) =
+  renderBlank a <>
+  singleton (renderNewline b) <>
+  renderModule c
 renderModule (ModuleStatement a b) =
   renderStatement a <>
   renderModule b

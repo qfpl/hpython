@@ -23,15 +23,13 @@ module Language.Python.Validate.Indentation
   )
 where
 
-import Control.Lens.Cons (_head)
 import Control.Lens.Fold ((^?!), folded)
 import Control.Lens.Getter ((^.))
-import Control.Lens.Iso (from)
 import Control.Lens.Prism (_Right)
 import Control.Lens.Review ((#))
 import Control.Lens.Setter (over, mapped)
 import Control.Lens.Traversal (traverseOf)
-import Control.Lens.Tuple (_2)
+import Control.Lens.Tuple (_1, _2)
 import Control.Monad.State (State, evalState, get, put)
 import Data.Coerce (coerce)
 import Data.Foldable (fold)
@@ -124,14 +122,15 @@ equivalentIndentation (x:xs) (y:ys) =
     (Continued _ _, Continued _ _) -> True
     _ -> False
 
-checkBlankIndents
-  :: AsIndentationError e v a
-  => (a, [Whitespace], Maybe (Comment a), Newline)
-  -> ValidateIndentation e (a, [Whitespace], Maybe (Comment a), Newline)
-checkBlankIndents (a, b, c, d) =
-  if any (\case; Continued{} -> True; _ -> False) b
+validateBlankIndentation
+  :: forall e v a.
+     AsIndentationError e v a
+  => Blank a
+  -> ValidateIndentation e (Blank a)
+validateBlankIndentation (Blank a ws cmt) =
+  if any (\case; Continued{} -> True; _ -> False) ws
   then errorVM1 $ _EmptyContinuedLine # a
-  else pure (a, b, c, d)
+  else pure $ Blank a ws cmt
 
 validateBlockIndentation
   :: forall e v a.
@@ -143,7 +142,7 @@ validateBlockIndentation (Block x b bs) =
      case b' of
        Right b'' -> Block x' b'' bs'
        _ -> error "impossible") <$>
-  traverseOf _head checkBlankIndents x <*>
+  traverseOf (traverse._1) validateBlankIndentation x <*>
   go False (Right b) bs
   where
     is = (Right b:|bs) ^?! folded._Right.unvalidated._Indents.indentsValue
@@ -151,18 +150,23 @@ validateBlockIndentation (Block x b bs) =
     go
       :: Bool
       -> Either
-           (a, [Whitespace], Maybe (Comment a), Newline)
+           (Blank a, Newline)
            (Statement v a)
-      -> [Either (a, [Whitespace], Maybe (Comment a), Newline) (Statement v a)]
+      -> [Either (Blank a, Newline) (Statement v a)]
       -> ValidateIndentation e
          (NonEmpty
             (Either
-               (a, [Whitespace], Maybe (Comment a), Newline)
+               (Blank a, Newline)
                (Statement (Nub (Indentation ': v)) a)))
     go flag (Left e) rest =
         case rest of
-          [] -> pure . Left <$> checkBlankIndents e
-          r : rs -> NonEmpty.cons . Left <$> checkBlankIndents e <*> go flag r rs
+          [] ->
+            pure . Left <$>
+            traverseOf _1 validateBlankIndentation e
+          r : rs ->
+            NonEmpty.cons . Left <$>
+            traverseOf _1 validateBlankIndentation e <*>
+            go flag r rs
     go flag (Right st) rest =
       let
         validated =
@@ -240,9 +244,10 @@ validateDecoratorsIndentation (DecoratorsValue a b) =
       Decorators'Value <$>
       validateDecoratorIndentation a <*>
       validateDecoratorsIndentation' b
-    validateDecoratorsIndentation' (Decorators'Blank a b c d) =
-      Decorators'Blank a b c <$>
-      validateDecoratorsIndentation' d
+    validateDecoratorsIndentation' (Decorators'Blank a b c) =
+      (\a' -> Decorators'Blank a' b) <$>
+      validateBlankIndentation a <*>
+      validateDecoratorsIndentation' c
     validateDecoratorsIndentation' Decorators'Empty = pure Decorators'Empty
 
 validateCompoundStatementIndentation
@@ -384,21 +389,15 @@ validateModuleIndentation
 validateModuleIndentation m =
   case m of
     ModuleEmpty -> pure ModuleEmpty
-    ModuleBlankFinal a b c ->
-      ModuleBlankFinal a <$>
-      checkBlankWs a b <*>
-      pure c
-    ModuleBlank a b c d e ->
-      (\b' e' -> ModuleBlank a b' c d e') <$>
-      checkBlankWs a b <*>
-      validateModuleIndentation e
+    ModuleBlankFinal a ->
+      ModuleBlankFinal <$>
+      validateBlankIndentation a
+    ModuleBlank a b c ->
+      (\a' -> ModuleBlank a' b) <$>
+      validateBlankIndentation a <*>
+      validateModuleIndentation c
     ModuleStatement a b ->
      ModuleStatement <$
      setNextIndent EqualTo [] <*>
      validateStatementIndentation a <*>
      validateModuleIndentation b
-  where
-    checkBlankWs a ws =
-      if any (\case; Continued{} -> True; _ -> False) ws
-      then errorVM1 $ _ExpectedEqualTo # ([], Indents [ws ^. from indentWhitespaces] a)
-      else pure ws

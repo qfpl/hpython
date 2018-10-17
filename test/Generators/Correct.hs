@@ -80,6 +80,12 @@ localState m = do
   put a
   pure b
 
+genBlank :: MonadGen m => m (Blank ())
+genBlank =
+  Blank () <$>
+  Gen.list (Range.constant 0 10) (Gen.element [Space, Tab]) <*>
+  Gen.maybe genComment
+
 genIdent :: (MonadGen m, MonadState GenState m) => m (Ident '[] ())
 genIdent = do
   isAsync <- maybe False snd <$> use inFunction
@@ -182,22 +188,16 @@ genImportTargets = do
 genBlock :: (MonadGen m, MonadState GenState m) => m (Block '[] ())
 genBlock = doIndent *> go <* doDedent
   where
-    genBlank =
-      (,,,) () <$>
-      Gen.list (Range.constant 0 10) (Gen.element [Space, Tab]) <*>
-      Gen.maybe genComment <*>
-      genNewline
-
     genLine =
       Gen.choice
         [ Right <$> genStatement
-        , Left <$> genBlank
+        , Left <$> ((,) <$> genBlank <*> genNewline)
         ]
 
     go =
       sizedBind genStatement $ \st ->
       Block <$>
-        Gen.list (Range.constant 0 10) genBlank <*>
+        Gen.list (Range.constant 0 10) ((,) <$> genBlank <*> genNewline) <*>
         pure st <*>
         sizedList genLine
 
@@ -749,8 +749,7 @@ genDecorators =
       sizedRecursive
         [ pure Decorators'Empty ]
         [ Decorators'Blank <$>
-          genWhitespaces <*>
-          Gen.maybe genComment <*>
+          genBlank <*>
           genNewline <*>
           genDecorators'
         , sized2 Decorators'Value genDecorator genDecorators'

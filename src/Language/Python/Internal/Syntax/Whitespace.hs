@@ -5,6 +5,7 @@
 module Language.Python.Internal.Syntax.Whitespace
   ( Newline(..)
   , Whitespace(..)
+  , Blank(..)
   , HasTrailingWhitespace(..)
   , IndentLevel, getIndentLevel, indentLevel, absoluteIndentLevel
   , Indent(..), indentWhitespaces
@@ -52,6 +53,13 @@ instance HasTrailingWhitespace a => HasTrailingWhitespace (NonEmpty a) where
          case xs of
            [] -> (x & trailingWhitespace .~ ws) :| xs
            x' : xs' -> NonEmpty.cons x $ (x' :| xs') & trailingWhitespace .~ ws)
+
+data Blank a
+  = Blank
+  { _blankAnn :: a
+  , _blankWhitespaces :: [Whitespace]
+  , _blankComment :: Maybe (Comment a)
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
 
 newtype IndentLevel
   = IndentLevel

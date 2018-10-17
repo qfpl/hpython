@@ -199,9 +199,9 @@ validateDecoratorsScope (DecoratorsValue a b) =
       Decorators'Value <$>
       validateDecoratorScope a <*>
       validateDecoratorsScope' b
-    validateDecoratorsScope' (Decorators'Blank a b c d) =
-      Decorators'Blank a b c <$>
-      validateDecoratorsScope' d
+    validateDecoratorsScope' (Decorators'Blank a b c) =
+      Decorators'Blank a b <$>
+      validateDecoratorsScope' c
     validateDecoratorsScope' Decorators'Empty = pure Decorators'Empty
 
 validateCompoundStatementScope
@@ -663,8 +663,8 @@ validateModuleScope
 validateModuleScope m =
   case m of
     ModuleEmpty -> pure ModuleEmpty
-    ModuleBlankFinal a b c -> pure $ ModuleBlankFinal a b c
-    ModuleBlank a b c d e -> ModuleBlank a b c d <$> validateModuleScope e
+    ModuleBlankFinal a -> pure $ ModuleBlankFinal a
+    ModuleBlank a b c -> ModuleBlank a b <$> validateModuleScope c
     ModuleStatement a b ->
      ModuleStatement <$>
      validateStatementScope a <*>

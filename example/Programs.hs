@@ -20,7 +20,7 @@ import Language.Python.Syntax
 append_to :: Raw Statement
 append_to =
   CompoundStatement $
-  Fundef () Nothing (Indents [] ())
+  Fundef () [] (Indents [] ())
     Nothing
     (Space :| [])
     "append_to"

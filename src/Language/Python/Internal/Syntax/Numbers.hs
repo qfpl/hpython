@@ -11,6 +11,7 @@ import Data.Digit.Octal (OctDigit)
 import Data.Digit.Decimal (DecDigit)
 import Data.Digit.Hexadecimal.MixedCase (HeXDigit)
 import Data.List.NonEmpty (NonEmpty)
+import Data.Semigroup ((<>))
 import Data.Text (Text)
 import Data.These (These(..))
 

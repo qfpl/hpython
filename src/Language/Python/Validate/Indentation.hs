@@ -40,8 +40,8 @@ import Data.Validation (Validation(..))
 import Data.Validate.Monadic (ValidateM(..), liftVM0, errorVM, errorVM1)
 import qualified Data.List.NonEmpty as NonEmpty
 
-import Language.Python.Internal.Optics
-import Language.Python.Internal.Optics.Validated (unvalidated)
+import Language.Python.Optics
+import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax
 import Language.Python.Validate.Indentation.Error
 

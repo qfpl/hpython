@@ -12,7 +12,7 @@ import qualified Data.Text.IO as Text
 import Language.Python.Parse (parseModule)
 import Language.Python.Internal.Render (showModule)
 import Language.Python.Internal.Syntax (Whitespace(..), _Statements)
-import Language.Python.Internal.Optics (_Indent)
+import Language.Python.Optics (_Indent)
 
 opticsTests :: Group
 opticsTests = $$discover

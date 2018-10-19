@@ -58,8 +58,6 @@ library
   exposed-modules:     Data.Type.Set
                      , Data.Validate.Monadic
                      , Language.Python.Internal.Lexer
-                     , Language.Python.Internal.Optics
-                     , Language.Python.Internal.Optics.Validated
                      , Language.Python.Internal.Parse
                      , Language.Python.Internal.Render
                      , Language.Python.Internal.Render.Correction
@@ -80,6 +78,8 @@ library
                      , Language.Python.Internal.Syntax.Strings
                      , Language.Python.Internal.Syntax.UnOp
                      , Language.Python.Internal.Syntax.Whitespace
+                     , Language.Python.Optics
+                     , Language.Python.Optics.Validated
                      , Language.Python.Parse
                      , Language.Python.Syntax
                      , Language.Python.Syntax.Types

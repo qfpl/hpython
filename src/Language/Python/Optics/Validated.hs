@@ -1,5 +1,5 @@
 {-# language DataKinds, PolyKinds, DefaultSignatures #-}
-module Language.Python.Internal.Optics.Validated where
+module Language.Python.Optics.Validated where
 
 import Control.Lens.Getter (Getter, to)
 import Data.Coerce (Coercible, coerce)

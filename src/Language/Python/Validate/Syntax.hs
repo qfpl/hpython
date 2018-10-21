@@ -73,8 +73,8 @@ import Unsafe.Coerce (unsafeCoerce)
 
 import qualified Data.List.NonEmpty as NonEmpty
 
-import Language.Python.Internal.Optics
-import Language.Python.Internal.Optics.Validated (unvalidated)
+import Language.Python.Optics
+import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax
 import Language.Python.Validate.Indentation
 import Language.Python.Validate.Syntax.Error

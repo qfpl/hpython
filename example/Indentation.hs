@@ -5,7 +5,7 @@ import Control.Lens.Setter ((.~))
 import Control.Lens.Plated (transform)
 import GHC.Natural (Natural)
 
-import Language.Python.Internal.Optics
+import Language.Python.Optics
 import Language.Python.Internal.Syntax
 
 indentSpaces :: Natural -> Statement '[] a -> Statement '[] a

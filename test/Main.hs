@@ -3,7 +3,7 @@
 {-# language OverloadedStrings #-}
 module Main where
 
-import Language.Python.Internal.Optics.Validated (unvalidated)
+import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Internal.Render
 import Language.Python.Internal.Syntax
 import Language.Python.Parse (parseStatement, parseExpr, parseExprList)
@@ -223,17 +223,14 @@ string_correct path =
 
 main :: IO ()
 main = do
-  checkParallel lexerParserTests
-  checkParallel dslTests
-  checkParallel parserTests
-  checkParallel opticsTests
-  checkParallel printerTests
-  checkParallel scopeTests
-  checkParallel syntaxTests
-  checkParallel roundtripTests
-  let file = "hedgehog-test.py"
-  checkParallel $
-    Group "Main tests"
+  results <- traverse checkParallel groups
+  removeFile file
+  when (not (and results))
+    exitFailure
+  where
+    file = "hedgehog-test.py"
+    groups = [lexerParserTests, dslTests, parserTests, opticsTests, printerTests, scopeTests, syntaxTests, roundtripTests, mainGroup]
+    mainGroup = Group "Main tests"
       [ ("Haskell String to Python String", withTests 500 $ string_correct file)
       , ("Syntax checking for expressions", withTests 500 $ syntax_expr file)
       , ("Syntax checking for statements", withTests 500 $ syntax_statement file)
@@ -243,4 +240,3 @@ main = do
       , ("Print/Parse idempotent expressions", withTests 500 $ expr_printparseprint_print)
       , ("Print/Parse idempotent statements", withTests 500 $ statement_printparseprint_print)
       ]
-  removeFile "hedgehog-test.py"

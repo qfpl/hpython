@@ -42,7 +42,8 @@ extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 tested-with:           GHC == 8.0.2
                      , GHC == 8.2.2
-                     , GHC == 8.4.3
+                     , GHC == 8.4.4
+                     , GHC == 8.6.1
 
 
 source-repository    head
@@ -57,8 +58,6 @@ library
   exposed-modules:     Data.Type.Set
                      , Data.Validate.Monadic
                      , Language.Python.Internal.Lexer
-                     , Language.Python.Internal.Optics
-                     , Language.Python.Internal.Optics.Validated
                      , Language.Python.Internal.Parse
                      , Language.Python.Internal.Render
                      , Language.Python.Internal.Render.Correction
@@ -79,6 +78,8 @@ library
                      , Language.Python.Internal.Syntax.Strings
                      , Language.Python.Internal.Syntax.UnOp
                      , Language.Python.Internal.Syntax.Whitespace
+                     , Language.Python.Optics
+                     , Language.Python.Optics.Validated
                      , Language.Python.Parse
                      , Language.Python.Syntax
                      , Language.Python.Syntax.Types
@@ -98,7 +99,7 @@ library
                      , megaparsec >=6.3 && <7.1
                      , fingertree >=0.1 && <0.2
                      , mtl >= 2.1 && < 2.3
-                     , containers >=0.5.8 && <0.7
+                     , containers >=0.5.7.1 && <0.7
                      , deriving-compat >=0.4 && <0.6
                      , semigroupoids >=5.2.2 && <5.4
                      , text >=1.2 && <1.3

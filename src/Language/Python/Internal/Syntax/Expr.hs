@@ -28,7 +28,7 @@ import Data.String (IsString(..))
 import GHC.Generics (Generic)
 import Unsafe.Coerce (unsafeCoerce)
 
-import Language.Python.Internal.Optics.Validated (Validated(..))
+import Language.Python.Optics.Validated (Validated(..))
 import Language.Python.Internal.Syntax.BinOp
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Ident

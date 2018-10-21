@@ -351,7 +351,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe)
 import Data.Semigroup ((<>))
 
-import Language.Python.Internal.Optics
+import Language.Python.Optics
 import Language.Python.Internal.Syntax hiding (Fundef, While, Call)
 import Language.Python.Syntax.Types
 

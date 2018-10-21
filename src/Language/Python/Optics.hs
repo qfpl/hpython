@@ -1,7 +1,7 @@
 {-# language DataKinds #-}
 {-# language PolyKinds #-}
 {-# language LambdaCase #-}
-module Language.Python.Internal.Optics where
+module Language.Python.Optics where
 
 import Control.Lens.Fold (Fold)
 import Control.Lens.Getter ((^.), view)
@@ -13,7 +13,7 @@ import Control.Lens.Prism (Prism, _Right, prism)
 import Data.Coerce (coerce)
 import Data.Function ((&))
 
-import Language.Python.Internal.Optics.Validated (unvalidated)
+import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax.Types
 

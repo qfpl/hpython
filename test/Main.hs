@@ -3,7 +3,7 @@
 {-# language OverloadedStrings #-}
 module Main where
 
-import Language.Python.Internal.Optics.Validated (unvalidated)
+import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Internal.Render
 import Language.Python.Internal.Syntax
 import Language.Python.Parse (parseStatement, parseExpr, parseExprList)

@@ -7,7 +7,7 @@ import Control.Lens.Lens (Lens, lens)
 import Data.Char (isDigit, isLetter)
 import Data.String (IsString(..))
 
-import Language.Python.Internal.Optics.Validated (Validated)
+import Language.Python.Optics.Validated (Validated)
 import Language.Python.Internal.Syntax.Whitespace
 
 data Ident (v :: [*]) a

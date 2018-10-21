@@ -29,7 +29,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import GHC.Stack
 
 import Language.Python.Syntax.Types (spType)
-import Language.Python.Internal.Optics
+import Language.Python.Optics
 import Language.Python.Internal.Syntax
 
 import Generators.Common

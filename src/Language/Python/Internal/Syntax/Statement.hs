@@ -24,7 +24,7 @@ import Data.Monoid ((<>))
 import GHC.Generics (Generic)
 import Unsafe.Coerce (unsafeCoerce)
 
-import Language.Python.Internal.Optics.Validated
+import Language.Python.Optics.Validated
 import Language.Python.Internal.Syntax.AugAssign
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Comment

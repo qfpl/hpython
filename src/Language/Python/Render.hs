@@ -1,9 +1,5 @@
 module Language.Python.Render
-  ( -- * Common Functions
-    showModule, showStatement, showExpr
-    -- * Rendering
-  , RenderOutput, showRenderOutput, singleton, cons
-  , renderModule, renderStatement, renderExpr
+  ( showModule, showStatement, showExpr
   )
 where
 

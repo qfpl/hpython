@@ -1,13 +1,23 @@
--- |
--- There are configurations of the core syntax tree which won't print to valid Python
--- if we printed them naively. Many of these we catch in the
--- 'Language.Python.Validation.Syntax' phase, because those mistakes correspond to
--- some Python syntax error. In other cases, the mistakes are more benign and have
--- a "resonable correction" which doesn't break the "print-parse idempotence" law.
---
--- This module is where such corrections are defined
 {-# language BangPatterns #-}
 {-# language LambdaCase #-}
+
+{-|
+Module      : Language.Python.Internal.Render.Correction
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+
+There are configurations of the core syntax tree which won't print to valid Python
+if we printed them naively. Many of these we catch in the
+'Language.Python.Validation.Syntax' phase, because those mistakes correspond to
+some Python syntax error. In other cases, the mistakes are more benign and have
+a "resonable correction" which doesn't break the "print-parse idempotence" law.
+
+This module is where such corrections are defined
+-}
+
 module Language.Python.Internal.Render.Correction where
 
 import Control.Lens.Getter ((^.))

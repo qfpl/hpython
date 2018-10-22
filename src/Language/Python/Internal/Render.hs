@@ -955,17 +955,20 @@ renderBlock isFinal bl =
   where
     Block a b c = correctBlock isFinal bl
 
-renderSuite :: Bool -> Suite v a -> RenderOutput
+renderSuite
+  :: Bool -- ^ is the final suite in a block
+  -> Suite v a
+  -> RenderOutput
 renderSuite isFinal (SuiteMany _ a b c d) =
   TkColon () `cons`
   foldMap renderWhitespace a <>
   foldMap renderComment b <>
   singleton (renderNewline c) <>
   renderBlock isFinal d
-renderSuite _ (SuiteOne _ a b) =
+renderSuite isFinal (SuiteOne _ a b) =
   TkColon () `cons`
   foldMap renderWhitespace a <>
-  renderSimpleStatement b
+  renderSimpleStatement (correctSimpleStatement isFinal b)
 
 renderDecorator :: Decorator v a -> RenderOutput
 renderDecorator (Decorator _ a b c d e f) =
@@ -1031,7 +1034,7 @@ renderCompoundStatement (While _ idnt ws1 expr s els) =
 renderCompoundStatement (TryExcept _ idnt a s e f g) =
   renderIndents idnt <>
   singleton (TkTry ()) <> foldMap renderWhitespace a <>
-  renderSuite (fEmpty && gEmpty) s <>
+  renderSuite False s <>
   foldMap
     (\(idnt, ws1, eas, s) ->
        renderIndents idnt <>

@@ -148,23 +148,23 @@ correctSimpleStatements isFinal (Block a b c) = Block a b' c'
   where
     Right b' :| c' = go (Right b) c
 
-    insertNewline x =
+    correctLine b x =
       case x of
         Left l -> Left l
         Right s ->
           Right $
           case s of
-            SimpleStatement i a ->
-              SimpleStatement i $
-              case a of
-                MkSimpleStatement l m n o Nothing ->
-                  MkSimpleStatement l m n o (Just LF)
-                MkSimpleStatement l m n o (Just p) ->
-                  MkSimpleStatement l m n o (Just p)
+            SimpleStatement i a -> SimpleStatement i $ correctSimpleStatement b a
             CompoundStatement c -> CompoundStatement c
 
-    go x [] =
-      (if isFinal
-       then x
-       else insertNewline x) :| []
-    go x (y:ys) = insertNewline x `NonEmpty.cons` go y ys
+    go x [] = correctLine isFinal x :| []
+    go x (y:ys) = correctLine False x `NonEmpty.cons` go y ys
+
+correctSimpleStatement :: Bool -> SimpleStatement v a -> SimpleStatement v a
+correctSimpleStatement False a =
+  case a of
+    MkSimpleStatement l m n o Nothing ->
+      MkSimpleStatement l m n o (Just LF)
+    MkSimpleStatement l m n o (Just p) ->
+      MkSimpleStatement l m n o (Just p)
+correctSimpleStatement True a = a

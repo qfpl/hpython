@@ -17,7 +17,7 @@ import qualified Data.Text.IO as StrictText
 import qualified Data.Text as Strict
 
 import Language.Python.Internal.Lexer (SrcInfo)
-import Language.Python.Internal.Render (showModule)
+import Language.Python.Render (showModule)
 import Language.Python.Parse (parseModule)
 import Language.Python.Validate.Indentation
   (Indentation, runValidateIndentation, validateModuleIndentation)

@@ -2,7 +2,7 @@
 {-# language LambdaCase #-}
 
 {-|
-Module      : Language.Python.Internal.Syntax.UnOp
+Module      : Language.Python.Internal.Syntax.Operator.Unary
 Copyright   : (C) CSIRO 2017-2018
 License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
@@ -12,7 +12,7 @@ Portability : non-portable
 Unary operators
 -}
 
-module Language.Python.Internal.Syntax.UnOp where
+module Language.Python.Internal.Syntax.Operator.Unary where
 
 import Control.Lens.Lens (lens)
 import Language.Python.Internal.Syntax.Whitespace

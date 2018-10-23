@@ -36,7 +36,6 @@ import qualified Text.Megaparsec as Megaparsec
 
 import Language.Python.Internal.Lexer (SrcInfo(..), withSrcInfo)
 import Language.Python.Internal.Syntax.AugAssign
-import Language.Python.Internal.Syntax.BinOp
 import Language.Python.Internal.Syntax.Comment
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.IR
@@ -44,8 +43,9 @@ import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Import
 import Language.Python.Internal.Syntax.ModuleNames
 import Language.Python.Internal.Syntax.Numbers
+import Language.Python.Internal.Syntax.Operator.Binary
+import Language.Python.Internal.Syntax.Operator.Unary
 import Language.Python.Internal.Syntax.Strings
-import Language.Python.Internal.Syntax.UnOp
 import Language.Python.Internal.Syntax.Whitespace
 import Language.Python.Internal.Token
 

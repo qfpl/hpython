@@ -22,7 +22,7 @@ import Data.List.NonEmpty (NonEmpty)
 
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Ident
-import Language.Python.Internal.Syntax.Whitespace
+import Language.Python.Syntax.Whitespace
 
 data ImportAs e v a
   = ImportAs a (e a) (Maybe (NonEmpty Whitespace, Ident v a))

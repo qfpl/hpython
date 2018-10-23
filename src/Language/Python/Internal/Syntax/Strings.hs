@@ -21,7 +21,7 @@ import Data.Digit.Hexadecimal.MixedCase (HeXDigit(..))
 import Data.Maybe (isJust)
 import Data.Text (Text)
 
-import Language.Python.Internal.Syntax.Whitespace
+import Language.Python.Syntax.Whitespace
 
 data QuoteType
   = SingleQuote

@@ -20,7 +20,7 @@ import Control.Lens.TH (makeLenses)
 import Data.Functor (($>))
 import Data.Semigroup ((<>))
 
-import Language.Python.Internal.Syntax.Whitespace
+import Language.Python.Syntax.Whitespace
 
 -- | A Python binary operator, such as @+@, along with its trailing 'Whitespace'
 --

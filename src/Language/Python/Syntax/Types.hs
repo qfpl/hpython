@@ -17,6 +17,7 @@ import Control.Lens.TH (makeLenses)
 import Data.List.NonEmpty (NonEmpty)
 
 import Language.Python.Internal.Syntax hiding (Fundef, While)
+import Language.Python.Syntax.Whitespace
 
 data Fundef v a
   = MkFundef

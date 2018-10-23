@@ -18,8 +18,9 @@ import Data.Semigroup ((<>))
 
 
 import Language.Python.Optics
-import Language.Python.Internal.Syntax (CompoundStatement (..), Expr (..), Statement (..), SimpleStatement (..), SmallStatement (..), Whitespace (..), _Exprs, _Statements, argExpr, paramName)
+import Language.Python.Internal.Syntax (CompoundStatement (..), Expr (..), Statement (..), SimpleStatement (..), SmallStatement (..), _Exprs, _Statements, argExpr, paramName)
 import Language.Python.Syntax
+import Language.Python.Syntax.Whitespace
 
 optimizeTailRecursion :: Raw Statement -> Maybe (Raw Statement)
 optimizeTailRecursion st = do

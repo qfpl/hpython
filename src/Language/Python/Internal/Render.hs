@@ -172,7 +172,15 @@ renderPyCharsBytes qt st =
       case s of
         [] -> ""
         Char_newline : cs -> "\\newline" <> go cs
-        Char_octal a b c : cs ->
+        Char_octal1 a  : cs ->
+          "\\" <>
+          [charOctal # a] <>
+          go cs
+        Char_octal2 a b : cs ->
+          "\\" <>
+          [charOctal # a, charOctal # b] <>
+          go cs
+        Char_octal3 a b c : cs ->
           "\\" <>
           [charOctal # a, charOctal # b, charOctal # c] <>
           go cs
@@ -391,7 +399,15 @@ renderPyChars qt st =
       case s of
         [] -> ""
         Char_newline : cs -> "\\newline" <> go cs
-        Char_octal a b c : cs ->
+        Char_octal1 a : cs ->
+          "\\" <>
+          [charOctal # a] <>
+          go cs
+        Char_octal2 a b : cs ->
+          "\\" <>
+          [charOctal # a, charOctal # b] <>
+          go cs
+        Char_octal3 a b c : cs ->
           "\\" <>
           [charOctal # a, charOctal # b, charOctal # c] <>
           go cs

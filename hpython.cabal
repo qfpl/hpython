@@ -81,6 +81,7 @@ library
                      , Language.Python.Optics
                      , Language.Python.Optics.Validated
                      , Language.Python.Parse
+                     , Language.Python.Render
                      , Language.Python.Syntax
                      , Language.Python.Syntax.Types
                      , Language.Python.Validate.Scope

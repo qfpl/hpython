@@ -10,7 +10,7 @@ import Data.Validation (validation)
 import qualified Data.Text.IO as Text
 
 import Language.Python.Parse (parseModule)
-import Language.Python.Internal.Render (showModule)
+import Language.Python.Render (showModule)
 import Language.Python.Internal.Syntax (Whitespace(..), _Statements)
 import Language.Python.Optics (_Indent)
 

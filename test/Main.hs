@@ -4,7 +4,7 @@
 module Main where
 
 import Language.Python.Optics.Validated (unvalidated)
-import Language.Python.Internal.Render
+import Language.Python.Render
 import Language.Python.Internal.Syntax
 import Language.Python.Parse (parseStatement, parseExpr, parseExprList)
 import Language.Python.Validate.Indentation

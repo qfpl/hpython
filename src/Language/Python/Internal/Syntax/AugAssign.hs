@@ -15,6 +15,18 @@ import Control.Lens.Lens (lens)
 
 import Language.Python.Internal.Syntax.Whitespace
 
+
+-- | Augmented assignments (PEP 203), such as:
+--
+-- @
+-- x += y
+-- @
+--
+-- or
+--
+-- @
+-- x <<= 8
+-- @
 data AugAssign a
   = PlusEq
   { _augAssignAnn :: a

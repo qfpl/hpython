@@ -64,7 +64,6 @@ library
                      , Language.Python.Internal.Syntax
                      , Language.Python.Internal.Token
                      , Language.Python.Internal.Syntax.AugAssign
-                     , Language.Python.Internal.Syntax.BinOp
                      , Language.Python.Internal.Syntax.Comment
                      , Language.Python.Internal.Syntax.CommaSep
                      , Language.Python.Internal.Syntax.Expr
@@ -73,10 +72,11 @@ library
                      , Language.Python.Internal.Syntax.IR
                      , Language.Python.Internal.Syntax.Module
                      , Language.Python.Internal.Syntax.ModuleNames
+                     , Language.Python.Internal.Syntax.Operator.Binary
+                     , Language.Python.Internal.Syntax.Operator.Unary
                      , Language.Python.Internal.Syntax.Numbers
                      , Language.Python.Internal.Syntax.Statement
                      , Language.Python.Internal.Syntax.Strings
-                     , Language.Python.Internal.Syntax.UnOp
                      , Language.Python.Internal.Syntax.Whitespace
                      , Language.Python.Optics
                      , Language.Python.Optics.Validated

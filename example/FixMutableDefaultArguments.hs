@@ -9,7 +9,7 @@ import Data.Function ((&))
 import Data.Semigroup ((<>))
 
 import Language.Python.Optics
-import Language.Python.Internal.Syntax
+import Language.Python.Internal.Syntax (Expr (..), Whitespace (..), _Exprs)
 import Language.Python.Syntax
 
 fixMutableDefaultArguments :: Raw Statement -> Maybe (Raw Statement)

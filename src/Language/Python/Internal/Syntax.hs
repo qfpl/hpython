@@ -12,7 +12,6 @@ module Language.Python.Internal.Syntax
   , idStyle
   , reserved
   , module Language.Python.Internal.Syntax.AugAssign
-  , module Language.Python.Internal.Syntax.BinOp
   , module Language.Python.Internal.Syntax.CommaSep
   , module Language.Python.Internal.Syntax.Comment
   , module Language.Python.Internal.Syntax.Expr
@@ -21,9 +20,10 @@ module Language.Python.Internal.Syntax
   , module Language.Python.Internal.Syntax.Module
   , module Language.Python.Internal.Syntax.ModuleNames
   , module Language.Python.Internal.Syntax.Numbers
+  , module Language.Python.Internal.Syntax.Operator.Binary
+  , module Language.Python.Internal.Syntax.Operator.Unary
   , module Language.Python.Internal.Syntax.Statement
   , module Language.Python.Internal.Syntax.Strings
-  , module Language.Python.Internal.Syntax.UnOp
   , module Language.Python.Internal.Syntax.Whitespace
   )
 where
@@ -35,7 +35,6 @@ import Text.Parser.Token (TokenParsing, IdentifierStyle(..), Unspaced(..), reser
 import Text.Parser.Token.Highlight (Highlight(..))
 
 import Language.Python.Internal.Syntax.AugAssign
-import Language.Python.Internal.Syntax.BinOp
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Comment
 import Language.Python.Internal.Syntax.Expr
@@ -44,9 +43,10 @@ import Language.Python.Internal.Syntax.Import
 import Language.Python.Internal.Syntax.Module
 import Language.Python.Internal.Syntax.ModuleNames
 import Language.Python.Internal.Syntax.Numbers
+import Language.Python.Internal.Syntax.Operator.Binary
+import Language.Python.Internal.Syntax.Operator.Unary
 import Language.Python.Internal.Syntax.Statement
 import Language.Python.Internal.Syntax.Strings
-import Language.Python.Internal.Syntax.UnOp
 import Language.Python.Internal.Syntax.Whitespace
 
 reservedWords :: [String]

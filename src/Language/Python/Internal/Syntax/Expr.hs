@@ -39,12 +39,12 @@ import GHC.Generics (Generic)
 import Unsafe.Coerce (unsafeCoerce)
 
 import Language.Python.Optics.Validated (Validated(..))
-import Language.Python.Internal.Syntax.BinOp
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Numbers
+import Language.Python.Internal.Syntax.Operator.Binary
+import Language.Python.Internal.Syntax.Operator.Unary
 import Language.Python.Internal.Syntax.Strings
-import Language.Python.Internal.Syntax.UnOp
 import Language.Python.Internal.Syntax.Whitespace
 
 {-

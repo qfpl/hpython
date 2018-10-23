@@ -414,6 +414,7 @@ genSizedCommaSep1' ma = Gen.sized $ \n ->
 
 genAugAssign :: MonadGen m => m (AugAssign ())
 genAugAssign =
+  MkAugAssign <$>
   Gen.element
     [ PlusEq
     , MinusEq
@@ -525,7 +526,12 @@ genPyChar :: MonadGen m => m Char -> m PyChar
 genPyChar mlit =
   Gen.choice
   [ pure Char_newline
-  , Char_octal <$>
+  , Char_octal1 <$>
+    Gen.element enumOctal
+  , Char_octal2 <$>
+    Gen.element enumOctal <*>
+    Gen.element enumOctal
+  , Char_octal3 <$>
     Gen.element enumOctal <*>
     Gen.element enumOctal <*>
     Gen.element enumOctal

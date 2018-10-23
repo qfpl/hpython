@@ -21,6 +21,8 @@ import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Syntax.Comment (Comment(..))
 import Language.Python.Internal.Syntax.Whitespace (Newline(..), Indents)
 
+-- | A 'PyToken' is a single lexical token of Python source. A 'PyToken' has an
+-- optional annotation, which can be '()' when no annotation is desired.
 data PyToken a
   = TkIf a
   | TkElse a
@@ -127,6 +129,7 @@ instance Eq (PyToken a) where
 instance Ord (PyToken a) where
   compare = liftCompare (\_ _ -> EQ)
 
+-- | Get the annotation from a 'PyToken'.
 pyTokenAnn :: PyToken a -> a
 pyTokenAnn tk =
   case tk of

@@ -47,18 +47,26 @@ import Language.Python.Internal.Syntax
 import Language.Python.Internal.Render.Correction
 import Language.Python.Internal.Token (PyToken(..))
 
+-- | A 'RenderOutput' is an intermediate form used during rendering
+-- with efficient 'Semigroup' and 'Monoid' instances.
 newtype RenderOutput
   = RenderOutput
   { unRenderOutput :: DList (PyToken ())
   } deriving (Eq, Show, Semigroup, Monoid)
 
+-- | Render a single token as a 'RenderOutput'
 singleton :: PyToken () -> RenderOutput
 singleton a = RenderOutput $ DList.singleton a
 
+-- | Prepend a single token to a 'RenderOutput'
 cons :: PyToken () -> RenderOutput -> RenderOutput
 cons a (RenderOutput b) = RenderOutput $ DList.cons a b
 infixr 5 `cons`
 
+-- | Run a 'RenderOutput' to produce a final 'Text'.
+--
+-- These 'Text's should then not be appended any more. All appending should
+-- be done during the 'RenderOutput' phase.
 showRenderOutput :: RenderOutput -> Text
 showRenderOutput =
   Lazy.toStrict .
@@ -1252,11 +1260,14 @@ renderModule (ModuleStatement a b) =
   renderStatement a <>
   renderModule b
 
+-- | Render an entire Python module to 'Text'
 showModule :: Module v a -> Text
 showModule = showRenderOutput . renderModule
 
+-- | Render a single Python statement to 'Text'
 showStatement :: Statement v a -> Text
 showStatement = showRenderOutput . renderStatement
 
+-- | Render a single Python expression to 'Text'
 showExpr :: Expr v a -> Text
 showExpr = showRenderOutput . bracketGenerator

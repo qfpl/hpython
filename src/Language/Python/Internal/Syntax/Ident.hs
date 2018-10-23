@@ -1,6 +1,16 @@
 {-# language DataKinds, KindSignatures #-}
 {-# language FlexibleInstances #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+
+{-|
+Module      : Language.Python.Internal.Syntax.Ident
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Language.Python.Internal.Syntax.Ident where
 
 import Control.Lens.Lens (Lens, lens)

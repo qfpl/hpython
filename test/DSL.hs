@@ -3,7 +3,7 @@ module DSL (dslTests) where
 
 import Hedgehog
 
-import Language.Python.Internal.Render (showExpr)
+import Language.Python.Render (showExpr)
 import Language.Python.Syntax
 
 dslTests :: Group

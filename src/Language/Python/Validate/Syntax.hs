@@ -7,6 +7,16 @@
 {-# language TemplateHaskell, TypeFamilies, MultiParamTypeClasses #-}
 {-# language RankNTypes #-}
 {-# language LambdaCase #-}
+
+{-|
+Module      : Language.Python.Validate.Syntax
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Language.Python.Validate.Syntax
   ( module Language.Python.Validate.Syntax.Error
   , Syntax

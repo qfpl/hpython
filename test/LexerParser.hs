@@ -6,7 +6,7 @@ import Control.Monad (void)
 import Data.Validation (Validation(..), validation)
 import qualified Data.Text as Text
 
-import Language.Python.Internal.Render
+import Language.Python.Render
 import Language.Python.Parse (parseModule, parseStatement, parseExpr)
 
 import Helpers (shouldBeSuccess)

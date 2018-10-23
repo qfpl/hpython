@@ -1,6 +1,16 @@
 {-# language DeriveFunctor #-}
 {-# language OverloadedStrings #-}
 {-# language TemplateHaskell #-}
+
+{-|
+Module      : Language.Python.Internal.Token
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Language.Python.Internal.Token where
 
 import Data.Deriving (deriveEq1, deriveOrd1)

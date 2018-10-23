@@ -7,7 +7,7 @@ import Hedgehog
 import Control.Lens.Iso (from)
 import Control.Lens.Getter ((^.))
 import Control.Monad (void)
-import Language.Python.Internal.Render (showStatement)
+import Language.Python.Render (showStatement)
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Expr
 import Language.Python.Internal.Syntax.Statement

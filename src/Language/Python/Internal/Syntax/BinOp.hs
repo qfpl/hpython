@@ -2,6 +2,16 @@
 {-# language MultiParamTypeClasses, FlexibleInstances #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# language TemplateHaskell #-}
+
+{-|
+Module      : Language.Python.Internal.Syntax.BinOp
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Language.Python.Internal.Syntax.BinOp where
 
 import Control.Lens.Getter ((^.))
@@ -12,6 +22,9 @@ import Data.Semigroup ((<>))
 
 import Language.Python.Internal.Syntax.Whitespace
 
+-- | A Python binary operator, such as @+@, along with its trailing 'Whitespace'
+--
+-- The type variable allows annotations, but it can simply be made @()@ for an unannotated @BinOp@.
 data BinOp a
   = Is a [Whitespace]
   | IsNot a [Whitespace] [Whitespace]
@@ -97,8 +110,22 @@ instance HasTrailingWhitespace (BinOp a) where
            Percent a _ -> Equals a ws
            At a _ -> At a ws)
 
+-- | The associativity of an operator. Each operator is either left-associative or right associative.
+--
+-- Left associative:
+--
+-- @
+-- x + y + z = (x + y) + z
+-- @
+--
+-- Right associative:
+--
+-- @
+-- x + y + z = x + (y + z)
+-- @
 data Assoc = L | R deriving (Eq, Show)
 
+-- | An operator along with its precedence and associativity.
 data OpEntry
   = OpEntry
   { _opOperator :: BinOp ()
@@ -107,6 +134,7 @@ data OpEntry
   }
 makeLenses ''OpEntry
 
+-- | 'operatorTable' is a list of all operators in ascending order of precedence.
 operatorTable :: [OpEntry]
 operatorTable =
   [ entry BoolOr 4 L
@@ -139,6 +167,7 @@ operatorTable =
     entry a = OpEntry (a () [])
     entry1 a = OpEntry (a () [] [])
 
+-- | Compare two 'BinOp's to determine whether they represent the same operator, ignoring annotations and trailing whitespace.
 sameOperator :: BinOp a -> BinOp a' -> Bool
 sameOperator op op' =
   case (op, op') of
@@ -169,6 +198,7 @@ sameOperator op op' =
     (At{}, At{}) -> True
     _ -> False
 
+-- | Is a 'BinOp' a comparison, such as @<=@
 isComparison :: BinOp a -> Bool
 isComparison a =
   case a of
@@ -184,6 +214,7 @@ isComparison a =
     NotEquals{} -> True
     _ -> False
 
+-- | Retrieve the information for a given operator from the operator table.
 lookupOpEntry :: BinOp a -> [OpEntry] -> OpEntry
 lookupOpEntry op =
   go (op $> ())

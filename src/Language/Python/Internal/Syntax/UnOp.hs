@@ -8,6 +8,8 @@ License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
 Stability   : experimental
 Portability : non-portable
+
+Unary operators
 -}
 
 module Language.Python.Internal.Syntax.UnOp where
@@ -15,6 +17,8 @@ module Language.Python.Internal.Syntax.UnOp where
 import Control.Lens.Lens (lens)
 import Language.Python.Internal.Syntax.Whitespace
 
+-- | An 'UnOp' is a unary operator in Python, such as @-@ for negation.
+-- An operator is stored with an annotation and its trailing whitespace.
 data UnOp a
   = Negate a [Whitespace]
   | Positive a [Whitespace]

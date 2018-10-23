@@ -879,20 +879,20 @@ renderImportTargets (ImportSomeParens _ ws1 ts ws2) =
 
 renderAugAssign :: AugAssign a -> RenderOutput
 renderAugAssign aa =
-  (case aa of
-     PlusEq{} -> TkPlusEq ()
-     MinusEq{} -> TkMinusEq ()
-     StarEq{} -> TkStarEq ()
-     AtEq{} -> TkAtEq ()
-     SlashEq{} -> TkSlashEq ()
-     PercentEq{} -> TkPercentEq ()
-     AmpersandEq{} -> TkAmpersandEq ()
-     PipeEq{} -> TkPipeEq ()
-     CaretEq{} -> TkCaretEq ()
-     ShiftLeftEq{} -> TkShiftLeftEq ()
-     ShiftRightEq{} -> TkShiftRightEq ()
-     DoubleStarEq{} -> TkDoubleStarEq ()
-     DoubleSlashEq{} -> TkDoubleSlashEq ()) `cons`
+  (case _augAssignType aa of
+     PlusEq -> TkPlusEq ()
+     MinusEq -> TkMinusEq ()
+     StarEq -> TkStarEq ()
+     AtEq -> TkAtEq ()
+     SlashEq -> TkSlashEq ()
+     PercentEq -> TkPercentEq ()
+     AmpersandEq -> TkAmpersandEq ()
+     PipeEq -> TkPipeEq ()
+     CaretEq -> TkCaretEq ()
+     ShiftLeftEq -> TkShiftLeftEq ()
+     ShiftRightEq -> TkShiftRightEq ()
+     DoubleStarEq -> TkDoubleStarEq ()
+     DoubleSlashEq -> TkDoubleSlashEq ()) `cons`
   foldMap renderWhitespace (_augAssignWhitespace aa)
 
 renderSmallStatement :: SmallStatement v a -> RenderOutput

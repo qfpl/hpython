@@ -414,6 +414,7 @@ genSizedCommaSep1' ma = Gen.sized $ \n ->
 
 genAugAssign :: MonadGen m => m (AugAssign ())
 genAugAssign =
+  MkAugAssign <$>
   Gen.element
     [ PlusEq
     , MinusEq

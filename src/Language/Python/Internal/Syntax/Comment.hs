@@ -14,6 +14,25 @@ module Language.Python.Internal.Syntax.Comment where
 
 import Data.Deriving (deriveEq1, deriveOrd1)
 
+-- | A Python single-line comment, such as on the following line:
+--
+-- @
+-- y = x + 4 # add four to the value of x
+-- @
+--
+-- In this case, the structure parsed would be
+--
+-- @
+-- MkComment () " add four to the value of x"
+-- @
+--
+-- with the hash being inferred, and the space after the hash being preserved.
+--
+-- Python does not have multi-line comments. There is a common convention of
+-- using a multi-line string expression as a multi-line comment, since a
+-- string expression is a no-op statement. Such multi-line comments are
+-- __NOT__ represented with this data type, but rather as normal
+-- string expressions (since that's what they are).
 data Comment a
   = MkComment
   { _commentAnn :: a

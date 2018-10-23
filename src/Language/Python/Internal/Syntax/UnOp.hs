@@ -1,5 +1,15 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# language LambdaCase #-}
+
+{-|
+Module      : Language.Python.Internal.Syntax.UnOp
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Language.Python.Internal.Syntax.UnOp where
 
 import Control.Lens.Lens (lens)

@@ -2,6 +2,16 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# language LambdaCase #-}
 {-# language TemplateHaskell #-}
+
+{-|
+Module      : Language.Python.Internal.Syntax.IR
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Language.Python.Internal.Syntax.IR where
 
 import Control.Lens.Fold (foldMapOf, folded)

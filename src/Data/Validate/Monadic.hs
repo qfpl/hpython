@@ -1,5 +1,15 @@
 {-# language GeneralizedNewtypeDeriving #-}
 {-# language RankNTypes #-}
+
+{-|
+Module      : Data.Validate.Monadic
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Data.Validate.Monadic where
 
 import Data.Functor.Compose (Compose(..))

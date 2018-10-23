@@ -1,9 +1,15 @@
 {-|
+Module      : Language.Python.Syntax
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
 
 Passing @[]@ to a function which expects a @['Raw' 'Line']@ is the same as
 passing @['line_' 'pass_']@
-
 -}
+
 
 {-# language DataKinds #-}
 {-# language MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}

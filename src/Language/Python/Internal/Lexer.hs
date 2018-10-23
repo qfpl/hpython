@@ -6,6 +6,16 @@
 {-# language TypeFamilies #-}
 {-# language OverloadedStrings #-}
 {-# language LambdaCase #-}
+
+{-|
+Module      : Language.Python.Internal.Lexer
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Language.Python.Internal.Lexer
   ( SrcInfo(..), initialSrcInfo, withSrcInfo
   , tokenize

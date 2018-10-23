@@ -1,6 +1,16 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# language DataKinds, FlexibleInstances, MultiParamTypeClasses #-}
 {-# language LambdaCase #-}
+
+{-|
+Module      : Language.Python.Internal.Syntax.ModuleNames
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Language.Python.Internal.Syntax.ModuleNames where
 
 import Control.Lens.Cons (_last)

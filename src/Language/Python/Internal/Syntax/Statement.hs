@@ -7,11 +7,12 @@
 {-# language UndecidableInstances #-}
 module Language.Python.Internal.Syntax.Statement where
 
+import Control.Lens.Cons (_last)
 import Control.Lens.Fold (foldMapOf, folded)
 import Control.Lens.Getter ((^.), to, view)
 import Control.Lens.Plated (Plated(..), gplate)
 import Control.Lens.Prism (_Right)
-import Control.Lens.Setter (over, mapped)
+import Control.Lens.Setter ((.~), over, mapped)
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (Traversal, traverseOf)
 import Control.Lens.Tuple (_1, _2, _3, _4)
@@ -19,10 +20,14 @@ import Data.Bifoldable (bifoldMap)
 import Data.Bifunctor (bimap)
 import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
+import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty)
+import Data.Maybe (isNothing)
 import Data.Monoid ((<>))
 import GHC.Generics (Generic)
 import Unsafe.Coerce (unsafeCoerce)
+
+import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Optics.Validated
 import Language.Python.Internal.Syntax.AugAssign
@@ -439,6 +444,136 @@ instance HasExprs CompoundStatement where
     _Exprs fun e
   _Exprs fun (With a b asyncWs c d e) =
     With a b asyncWs c <$> traverseOf (traverse._Exprs) fun d <*> _Exprs fun e
+
+instance HasTrailingNewline Statement where
+  trailingNewline f x =
+    case x of
+      SimpleStatement a b -> SimpleStatement a <$> trailingNewline f b
+      CompoundStatement c -> CompoundStatement <$> trailingNewline f c
+
+  setTrailingNewline s n =
+    case s of
+      SimpleStatement i a -> SimpleStatement i $ a & trailingNewline .~ n
+      CompoundStatement c -> CompoundStatement $ c & trailingNewline .~ n
+
+instance HasTrailingNewline SimpleStatement where
+  trailingNewline f (MkSimpleStatement a b c d e) =
+    MkSimpleStatement a b c d <$> traverse f e
+  setTrailingNewline (MkSimpleStatement a b c d _) n =
+    MkSimpleStatement a b c d (Just n)
+
+instance HasTrailingNewline Suite where
+  trailingNewline f x =
+    case x of
+      SuiteOne a b c -> SuiteOne a b <$> trailingNewline f c
+      SuiteMany a b c d e -> SuiteMany a b c d <$> trailingNewline f e
+  setTrailingNewline x n =
+    case x of
+      SuiteOne a b c -> SuiteOne a b $ setTrailingNewline c n
+      SuiteMany a b c d e -> SuiteMany a b c d $ setTrailingNewline e n
+
+instance HasTrailingNewline Block where
+  trailingNewline f (Block a b []) = Block a <$> trailingNewline f b <*> pure []
+  trailingNewline f (Block a b (c:cs)) =
+    Block a b <$>
+    traverseOf
+      _last
+      (bitraverse (traverseOf _2 f) (trailingNewline f))
+      (c:cs)
+
+  setTrailingNewline (Block a b []) n =
+    Block a (setTrailingNewline b n) []
+  setTrailingNewline (Block a b (c:cs)) n =
+    Block a b (over _last (bimap (_2 .~ n) (flip setTrailingNewline n)) $ c:cs)
+
+instance HasTrailingNewline CompoundStatement where
+  trailingNewline fun s =
+    case s of
+      Fundef a b c d e f g h i j k ->
+        Fundef a b c d e f g h i j <$> trailingNewline fun k
+      If a b c d e f g ->
+        If a b c d <$>
+        (if null f && isNothing g
+         then trailingNewline fun e
+         else pure e) <*>
+        (if isNothing g
+         then (_last._4.trailingNewline) fun f
+         else pure f)<*>
+        (traverse._3.trailingNewline) fun g
+      While a b c d e f ->
+        While a b c d <$>
+        (if isNothing f
+         then trailingNewline fun e
+         else pure e) <*>
+        (traverse._3.trailingNewline) fun f
+      TryExcept a b c d e f g ->
+        TryExcept a b c d <$>
+        (if isNothing f && isNothing g
+         then
+           fmap
+             NonEmpty.fromList
+             ((_last._4.trailingNewline) fun $ NonEmpty.toList e)
+         else pure e) <*>
+        (if isNothing g
+         then (traverse._3.trailingNewline) fun f
+         else pure f) <*>
+        (traverse._3.trailingNewline) fun g
+      TryFinally a b c d e f g ->
+        TryFinally a b c d e f <$>
+        trailingNewline fun g
+      For a b c d e f g h i ->
+        For a b c d e f g <$>
+        (if isNothing i
+         then trailingNewline fun h
+         else pure h) <*>
+        (traverse._3.trailingNewline) fun i
+      ClassDef a b c d e f g ->
+        ClassDef a b c d e f <$> trailingNewline fun g
+      With a b c d e f ->
+        With a b c d e <$> trailingNewline fun f
+  setTrailingNewline s n =
+    case s of
+      Fundef a b c d e f g h i j k ->
+        Fundef a b c d e f g h i j $ setTrailingNewline k n
+      If a b c d e f g ->
+        If a b c d
+        (if null f && isNothing g
+         then setTrailingNewline e n
+         else e)
+        (if isNothing g
+         then over (_last._4) (flip setTrailingNewline n) f
+         else f)
+        (over (mapped._3) (flip setTrailingNewline n) g)
+      While a b c d e f ->
+        While a b c d
+        (if isNothing f
+         then setTrailingNewline e n
+         else e)
+        (over (mapped._3) (flip setTrailingNewline n) f)
+      TryExcept a b c d e f g ->
+        TryExcept a b c d
+        (if isNothing f && isNothing g
+         then
+             NonEmpty.fromList
+             (over (_last._4) (flip setTrailingNewline n) $ NonEmpty.toList e)
+         else e)
+        (if isNothing g
+         then over (mapped._3) (flip setTrailingNewline n) f
+         else f)
+        (over (mapped._3) (flip setTrailingNewline n) g)
+      TryFinally a b c d e f g ->
+        TryFinally a b c d e f $
+        setTrailingNewline g n
+      For a b c d e f g h i ->
+        For a b c d e f g
+        (if isNothing i
+         then setTrailingNewline h n
+         else h)
+        (over (mapped._3) (flip setTrailingNewline n) i)
+      ClassDef a b c d e f g ->
+        ClassDef a b c d e f $ setTrailingNewline g n
+      With a b c d e f ->
+        With a b c d e $ setTrailingNewline f n
 
 makeLenses ''ExceptAs
 makeLenses ''Block

@@ -1,3 +1,4 @@
+{-# language DataKinds #-}
 {-# language GeneralizedNewtypeDeriving, MultiParamTypeClasses, BangPatterns #-}
 {-# language TypeFamilies #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
@@ -7,6 +8,7 @@ module Language.Python.Internal.Syntax.Whitespace
   , Whitespace(..)
   , Blank(..)
   , HasTrailingWhitespace(..)
+  , HasTrailingNewline(..)
   , IndentLevel, getIndentLevel, indentLevel, absoluteIndentLevel
   , Indent(..), indentWhitespaces
   , Indents(..), indentsValue, indentsAnn, subtractStart
@@ -18,6 +20,7 @@ import Control.Lens.Getter (view)
 import Control.Lens.Lens (Lens', lens)
 import Control.Lens.Setter ((.~))
 import Control.Lens.TH (makeLenses)
+import Control.Lens.Traversal (Traversal')
 import Data.Deriving (deriveEq1, deriveOrd1)
 import Data.Foldable (toList)
 import Data.Function ((&))
@@ -53,6 +56,11 @@ instance HasTrailingWhitespace a => HasTrailingWhitespace (NonEmpty a) where
          case xs of
            [] -> (x & trailingWhitespace .~ ws) :| xs
            x' : xs' -> NonEmpty.cons x $ (x' :| xs') & trailingWhitespace .~ ws)
+
+-- | A newline that may be following a statement-containing thing
+class HasTrailingNewline (s :: [*] -> * -> *) where
+  trailingNewline :: Traversal' (s v a) Newline
+  setTrailingNewline :: s v a -> Newline -> s v a
 
 data Blank a
   = Blank

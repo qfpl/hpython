@@ -10,6 +10,7 @@
 {-# language LambdaCase #-}
 module Language.Python.Internal.Render.Correction where
 
+import Control.Lens.Fold (hasn't)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Plated (transform)
 import Control.Lens.Setter ((.~))
@@ -22,7 +23,6 @@ import qualified Data.Text as Text
 
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Numbers
-import Language.Python.Internal.Syntax.Statement
 import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Token
 import Language.Python.Internal.Syntax.Whitespace
@@ -137,34 +137,12 @@ correctInitialFinalQuotes qt = correctFinalQuotes . correctInitialQuotes
             else c : go (n+1 `mod` 3) cs
           else c : cs
 
-correctBlock :: Bool -> Block v a -> Block v a
-correctBlock isFinal = correctSimpleStatements isFinal
-
--- | It's possible that successive 'SimpleStatement's have no newlines in between
+-- | It's possible that successive statements have no newlines in between
 -- them. This would cause them to be displayed on the same line. In every line where
 -- this would be the case, we explicitly insert a line-feed character.
-correctSimpleStatements :: Bool -> Block v a -> Block v a
-correctSimpleStatements isFinal (Block a b c) = Block a b' c'
-  where
-    Right b' :| c' = go (Right b) c
-
-    correctLine b x =
-      case x of
-        Left l -> Left l
-        Right s ->
-          Right $
-          case s of
-            SimpleStatement i a -> SimpleStatement i $ correctSimpleStatement b a
-            CompoundStatement c -> CompoundStatement c
-
-    go x [] = correctLine isFinal x :| []
-    go x (y:ys) = correctLine False x `NonEmpty.cons` go y ys
-
-correctSimpleStatement :: Bool -> SimpleStatement v a -> SimpleStatement v a
-correctSimpleStatement False a =
-  case a of
-    MkSimpleStatement l m n o Nothing ->
-      MkSimpleStatement l m n o (Just LF)
-    MkSimpleStatement l m n o (Just p) ->
-      MkSimpleStatement l m n o (Just p)
-correctSimpleStatement True a = a
+correctTrailingNewline :: HasTrailingNewline s => Bool -> s v a -> s v a
+correctTrailingNewline False s =
+  if hasn't trailingNewline s
+  then setTrailingNewline s LF
+  else s
+correctTrailingNewline True s = s

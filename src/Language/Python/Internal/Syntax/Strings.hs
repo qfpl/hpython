@@ -21,7 +21,7 @@ import Data.Digit.Hexadecimal.MixedCase (HeXDigit(..))
 import Data.Maybe (isJust)
 import Data.Text (Text)
 
-import Language.Python.Internal.Syntax.Whitespace
+import Language.Python.Syntax.Whitespace
 
 data QuoteType
   = SingleQuote
@@ -116,7 +116,9 @@ instance HasTrailingWhitespace (StringLiteral a) where
 
 data PyChar
   = Char_newline
-  | Char_octal OctDigit OctDigit OctDigit
+  | Char_octal1 OctDigit
+  | Char_octal2 OctDigit OctDigit
+  | Char_octal3 OctDigit OctDigit OctDigit
   | Char_hex HeXDigit HeXDigit
   | Char_uni16
       HeXDigit
@@ -149,7 +151,9 @@ isEscape :: PyChar -> Bool
 isEscape c =
   case c of
     Char_newline -> True
-    Char_octal{} -> True
+    Char_octal1{} -> True
+    Char_octal2{} -> True
+    Char_octal3{} -> True
     Char_hex{} -> True
     Char_uni16{} -> True
     Char_uni32{} -> True

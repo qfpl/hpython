@@ -52,7 +52,10 @@ import qualified Data.Text.Lazy.Builder as Builder
 import Language.Python.Internal.Syntax
 import Language.Python.Internal.Render.Correction
 import Language.Python.Internal.Token (PyToken(..))
+import Language.Python.Syntax.Whitespace
 
+-- | A 'RenderOutput' is an intermediate form used during rendering
+-- with efficient concatenation
 newtype RenderOutput a
   = RenderOutput
   { unRenderOutput :: ReaderT Bool (Writer (DList (PyToken ()))) a
@@ -67,9 +70,14 @@ notFinal (RenderOutput a) = RenderOutput $ local (const False) a
 isFinal :: RenderOutput Bool
 isFinal = RenderOutput ask
 
+-- | Render a single token as a 'RenderOutput'
 singleton :: PyToken () -> RenderOutput ()
 singleton a = RenderOutput $ writer ((), DList.singleton a)
 
+-- | Run a 'RenderOutput' to produce a final 'Text'.
+--
+-- These 'Text's should then not be appended any more. All appending should
+-- be done during the 'RenderOutput' phase.
 showRenderOutput :: RenderOutput a -> Text
 showRenderOutput =
   Lazy.toStrict .
@@ -180,7 +188,15 @@ renderPyCharsBytes qt st =
       case s of
         [] -> ""
         Char_newline : cs -> "\\newline" <> go cs
-        Char_octal a b c : cs ->
+        Char_octal1 a  : cs ->
+          "\\" <>
+          [charOctal # a] <>
+          go cs
+        Char_octal2 a b : cs ->
+          "\\" <>
+          [charOctal # a, charOctal # b] <>
+          go cs
+        Char_octal3 a b c : cs ->
           "\\" <>
           [charOctal # a, charOctal # b, charOctal # c] <>
           go cs
@@ -399,7 +415,15 @@ renderPyChars qt st =
       case s of
         [] -> ""
         Char_newline : cs -> "\\newline" <> go cs
-        Char_octal a b c : cs ->
+        Char_octal1 a : cs ->
+          "\\" <>
+          [charOctal # a] <>
+          go cs
+        Char_octal2 a b : cs ->
+          "\\" <>
+          [charOctal # a, charOctal # b] <>
+          go cs
+        Char_octal3 a b c : cs ->
           "\\" <>
           [charOctal # a, charOctal # b, charOctal # c] <>
           go cs
@@ -989,20 +1013,20 @@ renderImportTargets (ImportSomeParens _ ws1 ts ws2) = do
 
 renderAugAssign :: AugAssign a -> RenderOutput ()
 renderAugAssign aa = do
-  singleton $ case aa of
-    PlusEq{} -> TkPlusEq ()
-    MinusEq{} -> TkMinusEq ()
-    StarEq{} -> TkStarEq ()
-    AtEq{} -> TkAtEq ()
-    SlashEq{} -> TkSlashEq ()
-    PercentEq{} -> TkPercentEq ()
-    AmpersandEq{} -> TkAmpersandEq ()
-    PipeEq{} -> TkPipeEq ()
-    CaretEq{} -> TkCaretEq ()
-    ShiftLeftEq{} -> TkShiftLeftEq ()
-    ShiftRightEq{} -> TkShiftRightEq ()
-    DoubleStarEq{} -> TkDoubleStarEq ()
-    DoubleSlashEq{} -> TkDoubleSlashEq ()
+  singleton $ case _augAssignType aa of
+    PlusEq -> TkPlusEq ()
+    MinusEq -> TkMinusEq ()
+    StarEq -> TkStarEq ()
+    AtEq -> TkAtEq ()
+    SlashEq -> TkSlashEq ()
+    PercentEq -> TkPercentEq ()
+    AmpersandEq -> TkAmpersandEq ()
+    PipeEq -> TkPipeEq ()
+    CaretEq -> TkCaretEq ()
+    ShiftLeftEq -> TkShiftLeftEq ()
+    ShiftRightEq -> TkShiftRightEq ()
+    DoubleStarEq -> TkDoubleStarEq ()
+    DoubleSlashEq -> TkDoubleSlashEq ()
   traverse_ renderWhitespace (_augAssignWhitespace aa)
 
 renderSmallStatement :: SmallStatement v a -> RenderOutput ()
@@ -1525,11 +1549,14 @@ renderModule (ModuleStatement a b) = do
   renderStatement a
   renderModule b
 
+-- | Render an entire Python module to 'Text'
 showModule :: Module v a -> Text
 showModule = showRenderOutput . renderModule
 
+-- | Render a single Python statement to 'Text'
 showStatement :: Statement v a -> Text
 showStatement = showRenderOutput . renderStatement
 
+-- | Render a single Python expression to 'Text'
 showExpr :: Expr v a -> Text
 showExpr = showRenderOutput . bracketGenerator

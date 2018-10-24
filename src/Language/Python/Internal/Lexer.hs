@@ -59,6 +59,7 @@ import qualified Text.Megaparsec as Parsec
 
 import Language.Python.Internal.Syntax
 import Language.Python.Internal.Token (PyToken(..), pyTokenAnn)
+import Language.Python.Syntax.Whitespace
 
 data SrcInfo
   = SrcInfo
@@ -156,7 +157,15 @@ stringChar =
        replicateM 4 parseHeXaDeCiMaL)
 
     hexChar = Char_hex <$ char 'x' <*> parseHeXaDeCiMaL <*> parseHeXaDeCiMaL
-    octChar = Char_octal <$> parseOctal <*> parseOctal <*> parseOctal
+    octChar =
+      (\a b c ->
+         maybe
+           (Char_octal1 a)
+           (\b' -> maybe (Char_octal2 a b') (Char_octal3 a b') c)
+           b) <$>
+      parseOctal <*>
+      optional parseOctal <*>
+      optional parseOctal
 
 number :: (CharParsing m, Monad m) => m (a -> PyToken a)
 number = do

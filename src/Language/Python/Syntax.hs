@@ -360,6 +360,7 @@ import Data.Semigroup ((<>))
 import Language.Python.Optics
 import Language.Python.Internal.Syntax hiding (Fundef, While, Call)
 import Language.Python.Syntax.Types
+import Language.Python.Syntax.Whitespace
 
 type Raw f = f '[] ()
 
@@ -1207,12 +1208,12 @@ longStr_ s =
   String () . pure $
   StringLiteral () Nothing LongString DoubleQuote (Char_lit <$> s) []
 
-mkAugAssign :: ([Whitespace] -> AugAssign ()) -> Raw Expr -> Raw Expr -> Raw Statement
-mkAugAssign as a b =
+mkAugAssign :: AugAssignOp -> Raw Expr -> Raw Expr -> Raw Statement
+mkAugAssign at a b =
   SimpleStatement
     (Indents [] ())
     (MkSimpleStatement
-       (AugAssign () (a & trailingWhitespace .~ [Space]) (as [Space]) b)
+       (AugAssign () (a & trailingWhitespace .~ [Space]) (MkAugAssign at () [Space]) b)
        []
        Nothing
        Nothing
@@ -1250,55 +1251,55 @@ chainEq t (a:as) =
 infix 0 .=
 
 (.+=) :: Raw Expr -> Raw Expr -> Raw Statement
-(.+=) = mkAugAssign (PlusEq ())
+(.+=) = mkAugAssign PlusEq
 infix 0 .+=
 
 (.-=) :: Raw Expr -> Raw Expr -> Raw Statement
-(.-=) = mkAugAssign (MinusEq ())
+(.-=) = mkAugAssign MinusEq
 infix 0 .-=
 
 (.*=) :: Raw Expr -> Raw Expr -> Raw Statement
-(.*=) = mkAugAssign (StarEq ())
+(.*=) = mkAugAssign StarEq
 infix 0 .*=
 
 (.@=) :: Raw Expr -> Raw Expr -> Raw Statement
-(.@=) = mkAugAssign (AtEq ())
+(.@=) = mkAugAssign AtEq
 infix 0 .@=
 
 (./=) :: Raw Expr -> Raw Expr -> Raw Statement
-(./=) = mkAugAssign (SlashEq ())
+(./=) = mkAugAssign SlashEq
 infix 0 ./=
 
 (.%=) :: Raw Expr -> Raw Expr -> Raw Statement
-(.%=) = mkAugAssign (PercentEq ())
+(.%=) = mkAugAssign PercentEq
 infix 0 .%=
 
 (.&=) :: Raw Expr -> Raw Expr -> Raw Statement
-(.&=) = mkAugAssign (AmpersandEq ())
+(.&=) = mkAugAssign AmpersandEq
 infix 0 .&=
 
 (.|=) :: Raw Expr -> Raw Expr -> Raw Statement
-(.|=) = mkAugAssign (PipeEq ())
+(.|=) = mkAugAssign PipeEq
 infix 0 .|=
 
 (.^=) :: Raw Expr -> Raw Expr -> Raw Statement
-(.^=) = mkAugAssign (CaretEq ())
+(.^=) = mkAugAssign CaretEq
 infix 0 .^=
 
 (.<<=) :: Raw Expr -> Raw Expr -> Raw Statement
-(.<<=) = mkAugAssign (ShiftLeftEq ())
+(.<<=) = mkAugAssign ShiftLeftEq
 infix 0 .<<=
 
 (.>>=) :: Raw Expr -> Raw Expr -> Raw Statement
-(.>>=) = mkAugAssign (ShiftRightEq ())
+(.>>=) = mkAugAssign ShiftRightEq
 infix 0 .>>=
 
 (.**=) :: Raw Expr -> Raw Expr -> Raw Statement
-(.**=) = mkAugAssign (DoubleStarEq ())
+(.**=) = mkAugAssign DoubleStarEq
 infix 0 .**=
 
 (.//=) :: Raw Expr -> Raw Expr -> Raw Statement
-(.//=) = mkAugAssign (DoubleSlashEq ())
+(.//=) = mkAugAssign DoubleSlashEq
 infix 0 .//=
 
 mkFor :: Raw Expr -> [Raw Expr] -> [Raw Line] -> Raw For

@@ -86,6 +86,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Language.Python.Optics
 import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax
+import Language.Python.Syntax.Whitespace
 import Language.Python.Validate.Indentation
 import Language.Python.Validate.Syntax.Error
 
@@ -680,7 +681,7 @@ validateCompoundStatementSyntax (TryFinally a idnts b e idnts2 f i) =
   validateWhitespace a f <*>
   liftVM1 (local $ inFinally .~ True) (validateSuiteSyntax i)
 validateCompoundStatementSyntax (ClassDef a decos idnts b c d g) =
-  liftVM1 (local $ inLoop .~ False) $
+  liftVM1 (local $ (inLoop .~ False) . (inFunction .~ Nothing)) $
   (\decos' -> ClassDef a decos' idnts) <$>
   traverse validateDecoratorSyntax decos <*>
   validateWhitespace a b <*>

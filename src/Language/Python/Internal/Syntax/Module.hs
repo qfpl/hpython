@@ -12,8 +12,10 @@ Portability : non-portable
 module Language.Python.Internal.Syntax.Module where
 
 import Language.Python.Internal.Syntax.Statement
-import Language.Python.Internal.Syntax.Whitespace
+import Language.Python.Syntax.Whitespace
 
+-- | A Python 'Module', which is stored as a sequence of statements.
+-- A module corresponds to one source file of Python code.
 data Module v a
   = ModuleEmpty
   | ModuleBlankFinal (Blank a)

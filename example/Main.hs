@@ -9,7 +9,7 @@ import OptimizeTailRecursion
 import Indentation
 
 import Language.Python.Render (showModule)
-import Language.Python.Internal.Syntax
+import Language.Python.Internal.Syntax (_Statements)
 
 import qualified Data.Text.IO as StrictText
 

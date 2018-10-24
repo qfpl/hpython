@@ -36,7 +36,6 @@ import qualified Text.Megaparsec as Megaparsec
 
 import Language.Python.Internal.Lexer (SrcInfo(..), withSrcInfo)
 import Language.Python.Internal.Syntax.AugAssign
-import Language.Python.Internal.Syntax.BinOp
 import Language.Python.Internal.Syntax.Comment
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.IR
@@ -44,10 +43,11 @@ import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Import
 import Language.Python.Internal.Syntax.ModuleNames
 import Language.Python.Internal.Syntax.Numbers
+import Language.Python.Internal.Syntax.Operator.Binary
+import Language.Python.Internal.Syntax.Operator.Unary
 import Language.Python.Internal.Syntax.Strings
-import Language.Python.Internal.Syntax.UnOp
-import Language.Python.Internal.Syntax.Whitespace
 import Language.Python.Internal.Token
+import Language.Python.Syntax.Whitespace
 
 newtype PyTokens = PyTokens { unPyTokens :: [PyToken SrcInfo] }
   deriving (Eq, Ord)
@@ -738,67 +738,67 @@ smallStatement =
       token space (\case; TkContinue{} -> True; _ -> False) "continue"
 
     augAssign =
-      (\(tk, s) -> PlusEq (pyTokenAnn tk) s) <$>
+      (\(tk, s) -> MkAugAssign PlusEq (pyTokenAnn tk) s) <$>
       token space (\case; TkPlusEq{} -> True; _ -> False) "+="
 
       <|>
 
-      (\(tk, s) -> MinusEq (pyTokenAnn tk) s) <$>
+      (\(tk, s) -> MkAugAssign MinusEq (pyTokenAnn tk) s) <$>
       token space (\case; TkMinusEq{} -> True; _ -> False) "-="
 
       <|>
 
-      (\(tk, s) -> AtEq (pyTokenAnn tk) s) <$>
+      (\(tk, s) -> MkAugAssign AtEq (pyTokenAnn tk) s) <$>
       token space (\case; TkAtEq{} -> True; _ -> False) "@="
 
       <|>
 
-      (\(tk, s) -> StarEq (pyTokenAnn tk) s) <$>
+      (\(tk, s) -> MkAugAssign StarEq (pyTokenAnn tk) s) <$>
       token space (\case; TkStarEq{} -> True; _ -> False) "*="
 
       <|>
 
-      (\(tk, s) -> SlashEq (pyTokenAnn tk) s) <$>
+      (\(tk, s) -> MkAugAssign SlashEq (pyTokenAnn tk) s) <$>
       token space (\case; TkSlashEq{} -> True; _ -> False) "/="
 
       <|>
 
-      (\(tk, s) -> PercentEq (pyTokenAnn tk) s) <$>
+      (\(tk, s) -> MkAugAssign PercentEq (pyTokenAnn tk) s) <$>
       token space (\case; TkPercentEq{} -> True; _ -> False) "%="
 
       <|>
 
-      (\(tk, s) -> AmpersandEq (pyTokenAnn tk) s) <$>
+      (\(tk, s) -> MkAugAssign AmpersandEq (pyTokenAnn tk) s) <$>
       token space (\case; TkAmpersandEq{} -> True; _ -> False) "&="
 
       <|>
 
-      (\(tk, s) -> PipeEq (pyTokenAnn tk) s) <$>
+      (\(tk, s) -> MkAugAssign PipeEq (pyTokenAnn tk) s) <$>
       token space (\case; TkPipeEq{} -> True; _ -> False) "|="
 
       <|>
 
-      (\(tk, s) -> CaretEq (pyTokenAnn tk) s) <$>
+      (\(tk, s) -> MkAugAssign CaretEq (pyTokenAnn tk) s) <$>
       token space (\case; TkCaretEq{} -> True; _ -> False) "^="
 
       <|>
 
-      (\(tk, s) -> ShiftLeftEq (pyTokenAnn tk) s) <$>
+      (\(tk, s) -> MkAugAssign ShiftLeftEq (pyTokenAnn tk) s) <$>
       token space (\case; TkShiftLeftEq{} -> True; _ -> False) "<<="
 
       <|>
 
-      (\(tk, s) -> ShiftRightEq (pyTokenAnn tk) s) <$>
+      (\(tk, s) -> MkAugAssign ShiftRightEq (pyTokenAnn tk) s) <$>
       token space (\case; TkShiftRightEq{} -> True; _ -> False) ">>="
 
       <|>
 
-      (\(tk, s) -> DoubleStarEq (pyTokenAnn tk) s) <$>
+      (\(tk, s) -> MkAugAssign DoubleStarEq (pyTokenAnn tk) s) <$>
       token space (\case; TkDoubleStarEq{} -> True; _ -> False) "**="
 
       <|>
 
-      (\(tk, s) -> DoubleSlashEq (pyTokenAnn tk) s) <$>
+      (\(tk, s) -> MkAugAssign DoubleSlashEq (pyTokenAnn tk) s) <$>
       token space (\case; TkDoubleSlashEq{} -> True; _ -> False) "//="
 
     exprOrAssignSt =

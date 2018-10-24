@@ -293,3 +293,17 @@ prop_fulltrip_23 =
     let str = "None,*None"
 
     void . shouldBeSuccess $ parseModule "test" str
+
+prop_fulltrip_24 :: Property
+prop_fulltrip_24 =
+  withTests 1 . property $ do
+    let str = "'\1'"
+
+    void . shouldBeSuccess $ parseModule "test" str
+
+prop_fulltrip_25 :: Property
+prop_fulltrip_25 =
+  withTests 1 . property $ do
+    let str = "'\11'"
+
+    void . shouldBeSuccess $ parseModule "test" str

@@ -58,15 +58,29 @@ import Language.Python.Syntax.Whitespace
 -- with efficient concatenation
 newtype RenderOutput a
   = RenderOutput
-  { unRenderOutput :: ReaderT Bool (Writer (DList (PyToken ()))) a
+  { unRenderOutput
+    :: ReaderT
+         -- Is the thing we're rendering followed by an optional
+         -- newline? (as opposed to mandatory newline)
+         --
+         -- This is because the AST may be missing critical newlines
+         -- and we supply them during rendering
+         Bool
+         (Writer (DList (PyToken ())))
+         a
   } deriving (Functor, Applicative, Monad)
 
+-- | Treats the input as a terminating statement (does not cause additional newlines to
+-- be inserted)
 final :: RenderOutput a -> RenderOutput a
 final = id
 
+-- | Treats the input as a non-terminating statement (causes additional newlines to be
+-- inserted)
 notFinal :: RenderOutput a -> RenderOutput a
 notFinal (RenderOutput a) = RenderOutput $ local (const False) a
 
+-- | Are we inside a terminating or non-terminating context?
 isFinal :: RenderOutput Bool
 isFinal = RenderOutput ask
 

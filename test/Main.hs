@@ -74,7 +74,8 @@ validateModuleIndentation' = runValidateIndentation . validateModuleIndentation
 runPython3 :: (MonadTest m, MonadIO m) => FilePath -> Bool -> Text -> m ()
 runPython3 path shouldSucceed str = do
   () <- liftIO $ StrictText.writeFile path str
-  (ec, sto, ste) <- liftIO $ readProcessWithExitCode "python3" ["-m", "py_compile", path] ""
+  (ec, sto, ste) <-
+    liftIO $ readProcessWithExitCode "python3.5" ["-m", "py_compile", path] ""
   annotateShow str
   annotateShow shouldSucceed
   annotateShow ec

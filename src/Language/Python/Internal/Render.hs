@@ -15,11 +15,12 @@ module Language.Python.Internal.Render
   ( -- * Common Functions
     showModule, showStatement, showExpr
     -- * Rendering
-  , RenderOutput, showRenderOutput, singleton, cons
+  , RenderOutput, showRenderOutput, singleton
   , renderModule, renderStatement, renderExpr
     -- * Miscellany
   , showQuoteType, showStringPrefix, showBytesPrefix, showToken, showTokens
-  , bracket, renderWhitespace, renderCommaSep, renderCommaSep1, renderCommaSep1'
+  , parens, braces, brackets
+  , renderWhitespace, renderCommaSep, renderCommaSep1, renderCommaSep1'
   , renderIdent, renderComment, renderModuleName, renderDot, renderRelativeModuleName
   , renderImportAs, renderImportTargets, renderSmallStatement, renderCompoundStatement
   , renderBlock, renderIndent, renderIndents, renderExceptAs, renderArg, renderParam
@@ -28,17 +29,23 @@ module Language.Python.Internal.Render
   )
 where
 
+import Control.Lens.Cons (_init, _last)
+import Control.Lens.Fold (traverseOf_)
 import Control.Lens.Review ((#))
-import Data.Bifoldable (bifoldMap)
+import Control.Monad.Writer.Strict (Writer, execWriter, writer)
+import Control.Monad.Reader (ReaderT, runReaderT, local, ask)
+import Data.Bifoldable (bitraverse_, bitraverse_)
 import Data.Char (ord)
 import Data.Digit.Char (charHeXaDeCiMaL, charOctal)
 import Data.Digit.Hexadecimal.MixedCase (HeXDigit(..))
 import Data.DList (DList)
-import Data.Foldable (toList)
+import Data.Foldable (toList, traverse_)
+import Data.Maybe (isNothing)
 import Data.Semigroup (Semigroup(..))
 import Data.Text (Text)
 
 import qualified Data.DList as DList
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
 import qualified Data.Text.Lazy as Lazy
 import qualified Data.Text.Lazy.Builder as Builder
@@ -49,26 +56,44 @@ import Language.Python.Internal.Token (PyToken(..))
 import Language.Python.Syntax.Whitespace
 
 -- | A 'RenderOutput' is an intermediate form used during rendering
--- with efficient 'Semigroup' and 'Monoid' instances.
-newtype RenderOutput
+-- with efficient concatenation
+newtype RenderOutput a
   = RenderOutput
-  { unRenderOutput :: DList (PyToken ())
-  } deriving (Eq, Show, Semigroup, Monoid)
+  { unRenderOutput
+    :: ReaderT
+         -- Is the thing we're rendering followed by an optional
+         -- newline? (as opposed to mandatory newline)
+         --
+         -- This is because the AST may be missing critical newlines
+         -- and we supply them during rendering
+         Bool
+         (Writer (DList (PyToken ())))
+         a
+  } deriving (Functor, Applicative, Monad)
+
+-- | Treats the input as a terminating statement (does not cause additional newlines to
+-- be inserted)
+final :: RenderOutput a -> RenderOutput a
+final = id
+
+-- | Treats the input as a non-terminating statement (causes additional newlines to be
+-- inserted)
+notFinal :: RenderOutput a -> RenderOutput a
+notFinal (RenderOutput a) = RenderOutput $ local (const False) a
+
+-- | Are we inside a terminating or non-terminating context?
+isFinal :: RenderOutput Bool
+isFinal = RenderOutput ask
 
 -- | Render a single token as a 'RenderOutput'
-singleton :: PyToken () -> RenderOutput
-singleton a = RenderOutput $ DList.singleton a
-
--- | Prepend a single token to a 'RenderOutput'
-cons :: PyToken () -> RenderOutput -> RenderOutput
-cons a (RenderOutput b) = RenderOutput $ DList.cons a b
-infixr 5 `cons`
+singleton :: PyToken () -> RenderOutput ()
+singleton a = RenderOutput $ writer ((), DList.singleton a)
 
 -- | Run a 'RenderOutput' to produce a final 'Text'.
 --
 -- These 'Text's should then not be appended any more. All appending should
 -- be done during the 'RenderOutput' phase.
-showRenderOutput :: RenderOutput -> Text
+showRenderOutput :: RenderOutput a -> Text
 showRenderOutput =
   Lazy.toStrict .
   Builder.toLazyText .
@@ -76,34 +101,45 @@ showRenderOutput =
   correctSpaces showToken .
   correctNewlines .
   DList.toList .
+  execWriter .
+  flip runReaderT True .
   unRenderOutput
 
-renderComment :: Comment a -> RenderOutput
+renderComment :: Comment a -> RenderOutput ()
 renderComment c = singleton $ TkComment (() <$ c)
 
 showComment :: Comment a -> Text
 showComment (MkComment _ s) = Text.pack $ "#" <> s
 
-bracket :: RenderOutput -> RenderOutput
-bracket a = TkLeftParen () `cons` a <> singleton (TkRightParen ())
+between :: RenderOutput l -> RenderOutput r -> RenderOutput a -> RenderOutput a
+between l r m = l *> m <* r
 
-bracketTuple :: Expr v a -> RenderOutput
-bracketTuple e =
+parens :: RenderOutput a -> RenderOutput a
+parens = between (singleton $ TkLeftParen ()) (singleton $ TkRightParen ())
+
+brackets :: RenderOutput a -> RenderOutput a
+brackets = between (singleton $ TkLeftBracket ()) (singleton $ TkRightBracket ())
+
+braces :: RenderOutput a -> RenderOutput a
+braces = between (singleton $ TkLeftBrace ()) (singleton $ TkRightBrace ())
+
+parensTuple :: Expr v a -> RenderOutput ()
+parensTuple e =
   case e of
-    Tuple{} -> bracket $ renderExpr e
+    Tuple{} -> parens $ renderExpr e
     _ -> renderExpr e
 
-bracketGenerator :: Expr v a -> RenderOutput
-bracketGenerator e =
+parensGenerator :: Expr v a -> RenderOutput ()
+parensGenerator e =
   case e of
-    Generator{} -> bracket $ renderExpr e
+    Generator{} -> parens $ renderExpr e
     _ -> renderExpr e
 
-bracketTupleGenerator :: Expr v a -> RenderOutput
-bracketTupleGenerator e =
+parensTupleGenerator :: Expr v a -> RenderOutput ()
+parensTupleGenerator e =
   case e of
-    Tuple{} -> bracket $ renderExpr e
-    Generator{} -> bracket $ renderExpr e
+    Tuple{} -> parens $ renderExpr e
+    Generator{} -> parens $ renderExpr e
     _ -> renderExpr e
 
 escapeChars :: [(Char, Char)]
@@ -455,826 +491,1076 @@ renderPyChars qt st =
                 '\"' | DoubleQuote <- qt -> go $ Char_esc_singlequote : cs
                 _ -> c : go cs
 
-renderWhitespace :: Whitespace -> RenderOutput
+renderWhitespace :: Whitespace -> RenderOutput ()
 renderWhitespace Space = singleton $ TkSpace ()
 renderWhitespace Tab = singleton $ TkTab ()
-renderWhitespace (Continued nl ws) = TkContinued nl () `cons` foldMap renderWhitespace ws
+renderWhitespace (Continued nl ws) = do
+  singleton $ TkContinued nl ()
+  traverse_ renderWhitespace ws
 renderWhitespace (Newline nl) = singleton $ TkNewline nl ()
 renderWhitespace (Comment cmt) = renderComment cmt
 
 renderNewline :: Newline -> PyToken ()
 renderNewline nl = TkNewline nl ()
 
-renderCommaSep :: (a -> RenderOutput) -> CommaSep a -> RenderOutput
-renderCommaSep _ CommaSepNone = mempty
+renderCommaSep :: (a -> RenderOutput ()) -> CommaSep a -> RenderOutput ()
+renderCommaSep _ CommaSepNone = pure ()
 renderCommaSep f (CommaSepOne a) = f a
-renderCommaSep f (CommaSepMany a ws2 c) =
-  f a <>
-  singleton (TkComma ()) <>
-  foldMap renderWhitespace ws2 <>
+renderCommaSep f (CommaSepMany a ws2 c) = do
+  f a
+  singleton $ TkComma ()
+  traverse_ renderWhitespace ws2
   renderCommaSep f c
 
-renderCommaSep1 :: (a -> RenderOutput) -> CommaSep1 a -> RenderOutput
+renderCommaSep1 :: (a -> RenderOutput ()) -> CommaSep1 a -> RenderOutput ()
 renderCommaSep1 f (CommaSepOne1 a) = f a
-renderCommaSep1 f (CommaSepMany1 a ws2 c) =
-  f a <>
-  singleton (TkComma ()) <>
-  foldMap renderWhitespace ws2 <>
+renderCommaSep1 f (CommaSepMany1 a ws2 c) = do
+  f a
+  singleton $ TkComma ()
+  traverse_ renderWhitespace ws2
   renderCommaSep1 f c
 
-renderCommaSep1' :: (a -> RenderOutput) -> CommaSep1' a -> RenderOutput
-renderCommaSep1' f (CommaSepOne1' a b) =
-  f a <>
-  foldMap (\x -> TkComma () `cons` foldMap renderWhitespace x) b
-renderCommaSep1' f (CommaSepMany1' a ws2 c) =
-  f a <>
-  singleton (TkComma ()) <>
-  foldMap renderWhitespace ws2 <>
+renderCommaSep1' :: (a -> RenderOutput ()) -> CommaSep1' a -> RenderOutput ()
+renderCommaSep1' f (CommaSepOne1' a b) = do
+  f a
+  traverse_
+    (\x -> do
+        singleton $ TkComma ()
+        traverse renderWhitespace x)
+    b
+renderCommaSep1' f (CommaSepMany1' a ws2 c) = do
+  f a
+  singleton (TkComma ())
+  traverse_ renderWhitespace ws2
   renderCommaSep1' f c
 
-renderIdent :: Ident v a -> RenderOutput
-renderIdent (MkIdent _ a b) = TkIdent a () `cons` foldMap renderWhitespace b
+renderIdent :: Ident v a -> RenderOutput ()
+renderIdent (MkIdent _ a b) = do
+  singleton $ TkIdent a ()
+  traverse_ renderWhitespace b
 
-bracketTernaryLambda :: (Expr v a -> RenderOutput) -> Expr v a -> RenderOutput
-bracketTernaryLambda _ e@Ternary{} = bracket $ renderExpr e
-bracketTernaryLambda _ e@Lambda{} = bracket $ renderExpr e
-bracketTernaryLambda f e = f e
+parensTernaryLambda :: (Expr v a -> RenderOutput ()) -> Expr v a -> RenderOutput ()
+parensTernaryLambda _ e@Ternary{} = parens $ renderExpr e
+parensTernaryLambda _ e@Lambda{} = parens $ renderExpr e
+parensTernaryLambda f e = f e
 
-renderCompFor :: CompFor v a -> RenderOutput
-renderCompFor (CompFor _ ws1 ex1 ws2 ex2) =
-  TkFor () `cons`
-  foldMap renderWhitespace ws1 <>
+renderCompFor :: CompFor v a -> RenderOutput ()
+renderCompFor (CompFor _ ws1 ex1 ws2 ex2) = do
+  singleton $ TkFor ()
+  traverse_ renderWhitespace ws1
   (case ex1 of
-     Not{} -> bracket $ renderExpr ex1
-     _ -> bracketGenerator ex1) <>
-  singleton (TkIn ()) <>
-  foldMap renderWhitespace ws2 <>
-  bracketTernaryLambda bracketTupleGenerator ex2
+     Not{} -> parens $ renderExpr ex1
+     _ -> parensGenerator ex1)
+  singleton $ TkIn ()
+  traverse_ renderWhitespace ws2
+  parensTernaryLambda parensTupleGenerator ex2
 
-renderCompIf :: CompIf v a -> RenderOutput
-renderCompIf (CompIf _ ws ex) =
-  TkIf () `cons`
-  foldMap renderWhitespace ws <>
-  bracketTernaryLambda bracketTupleGenerator ex
+renderCompIf :: CompIf v a -> RenderOutput ()
+renderCompIf (CompIf _ ws ex) = do
+  singleton $ TkIf ()
+  traverse_ renderWhitespace ws
+  parensTernaryLambda parensTupleGenerator ex
 
-renderComprehension :: (e v a -> RenderOutput) -> Comprehension e v a -> RenderOutput
-renderComprehension f (Comprehension _ expr cf cs) =
-  f expr <>
-  renderCompFor cf <>
-  foldMap (bifoldMap renderCompFor renderCompIf) cs
+renderComprehension
+  :: (e v a -> RenderOutput ())
+  -> Comprehension e v a
+  -> RenderOutput ()
+renderComprehension f (Comprehension _ expr cf cs) = do
+  f expr
+  renderCompFor cf
+  traverse_ (bitraverse_ renderCompFor renderCompIf) cs
 
-renderDictItem :: DictItem v a -> RenderOutput
-renderDictItem (DictItem _ a b c) =
-  bracketTupleGenerator a <>
-  singleton (TkColon ()) <>
-  foldMap renderWhitespace b <>
-  bracketTupleGenerator c
-renderDictItem (DictUnpack _ a b) =
-  TkDoubleStar () `cons`
-  foldMap renderWhitespace a <>
+renderDictItem :: DictItem v a -> RenderOutput ()
+renderDictItem (DictItem _ a b c) = do
+  parensTupleGenerator a
+  singleton $ TkColon ()
+  traverse_ renderWhitespace b
+  parensTupleGenerator c
+renderDictItem (DictUnpack _ a b) = do
+  singleton $ TkDoubleStar ()
+  traverse_ renderWhitespace a
   case b of
-    BinOp _ _ BoolAnd{} _ -> bracket $ renderExpr b
-    BinOp _ _ BoolOr{} _ -> bracket $ renderExpr b
-    BinOp _ _ op _ | isComparison op -> bracket $ renderExpr b
-    Not{} -> bracket $ renderExpr b
-    _ -> bracketTernaryLambda bracketTupleGenerator b
+    BinOp _ _ BoolAnd{} _ -> parens $ renderExpr b
+    BinOp _ _ BoolOr{} _ -> parens $ renderExpr b
+    BinOp _ _ op _ | isComparison op -> parens $ renderExpr b
+    Not{} -> parens $ renderExpr b
+    _ -> parensTernaryLambda parensTupleGenerator b
 
-renderStringLiteral :: StringLiteral a -> RenderOutput
-renderStringLiteral (StringLiteral _ a b c d e) =
-  TkString a b c d () `cons`
-  foldMap renderWhitespace e
-renderStringLiteral (BytesLiteral _ a b c d e) =
-  TkBytes a b c d () `cons`
-  foldMap renderWhitespace e
-renderStringLiteral (RawStringLiteral _ a b c d e) =
-  TkRawString a b c d () `cons`
-  foldMap renderWhitespace e
-renderStringLiteral (RawBytesLiteral _ a b c d e) =
-  TkRawBytes a b c d () `cons`
-  foldMap renderWhitespace e
+renderStringLiteral :: StringLiteral a -> RenderOutput ()
+renderStringLiteral (StringLiteral _ a b c d e) = do
+  singleton $ TkString a b c d ()
+  traverse_ renderWhitespace e
+renderStringLiteral (BytesLiteral _ a b c d e) = do
+  singleton $ TkBytes a b c d ()
+  traverse_ renderWhitespace e
+renderStringLiteral (RawStringLiteral _ a b c d e) = do
+  singleton $ TkRawString a b c d ()
+  traverse_ renderWhitespace e
+renderStringLiteral (RawBytesLiteral _ a b c d e) = do
+  singleton $ TkRawBytes a b c d ()
+  traverse_ renderWhitespace e
 
-renderSubscript :: Subscript v a -> RenderOutput
+renderSubscript :: Subscript v a -> RenderOutput ()
 renderSubscript (SubscriptExpr a) =
   case a of
-    Await{} -> bracket $ renderExpr a
-    _ -> bracketTupleGenerator a
-renderSubscript (SubscriptSlice a b c d) =
-  foldMap bracketTupleGenerator a <>
-  singleton (TkColon ()) <>
-  foldMap renderWhitespace b <>
-  foldMap bracketTupleGenerator c <>
-  foldMap
-    (bifoldMap
-      (cons (TkColon ()) . foldMap renderWhitespace)
-      (foldMap bracketTupleGenerator))
+    Await{} -> parens $ renderExpr a
+    _ -> parensTupleGenerator a
+renderSubscript (SubscriptSlice a b c d) = do
+  traverse_ parensTupleGenerator a
+  singleton $ TkColon ()
+  traverse_ renderWhitespace b
+  traverse_ parensTupleGenerator c
+  traverse_
+    (bitraverse_
+      (\ws -> do
+          singleton $ TkColon ()
+          traverse_ renderWhitespace ws)
+      (traverse_ parensTupleGenerator))
     d
 
-renderYield :: (Expr v a -> RenderOutput) -> Expr v a -> RenderOutput
-renderYield re (Yield _ a b) =
-  singleton (TkYield ()) <>
-  foldMap renderWhitespace a <>
-  foldMap
+renderYield :: (Expr v a -> RenderOutput ()) -> Expr v a -> RenderOutput ()
+renderYield re (Yield _ a b) = do
+  singleton $ TkYield ()
+  traverse_ renderWhitespace a
+  traverse_
     (\x -> case x of
-       Generator{} -> bracket $ renderExpr x
+       Generator{} -> parens $ renderExpr x
        _ -> re x)
     b
-renderYield re (YieldFrom _ a b c) =
-  singleton (TkYield ()) <>
-  foldMap renderWhitespace a <>
-  singleton (TkFrom ()) <>
-  foldMap renderWhitespace b <>
+renderYield re (YieldFrom _ a b c) = do
+  singleton $ TkYield ()
+  traverse_ renderWhitespace a
+  singleton $ TkFrom ()
+  traverse_ renderWhitespace b
   case c of
-    Generator{} -> bracket $ renderExpr c
+    Generator{} -> parens $ renderExpr c
     _ -> re c
 renderYield re e = re e
 
-renderUnpackTarget :: Expr v a -> RenderOutput
+renderUnpackTarget :: Expr v a -> RenderOutput ()
 renderUnpackTarget e =
   case e of
-    BinOp _ _ BoolAnd{} _ -> bracket $ renderExpr e
-    BinOp _ _ BoolOr{} _ -> bracket $ renderExpr e
-    BinOp _ _ op _ | isComparison op -> bracket $ renderExpr e
-    Not{} -> bracket $ renderExpr e
-    _ -> bracketTernaryLambda bracketTupleGenerator e
+    BinOp _ _ BoolAnd{} _ -> parens $ renderExpr e
+    BinOp _ _ BoolOr{} _ -> parens $ renderExpr e
+    BinOp _ _ op _ | isComparison op -> parens $ renderExpr e
+    Not{} -> parens $ renderExpr e
+    _ -> parensTernaryLambda parensTupleGenerator e
 
-renderNestedParens :: RenderOutput -> [([Whitespace], [Whitespace])] -> RenderOutput
+renderNestedParens
+  :: RenderOutput ()
+  -> [([Whitespace], [Whitespace])]
+  -> RenderOutput ()
 renderNestedParens =
   foldr
-    (\(ws1, ws2) y ->
-        TkLeftParen () `cons`
-        foldMap renderWhitespace ws1 <>
-        y <>
-        singleton (TkRightParen ()) <>
-        foldMap renderWhitespace ws2)
+    (\(ws1, ws2) y -> do
+        singleton $ TkLeftParen ()
+        traverse_ renderWhitespace ws1
+        y
+        singleton $ TkRightParen ()
+        traverse_ renderWhitespace ws2)
 
-renderTupleItems :: CommaSep1' (TupleItem v a) -> RenderOutput
+renderTupleItems
+  :: CommaSep1' (TupleItem v a)
+  -> RenderOutput ()
 renderTupleItems (CommaSepOne1' a Nothing) =
   case a of
-    TupleItem _ b -> bracketTupleGenerator b
+    TupleItem _ b -> parensTupleGenerator b
     TupleUnpack _ b c d ->
       renderNestedParens
-        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        (do
+            singleton $ TkStar ()
+            traverse_ renderWhitespace c
+            renderUnpackTarget d)
         b
-renderTupleItems (CommaSepOne1' a (Just ws)) =
+renderTupleItems (CommaSepOne1' a (Just ws)) = do
   (case a of
-     TupleItem _ b -> bracketTupleGenerator b
+     TupleItem _ b -> parensTupleGenerator b
      TupleUnpack _ [] b c ->
-       bracket $ TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
+       parens $ do
+         singleton $ TkStar ()
+         traverse_ renderWhitespace b
+         renderUnpackTarget c
      TupleUnpack _ b c d ->
        renderNestedParens
-         (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
-         b) <>
-  singleton (TkComma ()) <> foldMap renderWhitespace ws
-renderTupleItems (CommaSepMany1' a ws rest) =
+         (do
+             singleton $ TkStar ()
+             traverse_ renderWhitespace c
+             renderUnpackTarget d)
+         b)
+  singleton $ TkComma ()
+  traverse_ renderWhitespace ws
+renderTupleItems (CommaSepMany1' a ws rest) = do
   (case a of
-    TupleItem _ b -> bracketTupleGenerator b
+    TupleItem _ b -> parensTupleGenerator b
     TupleUnpack _ [] b c ->
-      bracket $ TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
+      parens $ do
+        singleton $ TkStar ()
+        traverse_ renderWhitespace b
+        renderUnpackTarget c
     TupleUnpack _ b c d ->
       renderNestedParens
-        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
-        b) <>
-  singleton (TkComma ()) <> foldMap renderWhitespace ws <>
+        (do
+            singleton $ TkStar ()
+            traverse_ renderWhitespace c
+            renderUnpackTarget d)
+        b)
+  singleton $ TkComma ()
+  traverse_ renderWhitespace ws
   renderTupleItems rest
 
-renderSetItem :: SetItem v a -> RenderOutput
+renderSetItem :: SetItem v a -> RenderOutput ()
 renderSetItem a =
   case a of
-    SetItem _ b -> bracketTupleGenerator b
+    SetItem _ b -> parensTupleGenerator b
     SetUnpack _ b c d ->
       renderNestedParens
-        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        (do
+            singleton $ TkStar ()
+            traverse_ renderWhitespace c
+            renderUnpackTarget d)
         b
 
-renderSetItems :: CommaSep1' (SetItem v a) -> RenderOutput
+renderSetItems :: CommaSep1' (SetItem v a) -> RenderOutput ()
 renderSetItems (CommaSepOne1' a Nothing) =
   case a of
-    SetItem _ b -> bracketTupleGenerator b
+    SetItem _ b -> parensTupleGenerator b
     SetUnpack _ b c d ->
       renderNestedParens
-        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        (do
+            singleton $ TkStar ()
+            traverse_ renderWhitespace c
+            renderUnpackTarget d)
         b
-renderSetItems (CommaSepOne1' a (Just ws)) =
+renderSetItems (CommaSepOne1' a (Just ws)) = do
   (case a of
-     SetItem _ b -> bracketTupleGenerator b
-     SetUnpack _ [] b c ->
-       TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
+     SetItem _ b -> parensTupleGenerator b
+     SetUnpack _ [] b c -> do
+       singleton $ TkStar ()
+       traverse_ renderWhitespace b
+       renderUnpackTarget c
      SetUnpack _ b c d ->
        renderNestedParens
-         (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
-         b) <>
-  singleton (TkComma ()) <> foldMap renderWhitespace ws
-renderSetItems (CommaSepMany1' a ws rest) =
+         (do
+             singleton $ TkStar ()
+             traverse_ renderWhitespace c
+             renderUnpackTarget d)
+         b)
+  singleton $ TkComma ()
+  traverse_ renderWhitespace ws
+renderSetItems (CommaSepMany1' a ws rest) = do
   (case a of
-    SetItem _ b -> bracketTupleGenerator b
-    SetUnpack _ [] b c ->
-      TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
+    SetItem _ b -> parensTupleGenerator b
+    SetUnpack _ [] b c -> do
+      singleton $ TkStar ()
+      traverse_ renderWhitespace b
+      renderUnpackTarget c
     SetUnpack _ b c d ->
       renderNestedParens
-        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
-        b) <>
-  singleton (TkComma ()) <> foldMap renderWhitespace ws <>
+        (do
+            singleton $ TkStar ()
+            traverse_ renderWhitespace c
+            renderUnpackTarget d)
+        b)
+  singleton $ TkComma ()
+  traverse_ renderWhitespace ws
   renderSetItems rest
 
-renderListItems :: CommaSep1' (ListItem v a) -> RenderOutput
+renderListItems :: CommaSep1' (ListItem v a) -> RenderOutput ()
 renderListItems (CommaSepOne1' a Nothing) =
   case a of
-    ListItem _ b -> bracketTupleGenerator b
+    ListItem _ b -> parensTupleGenerator b
     ListUnpack _ b c d ->
       renderNestedParens
-        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
+        (do
+            singleton $ TkStar ()
+            traverse_ renderWhitespace c
+            renderUnpackTarget d)
         b
-renderListItems (CommaSepOne1' a (Just ws)) =
+renderListItems (CommaSepOne1' a (Just ws)) = do
   (case a of
-     ListItem _ b -> bracketTupleGenerator b
-     ListUnpack _ [] b c ->
-       TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
+     ListItem _ b -> parensTupleGenerator b
+     ListUnpack _ [] b c -> do
+       singleton $ TkStar ()
+       traverse_ renderWhitespace b
+       renderUnpackTarget c
      ListUnpack _ b c d ->
        renderNestedParens
-         (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
-         b) <>
-  singleton (TkComma ()) <> foldMap renderWhitespace ws
-renderListItems (CommaSepMany1' a ws rest) =
+         (do
+             singleton $ TkStar ()
+             traverse_ renderWhitespace c
+             renderUnpackTarget d)
+         b)
+  singleton (TkComma ())
+  traverse_ renderWhitespace ws
+renderListItems (CommaSepMany1' a ws rest) = do
   (case a of
-    ListItem _ b -> bracketTupleGenerator b
-    ListUnpack _ [] b c ->
-      TkStar () `cons` foldMap renderWhitespace b <> renderUnpackTarget c
+    ListItem _ b -> parensTupleGenerator b
+    ListUnpack _ [] b c -> do
+      singleton $ TkStar ()
+      traverse_ renderWhitespace b
+      renderUnpackTarget c
     ListUnpack _ b c d ->
       renderNestedParens
-        (TkStar () `cons` foldMap renderWhitespace c <> renderUnpackTarget d)
-        b) <>
-  singleton (TkComma ()) <> foldMap renderWhitespace ws <>
+        (do
+            singleton $ TkStar ()
+            traverse_ renderWhitespace c
+            renderUnpackTarget d)
+        b)
+  singleton (TkComma ())
+  traverse_ renderWhitespace ws
   renderListItems rest
 
-renderExpr :: Expr v a -> RenderOutput
-renderExpr (Unit _ a b) =
-  TkLeftParen () `cons`
-  foldMap renderWhitespace a <>
-  singleton (TkRightParen ()) <>
-  foldMap renderWhitespace b
-renderExpr (Lambda _ a b c d) =
-  TkLambda () `cons`
-  foldMap renderWhitespace a <>
-  renderParams b <>
-  singleton (TkColon ()) <> foldMap renderWhitespace c <>
-  bracketTupleGenerator d
-renderExpr e@Yield{} = bracket $ renderYield bracketTupleGenerator e
-renderExpr e@YieldFrom{} = bracket $ renderYield bracketTupleGenerator e
-renderExpr (Ternary _ a b c d e) =
+renderExpr :: Expr v a -> RenderOutput ()
+renderExpr (Unit _ a b) = do
+  singleton $ TkLeftParen ()
+  traverse_ renderWhitespace a
+  singleton $ TkRightParen ()
+  traverse_ renderWhitespace b
+renderExpr (Lambda _ a b c d) = do
+  singleton $ TkLambda ()
+  traverse_ renderWhitespace a
+  renderParams b
+  singleton $ TkColon ()
+  traverse_ renderWhitespace c
+  parensTupleGenerator d
+renderExpr e@Yield{} = parens $ renderYield parensTupleGenerator e
+renderExpr e@YieldFrom{} = parens $ renderYield parensTupleGenerator e
+renderExpr (Ternary _ a b c d e) = do
   (case a of
-     Generator{} -> bracket $ renderExpr a
-     _ -> bracketTupleGenerator a) <>
-  singleton (TkIf ()) <> foldMap renderWhitespace b <>
-  (case c of
-     _ -> bracketTernaryLambda bracketTupleGenerator c) <>
-  singleton (TkElse ()) <> foldMap renderWhitespace d <>
-  (case e of
-     _ -> bracketTupleGenerator e)
-renderExpr (Subscript _ a b c d) =
+     Generator{} -> parens $ renderExpr a
+     _ -> parensTupleGenerator a)
+  singleton $ TkIf ()
+  traverse_ renderWhitespace b
+  parensTernaryLambda parensTupleGenerator c
+  singleton $ TkElse ()
+  traverse_ renderWhitespace d
+  parensTupleGenerator e
+renderExpr (Subscript _ a b c d) = do
   (case a of
-     BinOp{} -> bracket $ renderExpr a
-     UnOp{} -> bracket $ renderExpr a
-     Not{} -> bracket $ renderExpr a
-     Ternary{} -> bracket $ renderExpr a
-     Lambda{} -> bracket $ renderExpr a
-     _ -> bracketTupleGenerator a) <>
-  singleton (TkLeftBracket ()) <>
-  foldMap renderWhitespace b <>
-  renderCommaSep1' renderSubscript c <>
-  singleton (TkRightBracket ()) <>
-  foldMap renderWhitespace d
-renderExpr (Not _ ws e) =
-  TkNot () `cons`
-  foldMap renderWhitespace ws <>
+     BinOp{} -> parens $ renderExpr a
+     UnOp{} -> parens $ renderExpr a
+     Not{} -> parens $ renderExpr a
+     Ternary{} -> parens $ renderExpr a
+     Lambda{} -> parens $ renderExpr a
+     _ -> parensTupleGenerator a)
+  brackets $ do
+    traverse_ renderWhitespace b
+    renderCommaSep1' renderSubscript c
+  traverse_ renderWhitespace d
+renderExpr (Not _ ws e) = do
+  singleton $ TkNot ()
+  traverse_ renderWhitespace ws
   case e of
-    BinOp _ _ BoolAnd{} _ -> bracket $ renderExpr e
-    BinOp _ _ BoolOr{} _ -> bracket $ renderExpr e
-    Ternary{} -> bracket $ renderExpr e
-    Lambda{} -> bracket $ renderExpr e
-    _ -> bracketTupleGenerator e
-renderExpr (Parens _ ws1 e ws2) =
-  bracket (foldMap renderWhitespace ws1 <> renderYield renderExpr e) <>
-  foldMap renderWhitespace ws2
-renderExpr (Bool _ b ws) =
-  (if b then TkTrue () else TkFalse ()) `cons`
-  foldMap renderWhitespace ws
-renderExpr (UnOp _ op expr) =
-  renderUnOp op <>
+    BinOp _ _ BoolAnd{} _ -> parens $ renderExpr e
+    BinOp _ _ BoolOr{} _ -> parens $ renderExpr e
+    Ternary{} -> parens $ renderExpr e
+    Lambda{} -> parens $ renderExpr e
+    _ -> parensTupleGenerator e
+renderExpr (Parens _ ws1 e ws2) = do
+  parens $ do
+    traverse_ renderWhitespace ws1
+    renderYield renderExpr e
+  traverse_ renderWhitespace ws2
+renderExpr (Bool _ b ws) = do
+  singleton $ if b then TkTrue () else TkFalse ()
+  traverse_ renderWhitespace ws
+renderExpr (UnOp _ op expr) = do
+  renderUnOp op
   case expr of
-    BinOp _ _ Exp{} _ -> bracketTupleGenerator expr
-    BinOp{} -> bracket $ renderExpr expr
-    Deref _ Int{} _ _ -> bracket $ renderExpr expr
-    Not{} -> bracket $ renderExpr expr
-    Ternary{} -> bracket $ renderExpr expr
-    Lambda{} -> bracket $ renderExpr expr
-    _ -> bracketTupleGenerator expr
+    BinOp _ _ Exp{} _ -> parensTupleGenerator expr
+    BinOp{} -> parens $ renderExpr expr
+    Deref _ Int{} _ _ -> parens $ renderExpr expr
+    Not{} -> parens $ renderExpr expr
+    Ternary{} -> parens $ renderExpr expr
+    Lambda{} -> parens $ renderExpr expr
+    _ -> parensTupleGenerator expr
 renderExpr (String _ vs) =
-  foldMap renderStringLiteral $ correctAdjacentStrings vs
-renderExpr (Int _ n ws) = TkInt (() <$ n) `cons` foldMap renderWhitespace ws
-renderExpr (Float _ n ws) = TkFloat (() <$ n) `cons` foldMap renderWhitespace ws
-renderExpr (Imag _ n ws) = TkImag (() <$ n) `cons` foldMap renderWhitespace ws
+  traverse_ renderStringLiteral $ correctAdjacentStrings vs
+renderExpr (Int _ n ws) = do
+  singleton $ TkInt (() <$ n)
+  traverse_ renderWhitespace ws
+renderExpr (Float _ n ws) = do
+  singleton $ TkFloat (() <$ n)
+  traverse_ renderWhitespace ws
+renderExpr (Imag _ n ws) = do
+  singleton $ TkImag (() <$ n)
+  traverse_ renderWhitespace ws
 renderExpr (Ident name) = renderIdent name
-renderExpr (List _ ws1 exprs ws2) =
-  TkLeftBracket () `cons`
-  foldMap renderWhitespace ws1 <>
-  foldMap renderListItems exprs <>
-  singleton (TkRightBracket ()) <> foldMap renderWhitespace ws2
-renderExpr (ListComp _ ws1 comp ws2) =
-  TkLeftBracket () `cons`
-  foldMap renderWhitespace ws1 <>
-  renderComprehension
-    (\e -> case e of
-        Yield{} -> bracket $ renderExpr e
-        YieldFrom{} -> bracket $ renderExpr e
-        _ -> bracketTupleGenerator e)
-    comp <>
-  singleton (TkRightBracket ()) <> foldMap renderWhitespace ws2
-renderExpr (Call _ expr ws args ws2) =
+renderExpr (List _ ws1 exprs ws2) = do
+  brackets $ do
+    traverse_ renderWhitespace ws1
+    traverse_ renderListItems exprs
+  traverse_ renderWhitespace ws2
+renderExpr (ListComp _ ws1 comp ws2) = do
+  brackets $ do
+    traverse_ renderWhitespace ws1
+    renderComprehension
+      (\e -> case e of
+          Yield{} -> parens $ renderExpr e
+          YieldFrom{} -> parens $ renderExpr e
+          _ -> parensTupleGenerator e)
+      comp
+  traverse_ renderWhitespace ws2
+renderExpr (Call _ expr ws args ws2) = do
   (case expr of
-     UnOp{} -> bracket $ renderExpr expr
-     BinOp{} -> bracket $ renderExpr expr
-     Tuple{} -> bracket $ renderExpr expr
-     Not{} -> bracket $ renderExpr expr
-     Ternary{} -> bracket $ renderExpr expr
-     Lambda{} -> bracket $ renderExpr expr
-     _ -> bracketGenerator expr) <>
-  bracket (foldMap renderWhitespace ws <> foldMap renderArgs args) <>
-  foldMap renderWhitespace ws2
-renderExpr (Deref _ expr ws name) =
+     UnOp{} -> parens $ renderExpr expr
+     BinOp{} -> parens $ renderExpr expr
+     Tuple{} -> parens $ renderExpr expr
+     Not{} -> parens $ renderExpr expr
+     Ternary{} -> parens $ renderExpr expr
+     Lambda{} -> parens $ renderExpr expr
+     _ -> parensGenerator expr)
+  parens $ do
+    traverse_ renderWhitespace ws
+    traverse_ renderArgs args
+  traverse_ renderWhitespace ws2
+renderExpr (Deref _ expr ws name) = do
   (case expr of
-     Int{} -> bracket $ renderExpr expr
-     BinOp{} -> bracket $ renderExpr expr
-     Tuple{} -> bracket $ renderExpr expr
-     Not{} -> bracket $ renderExpr expr
-     UnOp{} -> bracket $ renderExpr expr
-     Ternary{} -> bracket $ renderExpr expr
-     Lambda{} -> bracket $ renderExpr expr
-     _ -> bracketGenerator expr) <>
-  singleton (TkDot ()) <>
-  foldMap renderWhitespace ws <>
+     Int{} -> parens $ renderExpr expr
+     BinOp{} -> parens $ renderExpr expr
+     Tuple{} -> parens $ renderExpr expr
+     Not{} -> parens $ renderExpr expr
+     UnOp{} -> parens $ renderExpr expr
+     Ternary{} -> parens $ renderExpr expr
+     Lambda{} -> parens $ renderExpr expr
+     _ -> parensGenerator expr)
+  singleton $ TkDot ()
+  traverse_ renderWhitespace ws
   renderIdent name
-renderExpr (None _ ws) = TkNone () `cons` foldMap renderWhitespace ws
-renderExpr (Ellipsis _ ws) = TkEllipsis () `cons` foldMap renderWhitespace ws
-renderExpr (BinOp _ e1 op e2) =
-  (if shouldBracketLeft op e1 then bracket else id) (bracketTernaryLambda bracketGenerator e1) <>
-  renderBinOp op <>
-  (if shouldBracketRight op e2 then bracket else id) (bracketTernaryLambda bracketGenerator e2)
+renderExpr (None _ ws) = do
+  singleton $ TkNone ()
+  traverse_ renderWhitespace ws
+renderExpr (Ellipsis _ ws) = do
+  singleton $ TkEllipsis ()
+  traverse_ renderWhitespace ws
+renderExpr (BinOp _ e1 op e2) = do
+  (if shouldGroupLeft op e1 then parens else id)
+    (parensTernaryLambda parensGenerator e1)
+  renderBinOp op
+  (if shouldGroupRight op e2 then parens else id)
+    (parensTernaryLambda parensGenerator e2)
 renderExpr (Tuple _ a ws c) =
   renderTupleItems $
   case c of
     Nothing -> CommaSepOne1' a (Just ws)
     Just c' -> CommaSepMany1' a ws c'
-renderExpr (DictComp _ ws1 comp ws2) =
-  TkLeftBrace () `cons`
-  foldMap renderWhitespace ws1 <>
-  renderComprehension renderDictItem comp <>
-  singleton (TkRightBrace ()) <> foldMap renderWhitespace ws2
-renderExpr (Dict _ a b c) =
-  TkLeftBrace () `cons`
-  foldMap renderWhitespace a <>
-  foldMap (renderCommaSep1' renderDictItem) b <>
-  singleton (TkRightBrace ()) <>
-  foldMap renderWhitespace c
-renderExpr (SetComp _ ws1 comp ws2) =
-  TkLeftBrace () `cons`
-  foldMap renderWhitespace ws1 <>
-  renderComprehension renderSetItem comp <>
-  singleton (TkRightBrace ()) <> foldMap renderWhitespace ws2
-renderExpr (Set _ a b c) =
-  TkLeftBrace () `cons`
-  foldMap renderWhitespace a <>
-  renderSetItems b <>
-  singleton (TkRightBrace ()) <>
-  foldMap renderWhitespace c
+renderExpr (DictComp _ ws1 comp ws2) = do
+  braces $ do
+    traverse_ renderWhitespace ws1
+    renderComprehension renderDictItem comp
+  traverse_ renderWhitespace ws2
+renderExpr (Dict _ a b c) = do
+  braces $ do
+    traverse_ renderWhitespace a
+    traverse_ (renderCommaSep1' renderDictItem) b
+  traverse_ renderWhitespace c
+renderExpr (SetComp _ ws1 comp ws2) = do
+  braces $ do
+    traverse_ renderWhitespace ws1
+    renderComprehension renderSetItem comp
+  traverse_ renderWhitespace ws2
+renderExpr (Set _ a b c) = do
+  braces $ do
+    traverse_ renderWhitespace a
+    renderSetItems b
+  traverse_ renderWhitespace c
 renderExpr (Generator _ a) =
   renderComprehension
     (\e -> case e of
-        Yield{} -> bracket $ renderExpr e
-        YieldFrom{} -> bracket $ renderExpr e
-        _ -> bracketTupleGenerator e)
+        Yield{} -> parens $ renderExpr e
+        YieldFrom{} -> parens $ renderExpr e
+        _ -> parensTupleGenerator e)
     a
-renderExpr (Await _ ws expr) =
-  TkIdent "await" () `cons`
-  foldMap renderWhitespace ws <>
+renderExpr (Await _ ws expr) = do
+  singleton $ TkIdent "await" ()
+  traverse_ renderWhitespace ws
   (case expr of
-     UnOp{} -> bracket $ renderExpr expr
-     BinOp{} -> bracket $ renderExpr expr
-     Tuple{} -> bracket $ renderExpr expr
-     Not{} -> bracket $ renderExpr expr
-     Ternary{} -> bracket $ renderExpr expr
-     Lambda{} -> bracket $ renderExpr expr
-     _ -> bracketGenerator expr)
+     UnOp{} -> parens $ renderExpr expr
+     BinOp{} -> parens $ renderExpr expr
+     Tuple{} -> parens $ renderExpr expr
+     Not{} -> parens $ renderExpr expr
+     Ternary{} -> parens $ renderExpr expr
+     Lambda{} -> parens $ renderExpr expr
+     _ -> parensGenerator expr)
 
-renderModuleName :: ModuleName v a -> RenderOutput
+renderModuleName :: ModuleName v a -> RenderOutput ()
 renderModuleName (ModuleNameOne _ s) = renderIdent s
-renderModuleName (ModuleNameMany _ n ws2 rest) =
-  renderIdent n <> singleton (TkDot ()) <> foldMap renderWhitespace ws2 <>
+renderModuleName (ModuleNameMany _ n ws2 rest) = do
+  renderIdent n
+  singleton $ TkDot ()
+  traverse_ renderWhitespace ws2
   renderModuleName rest
 
-renderDot :: Dot -> RenderOutput
-renderDot (Dot ws) = TkDot () `cons` foldMap renderWhitespace ws
+renderDot :: Dot -> RenderOutput ()
+renderDot (Dot ws) = do
+  singleton $ TkDot ()
+  traverse_ renderWhitespace ws
 
-renderRelativeModuleName :: RelativeModuleName v a -> RenderOutput
-renderRelativeModuleName (RelativeWithName ds mn) =
-  foldMap renderDot ds <> renderModuleName mn
+renderRelativeModuleName :: RelativeModuleName v a -> RenderOutput ()
+renderRelativeModuleName (RelativeWithName ds mn) = do
+  traverse_ renderDot ds
+  renderModuleName mn
 renderRelativeModuleName (Relative ds) =
-  foldMap renderDot ds
+  traverse_ renderDot ds
 
-renderImportAs :: (e a -> RenderOutput) -> ImportAs e v a -> RenderOutput
-renderImportAs f (ImportAs _ ea m) =
-  f ea <>
-  foldMap (\(a, b) -> TkAs () `cons` foldMap renderWhitespace a <> renderIdent b) m
+renderImportAs :: (e a -> RenderOutput ()) -> ImportAs e v a -> RenderOutput ()
+renderImportAs f (ImportAs _ ea m) = do
+  f ea
+  traverse_
+    (\(a, b) -> do
+        singleton $ TkAs ()
+        traverse_ renderWhitespace a
+        renderIdent b)
+    m
 
-renderImportTargets :: ImportTargets v a -> RenderOutput
-renderImportTargets (ImportAll _ ws) = TkStar () `cons` foldMap renderWhitespace ws
+renderImportTargets :: ImportTargets v a -> RenderOutput ()
+renderImportTargets (ImportAll _ ws) = do
+  singleton $ TkStar ()
+  traverse_ renderWhitespace ws
 renderImportTargets (ImportSome _ ts) =
   renderCommaSep1 (renderImportAs renderIdent) ts
-renderImportTargets (ImportSomeParens _ ws1 ts ws2) =
-  bracket
-    (foldMap renderWhitespace ws1 <> renderCommaSep1' (renderImportAs renderIdent) ts) <>
-  foldMap renderWhitespace ws2
+renderImportTargets (ImportSomeParens _ ws1 ts ws2) = do
+  parens $ do
+    traverse_ renderWhitespace ws1
+    renderCommaSep1' (renderImportAs renderIdent) ts
+  traverse_ renderWhitespace ws2
 
-renderAugAssign :: AugAssign a -> RenderOutput
-renderAugAssign aa =
-  (case _augAssignType aa of
-     PlusEq -> TkPlusEq ()
-     MinusEq -> TkMinusEq ()
-     StarEq -> TkStarEq ()
-     AtEq -> TkAtEq ()
-     SlashEq -> TkSlashEq ()
-     PercentEq -> TkPercentEq ()
-     AmpersandEq -> TkAmpersandEq ()
-     PipeEq -> TkPipeEq ()
-     CaretEq -> TkCaretEq ()
-     ShiftLeftEq -> TkShiftLeftEq ()
-     ShiftRightEq -> TkShiftRightEq ()
-     DoubleStarEq -> TkDoubleStarEq ()
-     DoubleSlashEq -> TkDoubleSlashEq ()) `cons`
-  foldMap renderWhitespace (_augAssignWhitespace aa)
+renderAugAssign :: AugAssign a -> RenderOutput ()
+renderAugAssign aa = do
+  singleton $ case _augAssignType aa of
+    PlusEq -> TkPlusEq ()
+    MinusEq -> TkMinusEq ()
+    StarEq -> TkStarEq ()
+    AtEq -> TkAtEq ()
+    SlashEq -> TkSlashEq ()
+    PercentEq -> TkPercentEq ()
+    AmpersandEq -> TkAmpersandEq ()
+    PipeEq -> TkPipeEq ()
+    CaretEq -> TkCaretEq ()
+    ShiftLeftEq -> TkShiftLeftEq ()
+    ShiftRightEq -> TkShiftRightEq ()
+    DoubleStarEq -> TkDoubleStarEq ()
+    DoubleSlashEq -> TkDoubleSlashEq ()
+  traverse_ renderWhitespace (_augAssignWhitespace aa)
 
-renderSmallStatement :: SmallStatement v a -> RenderOutput
-renderSmallStatement (Assert _ b c d) =
-  TkAssert () `cons`
-  foldMap renderWhitespace b <>
-  bracketTupleGenerator c <>
-  foldMap
-    (\(a, b) -> TkComma () `cons` foldMap renderWhitespace a <> bracketTupleGenerator b)
+renderSmallStatement :: SmallStatement v a -> RenderOutput ()
+renderSmallStatement (Assert _ b c d) = do
+  singleton $ TkAssert ()
+  traverse_ renderWhitespace b
+  parensTupleGenerator c
+  traverse_
+    (\(a, b) -> do
+        singleton $ TkComma ()
+        traverse_ renderWhitespace a
+        parensTupleGenerator b)
     d
-renderSmallStatement (Raise _ ws x) =
-  TkRaise () `cons` foldMap renderWhitespace ws <>
-  foldMap
-    (\(b, c) ->
-       bracketTupleGenerator b <>
-       foldMap
-         (\(d, e) ->
-            TkFrom () `cons` foldMap renderWhitespace d <>
-            bracketTupleGenerator e)
+renderSmallStatement (Raise _ ws x) = do
+  singleton $ TkRaise ()
+  traverse_ renderWhitespace ws
+  traverse_
+    (\(b, c) -> do
+       parensTupleGenerator b
+       traverse_
+         (\(d, e) -> do
+            singleton $ TkFrom ()
+            traverse_ renderWhitespace d
+            parensTupleGenerator e)
          c)
     x
-renderSmallStatement (Return _ ws expr) =
-  TkReturn () `cons` foldMap renderWhitespace ws <> foldMap bracketGenerator expr
-renderSmallStatement (Expr _ expr) = renderYield bracketGenerator expr
-renderSmallStatement (Assign _ lvalue rvalues) =
-  renderExpr lvalue <>
-  foldMap
-    (\(ws2, rvalue) ->
-       TkEq () `cons`
-       foldMap renderWhitespace ws2 <>
-       renderYield bracketGenerator rvalue)
+renderSmallStatement (Return _ ws expr) = do
+  singleton $ TkReturn ()
+  traverse_ renderWhitespace ws
+  traverse_ parensGenerator expr
+renderSmallStatement (Expr _ expr) = renderYield parensGenerator expr
+renderSmallStatement (Assign _ lvalue rvalues) = do
+  renderExpr lvalue
+  traverse_
+    (\(ws2, rvalue) -> do
+       singleton $ TkEq ()
+       traverse_ renderWhitespace ws2
+       renderYield parensGenerator rvalue)
     rvalues
-renderSmallStatement (AugAssign _ lvalue as rvalue) =
-  renderExpr lvalue <> renderAugAssign as <> bracketTupleGenerator rvalue
-renderSmallStatement (Pass _ ws) = TkPass () `cons` foldMap renderWhitespace ws
-renderSmallStatement (Continue _ ws) = TkContinue () `cons` foldMap renderWhitespace ws
-renderSmallStatement (Break _ ws) = TkBreak () `cons` foldMap renderWhitespace ws
-renderSmallStatement (Global _ ws ids) =
-  TkGlobal () `cons` foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
-renderSmallStatement (Nonlocal _ ws ids) =
-  TkNonlocal () `cons` foldMap renderWhitespace ws <> renderCommaSep1 renderIdent ids
-renderSmallStatement (Del _ ws vals) =
-  TkDel () `cons`
-  foldMap renderWhitespace ws <>
+renderSmallStatement (AugAssign _ lvalue as rvalue) = do
+  renderExpr lvalue
+  renderAugAssign as
+  parensTupleGenerator rvalue
+renderSmallStatement (Pass _ ws) = do
+  singleton $ TkPass ()
+  traverse_ renderWhitespace ws
+renderSmallStatement (Continue _ ws) = do
+  singleton $ TkContinue ()
+  traverse_ renderWhitespace ws
+renderSmallStatement (Break _ ws) = do
+  singleton $ TkBreak ()
+  traverse_ renderWhitespace ws
+renderSmallStatement (Global _ ws ids) = do
+  singleton $ TkGlobal ()
+  traverse_ renderWhitespace ws
+  renderCommaSep1 renderIdent ids
+renderSmallStatement (Nonlocal _ ws ids) = do
+  singleton $ TkNonlocal ()
+  traverse_ renderWhitespace ws
+  renderCommaSep1 renderIdent ids
+renderSmallStatement (Del _ ws vals) = do
+  singleton $ TkDel ()
+  traverse_ renderWhitespace ws
   renderCommaSep1'
     (\a -> case a of
-        BinOp{} -> bracket $ renderExpr a
-        Not{} -> bracket $ renderExpr a
-        Ternary{} -> bracket $ renderExpr a
-        Lambda{} -> bracket $ renderExpr a
-        _ -> bracketTupleGenerator a)
+        BinOp{} -> parens $ renderExpr a
+        Not{} -> parens $ renderExpr a
+        Ternary{} -> parens $ renderExpr a
+        Lambda{} -> parens $ renderExpr a
+        _ -> parensTupleGenerator a)
     vals
-renderSmallStatement (Import _ ws ns) =
-  TkImport () `cons` foldMap renderWhitespace ws <>
+renderSmallStatement (Import _ ws ns) = do
+  singleton $ TkImport ()
+  traverse_ renderWhitespace ws
   renderCommaSep1 (renderImportAs renderModuleName) ns
-renderSmallStatement (From _ ws1 name ws3 ns) =
-  TkFrom () `cons` foldMap renderWhitespace ws1 <>
-  renderRelativeModuleName name <>
-  singleton (TkImport ()) <> foldMap renderWhitespace ws3 <>
+renderSmallStatement (From _ ws1 name ws3 ns) = do
+  singleton $ TkFrom ()
+  traverse_ renderWhitespace ws1
+  renderRelativeModuleName name
+  singleton $ TkImport ()
+  traverse_ renderWhitespace ws3
   renderImportTargets ns
 
-renderBlank :: Blank a -> RenderOutput
-renderBlank (Blank _ a b) = foldMap renderWhitespace a <> foldMap renderComment b
+renderBlank :: Blank a -> RenderOutput ()
+renderBlank (Blank _ a b) = do
+  traverse_ renderWhitespace a
+  traverse_ renderComment b
 
-renderBlock :: Block v a -> RenderOutput
-renderBlock bl =
-  foldMap (bifoldMap renderBlank (singleton . renderNewline)) a <>
-  renderStatement b <>
-  foldMap
-    (bifoldMap
-      (bifoldMap renderBlank (singleton . renderNewline))
-      renderStatement)
+renderBlock :: Block v a -> RenderOutput ()
+renderBlock (Block a b c) = do
+  traverse_ (bitraverse_ renderBlank (singleton . renderNewline)) a
+  (if null c then final else notFinal) $ renderStatement b
+  traverseOf_
+    (_init.traverse)
+    (bitraverse_
+      (bitraverse_ renderBlank (singleton . renderNewline))
+      (notFinal . renderStatement))
     c
-  where
-    Block a b c = correctBlock bl
+  traverseOf_
+    _last
+    (bitraverse_
+      (bitraverse_ renderBlank (singleton . renderNewline))
+      (final . renderStatement))
+    c
 
-renderSuite :: Suite v a -> RenderOutput
-renderSuite (SuiteMany _ a b c d) =
-  TkColon () `cons`
-  foldMap renderWhitespace a <>
-  foldMap renderComment b <>
-  singleton (renderNewline c) <>
+renderSuite
+  :: Suite v a
+  -> RenderOutput ()
+renderSuite (SuiteMany _ a b c d) = do
+  singleton $ TkColon ()
+  traverse_ renderWhitespace a
+  traverse_ renderComment b
+  singleton (renderNewline c)
   renderBlock d
-renderSuite (SuiteOne _ a b) =
-  TkColon () `cons`
-  foldMap renderWhitespace a <>
-  renderSimpleStatement b
+renderSuite (SuiteOne _ a b) = do
+  singleton $ TkColon ()
+  traverse_ renderWhitespace a
+  fin <- isFinal
+  renderSimpleStatement $ correctTrailingNewline fin b
 
-renderDecorator :: Decorator v a -> RenderOutput
-renderDecorator (Decorator _ a b c d e f) =
-  renderIndents a <>
-  singleton (TkAt ()) <>
-  foldMap renderWhitespace b <>
-  renderExpr c <>
-  foldMap renderComment d <>
-  singleton (renderNewline e) <>
-  foldMap (bifoldMap renderBlank (singleton . renderNewline)) f
+renderDecorator :: Decorator v a -> RenderOutput ()
+renderDecorator (Decorator _ a b c d e f) = do
+  renderIndents a
+  singleton $ TkAt ()
+  traverse_ renderWhitespace b
+  renderExpr c
+  traverse_ renderComment d
+  singleton (renderNewline e)
+  traverse_ (bitraverse_ renderBlank (singleton . renderNewline)) f
 
-renderCompoundStatement :: CompoundStatement v a -> RenderOutput
-renderCompoundStatement (Fundef _ decos idnt asyncWs ws1 name ws2 params ws3 mty s) =
-  foldMap renderDecorator decos <>
-  renderIndents idnt <>
-  foldMap (\ws -> TkIdent "async" () `cons` foldMap renderWhitespace ws) asyncWs <>
-  singleton (TkDef ()) <> foldMap renderWhitespace ws1 <> renderIdent name <>
-  bracket (foldMap renderWhitespace ws2 <> renderParams params) <>
-  foldMap renderWhitespace ws3 <>
-  foldMap
-    (\(ws, ty) -> TkRightArrow () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
-    mty <>
-  renderSuite s
-renderCompoundStatement (If _ idnt ws1 expr s elifs body') =
-  renderIndents idnt <>
-  singleton (TkIf ()) <> foldMap renderWhitespace ws1 <>
-  bracketTupleGenerator expr <>
-  renderSuite s <>
-  foldMap
-    (\(idnt, ws4, ex, s) ->
-        renderIndents idnt <>
-        singleton (TkElif ()) <> foldMap renderWhitespace ws4 <>
-        bracketTupleGenerator ex <>
-        renderSuite s)
-    elifs <>
-  foldMap
-    (\(idnt, ws4, s) ->
-        renderIndents idnt <>
-        singleton (TkElse ()) <> foldMap renderWhitespace ws4 <>
-        renderSuite s)
+renderCompoundStatement :: CompoundStatement v a -> RenderOutput ()
+renderCompoundStatement (Fundef _ decos idnt asyncWs ws1 name ws2 params ws3 mty s) = do
+  traverse_ renderDecorator decos
+  renderIndents idnt
+  traverse_
+    (\ws -> do
+        singleton $ TkIdent "async" ()
+        traverse_ renderWhitespace ws)
+    asyncWs
+  singleton (TkDef ())
+  traverse_ renderWhitespace ws1
+  renderIdent name
+  parens $ do
+    traverse_ renderWhitespace ws2
+    renderParams params
+  traverse_ renderWhitespace ws3
+  traverse_
+    (\(ws, ty) -> do
+        singleton $ TkRightArrow ()
+        traverse_ renderWhitespace ws
+        parensTupleGenerator ty)
+    mty
+  final $ renderSuite s
+renderCompoundStatement (If _ idnt ws1 expr s elifs body') = do
+  renderIndents idnt
+  singleton $ TkIf ()
+  traverse_ renderWhitespace ws1
+  parensTupleGenerator expr
+  notFinal $ renderSuite s
+  traverseOf_
+    (_init.traverse)
+    (\(idnt, ws4, ex, s) -> do
+        renderIndents idnt
+        singleton $ TkElif ()
+        traverse_ renderWhitespace ws4
+        parensTupleGenerator ex
+        notFinal $ renderSuite s)
+    elifs
+  traverseOf_
+    _last
+    (\(idnt, ws4, ex, s) -> do
+        renderIndents idnt
+        singleton $ TkElif ()
+        traverse_ renderWhitespace ws4
+        parensTupleGenerator ex
+        (if isNothing body' then final else notFinal) $ renderSuite s)
+    elifs
+  traverse_
+    (\(idnt, ws4, s) -> do
+        renderIndents idnt
+        singleton $ TkElse ()
+        traverse_ renderWhitespace ws4
+        final $ renderSuite s)
     body'
-renderCompoundStatement (While _ idnt ws1 expr s els) =
-  renderIndents idnt <>
-  singleton (TkWhile ()) <>
-  foldMap renderWhitespace ws1 <>
-  bracketTupleGenerator expr <>
-  renderSuite s <>
-  foldMap
-    (\(idnt, ws4, s) ->
-        renderIndents idnt <>
-        singleton (TkElse ()) <> foldMap renderWhitespace ws4 <>
-        renderSuite s)
+renderCompoundStatement (While _ idnt ws1 expr s els) = do
+  renderIndents idnt
+  singleton $ TkWhile ()
+  traverse_ renderWhitespace ws1
+  parensTupleGenerator expr
+  (if isNothing els then final else notFinal) $ renderSuite s
+  traverse_
+    (\(idnt, ws4, s) -> do
+        renderIndents idnt
+        singleton $ TkElse ()
+        traverse_ renderWhitespace ws4
+        final $ renderSuite s)
     els
-renderCompoundStatement (TryExcept _ idnt a s e f g) =
-  renderIndents idnt <>
-  singleton (TkTry ()) <> foldMap renderWhitespace a <>
-  renderSuite s <>
-  foldMap
-    (\(idnt, ws1, eas, s) ->
-       renderIndents idnt <>
-       singleton (TkExcept ()) <> foldMap renderWhitespace ws1 <>
-       foldMap renderExceptAs eas <>
-       renderSuite s)
-    e <>
-  foldMap
-    (\(idnt, ws1, s) ->
-       renderIndents idnt <>
-       singleton (TkElse ()) <> foldMap renderWhitespace ws1 <>
-       renderSuite s)
-    f <>
-  foldMap
-    (\(idnt, ws1, s) ->
-       renderIndents idnt <>
-       singleton (TkFinally ()) <> foldMap renderWhitespace ws1 <>
-       renderSuite s)
+renderCompoundStatement (TryExcept _ idnt a s e f g) = do
+  renderIndents idnt
+  singleton $ TkTry ()
+  traverse_ renderWhitespace a
+  notFinal $ renderSuite s
+  traverse_
+    (\(idnt, ws1, eas, s) -> do
+       renderIndents idnt
+       singleton $ TkExcept ()
+       traverse_ renderWhitespace ws1
+       traverse_ renderExceptAs eas
+       notFinal $ renderSuite s)
+    (NonEmpty.init e)
+  (case NonEmpty.last e of
+     (idnt, ws1, eas, s) -> do
+       renderIndents idnt
+       singleton $ TkExcept ()
+       traverse_ renderWhitespace ws1
+       traverse_ renderExceptAs eas
+       (if isNothing f && isNothing g then final else notFinal) $ renderSuite s)
+  traverse_
+    (\(idnt, ws1, s) -> do
+       renderIndents idnt
+       singleton $ TkElse ()
+       traverse_ renderWhitespace ws1
+       (if isNothing g then final else notFinal) $ renderSuite s)
+    f
+  traverse_
+    (\(idnt, ws1, s) -> do
+       renderIndents idnt
+       singleton $ TkFinally ()
+       traverse_ renderWhitespace ws1
+       final $ renderSuite s)
     g
-renderCompoundStatement (TryFinally _ idnt a s idnt2 e s') =
-  renderIndents idnt <>
-  singleton (TkTry ()) <> foldMap renderWhitespace a <>
-  renderSuite s <>
-  renderIndents idnt2 <>
-  singleton (TkFinally ()) <> foldMap renderWhitespace e <>
-  renderSuite s'
-renderCompoundStatement (For _ idnt asyncWs a b c d s h) =
-  renderIndents idnt <>
-  foldMap (\ws -> TkIdent "async" () `cons` foldMap renderWhitespace ws) asyncWs <>
-  singleton (TkFor ()) <> foldMap renderWhitespace a <> bracketGenerator b <>
-  singleton (TkIn ()) <>
-  foldMap renderWhitespace c <>
-  renderCommaSep1' bracketTupleGenerator d <>
-  renderSuite s <>
-  foldMap
-    (\(idnt, x, s) ->
-        renderIndents idnt <>
-        singleton (TkElse ()) <> foldMap renderWhitespace x <>
-        renderSuite s)
+renderCompoundStatement (TryFinally _ idnt a s idnt2 e s') = do
+  renderIndents idnt
+  singleton $ TkTry ()
+  traverse_ renderWhitespace a
+  notFinal $ renderSuite s
+  renderIndents idnt2
+  singleton $ TkFinally ()
+  traverse_ renderWhitespace e
+  final $ renderSuite s'
+renderCompoundStatement (For _ idnt asyncWs a b c d s h) = do
+  renderIndents idnt
+  traverse_
+    (\ws -> do
+        singleton $ TkIdent "async" ()
+        traverse_ renderWhitespace ws)
+    asyncWs
+  singleton $ TkFor ()
+  traverse_ renderWhitespace a
+  parensGenerator b
+  singleton $ TkIn ()
+  traverse_ renderWhitespace c
+  renderCommaSep1' parensTupleGenerator d
+  (if isNothing h then final else notFinal) $ renderSuite s
+  traverse_
+    (\(idnt, x, s) -> do
+        renderIndents idnt
+        singleton $ TkElse ()
+        traverse_ renderWhitespace x
+        final $ renderSuite s)
     h
-renderCompoundStatement (ClassDef _ decos idnt a b c s) =
-  foldMap renderDecorator decos <>
-  renderIndents idnt <>
-  singleton (TkClass ()) <> foldMap renderWhitespace a <>
-  renderIdent b <>
-  foldMap
-    (\(x, y, z) ->
-      bracket
-        (foldMap renderWhitespace x <>
-         foldMap renderArgs y) <>
-      foldMap renderWhitespace z)
-    c <>
-  renderSuite s
-renderCompoundStatement (With _ idnt asyncWs a b s) =
-  renderIndents idnt <>
-  foldMap (\ws -> TkIdent "async" () `cons` foldMap renderWhitespace ws) asyncWs <>
-  singleton (TkWith ()) <> foldMap renderWhitespace a <>
-  renderCommaSep1 renderWithItem b <>
-  renderSuite s
+renderCompoundStatement (ClassDef _ decos idnt a b c s) = do
+  traverse_ renderDecorator decos
+  renderIndents idnt
+  singleton $ TkClass ()
+  traverse_ renderWhitespace a
+  renderIdent b
+  traverse_
+    (\(x, y, z) -> do
+      parens $ do
+        traverse_ renderWhitespace x
+        traverse_ renderArgs y
+      traverse_ renderWhitespace z)
+    c
+  final $ renderSuite s
+renderCompoundStatement (With _ idnt asyncWs a b s) = do
+  renderIndents idnt
+  traverse_
+    (\ws -> do
+        singleton $ TkIdent "async" ()
+        traverse_ renderWhitespace ws)
+    asyncWs
+  singleton $ TkWith ()
+  traverse_ renderWhitespace a
+  renderCommaSep1 renderWithItem b
+  final $ renderSuite s
 
-renderWithItem :: WithItem v a -> RenderOutput
-renderWithItem (WithItem _ a b) =
-  bracketTupleGenerator a <>
-  foldMap
-    (\(c, d) -> 
-       singleton (TkAs ()) <>
-       foldMap renderWhitespace c <>
-       bracketTupleGenerator d)
+renderWithItem :: WithItem v a -> RenderOutput ()
+renderWithItem (WithItem _ a b) = do
+  parensTupleGenerator a
+  traverse_
+    (\(c, d) -> do
+       singleton $ TkAs ()
+       traverse_ renderWhitespace c
+       parensTupleGenerator d)
     b
 
-renderIndent :: Indent -> RenderOutput
-renderIndent (MkIndent ws) = foldMap renderWhitespace $ toList ws
+renderIndent :: Indent -> RenderOutput ()
+renderIndent (MkIndent ws) = traverse_ renderWhitespace $ toList ws
 
-renderSimpleStatement :: SimpleStatement v a -> RenderOutput
-renderSimpleStatement (MkSimpleStatement s ss sc cmt nl) =
-  renderSmallStatement s <>
-  foldMap
-    (\(b, c) ->
-       TkSemicolon () `cons`
-       foldMap renderWhitespace b <>
+renderSimpleStatement :: SimpleStatement v a -> RenderOutput ()
+renderSimpleStatement (MkSimpleStatement s ss sc cmt nl) = do
+  renderSmallStatement s
+  traverse_
+    (\(b, c) -> do
+       singleton $ TkSemicolon ()
+       traverse_ renderWhitespace b
        renderSmallStatement c)
-    ss <>
-  foldMap
-    (\b -> TkSemicolon () `cons` foldMap renderWhitespace b)
-    sc <>
-  foldMap renderComment cmt <>
-  foldMap (singleton . renderNewline) nl
+    ss
+  traverse_
+    (\b -> do
+        singleton $ TkSemicolon ()
+        traverse_ renderWhitespace b)
+    sc
+  traverse_ renderComment cmt
+  traverse_ (singleton . renderNewline) nl
 
-renderStatement :: Statement v a -> RenderOutput
+renderStatement :: Statement v a -> RenderOutput ()
 renderStatement (CompoundStatement c) = renderCompoundStatement c
-renderStatement (SimpleStatement idnts s) =
-  renderIndents idnts <> renderSimpleStatement s
+renderStatement (SimpleStatement idnts s) = do
+  renderIndents idnts
+  fin <- isFinal
+  renderSimpleStatement $ correctTrailingNewline fin s
 
-renderExceptAs :: ExceptAs v a -> RenderOutput
-renderExceptAs (ExceptAs _ e f) =
-  bracketTupleGenerator e <>
-  foldMap (\(a, b) -> TkAs () `cons` foldMap renderWhitespace a <> renderIdent b) f
+renderExceptAs :: ExceptAs v a -> RenderOutput ()
+renderExceptAs (ExceptAs _ e f) = do
+  parensTupleGenerator e
+  traverse_
+    (\(a, b) -> do
+        singleton $ TkAs ()
+        traverse_ renderWhitespace a
+        renderIdent b)
+    f
 
-renderArgs :: CommaSep1' (Arg v a) -> RenderOutput
-renderArgs (CommaSepOne1' a Nothing) = renderArg bracketTuple a
-renderArgs e = renderCommaSep1' (renderArg bracketTupleGenerator) e
+renderArgs :: CommaSep1' (Arg v a) -> RenderOutput ()
+renderArgs (CommaSepOne1' a Nothing) = renderArg parensTuple a
+renderArgs e = renderCommaSep1' (renderArg parensTupleGenerator) e
 
-renderArg :: (Expr v a -> RenderOutput) -> Arg v a -> RenderOutput
+renderArg :: (Expr v a -> RenderOutput ()) -> Arg v a -> RenderOutput ()
 renderArg re (PositionalArg _ expr) = re expr
-renderArg _ (KeywordArg _ name ws2 expr) =
-  renderIdent name <> singleton (TkEq ()) <>
-  foldMap renderWhitespace ws2 <>
-  bracketTupleGenerator expr
-renderArg _ (StarArg _ ws expr) =
-  TkStar () `cons`
-  foldMap renderWhitespace ws <>
-  bracketTupleGenerator expr
-renderArg _ (DoubleStarArg _ ws expr) =
-  TkDoubleStar () `cons`
-  foldMap renderWhitespace ws <>
-  bracketTupleGenerator expr
+renderArg _ (KeywordArg _ name ws2 expr) = do
+  renderIdent name
+  singleton $ TkEq ()
+  traverse_ renderWhitespace ws2
+  parensTupleGenerator expr
+renderArg _ (StarArg _ ws expr) = do
+  singleton $ TkStar ()
+  traverse_ renderWhitespace ws
+  parensTupleGenerator expr
+renderArg _ (DoubleStarArg _ ws expr) = do
+  singleton $ TkDoubleStar ()
+  traverse_ renderWhitespace ws
+  parensTupleGenerator expr
 
-renderParams :: CommaSep (Param v a) -> RenderOutput
+renderParams :: CommaSep (Param v a) -> RenderOutput ()
 renderParams = go False
   where
-    go :: Bool -> CommaSep (Param v a) -> RenderOutput
-    go _ CommaSepNone = mempty
+    go :: Bool -> CommaSep (Param v a) -> RenderOutput ()
+    go _ CommaSepNone = pure ()
     go _ (CommaSepOne a) = renderParam a
-    go sawStar (CommaSepMany a ws2 b) =
+    go sawStar (CommaSepMany a ws2 b) = do
       let
         sawStar' =
           case a of
             StarParam{} -> True;
             DoubleStarParam{} -> True
             _ -> sawStar
-      in
-        renderParam a <>
-        (case b of
-           CommaSepNone | sawStar' -> mempty
-           _ ->
-             singleton (TkComma ()) <>
-             foldMap renderWhitespace ws2) <>
+      renderParam a
+      (case b of
+          CommaSepNone | sawStar' -> pure ()
+          _ -> do
+            singleton (TkComma ())
+            traverse_ renderWhitespace ws2)
       go sawStar' b
 
-renderParam :: Param v a -> RenderOutput
-renderParam (PositionalParam _ name mty) =
-  renderIdent name <>
-  foldMap
-    (\(ws, ty) -> TkColon () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
+renderParam :: Param v a -> RenderOutput ()
+renderParam (PositionalParam _ name mty) = do
+  renderIdent name
+  traverse_
+    (\(ws, ty) -> do
+        singleton $ TkColon ()
+        traverse_ renderWhitespace ws
+        parensTupleGenerator ty)
     mty
-renderParam (StarParam _ ws name mty) =
-  TkStar () `cons`
-  foldMap renderWhitespace ws <>
-  foldMap renderIdent name <>
-  foldMap
-    (\(ws, ty) -> TkColon () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
+renderParam (StarParam _ ws name mty) = do
+  singleton $ TkStar ()
+  traverse_ renderWhitespace ws
+  traverse_ renderIdent name
+  traverse_
+    (\(ws, ty) -> do
+        singleton $ TkColon ()
+        traverse_ renderWhitespace ws
+        parensTupleGenerator ty)
     mty
-renderParam (DoubleStarParam _ ws name mty) =
-  TkDoubleStar () `cons`
-  foldMap renderWhitespace ws <>
-  renderIdent name <>
-  foldMap
-    (\(ws, ty) -> TkColon () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
+renderParam (DoubleStarParam _ ws name mty) = do
+  singleton $ TkDoubleStar ()
+  traverse_ renderWhitespace ws
+  renderIdent name
+  traverse_
+    (\(ws, ty) -> do
+        singleton $ TkColon ()
+        traverse_ renderWhitespace ws
+        parensTupleGenerator ty)
     mty
-renderParam (KeywordParam _ name mty ws2 expr) =
-  renderIdent name <>
-  foldMap
-    (\(ws, ty) -> TkColon () `cons` foldMap renderWhitespace ws <> bracketTupleGenerator ty)
-    mty <>
-  singleton (TkEq ()) <>
-  foldMap renderWhitespace ws2 <>
-  bracketTupleGenerator expr
+renderParam (KeywordParam _ name mty ws2 expr) = do
+  renderIdent name
+  traverse_
+    (\(ws, ty) -> do
+        singleton $ TkColon ()
+        traverse_ renderWhitespace ws
+        parensTupleGenerator ty)
+    mty
+  singleton $ TkEq ()
+  traverse_ renderWhitespace ws2
+  parensTupleGenerator expr
 
-renderUnOp :: UnOp a -> RenderOutput
-renderUnOp (Negate _ ws) = singleton (TkMinus ()) <> foldMap renderWhitespace ws
-renderUnOp (Positive _ ws) = singleton (TkPlus ()) <> foldMap renderWhitespace ws
-renderUnOp (Complement _ ws) = singleton (TkTilde ()) <> foldMap renderWhitespace ws
+renderUnOp :: UnOp a -> RenderOutput ()
+renderUnOp (Negate _ ws) = do
+  singleton $ TkMinus ()
+  traverse_ renderWhitespace ws
+renderUnOp (Positive _ ws) = do
+  singleton $ TkPlus ()
+  traverse_ renderWhitespace ws
+renderUnOp (Complement _ ws) = do
+  singleton $ TkTilde ()
+  traverse_ renderWhitespace ws
 
-renderBinOp :: BinOp a -> RenderOutput
-renderBinOp (Is _ ws) = TkIs () `cons` foldMap renderWhitespace ws
-renderBinOp (IsNot _ ws1 ws2) =
-  TkIs () `cons`
-  foldMap renderWhitespace ws1 <>
-  singleton (TkNot ()) <>
-  foldMap renderWhitespace ws2
-renderBinOp (In _ ws) = TkIn () `cons` foldMap renderWhitespace ws
-renderBinOp (NotIn _ ws1 ws2) =
-  TkNot () `cons`
-  foldMap renderWhitespace ws1 <>
-  singleton (TkIn ()) <>
-  foldMap renderWhitespace ws2
-renderBinOp (Plus _ ws) = TkPlus () `cons` foldMap renderWhitespace ws
-renderBinOp (Minus _ ws) = TkMinus () `cons` foldMap renderWhitespace ws
-renderBinOp (Multiply _ ws) = TkStar () `cons` foldMap renderWhitespace ws
-renderBinOp (At _ ws) = TkAt () `cons` foldMap renderWhitespace ws
-renderBinOp (Divide _ ws) = TkSlash () `cons` foldMap renderWhitespace ws
-renderBinOp (FloorDivide _ ws) =
-  TkDoubleSlash () `cons` foldMap renderWhitespace ws
-renderBinOp (Exp _ ws) = TkDoubleStar () `cons` foldMap renderWhitespace ws
-renderBinOp (BoolAnd _ ws) = TkAnd () `cons` foldMap renderWhitespace ws
-renderBinOp (BoolOr _ ws) = TkOr () `cons` foldMap renderWhitespace ws
-renderBinOp (Equals _ ws) = TkDoubleEq () `cons` foldMap renderWhitespace ws
-renderBinOp (Lt _ ws) = TkLt () `cons` foldMap renderWhitespace ws
-renderBinOp (LtEquals _ ws) = TkLte () `cons` foldMap renderWhitespace ws
-renderBinOp (Gt _ ws) = TkGt () `cons` foldMap renderWhitespace ws
-renderBinOp (GtEquals _ ws) = TkGte () `cons` foldMap renderWhitespace ws
-renderBinOp (NotEquals _ ws) = TkBangEq () `cons` foldMap renderWhitespace ws
-renderBinOp (Percent _ ws) = TkPercent () `cons` foldMap renderWhitespace ws
-renderBinOp (BitOr _ ws) = TkPipe () `cons` foldMap renderWhitespace ws
-renderBinOp (BitXor _ ws) = TkCaret () `cons` foldMap renderWhitespace ws
-renderBinOp (BitAnd _ ws) = TkAmpersand () `cons` foldMap renderWhitespace ws
-renderBinOp (ShiftLeft _ ws) = TkShiftLeft () `cons` foldMap renderWhitespace ws
-renderBinOp (ShiftRight _ ws) = TkShiftRight () `cons` foldMap renderWhitespace ws
+renderBinOp :: BinOp a -> RenderOutput ()
+renderBinOp (Is _ ws) = do
+  singleton $ TkIs ()
+  traverse_ renderWhitespace ws
+renderBinOp (IsNot _ ws1 ws2) = do
+  singleton $ TkIs ()
+  traverse_ renderWhitespace ws1
+  singleton $ TkNot ()
+  traverse_ renderWhitespace ws2
+renderBinOp (In _ ws) = do
+  singleton $ TkIn ()
+  traverse_ renderWhitespace ws
+renderBinOp (NotIn _ ws1 ws2) = do
+  singleton $ TkNot ()
+  traverse_ renderWhitespace ws1
+  singleton $ TkIn ()
+  traverse_ renderWhitespace ws2
+renderBinOp (Plus _ ws) = do
+  singleton $ TkPlus ()
+  traverse_ renderWhitespace ws
+renderBinOp (Minus _ ws) = do
+  singleton $ TkMinus ()
+  traverse_ renderWhitespace ws
+renderBinOp (Multiply _ ws) = do
+  singleton $ TkStar ()
+  traverse_ renderWhitespace ws
+renderBinOp (At _ ws) = do
+  singleton $ TkAt ()
+  traverse_ renderWhitespace ws
+renderBinOp (Divide _ ws) = do
+  singleton $ TkSlash ()
+  traverse_ renderWhitespace ws
+renderBinOp (FloorDivide _ ws) = do
+  singleton $ TkDoubleSlash ()
+  traverse_ renderWhitespace ws
+renderBinOp (Exp _ ws) = do
+  singleton $ TkDoubleStar ()
+  traverse_ renderWhitespace ws
+renderBinOp (BoolAnd _ ws) = do
+  singleton $ TkAnd ()
+  traverse_ renderWhitespace ws
+renderBinOp (BoolOr _ ws) = do
+  singleton $ TkOr ()
+  traverse_ renderWhitespace ws
+renderBinOp (Equals _ ws) = do
+  singleton $ TkDoubleEq ()
+  traverse_ renderWhitespace ws
+renderBinOp (Lt _ ws) = do
+  singleton $ TkLt ()
+  traverse_ renderWhitespace ws
+renderBinOp (LtEquals _ ws) = do
+  singleton $ TkLte ()
+  traverse_ renderWhitespace ws
+renderBinOp (Gt _ ws) = do
+  singleton $ TkGt ()
+  traverse_ renderWhitespace ws
+renderBinOp (GtEquals _ ws) = do
+  singleton $ TkGte ()
+  traverse_ renderWhitespace ws
+renderBinOp (NotEquals _ ws) = do
+  singleton $ TkBangEq ()
+  traverse_ renderWhitespace ws
+renderBinOp (Percent _ ws) = do
+  singleton $ TkPercent ()
+  traverse_ renderWhitespace ws
+renderBinOp (BitOr _ ws) = do
+  singleton $ TkPipe ()
+  traverse_ renderWhitespace ws
+renderBinOp (BitXor _ ws) = do
+  singleton $ TkCaret ()
+  traverse_ renderWhitespace ws
+renderBinOp (BitAnd _ ws) = do
+  singleton $ TkAmpersand ()
+  traverse_ renderWhitespace ws
+renderBinOp (ShiftLeft _ ws) = do
+  singleton $ TkShiftLeft ()
+  traverse_ renderWhitespace ws
+renderBinOp (ShiftRight _ ws) = do
+  singleton $ TkShiftRight ()
+  traverse_ renderWhitespace ws
 
-renderIndents :: Indents a -> RenderOutput
-renderIndents (Indents is _) = foldMap renderIndent is
+renderIndents :: Indents a -> RenderOutput ()
+renderIndents (Indents is _) = traverse_ renderIndent is
 
-renderModule :: Module v a -> RenderOutput
-renderModule ModuleEmpty = mempty
+renderModule :: Module v a -> RenderOutput ()
+renderModule ModuleEmpty = pure ()
 renderModule (ModuleBlankFinal a) = renderBlank a
-renderModule (ModuleBlank a b c) =
-  renderBlank a <>
-  singleton (renderNewline b) <>
+renderModule (ModuleBlank a b c) = do
+  renderBlank a
+  singleton $ renderNewline b
   renderModule c
-renderModule (ModuleStatement a b) =
-  renderStatement a <>
+renderModule (ModuleStatement a b) = do
+  renderStatement a
   renderModule b
 
 -- | Render an entire Python module to 'Text'
@@ -1287,4 +1573,4 @@ showStatement = showRenderOutput . renderStatement
 
 -- | Render a single Python expression to 'Text'
 showExpr :: Expr v a -> Text
-showExpr = showRenderOutput . bracketGenerator
+showExpr = showRenderOutput . parensGenerator

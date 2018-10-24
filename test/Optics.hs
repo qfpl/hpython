@@ -11,7 +11,8 @@ import qualified Data.Text.IO as Text
 
 import Language.Python.Parse (parseModule)
 import Language.Python.Render (showModule)
-import Language.Python.Internal.Syntax (Whitespace(..), _Statements)
+import Language.Python.Internal.Syntax (_Statements)
+import Language.Python.Syntax.Whitespace (Whitespace (..))
 import Language.Python.Optics (_Indent)
 
 opticsTests :: Group

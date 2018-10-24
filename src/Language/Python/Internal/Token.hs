@@ -19,7 +19,7 @@ import Data.Functor.Classes (liftCompare, liftEq)
 import Language.Python.Internal.Syntax.Numbers
 import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Syntax.Comment (Comment(..))
-import Language.Python.Internal.Syntax.Whitespace (Newline(..), Indents)
+import Language.Python.Syntax.Whitespace (Newline(..), Indents)
 
 -- | A 'PyToken' is a single lexical token of Python source. A 'PyToken' has an
 -- optional annotation, which can be '()' when no annotation is desired.

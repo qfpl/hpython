@@ -53,6 +53,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Language.Python.Optics
 import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax
+import Language.Python.Syntax.Whitespace
 import Language.Python.Validate.Indentation.Error
 
 data Indentation

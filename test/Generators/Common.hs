@@ -17,6 +17,7 @@ import Data.These (These(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax
+import Language.Python.Syntax.Whitespace
 import Generators.Sized
 
 genSimpleStatement

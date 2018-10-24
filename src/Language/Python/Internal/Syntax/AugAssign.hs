@@ -13,7 +13,7 @@ module Language.Python.Internal.Syntax.AugAssign where
 
 import Control.Lens.Lens (lens)
 
-import Language.Python.Internal.Syntax.Whitespace
+import Language.Python.Syntax.Whitespace
 
 -- | Augmented assignments (PEP 203), such as:
 --

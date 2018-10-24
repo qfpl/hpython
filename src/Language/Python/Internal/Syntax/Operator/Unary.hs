@@ -15,7 +15,7 @@ Unary operators
 module Language.Python.Internal.Syntax.Operator.Unary where
 
 import Control.Lens.Lens (lens)
-import Language.Python.Internal.Syntax.Whitespace
+import Language.Python.Syntax.Whitespace
 
 -- | An 'UnOp' is a unary operator in Python, such as @-@ for negation.
 -- An operator is stored with an annotation and its trailing whitespace.

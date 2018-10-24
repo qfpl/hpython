@@ -14,6 +14,7 @@ import Language.Python.Validate.Indentation
 import Language.Python.Validate.Scope
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax
+import Language.Python.Syntax.Whitespace
 
 scopeTests :: Group
 scopeTests = $$discover

@@ -12,8 +12,7 @@ import qualified Data.Text.IO as StrictText
 
 import Language.Python.Parse (parseModule)
 import Language.Python.Internal.Lexer (SrcInfo, tokenize)
-import Language.Python.Validate.Indentation
-import Language.Python.Validate.Syntax
+import Language.Python.Validate
 
 parseCheckSeq :: FilePath -> IO ()
 parseCheckSeq name = do

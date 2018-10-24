@@ -9,9 +9,7 @@ import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.Validation (Validation(..), _Success)
 
-import Language.Python.Validate.Syntax
-import Language.Python.Validate.Indentation
-import Language.Python.Validate.Scope
+import Language.Python.Validate
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax
 import Language.Python.Syntax.Whitespace

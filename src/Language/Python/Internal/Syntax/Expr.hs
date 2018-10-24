@@ -731,8 +731,10 @@ instance Plated (Expr '[] a) where; plate = gplate
 instance HasExprs Expr where
   _Exprs = id
 
-shouldBracketLeft :: BinOp a -> Expr v a -> Bool
-shouldBracketLeft op left =
+-- | @shouldGroupLeft op left@ returns true if @left@ needs to be parenthesised
+-- when it is the left argument of @op@
+shouldGroupLeft :: BinOp a -> Expr v a -> Bool
+shouldGroupLeft op left =
   let
     entry = lookupOpEntry op operatorTable
 
@@ -757,8 +759,10 @@ shouldBracketLeft op left =
   in
     leftf || leftf'
 
-shouldBracketRight :: BinOp a -> Expr v a -> Bool
-shouldBracketRight op right =
+-- | @shouldGroupRight op right@ returns true if @right@ needs to be parenthesised
+-- when it is the right argument of @op@
+shouldGroupRight :: BinOp a -> Expr v a -> Bool
+shouldGroupRight op right =
   let
     entry = lookupOpEntry op operatorTable
 

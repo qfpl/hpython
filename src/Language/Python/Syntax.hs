@@ -360,6 +360,7 @@ import Data.Semigroup ((<>))
 import Language.Python.Optics
 import Language.Python.Internal.Syntax hiding (Fundef, While, Call)
 import Language.Python.Syntax.Types
+import Language.Python.Syntax.Whitespace
 
 type Raw f = f '[] ()
 

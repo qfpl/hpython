@@ -46,6 +46,7 @@ import qualified Data.Text.Lazy.Builder as Builder
 import Language.Python.Internal.Syntax
 import Language.Python.Internal.Render.Correction
 import Language.Python.Internal.Token (PyToken(..))
+import Language.Python.Syntax.Whitespace
 
 -- | A 'RenderOutput' is an intermediate form used during rendering
 -- with efficient 'Semigroup' and 'Monoid' instances.

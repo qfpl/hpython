@@ -18,7 +18,7 @@ import Data.Char (isDigit, isLetter)
 import Data.String (IsString(..))
 
 import Language.Python.Optics.Validated (Validated)
-import Language.Python.Internal.Syntax.Whitespace
+import Language.Python.Syntax.Whitespace
 
 data Ident (v :: [*]) a
   = MkIdent

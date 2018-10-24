@@ -11,8 +11,8 @@ import Language.Python.Render (showStatement)
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Expr
 import Language.Python.Internal.Syntax.Statement
-import Language.Python.Internal.Syntax.Whitespace
 import Language.Python.Parse (parseStatement)
+import Language.Python.Syntax.Whitespace
 
 import Helpers
   (shouldBeFailure, shouldBeSuccess, syntaxValidateExpr)

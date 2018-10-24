@@ -16,7 +16,7 @@ module Language.Python.Validate.Indentation.Error where
 import Control.Lens.Type
 import Control.Lens.Prism
 
-import Language.Python.Internal.Syntax
+import Language.Python.Syntax.Whitespace
 
 
 data IndentationError (v :: [*]) a

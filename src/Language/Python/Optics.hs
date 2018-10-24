@@ -26,6 +26,7 @@ import Data.Function ((&))
 import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax.Types
+import Language.Python.Syntax.Whitespace
 
 _TupleUnpack :: Prism (TupleItem v a) (TupleItem '[] a) (TupleUnpack v a) (TupleUnpack '[] a)
 _TupleUnpack =

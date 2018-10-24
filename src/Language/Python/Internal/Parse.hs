@@ -46,8 +46,8 @@ import Language.Python.Internal.Syntax.Numbers
 import Language.Python.Internal.Syntax.Operator.Binary
 import Language.Python.Internal.Syntax.Operator.Unary
 import Language.Python.Internal.Syntax.Strings
-import Language.Python.Internal.Syntax.Whitespace
 import Language.Python.Internal.Token
+import Language.Python.Syntax.Whitespace
 
 newtype PyTokens = PyTokens { unPyTokens :: [PyToken SrcInfo] }
   deriving (Eq, Ord)

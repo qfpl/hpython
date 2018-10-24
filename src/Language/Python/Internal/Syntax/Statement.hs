@@ -42,7 +42,7 @@ import Language.Python.Internal.Syntax.Expr
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Import
 import Language.Python.Internal.Syntax.ModuleNames
-import Language.Python.Internal.Syntax.Whitespace
+import Language.Python.Syntax.Whitespace
 
 -- See note [unsafeCoerce Validation] in Language.Python.Internal.Syntax.Expr
 instance Validated Statement where; unvalidated = to unsafeCoerce

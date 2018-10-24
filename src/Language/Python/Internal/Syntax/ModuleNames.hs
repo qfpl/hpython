@@ -24,7 +24,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax.Ident
-import Language.Python.Internal.Syntax.Whitespace
+import Language.Python.Syntax.Whitespace
 
 data RelativeModuleName v a
   = RelativeWithName [Dot] (ModuleName v a)

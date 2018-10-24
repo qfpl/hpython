@@ -24,7 +24,6 @@ module Language.Python.Internal.Syntax
   , module Language.Python.Internal.Syntax.Operator.Unary
   , module Language.Python.Internal.Syntax.Statement
   , module Language.Python.Internal.Syntax.Strings
-  , module Language.Python.Internal.Syntax.Whitespace
   )
 where
 
@@ -47,7 +46,6 @@ import Language.Python.Internal.Syntax.Operator.Binary
 import Language.Python.Internal.Syntax.Operator.Unary
 import Language.Python.Internal.Syntax.Statement
 import Language.Python.Internal.Syntax.Strings
-import Language.Python.Internal.Syntax.Whitespace
 
 reservedWords :: [String]
 reservedWords =

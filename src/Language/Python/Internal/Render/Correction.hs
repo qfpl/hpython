@@ -35,7 +35,7 @@ import Language.Python.Internal.Syntax.Numbers
 import Language.Python.Internal.Syntax.Statement
 import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Token
-import Language.Python.Internal.Syntax.Whitespace
+import Language.Python.Syntax.Whitespace
 
 correctSpaces :: (PyToken () -> Text) -> [PyToken ()] -> [PyToken ()]
 correctSpaces f =

@@ -21,6 +21,10 @@ extra-source-files:  ChangeLog.md
                      test/files/django.py
                      test/files/django2.py
                      test/files/imaginary.py
+                     test/files/indent_optics_in.py
+                     test/files/indent_optics_out.py
+                     test/files/indent_optics_in2.py
+                     test/files/indent_optics_out2.py
                      test/files/joblib.py
                      test/files/joblib2.py
                      test/files/mypy.py

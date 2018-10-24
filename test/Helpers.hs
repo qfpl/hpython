@@ -16,7 +16,7 @@ import Language.Python.Internal.Lexer
   )
 import Language.Python.Internal.Token (PyToken)
 import Language.Python.Internal.Parse (Parser, runParser)
-import Language.Python.Internal.Syntax (Statement, Expr)
+import Language.Python.Internal.Syntax (Module, Statement, Expr)
 import Language.Python.Parse (ParseError, ErrorItem(..), _ParseError)
 import Language.Python.Validate.Syntax
 import Language.Python.Validate.Indentation
@@ -45,6 +45,20 @@ doParse pa input = do
       annotateShow err
       failure
     Right a -> pure a
+
+syntaxValidateModule
+  :: Module '[] ()
+  -> PropertyT IO
+       (Validation
+          (NonEmpty (SyntaxError '[Indentation] ()))
+          (Module '[Syntax, Indentation] ()))
+syntaxValidateModule x =
+  case runValidateIndentation $ validateModuleIndentation x of
+    Failure errs -> do
+      annotateShow (errs :: NonEmpty (IndentationError '[] ()))
+      failure
+    Success a ->
+      pure $ runValidateSyntax initialSyntaxContext [] (validateModuleSyntax a)
 
 syntaxValidateStatement
   :: Statement '[] ()

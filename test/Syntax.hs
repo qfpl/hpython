@@ -12,10 +12,10 @@ import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Expr
 import Language.Python.Internal.Syntax.Statement
 import Language.Python.Internal.Syntax.Whitespace
-import Language.Python.Parse (parseStatement)
+import Language.Python.Parse (parseStatement, parseModule)
 
 import Helpers
-  (shouldBeFailure, shouldBeSuccess, syntaxValidateExpr)
+  (shouldBeFailure, shouldBeSuccess, syntaxValidateExpr, syntaxValidateModule)
 
 syntaxTests :: Group
 syntaxTests = $$discover
@@ -57,3 +57,11 @@ prop_syntax_2 =
     res <- shouldBeSuccess $ parseStatement "test" (showStatement e)
     res' <- shouldBeSuccess $ parseStatement "test" (showStatement res)
     void res === void res'
+
+prop_syntax_3 :: Property
+prop_syntax_3 =
+  withTests 1 . property $ do
+    let
+      s = "@a\ndef a():\n pass\n @a\n class a: return "
+    e <- shouldBeSuccess $ parseModule "test" s
+    shouldBeFailure =<< syntaxValidateModule (() <$ e)

@@ -19,7 +19,8 @@ module Language.Python.Internal.Render
   , renderModule, renderStatement, renderExpr
     -- * Miscellany
   , showQuoteType, showStringPrefix, showBytesPrefix, showToken, showTokens
-  , parens, renderWhitespace, renderCommaSep, renderCommaSep1, renderCommaSep1'
+  , parens, braces, brackets
+  , renderWhitespace, renderCommaSep, renderCommaSep1, renderCommaSep1'
   , renderIdent, renderComment, renderModuleName, renderDot, renderRelativeModuleName
   , renderImportAs, renderImportTargets, renderSmallStatement, renderCompoundStatement
   , renderBlock, renderIndent, renderIndents, renderExceptAs, renderArg, renderParam
@@ -114,8 +115,13 @@ between :: RenderOutput l -> RenderOutput r -> RenderOutput a -> RenderOutput a
 between l r m = l *> m <* r
 
 parens :: RenderOutput a -> RenderOutput a
-parens =
-  between (singleton $ TkLeftParen ()) (singleton $ TkRightParen ())
+parens = between (singleton $ TkLeftParen ()) (singleton $ TkRightParen ())
+
+brackets :: RenderOutput a -> RenderOutput a
+brackets = between (singleton $ TkLeftBracket ()) (singleton $ TkRightBracket ())
+
+braces :: RenderOutput a -> RenderOutput a
+braces = between (singleton $ TkLeftBrace ()) (singleton $ TkRightBrace ())
 
 parensTuple :: Expr v a -> RenderOutput ()
 parensTuple e =
@@ -366,8 +372,8 @@ showToken t =
         CR -> "\r"
         LF -> "\n"
         CRLF -> "\r\n"
-    TkLeftParens{} -> "["
-    TkRightParens{} -> "]"
+    TkLeftBracket{} -> "["
+    TkRightBracket{} -> "]"
     TkLeftParen{} -> "("
     TkRightParen{} -> ")"
     TkLeftBrace{} -> "{"
@@ -837,10 +843,9 @@ renderExpr (Subscript _ a b c d) = do
      Ternary{} -> parens $ renderExpr a
      Lambda{} -> parens $ renderExpr a
      _ -> parensTupleGenerator a)
-  singleton $ TkLeftParens ()
-  traverse_ renderWhitespace b
-  renderCommaSep1' renderSubscript c
-  singleton $ TkRightParens ()
+  brackets $ do
+    traverse_ renderWhitespace b
+    renderCommaSep1' renderSubscript c
   traverse_ renderWhitespace d
 renderExpr (Not _ ws e) = do
   singleton $ TkNot ()
@@ -882,21 +887,19 @@ renderExpr (Imag _ n ws) = do
   traverse_ renderWhitespace ws
 renderExpr (Ident name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) = do
-  singleton $ TkLeftParens ()
-  traverse_ renderWhitespace ws1
-  traverse_ renderListItems exprs
-  singleton $ TkRightParens ()
+  brackets $ do
+    traverse_ renderWhitespace ws1
+    traverse_ renderListItems exprs
   traverse_ renderWhitespace ws2
 renderExpr (ListComp _ ws1 comp ws2) = do
-  singleton $ TkLeftParens ()
-  traverse_ renderWhitespace ws1
-  renderComprehension
-    (\e -> case e of
-        Yield{} -> parens $ renderExpr e
-        YieldFrom{} -> parens $ renderExpr e
-        _ -> parensTupleGenerator e)
-    comp
-  singleton $ TkRightParens ()
+  brackets $ do
+    traverse_ renderWhitespace ws1
+    renderComprehension
+      (\e -> case e of
+          Yield{} -> parens $ renderExpr e
+          YieldFrom{} -> parens $ renderExpr e
+          _ -> parensTupleGenerator e)
+      comp
   traverse_ renderWhitespace ws2
 renderExpr (Call _ expr ws args ws2) = do
   (case expr of
@@ -931,10 +934,10 @@ renderExpr (Ellipsis _ ws) = do
   singleton $ TkEllipsis ()
   traverse_ renderWhitespace ws
 renderExpr (BinOp _ e1 op e2) = do
-  (if shouldParensLeft op e1 then parens else id)
+  (if shouldGroupLeft op e1 then parens else id)
     (parensTernaryLambda parensGenerator e1)
   renderBinOp op
-  (if shouldParensRight op e2 then parens else id)
+  (if shouldGroupRight op e2 then parens else id)
     (parensTernaryLambda parensGenerator e2)
 renderExpr (Tuple _ a ws c) =
   renderTupleItems $
@@ -942,28 +945,24 @@ renderExpr (Tuple _ a ws c) =
     Nothing -> CommaSepOne1' a (Just ws)
     Just c' -> CommaSepMany1' a ws c'
 renderExpr (DictComp _ ws1 comp ws2) = do
-  singleton $ TkLeftBrace ()
-  traverse_ renderWhitespace ws1
-  renderComprehension renderDictItem comp
-  singleton $ TkRightBrace ()
+  braces $ do
+    traverse_ renderWhitespace ws1
+    renderComprehension renderDictItem comp
   traverse_ renderWhitespace ws2
 renderExpr (Dict _ a b c) = do
-  singleton $ TkLeftBrace ()
-  traverse_ renderWhitespace a
-  traverse_ (renderCommaSep1' renderDictItem) b
-  singleton $ TkRightBrace ()
+  braces $ do
+    traverse_ renderWhitespace a
+    traverse_ (renderCommaSep1' renderDictItem) b
   traverse_ renderWhitespace c
 renderExpr (SetComp _ ws1 comp ws2) = do
-  singleton $ TkLeftBrace ()
-  traverse_ renderWhitespace ws1
-  renderComprehension renderSetItem comp
-  singleton $ TkRightBrace ()
+  braces $ do
+    traverse_ renderWhitespace ws1
+    renderComprehension renderSetItem comp
   traverse_ renderWhitespace ws2
 renderExpr (Set _ a b c) = do
-  singleton $ TkLeftBrace ()
-  traverse_ renderWhitespace a
-  renderSetItems b
-  singleton $ TkRightBrace ()
+  braces $ do
+    traverse_ renderWhitespace a
+    renderSetItems b
   traverse_ renderWhitespace c
 renderExpr (Generator _ a) =
   renderComprehension

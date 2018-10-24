@@ -17,6 +17,7 @@ extra-source-files:  ChangeLog.md
                      test/files/ansible.py
                      test/files/asyncstatements.py
                      test/files/comments.py
+                     test/files/decorators.py
                      test/files/dictcomp.py
                      test/files/django.py
                      test/files/django2.py
@@ -37,6 +38,8 @@ extra-source-files:  ChangeLog.md
                      test/files/pypy2.py
                      test/files/requests.py
                      test/files/requests2.py
+                     test/files/set.py
+                     test/files/string.py
                      test/files/sqlalchemy.py
                      test/files/test.py
                      test/files/typeann.py

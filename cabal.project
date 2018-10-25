@@ -1,4 +1,6 @@
-packages: .
+packages:
+  ./
+  ./hpython-test/
 
 package hpython
   flags: +development

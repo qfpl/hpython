@@ -62,16 +62,21 @@ instance Validated Arg where; unvalidated = to unsafeCoerce
 instance Validated TupleItem where; unvalidated = to unsafeCoerce
 instance Validated ListItem where; unvalidated = to unsafeCoerce
 
--- | 'Traversal' over all the expressions in a term
+-- | 'Control.Lens.Traversal.Traversal' over all the expressions in a term
 class HasExprs s where
   _Exprs :: Traversal (s v a) (s '[] a) (Expr v a) (Expr '[] a)
 
+-- | Formal parameters for functions
+--
+-- See <https://docs.python.org/3.5/reference/compound_stmts.html#function-definitions>
 data Param (v :: [*]) a
+  -- | @def foo(a):@
   = PositionalParam
   { _paramAnn :: a
   , _paramName :: Ident v a
   , _paramType :: Maybe ([Whitespace], Expr v a)
   }
+  -- | @def foo(bar=None):@
   | KeywordParam
   { _paramAnn :: a
   , _paramName :: Ident v a
@@ -81,6 +86,7 @@ data Param (v :: [*]) a
   , _unsafeKeywordParamWhitespaceRight :: [Whitespace]
   , _unsafeKeywordParamExpr :: Expr v a
   }
+  -- | @def foo(*xs):@
   | StarParam
   { _paramAnn :: a
   -- '*' spaces
@@ -89,6 +95,7 @@ data Param (v :: [*]) a
   -- ':' spaces <expr>
   , _paramType :: Maybe ([Whitespace], Expr v a)
   }
+  -- | @def foo(**dict):@
   | DoubleStarParam
   { _paramAnn :: a
   -- '**' spaces
@@ -99,9 +106,20 @@ data Param (v :: [*]) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+-- | Lens on the syntrax tree annotation on a parameter
 paramAnn :: Lens' (Param v a) a
 paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
 
+-- | Lens on the optional Python type annotation which may follow a parameter
+--
+-- This lens, like many others in hpython, loses validation information
+-- (the @v@ type parameter)
+--
+-- The following is an example, where @int@ is the paramtype:
+--
+-- @
+-- def foo(x: int):
+-- @
 paramType
   :: Lens
        (Param v a)
@@ -111,6 +129,22 @@ paramType
 paramType =
   lens _paramType (\s a -> (s ^. unvalidated) { _paramType = a})
 
+-- | (affine) 'Control.Lens.Traversal.Traversal' on the name of a parameter
+--
+-- The name is @x@ in the following examples:
+--
+-- @
+-- def foo(x):
+-- def foo(x=None):
+-- def foo(*x):
+-- def foo(**x):
+-- @
+--
+-- But the following example does not have a 'paramName':
+--
+-- @
+-- def foo(*):
+-- @
 paramName :: Traversal (Param v a) (Param '[] a) (Ident v a) (Ident '[] a)
 paramName f (PositionalParam a b c) =
   PositionalParam a <$> f b <*> pure (over (mapped._2) (view unvalidated) c)
@@ -137,6 +171,16 @@ instance HasExprs Param where
   _Exprs f (DoubleStarParam a b c d) =
     DoubleStarParam a b (coerce c) <$> traverseOf (traverse._2) f d
 
+-- | Actual parameters for functions
+--
+-- In the following examples, @x@ is an actual parameter.
+--
+-- @
+-- y = foo(x)
+-- y = bar(quux=x)
+-- y = baz(*x)
+-- y = flux(**x)
+-- @
 data Arg (v :: [*]) a
   = PositionalArg
   { _argAnn :: a
@@ -162,6 +206,7 @@ data Arg (v :: [*]) a
 
 instance IsString (Arg '[] ()) where; fromString = PositionalArg () . fromString
 
+-- | Lens on the Python expression which is passed as the argument
 argExpr :: Lens (Arg v a) (Arg '[] a) (Expr v a) (Expr '[] a)
 argExpr = lens _argExpr (\s a -> (s ^. unvalidated) { _argExpr = a })
 
@@ -171,6 +216,11 @@ instance HasExprs Arg where
   _Exprs f (StarArg a ws expr) = StarArg a ws <$> f expr
   _Exprs f (DoubleStarArg a ws expr) = StarArg a ws <$> f expr
 
+-- | A Python for comprehension, such as
+--
+-- @
+-- x for y in z
+-- @
 data Comprehension e (v :: [*]) a
   = Comprehension a (e v a) (CompFor v a) [Either (CompFor v a) (CompIf v a)] -- ^ <expr> <comp_for> (comp_for | comp_if)*
   deriving (Eq, Show)
@@ -375,6 +425,7 @@ instance HasTrailingWhitespace (TupleItem v a) where
            TupleUnpack b [] d e -> TupleUnpack b [] d $ e & trailingWhitespace .~ ws
            TupleUnpack b ((c, _) : rest) e f -> TupleUnpack b ((c, ws) : rest) e f)
 
+-- | This large sum type covers all valid Python /expressions/
 data Expr (v :: [*]) a
   = Unit
   { _unsafeExprAnn :: a
@@ -571,6 +622,7 @@ data Expr (v :: [*]) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+-- | Lens on the top-level annotation in an expression
 exprAnn :: Lens' (Expr v a) a
 exprAnn =
   lens

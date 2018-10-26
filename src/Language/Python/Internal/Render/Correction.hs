@@ -102,8 +102,19 @@ correctBackslashes [x] =
 correctBackslashes (x:y:ys) =
   case x of
     Char_lit '\\'
+      -- if the next character is an escape sequence, then the current backslash
+      -- must be escaped
       | isEscape y -> Char_esc_bslash : y : correctBackslashes ys
-      | Char_lit '\\' <- y -> Char_esc_bslash : y : correctBackslashes ys
+      | Char_lit c <- y ->
+        case c of
+          '\\' -> Char_esc_bslash : y : correctBackslashes ys
+          -- if we print out ['\', 'u'] then the parser will think it's beginning a
+          -- unicode point
+          'u' -> Char_esc_bslash : y : correctBackslashes ys
+          'U' -> Char_esc_bslash : y : correctBackslashes ys
+          -- same for 'x' and hex values
+          'x' -> Char_esc_bslash : y : correctBackslashes ys
+          _ -> x : correctBackslashes (y : ys)
     _ -> x : correctBackslashes (y : ys)
 
 -- | Every quote in a string of a particular quote type should be escaped

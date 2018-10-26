@@ -7,11 +7,12 @@ import Hedgehog
 import Control.Lens.Iso (from)
 import Control.Lens.Getter ((^.))
 import Control.Monad (void)
-import Language.Python.Render (showStatement)
+import Language.Python.Render (showStatement, showExpr)
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Expr
 import Language.Python.Internal.Syntax.Statement
-import Language.Python.Parse (parseModule, parseStatement)
+import Language.Python.Internal.Syntax.Strings
+import Language.Python.Parse (parseModule, parseStatement, parseExpr)
 import Language.Python.Syntax.Whitespace
 
 import Helpers
@@ -65,3 +66,35 @@ prop_syntax_3 =
       s = "@a\ndef a():\n pass\n @a\n class a: return "
     e <- shouldBeSuccess $ parseModule "test" s
     shouldBeFailure =<< syntaxValidateModule (() <$ e)
+
+prop_syntax_4 :: Property
+prop_syntax_4 =
+  withTests 1 . property $ do
+    let
+      e :: Expr '[] ()
+      e =
+        String () . pure $
+        StringLiteral ()
+          Nothing
+        ShortString SingleQuote
+        [Char_lit '\\', Char_lit 'u']
+        []
+    res <- shouldBeSuccess $ parseExpr "test" (showExpr e)
+    res' <- shouldBeSuccess $ parseExpr "test" (showExpr res)
+    void res === void res'
+
+prop_syntax_5 :: Property
+prop_syntax_5 =
+  withTests 1 . property $ do
+    let
+      e :: Expr '[] ()
+      e =
+        String () . pure $
+        StringLiteral ()
+          Nothing
+        ShortString SingleQuote
+        [Char_lit '\\', Char_lit 'x']
+        []
+    res <- shouldBeSuccess $ parseExpr "test" (showExpr e)
+    res' <- shouldBeSuccess $ parseExpr "test" (showExpr res)
+    void res === void res'

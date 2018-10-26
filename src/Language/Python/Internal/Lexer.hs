@@ -128,7 +128,7 @@ stringOrBytesPrefix =
 
 stringChar :: (CharParsing m, LookAheadParsing m) => m PyChar
 stringChar =
-  (try (char '\\' <* lookAhead (oneOf "\"'U\\abfnftuvx012334567")) *>
+  (try (char '\\' <* lookAhead (oneOf "\"'U\\abfntuvx01234567")) *>
    (escapeChar <|> unicodeChar <|> octChar <|> hexChar)) <|>
   other
   where

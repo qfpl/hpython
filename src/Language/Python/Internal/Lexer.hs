@@ -295,6 +295,7 @@ parseToken =
      , TkIs <$ text "is"
      , TkNot <$ text "not"
      , TkGlobal <$ text "global"
+     , TkNonlocal <$ text "nonlocal"
      , TkDel <$ text "del"
      , TkLambda <$ text "lambda"
      , TkImport <$ text "import"

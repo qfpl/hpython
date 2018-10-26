@@ -165,34 +165,22 @@ benchmark bench
 test-suite hpython-tests
   main-is:             Main.hs
   type:                exitcode-stdio-1.0
-  other-modules:       Generators.General
-                     , Generators.Common
-                     , Generators.Correct
-                     , Generators.Sized
-                     , DSL
+  other-modules:       DSL
                      , Helpers
                      , LexerParser
                      , Optics
                      , Parser
-                     , Printer
                      , Roundtrip
                      , Scope
                      , Syntax
   hs-source-dirs:      test
   build-depends:       base >=4.9 && <5
-                     , directory
-                     , digit >=0.7 && < 0.8
                      , filepath
                      , hpython
                      , hedgehog >= 0.5 && < 0.7
                      , lens
-                     , mtl
-                     , process
-                     , semigroupoids >=5.2.2 && <5.4
                      , text >=1.2 && <1.3
-                     , transformers
                      , megaparsec >=6.3 && < 7.1
-                     , these >=0.7.4 && <0.8
                      , validation >= 1 && < 1.1
   default-language:    Haskell2010
   ghc-options:         -Wall

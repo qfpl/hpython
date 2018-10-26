@@ -10,7 +10,7 @@ import Data.Semigroup ((<>))
 
 import Language.Python.Optics
 import Language.Python.Internal.Syntax (Expr (..), _Exprs)
-import Language.Python.Syntax
+import Language.Python.DSL
 import Language.Python.Syntax.Whitespace
 
 fixMutableDefaultArguments :: Raw Statement -> Maybe (Raw Statement)

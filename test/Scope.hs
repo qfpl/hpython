@@ -11,7 +11,7 @@ import Data.Validation (Validation(..), _Success)
 
 import Language.Python.Validate
 import Language.Python.Internal.Syntax
-import Language.Python.Syntax
+import Language.Python.DSL
 import Language.Python.Syntax.Whitespace
 
 scopeTests :: Group

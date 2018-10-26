@@ -4,7 +4,7 @@ module DSL (dslTests) where
 import Hedgehog
 
 import Language.Python.Render (showExpr)
-import Language.Python.Syntax
+import Language.Python.DSL
 
 dslTests :: Group
 dslTests = $$discover

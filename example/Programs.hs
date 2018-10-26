@@ -7,7 +7,7 @@ import Control.Lens.Iso (from)
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
 import Language.Python.Internal.Syntax (Arg (..), Block (..), CommaSep (..), CommaSep1' (..), CompoundStatement (..), Expr (..), Module (..), Param (..), SimpleStatement (..), SmallStatement (..), Statement (..), Suite (..))
-import Language.Python.Syntax
+import Language.Python.DSL
 import Language.Python.Syntax.Whitespace
 
 -- |

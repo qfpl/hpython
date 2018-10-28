@@ -9,9 +9,22 @@ License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
 Stability   : experimental
 Portability : non-portable
+
+Numerical literal values in Python
 -}
 
-module Language.Python.Internal.Syntax.Numbers where
+module Language.Python.Internal.Syntax.Numbers
+  ( IntLiteral (..)
+  , FloatLiteral (..)
+  , FloatExponent (..)
+  , ImagLiteral (..)
+  , Sign (..)
+  , showIntLiteral
+  , showFloatLiteral
+  , showFloatExponent
+  , showImagLiteral
+  )
+where
 
 import Control.Lens.Review ((#))
 import Data.Deriving (deriveEq1, deriveOrd1)
@@ -28,6 +41,15 @@ import Data.These (These(..))
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
 
+-- | An integer literal value.
+--
+-- @5@ is an integer literal.
+--
+-- @6.2@ is a literal but is not an integer
+--
+-- @x@ might be an integer, but is not a literal
+--
+-- See <https://docs.python.org/3.5/reference/lexical_analysis.html#integer-literals>
 data IntLiteral a
   = IntLiteralDec
   { _intLiteralAnn :: a
@@ -52,11 +74,17 @@ data IntLiteral a
 deriveEq1 ''IntLiteral
 deriveOrd1 ''IntLiteral
 
+-- | Positive or negative, as in @-7@
 data Sign = Pos | Neg deriving (Eq, Ord, Show)
 
 data FloatExponent = FloatExponent Bool (Maybe Sign) (NonEmpty DecDigit)
   deriving (Eq, Ord, Show)
 
+-- | A literal floating point value.
+--
+-- Eg. @7.63@
+--
+-- See <https://docs.python.org/3.5/reference/lexical_analysis.html#floating-point-literals>
 data FloatLiteral a
   = FloatLiteralFull
   { _floatLiteralAnn :: a
@@ -82,6 +110,9 @@ data FloatLiteral a
 deriveEq1 ''FloatLiteral
 deriveOrd1 ''FloatLiteral
 
+-- | Imaginary number literals
+--
+-- See <https://docs.python.org/3.5/reference/lexical_analysis.html#imaginary-literals>
 data ImagLiteral a
   = ImagLiteralInt
   { _imagLiteralAnn :: a

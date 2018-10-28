@@ -634,6 +634,7 @@ renderYield re (YieldFrom _ a b c) = do
   traverse_ renderWhitespace b
   case c of
     Generator{} -> parens $ renderExpr c
+    Tuple{} -> parens $ renderExpr c
     _ -> re c
 renderYield re e = re e
 

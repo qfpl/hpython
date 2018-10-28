@@ -924,6 +924,7 @@ renderExpr (Deref _ expr ws name) = do
      UnOp{} -> parens $ renderExpr expr
      Ternary{} -> parens $ renderExpr expr
      Lambda{} -> parens $ renderExpr expr
+     Await{} -> parens $ renderExpr expr
      _ -> parensGenerator expr)
   singleton $ TkDot ()
   traverse_ renderWhitespace ws

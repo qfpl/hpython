@@ -909,6 +909,7 @@ genCompoundStatement =
             genWhitespaces)
         (localState $ do
             modify (inClass .~ True)
+            modify (inFunction .~ Nothing)
             modify (inLoop .~ False)
             genSuite genSmallStatement genBlock)
     , do

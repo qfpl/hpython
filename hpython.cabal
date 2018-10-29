@@ -91,6 +91,7 @@ library
                      , Language.Python.Parse
                      , Language.Python.Render
                      , Language.Python.Syntax
+                     , Language.Python.Syntax.Expr
                      , Language.Python.Syntax.Types
                      , Language.Python.Syntax.Whitespace
                      , Language.Python.Validate

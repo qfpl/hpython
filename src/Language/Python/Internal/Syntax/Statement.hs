@@ -43,10 +43,10 @@ import Language.Python.Optics.Validated
 import Language.Python.Internal.Syntax.AugAssign
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Comment
-import Language.Python.Internal.Syntax.Expr
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Import
 import Language.Python.Internal.Syntax.ModuleNames
+import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Whitespace
 
 -- See note [unsafeCoerce Validation] in Language.Python.Internal.Syntax.Expr

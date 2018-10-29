@@ -20,6 +20,10 @@ import Data.String (IsString(..))
 import Language.Python.Optics.Validated (Validated)
 import Language.Python.Syntax.Whitespace
 
+-- | An identifier. Like many types in hpython, it has an optional annotation
+-- and tracks its trailing whitespace.
+--
+-- See <https://docs.python.org/3.5/reference/lexical_analysis.html#identifiers>
 data Ident (v :: [*]) a
   = MkIdent
   { _identAnn :: a
@@ -27,12 +31,14 @@ data Ident (v :: [*]) a
   , _identWhitespace :: [Whitespace]
   } deriving (Eq, Show, Functor, Foldable, Traversable)
 
+-- | Determine whether this character could start a valid identifier
 isIdentifierStart :: Char -> Bool
 isIdentifierStart = do
   a <- isLetter
   b <- (=='_')
   pure $ a || b
 
+-- | Determine whether this character could be part of a valid identifier
 isIdentifierChar :: Char -> Bool
 isIdentifierChar = do
   a <- isIdentifierStart

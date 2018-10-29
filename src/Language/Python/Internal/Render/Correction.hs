@@ -49,7 +49,6 @@ correctSpaces f =
       | isIdentifierChar (Text.head $ f b) -> a : TkSpace () : b : rest
     a -> a
 
-
 correctNewlines :: [PyToken ()] -> [PyToken ()]
 correctNewlines =
   transform $
@@ -93,6 +92,37 @@ quote qt =
     DoubleQuote -> '\"'
     SingleQuote -> '\''
 
+-- | When a backslash character, precedes an escape sequence it needs to be escaped
+-- so that it doesn't interfere with the backslash that begins the escape sequence.
+--
+-- For example:
+--
+-- @['Char_lit' \'\\\\\', Char_esc_n]@ would naively render to \'\\\\n\', which
+-- would parse to @['Char_esc_bslash', 'Char_lit' \'n\']@, breaking the
+-- @parse . print@ identity
+correctBackslashEscapes :: [PyChar] -> [PyChar]
+correctBackslashEscapes [] = []
+correctBackslashEscapes [x] = [x]
+correctBackslashEscapes (x:y:ys) =
+  case x of
+    Char_lit '\\'
+      -- if the next character is an escape sequence, then the current backslash
+      -- must be escaped
+      | isEscape y -> Char_esc_bslash : y : correctBackslashEscapes ys
+      | Char_lit c <- y ->
+        case c of
+          '\\' -> Char_esc_bslash : correctBackslashEscapes ys
+          '\'' -> Char_esc_bslash : correctBackslashEscapes ys
+          '\"' -> Char_esc_bslash : correctBackslashEscapes ys
+          -- if we print out ['\', 'u'] then the parser will think it's beginning a
+          -- unicode point
+          'u' -> Char_esc_bslash : y : correctBackslashEscapes ys
+          'U' -> Char_esc_bslash : y : correctBackslashEscapes ys
+          -- same for 'x' and hex values
+          'x' -> Char_esc_bslash : y : correctBackslashEscapes ys
+          _ -> x : correctBackslashEscapes (y : ys)
+    _ -> x : correctBackslashEscapes (y : ys)
+
 correctBackslashes :: [PyChar] -> [PyChar]
 correctBackslashes [] = []
 correctBackslashes [x] =
@@ -104,17 +134,7 @@ correctBackslashes (x:y:ys) =
     Char_lit '\\'
       -- if the next character is an escape sequence, then the current backslash
       -- must be escaped
-      | isEscape y -> Char_esc_bslash : y : correctBackslashes ys
-      | Char_lit c <- y ->
-        case c of
-          '\\' -> Char_esc_bslash : y : correctBackslashes ys
-          -- if we print out ['\', 'u'] then the parser will think it's beginning a
-          -- unicode point
-          'u' -> Char_esc_bslash : y : correctBackslashes ys
-          'U' -> Char_esc_bslash : y : correctBackslashes ys
-          -- same for 'x' and hex values
-          'x' -> Char_esc_bslash : y : correctBackslashes ys
-          _ -> x : correctBackslashes (y : ys)
+      | Char_esc_bslash <- y -> Char_esc_bslash : y : correctBackslashes ys
     _ -> x : correctBackslashes (y : ys)
 
 -- | Every quote in a string of a particular quote type should be escaped
@@ -125,9 +145,35 @@ correctQuotes qt =
        DoubleQuote -> \case; Char_lit '"' -> Char_esc_doublequote; c -> c
        SingleQuote -> \case; Char_lit '\'' -> Char_esc_singlequote; c -> c)
 
+-- | Merges every literal backslash followed by literal quote char
+-- into an escaped quote char
+mergeQuotesRaw :: QuoteType -> [PyChar] -> [PyChar]
+mergeQuotesRaw qt =
+  transform $ \case
+    Char_lit '\\' : Char_lit c : xs | c == q -> qc : xs
+    x -> x
+  where
+    qc = quoteChar qt
+    q = quote qt
+
+-- | Every quote in short raw string that isn't preceded by
+-- a backslash should be escaped
+correctQuotesShortRaw :: QuoteType -> [PyChar] -> [PyChar]
+correctQuotesShortRaw qt = go False
+  where
+    qc = quoteChar qt
+    q = quote qt
+
+    go _ [] = []
+    go b (x:xs) =
+      case x of
+        Char_lit '\\' -> x : go True xs
+        Char_lit c | b && c == q -> qc : go False xs
+        _ -> x : go False xs
+
 -- | Literal quotes at the beginning and end of a long (non-raw) string should be escaped
-correctInitialFinalQuotes :: QuoteType -> [PyChar] -> [PyChar]
-correctInitialFinalQuotes qt = correctFinalQuotes . correctInitialQuotes
+correctInitialFinalQuotesLong :: QuoteType -> [PyChar] -> [PyChar]
+correctInitialFinalQuotesLong qt = correctFinalQuotes . correctInitialQuotes
   where
     qc = quoteChar qt
     q = quote qt

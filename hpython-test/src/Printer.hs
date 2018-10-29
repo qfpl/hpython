@@ -95,22 +95,22 @@ prop_printer_5 =
     let
       e1 = [q]
 
-    correctInitialFinalQuotes qt e1 === [esc]
+    correctInitialFinalQuotesLong qt e1 === [esc]
 
     let
       e2 = [q, Char_lit ' ']
 
-    correctInitialFinalQuotes qt e2 === e2
+    correctInitialFinalQuotesLong qt e2 === e2
 
     let
       e3 = [q, q, q, Char_lit ' ']
 
-    correctInitialFinalQuotes qt e3 === [q, q, esc, Char_lit ' ']
+    correctInitialFinalQuotesLong qt e3 === [q, q, esc, Char_lit ' ']
 
     let
       e4 = [q, q, q, q, Char_lit ' ']
 
-    correctInitialFinalQuotes qt e4 === [q, q, esc, q, Char_lit ' ']
+    correctInitialFinalQuotesLong qt e4 === [q, q, esc, q, Char_lit ' ']
 
 prop_printer_6 :: Property
 prop_printer_6 =

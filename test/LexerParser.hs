@@ -8,6 +8,10 @@ import qualified Data.Text as Text
 
 import Language.Python.Render
 import Language.Python.Parse (parseModule, parseStatement, parseExpr)
+import Language.Python.Internal.Syntax
+  ( Expr(..), StringLiteral(..), StringType(..), QuoteType(..), PyChar(..)
+  , RawBytesPrefix(..), RawStringPrefix(..)
+  )
 
 import Helpers (shouldBeSuccess)
 
@@ -307,3 +311,93 @@ prop_fulltrip_25 =
     let str = "'\11'"
 
     void . shouldBeSuccess $ parseModule "test" str
+
+prop_fulltrip_26 :: Property
+prop_fulltrip_26 =
+  withTests 1 . property $ do
+    let str =
+          showExpr $
+          String ()
+            (pure $
+             RawBytesLiteral ()
+               Prefix_br
+               LongString
+               SingleQuote
+               [ Char_esc_bslash ]
+               [])
+    annotateShow str
+
+    res <- shouldBeSuccess $ parseExpr "test" str
+    str === showExpr (() <$ res)
+
+prop_fulltrip_27 :: Property
+prop_fulltrip_27 =
+  withTests 1 . property $ do
+    let str =
+          showExpr $
+          String ()
+            (pure $
+             RawStringLiteral ()
+               Prefix_r
+               LongString
+               SingleQuote
+               [ Char_lit '\\', Char_lit '\\', Char_lit '\\', Char_lit '\'' ]
+               [])
+    annotateShow str
+
+    res <- shouldBeSuccess $ parseExpr "test" str
+    str === showExpr (() <$ res)
+
+prop_fulltrip_28 :: Property
+prop_fulltrip_28 =
+  withTests 1 . property $ do
+    let str =
+          showExpr $
+          String ()
+            (pure $
+             RawStringLiteral ()
+               Prefix_r
+               ShortString
+               DoubleQuote
+               [ Char_lit '\\' ]
+               [])
+    annotateShow str
+
+    res <- shouldBeSuccess $ parseExpr "test" str
+    str === showExpr (() <$ res)
+
+prop_fulltrip_29 :: Property
+prop_fulltrip_29 =
+  withTests 1 . property $ do
+    let str =
+          showExpr $
+          String ()
+            (pure $
+             RawStringLiteral ()
+               Prefix_r
+               ShortString
+               DoubleQuote
+               [ Char_lit '\\', Char_lit '\\' ]
+               [])
+    annotateShow str
+
+    res <- shouldBeSuccess $ parseExpr "test" str
+    str === showExpr (() <$ res)
+
+prop_fulltrip_30 :: Property
+prop_fulltrip_30 =
+  withTests 1 . property $ do
+    let str =
+          showExpr $
+          String ()
+            (pure $
+             RawStringLiteral ()
+               Prefix_r
+               ShortString
+               DoubleQuote
+               [ Char_lit '\\', Char_lit '\\', Char_lit '\\' ]
+               [])
+    annotateShow str
+
+    res <- shouldBeSuccess $ parseExpr "test" str
+    str === showExpr (() <$ res)

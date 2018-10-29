@@ -646,7 +646,7 @@ validateCompoundStatementSyntax (While a idnts ws1 expr body els) =
   While a idnts <$>
   validateWhitespace a ws1 <*>
   validateExprSyntax expr <*>
-  liftVM1 (local $ inLoop .~ True) (validateSuiteSyntax body) <*>
+  liftVM1 (local $ (inFinally .~ False) . (inLoop .~ True)) (validateSuiteSyntax body) <*>
   traverseOf (traverse._3) validateSuiteSyntax els
 validateCompoundStatementSyntax (TryExcept a idnts b e f k l) =
   TryExcept a idnts <$>
@@ -707,7 +707,9 @@ validateCompoundStatementSyntax (For a idnts asyncWs b c d e h i) =
   validateAssignmentSyntax a c <*>
   validateWhitespace a d <*>
   traverse validateExprSyntax e <*>
-  liftVM1 (local $ inLoop .~ True) (validateSuiteSyntax h) <*>
+  liftVM1
+    (local $ (inFinally .~ False) . (inLoop .~ True))
+    (validateSuiteSyntax h) <*>
   traverse
     (\(idnts, x, w) ->
        (,,) idnts <$>
@@ -954,7 +956,6 @@ validateStatementSyntax
   => Statement v a
   -> ValidateSyntax e (Statement (Nub (Syntax ': v)) a)
 validateStatementSyntax (CompoundStatement c) =
-  liftVM1 (local $ inFinally .~ False) $
   CompoundStatement <$> validateCompoundStatementSyntax c
 validateStatementSyntax (SimpleStatement idnts a) =
   SimpleStatement idnts <$> validateSimpleStatementSyntax a

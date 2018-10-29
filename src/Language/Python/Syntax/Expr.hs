@@ -13,7 +13,7 @@ module Language.Python.Syntax.Expr
     -- * Parameters and arguments
   , Param (..), paramAnn, paramType, paramName
   , Arg (..), argExpr
-    -- * Comprenehsion expressions
+    -- * Comprehension expressions
   , Comprehension (..), CompIf (..), CompFor (..), DictItem (..), Subscript (..), ListItem (..), SetItem (..), TupleItem (..)
   )
 where

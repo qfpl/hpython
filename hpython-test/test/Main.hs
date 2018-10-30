@@ -6,7 +6,6 @@ module Main where
 
 import Control.Lens
 import Control.Monad.State
-import Control.Monad.IO.Class
 import Data.List.NonEmpty
 import Data.Functor (($>))
 import Data.Text (Text)

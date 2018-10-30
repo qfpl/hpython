@@ -75,7 +75,6 @@ library
                      , Language.Python.Internal.Syntax.AugAssign
                      , Language.Python.Internal.Syntax.Comment
                      , Language.Python.Internal.Syntax.CommaSep
-                     , Language.Python.Internal.Syntax.Expr
                      , Language.Python.Internal.Syntax.Ident
                      , Language.Python.Internal.Syntax.Import
                      , Language.Python.Internal.Syntax.IR

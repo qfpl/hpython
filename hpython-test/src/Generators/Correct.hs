@@ -314,8 +314,8 @@ genParams isLambda =
 
       pure $
         appendCommaSep
-          (pparams `appendCommaSep` maybe CommaSepNone CommaSepOne sp)
-          (kwparams' `appendCommaSep` maybe CommaSepNone CommaSepOne dsp)
+          (pparams `appendCommaSep` maybeToCommaSep sp)
+          (kwparams' `appendCommaSep` maybeToCommaSep dsp)
 
 genDeletableList :: (MonadState GenState m, MonadGen m) => m (Expr '[] ()) -> m (Expr '[] ())
 genDeletableList genExpr' =

@@ -31,6 +31,9 @@ data CommaSep a
   | CommaSepMany a [Whitespace] (CommaSep a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+maybeToCommaSep :: Maybe a -> CommaSep a
+maybeToCommaSep = maybe CommaSepNone CommaSepOne
+
 listToCommaSep :: [a] -> CommaSep a
 listToCommaSep [] = CommaSepNone
 listToCommaSep [a] = CommaSepOne a

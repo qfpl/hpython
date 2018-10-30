@@ -276,7 +276,9 @@ renderPyChars =
 renderRawPyChars :: QuoteType -> StringType -> [PyChar] -> Text
 renderRawPyChars =
   renderPyCharsWithCorrection $
-  \qt _ -> correctQuotes qt . mergeQuotesRaw qt
+  \qt _ ->
+    correctBackslashEscapesRaw . correctBackslashesRaw .
+    correctQuotesRaw qt
 
 renderPyCharsBytesWithCorrection
   :: (QuoteType -> StringType -> [PyChar] -> [PyChar])
@@ -363,7 +365,9 @@ renderPyCharsBytes =
 renderRawPyCharsBytes :: QuoteType -> StringType -> [PyChar] -> Text
 renderRawPyCharsBytes =
   renderPyCharsBytesWithCorrection $
-  \qt _ -> correctQuotes qt . mergeQuotesRaw qt
+  \qt _ ->
+    correctBackslashEscapesRaw . correctBackslashesRaw .
+    correctQuotesRaw qt
 
 showTokens :: [PyToken a] -> Text
 showTokens =

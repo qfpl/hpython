@@ -137,6 +137,75 @@ correctBackslashes (x:y:ys) =
       | Char_esc_bslash <- y -> Char_esc_bslash : y : correctBackslashes ys
     _ -> x : correctBackslashes (y : ys)
 
+{-
+
+correct_bs :: [PyChar] -> [PyChar]
+
+correct_bs (prefix ++ replicate n [Char_lit '\\']) =
+  if even n
+  then (prefix ++ replicate n [Char_lit '\\'])
+  else (prefix ++ Char_esc_bslash : replicate (n-1) [Char_lit '\\'])
+
+correct_bs (foldr (:) (replicate n [Char_lit '\\']) prefix) =
+  if even n
+  then foldr (:) (replicate n [Char_lit '\\']) prefix
+  else foldr (:) (Char_esc_bslash : replicate (n-1) [Char_lit '\\']) prefix
+
+-}
+
+-- | @(as, bs) = span p xs@
+-- @bs@ is the longest suffix that satisfies the predicate, and @as@ is the
+-- prefix up to that point
+--
+-- It's like the reverse of 'span'
+naps :: (a -> Maybe b) -> [a] -> ([a], [b])
+naps p = go (,) (,)
+  where
+    go _ r [] = r [] []
+    go l r (x:xs) =
+      go
+        (\res res' -> l (x:res) res')
+        (\res res' ->
+           case p x of
+             Just x' -> r res (x':res')
+             Nothing -> l (x:res) res')
+        xs
+
+correctBackslashEscapesRaw :: [PyChar] -> [PyChar]
+correctBackslashEscapesRaw [] = []
+correctBackslashEscapesRaw [x] = [x]
+correctBackslashEscapesRaw (x:y:ys) =
+  case x of
+    Char_lit '\\' ->
+      case y of
+        Char_esc_doublequote -> Char_esc_bslash : y : correctBackslashEscapesRaw ys
+        Char_esc_singlequote -> Char_esc_bslash : y : correctBackslashEscapesRaw ys
+        _ -> x : correctBackslashEscapesRaw (y : ys)
+    _ -> x : correctBackslashEscapesRaw (y : ys)
+
+correctBackslashesRaw :: [PyChar] -> [PyChar]
+correctBackslashesRaw ps =
+  let
+    (as, bs) =
+      naps
+        (\a ->
+           case a of
+             Char_lit '\\' -> Just a
+             Char_esc_bslash -> Just a
+             _ -> Nothing)
+        ps
+  in
+    if even (numSlashes bs)
+    then ps
+    else
+      as <> (Char_lit '\\' : bs)
+  where
+    numSlashes :: [PyChar] -> Int
+    numSlashes [] = 0
+    numSlashes (Char_lit '\\' : xs) = 1 + numSlashes xs
+    numSlashes (Char_esc_bslash : xs) = 2 + numSlashes xs
+    numSlashes _ = undefined
+
 -- | Every quote in a string of a particular quote type should be escaped
 correctQuotes :: QuoteType -> [PyChar] -> [PyChar]
 correctQuotes qt =
@@ -145,31 +214,31 @@ correctQuotes qt =
        DoubleQuote -> \case; Char_lit '"' -> Char_esc_doublequote; c -> c
        SingleQuote -> \case; Char_lit '\'' -> Char_esc_singlequote; c -> c)
 
--- | Merges every literal backslash followed by literal quote char
--- into an escaped quote char
-mergeQuotesRaw :: QuoteType -> [PyChar] -> [PyChar]
-mergeQuotesRaw qt =
-  transform $ \case
-    Char_lit '\\' : Char_lit c : xs | c == q -> qc : xs
-    x -> x
-  where
-    qc = quoteChar qt
-    q = quote qt
-
 -- | Every quote in short raw string that isn't preceded by
 -- a backslash should be escaped
-correctQuotesShortRaw :: QuoteType -> [PyChar] -> [PyChar]
-correctQuotesShortRaw qt = go False
+correctQuotesRaw :: QuoteType -> [PyChar] -> [PyChar]
+correctQuotesRaw _ [] = []
+correctQuotesRaw qt [x] =
+  case x of
+    Char_lit c | quote qt == c -> [quoteChar qt]
+    _ -> [x]
+correctQuotesRaw qt (x:y:ys) =
+  case x of
+    Char_lit c | q == c -> go (qc:y:ys)
+    _ -> go (x:y:ys)
   where
     qc = quoteChar qt
     q = quote qt
 
-    go _ [] = []
-    go b (x:xs) =
+    go [] = []
+    go [x] = [x]
+    go (x:y:ys) =
       case x of
-        Char_lit '\\' -> x : go True xs
-        Char_lit c | b && c == q -> qc : go False xs
-        _ -> x : go False xs
+        Char_lit '\\' -> x : go (y:ys)
+        _ ->
+          case y of
+            Char_lit c | q == c -> x : go (qc:ys)
+            _ -> x : go (y:ys)
 
 -- | Literal quotes at the beginning and end of a long (non-raw) string should be escaped
 correctInitialFinalQuotesLong :: QuoteType -> [PyChar] -> [PyChar]

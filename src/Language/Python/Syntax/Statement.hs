@@ -7,7 +7,7 @@
 {-# language UndecidableInstances #-}
 
 {-|
-Module      : Language.Python.Internal.Syntax.Statement
+Module      : Language.Python.Syntax.Statement
 Copyright   : (C) CSIRO 2017-2018
 License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
@@ -15,7 +15,18 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Internal.Syntax.Statement where
+module Language.Python.Syntax.Statement
+  ( Statement (..), HasStatements (..)
+  , SimpleStatement (..)
+  , CompoundStatement (..)
+  , SmallStatement (..)
+  , Block (..), HasBlocks (..), blockBlankLines, blockHead, blockTail
+  , Suite (..)
+  , WithItem (..)
+  , Decorator (..)
+  , ExceptAs (..), exceptAsAnn, exceptAsExpr, exceptAsName
+  )
+where
 
 import Control.Lens.Cons (_last)
 import Control.Lens.Fold (foldMapOf, folded)

@@ -9,10 +9,10 @@ import Control.Lens.Getter ((^.))
 import Control.Monad (void)
 import Language.Python.Render (showStatement, showExpr)
 import Language.Python.Internal.Syntax.CommaSep
-import Language.Python.Internal.Syntax.Statement
 import Language.Python.Internal.Syntax.Strings
 import Language.Python.Parse (parseModule, parseStatement, parseExpr)
 import Language.Python.Syntax.Expr
+import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Whitespace
 
 import Helpers

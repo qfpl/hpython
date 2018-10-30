@@ -16,8 +16,10 @@ module Language.Python.Validate.Syntax.Error where
 -- import Control.Lens.TH
 import Control.Lens.Type
 import Control.Lens.Prism
-import Language.Python.Internal.Syntax
-import Language.Python.Syntax.Whitespace
+import Language.Python.Syntax.Expr (Expr)
+import Language.Python.Internal.Syntax.Ident (Ident)
+import Language.Python.Syntax.Statement (Statement)
+import Language.Python.Syntax.Whitespace (Newline, Whitespace)
 
 data SyntaxError (v :: [*]) a
   = PositionalAfterKeywordArg a (Expr v a)

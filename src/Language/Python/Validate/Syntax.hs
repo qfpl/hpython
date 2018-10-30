@@ -89,9 +89,9 @@ import Language.Python.Internal.Syntax (reservedWords)
 import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Import
-import Language.Python.Internal.Syntax.Module
 import Language.Python.Internal.Syntax.Strings
 import Language.Python.Syntax.Expr
+import Language.Python.Syntax.Module
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Whitespace
 import Language.Python.Validate.Indentation

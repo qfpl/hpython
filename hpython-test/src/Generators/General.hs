@@ -10,6 +10,7 @@ import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
 import Language.Python.Internal.Syntax
+import Language.Python.Syntax.Module
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Whitespace
 

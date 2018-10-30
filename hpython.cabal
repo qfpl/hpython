@@ -79,7 +79,6 @@ library
                      , Language.Python.Internal.Syntax.Ident
                      , Language.Python.Internal.Syntax.Import
                      , Language.Python.Internal.Syntax.IR
-                     , Language.Python.Internal.Syntax.Module
                      , Language.Python.Internal.Syntax.ModuleNames
                      , Language.Python.Internal.Syntax.Operator.Binary
                      , Language.Python.Internal.Syntax.Operator.Unary
@@ -91,6 +90,7 @@ library
                      , Language.Python.Render
                      , Language.Python.Syntax
                      , Language.Python.Syntax.Expr
+                     , Language.Python.Syntax.Module
                      , Language.Python.Syntax.Statement
                      , Language.Python.Syntax.Types
                      , Language.Python.Syntax.Whitespace

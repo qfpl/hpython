@@ -855,6 +855,7 @@ renderExpr (Subscript _ a b c d) = do
      Not{} -> parens $ renderExpr a
      Ternary{} -> parens $ renderExpr a
      Lambda{} -> parens $ renderExpr a
+     Await{} -> parens $ renderExpr a
      _ -> parensTupleGenerator a)
   brackets $ do
     traverse_ renderWhitespace b

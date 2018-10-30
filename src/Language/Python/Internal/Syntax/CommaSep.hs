@@ -25,23 +25,34 @@ import Data.Semigroup (Semigroup(..))
 
 import Language.Python.Syntax.Whitespace
 
+-- | Items separated by commas, with optional whitespace following each comma
 data CommaSep a
   = CommaSepNone
   | CommaSepOne a
   | CommaSepMany a [Whitespace] (CommaSep a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+maybeToCommaSep :: Maybe a -> CommaSep a
+maybeToCommaSep = maybe CommaSepNone CommaSepOne
+
 listToCommaSep :: [a] -> CommaSep a
 listToCommaSep [] = CommaSepNone
 listToCommaSep [a] = CommaSepOne a
 listToCommaSep (a:as) = CommaSepMany a [Space] $ listToCommaSep as
 
-appendCommaSep :: CommaSep a -> CommaSep a -> CommaSep a
-appendCommaSep CommaSepNone b = b
-appendCommaSep (CommaSepOne a) CommaSepNone = CommaSepOne a
-appendCommaSep (CommaSepOne a) (CommaSepOne b) = CommaSepMany a [] (CommaSepOne b)
-appendCommaSep (CommaSepOne a) (CommaSepMany b ws1 cs) = CommaSepMany a [] (CommaSepMany b ws1 cs)
-appendCommaSep (CommaSepMany a ws1 cs) b = CommaSepMany a ws1 (appendCommaSep cs b)
+appendCommaSep :: [Whitespace] -> CommaSep a -> CommaSep a -> CommaSep a
+appendCommaSep _  CommaSepNone b = b
+appendCommaSep _  (CommaSepOne a) CommaSepNone = CommaSepOne a
+appendCommaSep ws (CommaSepOne a) (CommaSepOne b) = CommaSepMany a ws (CommaSepOne b)
+appendCommaSep ws (CommaSepOne a) (CommaSepMany b ws1 cs) = CommaSepMany a ws (CommaSepMany b ws1 cs)
+appendCommaSep ws (CommaSepMany a ws1 cs) b = CommaSepMany a ws1 (appendCommaSep ws cs b)
+
+instance Semigroup (CommaSep a) where
+  (<>) = appendCommaSep [Space]
+
+instance Monoid (CommaSep a) where
+  mempty  = CommaSepNone
+  mappend = (<>)
 
 -- | Non-empty 'CommaSep'
 data CommaSep1 a
@@ -53,12 +64,15 @@ commaSep1Head :: CommaSep1 a -> a
 commaSep1Head (CommaSepOne1 a) = a
 commaSep1Head (CommaSepMany1 a _ _) = a
 
+appendCommaSep1 :: [Whitespace] -> CommaSep1 a -> CommaSep1 a -> CommaSep1 a
+appendCommaSep1 ws a b =
+  CommaSepMany1
+    (case a of; CommaSepOne1 x -> x;  CommaSepMany1 x _ _  -> x)
+    (case a of; CommaSepOne1 _ -> ws; CommaSepMany1 _ ws' _ -> ws')
+    (case a of; CommaSepOne1 _ -> b;  CommaSepMany1 _ _ x  -> x <> b)
+
 instance Semigroup (CommaSep1 a) where
-  a <> b =
-    CommaSepMany1
-      (case a of; CommaSepOne1 x -> x;  CommaSepMany1 x _ _  -> x)
-      (case a of; CommaSepOne1 _ -> []; CommaSepMany1 _ ws _ -> ws)
-      (case a of; CommaSepOne1 _ -> b;  CommaSepMany1 _ _ x  -> x <> b)
+  (<>) = appendCommaSep1 [Space]
 
 instance HasTrailingWhitespace s => HasTrailingWhitespace (CommaSep1 s) where
   trailingWhitespace =

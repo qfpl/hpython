@@ -9,9 +9,9 @@ import Data.Function ((&))
 import Data.Semigroup ((<>))
 
 import Language.Python.Optics
-import Language.Python.Internal.Syntax (Expr (..), _Exprs)
 import Language.Python.DSL
-import Language.Python.Syntax.Whitespace
+import Language.Python.Syntax.Expr (Expr (..), _Exprs)
+import Language.Python.Syntax.Whitespace (Whitespace (Space))
 
 fixMutableDefaultArguments :: Raw Statement -> Maybe (Raw Statement)
 fixMutableDefaultArguments input = do

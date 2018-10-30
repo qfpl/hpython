@@ -6,9 +6,13 @@ import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
-import Language.Python.Internal.Syntax (Arg (..), Block (..), CommaSep (..), CommaSep1' (..), CompoundStatement (..), Expr (..), Module (..), Param (..), SimpleStatement (..), SmallStatement (..), Statement (..), Suite (..))
+
 import Language.Python.DSL
-import Language.Python.Syntax.Whitespace
+import Language.Python.Internal.Syntax.Module (Module (..))
+import Language.Python.Internal.Syntax.CommaSep (CommaSep (..), CommaSep1' (..))
+import Language.Python.Syntax.Expr (Arg (..), Expr (..), Param (..))
+import Language.Python.Syntax.Statement (Block (..), CompoundStatement (..), SimpleStatement (..), SmallStatement (..), Statement (..), Suite (..))
+import Language.Python.Syntax.Whitespace (Blank (..), Indents (..), Newline (..), Whitespace (..), indentWhitespaces)
 
 -- |
 -- @

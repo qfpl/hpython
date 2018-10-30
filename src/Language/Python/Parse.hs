@@ -45,7 +45,9 @@ import Text.Megaparsec.Pos (SourcePos(..))
 import Language.Python.Internal.Lexer
   (SrcInfo(..), initialSrcInfo, withSrcInfo, tokenize, insertTabs)
 import Language.Python.Internal.Token (PyToken)
-import Language.Python.Internal.Syntax (Module, Statement, Expr)
+import Language.Python.Internal.Syntax (Module)
+import Language.Python.Syntax.Expr (Expr)
+import Language.Python.Syntax.Statement (Statement)
 import Language.Python.Syntax.Whitespace (Indents (..))
 
 import qualified Text.Megaparsec.Error as Megaparsec

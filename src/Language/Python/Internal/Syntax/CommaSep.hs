@@ -48,7 +48,7 @@ appendCommaSep ws (CommaSepOne a) (CommaSepMany b ws1 cs) = CommaSepMany a ws (C
 appendCommaSep ws (CommaSepMany a ws1 cs) b = CommaSepMany a ws1 (appendCommaSep ws cs b)
 
 instance Semigroup (CommaSep a) where
-  (<>) = appendCommaSep []
+  (<>) = appendCommaSep [Space]
 
 instance Monoid (CommaSep a) where
   mempty  = CommaSepNone
@@ -72,7 +72,7 @@ appendCommaSep1 ws a b =
     (case a of; CommaSepOne1 _ -> b;  CommaSepMany1 _ _ x  -> x <> b)
 
 instance Semigroup (CommaSep1 a) where
-  (<>) = appendCommaSep1 []
+  (<>) = appendCommaSep1 [Space]
 
 instance HasTrailingWhitespace s => HasTrailingWhitespace (CommaSep1 s) where
   trailingWhitespace =

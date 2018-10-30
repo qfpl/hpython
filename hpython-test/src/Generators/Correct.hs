@@ -313,9 +313,8 @@ genParams isLambda =
     sizedBind (sizedMaybe $ genDoubleStarParam isLambda pparamNames'') $ \dsp ->
 
       pure $
-        appendCommaSep
-          (pparams `appendCommaSep` maybeToCommaSep sp)
-          (kwparams' `appendCommaSep` maybeToCommaSep dsp)
+        pparams <> maybeToCommaSep sp <>
+          kwparams' <> maybeToCommaSep dsp
 
 genDeletableList :: (MonadState GenState m, MonadGen m) => m (Expr '[] ()) -> m (Expr '[] ())
 genDeletableList genExpr' =

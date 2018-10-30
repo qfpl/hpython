@@ -39,12 +39,16 @@ listToCommaSep [] = CommaSepNone
 listToCommaSep [a] = CommaSepOne a
 listToCommaSep (a:as) = CommaSepMany a [Space] $ listToCommaSep as
 
-appendCommaSep :: CommaSep a -> CommaSep a -> CommaSep a
-appendCommaSep CommaSepNone b = b
-appendCommaSep (CommaSepOne a) CommaSepNone = CommaSepOne a
-appendCommaSep (CommaSepOne a) (CommaSepOne b) = CommaSepMany a [] (CommaSepOne b)
-appendCommaSep (CommaSepOne a) (CommaSepMany b ws1 cs) = CommaSepMany a [] (CommaSepMany b ws1 cs)
-appendCommaSep (CommaSepMany a ws1 cs) b = CommaSepMany a ws1 (appendCommaSep cs b)
+instance Semigroup (CommaSep a) where
+  CommaSepNone <> b = b
+  CommaSepOne a <> CommaSepNone = CommaSepOne a
+  CommaSepOne a <> CommaSepOne b = CommaSepMany a [] (CommaSepOne b)
+  CommaSepOne a <> CommaSepMany b ws1 cs = CommaSepMany a [] (CommaSepMany b ws1 cs)
+  CommaSepMany a ws1 cs <> b = CommaSepMany a ws1 (cs <> b)
+
+instance Monoid (CommaSep a) where
+  mempty  = CommaSepNone
+  mappend = (<>)
 
 -- | Non-empty 'CommaSep'
 data CommaSep1 a

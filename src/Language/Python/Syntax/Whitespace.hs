@@ -53,8 +53,32 @@ data Newline = CR | LF | CRLF deriving (Eq, Ord, Show)
 -- logical line ('Continued'), a newline that ends the logical line ('Newline'),
 -- or a 'Comment'.
 --
--- Despite not literally being whitespace, comments are treated
--- as a form of whitespace for the purposes of parsing.
+-- Despite not literally being whitespace, comments inside enclosed forms
+-- are treated as whitespace. See <https://docs.python.org/3.5/reference/lexical_analysis.html#implicit-line-joining>
+--
+-- Example and counterexample of comments as whitespace
+--
+-- @
+--( 1 +
+--  # here's a comment
+-- 2 +
+-- 3 # another comment
+--)
+-- @
+--
+-- @
+-- x = 5 + 5
+-- # this line is not considered whitespace
+-- y = x * 2
+-- @
+--
+-- @
+-- [ 1
+-- , 2 # I'm whitespace
+-- , 3
+-- # also whitespace
+-- ]
+-- @
 data Whitespace
   = Space
   | Tab

@@ -7,7 +7,7 @@
 {-# language UndecidableInstances #-}
 
 {-|
-Module      : Language.Python.Internal.Syntax.Statement
+Module      : Language.Python.Syntax.Statement
 Copyright   : (C) CSIRO 2017-2018
 License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
@@ -15,7 +15,18 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Internal.Syntax.Statement where
+module Language.Python.Syntax.Statement
+  ( Statement (..), HasStatements (..)
+  , SimpleStatement (..)
+  , CompoundStatement (..)
+  , SmallStatement (..)
+  , Block (..), HasBlocks (..), blockBlankLines, blockHead, blockTail
+  , Suite (..)
+  , WithItem (..)
+  , Decorator (..)
+  , ExceptAs (..), exceptAsAnn, exceptAsExpr, exceptAsName
+  )
+where
 
 import Control.Lens.Cons (_last)
 import Control.Lens.Fold (foldMapOf, folded)
@@ -41,12 +52,12 @@ import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Optics.Validated
 import Language.Python.Internal.Syntax.AugAssign
-import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Comment
-import Language.Python.Internal.Syntax.Expr
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Import
 import Language.Python.Internal.Syntax.ModuleNames
+import Language.Python.Syntax.CommaSep
+import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Whitespace
 
 -- See note [unsafeCoerce Validation] in Language.Python.Internal.Syntax.Expr
@@ -227,7 +238,7 @@ data SmallStatement (v :: [*]) a
   | Continue a [Whitespace]
   | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
-  | Del a (NonEmpty Whitespace) (CommaSep1' (Expr v a))
+  | Del a [Whitespace] (CommaSep1' (Expr v a))
   | Import
       a
       (NonEmpty Whitespace)

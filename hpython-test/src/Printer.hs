@@ -9,8 +9,8 @@ import Data.Foldable (traverse_)
 import Data.List.NonEmpty (NonEmpty(..))
 import Language.Python.Render
 import Language.Python.Internal.Render.Correction
-import Language.Python.Internal.Syntax.Expr
 import Language.Python.Internal.Syntax.Strings
+import Language.Python.Syntax.Expr
 
 import Generators.Common
 

@@ -37,7 +37,6 @@ import qualified Text.Megaparsec as Megaparsec
 import Language.Python.Internal.Lexer (SrcInfo(..), withSrcInfo)
 import Language.Python.Internal.Syntax.AugAssign
 import Language.Python.Internal.Syntax.Comment
-import Language.Python.Internal.Syntax.CommaSep
 import Language.Python.Internal.Syntax.IR
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Import
@@ -47,6 +46,7 @@ import Language.Python.Internal.Syntax.Operator.Binary
 import Language.Python.Internal.Syntax.Operator.Unary
 import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Token
+import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Whitespace
 
 newtype PyTokens = PyTokens { unPyTokens :: [PyToken SrcInfo] }
@@ -831,7 +831,7 @@ smallStatement =
       commaSep1 space (identifier space)
 
     delSt =
-      (\(tk, s) -> Del (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
+      (\(tk, s) -> Del (pyTokenAnn tk) s) <$>
       token space (\case; TkDel{} -> True; _ -> False) "del" <*>
       commaSep1' space (orExpr space)
 

@@ -16,8 +16,10 @@ import Language.Python.Internal.Lexer
   )
 import Language.Python.Internal.Token (PyToken)
 import Language.Python.Internal.Parse (Parser, runParser)
-import Language.Python.Internal.Syntax (Module, Statement, Expr)
 import Language.Python.Parse (ParseError, ErrorItem(..), _ParseError)
+import Language.Python.Syntax.Expr (Expr)
+import Language.Python.Syntax.Module (Module)
+import Language.Python.Syntax.Statement (Statement)
 import Language.Python.Validate
 
 doTokenize :: Monad m => Text -> PropertyT m [PyToken SrcInfo]

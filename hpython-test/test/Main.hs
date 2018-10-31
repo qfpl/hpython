@@ -6,7 +6,6 @@ module Main where
 
 import Control.Lens
 import Control.Monad.State
-import Control.Monad.IO.Class
 import Data.List.NonEmpty
 import Data.Functor (($>))
 import Data.Text (Text)
@@ -20,6 +19,9 @@ import Language.Python.Internal.Syntax
 import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Parse (parseStatement, parseExpr, parseExprList)
 import Language.Python.Render
+import Language.Python.Syntax.Expr
+import Language.Python.Syntax.Module
+import Language.Python.Syntax.Statement
 import Language.Python.Validate
 
 import Hedgehog

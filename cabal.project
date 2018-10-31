@@ -5,3 +5,5 @@ packages:
 package hpython
   flags: +development
 
+package hpython-test
+  flags: +development

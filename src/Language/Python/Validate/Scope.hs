@@ -81,7 +81,10 @@ import qualified Data.Map.Strict as Map
 
 import Language.Python.Optics
 import Language.Python.Optics.Validated (unvalidated)
-import Language.Python.Internal.Syntax
+import Language.Python.Syntax.Statement
+import Language.Python.Syntax.Expr
+import Language.Python.Internal.Syntax.Ident
+import Language.Python.Syntax.Module
 import Language.Python.Validate.Scope.Error
 
 data Scope

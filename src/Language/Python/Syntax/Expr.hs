@@ -7,7 +7,7 @@
 {-# language TemplateHaskell #-}
 
 {-|
-Module      : Language.Python.Internal.Syntax.Expr
+Module      : Language.Python.Syntax.Expr
 Copyright   : (C) CSIRO 2017-2018
 License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
@@ -15,7 +15,16 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Internal.Syntax.Expr where
+module Language.Python.Syntax.Expr
+  ( -- * Expressions
+    Expr (..), HasExprs (..), exprAnn, shouldGroupLeft, shouldGroupRight
+    -- * Parameters and arguments
+  , Param (..), paramAnn, paramType, paramName
+  , Arg (..), argExpr
+    -- * Comprehension expressions
+  , Comprehension (..), CompIf (..), CompFor (..), DictItem (..), Subscript (..), ListItem (..), SetItem (..), TupleItem (..)
+  )
+where
 
 import Control.Lens.Cons (_last)
 import Control.Lens.Fold ((^?), (^?!))
@@ -39,7 +48,7 @@ import GHC.Generics (Generic)
 import Unsafe.Coerce (unsafeCoerce)
 
 import Language.Python.Optics.Validated (Validated(..))
-import Language.Python.Internal.Syntax.CommaSep
+import Language.Python.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Numbers
 import Language.Python.Internal.Syntax.Operator.Binary

@@ -1,7 +1,7 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
 {-|
-Module      : Language.Python.Internal.Syntax.Module
+Module      : Language.Python.Syntax.Module
 Copyright   : (C) CSIRO 2017-2018
 License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
@@ -9,9 +9,12 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Internal.Syntax.Module where
+module Language.Python.Syntax.Module
+  ( Module (ModuleEmpty, ModuleBlankFinal, ModuleBlank, ModuleStatement)
+  )
+where
 
-import Language.Python.Internal.Syntax.Statement
+import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Whitespace
 
 -- | A Python 'Module', which is stored as a sequence of statements.

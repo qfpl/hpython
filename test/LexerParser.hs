@@ -401,3 +401,10 @@ prop_fulltrip_30 =
 
     res <- shouldBeSuccess $ parseExpr "test" str
     str === showExpr (() <$ res)
+
+prop_fulltrip_31 :: Property
+prop_fulltrip_31 =
+  withTests 1 . property $ do
+    let str = "del(a)"
+
+    void . shouldBeSuccess $ parseModule "test" str

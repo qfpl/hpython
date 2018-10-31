@@ -8,7 +8,7 @@ import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
 
 import Language.Python.DSL
-import Language.Python.Internal.Syntax.Module (Module (..))
+import Language.Python.Syntax.Module (Module (..))
 import Language.Python.Syntax.CommaSep (CommaSep (..), CommaSep1' (..))
 import Language.Python.Syntax.Expr (Arg (..), Expr (..), Param (..))
 import Language.Python.Syntax.Statement (Block (..), CompoundStatement (..), SimpleStatement (..), SmallStatement (..), Statement (..), Suite (..))

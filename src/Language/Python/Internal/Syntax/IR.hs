@@ -41,7 +41,7 @@ import Language.Python.Internal.Syntax.Strings
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Whitespace
 
-import qualified Language.Python.Internal.Syntax.Module as Syntax
+import qualified Language.Python.Syntax.Module as Syntax
 import qualified Language.Python.Syntax.Expr as Syntax
 import qualified Language.Python.Syntax.Statement as Syntax
 

@@ -682,7 +682,7 @@ genSmallStatement = do
        genWhitespaces1 <*>
        genSizedCommaSep1 genIdent
      , Del () <$>
-       genWhitespaces1 <*>
+       genWhitespaces <*>
        genSizedCommaSep1' genDeletable
      , Import () <$>
        genWhitespaces1 <*>

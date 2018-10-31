@@ -31,6 +31,8 @@ import GHC.Stack
 import Language.Python.Syntax.Types (spType)
 import Language.Python.Optics
 import Language.Python.Internal.Syntax
+import Language.Python.Syntax.CommaSep
+import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Whitespace
 
@@ -313,9 +315,8 @@ genParams isLambda =
     sizedBind (sizedMaybe $ genDoubleStarParam isLambda pparamNames'') $ \dsp ->
 
       pure $
-        appendCommaSep
-          (pparams `appendCommaSep` maybe CommaSepNone CommaSepOne sp)
-          (kwparams' `appendCommaSep` maybe CommaSepNone CommaSepOne dsp)
+        pparams <> maybeToCommaSep sp <>
+          kwparams' <> maybeToCommaSep dsp
 
 genDeletableList :: (MonadState GenState m, MonadGen m) => m (Expr '[] ()) -> m (Expr '[] ())
 genDeletableList genExpr' =

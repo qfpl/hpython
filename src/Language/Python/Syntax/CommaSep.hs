@@ -2,7 +2,7 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
 {-|
-Module      : Language.Python.Internal.Syntax.CommaSep
+Module      : Language.Python.Syntax.CommaSep
 Copyright   : (C) CSIRO 2017-2018
 License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
@@ -10,7 +10,15 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Internal.Syntax.CommaSep where
+module Language.Python.Syntax.CommaSep
+  ( CommaSep (..)
+  , appendCommaSep, maybeToCommaSep, listToCommaSep
+  , CommaSep1 (..)
+  , commaSep1Head, appendCommaSep1, listToCommaSep1, listToCommaSep1'
+  , CommaSep1' (..)
+  , _CommaSep1'
+  )
+where
 
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (Iso, iso)
@@ -23,25 +31,40 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe)
 import Data.Semigroup (Semigroup(..))
 
-import Language.Python.Syntax.Whitespace
+import Language.Python.Syntax.Whitespace (Whitespace (Space), HasTrailingWhitespace (..))
 
+-- | Items separated by commas, with optional whitespace following each comma
 data CommaSep a
   = CommaSepNone
   | CommaSepOne a
   | CommaSepMany a [Whitespace] (CommaSep a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+-- | Convert a maybe to a singleton or nullary 'CommaSep'
+maybeToCommaSep :: Maybe a -> CommaSep a
+maybeToCommaSep = maybe CommaSepNone CommaSepOne
+
+-- | Convert a list to a 'CommaSep'
+--
+-- Anywhere where whitespace is ambiguous, this function puts a single space
 listToCommaSep :: [a] -> CommaSep a
 listToCommaSep [] = CommaSepNone
 listToCommaSep [a] = CommaSepOne a
 listToCommaSep (a:as) = CommaSepMany a [Space] $ listToCommaSep as
 
-appendCommaSep :: CommaSep a -> CommaSep a -> CommaSep a
-appendCommaSep CommaSepNone b = b
-appendCommaSep (CommaSepOne a) CommaSepNone = CommaSepOne a
-appendCommaSep (CommaSepOne a) (CommaSepOne b) = CommaSepMany a [] (CommaSepOne b)
-appendCommaSep (CommaSepOne a) (CommaSepMany b ws1 cs) = CommaSepMany a [] (CommaSepMany b ws1 cs)
-appendCommaSep (CommaSepMany a ws1 cs) b = CommaSepMany a ws1 (appendCommaSep cs b)
+appendCommaSep :: [Whitespace] -> CommaSep a -> CommaSep a -> CommaSep a
+appendCommaSep _  CommaSepNone b = b
+appendCommaSep _  (CommaSepOne a) CommaSepNone = CommaSepOne a
+appendCommaSep ws (CommaSepOne a) (CommaSepOne b) = CommaSepMany a ws (CommaSepOne b)
+appendCommaSep ws (CommaSepOne a) (CommaSepMany b ws1 cs) = CommaSepMany a ws (CommaSepMany b ws1 cs)
+appendCommaSep ws (CommaSepMany a ws1 cs) b = CommaSepMany a ws1 (appendCommaSep ws cs b)
+
+instance Semigroup (CommaSep a) where
+  (<>) = appendCommaSep [Space]
+
+instance Monoid (CommaSep a) where
+  mempty  = CommaSepNone
+  mappend = (<>)
 
 -- | Non-empty 'CommaSep'
 data CommaSep1 a
@@ -53,12 +76,15 @@ commaSep1Head :: CommaSep1 a -> a
 commaSep1Head (CommaSepOne1 a) = a
 commaSep1Head (CommaSepMany1 a _ _) = a
 
+appendCommaSep1 :: [Whitespace] -> CommaSep1 a -> CommaSep1 a -> CommaSep1 a
+appendCommaSep1 ws a b =
+  CommaSepMany1
+    (case a of; CommaSepOne1 x -> x;  CommaSepMany1 x _ _  -> x)
+    (case a of; CommaSepOne1 _ -> ws; CommaSepMany1 _ ws' _ -> ws')
+    (case a of; CommaSepOne1 _ -> b;  CommaSepMany1 _ _ x  -> x <> b)
+
 instance Semigroup (CommaSep1 a) where
-  a <> b =
-    CommaSepMany1
-      (case a of; CommaSepOne1 x -> x;  CommaSepMany1 x _ _  -> x)
-      (case a of; CommaSepOne1 _ -> []; CommaSepMany1 _ ws _ -> ws)
-      (case a of; CommaSepOne1 _ -> b;  CommaSepMany1 _ _ x  -> x <> b)
+  (<>) = appendCommaSep1 [Space]
 
 instance HasTrailingWhitespace s => HasTrailingWhitespace (CommaSep1 s) where
   trailingWhitespace =
@@ -72,6 +98,9 @@ instance HasTrailingWhitespace s => HasTrailingWhitespace (CommaSep1 s) where
              CommaSepOne1 (a & trailingWhitespace .~ ws)
            CommaSepMany1 a b c -> CommaSepMany1 (coerce a) b (c & trailingWhitespace .~ ws))
 
+-- | Convert a 'NonEmpty' to a 'CommaSep1'
+--
+-- Anywhere where whitespace is ambiguous, this function puts a single space
 listToCommaSep1 :: NonEmpty a -> CommaSep1 a
 listToCommaSep1 (a :| as) = go (a:as)
   where

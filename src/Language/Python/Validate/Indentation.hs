@@ -52,7 +52,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Optics
 import Language.Python.Optics.Validated (unvalidated)
-import Language.Python.Internal.Syntax.CommaSep
+import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Module
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Statement

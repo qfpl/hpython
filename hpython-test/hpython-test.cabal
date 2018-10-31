@@ -42,12 +42,24 @@ library
                      , mtl
   hs-source-dirs:      src
   default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Werror
+                       -Wincomplete-patterns
+                       -Wincomplete-record-updates
+                       -Wunused-imports
+                       -fno-warn-name-shadowing
 
 test-suite test
   main-is:             Main.hs
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Werror
+                       -Wincomplete-patterns
+                       -Wincomplete-record-updates
+                       -Wunused-imports
+                       -fno-warn-name-shadowing
   build-depends:       base >=4.9 && <4.13
                      , lens >= 4 && < 4.18
                      , text >=1.2 && <1.3

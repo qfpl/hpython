@@ -20,7 +20,7 @@ import Control.Lens.Tuple (_2)
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty)
 
-import Language.Python.Internal.Syntax.CommaSep
+import Language.Python.Syntax.CommaSep
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Syntax.Whitespace
 

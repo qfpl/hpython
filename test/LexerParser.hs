@@ -8,8 +8,9 @@ import qualified Data.Text as Text
 
 import Language.Python.Render
 import Language.Python.Parse (parseModule, parseStatement, parseExpr)
-import Language.Python.Internal.Syntax
-  ( Expr(..), StringLiteral(..), StringType(..), QuoteType(..), PyChar(..)
+import Language.Python.Syntax.Expr (Expr(..))
+import Language.Python.Internal.Syntax.Strings
+  ( StringLiteral(..), StringType(..), QuoteType(..), PyChar(..)
   , RawBytesPrefix(..), RawStringPrefix(..)
   )
 

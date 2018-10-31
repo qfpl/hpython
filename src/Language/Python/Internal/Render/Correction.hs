@@ -137,22 +137,6 @@ correctBackslashes (x:y:ys) =
       | Char_esc_bslash <- y -> Char_esc_bslash : y : correctBackslashes ys
     _ -> x : correctBackslashes (y : ys)
 
-{-
-
-correct_bs :: [PyChar] -> [PyChar]
-
-correct_bs (prefix ++ replicate n [Char_lit '\\']) =
-  if even n
-  then (prefix ++ replicate n [Char_lit '\\'])
-  else (prefix ++ Char_esc_bslash : replicate (n-1) [Char_lit '\\'])
-
-correct_bs (foldr (:) (replicate n [Char_lit '\\']) prefix) =
-  if even n
-  then foldr (:) (replicate n [Char_lit '\\']) prefix
-  else foldr (:) (Char_esc_bslash : replicate (n-1) [Char_lit '\\']) prefix
-
--}
-
 -- | @(as, bs) = span p xs@
 -- @bs@ is the longest suffix that satisfies the predicate, and @as@ is the
 -- prefix up to that point

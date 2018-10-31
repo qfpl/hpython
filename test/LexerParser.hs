@@ -307,3 +307,10 @@ prop_fulltrip_25 =
     let str = "'\11'"
 
     void . shouldBeSuccess $ parseModule "test" str
+
+prop_fulltrip_26 :: Property
+prop_fulltrip_26 =
+  withTests 1 . property $ do
+    let str = "del(a)"
+
+    void . shouldBeSuccess $ parseModule "test" str

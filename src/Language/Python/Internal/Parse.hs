@@ -831,7 +831,7 @@ smallStatement =
       commaSep1 space (identifier space)
 
     delSt =
-      (\(tk, s) -> Del (pyTokenAnn tk) $ NonEmpty.fromList s) <$>
+      (\(tk, s) -> Del (pyTokenAnn tk) s) <$>
       token space (\case; TkDel{} -> True; _ -> False) "del" <*>
       commaSep1' space (orExpr space)
 

@@ -152,7 +152,7 @@ data SmallStatement a
   | Continue a [Whitespace]
   | Global a (NonEmpty Whitespace) (CommaSep1 (Ident '[] a))
   | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident '[] a))
-  | Del a (NonEmpty Whitespace) (CommaSep1' (Expr a))
+  | Del a [Whitespace] (CommaSep1' (Expr a))
   | Import
       a
       (NonEmpty Whitespace)

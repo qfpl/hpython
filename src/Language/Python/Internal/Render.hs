@@ -1025,6 +1025,7 @@ renderExpr (Await _ ws expr) = do
      Not{} -> parens $ renderExpr expr
      Ternary{} -> parens $ renderExpr expr
      Lambda{} -> parens $ renderExpr expr
+     Await{} -> parens $ renderExpr expr
      _ -> parensGenerator expr)
 
 renderModuleName :: ModuleName v a -> RenderOutput ()

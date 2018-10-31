@@ -224,9 +224,56 @@ correctQuotesRaw qt (x:y:ys) =
             Char_lit c | q == c -> x : go (qc:ys)
             _ -> x : go (y:ys)
 
+-- | Every third literal quote at the beginning of a long (non-raw) string should
+-- be escaped
+correctInitialQuotes :: QuoteType -> [PyChar] -> [PyChar]
+correctInitialQuotes qt = go (0::Int)
+  where
+    qc = quoteChar qt
+    q = quote qt
+
+    go !_ [] = []
+    go !n (c:cs) =
+      if c == Char_lit q
+      then
+        if n == 2
+        then qc : go (n+1 `mod` 3) cs
+        else c : go (n+1 `mod` 3) cs
+      else c : cs
+
+-- | Literal quotes at the beginning and end of a long raw string should be escaped
+correctInitialFinalQuotesLongRaw :: QuoteType -> [PyChar] -> [PyChar]
+correctInitialFinalQuotesLongRaw qt = correctFinalQuotes . correctInitialQuotes qt
+  where
+    qc = quoteChar qt
+    q = quote qt
+
+    -- | Literal quotes at the end of a long raw string should be escaped
+    correctFinalQuotes :: [PyChar] -> [PyChar]
+    correctFinalQuotes = snd . go
+      where
+        go [] = (True, [])
+        go (c:cs) =
+          if c /= Char_lit '\\'
+          then
+            case go cs of
+              (b, cs') ->
+                if b && c == Char_lit q
+                then (True, qc : cs')
+                else (False, c : cs')
+          else
+            let
+              (ds, es) = span (== Char_lit '\\') cs
+            in
+              case es of
+                [] -> (False, c : ds)
+                e':es' ->
+                  case go es' of
+                    (_, es'') -> (False, c : ds <> (e' : es''))
+
 -- | Literal quotes at the beginning and end of a long (non-raw) string should be escaped
 correctInitialFinalQuotesLong :: QuoteType -> [PyChar] -> [PyChar]
-correctInitialFinalQuotesLong qt = correctFinalQuotes . correctInitialQuotes
+correctInitialFinalQuotesLong qt = correctFinalQuotes . correctInitialQuotes qt
   where
     qc = quoteChar qt
     q = quote qt
@@ -242,20 +289,6 @@ correctInitialFinalQuotesLong qt = correctFinalQuotes . correctInitialQuotes
               if b && c == Char_lit q
               then (True, qc : cs')
               else (False, c : cs')
-
-    -- | Every third literal quote at the beginning of a long (non-raw) string should
-    -- be escaped
-    correctInitialQuotes :: [PyChar] -> [PyChar]
-    correctInitialQuotes = go (0::Int)
-      where
-        go !_ [] = []
-        go !n (c:cs) =
-          if c == Char_lit q
-          then
-            if n == 2
-            then qc : go (n+1 `mod` 3) cs
-            else c : go (n+1 `mod` 3) cs
-          else c : cs
 
 -- | It's possible that successive statements have no newlines in between
 -- them. This would cause them to be displayed on the same line. In every line where

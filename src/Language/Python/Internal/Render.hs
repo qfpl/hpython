@@ -291,7 +291,9 @@ renderRawPyChars =
   \qt st ->
     case st of
       LongString ->
-        correctBackslashEscapesRaw . correctBackslashesRaw
+        correctInitialFinalQuotesLongRaw qt .
+        correctBackslashEscapesRaw .
+        correctBackslashesRaw
       ShortString ->
         correctBackslashEscapesRaw . correctBackslashesRaw .
         correctQuotesRaw qt
@@ -384,7 +386,9 @@ renderRawPyCharsBytes =
   \qt st ->
     case st of
       LongString ->
-        correctBackslashEscapesRaw . correctBackslashesRaw
+        correctInitialFinalQuotesLongRaw qt .
+        correctBackslashEscapesRaw .
+        correctBackslashesRaw
       ShortString ->
         correctBackslashEscapesRaw . correctBackslashesRaw .
         correctQuotesRaw qt

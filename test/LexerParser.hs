@@ -409,3 +409,57 @@ prop_fulltrip_31 =
     let str = "del(a)"
 
     void . shouldBeSuccess $ parseModule "test" str
+
+prop_fulltrip_32 :: Property
+prop_fulltrip_32 =
+  withTests 1 . property $ do
+    let str =
+          showExpr $
+          String ()
+            (pure $
+             RawStringLiteral ()
+               Prefix_r
+               LongString
+               DoubleQuote
+               [ Char_lit ' ', Char_lit '"' ]
+               [])
+    annotateShow str
+
+    res <- shouldBeSuccess $ parseExpr "test" str
+    str === showExpr (() <$ res)
+
+prop_fulltrip_33 :: Property
+prop_fulltrip_33 =
+  withTests 1 . property $ do
+    let str =
+          showExpr $
+          String ()
+            (pure $
+             RawStringLiteral ()
+               Prefix_r
+               LongString
+               DoubleQuote
+               [ Char_lit '"', Char_lit ' ' ]
+               [])
+    annotateShow str
+
+    res <- shouldBeSuccess $ parseExpr "test" str
+    str === showExpr (() <$ res)
+
+prop_fulltrip_34 :: Property
+prop_fulltrip_34 =
+  withTests 1 . property $ do
+    let str =
+          showExpr $
+          String ()
+            (pure $
+             RawStringLiteral ()
+               Prefix_r
+               LongString
+               DoubleQuote
+               [ Char_lit '"' ]
+               [])
+    annotateShow str
+
+    res <- shouldBeSuccess $ parseExpr "test" str
+    str === showExpr (() <$ res)

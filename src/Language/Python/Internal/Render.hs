@@ -19,6 +19,7 @@ module Language.Python.Internal.Render
   , renderModule, renderStatement, renderExpr
     -- * Miscellany
   , showQuoteType, showStringPrefix, showBytesPrefix, showToken, showTokens
+  , expandIndents, whitespaceTokens, commentTokens
   , parens, braces, brackets
   , renderWhitespace, renderCommaSep, renderCommaSep1, renderCommaSep1'
   , renderIdent, renderComment, renderModuleName, renderDot, renderRelativeModuleName
@@ -30,7 +31,7 @@ module Language.Python.Internal.Render
 where
 
 import Control.Lens.Cons (_init, _last)
-import Control.Lens.Fold (traverseOf_)
+import Control.Lens.Fold ((^..), folded, traverseOf_)
 import Control.Lens.Review ((#))
 import Control.Monad.Writer.Strict (Writer, execWriter, writer)
 import Control.Monad.Reader (ReaderT, runReaderT, local, ask)
@@ -118,7 +119,10 @@ showRenderOutput =
   unRenderOutput
 
 renderComment :: Comment a -> RenderOutput ()
-renderComment c = singleton $ TkComment (() <$ c)
+renderComment = traverse_ singleton . commentTokens
+
+commentTokens :: Comment a -> [PyToken ()]
+commentTokens c = [TkComment $ () <$ c]
 
 showComment :: Comment a -> Text
 showComment (MkComment _ s) = Text.pack $ "#" <> s
@@ -397,7 +401,18 @@ showTokens :: [PyToken a] -> Text
 showTokens =
   Lazy.toStrict .
   Builder.toLazyText .
-  foldMap (Builder.fromText . showToken . (() <$))
+  foldMap (Builder.fromText . showToken . (() <$)) .
+  (expandIndents =<<)
+
+expandIndents :: PyToken a -> [PyToken ()]
+expandIndents (TkIndent _ i) =
+  (i ^.. indentsValue.folded.indentWhitespaces.folded) >>=
+  whitespaceTokens 
+expandIndents (TkLevel _ i) =
+  (i ^.. indentsValue.folded.indentWhitespaces.folded) >>=
+  whitespaceTokens
+expandIndents TkDedent{} = []
+expandIndents a = pure $ () <$ a
 
 showToken :: PyToken a -> Text
 showToken t =
@@ -545,14 +560,15 @@ showToken t =
     TkDoubleStarEq{} -> "**="
     TkDoubleSlashEq{} -> "//="
 
+whitespaceTokens :: Whitespace -> [PyToken ()]
+whitespaceTokens Space = [TkSpace ()]
+whitespaceTokens Tab = [TkTab ()]
+whitespaceTokens (Continued nl ws) = TkContinued nl () : (ws >>= whitespaceTokens)
+whitespaceTokens (Newline nl) = [TkNewline nl ()]
+whitespaceTokens (Comment cmt) = commentTokens cmt
+
 renderWhitespace :: Whitespace -> RenderOutput ()
-renderWhitespace Space = singleton $ TkSpace ()
-renderWhitespace Tab = singleton $ TkTab ()
-renderWhitespace (Continued nl ws) = do
-  singleton $ TkContinued nl ()
-  traverse_ renderWhitespace ws
-renderWhitespace (Newline nl) = singleton $ TkNewline nl ()
-renderWhitespace (Comment cmt) = renderComment cmt
+renderWhitespace = traverse_ singleton . whitespaceTokens
 
 renderNewline :: Newline -> PyToken ()
 renderNewline nl = TkNewline nl ()

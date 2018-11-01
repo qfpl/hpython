@@ -12,6 +12,7 @@ passing @['line_' 'pass_']@
 
 
 {-# language DataKinds #-}
+{-# language FlexibleContexts #-}
 {-# language MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 {-# language LambdaCase #-}
 {-# language RankNTypes #-}
@@ -612,7 +613,7 @@ instance HasDecorators Fundef where
   getDecorators code = code ^.. fdDecorators.folded._Exprs
 
 mkSetBody
-  :: HasIndents s
+  :: HasIndents (Raw s) ()
   => Setter' (Raw s) (Raw Suite)
   -> (Raw s -> Indents ())
   -> [Whitespace]
@@ -628,7 +629,7 @@ mkSetBody bodyField indentsField ws new code =
       (SuiteMany () [] Nothing LF $ toBlock new)
 
 mkGetBody
-  :: HasIndents s
+  :: HasIndents (Raw s) ()
   => String
   -> (Raw s -> Raw Suite)
   -> (Raw s -> Indents ())

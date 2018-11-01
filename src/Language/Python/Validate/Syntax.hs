@@ -881,7 +881,21 @@ validateSmallStatementSyntax (Continue a ws) =
       else pure ())) <*>
   validateWhitespace a ws
 validateSmallStatementSyntax (Global a ws ids) =
-  Global a ws <$> traverse validateIdentSyntax ids
+  ask `bindVM` \ctx ->
+  let
+    params = ctx ^.. inFunction.folded.functionParams.folded
+  in
+    Global a ws <$>
+    traverse
+      (\i ->
+         let
+           ival = i ^. getting identValue
+         in
+         (if ival `elem` params
+          then errorVM1 $ _ParameterMarkedGlobal # (a, ival)
+          else pure ()) *>
+         validateIdentSyntax i)
+      ids
 validateSmallStatementSyntax (Nonlocal a ws ids) =
   ask `bindVM` \sctxt ->
   get `bindVM` \nls ->

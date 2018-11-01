@@ -688,7 +688,7 @@ validateCompoundStatementSyntax (TryFinally a idnts b e idnts2 f i) =
   validateWhitespace a f <*>
   liftVM1 (local $ inFinally .~ True) (validateSuiteSyntax i)
 validateCompoundStatementSyntax (ClassDef a decos idnts b c d g) =
-  liftVM1 (local $ (inLoop .~ False) . (inFunction .~ Nothing)) $
+  liftVM1 (local $ inLoop .~ False) $
   (\decos' -> ClassDef a decos' idnts) <$>
   traverse validateDecoratorSyntax decos <*>
   validateWhitespace a b <*>
@@ -702,7 +702,9 @@ validateCompoundStatementSyntax (ClassDef a decos idnts b c d g) =
          y <*>
        validateWhitespace a z)
     d <*>
-  liftVM1 (local $ inClass .~ True) (validateSuiteSyntax g)
+  liftVM1
+    (local $ (inClass .~ True) . (inFunction .~ Nothing))
+    (validateSuiteSyntax g)
 validateCompoundStatementSyntax (For a idnts asyncWs b c d e h i) =
   bindVM ask $ \ctxt ->
   For a idnts <$

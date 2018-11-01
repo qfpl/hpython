@@ -265,7 +265,7 @@ number = do
     jJ = False <$ char 'j' <|> True <$ char 'J'
     floatExp =
       FloatExponent <$>
-      (True <$ char 'E' <|> False <$ char 'e') <*>
+      (EE <$ char 'E' <|> Ee <$ char 'e') <*>
       optional (Pos <$ char '+' <|> Neg <$ char '-') <*>
       some1 parseDecimal
 

@@ -106,19 +106,19 @@ genDeletableTuple :: (MonadGen m, MonadState GenState m) => m (Expr '[] ()) -> m
 genDeletableTuple expr =
   Tuple () <$>
   (TupleItem () <$> expr) <*>
-  genWhitespaces <*>
+  genComma <*>
   Gen.maybe (genSizedCommaSep1' $ TupleItem () <$> expr)
 
 genTuple :: (MonadGen m, MonadState GenState m) => m (Expr '[] ()) -> m (Expr '[] ())
 genTuple expr =
   Tuple () <$>
   genTupleItem genWhitespaces expr <*>
-  genWhitespaces <*>
+  genComma <*>
   Gen.maybe (genSizedCommaSep1' $ genTupleItem genWhitespaces expr)
 
 genAssignableTuple :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genAssignableTuple =
-  (\(ti, tis) ws -> Tuple () ti ws tis) <$> genTupleItems <*> genWhitespaces
+  (\(ti, tis) ws -> Tuple () ti ws tis) <$> genTupleItems <*> genComma
   where
     genTupleItems =
       sizedBind
@@ -141,15 +141,15 @@ genAssignableTuple =
     genTupleItemsRest' seen a as =
       Gen.sized $ \n ->
       if n == 0
-      then (,,) a as <$> Gen.maybe genWhitespaces
+      then (,,) a as <$> Gen.maybe genComma
       else
         sizedBind
           (if seen
            then TupleItem () <$> genAssignable
            else genTupleItem genWhitespaces genAssignable)
           (\ti -> do
-              ws <- genWhitespaces
-              genTupleItemsRest' (seen || has _TupleUnpack ti) ti ((ws, a) : as))
+              comma <- genComma
+              genTupleItemsRest' (seen || has _TupleUnpack ti) ti ((comma, a) : as))
 
 genModuleName :: (MonadGen m, MonadState GenState m) => m (ModuleName '[] ())
 genModuleName =
@@ -226,9 +226,9 @@ genArgs =
   sized4
     (\a b c d -> (a, b <> c, d) ^. _CommaSep1')
     genPositionalArg
-    (sizedList $ (,) <$> genWhitespaces <*> genPositionalArg)
-    (sizedList $ (,) <$> genWhitespaces <*> genKeywordArg)
-    (Gen.maybe genWhitespaces)
+    (sizedList $ (,) <$> genComma <*> genPositionalArg)
+    (sizedList $ (,) <$> genComma <*> genKeywordArg)
+    (Gen.maybe genComma)
 
 genPositionalParams
   :: (MonadGen m, MonadState GenState m)
@@ -363,15 +363,15 @@ genAssignableList =
     genListItemsRest seen a as =
       Gen.sized $ \n ->
       if n == 0
-      then (,,) a as <$> Gen.maybe genWhitespaces
+      then (,,) a as <$> Gen.maybe genComma
       else
         sizedBind
           (if seen
            then ListItem () <$> genAssignable
            else genListItem genWhitespaces genAssignable)
           (\ti -> do
-              ws <- genWhitespaces
-              genListItemsRest (seen || has _ListUnpack ti) ti ((ws, a) : as))
+              comma <- genComma
+              genListItemsRest (seen || has _ListUnpack ti) ti ((comma, a) : as))
 
 genParens :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
 genParens genExpr' = Parens () <$> genWhitespaces <*> genExpr' <*> genWhitespaces
@@ -459,7 +459,7 @@ genExprList =
     mes <- Gen.maybe $ sizedMaybe (genSizedCommaSep1' $ TupleItem () <$> genExpr)
     case mes of
       Nothing -> pure e
-      Just es -> (\ws -> Tuple () (TupleItem () e) ws es) <$> genWhitespaces
+      Just es -> (\ws -> Tuple () (TupleItem () e) ws es) <$> genComma
 
 -- | This is necessary to prevent generating exponentials that will take forever to evaluate
 -- when python does constant folding
@@ -696,7 +696,7 @@ genSmallStatement = do
     , sized2M
         (\a b -> (\ws -> Assert () ws a b) <$> genWhitespaces)
         genExpr
-        (sizedMaybe ((,) <$> genWhitespaces <*> genExpr))
+        (sizedMaybe ((,) <$> genComma <*> genExpr))
      , From () <$>
        genWhitespaces <*>
        (genRelativeModuleName & mapped.trailingWhitespace .~ [Space]) <*>

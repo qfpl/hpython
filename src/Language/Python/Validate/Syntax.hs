@@ -205,6 +205,13 @@ validateWhitespace ann ws =
   then errorVM1 (_UnexpectedComment # ann)
   else pure ws
 
+validateComma
+  :: (AsSyntaxError e v a)
+  => a
+  -> Comma
+  -> ValidateSyntax e Comma
+validateComma a (Comma ws) = Comma <$> validateWhitespace a ws
+
 validateAssignmentSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
@@ -512,10 +519,10 @@ validateExprSyntax (BinOp a e1 op e2) =
   validateExprSyntax e1 <*>
   pure op <*>
   validateExprSyntax e2
-validateExprSyntax (Tuple a b ws d) =
+validateExprSyntax (Tuple a b comma d) =
   Tuple a <$>
   validateTupleItemSyntax b <*>
-  validateWhitespace a ws <*>
+  validateComma a comma <*>
   traverseOf (traverse.traverse) validateTupleItemSyntax d
 validateExprSyntax (DictComp a ws1 comp ws2) =
   liftVM1

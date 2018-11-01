@@ -611,7 +611,7 @@ data Expr (v :: [*]) a
   -- expr
   , _unsafeTupleHead :: TupleItem v a
   -- , spaces
-  , _unsafeTupleWhitespace :: [Whitespace]
+  , _unsafeTupleWhitespace :: Comma
   -- [exprs]
   , _unsafeTupleTail :: Maybe (CommaSep1' (TupleItem v a))
   }
@@ -724,7 +724,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Bool _ _ ws -> ws
           String _ v -> v ^. trailingWhitespace
           Not _ _ e -> e ^. trailingWhitespace
-          Tuple _ _ ws Nothing -> ws
+          Tuple _ _ (Comma ws) Nothing -> ws
           Tuple _ _ _ (Just cs) -> cs ^. trailingWhitespace
           DictComp _ _ _ ws -> ws
           Dict _ _ _ ws -> ws
@@ -757,9 +757,9 @@ instance HasTrailingWhitespace (Expr v a) where
           Bool a b _ -> Bool a b ws
           String a v -> String a (v & trailingWhitespace .~ ws)
           Not a b c -> Not a b (c & trailingWhitespace .~ ws)
-          Tuple a e _ Nothing -> Tuple a (coerce e) ws Nothing
-          Tuple a b ws (Just cs) ->
-            Tuple a (coerce b) ws (Just $ cs & trailingWhitespace .~ ws)
+          Tuple a e _ Nothing -> Tuple a (coerce e) (Comma ws) Nothing
+          Tuple a b c@(Comma ws) (Just cs) ->
+            Tuple a (coerce b) c (Just $ cs & trailingWhitespace .~ ws)
           DictComp a b c _ -> DictComp a b c ws
           Dict a b c _ -> Dict a b c ws
           SetComp a b c _ -> SetComp a b c ws

@@ -11,7 +11,8 @@ Portability : non-portable
 -}
 
 module Language.Python.Syntax.CommaSep
-  ( CommaSep (..)
+  ( Comma (..)
+  , CommaSep (..)
   , appendCommaSep, maybeToCommaSep, listToCommaSep
   , CommaSep1 (..)
   , commaSep1Head, appendCommaSep1, listToCommaSep1, listToCommaSep1'
@@ -33,11 +34,20 @@ import Data.Semigroup (Semigroup(..))
 
 import Language.Python.Syntax.Whitespace (Whitespace (Space), HasTrailingWhitespace (..))
 
+-- | The venerable comma separator
+newtype Comma =
+  Comma [Whitespace]
+  deriving (Eq, Show)
+
+instance HasTrailingWhitespace Comma where
+  trailingWhitespace =
+    lens (\(Comma ws) -> ws) (\_ ws -> Comma ws)
+
 -- | Items separated by commas, with optional whitespace following each comma
 data CommaSep a
   = CommaSepNone
   | CommaSepOne a
-  | CommaSepMany a [Whitespace] (CommaSep a)
+  | CommaSepMany a Comma (CommaSep a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 -- | Convert a maybe to a singleton or nullary 'CommaSep'
@@ -50,14 +60,14 @@ maybeToCommaSep = maybe CommaSepNone CommaSepOne
 listToCommaSep :: [a] -> CommaSep a
 listToCommaSep [] = CommaSepNone
 listToCommaSep [a] = CommaSepOne a
-listToCommaSep (a:as) = CommaSepMany a [Space] $ listToCommaSep as
+listToCommaSep (a:as) = CommaSepMany a (Comma [Space]) $ listToCommaSep as
 
 appendCommaSep :: [Whitespace] -> CommaSep a -> CommaSep a -> CommaSep a
 appendCommaSep _  CommaSepNone b = b
 appendCommaSep _  (CommaSepOne a) CommaSepNone = CommaSepOne a
-appendCommaSep ws (CommaSepOne a) (CommaSepOne b) = CommaSepMany a ws (CommaSepOne b)
-appendCommaSep ws (CommaSepOne a) (CommaSepMany b ws1 cs) = CommaSepMany a ws (CommaSepMany b ws1 cs)
-appendCommaSep ws (CommaSepMany a ws1 cs) b = CommaSepMany a ws1 (appendCommaSep ws cs b)
+appendCommaSep ws (CommaSepOne a) (CommaSepOne b) = CommaSepMany a (Comma ws) (CommaSepOne b)
+appendCommaSep ws (CommaSepOne a) (CommaSepMany b c cs) = CommaSepMany a (Comma ws) (CommaSepMany b c cs)
+appendCommaSep ws (CommaSepMany a c cs) b = CommaSepMany a c (appendCommaSep ws cs b)
 
 instance Semigroup (CommaSep a) where
   (<>) = appendCommaSep [Space]
@@ -69,7 +79,7 @@ instance Monoid (CommaSep a) where
 -- | Non-empty 'CommaSep'
 data CommaSep1 a
   = CommaSepOne1 a
-  | CommaSepMany1 a [Whitespace] (CommaSep1 a)
+  | CommaSepMany1 a Comma (CommaSep1 a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 commaSep1Head :: CommaSep1 a -> a
@@ -80,7 +90,7 @@ appendCommaSep1 :: [Whitespace] -> CommaSep1 a -> CommaSep1 a -> CommaSep1 a
 appendCommaSep1 ws a b =
   CommaSepMany1
     (case a of; CommaSepOne1 x -> x;  CommaSepMany1 x _ _  -> x)
-    (case a of; CommaSepOne1 _ -> ws; CommaSepMany1 _ ws' _ -> ws')
+    (case a of; CommaSepOne1 _ -> Comma ws; CommaSepMany1 _ ws' _ -> ws')
     (case a of; CommaSepOne1 _ -> b;  CommaSepMany1 _ _ x  -> x <> b)
 
 instance Semigroup (CommaSep1 a) where
@@ -106,19 +116,19 @@ listToCommaSep1 (a :| as) = go (a:as)
   where
     go [] = error "impossible"
     go [x] = CommaSepOne1 x
-    go (x:xs) = CommaSepMany1 x [Space] $ go xs
+    go (x:xs) = CommaSepMany1 x (Comma [Space]) $ go xs
 
 -- | Non-empty 'CommaSep', optionally terminated by a comma
 -- Assumes that the contents consumes trailing whitespace
 data CommaSep1' a
-  = CommaSepOne1' a (Maybe [Whitespace])
-  | CommaSepMany1' a [Whitespace] (CommaSep1' a)
+  = CommaSepOne1' a (Maybe Comma)
+  | CommaSepMany1' a Comma (CommaSep1' a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 _CommaSep1'
   :: Iso
-       (a, [([Whitespace], a)], Maybe [Whitespace])
-       (b, [([Whitespace], b)], Maybe [Whitespace])
+       (a, [(Comma, a)], Maybe Comma)
+       (b, [(Comma, b)], Maybe Comma)
        (CommaSep1' a)
        (CommaSep1' b)
 _CommaSep1' = iso toCs fromCs
@@ -137,19 +147,19 @@ listToCommaSep1' :: [a] -> Maybe (CommaSep1' a)
 listToCommaSep1' [] = Nothing
 listToCommaSep1' [a] = Just (CommaSepOne1' a Nothing)
 listToCommaSep1' (a:as) =
-  CommaSepMany1' a [Space] <$> listToCommaSep1' as
+  CommaSepMany1' a (Comma [Space]) <$> listToCommaSep1' as
 
 instance HasTrailingWhitespace s => HasTrailingWhitespace (CommaSep1' s) where
   trailingWhitespace =
     lens
       (\case
-         CommaSepOne1' a b -> fromMaybe (a ^. trailingWhitespace) b
+         CommaSepOne1' a b -> maybe (a ^. trailingWhitespace) (^. trailingWhitespace) b
          CommaSepMany1' _ _ a -> a ^. trailingWhitespace)
       (\cs ws ->
          case cs of
            CommaSepOne1' a b ->
              CommaSepOne1'
                (fromMaybe (a & trailingWhitespace .~ ws) $ b $> coerce a)
-               (b $> ws)
+               (b $> Comma ws)
            CommaSepMany1' a b c ->
              CommaSepMany1' (coerce a) b (c & trailingWhitespace .~ ws))

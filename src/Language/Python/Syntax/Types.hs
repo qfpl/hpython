@@ -17,7 +17,7 @@ import Control.Lens.TH (makeLenses)
 import Data.List.NonEmpty (NonEmpty)
 
 import Language.Python.Internal.Syntax.Ident (Ident)
-import Language.Python.Syntax.CommaSep (CommaSep, CommaSep1, CommaSep1')
+import Language.Python.Syntax.CommaSep (Comma, CommaSep, CommaSep1, CommaSep1')
 import Language.Python.Syntax.Expr (Arg, Expr, ListItem, Param, TupleItem)
 import Language.Python.Syntax.Statement (Decorator, ExceptAs, Suite, WithItem)
 import Language.Python.Syntax.Whitespace
@@ -195,7 +195,7 @@ data Tuple v a
   = MkTuple
   { _tupleAnn :: a
   , _tupleHead :: TupleItem v a
-  , _tupleComma :: [Whitespace]
+  , _tupleComma :: Comma
   , _tupleTail :: Maybe (CommaSep1' (TupleItem v a))
   } deriving (Eq, Show)
 makeLenses ''Tuple

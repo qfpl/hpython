@@ -29,7 +29,7 @@ prop_syntax_1 =
         -- lambda *: None
         Lambda ()
           [Space]
-          (CommaSepMany (StarParam () [] Nothing Nothing) [] CommaSepNone)
+          (CommaSepMany (StarParam () [] Nothing Nothing) (Comma []) CommaSepNone)
           [Space]
           (None () [])
     res <- syntaxValidateExpr e

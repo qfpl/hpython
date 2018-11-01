@@ -557,35 +557,35 @@ renderWhitespace (Comment cmt) = renderComment cmt
 renderNewline :: Newline -> PyToken ()
 renderNewline nl = TkNewline nl ()
 
+renderComma :: Comma -> RenderOutput ()
+renderComma (Comma ws) = do
+  singleton $ TkComma ()
+  traverse_ renderWhitespace ws
+
 renderCommaSep :: (a -> RenderOutput ()) -> CommaSep a -> RenderOutput ()
 renderCommaSep _ CommaSepNone = pure ()
 renderCommaSep f (CommaSepOne a) = f a
-renderCommaSep f (CommaSepMany a ws2 c) = do
+renderCommaSep f (CommaSepMany a c cs) = do
   f a
-  singleton $ TkComma ()
-  traverse_ renderWhitespace ws2
-  renderCommaSep f c
+  renderComma c
+  renderCommaSep f cs
 
 renderCommaSep1 :: (a -> RenderOutput ()) -> CommaSep1 a -> RenderOutput ()
 renderCommaSep1 f (CommaSepOne1 a) = f a
-renderCommaSep1 f (CommaSepMany1 a ws2 c) = do
+renderCommaSep1 f (CommaSepMany1 a comma c) = do
   f a
-  singleton $ TkComma ()
-  traverse_ renderWhitespace ws2
+  renderComma comma
   renderCommaSep1 f c
 
 renderCommaSep1' :: (a -> RenderOutput ()) -> CommaSep1' a -> RenderOutput ()
 renderCommaSep1' f (CommaSepOne1' a b) = do
   f a
   traverse_
-    (\x -> do
-        singleton $ TkComma ()
-        traverse renderWhitespace x)
+    renderComma
     b
-renderCommaSep1' f (CommaSepMany1' a ws2 c) = do
+renderCommaSep1' f (CommaSepMany1' a comma c) = do
   f a
-  singleton (TkComma ())
-  traverse_ renderWhitespace ws2
+  renderComma comma
   renderCommaSep1' f c
 
 renderIdent :: Ident v a -> RenderOutput ()
@@ -727,7 +727,7 @@ renderTupleItems (CommaSepOne1' a Nothing) =
             traverse_ renderWhitespace c
             renderUnpackTarget d)
         b
-renderTupleItems (CommaSepOne1' a (Just ws)) = do
+renderTupleItems (CommaSepOne1' a (Just comma)) = do
   (case a of
      TupleItem _ b -> parensTupleGenerator b
      TupleUnpack _ [] b c ->
@@ -742,9 +742,8 @@ renderTupleItems (CommaSepOne1' a (Just ws)) = do
              traverse_ renderWhitespace c
              renderUnpackTarget d)
          b)
-  singleton $ TkComma ()
-  traverse_ renderWhitespace ws
-renderTupleItems (CommaSepMany1' a ws rest) = do
+  renderComma comma
+renderTupleItems (CommaSepMany1' a comma rest) = do
   (case a of
     TupleItem _ b -> parensTupleGenerator b
     TupleUnpack _ [] b c ->
@@ -759,8 +758,7 @@ renderTupleItems (CommaSepMany1' a ws rest) = do
             traverse_ renderWhitespace c
             renderUnpackTarget d)
         b)
-  singleton $ TkComma ()
-  traverse_ renderWhitespace ws
+  renderComma comma
   renderTupleItems rest
 
 renderSetItem :: SetItem v a -> RenderOutput ()
@@ -786,7 +784,7 @@ renderSetItems (CommaSepOne1' a Nothing) =
             traverse_ renderWhitespace c
             renderUnpackTarget d)
         b
-renderSetItems (CommaSepOne1' a (Just ws)) = do
+renderSetItems (CommaSepOne1' a (Just comma)) = do
   (case a of
      SetItem _ b -> parensTupleGenerator b
      SetUnpack _ [] b c -> do
@@ -800,9 +798,8 @@ renderSetItems (CommaSepOne1' a (Just ws)) = do
              traverse_ renderWhitespace c
              renderUnpackTarget d)
          b)
-  singleton $ TkComma ()
-  traverse_ renderWhitespace ws
-renderSetItems (CommaSepMany1' a ws rest) = do
+  renderComma comma
+renderSetItems (CommaSepMany1' a comma rest) = do
   (case a of
     SetItem _ b -> parensTupleGenerator b
     SetUnpack _ [] b c -> do
@@ -816,8 +813,7 @@ renderSetItems (CommaSepMany1' a ws rest) = do
             traverse_ renderWhitespace c
             renderUnpackTarget d)
         b)
-  singleton $ TkComma ()
-  traverse_ renderWhitespace ws
+  renderComma comma
   renderSetItems rest
 
 renderListItems :: CommaSep1' (ListItem v a) -> RenderOutput ()
@@ -831,7 +827,7 @@ renderListItems (CommaSepOne1' a Nothing) =
             traverse_ renderWhitespace c
             renderUnpackTarget d)
         b
-renderListItems (CommaSepOne1' a (Just ws)) = do
+renderListItems (CommaSepOne1' a (Just comma)) = do
   (case a of
      ListItem _ b -> parensTupleGenerator b
      ListUnpack _ [] b c -> do
@@ -845,9 +841,8 @@ renderListItems (CommaSepOne1' a (Just ws)) = do
              traverse_ renderWhitespace c
              renderUnpackTarget d)
          b)
-  singleton (TkComma ())
-  traverse_ renderWhitespace ws
-renderListItems (CommaSepMany1' a ws rest) = do
+  renderComma comma
+renderListItems (CommaSepMany1' a comma rest) = do
   (case a of
     ListItem _ b -> parensTupleGenerator b
     ListUnpack _ [] b c -> do
@@ -861,8 +856,7 @@ renderListItems (CommaSepMany1' a ws rest) = do
             traverse_ renderWhitespace c
             renderUnpackTarget d)
         b)
-  singleton (TkComma ())
-  traverse_ renderWhitespace ws
+  renderComma comma
   renderListItems rest
 
 renderExpr :: Expr v a -> RenderOutput ()
@@ -1108,8 +1102,7 @@ renderSmallStatement (Assert _ b c d) = do
   parensTupleGenerator c
   traverse_
     (\(a, b) -> do
-        singleton $ TkComma ()
-        traverse_ renderWhitespace a
+        renderComma a
         parensTupleGenerator b)
     d
 renderSmallStatement (Raise _ ws x) = do
@@ -1459,7 +1452,7 @@ renderParams = go False
     go :: Bool -> CommaSep (Param v a) -> RenderOutput ()
     go _ CommaSepNone = pure ()
     go _ (CommaSepOne a) = renderParam a
-    go sawStar (CommaSepMany a ws2 b) = do
+    go sawStar (CommaSepMany a c b) = do
       let
         sawStar' =
           case a of
@@ -1469,9 +1462,7 @@ renderParams = go False
       renderParam a
       (case b of
           CommaSepNone | sawStar' -> pure ()
-          _ -> do
-            singleton (TkComma ())
-            traverse_ renderWhitespace ws2)
+          _ -> renderComma c)
       go sawStar' b
 
 renderParam :: Param v a -> RenderOutput ()

@@ -17,6 +17,7 @@ module Language.Python.Internal.Syntax.Numbers
   ( IntLiteral (..)
   , FloatLiteral (..)
   , FloatExponent (..)
+  , E (..)
   , ImagLiteral (..)
   , Sign (..)
   , showIntLiteral
@@ -77,7 +78,14 @@ deriveOrd1 ''IntLiteral
 -- | Positive or negative, as in @-7@
 data Sign = Pos | Neg deriving (Eq, Ord, Show)
 
-data FloatExponent = FloatExponent Bool (Maybe Sign) (NonEmpty DecDigit)
+-- | When a floating point literal is in scientific notation, it includes the character
+-- @e@, which can be lower or upper case.
+data E = Ee | EE deriving (Eq, Ord, Show)
+
+-- | The exponent of a floating point literal.
+--
+-- An @e@, followed by an optional 'Sign', followed by at least one digit.
+data FloatExponent = FloatExponent E (Maybe Sign) (NonEmpty DecDigit)
   deriving (Eq, Ord, Show)
 
 -- | A literal floating point value.
@@ -145,7 +153,7 @@ showIntLiteral (IntLiteralHex _ b n) =
 showFloatExponent :: FloatExponent -> Text
 showFloatExponent (FloatExponent e s ds) =
   Text.pack $
-  (if e then 'E' else 'e') :
+  (case e of; EE -> 'E'; Ee -> 'e') :
   foldMap (\case; Pos -> "+"; Neg -> "-") s <>
   fmap (charDecimal #) (NonEmpty.toList ds)
 

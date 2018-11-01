@@ -125,6 +125,9 @@ genInt = do
       ] <*>
     genWhitespaces
 
+genE :: MonadGen m => m E
+genE = Gen.element [Ee, EE]
+
 genSmallFloat :: MonadGen m => m (Expr '[] ())
 genSmallFloat =
   Float () <$>
@@ -146,7 +149,7 @@ genSmallFloat =
     genDecs = Gen.nonEmpty (Range.constant 1 3) (Gen.element enumDecimal)
     floatExponent =
       FloatExponent <$>
-      Gen.bool <*>
+      genE <*>
       Gen.maybe (Gen.element [Pos, Neg]) <*>
       genDecs
 
@@ -187,7 +190,7 @@ genFloatLiteral =
     genDecs = Gen.nonEmpty (Range.constant 1 10) (Gen.element enumDecimal)
     floatExponent =
       FloatExponent <$>
-      Gen.bool <*>
+      genE <*>
       Gen.maybe (Gen.element [Pos, Neg]) <*>
       genDecs
 

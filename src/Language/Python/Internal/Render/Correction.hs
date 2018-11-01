@@ -26,6 +26,7 @@ import Control.Lens.Plated (transform)
 import Control.Lens.Setter ((.~))
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
+import Data.Semigroup ((<>))
 import Data.Text (Text)
 
 import qualified Data.List.NonEmpty as NonEmpty

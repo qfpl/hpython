@@ -26,6 +26,7 @@ import Control.Lens.Plated (transform)
 import Control.Lens.Setter ((.~))
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
+import Data.Semigroup ((<>))
 import Data.Text (Text)
 
 import qualified Data.List.NonEmpty as NonEmpty
@@ -48,7 +49,6 @@ correctSpaces f =
     a@(TkFloat (FloatLiteralFull _ _ Nothing)) : b : rest
       | isIdentifierChar (Text.head $ f b) -> a : TkSpace () : b : rest
     a -> a
-
 
 correctNewlines :: [PyToken ()] -> [PyToken ()]
 correctNewlines =
@@ -93,6 +93,37 @@ quote qt =
     DoubleQuote -> '\"'
     SingleQuote -> '\''
 
+-- | When a backslash character, precedes an escape sequence it needs to be escaped
+-- so that it doesn't interfere with the backslash that begins the escape sequence.
+--
+-- For example:
+--
+-- @['Char_lit' \'\\\\\', Char_esc_n]@ would naively render to \'\\\\n\', which
+-- would parse to @['Char_esc_bslash', 'Char_lit' \'n\']@, breaking the
+-- @parse . print@ identity
+correctBackslashEscapes :: [PyChar] -> [PyChar]
+correctBackslashEscapes [] = []
+correctBackslashEscapes [x] = [x]
+correctBackslashEscapes (x:y:ys) =
+  case x of
+    Char_lit '\\'
+      -- if the next character is an escape sequence, then the current backslash
+      -- must be escaped
+      | isEscape y -> Char_esc_bslash : y : correctBackslashEscapes ys
+      | Char_lit c <- y ->
+        case c of
+          '\\' -> Char_esc_bslash : correctBackslashEscapes ys
+          '\'' -> Char_esc_bslash : correctBackslashEscapes ys
+          '\"' -> Char_esc_bslash : correctBackslashEscapes ys
+          -- if we print out ['\', 'u'] then the parser will think it's beginning a
+          -- unicode point
+          'u' -> Char_esc_bslash : y : correctBackslashEscapes ys
+          'U' -> Char_esc_bslash : y : correctBackslashEscapes ys
+          -- same for 'x' and hex values
+          'x' -> Char_esc_bslash : y : correctBackslashEscapes ys
+          _ -> x : correctBackslashEscapes (y : ys)
+    _ -> x : correctBackslashEscapes (y : ys)
+
 correctBackslashes :: [PyChar] -> [PyChar]
 correctBackslashes [] = []
 correctBackslashes [x] =
@@ -104,18 +135,61 @@ correctBackslashes (x:y:ys) =
     Char_lit '\\'
       -- if the next character is an escape sequence, then the current backslash
       -- must be escaped
-      | isEscape y -> Char_esc_bslash : y : correctBackslashes ys
-      | Char_lit c <- y ->
-        case c of
-          '\\' -> Char_esc_bslash : y : correctBackslashes ys
-          -- if we print out ['\', 'u'] then the parser will think it's beginning a
-          -- unicode point
-          'u' -> Char_esc_bslash : y : correctBackslashes ys
-          'U' -> Char_esc_bslash : y : correctBackslashes ys
-          -- same for 'x' and hex values
-          'x' -> Char_esc_bslash : y : correctBackslashes ys
-          _ -> x : correctBackslashes (y : ys)
+      | Char_esc_bslash <- y -> Char_esc_bslash : y : correctBackslashes ys
     _ -> x : correctBackslashes (y : ys)
+
+-- | @(as, bs) = span p xs@
+-- @bs@ is the longest suffix that satisfies the predicate, and @as@ is the
+-- prefix up to that point
+--
+-- It's like the reverse of 'span'
+naps :: (a -> Maybe b) -> [a] -> ([a], [b])
+naps p = go (,) (,)
+  where
+    go _ r [] = r [] []
+    go l r (x:xs) =
+      go
+        (\res res' -> l (x:res) res')
+        (\res res' ->
+           case p x of
+             Just x' -> r res (x':res')
+             Nothing -> l (x:res) res')
+        xs
+
+correctBackslashEscapesRaw :: [PyChar] -> [PyChar]
+correctBackslashEscapesRaw [] = []
+correctBackslashEscapesRaw [x] = [x]
+correctBackslashEscapesRaw (x:y:ys) =
+  case x of
+    Char_lit '\\' ->
+      case y of
+        Char_esc_doublequote -> Char_esc_bslash : y : correctBackslashEscapesRaw ys
+        Char_esc_singlequote -> Char_esc_bslash : y : correctBackslashEscapesRaw ys
+        _ -> x : correctBackslashEscapesRaw (y : ys)
+    _ -> x : correctBackslashEscapesRaw (y : ys)
+
+correctBackslashesRaw :: [PyChar] -> [PyChar]
+correctBackslashesRaw ps =
+  let
+    (as, bs) =
+      naps
+        (\a ->
+           case a of
+             Char_lit '\\' -> Just a
+             Char_esc_bslash -> Just a
+             _ -> Nothing)
+        ps
+  in
+    if even (numSlashes bs)
+    then ps
+    else
+      as <> (Char_lit '\\' : bs)
+  where
+    numSlashes :: [PyChar] -> Int
+    numSlashes [] = 0
+    numSlashes (Char_lit '\\' : xs) = 1 + numSlashes xs
+    numSlashes (Char_esc_bslash : xs) = 2 + numSlashes xs
+    numSlashes _ = undefined
 
 -- | Every quote in a string of a particular quote type should be escaped
 correctQuotes :: QuoteType -> [PyChar] -> [PyChar]
@@ -125,9 +199,82 @@ correctQuotes qt =
        DoubleQuote -> \case; Char_lit '"' -> Char_esc_doublequote; c -> c
        SingleQuote -> \case; Char_lit '\'' -> Char_esc_singlequote; c -> c)
 
+-- | Every quote in short raw string that isn't preceded by
+-- a backslash should be escaped
+correctQuotesRaw :: QuoteType -> [PyChar] -> [PyChar]
+correctQuotesRaw _ [] = []
+correctQuotesRaw qt [x] =
+  case x of
+    Char_lit c | quote qt == c -> [quoteChar qt]
+    _ -> [x]
+correctQuotesRaw qt (x:y:ys) =
+  case x of
+    Char_lit c | q == c -> go (qc:y:ys)
+    _ -> go (x:y:ys)
+  where
+    qc = quoteChar qt
+    q = quote qt
+
+    go [] = []
+    go [x] = [x]
+    go (x:y:ys) =
+      case x of
+        Char_lit '\\' -> x : go (y:ys)
+        _ ->
+          case y of
+            Char_lit c | q == c -> x : go (qc:ys)
+            _ -> x : go (y:ys)
+
+-- | Every third literal quote at the beginning of a long (non-raw) string should
+-- be escaped
+correctInitialQuotes :: QuoteType -> [PyChar] -> [PyChar]
+correctInitialQuotes qt = go (0::Int)
+  where
+    qc = quoteChar qt
+    q = quote qt
+
+    go !_ [] = []
+    go !n (c:cs) =
+      if c == Char_lit q
+      then
+        if n == 2
+        then qc : go (n+1 `mod` 3) cs
+        else c : go (n+1 `mod` 3) cs
+      else c : cs
+
+-- | Literal quotes at the beginning and end of a long raw string should be escaped
+correctInitialFinalQuotesLongRaw :: QuoteType -> [PyChar] -> [PyChar]
+correctInitialFinalQuotesLongRaw qt = correctFinalQuotes . correctInitialQuotes qt
+  where
+    qc = quoteChar qt
+    q = quote qt
+
+    -- | Literal quotes at the end of a long raw string should be escaped
+    correctFinalQuotes :: [PyChar] -> [PyChar]
+    correctFinalQuotes = snd . go
+      where
+        go [] = (True, [])
+        go (c:cs) =
+          if c /= Char_lit '\\'
+          then
+            case go cs of
+              (b, cs') ->
+                if b && c == Char_lit q
+                then (True, qc : cs')
+                else (False, c : cs')
+          else
+            let
+              (ds, es) = span (== Char_lit '\\') cs
+            in
+              case es of
+                [] -> (False, c : ds)
+                e':es' ->
+                  case go es' of
+                    (_, es'') -> (False, c : ds <> (e' : es''))
+
 -- | Literal quotes at the beginning and end of a long (non-raw) string should be escaped
-correctInitialFinalQuotes :: QuoteType -> [PyChar] -> [PyChar]
-correctInitialFinalQuotes qt = correctFinalQuotes . correctInitialQuotes
+correctInitialFinalQuotesLong :: QuoteType -> [PyChar] -> [PyChar]
+correctInitialFinalQuotesLong qt = correctFinalQuotes . correctInitialQuotes qt
   where
     qc = quoteChar qt
     q = quote qt
@@ -143,20 +290,6 @@ correctInitialFinalQuotes qt = correctFinalQuotes . correctInitialQuotes
               if b && c == Char_lit q
               then (True, qc : cs')
               else (False, c : cs')
-
-    -- | Every third literal quote at the beginning of a long (non-raw) string should
-    -- be escaped
-    correctInitialQuotes :: [PyChar] -> [PyChar]
-    correctInitialQuotes = go (0::Int)
-      where
-        go !_ [] = []
-        go !n (c:cs) =
-          if c == Char_lit q
-          then
-            if n == 2
-            then qc : go (n+1 `mod` 3) cs
-            else c : go (n+1 `mod` 3) cs
-          else c : cs
 
 -- | It's possible that successive statements have no newlines in between
 -- them. This would cause them to be displayed on the same line. In every line where

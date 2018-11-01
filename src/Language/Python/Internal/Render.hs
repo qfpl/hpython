@@ -209,13 +209,101 @@ intToHexH n = go n []
     go 15 = (++[HeXDigitF])
     go b = let (q, r) = quotRem b 16 in go r . go q
 
-renderPyCharsBytes :: QuoteType -> StringType -> [PyChar] -> Text
-renderPyCharsBytes qt st =
-  case st of
-    LongString ->
-      Text.pack . go . correctBackslashes . correctInitialFinalQuotes qt
-    ShortString ->
-      Text.pack . go . correctBackslashes . correctQuotes qt
+renderPyCharsWithCorrection
+  :: (QuoteType -> StringType -> [PyChar] -> [PyChar])
+  -> QuoteType
+  -> StringType
+  -> [PyChar] -> Text
+renderPyCharsWithCorrection c qt st = Text.pack . go . c qt st
+  where
+    go s =
+      case s of
+        [] -> ""
+        Char_newline : cs -> "\\newline" <> go cs
+        Char_octal1 a : cs ->
+          "\\" <>
+          [charOctal # a] <>
+          go cs
+        Char_octal2 a b : cs ->
+          "\\" <>
+          [charOctal # a, charOctal # b] <>
+          go cs
+        Char_octal3 a b c : cs ->
+          "\\" <>
+          [charOctal # a, charOctal # b, charOctal # c] <>
+          go cs
+        Char_hex a b : cs ->
+          "\\x" <> [charHeXaDeCiMaL # a, charHeXaDeCiMaL # b] <> go cs
+        Char_uni16 a b c d : cs ->
+          "\\u" <>
+          [ charHeXaDeCiMaL # a
+          , charHeXaDeCiMaL # b
+          , charHeXaDeCiMaL # c
+          , charHeXaDeCiMaL # d
+          ] <>
+          go cs
+        Char_uni32 a b c d e f g h : cs ->
+          "\\u" <>
+          [ charHeXaDeCiMaL # a
+          , charHeXaDeCiMaL # b
+          , charHeXaDeCiMaL # c
+          , charHeXaDeCiMaL # d
+          , charHeXaDeCiMaL # e
+          , charHeXaDeCiMaL # f
+          , charHeXaDeCiMaL # g
+          , charHeXaDeCiMaL # h
+          ] <>
+          go cs
+        Char_esc_bslash : cs -> '\\' : '\\' : go cs
+        Char_esc_singlequote : cs -> '\\' : '\'' : go cs
+        Char_esc_doublequote : cs -> '\\' : '"' : go cs
+        Char_esc_a : cs -> '\\' : 'a' : go cs
+        Char_esc_b : cs -> '\\' : 'b' : go cs
+        Char_esc_f : cs -> '\\' : 'f' : go cs
+        Char_esc_n : cs -> '\\' : 'n' : go cs
+        Char_esc_r : cs -> '\\' : 'r' : go cs
+        Char_esc_t : cs -> '\\' : 't' : go cs
+        Char_esc_v : cs -> '\\' : 'v' : go cs
+        Char_lit c : cs ->
+          case st of
+            LongString -> c : go cs
+            ShortString ->
+              case c of
+                '\r' -> go $ Char_esc_r : cs
+                '\n' -> go $ Char_esc_n : cs
+                _ -> c : go cs
+
+renderPyChars :: QuoteType -> StringType -> [PyChar] -> Text
+renderPyChars =
+  renderPyCharsWithCorrection $
+  \qt st ->
+    case st of
+      LongString ->
+        correctBackslashes . correctBackslashEscapes .
+        correctInitialFinalQuotesLong qt
+      ShortString ->
+        correctBackslashes . correctBackslashEscapes .
+        correctQuotes qt
+
+renderRawPyChars :: QuoteType -> StringType -> [PyChar] -> Text
+renderRawPyChars =
+  renderPyCharsWithCorrection $
+  \qt st ->
+    case st of
+      LongString ->
+        correctInitialFinalQuotesLongRaw qt .
+        correctBackslashEscapesRaw .
+        correctBackslashesRaw
+      ShortString ->
+        correctBackslashEscapesRaw . correctBackslashesRaw .
+        correctQuotesRaw qt
+
+renderPyCharsBytesWithCorrection
+  :: (QuoteType -> StringType -> [PyChar] -> [PyChar])
+  -> QuoteType
+  -> StringType
+  -> [PyChar] -> Text
+renderPyCharsBytesWithCorrection c qt st = Text.pack . go . c qt st
   where
     go s =
       case s of
@@ -280,9 +368,30 @@ renderPyCharsBytes qt st =
                   case c of
                     '\r' -> go $ Char_esc_r : cs
                     '\n' -> go $ Char_esc_n : cs
-                    '\'' | SingleQuote <- qt -> go $ Char_esc_singlequote : cs
-                    '\"' | DoubleQuote <- qt -> go $ Char_esc_singlequote : cs
                     _ -> c : go cs
+
+renderPyCharsBytes :: QuoteType -> StringType -> [PyChar] -> Text
+renderPyCharsBytes =
+  renderPyCharsBytesWithCorrection $
+  \qt st ->
+  case st of
+    LongString ->
+      correctBackslashes . correctBackslashEscapes . correctInitialFinalQuotesLong qt
+    ShortString ->
+      correctBackslashes . correctBackslashEscapes . correctQuotes qt
+
+renderRawPyCharsBytes :: QuoteType -> StringType -> [PyChar] -> Text
+renderRawPyCharsBytes =
+  renderPyCharsBytesWithCorrection $
+  \qt st ->
+    case st of
+      LongString ->
+        correctInitialFinalQuotesLongRaw qt .
+        correctBackslashEscapesRaw .
+        correctBackslashesRaw
+      ShortString ->
+        correctBackslashEscapesRaw . correctBackslashesRaw .
+        correctQuotesRaw qt
 
 showTokens :: [PyToken a] -> Text
 showTokens =
@@ -364,7 +473,7 @@ showToken t =
       in
         showRawStringPrefix sp <>
         quote <>
-        renderPyChars qt st s <>
+        renderRawPyChars qt st s <>
         quote
     TkRawBytes sp st qt s _ ->
       let
@@ -375,7 +484,7 @@ showToken t =
       in
         showRawBytesPrefix sp <>
         quote <>
-        renderPyCharsBytes qt st s <>
+        renderRawPyCharsBytes qt st s <>
         quote
     TkSpace{} -> " "
     TkTab{} -> "\t"
@@ -435,73 +544,6 @@ showToken t =
     TkShiftRightEq{} -> ">>="
     TkDoubleStarEq{} -> "**="
     TkDoubleSlashEq{} -> "//="
-
-renderPyChars :: QuoteType -> StringType -> [PyChar] -> Text
-renderPyChars qt st =
-  case st of
-    LongString ->
-      Text.pack . go . correctBackslashes . correctInitialFinalQuotes qt
-    ShortString ->
-      Text.pack . go . correctBackslashes . correctQuotes qt
-  where
-    go s =
-      case s of
-        [] -> ""
-        Char_newline : cs -> "\\newline" <> go cs
-        Char_octal1 a : cs ->
-          "\\" <>
-          [charOctal # a] <>
-          go cs
-        Char_octal2 a b : cs ->
-          "\\" <>
-          [charOctal # a, charOctal # b] <>
-          go cs
-        Char_octal3 a b c : cs ->
-          "\\" <>
-          [charOctal # a, charOctal # b, charOctal # c] <>
-          go cs
-        Char_hex a b : cs ->
-          "\\x" <> [charHeXaDeCiMaL # a, charHeXaDeCiMaL # b] <> go cs
-        Char_uni16 a b c d : cs ->
-          "\\u" <>
-          [ charHeXaDeCiMaL # a
-          , charHeXaDeCiMaL # b
-          , charHeXaDeCiMaL # c
-          , charHeXaDeCiMaL # d
-          ] <>
-          go cs
-        Char_uni32 a b c d e f g h : cs ->
-          "\\u" <>
-          [ charHeXaDeCiMaL # a
-          , charHeXaDeCiMaL # b
-          , charHeXaDeCiMaL # c
-          , charHeXaDeCiMaL # d
-          , charHeXaDeCiMaL # e
-          , charHeXaDeCiMaL # f
-          , charHeXaDeCiMaL # g
-          , charHeXaDeCiMaL # h
-          ] <>
-          go cs
-        Char_esc_bslash : cs -> '\\' : '\\' : go cs
-        Char_esc_singlequote : cs -> '\\' : '\'' : go cs
-        Char_esc_doublequote : cs -> '\\' : '"' : go cs
-        Char_esc_a : cs -> '\\' : 'a' : go cs
-        Char_esc_b : cs -> '\\' : 'b' : go cs
-        Char_esc_f : cs -> '\\' : 'f' : go cs
-        Char_esc_n : cs -> '\\' : 'n' : go cs
-        Char_esc_r : cs -> '\\' : 'r' : go cs
-        Char_esc_t : cs -> '\\' : 't' : go cs
-        Char_esc_v : cs -> '\\' : 'v' : go cs
-        Char_lit c : cs ->
-          case st of
-            LongString -> c : go cs
-            ShortString ->
-              case c of
-                '\r' -> go $ Char_esc_r : cs
-                '\n' -> go $ Char_esc_n : cs
-                '\'' | SingleQuote <- qt -> go $ Char_esc_singlequote : cs
-                '\"' | DoubleQuote <- qt -> go $ Char_esc_singlequote : cs
-                _ -> c : go cs
 
 renderWhitespace :: Whitespace -> RenderOutput ()
 renderWhitespace Space = singleton $ TkSpace ()

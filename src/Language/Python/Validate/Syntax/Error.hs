@@ -18,8 +18,6 @@ import Control.Lens.Type
 import Control.Lens.Prism
 import Language.Python.Syntax.Expr (Expr)
 import Language.Python.Internal.Syntax.Ident (Ident)
-import Language.Python.Syntax.Statement (Statement)
-import Language.Python.Syntax.Whitespace (Newline, Whitespace)
 
 data SyntaxError (v :: [*]) a
   = PositionalAfterKeywordArg a (Expr v a)
@@ -30,7 +28,6 @@ data SyntaxError (v :: [*]) a
   | CannotDelete a (Expr v a)
   | CannotAugAssignTo a (Expr v a)
   | DuplicateArgument a String
-  | ExpectedNewlineAfter (a, [Whitespace], Statement v a, Maybe Newline)
   | UnexpectedNewline a
   | UnexpectedComment a
   | IdentifierReservedWord a String
@@ -79,9 +76,6 @@ class AsSyntaxError r_actrO v_act2q a_act2r | r_actrO -> v_act2q
   _CannotAugAssignTo ::
     Prism' r_actrO (a_act2r, Expr v_act2q a_act2r)
   _DuplicateArgument :: Prism' r_actrO (a_act2r, String)
-  _ExpectedNewlineAfter ::
-    Prism' r_actrO (a_act2r, [Whitespace], Statement v_act2q a_act2r,
-                    Maybe Newline)
   _UnexpectedNewline :: Prism' r_actrO a_act2r
   _UnexpectedComment :: Prism' r_actrO a_act2r
   _IdentifierReservedWord :: Prism' r_actrO (a_act2r, String)
@@ -125,7 +119,6 @@ class AsSyntaxError r_actrO v_act2q a_act2r | r_actrO -> v_act2q
   _CannotDelete = ((.) _SyntaxError) _CannotDelete
   _CannotAugAssignTo = ((.) _SyntaxError) _CannotAugAssignTo
   _DuplicateArgument = ((.) _SyntaxError) _DuplicateArgument
-  _ExpectedNewlineAfter = ((.) _SyntaxError) _ExpectedNewlineAfter
   _UnexpectedNewline = ((.) _SyntaxError) _UnexpectedNewline
   _UnexpectedComment = ((.) _SyntaxError) _UnexpectedComment
   _IdentifierReservedWord
@@ -233,12 +226,6 @@ instance AsSyntaxError (SyntaxError v_act2q a_act2r) v_act2q a_act2r where
             -> case x_actsq of
                 DuplicateArgument y1_actsr y2_actss -> Right (y1_actsr, y2_actss)
                 _ -> Left x_actsq)
-  _ExpectedNewlineAfter
-    = (prism (\ x1_actst -> ExpectedNewlineAfter x1_actst))
-        (\ x_actsu
-            -> case x_actsu of
-                ExpectedNewlineAfter y1_actsv -> Right y1_actsv
-                _ -> Left x_actsu)
   _UnexpectedNewline
     = (prism (\ x1_actsw -> UnexpectedNewline x1_actsw))
         (\ x_actsx

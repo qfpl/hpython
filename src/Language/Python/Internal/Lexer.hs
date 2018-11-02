@@ -1,6 +1,6 @@
 {-# language BangPatterns #-}
 {-# language TypeApplications #-}
-{-# language MultiParamTypeClasses #-}
+{-# language FunctionalDependencies, MultiParamTypeClasses #-}
 {-# language GeneralizedNewtypeDeriving #-}
 {-# language FlexibleContexts #-}
 {-# language TypeFamilies #-}
@@ -17,9 +17,14 @@ Portability : non-portable
 -}
 
 module Language.Python.Internal.Lexer
-  ( SrcInfo(..), initialSrcInfo, withSrcInfo
+  ( tokenizeWithTabs
+    -- * Source Information
+  , SrcInfo(..), initialSrcInfo, withSrcInfo
+    -- * Errors
+  , AsLexicalError(..), fromLexicalError, Parsec.ParseError(..)
+  , AsTabError(..), fromTabError, TabError(..)
+    -- * Miscellaneous
   , tokenize
-  , TabError(..)
   , insertTabs
   )
 where
@@ -27,7 +32,9 @@ where
 import Control.Applicative ((<|>), many, optional)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
-import Control.Monad (when, replicateM)
+import Control.Lens.Prism (Prism')
+import Control.Lens.Review ((#))
+import Control.Monad ((<=<), when, replicateM)
 import Control.Monad.Except (throwError)
 import Control.Monad.State (StateT, evalStateT, get, modify, put)
 import Data.Bifunctor (first)
@@ -41,6 +48,7 @@ import Data.Foldable (asum)
 import Data.Functor.Identity (Identity)
 import Data.List.NonEmpty (NonEmpty(..), some1)
 import Data.Monoid (Sum(..))
+import Data.Set (Set)
 import Data.Semigroup (Semigroup, (<>))
 import Data.Semigroup.Foldable (foldMap1)
 import Data.These (These(..))
@@ -440,9 +448,26 @@ parseToken =
       many (satisfy isIdentifierChar)
     ]
 
+class AsLexicalError s t e | s -> t e where
+  _LexicalError
+    :: Prism'
+         s
+         ( NonEmpty Parsec.SourcePos
+         , Maybe (Parsec.ErrorItem t)
+         , Set (Parsec.ErrorItem t)
+         )
+
+fromLexicalError :: AsLexicalError s t e => ParseError t e -> s
+fromLexicalError (Parsec.TrivialError a b c) = _LexicalError # (a, b, c)
+fromLexicalError Parsec.FancyError{} = error "fancy errors"
+
 {-# noinline tokenize #-}
-tokenize :: FilePath -> Text.Text -> Either (ParseError Char Void) [PyToken SrcInfo]
-tokenize = parse (unParsecT tokens)
+tokenize
+  :: AsLexicalError e Char Void
+  => FilePath
+  -> Text.Text
+  -> Either e [PyToken SrcInfo]
+tokenize fp = first fromLexicalError . parse (unParsecT tokens) fp
   where
     tokens :: ParsecT Void Text.Text Identity [PyToken SrcInfo]
     tokens = many parseToken <* Parsec.eof
@@ -554,6 +579,14 @@ data TabError a
   | IncorrectDedent a
   deriving (Eq, Show)
 
+class AsTabError s a | s -> a where
+  _TabError :: Prism' s a
+  _IncorrectDedent :: Prism' s a
+
+fromTabError :: AsTabError s a => TabError a -> s
+fromTabError (TabError a) = _TabError # a
+fromTabError (IncorrectDedent a) = _IncorrectDedent # a
+
 indentation :: Semigroup a => a -> [LogicalLine a] -> Either (TabError a) [IndentedLine a]
 indentation ann lls =
   flip evalStateT (pure (ann, mempty)) $
@@ -662,5 +695,14 @@ chunked = go FingerTree.empty
     go leaps (Level i a : is) =
       TkLevel a (Indents (splitIndents leaps $ NonEmpty.toList i ^. from indentWhitespaces) a) : go leaps is
 
-insertTabs :: Semigroup a => a -> [PyToken a] -> Either (TabError a) [PyToken a]
-insertTabs a = fmap chunked . indentation a . logicalLines
+insertTabs :: (Semigroup a, AsTabError s a) => a -> [PyToken a] -> Either s [PyToken a]
+insertTabs a = first fromTabError . fmap chunked . indentation a . logicalLines
+
+-- | Tokenize an input file, inserting indent/level/dedent tokens in appropriate
+-- positions according to the block structure.
+tokenizeWithTabs
+  :: (AsLexicalError s Char Void, AsTabError s SrcInfo)
+  => FilePath
+  -> Text.Text
+  -> Either s [PyToken SrcInfo]
+tokenizeWithTabs fp = insertTabs (initialSrcInfo fp) <=< tokenize fp

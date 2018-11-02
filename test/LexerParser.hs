@@ -3,7 +3,6 @@ module LexerParser (lexerParserTests) where
 
 import Hedgehog
 import Control.Monad (void)
-import Data.Validation (Validation(..), validation)
 import qualified Data.Text as Text
 
 import Language.Python.Render
@@ -14,7 +13,7 @@ import Language.Python.Internal.Syntax.Strings
   , RawBytesPrefix(..), RawStringPrefix(..)
   )
 
-import Helpers (shouldBeSuccess)
+import Helpers (shouldBeParseSuccess, shouldBeParseFailure)
 
 lexerParserTests :: Group
 lexerParserTests = $$discover
@@ -24,8 +23,7 @@ prop_fulltrip_1 =
   withTests 1 . property $ do
     let str = "def a(x, y=2, *z, **w):\n   return 2 + 3"
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseStatement "test" str
-    annotateShow tree
+    tree <- shouldBeParseSuccess parseStatement str
 
     showStatement tree === str
 
@@ -34,8 +32,7 @@ prop_fulltrip_2 =
   withTests 1 . property $ do
     let str = "(   1\n       *\n  3\n    )"
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseExpr "test" str
-    annotateShow tree
+    tree <- shouldBeParseSuccess parseExpr str
 
     showExpr tree === str
 
@@ -44,8 +41,7 @@ prop_fulltrip_3 =
   withTests 1 . property $ do
     let str = "pass;"
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseStatement "test" str
-    annotateShow tree
+    tree <- shouldBeParseSuccess parseStatement str
 
     showStatement tree === str
 
@@ -54,8 +50,7 @@ prop_fulltrip_4 =
   withTests 1 . property $ do
     let str = "def a():\n pass\n #\n pass\n"
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseStatement "test" str
-    annotateShow tree
+    tree <- shouldBeParseSuccess parseStatement str
 
     showStatement tree === str
 
@@ -64,8 +59,7 @@ prop_fulltrip_5 =
   withTests 1 . property $ do
     let str = "if False:\n pass\n pass\nelse:\n pass\n pass\n"
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseStatement "test" str
-    annotateShow tree
+    tree <- shouldBeParseSuccess parseStatement str
 
     showStatement tree === str
 
@@ -74,8 +68,7 @@ prop_fulltrip_6 =
   withTests 1 . property $ do
     let str = "# blah\ndef boo():\n    pass\n       #bing\n    #   bop\n"
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" str
-    annotateShow tree
+    tree <- shouldBeParseSuccess parseModule str
 
     showModule tree === str
 
@@ -84,8 +77,7 @@ prop_fulltrip_7 =
   withTests 1 . property $ do
     let str = "if False:\n pass\nelse \\\n      \\\r\n:\n pass\n"
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" str
-    annotateShow tree
+    tree <- shouldBeParseSuccess parseModule str
 
     showModule tree === str
 
@@ -94,8 +86,7 @@ prop_fulltrip_8 =
   withTests 1 . property $ do
     let str = "def a():\n \n pass\n pass\n"
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" str
-    annotateShow tree
+    tree <- shouldBeParseSuccess parseModule str
 
     showModule tree === str
 
@@ -106,8 +97,7 @@ prop_fulltrip_9 =
       str =
         "try:\n pass\nexcept False:\n pass\nelse:\n pass\nfinally:\n pass\n def a():\n  pass\n pass\n"
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" str
-    annotateShow tree
+    tree <- shouldBeParseSuccess parseModule str
 
     showModule tree === str
 
@@ -130,8 +120,7 @@ prop_fulltrip_10 =
         , "    pass"
         ]
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" str
-    annotateShow $! tree
+    tree <- shouldBeParseSuccess parseModule str
 
     showModule tree === str
 
@@ -149,8 +138,7 @@ prop_fulltrip_11 =
         , " \tpass"
         ]
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" str
-    annotateShow $! tree
+    tree <- shouldBeParseSuccess parseModule str
 
     showModule tree === str
 
@@ -169,8 +157,7 @@ prop_fulltrip_12 =
         , " pass"
         ]
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" str
-    annotateShow $! tree
+    tree <- shouldBeParseSuccess parseModule str
 
     showModule tree === str
 
@@ -191,8 +178,7 @@ prop_fulltrip_13 =
         , " pass"
         ]
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" str
-    annotateShow $! tree
+    tree <- shouldBeParseSuccess parseModule str
 
     showModule tree === str
 
@@ -202,8 +188,7 @@ prop_fulltrip_14 =
     let
       str = "not ((False for a in False) if False else False or False)"
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" str
-    annotateShow $! tree
+    tree <- shouldBeParseSuccess parseModule str
 
     showModule tree === str
 
@@ -213,8 +198,7 @@ prop_fulltrip_15 =
     let
       str = "01."
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" str
-    annotateShow $! tree
+    tree <- shouldBeParseSuccess parseModule str
 
     showModule tree === str
 
@@ -224,8 +208,7 @@ prop_fulltrip_16 =
     let
       str = "def a():\n  return ~i"
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" str
-    annotateShow $! tree
+    tree <- shouldBeParseSuccess parseModule str
 
     showModule tree === str
 
@@ -234,8 +217,7 @@ prop_fulltrip_17 =
   withTests 1 . property $ do
     let str = "r\"\\\"\""
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" str
-    annotateShow $! tree
+    tree <- shouldBeParseSuccess parseModule str
 
     showModule tree === str
 
@@ -244,8 +226,7 @@ prop_fulltrip_18 =
   withTests 1 . property $ do
     let str = "\"\0\""
 
-    tree <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" str
-    annotateShow $! tree
+    tree <- shouldBeParseSuccess parseModule str
 
     showModule tree === str
 
@@ -254,64 +235,49 @@ prop_fulltrip_19 =
   withTests 1 . property $ do
     let str = " \\\n"
 
-    let res = parseModule "test" str
-    case res of
-      Failure{} -> success
-      Success a -> do
-        annotateShow a
-        failure
+    shouldBeParseFailure parseModule str
 
 prop_fulltrip_20 :: Property
 prop_fulltrip_20 =
   withTests 1 . property $ do
     let str = " pass"
 
-    let res = parseModule "test" str
-    case res of
-      Failure{} -> success
-      Success a -> do
-        annotateShow a
-        failure
+    shouldBeParseFailure parseModule str
 
 prop_fulltrip_21 :: Property
 prop_fulltrip_21 =
   withTests 1 . property $ do
     let str = "if a:\n  \\\n\n  pass"
 
-    let res = parseModule "test" str
-    case res of
-      Failure{} -> success
-      Success a -> do
-        annotateShow a
-        failure
+    shouldBeParseFailure parseModule str
 
 prop_fulltrip_22 :: Property
 prop_fulltrip_22 =
   withTests 1 . property $ do
     let str = "for a in (b, *c): pass"
 
-    void . shouldBeSuccess $ parseModule "test" str
+    void $ shouldBeParseSuccess parseModule str
 
 prop_fulltrip_23 :: Property
 prop_fulltrip_23 =
   withTests 1 . property $ do
     let str = "None,*None"
 
-    void . shouldBeSuccess $ parseModule "test" str
+    void $ shouldBeParseSuccess parseModule str
 
 prop_fulltrip_24 :: Property
 prop_fulltrip_24 =
   withTests 1 . property $ do
     let str = "'\1'"
 
-    void . shouldBeSuccess $ parseModule "test" str
+    void $ shouldBeParseSuccess parseModule str
 
 prop_fulltrip_25 :: Property
 prop_fulltrip_25 =
   withTests 1 . property $ do
     let str = "'\11'"
 
-    void . shouldBeSuccess $ parseModule "test" str
+    void $ shouldBeParseSuccess parseModule str
 
 prop_fulltrip_26 :: Property
 prop_fulltrip_26 =
@@ -328,7 +294,7 @@ prop_fulltrip_26 =
                [])
     annotateShow str
 
-    res <- shouldBeSuccess $ parseExpr "test" str
+    res <- shouldBeParseSuccess parseExpr str
     str === showExpr (() <$ res)
 
 prop_fulltrip_27 :: Property
@@ -346,7 +312,7 @@ prop_fulltrip_27 =
                [])
     annotateShow str
 
-    res <- shouldBeSuccess $ parseExpr "test" str
+    res <- shouldBeParseSuccess parseExpr str
     str === showExpr (() <$ res)
 
 prop_fulltrip_28 :: Property
@@ -364,7 +330,7 @@ prop_fulltrip_28 =
                [])
     annotateShow str
 
-    res <- shouldBeSuccess $ parseExpr "test" str
+    res <- shouldBeParseSuccess parseExpr str
     str === showExpr (() <$ res)
 
 prop_fulltrip_29 :: Property
@@ -382,7 +348,7 @@ prop_fulltrip_29 =
                [])
     annotateShow str
 
-    res <- shouldBeSuccess $ parseExpr "test" str
+    res <- shouldBeParseSuccess parseExpr str
     str === showExpr (() <$ res)
 
 prop_fulltrip_30 :: Property
@@ -400,7 +366,7 @@ prop_fulltrip_30 =
                [])
     annotateShow str
 
-    res <- shouldBeSuccess $ parseExpr "test" str
+    res <- shouldBeParseSuccess parseExpr str
     str === showExpr (() <$ res)
 
 prop_fulltrip_31 :: Property
@@ -408,7 +374,7 @@ prop_fulltrip_31 =
   withTests 1 . property $ do
     let str = "del(a)"
 
-    void . shouldBeSuccess $ parseModule "test" str
+    void $ shouldBeParseSuccess parseModule str
 
 prop_fulltrip_32 :: Property
 prop_fulltrip_32 =
@@ -425,7 +391,7 @@ prop_fulltrip_32 =
                [])
     annotateShow str
 
-    res <- shouldBeSuccess $ parseExpr "test" str
+    res <- shouldBeParseSuccess parseExpr str
     str === showExpr (() <$ res)
 
 prop_fulltrip_33 :: Property
@@ -443,7 +409,7 @@ prop_fulltrip_33 =
                [])
     annotateShow str
 
-    res <- shouldBeSuccess $ parseExpr "test" str
+    res <- shouldBeParseSuccess parseExpr "test"
     str === showExpr (() <$ res)
 
 prop_fulltrip_34 :: Property
@@ -461,5 +427,5 @@ prop_fulltrip_34 =
                [])
     annotateShow str
 
-    res <- shouldBeSuccess $ parseExpr "test" str
+    res <- shouldBeParseSuccess parseExpr str
     str === showExpr (() <$ res)

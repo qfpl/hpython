@@ -2,7 +2,7 @@
 {-# language FlexibleContexts #-}
 {-# language LambdaCase #-}
 {-# language RankNTypes #-}
-{-# language MultiParamTypeClasses #-}
+{-# language FunctionalDependencies, MultiParamTypeClasses #-}
 {-# language TypeFamilies #-}
 
 {-|
@@ -18,16 +18,19 @@ module Language.Python.Internal.Parse where
 
 import Control.Applicative (Alternative, (<|>), optional, many, some)
 import Control.Lens.Getter ((^.))
+import Control.Lens.Prism (Prism')
+import Control.Lens.Review ((#))
 import Control.Monad (void)
 import Data.Bifunctor (first)
 import Data.Coerce (coerce)
 import Data.Function ((&))
 import Data.List (foldl')
-import Data.List.NonEmpty (some1)
+import Data.List.NonEmpty (NonEmpty, some1)
 import Data.Proxy (Proxy(..))
+import Data.Set (Set)
 import Data.Void (Void)
 import Text.Megaparsec
-  ((<?>), MonadParsec, Parsec, ParseError, Stream(..), SourcePos(..), eof, try, lookAhead)
+  ((<?>), MonadParsec, Parsec, Stream(..), SourcePos(..), eof, try, lookAhead)
 import Text.Megaparsec.Char (satisfy)
 
 
@@ -111,15 +114,33 @@ instance Stream PyTokens where
 
   takeWhile_ f = coerce (span f)
 
+class AsParseError s t e | s -> t e where
+  _ParseError
+    :: Prism'
+         s
+         ( NonEmpty SourcePos
+         , Maybe (Megaparsec.ErrorItem t)
+         , Set (Megaparsec.ErrorItem t)
+         )
+
+fromParseError
+  :: AsParseError s t e
+  => Megaparsec.ParseError t e
+  -> s
+fromParseError Megaparsec.FancyError{} = error "there are none of these"
+fromParseError (Megaparsec.TrivialError pos a b) = _ParseError # (pos, a, b)
+
 type Parser = Parsec Void PyTokens
 
 {-# inline runParser #-}
 runParser
-  :: String
+  :: AsParseError e (PyToken SrcInfo) Void
+  => String
   -> Parser a
   -> [PyToken SrcInfo]
-  -> Either (ParseError (PyToken SrcInfo) Void) a
-runParser file p input = Megaparsec.parse p file (PyTokens input)
+  -> Either e a
+runParser file p input =
+  first fromParseError $ Megaparsec.parse p file (PyTokens input)
 
 eol :: MonadParsec e PyTokens m => m Newline
 eol =

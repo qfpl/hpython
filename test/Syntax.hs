@@ -107,3 +107,11 @@ prop_syntax_6 =
     let s= "async def a():\n class a(await None):\n  pass"
     e <- shouldBeParseSuccess parseModule s
     void . shouldBeSuccess =<< syntaxValidateModule (() <$ e)
+
+prop_syntax_7 :: Property
+prop_syntax_7 =
+  withTests 1 . property $ do
+    let
+      s = "def a(b): global b"
+    e <- shouldBeParseSuccess parseModule s
+    shouldBeFailure =<< syntaxValidateModule (() <$ e)

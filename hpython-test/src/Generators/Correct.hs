@@ -33,6 +33,7 @@ import Language.Python.Optics
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
+import Language.Python.Syntax.ModuleNames
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Whitespace
 

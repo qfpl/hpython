@@ -271,7 +271,7 @@ compFor =
   orTest anySpace
 
 -- | (',' x)* [',']
-commaSepRest :: MonadParsec e PyTokens m => m b -> m ([([Whitespace], b)], Maybe [Whitespace])
+commaSepRest :: MonadParsec e PyTokens m => m b -> m ([(Comma, b)], Maybe Comma)
 commaSepRest x = do
   c <- optional $ snd <$> comma anySpace
   case c of
@@ -981,8 +981,8 @@ suite =
       Left <$> ((,) <$> blank <*> eol) <|>
       Right <$> (statement level =<< i)
 
-comma :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, [Whitespace])
-comma ws = token ws (\case; TkComma{} -> True; _ -> False) ","
+comma :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Comma)
+comma ws = fmap Comma <$> token ws (\case; TkComma{} -> True; _ -> False) ","
 
 colon :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, [Whitespace])
 colon ws = token ws (\case; TkColon{} -> True; _ -> False) ":"

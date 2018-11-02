@@ -711,7 +711,7 @@ instance HasArguments Call where
     { _callArguments =
         case args of
           [] -> Nothing
-          a:as -> Just $ (a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1'
+          a:as -> Just $ (a, zip (repeat (Comma [Space])) as, Nothing) ^. _CommaSep1'
     }
 
   getArguments code = _callArguments code ^.. folded.folded
@@ -735,7 +735,7 @@ call_ expr args =
   { _callArguments = 
     case args of
       [] -> Nothing
-      a:as -> Just $ (a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1'
+      a:as -> Just $ (a, zip (repeat (Comma [Space])) as, Nothing) ^. _CommaSep1'
   }
 
 return_ :: Raw Expr -> Raw Statement
@@ -851,7 +851,7 @@ instance e ~ Raw SetItem => AsSet [e] where
   set_ es =
     case es of
       [] -> call_ (var_ "set") []
-      a:as -> Set () [] ((a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1') []
+      a:as -> Set () [] ((a, zip (repeat (Comma [Space])) as, Nothing) ^. _CommaSep1') []
 
 instance e ~ Comprehension SetItem => AsSet (Raw e) where
   set_ c = SetComp () [] c []
@@ -894,7 +894,7 @@ instance e ~ Raw DictItem => AsDict [e] where
     []
     (case ds of
        [] -> Nothing
-       a:as -> Just $ (a, zip (repeat [Space] ) as, Nothing) ^. _CommaSep1')
+       a:as -> Just $ (a, zip (repeat (Comma [Space])) as, Nothing) ^. _CommaSep1')
     []
 
 -- |
@@ -1555,7 +1555,7 @@ class_ name args body =
     _cdArguments =
       case args of
         [] -> Nothing
-        a:as -> Just ([], Just $ (a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1', [])
+        a:as -> Just ([], Just $ (a, zip (repeat (Comma [Space])) as, Nothing) ^. _CommaSep1', [])
   }
 
 -- | Create a minimal 'ClassDef'
@@ -1592,7 +1592,7 @@ instance HasArguments ClassDef where
     { _cdArguments =
         case args of
           [] -> Nothing
-          a:as -> Just ([], Just $ (a, zip (repeat [Space]) as, Nothing) ^. _CommaSep1', [])
+          a:as -> Just ([], Just $ (a, zip (repeat (Comma [Space])) as, Nothing) ^. _CommaSep1', [])
     }
 
   getArguments code = _cdArguments code ^.. folded._2.folded.folded
@@ -1689,10 +1689,10 @@ tuple_ :: [Raw TupleItem] -> Raw Expr
 tuple_ [] = Unit () [] []
 tuple_ (a:as) =
   case as of
-    [] -> Tuple () (ti_ a) [] Nothing
+    [] -> Tuple () (ti_ a) (Comma []) Nothing
     b:bs ->
-      Tuple () a [Space] . Just $
-      (b, zip (repeat [Space]) bs, Nothing) ^. _CommaSep1'
+      Tuple () a (Comma [Space]) . Just $
+      (b, zip (repeat (Comma [Space])) bs, Nothing) ^. _CommaSep1'
 
 await_ :: Raw Expr -> Raw Expr
 await_ = Await () [Space]
@@ -1845,26 +1845,26 @@ subs_ a e =
   where
     exprToSubscript
       :: Raw Expr
-      -> (Raw Subscript, [([Whitespace], Raw Subscript)], Maybe [Whitespace])
+      -> (Raw Subscript, [(Comma, Raw Subscript)], Maybe Comma)
     exprToSubscript e =
       let
-        notSlice :: (Raw Subscript, [([Whitespace], Raw Subscript)], Maybe [Whitespace])
+        notSlice :: (Raw Subscript, [(Comma, Raw Subscript)], Maybe Comma)
         notSlice =
           case e ^? _Tuple of
             Nothing -> (SubscriptExpr e, [], Nothing)
             Just tup ->
               let
                 h = tup ^. tupleHead
-                ws = tup ^. tupleComma
+                comma = tup ^. tupleComma
                 t = tup ^? tupleTail._Just.from _CommaSep1'
                 res =
                   case t of
                     Just (a, bs, c) ->
                       (,,) <$>
                       fromTupleItem h <*>
-                      traverseOf (traverse._2) fromTupleItem ((ws, a) : bs) <*>
+                      traverseOf (traverse._2) fromTupleItem ((comma, a) : bs) <*>
                       pure c
-                    Nothing -> (\a -> (a, [], Just ws)) <$> fromTupleItem h
+                    Nothing -> (\a -> (a, [], Just comma)) <$> fromTupleItem h
               in
                 fromMaybe (SubscriptExpr e, [], Nothing) res
       in

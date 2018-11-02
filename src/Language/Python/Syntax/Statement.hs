@@ -255,7 +255,7 @@ data SmallStatement (v :: [*]) a
   | Assert a
       [Whitespace]
       (Expr v a)
-      (Maybe ([Whitespace], Expr v a))
+      (Maybe (Comma, Expr v a))
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 instance Plated (SmallStatement '[] a) where; plate = gplate

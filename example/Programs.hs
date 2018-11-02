@@ -9,7 +9,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 
 import Language.Python.DSL
 import Language.Python.Syntax.Module (Module (..))
-import Language.Python.Syntax.CommaSep (CommaSep (..), CommaSep1' (..))
+import Language.Python.Syntax.CommaSep (Comma (..), CommaSep (..), CommaSep1' (..))
 import Language.Python.Syntax.Expr (Arg (..), Expr (..), Param (..))
 import Language.Python.Syntax.Statement (Block (..), CompoundStatement (..), SimpleStatement (..), SmallStatement (..), Statement (..), Suite (..))
 import Language.Python.Syntax.Whitespace (Blank (..), Indents (..), Newline (..), Whitespace (..), indentWhitespaces)
@@ -30,7 +30,7 @@ append_to =
     (Space :| [])
     "append_to"
     []
-    ( CommaSepMany (PositionalParam () "element" Nothing) [Space] $
+    ( CommaSepMany (PositionalParam () "element" Nothing) (Comma [Space]) $
       CommaSepOne (KeywordParam () "to" Nothing [] (List () [] Nothing []))
     )
     []

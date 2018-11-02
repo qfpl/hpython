@@ -211,6 +211,7 @@ statement_printparseprint_print =
               validation (\e -> annotateShow e *> failure) pure $
               parseStatement "test" (showStatement res')
             annotateShow py
+            annotateShow $ showStatement (() <$ py)
             showStatement (res' ^. unvalidated) ===
               showStatement (py $> ())
 

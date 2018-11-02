@@ -98,3 +98,18 @@ prop_syntax_5 =
     res <- shouldBeSuccess $ parseExpr "test" (showExpr e)
     res' <- shouldBeSuccess $ parseExpr "test" (showExpr res)
     void res === void res'
+
+prop_syntax_6 :: Property
+prop_syntax_6 =
+  withTests 1 . property $ do
+    let s= "async def a():\n class a(await None):\n  pass"
+    e <- shouldBeSuccess $ parseModule "test" s
+    void . shouldBeSuccess =<< syntaxValidateModule (() <$ e)
+
+prop_syntax_7 :: Property
+prop_syntax_7 =
+  withTests 1 . property $ do
+    let
+      s = "def a(b): global b"
+    e <- shouldBeSuccess $ parseModule "test" s
+    shouldBeFailure =<< syntaxValidateModule (() <$ e)

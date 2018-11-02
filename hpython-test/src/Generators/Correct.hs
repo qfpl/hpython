@@ -157,7 +157,7 @@ genModuleName =
   [ ModuleNameOne () <$> genIdent ]
   [ ModuleNameMany () <$>
     genIdent <*>
-    genWhitespaces <*>
+    genDot <*>
     genModuleName
   ]
 

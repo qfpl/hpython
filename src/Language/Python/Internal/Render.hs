@@ -1037,10 +1037,9 @@ renderExpr (Await _ ws expr) = do
 
 renderModuleName :: ModuleName v a -> RenderOutput ()
 renderModuleName (ModuleNameOne _ s) = renderIdent s
-renderModuleName (ModuleNameMany _ n ws2 rest) = do
+renderModuleName (ModuleNameMany _ n dot rest) = do
   renderIdent n
-  singleton $ TkDot ()
-  traverse_ renderWhitespace ws2
+  renderDot dot
   renderModuleName rest
 
 renderDot :: Dot -> RenderOutput ()

@@ -9,9 +9,20 @@ License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
 Stability   : experimental
 Portability : non-portable
+
+Module names, including those qualified by packages.
+
+See <https://docs.python.org/3.5/tutorial/modules.html#packages>
 -}
 
-module Language.Python.Internal.Syntax.ModuleNames where
+module Language.Python.Internal.Syntax.ModuleNames
+  ( ModuleName (..)
+  , RelativeModuleName (..)
+  , Dot (..)
+  , makeModuleName
+  , _moduleNameAnn
+  )
+where
 
 import Control.Lens.Cons (_last)
 import Control.Lens.Fold ((^?!))
@@ -26,6 +37,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Syntax.Whitespace
 
+-- | See <https://docs.python.org/3.5/tutorial/modules.html#intra-package-references>
 data RelativeModuleName v a
   = RelativeWithName [Dot] (ModuleName v a)
   | Relative (NonEmpty Dot)
@@ -44,6 +56,7 @@ instance HasTrailingWhitespace (RelativeModuleName v a) where
             NonEmpty.fromList $
             (a : as) & _last.trailingWhitespace .~ ws)
 
+-- | A period character, possibly followed by some whitespace.
 data Dot = Dot [Whitespace]
   deriving (Eq, Show)
 
@@ -51,19 +64,23 @@ instance HasTrailingWhitespace Dot where
   trailingWhitespace =
     lens (\(Dot ws) -> ws) (\_ ws -> Dot ws)
 
+-- | A module name. It can be a single segment, or a sequence of them which
+-- are implicitly separated by period character.
 data ModuleName v a
   = ModuleNameOne a (Ident v a)
-  | ModuleNameMany a (Ident v a) [Whitespace] (ModuleName v a)
+  | ModuleNameMany a (Ident v a) Dot (ModuleName v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+-- | Get the annotation from a 'ModuleName'
 _moduleNameAnn :: ModuleName v a -> a
 _moduleNameAnn (ModuleNameOne a _) = a
 _moduleNameAnn (ModuleNameMany a _ _ _) = a
 
+-- | Convenience constructor for 'ModuleName'
 makeModuleName :: Ident v a -> [([Whitespace], Ident v a)] -> ModuleName v a
 makeModuleName i [] = ModuleNameOne (_identAnn i) i
 makeModuleName i ((a, b) : as) =
-  ModuleNameMany (_identAnn i) i a $
+  ModuleNameMany (_identAnn i) i (Dot a) $
   makeModuleName b as
 
 instance HasTrailingWhitespace (ModuleName v a) where

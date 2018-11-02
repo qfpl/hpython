@@ -12,7 +12,7 @@ Portability : non-portable
 This module defines some helpful set-like functions for working with type-level lists.
 -}
 
-module Data.Type.Set where
+module Data.Type.Set (Nub, Member) where
 
 -- | Remove adjacent equal elements from a type-level list
 type family Nub t where

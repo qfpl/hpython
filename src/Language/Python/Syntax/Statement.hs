@@ -74,6 +74,8 @@ instance Validated Decorator where; unvalidated = to unsafeCoerce
 class HasStatements s where
   _Statements :: Traversal (s v a) (s '[] a) (Statement v a) (Statement '[] a)
 
+-- | A 'Block' is an indented multi-line chunk of code, forming part of a
+-- 'Suite'.
 data Block (v :: [*]) a
   = Block
   { _blockBlankLines :: [(Blank a, Newline)]
@@ -101,6 +103,7 @@ instance Traversable (Block v) where
     traverse f b <*>
     traverse (bitraverse (traverseOf (_1.traverse) f) (traverse f)) c
 
+-- | Classy 'Traversal' for 'Block's
 class HasBlocks s where
   _Blocks :: Traversal (s v a) (s '[] a) (Block v a) (Block '[] a)
 
@@ -157,6 +160,7 @@ instance HasStatements Suite where
   _Statements _ (SuiteOne a b c) = pure $ SuiteOne a b (c ^. unvalidated)
   _Statements f (SuiteMany a b c d e) = SuiteMany a b c d <$> _Statements f e
 
+-- | See <https://docs.python.org/3.5/reference/simple_stmts.html>
 data SimpleStatement (v :: [*]) a
   = MkSimpleStatement
       (SmallStatement v a)
@@ -166,6 +170,7 @@ data SimpleStatement (v :: [*]) a
       (Maybe Newline)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+-- | A 'Statement' is either a 'SimpleStatement' or a 'CompoundStatement'
 data Statement (v :: [*]) a
   = SimpleStatement (Indents a) (SimpleStatement v a)
   | CompoundStatement (CompoundStatement v a)
@@ -280,6 +285,7 @@ instance HasExprs SmallStatement where
   _Exprs _ p@Import{} = pure $ p ^. unvalidated
   _Exprs _ p@From{} = pure $ p ^. unvalidated
 
+-- | See <https://docs.python.org/3.5/reference/compound_stmts.html#the-try-statement>
 data ExceptAs (v :: [*]) a
   = ExceptAs
   { _exceptAsAnn :: a
@@ -288,6 +294,8 @@ data ExceptAs (v :: [*]) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+-- | A compound statement consists of one or more clauses.
+-- A clause consists of a header and a suite.
 data Suite (v :: [*]) a
   -- ':' <space> simplestatement
   = SuiteOne a [Whitespace] (SimpleStatement v a)
@@ -298,6 +306,7 @@ data Suite (v :: [*]) a
       (Block v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+-- | See <https://docs.python.org/3.5/reference/compound_stmts.html#the-with-statement>
 data WithItem (v :: [*]) a
   = WithItem
   { _withItemAnn :: a
@@ -306,6 +315,11 @@ data WithItem (v :: [*]) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+-- | Decorators on function definitions
+--
+-- <https://docs.python.org/3.5/reference/compound_stmts.html#function-definitions>
+--
+-- <https://docs.python.org/3.5/glossary.html#term-decorator>
 data Decorator (v :: [*]) a
   = Decorator
   { _decoratorAnn :: a
@@ -318,6 +332,7 @@ data Decorator (v :: [*]) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+-- | See <https://docs.python.org/3.5/reference/compound_stmts.html>
 data CompoundStatement (v :: [*]) a
   = Fundef
   { _csAnn :: a

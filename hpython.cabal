@@ -78,8 +78,6 @@ library
                      , Language.Python.Internal.Syntax.Import
                      , Language.Python.Internal.Syntax.IR
                      , Language.Python.Internal.Syntax.ModuleNames
-                     , Language.Python.Internal.Syntax.Operator.Binary
-                     , Language.Python.Internal.Syntax.Operator.Unary
                      , Language.Python.Internal.Syntax.Numbers
                      , Language.Python.Internal.Syntax.Strings
                      , Language.Python.Optics
@@ -90,6 +88,8 @@ library
                      , Language.Python.Syntax.CommaSep
                      , Language.Python.Syntax.Expr
                      , Language.Python.Syntax.Module
+                     , Language.Python.Syntax.Operator.Binary
+                     , Language.Python.Syntax.Operator.Unary
                      , Language.Python.Syntax.Statement
                      , Language.Python.Syntax.Types
                      , Language.Python.Syntax.Whitespace

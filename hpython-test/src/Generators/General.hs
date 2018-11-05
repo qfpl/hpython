@@ -25,7 +25,7 @@ genTuple :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
 genTuple expr =
   Tuple () <$>
   genTupleItem genWhitespaces expr <*>
-  genWhitespaces <*>
+  genComma <*>
   Gen.maybe (genSizedCommaSep1' $ genTupleItem genWhitespaces expr)
 
 genParam :: MonadGen m => m (Expr '[] ()) -> m (Param '[] ())
@@ -71,7 +71,7 @@ genModuleName =
   [ ModuleNameOne () <$> genIdent ]
   [ ModuleNameMany () <$>
     genIdent <*>
-    genWhitespaces <*>
+    genDot <*>
     genModuleName
   ]
 
@@ -347,7 +347,7 @@ genSmallStatement =
     , sized2M
         (\a b -> (\ws -> Assert () ws a b) <$> genWhitespaces)
         genExpr
-        (sizedMaybe ((,) <$> genWhitespaces <*> genExpr))
+        (sizedMaybe ((,) <$> genComma <*> genExpr))
     ]
 
 genDecorator :: MonadGen m => m (Decorator '[] ())

@@ -371,6 +371,9 @@ genOp = Gen.element $ _opOperator <$> operatorTable
 genDot :: MonadGen m => m Dot
 genDot = Dot <$> genWhitespaces
 
+genComma :: MonadGen m => m Comma
+genComma = Comma <$> genWhitespaces
+
 genSizedCommaSep :: MonadGen m => m a -> m (CommaSep a)
 genSizedCommaSep ma = Gen.sized $ \n ->
   if n <= 1
@@ -384,7 +387,7 @@ genSizedCommaSep ma = Gen.sized $ \n ->
           a <- Gen.resize n' ma
           Gen.subtermM
             (Gen.resize (n - n') $ genSizedCommaSep ma)
-            (\b -> CommaSepMany a <$> genWhitespaces <*> pure b)
+            (\b -> CommaSepMany a <$> genComma <*> pure b)
       ]
 
 genSizedCommaSep1 :: MonadGen m => m a -> m (CommaSep1 a)
@@ -400,23 +403,23 @@ genSizedCommaSep1 ma = Gen.sized $ \n ->
           a <- Gen.resize n' ma
           Gen.subtermM
             (Gen.resize (n - n') $ genSizedCommaSep1 ma)
-            (\b -> CommaSepMany1 a <$> genWhitespaces <*> pure b)
+            (\b -> CommaSepMany1 a <$> genComma <*> pure b)
       ]
 
 genSizedCommaSep1' :: MonadGen m => m a -> m (CommaSep1' a)
 genSizedCommaSep1' ma = Gen.sized $ \n ->
   if n <= 1
-  then CommaSepOne1' <$> ma <*> Gen.maybe genWhitespaces
+  then CommaSepOne1' <$> ma <*> Gen.maybe genComma
   else
     Gen.resize (n-1) $
     Gen.choice
-      [ CommaSepOne1' <$> ma <*> Gen.maybe genWhitespaces
+      [ CommaSepOne1' <$> ma <*> Gen.maybe genComma
       , Gen.sized $ \n -> do
           n' <- Gen.integral (Range.constant 1 (n-1))
           a <- Gen.resize n' ma
           Gen.subtermM
             (Gen.resize (n - n') $ genSizedCommaSep1' ma)
-            (\b -> CommaSepMany1' a <$> genWhitespaces <*> pure b)
+            (\b -> CommaSepMany1' a <$> genComma <*> pure b)
       ]
 
 genAugAssign :: MonadGen m => m (AugAssign ())

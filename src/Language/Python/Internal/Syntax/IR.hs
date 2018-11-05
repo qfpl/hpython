@@ -178,7 +178,7 @@ data SmallStatement a
   | Assert a
       [Whitespace]
       (Expr a)
-      (Maybe ([Whitespace], Expr a))
+      (Maybe (Comma, Expr a))
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Param a
@@ -470,7 +470,7 @@ data Expr a
   -- expr
   , _unsafeTupleHead :: Expr a
   -- , spaces
-  , _unsafeTupleWhitespace :: [Whitespace]
+  , _unsafeTupleWhitespace :: Comma
   -- [exprs]
   , _unsafeTupleTail :: Maybe (CommaSep1' (Expr a))
   }

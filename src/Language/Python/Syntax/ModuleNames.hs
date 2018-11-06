@@ -3,7 +3,7 @@
 {-# language LambdaCase #-}
 
 {-|
-Module      : Language.Python.Internal.Syntax.ModuleNames
+Module      : Language.Python.Syntax.ModuleNames
 Copyright   : (C) CSIRO 2017-2018
 License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
@@ -15,7 +15,7 @@ Module names, including those qualified by packages.
 See <https://docs.python.org/3.5/tutorial/modules.html#packages>
 -}
 
-module Language.Python.Internal.Syntax.ModuleNames
+module Language.Python.Syntax.ModuleNames
   ( ModuleName (..)
   , RelativeModuleName (..)
   , Dot (..)

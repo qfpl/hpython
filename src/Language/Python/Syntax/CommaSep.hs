@@ -62,6 +62,9 @@ listToCommaSep [] = CommaSepNone
 listToCommaSep [a] = CommaSepOne a
 listToCommaSep (a:as) = CommaSepMany a (Comma [Space]) $ listToCommaSep as
 
+-- | Appends two comma separated values together.
+--
+-- The provided whitespace is to follow the joining comma which is added
 appendCommaSep :: [Whitespace] -> CommaSep a -> CommaSep a -> CommaSep a
 appendCommaSep _  CommaSepNone b = b
 appendCommaSep _  (CommaSepOne a) CommaSepNone = CommaSepOne a
@@ -82,10 +85,14 @@ data CommaSep1 a
   | CommaSepMany1 a Comma (CommaSep1 a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+-- | Get the first element of a 'CommaSep1'
 commaSep1Head :: CommaSep1 a -> a
 commaSep1Head (CommaSepOne1 a) = a
 commaSep1Head (CommaSepMany1 a _ _) = a
 
+-- | Appends two non-empty comma separated values together.
+--
+-- The provided whitespace is to follow the joining comma which is added
 appendCommaSep1 :: [Whitespace] -> CommaSep1 a -> CommaSep1 a -> CommaSep1 a
 appendCommaSep1 ws a b =
   CommaSepMany1
@@ -125,6 +132,7 @@ data CommaSep1' a
   | CommaSepMany1' a Comma (CommaSep1' a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+-- | Iso to unpack a 'CommaSep1''
 _CommaSep1'
   :: Iso
        (a, [(Comma, a)], Maybe Comma)
@@ -143,6 +151,10 @@ _CommaSep1' = iso toCs fromCs
       in
         (a, (b, d) : e, f)
 
+-- | Attempt to insert comma separators into a list, which will not be
+-- terminated by a comma.
+--
+-- If the list is empty, 'Nothing' is returned.
 listToCommaSep1' :: [a] -> Maybe (CommaSep1' a)
 listToCommaSep1' [] = Nothing
 listToCommaSep1' [a] = Just (CommaSepOne1' a Nothing)

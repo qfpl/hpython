@@ -15,7 +15,6 @@ module Language.Python.Internal.Syntax
   , module Language.Python.Internal.Syntax.Comment
   , module Language.Python.Internal.Syntax.Ident
   , module Language.Python.Internal.Syntax.Import
-  , module Language.Python.Internal.Syntax.ModuleNames
   , module Language.Python.Internal.Syntax.Numbers
   , module Language.Python.Internal.Syntax.Strings
   )
@@ -31,7 +30,6 @@ import Language.Python.Internal.Syntax.AugAssign
 import Language.Python.Internal.Syntax.Comment
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Import
-import Language.Python.Internal.Syntax.ModuleNames
 import Language.Python.Internal.Syntax.Numbers
 import Language.Python.Internal.Syntax.Strings
 

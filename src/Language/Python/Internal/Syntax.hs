@@ -16,8 +16,6 @@ module Language.Python.Internal.Syntax
   , module Language.Python.Internal.Syntax.Ident
   , module Language.Python.Internal.Syntax.Import
   , module Language.Python.Internal.Syntax.Numbers
-  , module Language.Python.Internal.Syntax.Operator.Binary
-  , module Language.Python.Internal.Syntax.Operator.Unary
   , module Language.Python.Internal.Syntax.Strings
   )
 where
@@ -33,8 +31,6 @@ import Language.Python.Internal.Syntax.Comment
 import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Import
 import Language.Python.Internal.Syntax.Numbers
-import Language.Python.Internal.Syntax.Operator.Binary
-import Language.Python.Internal.Syntax.Operator.Unary
 import Language.Python.Internal.Syntax.Strings
 
 reservedWords :: [String]

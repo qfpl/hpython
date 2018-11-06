@@ -18,7 +18,6 @@ See <https://docs.python.org/3.5/tutorial/modules.html#packages>
 module Language.Python.Internal.Syntax.ModuleNames
   ( ModuleName (..)
   , RelativeModuleName (..)
-  , Dot (..)
   , makeModuleName
   , _moduleNameAnn
   )
@@ -35,6 +34,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax.Ident
+import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Whitespace
 
 -- | See <https://docs.python.org/3.5/tutorial/modules.html#intra-package-references>
@@ -55,14 +55,6 @@ instance HasTrailingWhitespace (RelativeModuleName v a) where
             Relative .
             NonEmpty.fromList $
             (a : as) & _last.trailingWhitespace .~ ws)
-
--- | A period character, possibly followed by some whitespace.
-data Dot = Dot [Whitespace]
-  deriving (Eq, Show)
-
-instance HasTrailingWhitespace Dot where
-  trailingWhitespace =
-    lens (\(Dot ws) -> ws) (\_ ws -> Dot ws)
 
 -- | A module name. It can be a single segment, or a sequence of them which
 -- are implicitly separated by period character.

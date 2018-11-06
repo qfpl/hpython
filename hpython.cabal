@@ -90,6 +90,7 @@ library
                      , Language.Python.Syntax.CommaSep
                      , Language.Python.Syntax.Expr
                      , Language.Python.Syntax.Module
+                     , Language.Python.Syntax.Punctuation
                      , Language.Python.Syntax.Statement
                      , Language.Python.Syntax.Types
                      , Language.Python.Syntax.Whitespace

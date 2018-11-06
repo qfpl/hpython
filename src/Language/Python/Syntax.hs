@@ -11,6 +11,9 @@ module Language.Python.Syntax
   ( module Language.Python.Syntax.CommaSep
   , module Language.Python.Syntax.Expr
   , module Language.Python.Syntax.Module
+  , module Language.Python.Syntax.Operator.Binary
+  , module Language.Python.Syntax.Operator.Unary
+  , module Language.Python.Syntax.ModuleNames
   , module Language.Python.Syntax.Statement
   , module Language.Python.Syntax.Types
   , module Language.Python.Syntax.Whitespace
@@ -20,6 +23,9 @@ where
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Module
+import Language.Python.Syntax.Operator.Binary
+import Language.Python.Syntax.Operator.Unary
+import Language.Python.Syntax.ModuleNames
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Types
 import Language.Python.Syntax.Whitespace

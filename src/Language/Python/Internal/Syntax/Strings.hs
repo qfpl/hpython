@@ -10,6 +10,10 @@ License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
 Stability   : experimental
 Portability : non-portable
+
+Python string literals.
+
+See <https://docs.python.org/3.5/reference/lexical_analysis.html#string-and-bytes-literals>
 -}
 
 module Language.Python.Internal.Syntax.Strings where
@@ -23,31 +27,54 @@ import Data.Text (Text)
 
 import Language.Python.Syntax.Whitespace
 
+-- | Double or single quotation marks?
+--
+-- @
+-- "Double quotes"
+-- """Double quotes"""
+-- 'Single quotes'
+-- '''Single quotes'''
+-- @
 data QuoteType
   = SingleQuote
   | DoubleQuote
   deriving (Eq, Ord, Show)
 
+-- | Three paris of quotations or one?
+--
+-- @
+-- """Long string"""
+-- '''Also long string'''
+-- "Short string"
+-- 'Also short string'
+-- @
 data StringType
   = ShortString
   | LongString
   deriving (Eq, Ord, Show)
 
+-- | In Python 3.5, a prefix of @u@ or @U@ is allowed, but doesn't have any
+-- meaning. They exist for backwards compatibility with Python 2.
+--
+-- See <https://www.python.org/dev/peps/pep-0414/>
 data StringPrefix
   = Prefix_u
   | Prefix_U
   deriving (Eq, Ord, Show)
 
+-- | Raw strings are prefixed with either @r@ or @R@.
 data RawStringPrefix
   = Prefix_r
   | Prefix_R
   deriving (Eq, Ord, Show)
 
+-- | This prefix indicates it's a bytes literal rather than a string literal.
 data BytesPrefix
   = Prefix_b
   | Prefix_B
   deriving (Eq, Ord, Show)
 
+-- | A string of raw bytes can be indicated by a number of prefixes
 data RawBytesPrefix
   = Prefix_br
   | Prefix_Br
@@ -59,12 +86,19 @@ data RawBytesPrefix
   | Prefix_RB
   deriving (Eq, Ord, Show)
 
+-- | Most types of 'StringLiteral' have prefixes. Plain old strings may have
+-- an optional prefix, but it is meaningless.
 hasStringPrefix :: StringLiteral a -> Bool
 hasStringPrefix RawStringLiteral{} = True
 hasStringPrefix RawBytesLiteral{} = True
 hasStringPrefix (StringLiteral _ a _ _ _ _) = isJust a
 hasStringPrefix BytesLiteral{} = True
 
+-- | A 'StringLiteral', complete with a prefix, information about
+-- quote type and number, and a list of 'PyChar's.
+--
+-- Like many other data types in hpython, it has an annotation and
+-- trailing whitespace.
 data StringLiteral a
   = RawStringLiteral
   { _stringLiteralAnn :: a
@@ -114,6 +148,8 @@ instance HasTrailingWhitespace (StringLiteral a) where
           BytesLiteral a b c d e _ -> BytesLiteral a b c d e ws
           RawBytesLiteral a b c d e _ -> RawBytesLiteral a b c d e ws)
 
+-- | A character in a string literal. This is a large sum type, with a
+-- catch-all of a Haskell 'Char'.
 data PyChar
   = Char_newline
   | Char_octal1 OctDigit
@@ -147,6 +183,7 @@ data PyChar
   | Char_lit Char
   deriving (Eq, Ord, Show)
 
+-- | Determine whether a 'PyChar' is an escape character or not.
 isEscape :: PyChar -> Bool
 isEscape c =
   case c of
@@ -169,10 +206,11 @@ isEscape c =
     Char_esc_v -> True
     Char_lit{} -> False
 
+-- | Convert a Haskell string to a list of 'PyChar'. This is useful when
+-- writing Python in Haskell.
 fromHaskellString :: String -> [PyChar]
-fromHaskellString "" = []
-fromHaskellString (c:cs) =
-  (case c of
+fromHaskellString = fmap
+  (\c -> case c of
     '\\' -> Char_esc_bslash
     '\'' -> Char_esc_singlequote
     '\"' -> Char_esc_doublequote
@@ -184,8 +222,7 @@ fromHaskellString (c:cs) =
     '\t' -> Char_esc_t
     '\v' -> Char_esc_v
     '\0' -> Char_hex HeXDigit0 HeXDigit0
-    _ -> Char_lit c) :
-  fromHaskellString cs
+    _ -> Char_lit c)
 
 showStringPrefix :: StringPrefix -> Text
 showStringPrefix sp =

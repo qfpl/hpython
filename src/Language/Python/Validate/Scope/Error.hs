@@ -16,7 +16,7 @@ module Language.Python.Validate.Scope.Error where
 -- import Control.Lens.TH
 import Control.Lens.Type
 import Control.Lens.Prism
-import Language.Python.Internal.Syntax
+import Language.Python.Syntax.Ident
 
 data ScopeError (v :: [*]) a
   = FoundNonlocal a

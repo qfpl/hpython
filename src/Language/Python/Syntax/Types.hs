@@ -16,9 +16,9 @@ module Language.Python.Syntax.Types where
 import Control.Lens.TH (makeLenses)
 import Data.List.NonEmpty (NonEmpty)
 
-import Language.Python.Internal.Syntax.Ident (Ident)
 import Language.Python.Syntax.CommaSep (Comma, CommaSep, CommaSep1, CommaSep1')
 import Language.Python.Syntax.Expr (Arg, Expr, ListItem, Param, TupleItem)
+import Language.Python.Syntax.Ident (Ident)
 import Language.Python.Syntax.Statement (Decorator, ExceptAs, Suite, WithItem)
 import Language.Python.Syntax.Whitespace
 

@@ -11,6 +11,7 @@ import qualified Hedgehog.Range as Range
 
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax.Expr
+import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Module
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Whitespace

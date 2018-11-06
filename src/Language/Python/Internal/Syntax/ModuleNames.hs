@@ -34,7 +34,7 @@ import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
-import Language.Python.Internal.Syntax.Ident
+import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Whitespace
 
 -- | See <https://docs.python.org/3.5/tutorial/modules.html#intra-package-references>

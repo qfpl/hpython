@@ -10,6 +10,7 @@ Portability : non-portable
 module Language.Python.Syntax
   ( module Language.Python.Syntax.CommaSep
   , module Language.Python.Syntax.Expr
+  , module Language.Python.Syntax.Ident
   , module Language.Python.Syntax.Module
   , module Language.Python.Syntax.Statement
   , module Language.Python.Syntax.Types
@@ -19,6 +20,7 @@ where
 
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
+import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Module
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Types

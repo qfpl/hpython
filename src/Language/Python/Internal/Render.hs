@@ -52,7 +52,6 @@ import qualified Data.Text.Lazy.Builder as Builder
 
 import Language.Python.Internal.Syntax.AugAssign
 import Language.Python.Internal.Syntax.Comment
-import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Import
 import Language.Python.Internal.Syntax.ModuleNames
 import Language.Python.Internal.Syntax.Numbers
@@ -63,6 +62,7 @@ import Language.Python.Internal.Render.Correction
 import Language.Python.Internal.Token (PyToken(..))
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
+import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Module
 import Language.Python.Syntax.Whitespace

@@ -83,7 +83,7 @@ import Language.Python.Optics
 import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Expr
-import Language.Python.Internal.Syntax.Ident
+import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Module
 import Language.Python.Validate.Scope.Error
 

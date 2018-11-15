@@ -33,7 +33,7 @@ import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
-import Language.Python.Internal.Syntax.Ident
+import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Whitespace
 

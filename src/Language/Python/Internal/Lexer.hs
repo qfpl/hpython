@@ -68,6 +68,7 @@ import qualified Text.Megaparsec as Parsec
 
 import Language.Python.Internal.Syntax
 import Language.Python.Internal.Token (PyToken(..), pyTokenAnn)
+import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Whitespace
 
 data SrcInfo

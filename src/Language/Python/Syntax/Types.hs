@@ -16,10 +16,10 @@ module Language.Python.Syntax.Types where
 import Control.Lens.TH (makeLenses)
 import Data.List.NonEmpty (NonEmpty)
 
-import Language.Python.Internal.Syntax.Ident (Ident)
 import Language.Python.Syntax.CommaSep (Comma, CommaSep, CommaSep1, CommaSep1')
 import Language.Python.Syntax.Expr (Arg, Expr, ListItem, Param, TupleItem)
-import Language.Python.Syntax.Statement (Decorator, ExceptAs, Suite, WithItem)
+import Language.Python.Syntax.Ident (Ident)
+import Language.Python.Syntax.Statement (Colon, Decorator, ExceptAs, Suite, WithItem)
 import Language.Python.Syntax.Whitespace
 
 data Fundef v a
@@ -61,7 +61,7 @@ data KeywordParam v a
   = MkKeywordParam
   { _kpAnn :: a
   , _kpName :: Ident v a
-  , _kpType :: Maybe ([Whitespace], Expr v a)
+  , _kpType :: Maybe (Colon, Expr v a)
   , _kpEquals :: [Whitespace]
   , _kpExpr :: Expr v a
   } deriving (Eq, Show)
@@ -71,7 +71,7 @@ data PositionalParam v a
   = MkPositionalParam
   { _ppAnn :: a
   , _ppName :: Ident v a
-  , _ppType :: Maybe ([Whitespace], Expr v a)
+  , _ppType :: Maybe (Colon, Expr v a)
   } deriving (Eq, Show)
 makeLenses ''PositionalParam
 
@@ -80,7 +80,7 @@ data StarParam v a
   { _spAnn :: a
   , _spWhitespace :: [Whitespace]
   , _spName :: Maybe (Ident v a)
-  , _spType :: Maybe ([Whitespace], Expr v a)
+  , _spType :: Maybe (Colon, Expr v a)
   } deriving (Eq, Show)
 makeLenses ''StarParam
 

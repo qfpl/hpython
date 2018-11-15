@@ -34,14 +34,15 @@ import Data.Validation (Validation(..))
 
 import Language.Python.Internal.Syntax.AugAssign
 import Language.Python.Internal.Syntax.Comment
-import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Import
-import Language.Python.Internal.Syntax.ModuleNames
 import Language.Python.Internal.Syntax.Numbers
-import Language.Python.Internal.Syntax.Operator.Binary
-import Language.Python.Internal.Syntax.Operator.Unary
 import Language.Python.Internal.Syntax.Strings
 import Language.Python.Syntax.CommaSep
+import Language.Python.Syntax.Ident
+import Language.Python.Syntax.ModuleNames
+import Language.Python.Syntax.Operator.Binary
+import Language.Python.Syntax.Operator.Unary
+import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Whitespace
 
 import qualified Language.Python.Syntax.Module as Syntax
@@ -185,13 +186,13 @@ data Param a
   = PositionalParam
   { _paramAnn :: a
   , _paramName :: Ident '[] a
-  , _paramType :: Maybe ([Whitespace], Expr a)
+  , _paramType :: Maybe (Colon, Expr a)
   }
   | KeywordParam
   { _paramAnn :: a
   , _paramName :: Ident '[] a
   -- ':' spaces <expr>
-  , _paramType :: Maybe ([Whitespace], Expr a)
+  , _paramType :: Maybe (Colon, Expr a)
   -- = spaces
   , _unsafeKeywordParamWhitespaceRight :: [Whitespace]
   , _unsafeKeywordParamExpr :: Expr a
@@ -201,14 +202,14 @@ data Param a
   -- '*' spaces
   , _unsafeStarParamWhitespace :: [Whitespace]
   , _unsafeStarParamName :: Maybe (Ident '[] a)
-  , _paramType :: Maybe ([Whitespace], Expr a)
+  , _paramType :: Maybe (Colon, Expr a)
   }
   | DoubleStarParam
   { _paramAnn :: a
   -- '**' spaces
   , _unsafeDoubleStarParamWhitespace :: [Whitespace]
   , _paramName :: Ident '[] a
-  , _paramType :: Maybe ([Whitespace], Expr a)
+  , _paramType :: Maybe (Colon, Expr a)
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -246,18 +247,18 @@ data Subscript a
       -- [expr]
       (Maybe (Expr a))
       -- ':' <spaces>
-      [Whitespace]
+      Colon
       -- [expr]
       (Maybe (Expr a))
       -- [':' [expr]]
-      (Maybe ([Whitespace], Maybe (Expr a)))
+      (Maybe (Colon, Maybe (Expr a)))
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data DictItem a
   = DictItem
   { _dictItemAnn :: a
   , _unsafeDictItemKey :: Expr a
-  , _unsafeDictItemWhitespace :: [Whitespace]
+  , _unsafeDictItemColon :: Colon
   , _unsafeDictItemvalue :: Expr a
   }
   | DictUnpack
@@ -304,7 +305,7 @@ data Expr a
   { _unsafeExprAnn :: a
   , _unsafeLambdaWhitespace :: [Whitespace]
   , _unsafeLambdaArgs :: CommaSep (Param a)
-  , _unsafeLambdaColon :: [Whitespace]
+  , _unsafeLambdaColon :: Colon
   , _unsafeLambdaBody :: Expr a
   }
   | Yield
@@ -559,10 +560,10 @@ exprAnn =
 
 data Suite a
   -- ':' <space> simplestatement
-  = SuiteOne a [Whitespace] (SimpleStatement a)
+  = SuiteOne a Colon (SimpleStatement a)
   | SuiteMany a
       -- ':' <spaces> [comment] <newline>
-      [Whitespace] (Maybe (Comment a)) Newline
+      Colon (Maybe (Comment a)) Newline
       -- <block>
       (Block a)
   deriving (Eq, Show, Functor, Foldable, Traversable)

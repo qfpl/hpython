@@ -25,10 +25,10 @@ import Control.Lens.Prism (Prism, _Right, prism)
 import Data.Coerce (coerce)
 import Data.Function ((&))
 
+import Language.Python.Internal.Token (PyToken(..))
 import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Syntax.Expr (Expr (..), TupleItem (TupleUnpack), ListItem (ListUnpack), Param (..), _Exprs)
-import Language.Python.Internal.Token (PyToken(..))
-import Language.Python.Internal.Syntax.Ident
+import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Module
 import Language.Python.Syntax.Statement (Block (..), CompoundStatement (..), Decorator (..), ExceptAs (..), SimpleStatement (..), Statement (..), Suite (..), _Statements)
 import Language.Python.Syntax.Types

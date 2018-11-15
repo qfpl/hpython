@@ -53,19 +53,20 @@ import qualified Data.Text.Lazy.Builder as Builder
 
 import Language.Python.Internal.Syntax.AugAssign
 import Language.Python.Internal.Syntax.Comment
-import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Import
-import Language.Python.Internal.Syntax.ModuleNames
 import Language.Python.Internal.Syntax.Numbers
-import Language.Python.Internal.Syntax.Operator.Binary
-import Language.Python.Internal.Syntax.Operator.Unary
 import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Render.Correction
 import Language.Python.Internal.Token (PyToken(..))
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
-import Language.Python.Syntax.Statement
+import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Module
+import Language.Python.Syntax.ModuleNames
+import Language.Python.Syntax.Operator.Binary
+import Language.Python.Syntax.Operator.Unary
+import Language.Python.Syntax.Punctuation
+import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Whitespace
 
 -- | A 'RenderOutput' is an intermediate form used during rendering
@@ -643,8 +644,7 @@ renderComprehension f (Comprehension _ expr cf cs) = do
 renderDictItem :: DictItem v a -> RenderOutput ()
 renderDictItem (DictItem _ a b c) = do
   parensTupleGenerator a
-  singleton $ TkColon ()
-  traverse_ renderWhitespace b
+  renderColon b
   parensTupleGenerator c
 renderDictItem (DictUnpack _ a b) = do
   singleton $ TkDoubleStar ()
@@ -677,14 +677,11 @@ renderSubscript (SubscriptExpr a) =
     _ -> parensTupleGenerator a
 renderSubscript (SubscriptSlice a b c d) = do
   traverse_ parensTupleGenerator a
-  singleton $ TkColon ()
-  traverse_ renderWhitespace b
+  renderColon b
   traverse_ parensTupleGenerator c
   traverse_
     (bitraverse_
-      (\ws -> do
-          singleton $ TkColon ()
-          traverse_ renderWhitespace ws)
+      renderColon
       (traverse_ parensTupleGenerator))
     d
 
@@ -885,8 +882,7 @@ renderExpr (Lambda _ a b c d) = do
   singleton $ TkLambda ()
   traverse_ renderWhitespace a
   renderParams b
-  singleton $ TkColon ()
-  traverse_ renderWhitespace c
+  renderColon c
   parensTupleGenerator d
 renderExpr e@Yield{} = parens $ renderYield parensTupleGenerator e
 renderExpr e@YieldFrom{} = parens $ renderYield parensTupleGenerator e
@@ -1212,18 +1208,21 @@ renderBlock (Block a b c) = do
       (final . renderStatement))
     c
 
+renderColon :: Colon -> RenderOutput ()
+renderColon (Colon ws) = do
+  singleton $ TkColon ()
+  traverse_ renderWhitespace ws
+
 renderSuite
   :: Suite v a
   -> RenderOutput ()
 renderSuite (SuiteMany _ a b c d) = do
-  singleton $ TkColon ()
-  traverse_ renderWhitespace a
+  renderColon a
   traverse_ renderComment b
   singleton (renderNewline c)
   renderBlock d
 renderSuite (SuiteOne _ a b) = do
-  singleton $ TkColon ()
-  traverse_ renderWhitespace a
+  renderColon a
   fin <- isFinal
   renderSimpleStatement $ correctTrailingNewline fin b
 
@@ -1484,9 +1483,8 @@ renderParam :: Param v a -> RenderOutput ()
 renderParam (PositionalParam _ name mty) = do
   renderIdent name
   traverse_
-    (\(ws, ty) -> do
-        singleton $ TkColon ()
-        traverse_ renderWhitespace ws
+    (\(c, ty) -> do
+        renderColon c
         parensTupleGenerator ty)
     mty
 renderParam (StarParam _ ws name mty) = do
@@ -1494,9 +1492,8 @@ renderParam (StarParam _ ws name mty) = do
   traverse_ renderWhitespace ws
   traverse_ renderIdent name
   traverse_
-    (\(ws, ty) -> do
-        singleton $ TkColon ()
-        traverse_ renderWhitespace ws
+    (\(c, ty) -> do
+        renderColon c
         parensTupleGenerator ty)
     mty
 renderParam (DoubleStarParam _ ws name mty) = do
@@ -1504,17 +1501,15 @@ renderParam (DoubleStarParam _ ws name mty) = do
   traverse_ renderWhitespace ws
   renderIdent name
   traverse_
-    (\(ws, ty) -> do
-        singleton $ TkColon ()
-        traverse_ renderWhitespace ws
+    (\(c, ty) -> do
+        renderColon c
         parensTupleGenerator ty)
     mty
 renderParam (KeywordParam _ name mty ws2 expr) = do
   renderIdent name
   traverse_
-    (\(ws, ty) -> do
-        singleton $ TkColon ()
-        traverse_ renderWhitespace ws
+    (\(c, ty) -> do
+        renderColon c
         parensTupleGenerator ty)
     mty
   singleton $ TkEq ()

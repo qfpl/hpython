@@ -360,12 +360,12 @@ import Data.Semigroup ((<>))
 
 import Language.Python.Optics
 import Language.Python.Internal.Syntax.AugAssign
-import Language.Python.Internal.Syntax.Ident
 import Language.Python.Internal.Syntax.Strings
-import Language.Python.Internal.Syntax.Operator.Binary
-import Language.Python.Internal.Syntax.Operator.Unary
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
+import Language.Python.Syntax.Ident
+import Language.Python.Syntax.Operator.Binary
+import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Types
 import Language.Python.Syntax.Whitespace
@@ -517,7 +517,7 @@ infix 0 .:
 --
 -- @('.:') :: 'Raw' 'Expr' -> 'Raw' 'Expr' -> 'Raw' 'DictItem'@
 instance HasColon Expr DictItem where
-  (.:) a = DictItem () a [Space]
+  (.:) a = DictItem () a (Colon [Space])
 
 -- | Function parameter type annotations
 --
@@ -525,7 +525,7 @@ instance HasColon Expr DictItem where
 --
 -- See 'def_'
 instance HasColon Param Param where
-  (.:) p t = p { _paramType = Just ([Space], t) }
+  (.:) p t = p { _paramType = Just (Colon [Space], t) }
 
 -- | Positional parameters/arguments
 --
@@ -626,7 +626,7 @@ mkSetBody bodyField indentsField ws new code =
     over
       (_Indents.indentsValue)
       ((indentsField code ^. indentsValue <>) . doIndent ws)
-      (SuiteMany () [] Nothing LF $ toBlock new)
+      (SuiteMany () (Colon []) Nothing LF $ toBlock new)
 
 mkGetBody
   :: HasIndents (Raw s) ()
@@ -668,7 +668,7 @@ mkFundef name body =
   , _fdParameters = CommaSepNone
   , _fdRightParenSpaces = []
   , _fdReturnType = Nothing
-  , _fdBody = SuiteMany () [] Nothing LF $ toBlock body
+  , _fdBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
   }
 
 -- |
@@ -1060,7 +1060,7 @@ mkWhile cond body =
   , _whileIndents = Indents [] ()
   , _whileWhile = [Space]
   , _whileCond = cond
-  , _whileBody = SuiteMany () [] Nothing LF $ toBlock body
+  , _whileBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
   , _whileElse = Nothing
   }
 
@@ -1075,7 +1075,7 @@ mkIf cond body =
   , _ifIndents = Indents [] ()
   , _ifIf = [Space]
   , _ifCond = cond
-  , _ifBody = SuiteMany () [] Nothing LF $ toBlock body
+  , _ifBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
   , _ifElifs = []
   , _ifElse = Nothing
   }
@@ -1129,7 +1129,7 @@ mkElif cond body =
   { _elifIndents = Indents [] ()
   , _elifElif = [Space]
   , _elifCond = cond
-  , _elifBody = SuiteMany () [] Nothing LF $ toBlock body
+  , _elifBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
   }
 
 elif_ :: Raw Expr -> [Raw Line] -> Raw If -> Raw If
@@ -1141,7 +1141,7 @@ mkElse body =
   MkElse
   { _elseIndents = Indents [] ()
   , _elseElse = []
-  , _elseBody = SuiteMany () [] Nothing LF $ toBlock body
+  , _elseBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
   }
 
 class HasElse s where
@@ -1323,7 +1323,7 @@ mkFor binder collection body =
       fromMaybe
         (CommaSepOne1' (Unit () [] []) Nothing)
         (listToCommaSep1' collection)
-  , _forBody = SuiteMany () [] Nothing LF $ toBlock body
+  , _forBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
   , _forElse = Nothing
   }
 
@@ -1362,7 +1362,7 @@ mkFinally body =
   MkFinally
   { _finallyIndents = Indents [] ()
   , _finallyFinally = []
-  , _finallyBody = SuiteMany () [] Nothing LF $ toBlock body
+  , _finallyBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
   }
 
 -- | Create a minimal valid 'Except'
@@ -1372,7 +1372,7 @@ mkExcept body =
   { _exceptIndents = Indents [] ()
   , _exceptExcept = []
   , _exceptExceptAs = Nothing
-  , _exceptBody = SuiteMany () [] Nothing LF $ toBlock body
+  , _exceptBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
   }
 
 -- | Create a minimal valid 'TryExcept'
@@ -1382,7 +1382,7 @@ mkTryExcept body except =
   { _teAnn = ()
   , _teIndents = Indents [] ()
   , _teTry = [Space]
-  , _teBody = SuiteMany () [] Nothing LF $ toBlock body
+  , _teBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
   , _teExcepts = pure except
   , _teElse = Nothing
   , _teFinally = Nothing
@@ -1395,7 +1395,7 @@ mkTryFinally body fBody =
   { _tfAnn = ()
   , _tfIndents = Indents [] ()
   , _tfTry = [Space]
-  , _tfBody = SuiteMany () [] Nothing LF $ toBlock body
+  , _tfBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
   , _tfFinally = mkFinally fBody
   }
 
@@ -1569,7 +1569,7 @@ mkClassDef name body =
   , _cdClass = Space :| []
   , _cdName = name
   , _cdArguments = Nothing
-  , _cdBody = SuiteMany () [] Nothing LF $ toBlock body
+  , _cdBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
   }
 
 instance HasBody ClassDef where
@@ -1607,7 +1607,7 @@ mkWith items body =
   , _withAsync = Nothing
   , _withWith = [Space]
   , _withItems = listToCommaSep1 items
-  , _withBody = SuiteMany () [] Nothing LF $ toBlock body
+  , _withBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
   }
 
 -- |
@@ -1721,7 +1721,7 @@ lambda_ params =
   Lambda ()
     (if null params then [] else [Space])
     (listToCommaSep params)
-    [Space]
+    (Colon [Space])
 
 yield_ :: Maybe (Raw Expr) -> Raw Expr
 yield_ a = Yield () (maybe [] (const [Space]) a) a
@@ -1880,19 +1880,19 @@ subs_ a e =
             Just "slice" ->
               pure $ case c ^.. callArguments.folded.folded of
                 [PositionalArg _ x] ->
-                  SubscriptSlice Nothing [] (Just x) Nothing
+                  SubscriptSlice Nothing (Colon []) (Just x) Nothing
                 [PositionalArg _ x, PositionalArg _ y] ->
                   SubscriptSlice
                     (noneToMaybe x)
-                    []
+                    (Colon [])
                     (noneToMaybe y)
                     Nothing
                 [PositionalArg _ x, PositionalArg _ y, PositionalArg _ z] ->
                   SubscriptSlice
                     (noneToMaybe x)
-                    []
+                    (Colon [])
                     (noneToMaybe y)
-                    ((,) [] . Just <$> noneToMaybe z)
+                    ((,) (Colon []) . Just <$> noneToMaybe z)
                 _ -> SubscriptExpr e
             _ -> Nothing
 

@@ -17,7 +17,8 @@ import System.Process
 
 import Language.Python.Internal.Syntax
 import Language.Python.Optics.Validated (unvalidated)
-import Language.Python.Parse (parseStatement, parseExpr, parseExprList)
+import Language.Python.Parse (SrcInfo, parseStatement, parseExpr, parseExprList)
+import Language.Python.Parse.Error (ParseError)
 import Language.Python.Render
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Module
@@ -142,7 +143,7 @@ string_correct path =
 
     let ex' = showExpr ex
     py <-
-      validation (\e -> annotateShow e *> failure) pure $
+      validation (\e -> annotateShow (e :: NonEmpty (ParseError SrcInfo)) *> failure) pure $
       parseExpr "test" ex'
 
     goodExpr path $ () <$ py
@@ -192,7 +193,7 @@ expr_printparseprint_print =
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
             _ <-
-              validation (\e -> annotateShow e *> failure) pure $
+              validation (\e -> annotateShow (e :: NonEmpty (ParseError SrcInfo)) *> failure) pure $
               parseExprList "test" (showExpr res')
             showExpr (res' ^. unvalidated) === showExpr (res $> ())
 
@@ -208,7 +209,7 @@ statement_printparseprint_print =
           Failure errs' -> annotateShow errs' *> failure
           Success res' -> do
             py <-
-              validation (\e -> annotateShow e *> failure) pure $
+              validation (\e -> annotateShow (e :: NonEmpty (ParseError SrcInfo)) *> failure) pure $
               parseStatement "test" (showStatement res')
             annotateShow py
             annotateShow $ showStatement (() <$ py)

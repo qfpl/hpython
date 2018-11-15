@@ -1,4 +1,6 @@
 {-# language DataKinds #-}
+{-# language RankNTypes #-}
+{-# language ScopedTypeVariables #-}
 module Helpers where
 
 import Hedgehog
@@ -15,8 +17,9 @@ import Language.Python.Internal.Lexer
   (SrcInfo, insertTabs, tokenize
   )
 import Language.Python.Internal.Token (PyToken)
-import Language.Python.Internal.Parse (Parser, runParser)
-import Language.Python.Parse (ParseError, ErrorItem(..), _ParseError)
+import Language.Python.Parse (Parser)
+import Language.Python.Parse.Error (ParseError, ErrorItem(..), _ParseError)
+import Language.Python.Internal.Parse (runParser)
 import Language.Python.Syntax.Expr (Expr)
 import Language.Python.Syntax.Module (Module)
 import Language.Python.Syntax.Statement (Statement)
@@ -25,17 +28,18 @@ import Language.Python.Validate
 doTokenize :: Monad m => Text -> PropertyT m [PyToken SrcInfo]
 doTokenize input =
   case tokenize "test" input of
-    Left err -> annotateShow err *> failure
+    Left err -> annotateShow (err :: ParseError SrcInfo) *> failure
     Right a -> pure a
 
 doTabs
-  :: (Semigroup ann, Show ann, Monad m)
+  :: forall ann m
+   . (Semigroup ann, Show ann, Monad m)
   => ann
   -> [PyToken ann]
   -> PropertyT m [PyToken ann]
 doTabs ann input =
   case insertTabs ann input of
-    Left err -> annotateShow err *> failure
+    Left err -> annotateShow (err :: ParseError ann) *> failure
     Right a -> pure a
 
 doParse :: Monad m => Parser a -> [PyToken SrcInfo] -> PropertyT m a
@@ -43,7 +47,7 @@ doParse pa input = do
   let res = runParser "test" pa input
   case res of
     Left err -> do
-      annotateShow err
+      annotateShow (err :: ParseError SrcInfo)
       failure
     Right a -> pure a
 
@@ -89,7 +93,7 @@ syntaxValidateExpr x =
     Success a ->
       pure $ runValidateSyntax initialSyntaxContext [] (validateExprSyntax a)
 
-shouldBeFailure :: Validation e a -> PropertyT IO ()
+shouldBeFailure :: MonadTest m => Validation e a -> m ()
 shouldBeFailure res =
   case res of
     Success{} -> failure
@@ -102,6 +106,18 @@ shouldBeSuccess res =
     Failure err -> do
       annotateShow err
       failure
+
+shouldBeParseSuccess
+  :: MonadTest m
+  => (FilePath -> Text -> Validation (NonEmpty (ParseError SrcInfo)) a)
+  -> Text -> m a
+shouldBeParseSuccess p = shouldBeSuccess . p "test"
+
+shouldBeParseFailure
+  :: MonadTest m
+  => (FilePath -> Text -> Validation (NonEmpty (ParseError SrcInfo)) a)
+  -> Text -> m ()
+shouldBeParseFailure p = shouldBeFailure . p "test"
 
 shouldBeParseError
   :: (MonadTest m, Show e, Show a)

@@ -16,7 +16,9 @@ import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Whitespace
 
 import Helpers
-  (shouldBeFailure, shouldBeSuccess, syntaxValidateExpr, syntaxValidateModule)
+  ( shouldBeParseSuccess, shouldBeFailure, shouldBeSuccess
+  , syntaxValidateExpr, syntaxValidateModule
+  )
 
 syntaxTests :: Group
 syntaxTests = $$discover
@@ -55,8 +57,8 @@ prop_syntax_2 =
              MkSimpleStatement (Pass () []) [] Nothing Nothing Nothing)
             [Right . SimpleStatement (Indents [i] ()) $
              MkSimpleStatement (Pass () []) [] Nothing Nothing Nothing]
-    res <- shouldBeSuccess $ parseStatement "test" (showStatement e)
-    res' <- shouldBeSuccess $ parseStatement "test" (showStatement res)
+    res <- shouldBeParseSuccess parseStatement (showStatement e)
+    res' <- shouldBeParseSuccess parseStatement (showStatement res)
     void res === void res'
 
 prop_syntax_3 :: Property
@@ -64,7 +66,7 @@ prop_syntax_3 =
   withTests 1 . property $ do
     let
       s = "@a\ndef a():\n pass\n @a\n class a: return "
-    e <- shouldBeSuccess $ parseModule "test" s
+    e <- shouldBeParseSuccess parseModule s
     shouldBeFailure =<< syntaxValidateModule (() <$ e)
 
 prop_syntax_4 :: Property
@@ -79,8 +81,8 @@ prop_syntax_4 =
         ShortString SingleQuote
         [Char_lit '\\', Char_lit 'u']
         []
-    res <- shouldBeSuccess $ parseExpr "test" (showExpr e)
-    res' <- shouldBeSuccess $ parseExpr "test" (showExpr res)
+    res <- shouldBeParseSuccess parseExpr (showExpr e)
+    res' <- shouldBeParseSuccess parseExpr (showExpr res)
     void res === void res'
 
 prop_syntax_5 :: Property
@@ -95,15 +97,15 @@ prop_syntax_5 =
         ShortString SingleQuote
         [Char_lit '\\', Char_lit 'x']
         []
-    res <- shouldBeSuccess $ parseExpr "test" (showExpr e)
-    res' <- shouldBeSuccess $ parseExpr "test" (showExpr res)
+    res <- shouldBeParseSuccess parseExpr (showExpr e)
+    res' <- shouldBeParseSuccess parseExpr (showExpr res)
     void res === void res'
 
 prop_syntax_6 :: Property
 prop_syntax_6 =
   withTests 1 . property $ do
     let s= "async def a():\n class a(await None):\n  pass"
-    e <- shouldBeSuccess $ parseModule "test" s
+    e <- shouldBeParseSuccess parseModule s
     void . shouldBeSuccess =<< syntaxValidateModule (() <$ e)
 
 prop_syntax_7 :: Property
@@ -111,5 +113,5 @@ prop_syntax_7 =
   withTests 1 . property $ do
     let
       s = "def a(b): global b"
-    e <- shouldBeSuccess $ parseModule "test" s
+    e <- shouldBeParseSuccess parseModule s
     shouldBeFailure =<< syntaxValidateModule (() <$ e)

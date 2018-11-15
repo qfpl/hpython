@@ -1,4 +1,6 @@
 {-# language DataKinds #-}
+{-# language FunctionalDependencies, MultiParamTypeClasses #-}
+{-# language FlexibleInstances #-}
 {-# language PolyKinds #-}
 {-# language LambdaCase #-}
 
@@ -23,6 +25,7 @@ import Control.Lens.Prism (Prism, _Right, prism)
 import Data.Coerce (coerce)
 import Data.Function ((&))
 
+import Language.Python.Internal.Token (PyToken(..))
 import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Syntax.Expr (Expr (..), TupleItem (TupleUnpack), ListItem (ListUnpack), Param (..), _Exprs)
 import Language.Python.Syntax.Ident
@@ -244,42 +247,47 @@ _With =
 _Ident :: Prism (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
 _Ident =
   prism
-    (\a -> Ident a)
+    Ident
     (\case
         Ident a -> Right a
         a -> Left $ a ^. unvalidated)
 
-_Indent :: HasIndents s => Traversal' (s '[] a) [Whitespace]
+_Indent :: HasIndents s a => Traversal' s [Whitespace]
 _Indent = _Indents.indentsValue.traverse.indentWhitespaces
 
-noIndents :: HasIndents s => Fold (s '[] a) (s '[] a)
+noIndents :: HasIndents s a => Fold s s
 noIndents f s = f $ s & _Indents.indentsValue .~ []
 
-class HasIndents s where
-  _Indents :: Traversal' (s '[] a) (Indents a)
+class HasIndents s a | s -> a where
+  _Indents :: Traversal' s (Indents a)
 
-instance HasIndents Fundef where
+instance HasIndents (PyToken a) a where
+  _Indents f (TkIndent a i) = TkIndent a <$> f i
+  _Indents f (TkLevel a i) = TkLevel a <$> f i
+  _Indents _ a = pure a
+
+instance HasIndents (Fundef '[] a) a where
   _Indents fun (MkFundef a b c d e f g h i j k) =
     (\b' c' -> MkFundef a b' c' d e f g h i j) <$>
     (traverse._Indents) fun b <*>
     fun c <*>
     _Indents fun k
 
-instance HasIndents For where
+instance HasIndents (For '[] a) a where
   _Indents fun (MkFor a b c d e f g h i) =
     (\b' -> MkFor a b' c d e f g) <$>
     fun b <*>
     _Indents fun h <*>
     (traverse._Indents) fun i
 
-instance HasIndents TryFinally where
+instance HasIndents (TryFinally '[] a) a where
   _Indents fun (MkTryFinally a b c d e) =
     (\b' -> MkTryFinally a b' c) <$>
     fun b <*>
     _Indents fun d <*>
     _Indents fun e
 
-instance HasIndents TryExcept where
+instance HasIndents (TryExcept '[] a) a where
   _Indents fun (MkTryExcept a b c d e f g) =
     (\b' -> MkTryExcept a b' c) <$>
     fun b <*>
@@ -288,19 +296,19 @@ instance HasIndents TryExcept where
     (traverse._Indents) fun f <*>
     (traverse._Indents) fun g
 
-instance HasIndents Except where
+instance HasIndents (Except '[] a) a where
   _Indents fun (MkExcept a b c d) =
     (\a' -> MkExcept a' b c) <$>
     fun a <*>
     _Indents fun d
 
-instance HasIndents Finally where
+instance HasIndents (Finally '[] a) a where
   _Indents fun (MkFinally a b c) =
     (\a' -> MkFinally a' b) <$>
     fun a <*>
     _Indents fun c
 
-instance HasIndents If where
+instance HasIndents (If '[] a) a where
   _Indents fun (MkIf a b c d e f g) =
     (\b' -> MkIf a b' c d) <$>
     fun b <*>
@@ -308,56 +316,56 @@ instance HasIndents If where
     (traverse._Indents) fun f <*>
     (traverse._Indents) fun g
 
-instance HasIndents While where
+instance HasIndents (While '[] a) a where
   _Indents fun (MkWhile a b c d e f) =
     (\b' -> MkWhile a b' c d) <$>
     fun b <*>
     _Indents fun e <*>
     (traverse._Indents) fun f
 
-instance HasIndents Elif where
+instance HasIndents (Elif '[] a) a where
   _Indents fun (MkElif a b c d) =
     (\a' -> MkElif a' b c) <$>
     fun a <*>
     _Indents fun d
 
-instance HasIndents Else where
+instance HasIndents (Else '[] a) a where
   _Indents f (MkElse a b c) = MkElse <$> f a <*> pure b <*> _Indents f c
 
-instance HasIndents SimpleStatement where
+instance HasIndents (SimpleStatement '[] a) a where
   _Indents _ (MkSimpleStatement a b c d e) =
     pure $ MkSimpleStatement a b c d e
 
-instance HasIndents Statement where
+instance HasIndents (Statement '[] a) a where
   _Indents f (SimpleStatement idnt a) = SimpleStatement <$> f idnt <*> _Indents f a
   _Indents f (CompoundStatement c) = CompoundStatement <$> _Indents f c
 
-instance HasIndents Block where
+instance HasIndents (Block '[] a) a where
   _Indents = _Statements._Indents
 
-instance HasIndents Suite where
+instance HasIndents (Suite '[] a) a where
   _Indents _ (SuiteOne a b c) = pure $ SuiteOne a b c
   _Indents f (SuiteMany a b c d e) = SuiteMany a b c d <$> _Indents f e
 
-instance HasIndents Decorator where
+instance HasIndents (Decorator '[] a) a where
   _Indents fun (Decorator a b c d e f g) =
     (\b' -> Decorator a b' c d e f g) <$>
     fun b
 
-instance HasIndents ClassDef where
+instance HasIndents (ClassDef '[] a) a where
   _Indents fun (MkClassDef a b c d e f g) =
     (\b' c' -> MkClassDef a b' c' d e f) <$>
     (traverse._Indents) fun b <*>
     fun c <*>
     _Indents fun g
 
-instance HasIndents With where
+instance HasIndents (With '[] a) a where
   _Indents fun (MkWith a b c d e f) =
     (\b' -> MkWith a b' c d e) <$>
     fun b <*>
     _Indents fun f
 
-instance HasIndents CompoundStatement where
+instance HasIndents (CompoundStatement '[] a) a where
   _Indents fun s =
     case s of
       Fundef a decos idnt asyncWs b c d e f g h ->

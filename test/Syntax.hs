@@ -30,7 +30,7 @@ prop_syntax_1 =
         Lambda ()
           [Space]
           (CommaSepMany (StarParam () [] Nothing Nothing) (Comma []) CommaSepNone)
-          [Space]
+          (Colon [Space])
           (None () [])
     res <- syntaxValidateExpr e
     shouldBeFailure res
@@ -49,7 +49,7 @@ prop_syntax_2 =
           (pure Space)
             "test"
             [] CommaSepNone [] Nothing .
-          SuiteMany () [] Nothing LF $
+          SuiteMany () (Colon []) Nothing LF $
           Block []
             (SimpleStatement (Indents [i] ()) $
              MkSimpleStatement (Pass () []) [] Nothing Nothing Nothing)

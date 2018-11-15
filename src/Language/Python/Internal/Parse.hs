@@ -19,7 +19,7 @@ module Language.Python.Internal.Parse where
 import Control.Applicative (Alternative, (<|>), optional, many, some)
 import Control.Lens.Getter ((^.))
 import Control.Monad (void)
-import Data.Bifunctor (first)
+import Data.Bifunctor (first, second)
 import Data.Coerce (coerce)
 import Data.Function ((&))
 import Data.List (foldl')
@@ -47,6 +47,7 @@ import Language.Python.Syntax.Ident
 import Language.Python.Syntax.ModuleNames
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
+import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Whitespace
 
 newtype PyTokens = PyTokens { unPyTokens :: [PyToken SrcInfo] }
@@ -420,7 +421,7 @@ lambda ws =
   (\(tk, s) -> Lambda (pyTokenAnn tk) s) <$>
   token ws (\case; TkLambda{} -> True; _ -> False) "lambda" <*>
   commaSep ws untypedParam <*>
-  (snd <$> token ws (\case; TkColon{} -> True; _ -> False) ":") <*>
+  (Colon . snd <$> token ws (\case; TkColon{} -> True; _ -> False) ":") <*>
   expr ws
 
 lambdaNoCond :: MonadParsec e PyTokens m => m Whitespace -> m (Expr SrcInfo)
@@ -428,7 +429,7 @@ lambdaNoCond ws =
   (\(tk, s) -> Lambda (pyTokenAnn tk) s) <$>
   token ws (\case; TkLambda{} -> True; _ -> False) "lambda" <*>
   commaSep ws untypedParam <*>
-  (snd <$> token ws (\case; TkColon{} -> True; _ -> False) ":") <*>
+  (Colon . snd <$> token ws (\case; TkColon{} -> True; _ -> False) ":") <*>
   exprNoCond ws
 
 exprNoCond :: MonadParsec e PyTokens m => m Whitespace -> m (Expr SrcInfo)
@@ -641,7 +642,7 @@ orExpr ws =
          Nothing -> pure $ Dict ann ws1 Nothing
          Just (Left (Left ex)) -> do
            maybeColon <-
-             optional $ snd <$> token anySpace (\case; TkColon{} -> True; _ -> False) ":"
+             optional $ Colon . snd <$> token anySpace (\case; TkColon{} -> True; _ -> False) ":"
            case maybeColon of
              Nothing ->
                -- The order of this choice matters because commaSepRest is implemented
@@ -982,10 +983,10 @@ suite =
       Right <$> (statement level =<< i)
 
 comma :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Comma)
-comma ws = fmap Comma <$> token ws (\case; TkComma{} -> True; _ -> False) ","
+comma ws = second Comma <$> token ws (\case; TkComma{} -> True; _ -> False) ","
 
-colon :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, [Whitespace])
-colon ws = token ws (\case; TkColon{} -> True; _ -> False) ":"
+colon :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Colon)
+colon ws = second Colon <$> token ws (\case; TkColon{} -> True; _ -> False) ":"
 
 semicolon :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, [Whitespace])
 semicolon ws = token ws (\case; TkSemicolon{} -> True; _ -> False) ";"
@@ -1073,7 +1074,7 @@ typedParam =
   where
     tyAnn =
       (,) <$>
-      (snd <$> token anySpace (\case; TkColon{} -> True; _ -> False) ":") <*>
+      (Colon . snd <$> token anySpace (\case; TkColon{} -> True; _ -> False) ":") <*>
       expr anySpace
 
 arg :: MonadParsec e PyTokens m => m (Arg SrcInfo)

@@ -11,6 +11,7 @@ import Language.Python.DSL
 import Language.Python.Syntax.Module (Module (..))
 import Language.Python.Syntax.CommaSep (Comma (..), CommaSep (..), CommaSep1' (..))
 import Language.Python.Syntax.Expr (Arg (..), Expr (..), Param (..))
+import Language.Python.Syntax.Punctuation (Colon (..))
 import Language.Python.Syntax.Statement (Block (..), CompoundStatement (..), SimpleStatement (..), SmallStatement (..), Statement (..), Suite (..))
 import Language.Python.Syntax.Whitespace (Blank (..), Indents (..), Newline (..), Whitespace (..), indentWhitespaces)
 
@@ -35,7 +36,7 @@ append_to =
     )
     []
     Nothing
-    (SuiteMany () [] Nothing LF $
+    (SuiteMany () (Colon []) Nothing LF $
      Block []
      ( SimpleStatement
          (Indents [replicate 4 Space ^. from indentWhitespaces] ())

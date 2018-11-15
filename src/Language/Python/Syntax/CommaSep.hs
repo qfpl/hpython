@@ -32,16 +32,8 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe)
 import Data.Semigroup (Semigroup(..))
 
+import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Whitespace (Whitespace (Space), HasTrailingWhitespace (..))
-
--- | The venerable comma separator
-newtype Comma =
-  Comma [Whitespace]
-  deriving (Eq, Show)
-
-instance HasTrailingWhitespace Comma where
-  trailingWhitespace =
-    lens (\(Comma ws) -> ws) (\_ ws -> Comma ws)
 
 -- | Items separated by commas, with optional whitespace following each comma
 data CommaSep a

@@ -37,15 +37,15 @@ genParam genExpr =
     [ StarParam () <$>
       genWhitespaces <*>
       Gen.maybe genIdent <*>
-      sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr)
+      sizedMaybe ((,) <$> genColonAny <*> genExpr)
     , DoubleStarParam () <$>
       genWhitespaces <*>
       genIdent <*>
-      sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr)
+      sizedMaybe ((,) <$> genColonAny <*> genExpr)
     ]
     [ KeywordParam () <$>
       genIdent <*>
-      sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr) <*>
+      sizedMaybe ((,) <$> genColonAny <*> genExpr) <*>
       genWhitespaces <*>
       genExpr
     ]
@@ -142,10 +142,10 @@ genSubscript =
   sizedRecursive
     [ SubscriptExpr <$> genExpr
     , sized3M
-        (\a b c -> (\ws -> SubscriptSlice a ws b c) <$> genWhitespaces)
+        (\a b c -> (\ws -> SubscriptSlice a ws b c) <$> genColon)
         (sizedMaybe genExpr)
         (sizedMaybe genExpr)
-        (sizedMaybe $ (,) <$> genWhitespaces <*> sizedMaybe genExpr)
+        (sizedMaybe $ (,) <$> genColon <*> sizedMaybe genExpr)
     ]
     []
 
@@ -304,7 +304,7 @@ genExpr' isExp =
            Lambda () <$>
            genWhitespaces <*>
            genSizedCommaSep (genParam genExpr) <*>
-           genWhitespaces <*>
+           genColon <*>
            pure a)
     ]
 

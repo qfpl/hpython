@@ -165,6 +165,7 @@ correctBackslashEscapesRaw (x:y:ys) =
       case y of
         Char_esc_doublequote -> Char_esc_bslash : y : correctBackslashEscapesRaw ys
         Char_esc_singlequote -> Char_esc_bslash : y : correctBackslashEscapesRaw ys
+        Char_esc_bslash -> Char_esc_bslash : y : correctBackslashEscapesRaw ys
         _ -> x : correctBackslashEscapesRaw (y : ys)
     _ -> x : correctBackslashEscapesRaw (y : ys)
 

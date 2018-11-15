@@ -429,3 +429,24 @@ prop_fulltrip_34 =
 
     res <- shouldBeParseSuccess parseExpr str
     str === showExpr (() <$ res)
+
+prop_fulltrip_35 :: Property
+prop_fulltrip_35 =
+  withTests 1 . property $ do
+    let str =
+          showExpr $
+          String ()
+            (pure $
+             RawStringLiteral ()
+               Prefix_r
+               LongString
+               DoubleQuote
+               [ Char_lit '\\'
+               , Char_esc_bslash
+               , Char_esc_doublequote
+               ]
+               [])
+    annotateShow str
+
+    res <- shouldBeParseSuccess parseExpr str
+    str === showExpr (() <$ res)

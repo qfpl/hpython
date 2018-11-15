@@ -409,7 +409,7 @@ prop_fulltrip_33 =
                [])
     annotateShow str
 
-    res <- shouldBeParseSuccess parseExpr "test"
+    res <- shouldBeParseSuccess parseExpr str
     str === showExpr (() <$ res)
 
 prop_fulltrip_34 :: Property

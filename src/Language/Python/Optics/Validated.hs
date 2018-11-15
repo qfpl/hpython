@@ -9,7 +9,9 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Optics.Validated where
+module Language.Python.Optics.Validated (
+  Validated (unvalidated)
+) where
 
 import Control.Lens.Getter (Getter, to)
 import Data.Coerce (Coercible, coerce)

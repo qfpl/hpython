@@ -21,7 +21,7 @@ module Language.Python.Internal.Lexer
     -- * Source Information
   , SrcInfo(..), initialSrcInfo, withSrcInfo
     -- * Errors
-  , AsLexicalError(..), fromLexicalError, Parsec.ParseError(..)
+  , AsLexicalError(..), unsafeFromLexicalError, Parsec.ParseError(..)
   , AsTabError(..), fromTabError, TabError(..)
     -- * Miscellaneous
   , tokenize
@@ -53,6 +53,7 @@ import Data.Semigroup (Semigroup, (<>))
 import Data.Semigroup.Foldable (foldMap1)
 import Data.These (These(..))
 import Data.Void (Void)
+import GHC.Stack (HasCallStack)
 import Text.Megaparsec (MonadParsec, ParseError, parse, unPos)
 import Text.Megaparsec.Parsers
   ( ParsecT, CharParsing, LookAheadParsing, lookAhead, unParsecT, satisfy, text
@@ -448,7 +449,7 @@ parseToken =
       many (satisfy isIdentifierChar)
     ]
 
-class AsLexicalError s t e | s -> t e where
+class AsLexicalError s t | s -> t where
   _LexicalError
     :: Prism'
          s
@@ -457,17 +458,22 @@ class AsLexicalError s t e | s -> t e where
          , Set (Parsec.ErrorItem t)
          )
 
-fromLexicalError :: AsLexicalError s t e => ParseError t e -> s
-fromLexicalError (Parsec.TrivialError a b c) = _LexicalError # (a, b, c)
-fromLexicalError Parsec.FancyError{} = error "fancy errors"
+unsafeFromLexicalError
+  :: ( HasCallStack
+     , AsLexicalError s t
+     )
+  => ParseError t Void
+  -> s
+unsafeFromLexicalError (Parsec.TrivialError a b c) = _LexicalError # (a, b, c)
+unsafeFromLexicalError Parsec.FancyError{} = error "'fancy error' used in lexer"
 
 {-# noinline tokenize #-}
 tokenize
-  :: AsLexicalError e Char Void
+  :: AsLexicalError e Char
   => FilePath
   -> Text.Text
   -> Either e [PyToken SrcInfo]
-tokenize fp = first fromLexicalError . parse (unParsecT tokens) fp
+tokenize fp = first unsafeFromLexicalError . parse (unParsecT tokens) fp
   where
     tokens :: ParsecT Void Text.Text Identity [PyToken SrcInfo]
     tokens = many parseToken <* Parsec.eof
@@ -701,7 +707,7 @@ insertTabs a = first fromTabError . fmap chunked . indentation a . logicalLines
 -- | Tokenize an input file, inserting indent/level/dedent tokens in appropriate
 -- positions according to the block structure.
 tokenizeWithTabs
-  :: (AsLexicalError s Char Void, AsTabError s SrcInfo)
+  :: (AsLexicalError s Char, AsTabError s SrcInfo)
   => FilePath
   -> Text.Text
   -> Either s [PyToken SrcInfo]

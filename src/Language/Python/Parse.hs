@@ -47,7 +47,7 @@ import Language.Python.Syntax.Whitespace (Indents (..))
 import qualified Language.Python.Internal.Syntax.IR as IR
 
 parseModule
-  :: ( AsLexicalError e Char Void
+  :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
      , AsParseError e (PyToken SrcInfo) Void
      , AsIRError e SrcInfo
@@ -66,7 +66,7 @@ parseModule fp input =
     fromEither (first pure ir) `bindValidation` IR.fromIR
 
 parseStatement
-  :: ( AsLexicalError e Char Void
+  :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
      , AsParseError e (PyToken SrcInfo) Void
      , AsIRError e SrcInfo
@@ -87,7 +87,7 @@ parseStatement fp input =
     tlIndent = level <|> withSrcInfo (pure $ Indents [])
 
 parseExprList
-  :: ( AsLexicalError e Char Void
+  :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
      , AsParseError e (PyToken SrcInfo) Void
      , AsIRError e SrcInfo
@@ -106,7 +106,7 @@ parseExprList fp input =
     fromEither (first pure ir) `bindValidation` IR.fromIR_expr
 
 parseExpr
-  :: ( AsLexicalError e Char Void
+  :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
      , AsParseError e (PyToken SrcInfo) Void
      , AsIRError e SrcInfo

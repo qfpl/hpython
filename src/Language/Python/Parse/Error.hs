@@ -37,7 +37,7 @@ data ParseError a
   | InvalidUnpacking a
   deriving (Eq, Show)
 
-instance AsLexicalError (ParseError a) Char Void where
+instance AsLexicalError (ParseError a) Char where
   _LexicalError =
     prism'
       (\(a, b, c) -> LexicalError a b c)

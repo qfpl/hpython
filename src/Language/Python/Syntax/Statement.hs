@@ -233,7 +233,7 @@ instance Plated (Statement '[] a) where
         ClassDef idnt a decos b c d <$> _Statements fun e
       With a b asyncWs c d e -> With a b asyncWs c (coerce d) <$> _Statements fun e
 
--- | Rougly, these are statements that can be chained together on a single line
+-- | Roughly, these are statements that can be chained together on a single line
 --
 -- See @small_stmt@ at <https://docs.python.org/3.5/reference/grammar.html>
 data SmallStatement (v :: [*]) a

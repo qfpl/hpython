@@ -212,6 +212,13 @@ validateComma
   -> ValidateSyntax e Comma
 validateComma a (Comma ws) = Comma <$> validateWhitespace a ws
 
+validateColon
+  :: (AsSyntaxError e v a)
+  => a
+  -> Colon
+  -> ValidateSyntax e Colon
+validateColon a (Colon ws) = Colon <$> validateWhitespace a ws
+
 validateAssignmentSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
@@ -393,7 +400,7 @@ validateExprSyntax (Lambda a b c d e) =
     Lambda a <$>
     validateWhitespace a b <*>
     validateParamsSyntax True c <*>
-    validateWhitespace a d <*>
+    validateColon a d <*>
     liftVM1
       (local $
        \ctxt ->
@@ -574,11 +581,11 @@ validateSuiteSyntax
   -> ValidateSyntax e (Suite (Nub (Syntax ': v)) a)
 validateSuiteSyntax (SuiteMany a b c d e) =
   (\b' -> SuiteMany a b' c d) <$>
-  validateWhitespace a b <*>
+  validateColon a b <*>
   validateBlockSyntax e
 validateSuiteSyntax (SuiteOne a b c) =
   SuiteOne a <$>
-  validateWhitespace a b <*>
+  validateColon a b <*>
   validateSimpleStatementSyntax c
 
 validateDecoratorSyntax
@@ -1095,8 +1102,8 @@ validateParamsSyntax isLambda e =
          , Member Indentation v
          )
       => a
-      -> Maybe ([Whitespace], Expr v a)
-      -> ValidateSyntax e (Maybe ([Whitespace], Expr (Nub (Syntax ': v)) a))
+      -> Maybe (Colon, Expr v a)
+      -> ValidateSyntax e (Maybe (Colon, Expr (Nub (Syntax ': v)) a))
     checkTy a mty =
       if isLambda
       then traverse (\_ -> errorVM1 (_TypedParamInLambda # a)) mty

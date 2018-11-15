@@ -246,7 +246,7 @@ genPositionalParams isLambda =
       mty <-
         if isLambda
         then pure Nothing
-        else sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr)
+        else sizedMaybe ((,) <$> genColonAny <*> genExpr)
       ((i, mty) :) <$> go (_identValue i : seen) (n-1)
 
 genKeywordParam
@@ -258,7 +258,7 @@ genKeywordParam isLambda positionals =
   Gen.scale (max 0 . subtract 1) $
   KeywordParam () <$>
   Gen.filter (\i -> _identValue i `notElem` positionals) genIdent <*>
-  (if isLambda then pure Nothing else sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr)) <*>
+  (if isLambda then pure Nothing else sizedMaybe ((,) <$> genColonAny <*> genExpr)) <*>
   genWhitespaces <*>
   genExpr
 
@@ -276,7 +276,7 @@ genStarParam isLambda positionals =
       else
         case ident of
           Nothing -> pure Nothing
-          _ -> sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr)
+          _ -> sizedMaybe ((,) <$> genColonAny <*> genExpr)
     StarParam () <$>
       genWhitespaces <*>
       pure ident <*>
@@ -292,7 +292,7 @@ genDoubleStarParam isLambda positionals =
   DoubleStarParam () <$>
   genWhitespaces <*>
   Gen.filter (\i -> _identValue i `notElem` positionals) genIdent <*>
-  (if isLambda then pure Nothing else sizedMaybe ((,) <$> genAnyWhitespaces <*> genExpr))
+  (if isLambda then pure Nothing else sizedMaybe ((,) <$> genColonAny <*> genExpr))
 
 genParams
   :: (MonadGen m, MonadState GenState m)
@@ -425,7 +425,7 @@ genDictComp =
     (Comprehension ())
     (localState $ do
         inGenerator .= True
-        DictItem () <$> genExpr <*> genAnyWhitespaces <*> genExpr)
+        DictItem () <$> genExpr <*> genColonAny <*> genExpr)
     genCompFor
     (localState $ do
         inGenerator .= True
@@ -448,10 +448,10 @@ genSubscriptItem =
   sizedRecursive
     [ SubscriptExpr <$> genExpr
     , sized3M
-        (\a b c -> (\ws -> SubscriptSlice a ws b c) <$> genWhitespaces)
+        (\a b c -> (\ws -> SubscriptSlice a ws b c) <$> genColon)
         (sizedMaybe genExpr)
         (sizedMaybe genExpr)
-        (sizedMaybe $ (,) <$> genWhitespaces <*> sizedMaybe genExpr)
+        (sizedMaybe $ (,) <$> genColon <*> sizedMaybe genExpr)
     ]
     []
 
@@ -586,7 +586,7 @@ genExpr' isExp = do
          Lambda () <$>
          (NonEmpty.toList <$> genWhitespaces1) <*>
          pure a <*>
-         genWhitespaces <*>
+         genColon <*>
          localState (do
            inLoop .= False
            modify $ \ctxt ->

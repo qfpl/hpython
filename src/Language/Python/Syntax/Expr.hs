@@ -54,6 +54,7 @@ import Language.Python.Internal.Syntax.Strings
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
+import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Whitespace
 
 {-
@@ -83,14 +84,14 @@ data Param (v :: [*]) a
   = PositionalParam
   { _paramAnn :: a
   , _paramName :: Ident v a
-  , _paramType :: Maybe ([Whitespace], Expr v a)
+  , _paramType :: Maybe (Colon, Expr v a)
   }
   -- | @def foo(bar=None):@
   | KeywordParam
   { _paramAnn :: a
   , _paramName :: Ident v a
   -- ':' spaces <expr>
-  , _paramType :: Maybe ([Whitespace], Expr v a)
+  , _paramType :: Maybe (Colon, Expr v a)
   -- = spaces
   , _unsafeKeywordParamWhitespaceRight :: [Whitespace]
   , _unsafeKeywordParamExpr :: Expr v a
@@ -102,7 +103,7 @@ data Param (v :: [*]) a
   , _unsafeStarParamWhitespace :: [Whitespace]
   , _unsafeStarParamName :: Maybe (Ident v a)
   -- ':' spaces <expr>
-  , _paramType :: Maybe ([Whitespace], Expr v a)
+  , _paramType :: Maybe (Colon, Expr v a)
   }
   -- | @def foo(**dict):@
   | DoubleStarParam
@@ -111,7 +112,7 @@ data Param (v :: [*]) a
   , _unsafeDoubleStarParamWhitespace :: [Whitespace]
   , _paramName :: Ident v a
   -- ':' spaces <expr>
-  , _paramType :: Maybe ([Whitespace], Expr v a)
+  , _paramType :: Maybe (Colon, Expr v a)
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -133,8 +134,8 @@ paramType
   :: Lens
        (Param v a)
        (Param '[] a)
-       (Maybe ([Whitespace], Expr v a))
-       (Maybe ([Whitespace], Expr '[] a))
+       (Maybe (Colon, Expr v a))
+       (Maybe (Colon, Expr '[] a))
 paramType =
   lens _paramType (\s a -> (s ^. unvalidated) { _paramType = a})
 
@@ -289,7 +290,7 @@ data DictItem (v :: [*]) a
   = DictItem
   { _dictItemAnn :: a
   , _unsafeDictItemKey :: Expr v a
-  , _unsafeDictItemWhitespace :: [Whitespace]
+  , _unsafeDictItemColon :: Colon
   , _unsafeDictItemValue :: Expr v a
   }
   | DictUnpack
@@ -310,11 +311,11 @@ data Subscript (v :: [*]) a
       -- [expr]
       (Maybe (Expr v a))
       -- ':' <spaces>
-      [Whitespace]
+      Colon
       -- [expr]
       (Maybe (Expr v a))
       -- [':' [expr]]
-      (Maybe ([Whitespace], Maybe (Expr v a)))
+      (Maybe (Colon, Maybe (Expr v a)))
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasTrailingWhitespace (Subscript v a) where
@@ -326,11 +327,11 @@ instance HasTrailingWhitespace (Subscript v a) where
             case d of
               Nothing ->
                 case c of
-                  Nothing -> b
+                  Nothing -> b ^. trailingWhitespace
                   Just e -> e ^. trailingWhitespace
               Just (e, f) ->
                 case f of
-                  Nothing -> e
+                  Nothing -> e ^. trailingWhitespace
                   Just g -> g ^. trailingWhitespace)
       (\x ws ->
          case x of
@@ -340,11 +341,11 @@ instance HasTrailingWhitespace (Subscript v a) where
             case d of
               Nothing ->
                 case c of
-                  Nothing -> (ws, c, d)
+                  Nothing -> (Colon ws, c, d)
                   Just e -> (b, Just $ e & trailingWhitespace .~ ws, d)
               Just (e, f) ->
                 case f of
-                  Nothing -> (b, c, Just (ws, f))
+                  Nothing -> (b, c, Just (Colon ws, f))
                   Just g -> (b, c, Just (e, Just $ g & trailingWhitespace .~ ws)))
 
 data ListItem (v :: [*]) a
@@ -445,7 +446,7 @@ data Expr (v :: [*]) a
   { _unsafeExprAnn :: a
   , _unsafeLambdaWhitespace :: [Whitespace]
   , _unsafeLambdaArgs :: CommaSep (Param v a)
-  , _unsafeLambdaColon :: [Whitespace]
+  , _unsafeLambdaColon :: Colon
   , _unsafeLambdaBody :: Expr v a
   }
   | Yield

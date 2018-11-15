@@ -21,7 +21,7 @@ module Language.Python.Syntax.Statement
   , CompoundStatement (..)
   , SmallStatement (..)
   , Block (..), HasBlocks (..), blockBlankLines, blockHead, blockTail
-  , Suite (..)
+  , Suite (..), Colon (..)
   , WithItem (..)
   , Decorator (..)
   , ExceptAs (..), exceptAsAnn, exceptAsExpr, exceptAsName
@@ -58,6 +58,7 @@ import Language.Python.Internal.Syntax.Import
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.ModuleNames
+import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Whitespace
 
 -- See note [unsafeCoerce Validation] in Language.Python.Internal.Syntax.Expr
@@ -301,10 +302,10 @@ data ExceptAs (v :: [*]) a
 -- A clause consists of a header and a suite.
 data Suite (v :: [*]) a
   -- ':' <space> simplestatement
-  = SuiteOne a [Whitespace] (SimpleStatement v a)
+  = SuiteOne a Colon (SimpleStatement v a)
   | SuiteMany a
       -- ':' <spaces> [comment] <newline>
-      [Whitespace] (Maybe (Comment a)) Newline
+      Colon (Maybe (Comment a)) Newline
       -- <block>
       (Block v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)

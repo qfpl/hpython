@@ -21,7 +21,7 @@ import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
-import Language.Python.Syntax.ModuleNames
+import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Whitespace
 import Generators.Sized
@@ -48,11 +48,11 @@ genSuite
 genSuite gss gb =
   Gen.choice
   [ SuiteMany () <$>
-    genWhitespaces <*>
+    genColon <*>
     Gen.maybe genComment <*>
     genNewline <*>
     gb
-  , SuiteOne () <$> genWhitespaces <*> genSimpleStatement gss
+  , SuiteOne () <$> genColon <*> genSimpleStatement gss
   ]
 
 genUnOp :: MonadGen m => m (UnOp ())
@@ -377,6 +377,12 @@ genDot = Dot <$> genWhitespaces
 genComma :: MonadGen m => m Comma
 genComma = Comma <$> genWhitespaces
 
+genColon :: MonadGen m => m Colon
+genColon = Colon <$> genWhitespaces
+
+genColonAny :: MonadGen m => m Colon
+genColonAny = Colon <$> genAnyWhitespaces
+
 genSizedCommaSep :: MonadGen m => m a -> m (CommaSep a)
 genSizedCommaSep ma = Gen.sized $ \n ->
   if n <= 1
@@ -501,7 +507,7 @@ genDictItem ge =
   Gen.choice
   [ DictItem () <$>
     ge <*>
-    genAnyWhitespaces <*>
+    genColonAny <*>
     ge
   , DictUnpack () <$>
     genAnyWhitespaces <*>

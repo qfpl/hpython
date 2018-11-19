@@ -37,7 +37,9 @@ import Language.Python.Internal.Lexer
   )
 import Language.Python.Internal.Token (PyToken)
 import Language.Python.Internal.Parse
-  (AsParseError, Parser, runParser, level, module_, statement, exprList, expr, space)
+  ( AsParseError, Parser, runParser, level, module_, statement, exprOrStarList
+  , expr, space
+  )
 import Language.Python.Syntax.Expr (Expr)
 import Language.Python.Internal.Syntax.IR (AsIRError)
 import Language.Python.Syntax.Module (Module)
@@ -101,7 +103,7 @@ parseExprList fp input =
     ir = do
       tokens <- tokenize fp input
       tabbed <- insertTabs si tokens
-      runParser fp (exprList space <* eof) tabbed
+      runParser fp (exprOrStarList space <* eof) tabbed
   in
     fromEither (first pure ir) `bindValidation` IR.fromIR_expr
 

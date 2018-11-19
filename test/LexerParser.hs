@@ -7,7 +7,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as Text
 
 import Language.Python.Render
-import Language.Python.Parse (parseModule, parseStatement, parseExpr)
+import Language.Python.Parse (parseModule, parseStatement, parseExpr, parseExprList)
 import Language.Python.Syntax.Expr (Expr(..))
 import Language.Python.Internal.Syntax.Strings
   ( StringLiteral(..), StringType(..), QuoteType(..), PyChar(..)
@@ -468,3 +468,10 @@ prop_fulltrip_36 =
 
     res <- shouldBeParseSuccess parseExpr str
     str === showExpr (() <$ res)
+
+prop_fulltrip_37 :: Property
+prop_fulltrip_37 =
+  withTests 1 . property $ do
+    let str = "None,*None"
+
+    void $ shouldBeParseSuccess parseExprList str

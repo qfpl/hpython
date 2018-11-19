@@ -3,6 +3,7 @@ module LexerParser (lexerParserTests) where
 
 import Hedgehog
 import Control.Monad (void)
+import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as Text
 
 import Language.Python.Render
@@ -446,6 +447,23 @@ prop_fulltrip_35 =
                , Char_esc_doublequote
                ]
                [])
+    annotateShow str
+
+    res <- shouldBeParseSuccess parseExpr str
+    str === showExpr (() <$ res)
+
+prop_fulltrip_36 :: Property
+prop_fulltrip_36 =
+  withTests 1 . property $ do
+    let str =
+          showExpr $
+          String ()
+            (RawStringLiteral ()
+               Prefix_r
+               LongString
+               SingleQuote
+               [Char_lit '\\', Char_esc_bslash] [] :|
+            [])
     annotateShow str
 
     res <- shouldBeParseSuccess parseExpr str

@@ -79,7 +79,7 @@ correctAdjacentStrings (a:|b:cs) =
   then
     NonEmpty.cons (a & trailingWhitespace .~ [Space]) (correctAdjacentStrings $ b :| cs)
   else
-    NonEmpty.cons a (correctAdjacentStrings $ b :| cs)
+    NonEmpty.cons a $ correctAdjacentStrings (b :| cs)
 
 quoteChar :: QuoteType -> PyChar
 quoteChar qt =
@@ -156,6 +156,10 @@ naps p = go (,) (,)
              Nothing -> l (x:res) res')
         xs
 
+-- | Sometimes strings need to be corrected when certain characters follow a literal
+-- backslash. For example, a literal backslash followed by an escape sequence means
+-- that the literal backslash actually needs to be escaped, so that it doesn't get
+-- 'combined' with the backslash in the escape sequence.
 correctBackslashEscapesRaw :: [PyChar] -> [PyChar]
 correctBackslashEscapesRaw [] = []
 correctBackslashEscapesRaw [x] = [x]
@@ -166,6 +170,7 @@ correctBackslashEscapesRaw (x:y:ys) =
         Char_esc_doublequote -> Char_esc_bslash : y : correctBackslashEscapesRaw ys
         Char_esc_singlequote -> Char_esc_bslash : y : correctBackslashEscapesRaw ys
         Char_esc_bslash -> Char_esc_bslash : y : correctBackslashEscapesRaw ys
+        Char_lit '\\' -> Char_esc_bslash : correctBackslashEscapesRaw ys
         _ -> x : correctBackslashEscapesRaw (y : ys)
     _ -> x : correctBackslashEscapesRaw (y : ys)
 

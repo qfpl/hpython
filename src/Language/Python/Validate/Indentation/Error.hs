@@ -1,12 +1,22 @@
 {-# language TemplateHaskell, MultiParamTypeClasses, FunctionalDependencies,
   FlexibleInstances, DataKinds, KindSignatures #-}
+
+{-|
+Module      : Language.Python.Validate.Indentation.Error
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Language.Python.Validate.Indentation.Error where
 
 -- import Control.Lens.TH
 import Control.Lens.Type
 import Control.Lens.Prism
 
-import Language.Python.Internal.Syntax
+import Language.Python.Syntax.Whitespace
 
 
 data IndentationError (v :: [*]) a
@@ -14,53 +24,57 @@ data IndentationError (v :: [*]) a
   | TabError a
   | ExpectedGreaterThan [Indent] (Indents a)
   | ExpectedEqualTo [Indent] (Indents a)
+  | EmptyContinuedLine a
   deriving (Eq, Show)
 
 -- makeClassyPrisms ''IndentationError
-class AsIndentationError r_aaVz0 v_aaVtZ a_aaVu0 | r_aaVz0 -> v_aaVtZ
-                                                              a_aaVu0 where
-  _IndentationError ::
-    Control.Lens.Type.Prism' r_aaVz0 (IndentationError v_aaVtZ a_aaVu0)
-  _WrongIndent ::
-    Control.Lens.Type.Prism' r_aaVz0 (Indent, Indent, a_aaVu0)
-  _TabError :: Control.Lens.Type.Prism' r_aaVz0 a_aaVu0
-  _ExpectedGreaterThan ::
-    Control.Lens.Type.Prism' r_aaVz0 ([Indent], Indents a_aaVu0)
-  _ExpectedEqualTo ::
-    Control.Lens.Type.Prism' r_aaVz0 ([Indent], Indents a_aaVu0)
+class AsIndentationError r_amPW v_aiuW a_aiuX | r_amPW -> v_aiuW
+                                                          a_aiuX where
+  _IndentationError :: Prism' r_amPW (IndentationError v_aiuW a_aiuX)
+  _WrongIndent :: Prism' r_amPW (Indent, Indent, a_aiuX)
+  _TabError :: Prism' r_amPW a_aiuX
+  _ExpectedGreaterThan :: Prism' r_amPW ([Indent], Indents a_aiuX)
+  _ExpectedEqualTo :: Prism' r_amPW ([Indent], Indents a_aiuX)
+  _EmptyContinuedLine :: Prism' r_amPW a_aiuX
   _WrongIndent = ((.) _IndentationError) _WrongIndent
   _TabError = ((.) _IndentationError) _TabError
   _ExpectedGreaterThan = ((.) _IndentationError) _ExpectedGreaterThan
   _ExpectedEqualTo = ((.) _IndentationError) _ExpectedEqualTo
-instance AsIndentationError (IndentationError v_aaVtZ a_aaVu0) v_aaVtZ a_aaVu0 where
+  _EmptyContinuedLine = ((.) _IndentationError) _EmptyContinuedLine
+instance AsIndentationError (IndentationError v_aiuW a_aiuX) v_aiuW a_aiuX where
   _IndentationError = id
   _WrongIndent
-    = (Control.Lens.Prism.prism
-          (\ (x1_aaVz6, x2_aaVz7, x3_aaVz8)
-            -> ((WrongIndent x1_aaVz6) x2_aaVz7) x3_aaVz8))
-        (\ x_aaVz9
-            -> case x_aaVz9 of
-                WrongIndent y1_aaVza y2_aaVzb y3_aaVzc
-                  -> Right (y1_aaVza, y2_aaVzb, y3_aaVzc)
-                _ -> Left x_aaVz9)
+    = (prism
+          (\ (x1_amQ3, x2_amQ4, x3_amQ5)
+            -> ((WrongIndent x1_amQ3) x2_amQ4) x3_amQ5))
+        (\ x_amQ6
+            -> case x_amQ6 of
+                WrongIndent y1_amQ7 y2_amQ8 y3_amQ9
+                  -> Right (y1_amQ7, y2_amQ8, y3_amQ9)
+                _ -> Left x_amQ6)
   _TabError
-    = (Control.Lens.Prism.prism (\ x1_aaVze -> TabError x1_aaVze))
-        (\ x_aaVzf
-            -> case x_aaVzf of
-                TabError y1_aaVzg -> Right y1_aaVzg
-                _ -> Left x_aaVzf)
+    = (prism (\ x1_amQb -> TabError x1_amQb))
+        (\ x_amQc
+            -> case x_amQc of
+                TabError y1_amQd -> Right y1_amQd
+                _ -> Left x_amQc)
   _ExpectedGreaterThan
-    = (Control.Lens.Prism.prism
-          (\ (x1_aaVzi, x2_aaVzj)
-            -> (ExpectedGreaterThan x1_aaVzi) x2_aaVzj))
-        (\ x_aaVzk
-            -> case x_aaVzk of
-                ExpectedGreaterThan y1_aaVzl y2_aaVzm -> Right (y1_aaVzl, y2_aaVzm)
-                _ -> Left x_aaVzk)
+    = (prism
+          (\ (x1_amQf, x2_amQg) -> (ExpectedGreaterThan x1_amQf) x2_amQg))
+        (\ x_amQh
+            -> case x_amQh of
+                ExpectedGreaterThan y1_amQi y2_amQj -> Right (y1_amQi, y2_amQj)
+                _ -> Left x_amQh)
   _ExpectedEqualTo
-    = (Control.Lens.Prism.prism
-          (\ (x1_aaVzo, x2_aaVzp) -> (ExpectedEqualTo x1_aaVzo) x2_aaVzp))
-        (\ x_aaVzq
-            -> case x_aaVzq of
-                ExpectedEqualTo y1_aaVzr y2_aaVzs -> Right (y1_aaVzr, y2_aaVzs)
-                _ -> Left x_aaVzq)
+    = (prism
+          (\ (x1_amQl, x2_amQm) -> (ExpectedEqualTo x1_amQl) x2_amQm))
+        (\ x_amQn
+            -> case x_amQn of
+                ExpectedEqualTo y1_amQo y2_amQp -> Right (y1_amQo, y2_amQp)
+                _ -> Left x_amQn)
+  _EmptyContinuedLine
+    = (prism (\ x1_amQr -> EmptyContinuedLine x1_amQr))
+        (\ x_amQs
+            -> case x_amQs of
+                EmptyContinuedLine y1_amQt -> Right y1_amQt
+                _ -> Left x_amQs)

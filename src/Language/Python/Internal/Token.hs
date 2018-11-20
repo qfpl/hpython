@@ -1,18 +1,28 @@
 {-# language DeriveFunctor #-}
+{-# language OverloadedStrings #-}
 {-# language TemplateHaskell #-}
+
+{-|
+Module      : Language.Python.Internal.Token
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Language.Python.Internal.Token where
 
-import Data.Deriving (deriveEq1)
+import Data.Deriving (deriveEq1, deriveOrd1)
+import Data.Functor.Classes (liftCompare, liftEq)
 
-import Language.Python.Internal.Syntax.Numbers (IntLiteral(..), FloatLiteral(..), ImagLiteral(..))
+import Language.Python.Internal.Syntax.Numbers
 import Language.Python.Internal.Syntax.Strings
-  ( StringPrefix(..), BytesPrefix(..)
-  , RawStringPrefix(..), RawBytesPrefix(..)
-  , QuoteType(..), StringType(..), PyChar(..)
-  )
-import Language.Python.Internal.Syntax.Strings.Raw (RawString)
-import Language.Python.Internal.Syntax.Whitespace (Newline(..))
+import Language.Python.Internal.Syntax.Comment (Comment(..))
+import Language.Python.Syntax.Whitespace (Newline(..), Indents)
 
+-- | A 'PyToken' is a single lexical token of Python source. A 'PyToken' has an
+-- optional annotation, which can be '()' when no annotation is desired.
 data PyToken a
   = TkIf a
   | TkElse a
@@ -53,10 +63,10 @@ data PyToken a
   | TkFloat (FloatLiteral a)
   | TkImag (ImagLiteral a)
   | TkIdent String a
-  | TkString (Maybe StringPrefix) QuoteType StringType [PyChar] a
-  | TkBytes BytesPrefix QuoteType StringType [PyChar] a
-  | TkRawString RawStringPrefix QuoteType StringType (RawString [Char]) a
-  | TkRawBytes RawBytesPrefix QuoteType StringType (RawString [Char]) a
+  | TkString (Maybe StringPrefix) StringType QuoteType [PyChar] a
+  | TkBytes BytesPrefix StringType QuoteType [PyChar] a
+  | TkRawString RawStringPrefix StringType QuoteType [PyChar] a
+  | TkRawBytes RawBytesPrefix StringType QuoteType [PyChar] a
   | TkSpace a
   | TkTab a
   | TkNewline Newline a
@@ -81,7 +91,7 @@ data PyToken a
   | TkPlus a
   | TkMinus a
   | TkTilde a
-  | TkComment String a
+  | TkComment (Comment a)
   | TkStar a
   | TkDoubleStar a
   | TkSlash a
@@ -106,15 +116,29 @@ data PyToken a
   | TkPipe a
   | TkCaret a
   | TkAmpersand a
-  deriving (Eq, Show, Functor)
+  | TkIndent a (Indents a)
+  | TkLevel a (Indents a)
+  | TkDedent a
+  deriving (Show, Functor)
 deriveEq1 ''PyToken
+deriveOrd1 ''PyToken
 
+instance Eq (PyToken a) where
+  (==) = liftEq (\_ _ -> True)
+
+instance Ord (PyToken a) where
+  compare = liftCompare (\_ _ -> EQ)
+
+-- | Get the annotation from a 'PyToken'.
 pyTokenAnn :: PyToken a -> a
 pyTokenAnn tk =
   case tk of
     TkPipe a -> a
     TkCaret a -> a
     TkAmpersand a -> a
+    TkIndent a _ -> a
+    TkLevel a _ -> a
+    TkDedent a -> a
     TkDef a -> a
     TkReturn a -> a
     TkPass a -> a
@@ -182,7 +206,7 @@ pyTokenAnn tk =
     TkSemicolon a -> a
     TkComma a -> a
     TkDot a -> a
-    TkComment _ a -> a
+    TkComment a -> _commentAnn a
     TkStar a -> a
     TkDoubleStar a -> a
     TkSlash a -> a

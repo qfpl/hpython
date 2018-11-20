@@ -5,6 +5,16 @@
 {-# language RankNTypes #-}
 {-# language LambdaCase #-}
 {-# language ScopedTypeVariables, TypeApplications #-}
+
+{-|
+Module      : Language.Python.Validate.Scope
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Language.Python.Validate.Scope
   ( module Language.Python.Validate.Scope.Error
   , Scope
@@ -52,7 +62,6 @@ import Control.Lens.Setter ((%~), (.~), Setter', mapped, over)
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Tuple (_2, _3)
 import Control.Lens.Traversal (traverseOf)
-import Control.Lens.Wrapped (_Wrapped)
 import Control.Monad.State (MonadState, State, evalState, modify)
 import Data.Bitraversable (bitraverse)
 import Data.ByteString (ByteString)
@@ -70,9 +79,12 @@ import Unsafe.Coerce (unsafeCoerce)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 
-import Language.Python.Internal.Optics
-import Language.Python.Internal.Optics.Validated (unvalidated)
-import Language.Python.Internal.Syntax
+import Language.Python.Optics
+import Language.Python.Optics.Validated (unvalidated)
+import Language.Python.Syntax.Statement
+import Language.Python.Syntax.Expr
+import Language.Python.Syntax.Ident
+import Language.Python.Syntax.Module
 import Language.Python.Validate.Scope.Error
 
 data Scope
@@ -168,18 +180,17 @@ validateSuiteScope
   :: AsScopeError e v a
   => Suite v a
   -> ValidateScope a e (Suite (Nub (Scope ': v)) a)
-validateSuiteScope (SuiteMany ann a b d) = SuiteMany ann a b <$> validateBlockScope d
-validateSuiteScope (SuiteOne ann a b d) =
-  SuiteOne ann a <$> validateSmallStatementScope b <*> pure d
+validateSuiteScope (SuiteMany ann a b c d) = SuiteMany ann a b c <$> validateBlockScope d
+validateSuiteScope (SuiteOne ann a b) =
+  SuiteOne ann a <$> validateSimpleStatementScope b
 
 validateDecoratorScope
   :: AsScopeError e v a
   => Decorator v a
   -> ValidateScope a e (Decorator (Nub (Scope ': v)) a)
-validateDecoratorScope (Decorator a b c d e) =
-  Decorator a b c <$>
-  validateExprScope d <*>
-  pure e
+validateDecoratorScope (Decorator a b c d e f g) =
+  (\d' -> Decorator a b c d' e f g) <$>
+  validateExprScope d
 
 validateCompoundStatementScope
   :: forall e v a
@@ -216,14 +227,15 @@ validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
           validateSuiteScope d)
        elifs <*>
      traverseOf (traverse._3) validateSuiteScope melse)))
-validateCompoundStatementScope (While idnts a ws1 e b) =
+validateCompoundStatementScope (While idnts a ws1 e b els) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
   locallyOver scGlobalScope (`unionR` unionR ls is) $
   locallyOver scImmediateScope (const Map.empty)
     (While idnts a ws1 <$>
      validateExprScope e <*>
-     validateSuiteScope b)))
+     validateSuiteScope b <*>
+     traverseOf (traverse._3) validateSuiteScope els)))
 validateCompoundStatementScope (TryExcept idnts a b e f k l) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
@@ -265,7 +277,7 @@ validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
           maybe (pure ()) (\_ -> errorVM1 (_BadShadowing # coerce s)) res)
        (c ^.. unvalidated.cosmos._Ident)) <*>
     pure d <*>
-    validateExprScope e <*>
+    traverse validateExprScope e <*>
     (let
        ls = c ^.. unvalidated.cosmos._Ident.to (_identAnn &&& _identValue)
      in
@@ -346,18 +358,23 @@ validateSmallStatementScope s@Continue{} = pure $ unsafeCoerce s
 validateSmallStatementScope s@Import{} = pure $ unsafeCoerce s
 validateSmallStatementScope s@From{} = pure $ unsafeCoerce s
 
+validateSimpleStatementScope
+  :: AsScopeError e v a
+  => SimpleStatement v a
+  -> ValidateScope a e (SimpleStatement (Nub (Scope ': v)) a)
+validateSimpleStatementScope (MkSimpleStatement s ss sc cmt nl) =
+  (\s' ss' -> MkSimpleStatement s' ss' sc cmt nl) <$>
+  validateSmallStatementScope s <*>
+  traverseOf (traverse._2) validateSmallStatementScope ss
+
 validateStatementScope
   :: AsScopeError e v a
   => Statement v a
   -> ValidateScope a e (Statement (Nub (Scope ': v)) a)
 validateStatementScope (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementScope c
-validateStatementScope (SmallStatements idnts s ss sc nl) =
-  SmallStatements idnts <$>
-  validateSmallStatementScope s <*>
-  traverseOf (traverse._2) validateSmallStatementScope ss <*>
-  pure sc <*>
-  pure nl
+validateStatementScope (SimpleStatement idnts a) =
+  SimpleStatement idnts <$> validateSimpleStatementScope a
 
 validateIdentScope
   :: AsScopeError e v a
@@ -407,8 +424,10 @@ validateBlockScope
   :: AsScopeError e v a
   => Block v a
   -> ValidateScope a e (Block (Nub (Scope ': v)) a)
-validateBlockScope (Block b) =
-  Block <$> traverseOf (traverse._Right) validateStatementScope b
+validateBlockScope (Block x b bs) =
+  Block x <$>
+  validateStatementScope b <*>
+  traverseOf (traverse._Right) validateStatementScope bs
 
 validateComprehensionScope
   :: AsScopeError e v a
@@ -629,8 +648,15 @@ validateModuleScope
   :: AsScopeError e v a
   => Module v a
   -> ValidateScope a e (Module (Nub (Scope ': v)) a)
-validateModuleScope =
-  traverseOf (_Wrapped.traverse._Right) validateStatementScope
+validateModuleScope m =
+  case m of
+    ModuleEmpty -> pure ModuleEmpty
+    ModuleBlankFinal a -> pure $ ModuleBlankFinal a
+    ModuleBlank a b c -> ModuleBlank a b <$> validateModuleScope c
+    ModuleStatement a b ->
+     ModuleStatement <$>
+     validateStatementScope a <*>
+     validateModuleScope b
 
 unionL :: Ord k => Map k v -> Map k v -> Map k v
 unionL = Map.unionWith const

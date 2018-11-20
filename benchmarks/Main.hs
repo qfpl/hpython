@@ -11,20 +11,20 @@ import System.Exit (exitFailure)
 import qualified Data.Text.IO as StrictText
 
 import Language.Python.Parse (parseModule)
+import Language.Python.Parse.Error (ParseError)
 import Language.Python.Internal.Lexer (SrcInfo, tokenize)
-import Language.Python.Validate.Indentation
-import Language.Python.Validate.Syntax
+import Language.Python.Validate
 
 parseCheckSeq :: FilePath -> IO ()
 parseCheckSeq name = do
   file <- StrictText.readFile name
   py <-
     case parseModule name file of
-      Failure e -> print e *> exitFailure
+      Failure e -> print (e :: NonEmpty (ParseError SrcInfo)) *> exitFailure
       Success a -> pure a
   case runValidateIndentation $ validateModuleIndentation py of
     Failure errs ->
-      print (errs :: (NonEmpty (IndentationError '[] SrcInfo))) *> exitFailure
+      print (errs :: NonEmpty (IndentationError '[] SrcInfo)) *> exitFailure
     Success res ->
       case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
         Failure errs' ->
@@ -35,7 +35,7 @@ tokenizeSeq :: FilePath -> IO ()
 tokenizeSeq name = do
   file <- StrictText.readFile name
   case tokenize name file of
-    Left e -> print e *> exitFailure
+    Left e -> print (e :: (ParseError SrcInfo)) *> exitFailure
     Right a -> pure $ seq (length a) ()
 
 main :: IO ()

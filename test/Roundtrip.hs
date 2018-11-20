@@ -6,7 +6,7 @@ import Control.Monad.IO.Class (liftIO)
 import Data.List.NonEmpty (NonEmpty)
 import Data.String (fromString)
 import Data.Text (Text)
-import Data.Validation (Validation(..), validation)
+import Data.Validation (Validation(..))
 import Hedgehog
   ( (===), Group(..), Property, PropertyT, annotateShow, failure, property
   , withTests, withShrinks
@@ -14,23 +14,28 @@ import Hedgehog
 import System.FilePath ((</>))
 
 import qualified Data.Text.IO as StrictText
-import qualified Data.Text as Strict
+-- import qualified Data.Text as Strict
 
 import Language.Python.Internal.Lexer (SrcInfo)
-import Language.Python.Internal.Render (showModule)
+import Language.Python.Render (showModule)
 import Language.Python.Parse (parseModule)
-import Language.Python.Validate.Indentation
-  (Indentation, runValidateIndentation, validateModuleIndentation)
-import Language.Python.Validate.Indentation.Error (IndentationError)
-import Language.Python.Validate.Syntax
-  (runValidateSyntax, validateModuleSyntax, initialSyntaxContext)
-import Language.Python.Validate.Syntax.Error (SyntaxError)
+import Language.Python.Validate
+  ( Indentation, IndentationError, SyntaxError
+  , runValidateIndentation, validateModuleIndentation, runValidateSyntax
+  , validateModuleSyntax, initialSyntaxContext
+  )
+
+import Helpers (shouldBeParseSuccess)
 
 roundtripTests :: Group
 roundtripTests =
   Group "Roundtrip tests" $
-  (\name -> (fromString name, withTests 1 . withShrinks 1 $ doRoundtripFile name)) <$>
-  [ "asyncstatements.py"
+  (\name -> (fromString name, withTests 1 . withShrinks 0 $ doRoundtripFile name)) <$>
+  [ "decorators.py"
+  , "string.py"
+  , "set.py"
+  , "regex.py"
+  , "asyncstatements.py"
   , "typeann.py"
   , "dictcomp.py"
   , "imaginary.py"
@@ -64,12 +69,17 @@ doRoundtripFile name =
 
 doRoundtrip :: Text -> PropertyT IO ()
 doRoundtrip file = do
-    py <- validation (\e -> annotateShow e *> failure) pure $ parseModule "test" file
-    case runValidateIndentation $ validateModuleIndentation py of
-      Failure errs -> annotateShow (errs :: NonEmpty (IndentationError '[] SrcInfo)) *> failure
-      Success res ->
-        case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
-          Failure errs' -> do
-            annotateShow res
-            annotateShow (errs' :: (NonEmpty (SyntaxError '[Indentation] SrcInfo))) *> failure
-          Success _ -> Strict.lines (showModule py) === Strict.lines file
+  py <- shouldBeParseSuccess parseModule file
+  case runValidateIndentation $ validateModuleIndentation py of
+    Failure errs -> do
+      annotateShow (errs :: NonEmpty (IndentationError '[] SrcInfo))
+      failure
+    Success res ->
+      case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
+        Failure errs' -> do
+          annotateShow (errs' :: NonEmpty (SyntaxError '[Indentation] SrcInfo))
+          failure
+        Success _ -> do
+          annotateShow py
+          -- Strict.lines (showModule py) === Strict.lines file
+          showModule py === file

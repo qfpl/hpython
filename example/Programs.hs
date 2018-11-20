@@ -6,8 +6,14 @@ import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
-import Language.Python.Internal.Syntax
-import Language.Python.Syntax
+
+import Language.Python.DSL
+import Language.Python.Syntax.Module (Module (..))
+import Language.Python.Syntax.CommaSep (Comma (..), CommaSep (..), CommaSep1' (..))
+import Language.Python.Syntax.Expr (Arg (..), Expr (..), Param (..))
+import Language.Python.Syntax.Punctuation (Colon (..))
+import Language.Python.Syntax.Statement (Block (..), CompoundStatement (..), SimpleStatement (..), SmallStatement (..), Statement (..), Suite (..))
+import Language.Python.Syntax.Whitespace (Blank (..), Indents (..), Newline (..), Whitespace (..), indentWhitespaces)
 
 -- |
 -- @
@@ -17,6 +23,7 @@ import Language.Python.Syntax
 -- @
 --
 -- Written without the DSL
+append_to :: Raw Statement
 append_to =
   CompoundStatement $
   Fundef () [] (Indents [] ())
@@ -24,33 +31,36 @@ append_to =
     (Space :| [])
     "append_to"
     []
-    ( CommaSepMany (PositionalParam () "element" Nothing) [Space] $
+    ( CommaSepMany (PositionalParam () "element" Nothing) (Comma [Space]) $
       CommaSepOne (KeywordParam () "to" Nothing [] (List () [] Nothing []))
     )
     []
     Nothing
-    (SuiteMany () [] (LF Nothing) .
-     Block $
-     ( Right $
-       SmallStatements
+    (SuiteMany () (Colon []) Nothing LF $
+     Block []
+     ( SimpleStatement
          (Indents [replicate 4 Space ^. from indentWhitespaces] ())
-         (Expr () $
-          Call ()
-            (Deref () (Ident "to") [] "append")
-            []
-            (Just $ CommaSepOne1' (PositionalArg () (Ident "element")) Nothing)
-            [])
-         []
-         Nothing
-         (Right $ LF Nothing)
-     ) :|
+         (MkSimpleStatement
+          (Expr () $
+           Call ()
+             (Deref () (Ident "to") [] "append")
+             []
+             (Just $ CommaSepOne1' (PositionalArg () (Ident "element")) Nothing)
+             [])
+          []
+          Nothing
+          Nothing
+          (Just LF))
+     )
      [ Right $
-         SmallStatements
+         SimpleStatement
            (Indents [replicate 4 Space ^. from indentWhitespaces] ())
-           (Return () [Space] (Just $ Ident "to"))
-           []
-           Nothing
-           (Right $ LF Nothing)
+           (MkSimpleStatement
+            (Return () [Space] (Just $ Ident "to"))
+            []
+            Nothing
+            Nothing
+            (Just LF))
      ])
 
 -- |
@@ -61,6 +71,7 @@ append_to =
 -- @
 --
 -- Written with the DSL
+append_to' :: Raw Statement
 append_to' =
   def_ "append_to" [ p_ "element", k_ "to" (list_ []) ]
     [ line_ $ call_ ("to" /> "append") [ "element" ]
@@ -77,6 +88,7 @@ append_to' =
 --       go(n-1, n*acc)
 --   return go(n, 1)
 -- @
+fact_tr :: Raw Statement
 fact_tr =
   def_ "fact" [p_ "n"]
   [ line_ $
@@ -93,6 +105,7 @@ fact_tr =
 -- def spin():
 --   spin()
 -- @
+spin :: Raw Statement
 spin = def_ "spin" [] [line_ $ call_ "spin" []]
 
 -- |
@@ -101,21 +114,25 @@ spin = def_ "spin" [] [line_ $ call_ "spin" []]
 --   print("yes")
 --   yes()
 -- @
+yes :: Raw Statement
 yes =
   def_ "yes" []
   [ line_ $ call_ "print" [p_ $ str_ "yes"]
   , line_ $ call_ "yes" []
   ]
 
+everything :: Raw Module
 everything =
-  Module
-    [ Right append_to
-    , Left (Indents [] (), Nothing, Just $ LF Nothing)
-    , Right append_to'
-    , Left (Indents [] (), Nothing, Just $ LF Nothing)
-    , Right fact_tr
-    , Left (Indents [] (), Nothing, Just $ LF Nothing)
-    , Right spin
-    , Left (Indents [] (), Nothing, Just $ LF Nothing)
-    , Right yes
-    ]
+  ModuleStatement append_to $
+  ModuleBlank (Blank () [] Nothing) LF $
+
+  ModuleStatement append_to' $
+  ModuleBlank (Blank () [] Nothing) LF $
+
+  ModuleStatement fact_tr $
+  ModuleBlank (Blank () [] Nothing) LF $
+
+  ModuleStatement spin $
+  ModuleBlank (Blank () [] Nothing) LF $
+
+  ModuleStatement yes ModuleEmpty

@@ -1,9 +1,3 @@
-async def a():
-    pass
-
-def a():
-    pass
-
 @a
 async def a():
     async with a as b:
@@ -11,6 +5,12 @@ async def a():
 
     async for x in y:
         await (lambda x: x)
+
+async def a():
+    pass
+
+def a():
+    pass
 
 @a
 def a():

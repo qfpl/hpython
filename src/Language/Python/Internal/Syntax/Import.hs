@@ -1,5 +1,15 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# language LambdaCase #-}
+
+{-|
+Module      : Language.Python.Internal.Syntax.Import
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Language.Python.Internal.Syntax.Import where
 
 import Control.Lens.Getter ((^.), getting)
@@ -10,9 +20,9 @@ import Control.Lens.Tuple (_2)
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty)
 
-import Language.Python.Internal.Syntax.CommaSep
-import Language.Python.Internal.Syntax.Ident
-import Language.Python.Internal.Syntax.Whitespace
+import Language.Python.Syntax.CommaSep
+import Language.Python.Syntax.Ident
+import Language.Python.Syntax.Whitespace
 
 data ImportAs e v a
   = ImportAs a (e a) (Maybe (NonEmpty Whitespace, Ident v a))

@@ -2,7 +2,7 @@
 , deepseq, deriving-compat, digit, directory, dlist, filepath
 , fingertree, hedgehog, lens, megaparsec, mtl, parsers
 , parsers-megaparsec, process, semigroupoids, stdenv, text, these
-, transformers
+, transformers, validation
 }:
 mkDerivation {
   pname = "hpython";
@@ -13,12 +13,12 @@ mkDerivation {
   libraryHaskellDepends = [
     base bifunctors bytestring containers deriving-compat digit dlist
     fingertree lens megaparsec mtl parsers parsers-megaparsec
-    semigroupoids text these
+    semigroupoids text these validation
   ];
   executableHaskellDepends = [ base lens text ];
   testHaskellDepends = [
     base digit directory filepath hedgehog lens megaparsec mtl process
-    semigroupoids text these transformers
+    semigroupoids text these transformers validation
   ];
   benchmarkHaskellDepends = [
     base criterion deepseq megaparsec text

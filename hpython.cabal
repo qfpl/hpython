@@ -17,10 +17,15 @@ extra-source-files:  ChangeLog.md
                      test/files/ansible.py
                      test/files/asyncstatements.py
                      test/files/comments.py
+                     test/files/decorators.py
                      test/files/dictcomp.py
                      test/files/django.py
                      test/files/django2.py
                      test/files/imaginary.py
+                     test/files/indent_optics_in.py
+                     test/files/indent_optics_out.py
+                     test/files/indent_optics_in2.py
+                     test/files/indent_optics_out2.py
                      test/files/joblib.py
                      test/files/joblib2.py
                      test/files/mypy.py
@@ -31,8 +36,11 @@ extra-source-files:  ChangeLog.md
                      test/files/pandas2.py
                      test/files/pypy.py
                      test/files/pypy2.py
+                     test/files/regex.py
                      test/files/requests.py
                      test/files/requests2.py
+                     test/files/set.py
+                     test/files/string.py
                      test/files/sqlalchemy.py
                      test/files/test.py
                      test/files/typeann.py
@@ -42,7 +50,8 @@ extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 tested-with:           GHC == 8.0.2
                      , GHC == 8.2.2
-                     , GHC == 8.4.3
+                     , GHC == 8.4.4
+                     , GHC == 8.6.1
 
 
 source-repository    head
@@ -56,32 +65,37 @@ flag development
 library
   exposed-modules:     Data.Type.Set
                      , Data.Validate.Monadic
+                     , Language.Python.DSL
                      , Language.Python.Internal.Lexer
-                     , Language.Python.Internal.Optics
-                     , Language.Python.Internal.Optics.Validated
                      , Language.Python.Internal.Parse
                      , Language.Python.Internal.Render
+                     , Language.Python.Internal.Render.Correction
                      , Language.Python.Internal.Syntax
                      , Language.Python.Internal.Token
                      , Language.Python.Internal.Syntax.AugAssign
-                     , Language.Python.Internal.Syntax.BinOp
                      , Language.Python.Internal.Syntax.Comment
-                     , Language.Python.Internal.Syntax.CommaSep
-                     , Language.Python.Internal.Syntax.Expr
-                     , Language.Python.Internal.Syntax.Ident
                      , Language.Python.Internal.Syntax.Import
                      , Language.Python.Internal.Syntax.IR
-                     , Language.Python.Internal.Syntax.Module
-                     , Language.Python.Internal.Syntax.ModuleNames
                      , Language.Python.Internal.Syntax.Numbers
-                     , Language.Python.Internal.Syntax.Statement
                      , Language.Python.Internal.Syntax.Strings
-                     , Language.Python.Internal.Syntax.Strings.Raw
-                     , Language.Python.Internal.Syntax.UnOp
-                     , Language.Python.Internal.Syntax.Whitespace
+                     , Language.Python.Optics
+                     , Language.Python.Optics.Validated
                      , Language.Python.Parse
+                     , Language.Python.Parse.Error
+                     , Language.Python.Render
                      , Language.Python.Syntax
+                     , Language.Python.Syntax.CommaSep
+                     , Language.Python.Syntax.Expr
+                     , Language.Python.Syntax.Ident
+                     , Language.Python.Syntax.Module
+                     , Language.Python.Syntax.Operator.Binary
+                     , Language.Python.Syntax.Operator.Unary
+                     , Language.Python.Syntax.ModuleNames
+                     , Language.Python.Syntax.Punctuation
+                     , Language.Python.Syntax.Statement
                      , Language.Python.Syntax.Types
+                     , Language.Python.Syntax.Whitespace
+                     , Language.Python.Validate
                      , Language.Python.Validate.Scope
                      , Language.Python.Validate.Scope.Error
                      , Language.Python.Validate.Syntax
@@ -95,10 +109,10 @@ library
                      , dlist >=0.8 && <0.9
                      , lens >= 4 && < 4.18
                      , parsers >= 0.10 && < 0.13
-                     , megaparsec >=6.3 && <7.1
+                     , megaparsec >=6.3 && <7
                      , fingertree >=0.1 && <0.2
                      , mtl >= 2.1 && < 2.3
-                     , containers >=0.5.8 && <0.7
+                     , containers >=0.5.7.1 && <0.7
                      , deriving-compat >=0.4 && <0.6
                      , semigroupoids >=5.2.2 && <5.4
                      , text >=1.2 && <1.3
@@ -137,7 +151,7 @@ benchmark bench
   hs-source-dirs:      benchmarks
   build-depends:       base >=4.9 && <5
                      , hpython
-                     , megaparsec >=6.3 && < 7.1
+                     , megaparsec >=6.3 && < 7
                      , criterion >= 1 && < 1.6
                      , deepseq
                      , text
@@ -154,30 +168,22 @@ benchmark bench
 test-suite hpython-tests
   main-is:             Main.hs
   type:                exitcode-stdio-1.0
-  other-modules:       Generators.General
-                     , Generators.Common
-                     , Generators.Correct
-                     , Generators.Sized
-                     , DSL
+  other-modules:       DSL
                      , Helpers
                      , LexerParser
-                     , Scope
+                     , Optics
+                     , Parser
                      , Roundtrip
+                     , Scope
+                     , Syntax
   hs-source-dirs:      test
   build-depends:       base >=4.9 && <5
-                     , directory
-                     , digit >=0.7 && < 0.8
                      , filepath
                      , hpython
                      , hedgehog >= 0.5 && < 0.7
                      , lens
-                     , mtl
-                     , process
-                     , semigroupoids >=5.2.2 && <5.4
                      , text >=1.2 && <1.3
-                     , transformers
-                     , megaparsec >=6.3 && < 7.1
-                     , these >=0.7.4 && <0.8
+                     , megaparsec >=6.3 && < 7
                      , validation >= 1 && < 1.1
   default-language:    Haskell2010
   ghc-options:         -Wall

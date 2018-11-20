@@ -1,5 +1,7 @@
-{-# language OverloadedStrings, DataKinds #-}
+{-# language OverloadedStrings, DataKinds, TemplateHaskell #-}
 module Scope (scopeTests) where
+
+import Hedgehog
 
 import Control.Lens (has)
 import Data.Function ((&))
@@ -7,29 +9,12 @@ import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.Validation (Validation(..), _Success)
 
-import Language.Python.Validate.Syntax
-import Language.Python.Validate.Indentation
-import Language.Python.Validate.Scope
-import Language.Python.Internal.Syntax
-import Language.Python.Syntax
-
-import Hedgehog
+import Language.Python.Validate
+import Language.Python.DSL
+import Language.Python.Syntax.Whitespace
 
 scopeTests :: Group
-scopeTests =
-  Group "Scope tests"
-  [ ("Scope test 1", withTests 1 test_1)
-  , ("Scope test 2", withTests 1 test_2)
-  , ("Scope test 3", withTests 1 test_3)
-  , ("Scope test 4", withTests 1 test_4)
-  , ("Scope test 5", withTests 1 test_5)
-  , ("Scope test 6", withTests 1 test_6)
-  , ("Scope test 7", withTests 1 test_7)
-  , ("Scope test 8", withTests 1 test_8)
-  , ("Scope test 9", withTests 1 test_9)
-  , ("Scope test 10", withTests 1 test_10)
-  , ("Scope test 11", withTests 1 test_11)
-  ]
+scopeTests = $$discover
 
 fullyValidate
   :: Statement '[] ()
@@ -49,9 +34,9 @@ fullyValidate x =
           failure
         Success a' -> pure $ runValidateScope initialScopeContext (validateStatementScope a')
 
-test_1 :: Property
-test_1 =
-  property $ do
+prop_scope_1 :: Property
+prop_scope_1 =
+  withTests 1 . property $ do
     let
       expr =
         def_ "test" [p_ "a", p_ "b"]
@@ -61,9 +46,9 @@ test_1 =
     res <- fullyValidate expr
     res === Failure (FoundDynamic () (MkIdent () "c" []) :| [])
 
-test_2 :: Property
-test_2 =
-  property $ do
+prop_scope_2 :: Property
+prop_scope_2 =
+  withTests 1 . property $ do
     let
       expr =
         def_ "test" [p_ "a", p_ "b"]
@@ -75,9 +60,9 @@ test_2 =
     annotateShow res
     assert $ has _Success res
 
-test_3 :: Property
-test_3 =
-  property $ do
+prop_scope_3 :: Property
+prop_scope_3 =
+  withTests 1 . property $ do
     let
       expr =
         def_ "test" [p_ "a", p_ "b"]
@@ -86,9 +71,9 @@ test_3 =
     annotateShow res
     res === Failure (NotInScope (MkIdent () "c" []) :| [])
 
-test_4 :: Property
-test_4 =
-  property $ do
+prop_scope_4 :: Property
+prop_scope_4 =
+  withTests 1 . property $ do
     let
       expr =
         def_ "test" [p_ "a", p_ "b"]
@@ -98,9 +83,9 @@ test_4 =
     res <- fullyValidate expr
     res === Failure (NotInScope (MkIdent () "g" []) :| [])
 
-test_5 :: Property
-test_5 =
-  property $ do
+prop_scope_5 :: Property
+prop_scope_5 =
+  withTests 1 . property $ do
     let
       expr =
         def_ "test" [p_ "a"]
@@ -110,9 +95,9 @@ test_5 =
     annotateShow res
     res === Failure (NotInScope (MkIdent () "c" []) :| [])
 
-test_6 :: Property
-test_6 =
-  property $ do
+prop_scope_6 :: Property
+prop_scope_6 =
+  withTests 1 . property $ do
     let
       expr =
         def_ "test" []
@@ -125,9 +110,9 @@ test_6 =
     annotateShow res
     res === Failure (FoundDynamic () (MkIdent () "x" []) :| [])
 
-test_7 :: Property
-test_7 =
-  property $ do
+prop_scope_7 :: Property
+prop_scope_7 =
+  withTests 1 . property $ do
     let
       expr =
         def_ "test" []
@@ -140,9 +125,9 @@ test_7 =
     annotateShow res
     res === Failure (FoundDynamic () (MkIdent () "x" []) :| [])
 
-test_8 :: Property
-test_8 =
-  property $ do
+prop_scope_8 :: Property
+prop_scope_8 =
+  withTests 1 . property $ do
     let
       expr =
         def_ "test" []
@@ -156,39 +141,39 @@ test_8 =
     annotateShow res
     (res $> ()) === Success ()
 
-test_9 :: Property
-test_9 =
-  property $ do
+prop_scope_9 :: Property
+prop_scope_9 =
+  withTests 1 . property $ do
     let
       expr =
         def_ "test" []
-          [ line_ $ for_ ("x" `in_` list_ [li_ $ int_ 1]) [ line_ pass_ ]
+          [ line_ $ for_ ("x" `in_` [ list_ [li_ $ int_ 1] ]) [ line_ pass_ ]
           , line_ $ var_ "x"
           ]
     res <- fullyValidate expr
     annotateShow res
     res === Failure (FoundDynamic () (MkIdent () "x" []) :| [])
 
-test_10 :: Property
-test_10 =
-  property $ do
+prop_scope_10 :: Property
+prop_scope_10 =
+  withTests 1 . property $ do
     let
       expr =
         def_ "test" []
-          [ line_ $ for_ ("x" `in_` list_ [li_ $ int_ 1]) [ line_ $ var_ "x" ]
+          [ line_ $ for_ ("x" `in_` [ list_ [li_ $ int_ 1] ]) [ line_ $ var_ "x" ]
           ]
     res <- fullyValidate expr
     annotateShow res
     (res $> ()) === Success ()
 
-test_11 :: Property
-test_11 =
-  property $ do
+prop_scope_11 :: Property
+prop_scope_11 =
+  withTests 1 . property $ do
     let
       expr =
         def_ "test" []
           [ line_ ("x" .= 2)
-          , line_ $ for_ ("x" `in_` list_ [li_ $ int_ 1]) [ line_ pass_ ]
+          , line_ $ for_ ("x" `in_` [ list_ [li_ $ int_ 1] ]) [ line_ pass_ ]
           ]
     res <- fullyValidate expr
     annotateShow res

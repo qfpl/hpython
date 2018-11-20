@@ -1,12 +1,26 @@
 {-# language DataKinds #-}
 {-# language KindSignatures #-}
 {-# language TemplateHaskell #-}
+
+{-|
+Module      : Language.Python.Syntax.Types
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Language.Python.Syntax.Types where
 
 import Control.Lens.TH (makeLenses)
 import Data.List.NonEmpty (NonEmpty)
 
-import Language.Python.Internal.Syntax hiding (Fundef, While)
+import Language.Python.Syntax.CommaSep (Comma, CommaSep, CommaSep1, CommaSep1')
+import Language.Python.Syntax.Expr (Arg, Expr, ListItem, Param, TupleItem)
+import Language.Python.Syntax.Ident (Ident)
+import Language.Python.Syntax.Statement (Colon, Decorator, ExceptAs, Suite, WithItem)
+import Language.Python.Syntax.Whitespace
 
 data Fundef v a
   = MkFundef
@@ -24,6 +38,14 @@ data Fundef v a
   } deriving (Eq, Show)
 makeLenses ''Fundef
 
+data Else v a
+  = MkElse
+  { _elseIndents :: Indents a
+  , _elseElse :: [Whitespace]
+  , _elseBody :: Suite v a
+  } deriving (Eq, Show)
+makeLenses ''Else
+
 data While v a
   = MkWhile
   { _whileAnn :: a
@@ -31,6 +53,7 @@ data While v a
   , _whileWhile :: [Whitespace]
   , _whileCond :: Expr v a
   , _whileBody :: Suite v a
+  , _whileElse :: Maybe (Else v a)
   } deriving (Eq, Show)
 makeLenses ''While
 
@@ -38,7 +61,7 @@ data KeywordParam v a
   = MkKeywordParam
   { _kpAnn :: a
   , _kpName :: Ident v a
-  , _kpType :: Maybe ([Whitespace], Expr v a)
+  , _kpType :: Maybe (Colon, Expr v a)
   , _kpEquals :: [Whitespace]
   , _kpExpr :: Expr v a
   } deriving (Eq, Show)
@@ -48,9 +71,18 @@ data PositionalParam v a
   = MkPositionalParam
   { _ppAnn :: a
   , _ppName :: Ident v a
-  , _ppType :: Maybe ([Whitespace], Expr v a)
+  , _ppType :: Maybe (Colon, Expr v a)
   } deriving (Eq, Show)
 makeLenses ''PositionalParam
+
+data StarParam v a
+  = MkStarParam
+  { _spAnn :: a
+  , _spWhitespace :: [Whitespace]
+  , _spName :: Maybe (Ident v a)
+  , _spType :: Maybe (Colon, Expr v a)
+  } deriving (Eq, Show)
+makeLenses ''StarParam
 
 data Call v a
   = MkCall
@@ -70,14 +102,6 @@ data Elif v a
   , _elifBody :: Suite v a
   } deriving (Eq, Show)
 makeLenses ''Elif
-
-data Else v a
-  = MkElse
-  { _elseIndents :: Indents a
-  , _elseElse :: [Whitespace]
-  , _elseBody :: Suite v a
-  } deriving (Eq, Show)
-makeLenses ''Else
 
 data If v a
   = MkIf
@@ -99,7 +123,7 @@ data For v a
   , _forFor :: [Whitespace]
   , _forBinder :: Expr v a
   , _forIn :: [Whitespace]
-  , _forCollection :: Expr v a
+  , _forCollection :: CommaSep1' (Expr v a)
   , _forBody :: Suite v a
   , _forElse :: Maybe (Else v a)
   } deriving (Eq, Show)
@@ -171,10 +195,28 @@ data Tuple v a
   = MkTuple
   { _tupleAnn :: a
   , _tupleHead :: TupleItem v a
-  , _tupleComma :: [Whitespace]
+  , _tupleComma :: Comma
   , _tupleTail :: Maybe (CommaSep1' (TupleItem v a))
   } deriving (Eq, Show)
 makeLenses ''Tuple
+
+data List v a
+  = MkList
+  { _listAnn :: a
+  , _listWhitespaceLeft :: [Whitespace]
+  , _listBody :: Maybe (CommaSep1' (ListItem v a))
+  , _listWhitespaceRight :: [Whitespace]
+  } deriving (Eq, Show)
+makeLenses ''List
+
+data ListUnpack v a
+  = MkListUnpack
+  { _listUnpackAnn :: a
+  , _listUnpackParens :: [([Whitespace], [Whitespace])]
+  , _listUnpackWhitespace :: [Whitespace]
+  , _listUnpackValue :: Expr v a
+  } deriving (Eq, Show)
+makeLenses ''ListUnpack
 
 data None (v :: [*]) a
   = MkNone
@@ -182,3 +224,12 @@ data None (v :: [*]) a
   , _noneWhitespace :: [Whitespace]
   } deriving (Eq, Show)
 makeLenses ''None
+
+data TupleUnpack v a
+  = MkTupleUnpack
+  { _tupleUnpackAnn :: a
+  , _tupleUnpackParens :: [([Whitespace], [Whitespace])]
+  , _tupleUnpackWhitespace :: [Whitespace]
+  , _tupleUnpackValue :: Expr v a
+  } deriving (Eq, Show)
+makeLenses ''TupleUnpack

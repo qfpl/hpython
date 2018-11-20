@@ -8,8 +8,8 @@ import FixMutableDefaultArguments
 import OptimizeTailRecursion
 import Indentation
 
-import Language.Python.Internal.Render
-import Language.Python.Internal.Syntax
+import Language.Python.Render (showModule)
+import Language.Python.Syntax.Statement (_Statements)
 
 import qualified Data.Text.IO as StrictText
 

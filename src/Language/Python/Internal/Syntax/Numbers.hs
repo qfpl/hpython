@@ -1,15 +1,56 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language LambdaCase #-}
 {-# language TemplateHaskell #-}
-module Language.Python.Internal.Syntax.Numbers where
 
-import Data.Deriving (deriveEq1)
+{-|
+Module      : Language.Python.Internal.Syntax.Numbers
+Copyright   : (C) CSIRO 2017-2018
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+
+Numerical literal values in Python
+-}
+
+module Language.Python.Internal.Syntax.Numbers
+  ( IntLiteral (..)
+  , FloatLiteral (..)
+  , FloatExponent (..)
+  , E (..)
+  , ImagLiteral (..)
+  , Sign (..)
+  , showIntLiteral
+  , showFloatLiteral
+  , showFloatExponent
+  , showImagLiteral
+  )
+where
+
+import Control.Lens.Review ((#))
+import Data.Deriving (deriveEq1, deriveOrd1)
 import Data.Digit.Binary (BinDigit)
+import Data.Digit.Char (charHeXaDeCiMaL, charOctal, charBinary, charDecimal)
 import Data.Digit.Octal (OctDigit)
 import Data.Digit.Decimal (DecDigit)
 import Data.Digit.Hexadecimal.MixedCase (HeXDigit)
 import Data.List.NonEmpty (NonEmpty)
-import Data.These (These)
+import Data.Semigroup ((<>))
+import Data.Text (Text)
+import Data.These (These(..))
 
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Text as Text
+
+-- | An integer literal value.
+--
+-- @5@ is an integer literal.
+--
+-- @6.2@ is a literal but is not an integer
+--
+-- @x@ might be an integer, but is not a literal
+--
+-- See <https://docs.python.org/3.5/reference/lexical_analysis.html#integer-literals>
 data IntLiteral a
   = IntLiteralDec
   { _intLiteralAnn :: a
@@ -32,12 +73,26 @@ data IntLiteral a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 deriveEq1 ''IntLiteral
+deriveOrd1 ''IntLiteral
 
-data Sign = Pos | Neg deriving (Eq, Show)
+-- | Positive or negative, as in @-7@
+data Sign = Pos | Neg deriving (Eq, Ord, Show)
 
-data FloatExponent = FloatExponent Bool (Maybe Sign) (NonEmpty DecDigit)
-  deriving (Eq, Show)
+-- | When a floating point literal is in scientific notation, it includes the character
+-- @e@, which can be lower or upper case.
+data E = Ee | EE deriving (Eq, Ord, Show)
 
+-- | The exponent of a floating point literal.
+--
+-- An @e@, followed by an optional 'Sign', followed by at least one digit.
+data FloatExponent = FloatExponent E (Maybe Sign) (NonEmpty DecDigit)
+  deriving (Eq, Ord, Show)
+
+-- | A literal floating point value.
+--
+-- Eg. @7.63@
+--
+-- See <https://docs.python.org/3.5/reference/lexical_analysis.html#floating-point-literals>
 data FloatLiteral a
   = FloatLiteralFull
   { _floatLiteralAnn :: a
@@ -61,7 +116,11 @@ data FloatLiteral a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 deriveEq1 ''FloatLiteral
+deriveOrd1 ''FloatLiteral
 
+-- | Imaginary number literals
+--
+-- See <https://docs.python.org/3.5/reference/lexical_analysis.html#imaginary-literals>
 data ImagLiteral a
   = ImagLiteralInt
   { _imagLiteralAnn :: a
@@ -75,3 +134,49 @@ data ImagLiteral a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 deriveEq1 ''ImagLiteral
+deriveOrd1 ''ImagLiteral
+
+showIntLiteral :: IntLiteral a -> Text
+showIntLiteral (IntLiteralDec _ n) =
+  Text.pack $
+  (charDecimal #) <$> NonEmpty.toList n
+showIntLiteral (IntLiteralBin _ b n) =
+  Text.pack $
+  '0' : (if b then 'B' else 'b') : fmap (charBinary #) (NonEmpty.toList n)
+showIntLiteral (IntLiteralOct _ b n) =
+  Text.pack $
+  '0' : (if b then 'O' else 'o') : fmap (charOctal #) (NonEmpty.toList n)
+showIntLiteral (IntLiteralHex _ b n) =
+  Text.pack $
+  '0' : (if b then 'X' else 'x') : fmap (charHeXaDeCiMaL #) (NonEmpty.toList n)
+
+showFloatExponent :: FloatExponent -> Text
+showFloatExponent (FloatExponent e s ds) =
+  Text.pack $
+  (case e of; EE -> 'E'; Ee -> 'e') :
+  foldMap (\case; Pos -> "+"; Neg -> "-") s <>
+  fmap (charDecimal #) (NonEmpty.toList ds)
+
+showFloatLiteral :: FloatLiteral a -> Text
+showFloatLiteral (FloatLiteralFull _ a b) =
+  Text.pack (fmap (charDecimal #) (NonEmpty.toList a) <> ".") <>
+  foldMap
+    (\case
+       This x -> Text.pack $ fmap (charDecimal #) (NonEmpty.toList x)
+       That x -> showFloatExponent x
+       These x y ->
+         Text.pack (fmap (charDecimal #) (NonEmpty.toList x)) <>
+         showFloatExponent y)
+    b
+showFloatLiteral (FloatLiteralPoint _ a b) =
+  Text.pack ('.' : fmap (charDecimal #) (NonEmpty.toList a)) <>
+  foldMap showFloatExponent b
+showFloatLiteral (FloatLiteralWhole _ a b) =
+  Text.pack (fmap (charDecimal #) (NonEmpty.toList a)) <>
+  showFloatExponent b
+
+showImagLiteral :: ImagLiteral a -> Text
+showImagLiteral (ImagLiteralInt _ ds b) =
+  Text.pack $ fmap (charDecimal #) (NonEmpty.toList ds) ++ [if b then 'J' else 'j']
+showImagLiteral (ImagLiteralFloat _ f b) =
+  showFloatLiteral f <> Text.singleton (if b then 'J' else 'j')

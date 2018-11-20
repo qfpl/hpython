@@ -30,7 +30,6 @@ import GHC.Stack
 
 import Language.Python.Syntax.Types (spType)
 import Language.Python.Optics
-import Language.Python.Internal.Syntax
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
@@ -40,6 +39,7 @@ import Language.Python.Syntax.ModuleNames
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
+import Language.Python.Validate.Syntax (reservedWords)
 
 import Generators.Common
 import Generators.Sized

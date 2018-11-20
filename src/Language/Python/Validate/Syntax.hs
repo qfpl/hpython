@@ -19,6 +19,7 @@ Portability : non-portable
 
 module Language.Python.Validate.Syntax
   ( module Language.Python.Validate.Syntax.Error
+  , reservedWords
   , Syntax
   , SyntaxContext(..), inLoop, inFunction, inGenerator, inParens
   , initialSyntaxContext
@@ -85,7 +86,6 @@ import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Optics
 import Language.Python.Optics.Validated (unvalidated)
-import Language.Python.Internal.Syntax (reservedWords)
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
@@ -103,6 +103,43 @@ deleteBy' eq a (b:bs) = if a `eq` b then bs else b : deleteBy' eq a bs
 
 deleteFirstsBy' :: (a -> b -> Bool) -> [a] -> [b] -> [a]
 deleteFirstsBy' eq = foldl (flip (deleteBy' (flip eq)))
+
+reservedWords :: [String]
+reservedWords =
+  [ "False"
+  , "class"
+  , "finally"
+  , "is"
+  , "return"
+  , "None"
+  , "continue"
+  , "for"
+  , "lambda"
+  , "try"
+  , "True"
+  , "def"
+  , "from"
+  , "nonlocal"
+  , "while"
+  , "and"
+  , "del"
+  , "global"
+  , "not"
+  , "with"
+  , "as"
+  , "elif"
+  , "if"
+  , "or"
+  , "yield"
+  , "assert"
+  , "else"
+  , "import"
+  , "pass"
+  , "break"
+  , "except"
+  , "in"
+  , "raise"
+  ]
 
 data Syntax
 

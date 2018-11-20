@@ -15,7 +15,6 @@ import System.Directory
 import System.Exit
 import System.Process
 
-import Language.Python.Internal.Syntax
 import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Parse (SrcInfo, parseStatement, parseExpr, parseExprList)
 import Language.Python.Parse.Error (ParseError)
@@ -23,6 +22,7 @@ import Language.Python.Render
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Module
 import Language.Python.Syntax.Statement
+import Language.Python.Syntax.Strings
 import Language.Python.Validate
 
 import Hedgehog

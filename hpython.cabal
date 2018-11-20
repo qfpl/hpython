@@ -72,27 +72,27 @@ library
                      , Language.Python.Internal.Render.Correction
                      , Language.Python.Internal.Syntax
                      , Language.Python.Internal.Token
-                     , Language.Python.Internal.Syntax.AugAssign
-                     , Language.Python.Internal.Syntax.Comment
-                     , Language.Python.Internal.Syntax.Import
                      , Language.Python.Internal.Syntax.IR
-                     , Language.Python.Internal.Syntax.Numbers
-                     , Language.Python.Internal.Syntax.Strings
                      , Language.Python.Optics
                      , Language.Python.Optics.Validated
                      , Language.Python.Parse
                      , Language.Python.Parse.Error
                      , Language.Python.Render
                      , Language.Python.Syntax
+                     , Language.Python.Syntax.AugAssign
                      , Language.Python.Syntax.CommaSep
+                     , Language.Python.Syntax.Comment
                      , Language.Python.Syntax.Expr
                      , Language.Python.Syntax.Ident
+                     , Language.Python.Syntax.Import
                      , Language.Python.Syntax.Module
                      , Language.Python.Syntax.Operator.Binary
                      , Language.Python.Syntax.Operator.Unary
                      , Language.Python.Syntax.ModuleNames
+                     , Language.Python.Syntax.Numbers
                      , Language.Python.Syntax.Punctuation
                      , Language.Python.Syntax.Statement
+                     , Language.Python.Syntax.Strings
                      , Language.Python.Syntax.Types
                      , Language.Python.Syntax.Whitespace
                      , Language.Python.Validate

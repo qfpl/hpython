@@ -38,19 +38,19 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Text.Megaparsec as Megaparsec
 
 import Language.Python.Internal.Lexer (SrcInfo(..), withSrcInfo)
-import Language.Python.Internal.Syntax.AugAssign
-import Language.Python.Internal.Syntax.Comment
 import Language.Python.Internal.Syntax.IR
-import Language.Python.Internal.Syntax.Import
-import Language.Python.Internal.Syntax.Numbers
-import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Token
+import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
+import Language.Python.Syntax.Comment
 import Language.Python.Syntax.Ident
+import Language.Python.Syntax.Import
 import Language.Python.Syntax.ModuleNames
+import Language.Python.Syntax.Numbers
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Punctuation
+import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
 
 newtype PyTokens = PyTokens { unPyTokens :: [PyToken SrcInfo] }

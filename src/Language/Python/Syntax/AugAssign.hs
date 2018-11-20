@@ -1,7 +1,7 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
 {-|
-Module      : Language.Python.Internal.Syntax.AugAssign
+Module      : Language.Python.Syntax.AugAssign
 Copyright   : (C) CSIRO 2017-2018
 License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
@@ -9,7 +9,7 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Internal.Syntax.AugAssign where
+module Language.Python.Syntax.AugAssign where
 
 import Control.Lens.Lens (lens)
 
@@ -41,19 +41,32 @@ instance HasTrailingWhitespace (AugAssign a) where
   trailingWhitespace =
     lens _augAssignWhitespace (\a b -> a { _augAssignWhitespace = b })
 
--- | The operation of an @AugAssign@. 'PlusEq' for '+=', 'PipeEq' for @|=@, etc.
+-- | Augmented assignment operators
 data AugAssignOp
+  -- | @+=@
   = PlusEq
+  -- | @-=@
   | MinusEq
+  -- | @*=@
   | StarEq
+  -- | @@=@
   | AtEq
+  -- | @/=@
   | SlashEq
+  -- | @%=@
   | PercentEq
+  -- | @&=@
   | AmpersandEq
+  -- | @|=@
   | PipeEq
+  -- | @^=@
   | CaretEq
+  -- | @<<=@
   | ShiftLeftEq
+  -- | @>>=@
   | ShiftRightEq
+  -- | @**=@
   | DoubleStarEq
+  -- | @//=@
   | DoubleSlashEq
   deriving (Eq, Show)

@@ -11,11 +11,6 @@ module Language.Python.Internal.Syntax
   ( reservedWords
   , idStyle
   , reserved
-  , module Language.Python.Internal.Syntax.AugAssign
-  , module Language.Python.Internal.Syntax.Comment
-  , module Language.Python.Internal.Syntax.Import
-  , module Language.Python.Internal.Syntax.Numbers
-  , module Language.Python.Internal.Syntax.Strings
   )
 where
 
@@ -24,12 +19,6 @@ import GHC.Exts (fromList)
 import Text.Parser.Char (CharParsing, char, letter, digit)
 import Text.Parser.Token (TokenParsing, IdentifierStyle(..), Unspaced(..), reserve)
 import Text.Parser.Token.Highlight (Highlight(..))
-
-import Language.Python.Internal.Syntax.AugAssign
-import Language.Python.Internal.Syntax.Comment
-import Language.Python.Internal.Syntax.Import
-import Language.Python.Internal.Syntax.Numbers
-import Language.Python.Internal.Syntax.Strings
 
 reservedWords :: [String]
 reservedWords =

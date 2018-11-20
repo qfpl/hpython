@@ -43,7 +43,7 @@ import GHC.Exts (IsList(..))
 
 import qualified Data.List.NonEmpty as NonEmpty
 
-import Language.Python.Internal.Syntax.Comment (Comment)
+import Language.Python.Syntax.Comment (Comment)
 
 -- | A newline is either a carriage return, a line feed, or a carriage return
 -- followed by a line feed.

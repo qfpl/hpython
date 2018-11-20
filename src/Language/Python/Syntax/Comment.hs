@@ -2,7 +2,7 @@
 {-# language TemplateHaskell #-}
 
 {-|
-Module      : Language.Python.Internal.Syntax.Comment
+Module      : Language.Python.Syntax.Comment
 Copyright   : (C) CSIRO 2017-2018
 License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
@@ -10,7 +10,7 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Internal.Syntax.Comment where
+module Language.Python.Syntax.Comment where
 
 import Data.Deriving (deriveEq1, deriveOrd1)
 

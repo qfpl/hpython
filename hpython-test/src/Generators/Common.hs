@@ -16,13 +16,16 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.These (These(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
-import Language.Python.Internal.Syntax
+import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
+import Language.Python.Syntax.Comment
 import Language.Python.Syntax.Expr
+import Language.Python.Syntax.Numbers
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Statement
+import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
 import Generators.Sized
 

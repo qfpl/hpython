@@ -359,14 +359,14 @@ import Data.Maybe (fromMaybe)
 import Data.Semigroup ((<>))
 
 import Language.Python.Optics
-import Language.Python.Internal.Syntax.AugAssign
-import Language.Python.Internal.Syntax.Strings
+import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Statement
+import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Types
 import Language.Python.Syntax.Whitespace
 

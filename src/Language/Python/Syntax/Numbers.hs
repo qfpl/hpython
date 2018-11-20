@@ -3,7 +3,7 @@
 {-# language TemplateHaskell #-}
 
 {-|
-Module      : Language.Python.Internal.Syntax.Numbers
+Module      : Language.Python.Syntax.Numbers
 Copyright   : (C) CSIRO 2017-2018
 License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
@@ -13,7 +13,7 @@ Portability : non-portable
 Numerical literal values in Python
 -}
 
-module Language.Python.Internal.Syntax.Numbers
+module Language.Python.Syntax.Numbers
   ( IntLiteral (..)
   , FloatLiteral (..)
   , FloatExponent (..)

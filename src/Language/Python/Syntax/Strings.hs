@@ -4,7 +4,7 @@
 {-# language TemplateHaskell #-}
 
 {-|
-Module      : Language.Python.Internal.Syntax.Strings
+Module      : Language.Python.Syntax.Strings
 Copyright   : (C) CSIRO 2017-2018
 License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
@@ -16,7 +16,7 @@ Python string literals.
 See <https://docs.python.org/3.5/reference/lexical_analysis.html#string-and-bytes-literals>
 -}
 
-module Language.Python.Internal.Syntax.Strings where
+module Language.Python.Syntax.Strings where
 
 import Control.Lens.Lens (lens)
 import Control.Lens.TH (makeLensesFor)

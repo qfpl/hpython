@@ -87,12 +87,12 @@ import Language.Python.Optics
 import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Internal.Syntax (reservedWords)
 import Language.Python.Internal.Syntax.Import
-import Language.Python.Internal.Syntax.Strings
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Module
 import Language.Python.Syntax.Statement
+import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
 import Language.Python.Validate.Indentation
 import Language.Python.Validate.Syntax.Error

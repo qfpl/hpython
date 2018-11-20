@@ -8,11 +8,11 @@ import Control.Lens.Iso (from)
 import Control.Lens.Getter ((^.))
 import Control.Monad (void)
 import Language.Python.Render (showStatement, showExpr)
-import Language.Python.Internal.Syntax.Strings
 import Language.Python.Parse (parseModule, parseStatement, parseExpr)
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Statement
+import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
 
 import Helpers

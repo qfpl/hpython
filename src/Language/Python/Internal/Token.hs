@@ -17,8 +17,8 @@ import Data.Deriving (deriveEq1, deriveOrd1)
 import Data.Functor.Classes (liftCompare, liftEq)
 
 import Language.Python.Internal.Syntax.Numbers
-import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Syntax.Comment (Comment(..))
+import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace (Newline(..), Indents)
 
 -- | A 'PyToken' is a single lexical token of Python source. A 'PyToken' has an

@@ -55,7 +55,6 @@ import Language.Python.Internal.Syntax.AugAssign
 import Language.Python.Internal.Syntax.Comment
 import Language.Python.Internal.Syntax.Import
 import Language.Python.Internal.Syntax.Numbers
-import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Render.Correction
 import Language.Python.Internal.Token (PyToken(..))
 import Language.Python.Syntax.CommaSep
@@ -67,6 +66,7 @@ import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Statement
+import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
 
 -- | A 'RenderOutput' is an intermediate form used during rendering

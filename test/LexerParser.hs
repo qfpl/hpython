@@ -9,7 +9,7 @@ import qualified Data.Text as Text
 import Language.Python.Render
 import Language.Python.Parse (parseModule, parseStatement, parseExpr, parseExprList)
 import Language.Python.Syntax.Expr (Expr(..))
-import Language.Python.Internal.Syntax.Strings
+import Language.Python.Syntax.Strings
   ( StringLiteral(..), StringType(..), QuoteType(..), PyChar(..)
   , RawBytesPrefix(..), RawStringPrefix(..)
   )

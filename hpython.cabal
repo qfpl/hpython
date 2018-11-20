@@ -77,7 +77,6 @@ library
                      , Language.Python.Internal.Syntax.Import
                      , Language.Python.Internal.Syntax.IR
                      , Language.Python.Internal.Syntax.Numbers
-                     , Language.Python.Internal.Syntax.Strings
                      , Language.Python.Optics
                      , Language.Python.Optics.Validated
                      , Language.Python.Parse
@@ -93,6 +92,7 @@ library
                      , Language.Python.Syntax.ModuleNames
                      , Language.Python.Syntax.Punctuation
                      , Language.Python.Syntax.Statement
+                     , Language.Python.Syntax.Strings
                      , Language.Python.Syntax.Types
                      , Language.Python.Syntax.Whitespace
                      , Language.Python.Validate

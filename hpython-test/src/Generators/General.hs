@@ -16,6 +16,7 @@ import Language.Python.Syntax.Module
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.ModuleNames
 import Language.Python.Syntax.Statement
+import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
 
 import Generators.Common

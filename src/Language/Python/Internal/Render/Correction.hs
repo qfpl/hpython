@@ -33,9 +33,9 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
 
 import Language.Python.Internal.Syntax.Numbers
-import Language.Python.Internal.Syntax.Strings
 import Language.Python.Internal.Token
 import Language.Python.Syntax.Ident
+import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
 
 correctSpaces :: (PyToken () -> Text) -> [PyToken ()] -> [PyToken ()]

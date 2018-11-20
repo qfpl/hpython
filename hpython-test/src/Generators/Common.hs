@@ -16,7 +16,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.These (These(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
-import Language.Python.Internal.Syntax
+import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Comment
 import Language.Python.Syntax.Expr

@@ -32,7 +32,7 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Monoid ((<>))
 import Data.Validation (Validation(..))
 
-import Language.Python.Internal.Syntax.AugAssign
+import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Comment
 import Language.Python.Syntax.Ident

@@ -11,7 +11,6 @@ module Language.Python.Internal.Syntax
   ( reservedWords
   , idStyle
   , reserved
-  , module Language.Python.Internal.Syntax.AugAssign
   )
 where
 
@@ -20,8 +19,6 @@ import GHC.Exts (fromList)
 import Text.Parser.Char (CharParsing, char, letter, digit)
 import Text.Parser.Token (TokenParsing, IdentifierStyle(..), Unspaced(..), reserve)
 import Text.Parser.Token.Highlight (Highlight(..))
-
-import Language.Python.Internal.Syntax.AugAssign
 
 reservedWords :: [String]
 reservedWords =

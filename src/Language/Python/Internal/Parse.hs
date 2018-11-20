@@ -38,9 +38,9 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Text.Megaparsec as Megaparsec
 
 import Language.Python.Internal.Lexer (SrcInfo(..), withSrcInfo)
-import Language.Python.Internal.Syntax.AugAssign
 import Language.Python.Internal.Syntax.IR
 import Language.Python.Internal.Token
+import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Comment
 import Language.Python.Syntax.Ident

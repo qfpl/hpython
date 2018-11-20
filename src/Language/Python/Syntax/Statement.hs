@@ -51,7 +51,7 @@ import Unsafe.Coerce (unsafeCoerce)
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Optics.Validated
-import Language.Python.Internal.Syntax.AugAssign
+import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Comment
 import Language.Python.Syntax.Expr

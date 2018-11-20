@@ -906,6 +906,7 @@ instance e ~ Comprehension DictItem => AsDict (Raw e) where
 mkBinOp :: ([Whitespace] -> BinOp ()) -> Raw Expr -> Raw Expr -> Raw Expr
 mkBinOp bop a = BinOp () (a & trailingWhitespace .~ [Space]) (bop [Space])
 
+-- | @a is b@
 is_ :: Raw Expr -> Raw Expr -> Raw Expr
 is_ = mkBinOp $ Is ()
 infixl 1 `is_`
@@ -928,103 +929,129 @@ instance HasIn Expr (Raw Expr) where
 instance e ~ Raw Expr => HasIn InList [e] where
   in_ = MkInList
 
+-- | @a not in b@
 notIn_ :: Raw Expr -> Raw Expr -> Raw Expr
 notIn_ = mkBinOp $ NotIn () [Space]
 infixl 1 `notIn_`
 
+-- | @a is not b@
 isNot_ :: Raw Expr -> Raw Expr -> Raw Expr
 isNot_ = mkBinOp $ IsNot () [Space]
 infixl 1 `isNot_`
 
+-- | @not a@
 not_ :: Raw Expr -> Raw Expr
 not_ = Not () [Space]
 
+-- | @a == b@
 (.==) :: Raw Expr -> Raw Expr -> Raw Expr
 (.==) = mkBinOp $ Equals ()
 infixl 1 .==
 
+-- | @a < b@
 (.<) :: Raw Expr -> Raw Expr -> Raw Expr
 (.<) = mkBinOp $ Lt ()
 infixl 1 .<
 
+-- | @a <= b@
 (.<=) :: Raw Expr -> Raw Expr -> Raw Expr
 (.<=) = mkBinOp $ LtEquals ()
 infixl 1 .<=
 
+-- | @a > b@
 (.>) :: Raw Expr -> Raw Expr -> Raw Expr
 (.>) = mkBinOp $ Gt ()
 infixl 1 .>
 
+-- | @a >= b@
 (.>=) :: Raw Expr -> Raw Expr -> Raw Expr
 (.>=) = mkBinOp $ GtEquals ()
 infixl 1 .>=
 
+-- | @a != b@
 (.!=) :: Raw Expr -> Raw Expr -> Raw Expr
 (.!=) = mkBinOp $ NotEquals ()
 infixl 1 .!=
 
+-- | @a | b@
 (.|) :: Raw Expr -> Raw Expr -> Raw Expr
 (.|) = mkBinOp $ BitOr ()
 infixl 2 .|
 
+-- | @a ^ b@
 (.^) :: Raw Expr -> Raw Expr -> Raw Expr
 (.^) = mkBinOp $ BitXor ()
 infixl 3 .^
 
+-- | @a & b@
 (.&) :: Raw Expr -> Raw Expr -> Raw Expr 
 (.&) = mkBinOp $ BitAnd ()
 infixl 4 .&
 
+-- | @a << b@
 (.<<) :: Raw Expr -> Raw Expr -> Raw Expr 
 (.<<) = mkBinOp $ ShiftLeft ()
 infixl 5 .<<
 
+-- | @a >> b@
 (.>>) :: Raw Expr -> Raw Expr -> Raw Expr 
 (.>>) = mkBinOp $ ShiftRight ()
 infixl 5 .>>
 
+-- | @a + b@
 (.+) :: Raw Expr -> Raw Expr -> Raw Expr 
 (.+) = (+)
 infixl 6 .+
 
+-- | @a - b@
 (.-) :: Raw Expr -> Raw Expr -> Raw Expr 
 (.-) = (-)
 infixl 6 .-
 
+-- | @a * b@
 (.*) :: Raw Expr -> Raw Expr -> Raw Expr 
 (.*) = (*)
 infixl 7 .*
 
+-- | @a \@ b@
 (.@) :: Raw Expr -> Raw Expr -> Raw Expr
 (.@) = mkBinOp $ At ()
 infixl 7 .@
 
+-- | @a / b@
 (./) :: Raw Expr -> Raw Expr -> Raw Expr
 (./) = mkBinOp $ Divide ()
 infixl 7 ./
 
+-- | @a // b@
 (.//) :: Raw Expr -> Raw Expr -> Raw Expr
 (.//) = mkBinOp $ FloorDivide ()
 infixl 7 .//
 
+-- | @a % b@
 (.%) :: Raw Expr -> Raw Expr -> Raw Expr
 (.%) = mkBinOp $ Percent ()
 infixl 7 .%
 
+-- | @a ** b@
 (.**) :: Raw Expr -> Raw Expr -> Raw Expr
 (.**) = mkBinOp $ Exp ()
 infixr 8 .**
 
+-- | @a.b@
 (/>) :: Raw Expr -> Raw Ident -> Raw Expr
 (/>) a = Deref () a []
 infixl 9 />
 
+-- | @-a@
 neg_ :: Raw Expr -> Raw Expr
 neg_ = negate
 
+-- | @+a@
 pos_ :: Raw Expr -> Raw Expr
 pos_ = UnOp () (Positive () [])
 
+-- | @~a@
 compl_ :: Raw Expr -> Raw Expr
 compl_ = UnOp () (Complement () [])
 

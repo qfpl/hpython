@@ -13,7 +13,6 @@ module Language.Python.Internal.Syntax
   , reserved
   , module Language.Python.Internal.Syntax.AugAssign
   , module Language.Python.Internal.Syntax.Comment
-  , module Language.Python.Internal.Syntax.Import
   )
 where
 
@@ -25,7 +24,6 @@ import Text.Parser.Token.Highlight (Highlight(..))
 
 import Language.Python.Internal.Syntax.AugAssign
 import Language.Python.Internal.Syntax.Comment
-import Language.Python.Internal.Syntax.Import
 
 reservedWords :: [String]
 reservedWords =

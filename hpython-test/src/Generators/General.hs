@@ -9,9 +9,9 @@ import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
-import Language.Python.Internal.Syntax
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
+import Language.Python.Syntax.Import
 import Language.Python.Syntax.Module
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.ModuleNames

@@ -19,6 +19,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
+import Language.Python.Syntax.Numbers
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Punctuation

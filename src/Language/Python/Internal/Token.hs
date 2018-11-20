@@ -16,8 +16,8 @@ module Language.Python.Internal.Token where
 import Data.Deriving (deriveEq1, deriveOrd1)
 import Data.Functor.Classes (liftCompare, liftEq)
 
-import Language.Python.Internal.Syntax.Numbers
 import Language.Python.Internal.Syntax.Comment (Comment(..))
+import Language.Python.Syntax.Numbers
 import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace (Newline(..), Indents)
 

@@ -73,7 +73,6 @@ library
                      , Language.Python.Internal.Syntax
                      , Language.Python.Internal.Token
                      , Language.Python.Internal.Syntax.AugAssign
-                     , Language.Python.Internal.Syntax.Comment
                      , Language.Python.Internal.Syntax.IR
                      , Language.Python.Optics
                      , Language.Python.Optics.Validated
@@ -82,6 +81,7 @@ library
                      , Language.Python.Render
                      , Language.Python.Syntax
                      , Language.Python.Syntax.CommaSep
+                     , Language.Python.Syntax.Comment
                      , Language.Python.Syntax.Expr
                      , Language.Python.Syntax.Ident
                      , Language.Python.Syntax.Import

@@ -12,7 +12,6 @@ module Language.Python.Internal.Syntax
   , idStyle
   , reserved
   , module Language.Python.Internal.Syntax.AugAssign
-  , module Language.Python.Internal.Syntax.Comment
   )
 where
 
@@ -23,7 +22,6 @@ import Text.Parser.Token (TokenParsing, IdentifierStyle(..), Unspaced(..), reser
 import Text.Parser.Token.Highlight (Highlight(..))
 
 import Language.Python.Internal.Syntax.AugAssign
-import Language.Python.Internal.Syntax.Comment
 
 reservedWords :: [String]
 reservedWords =

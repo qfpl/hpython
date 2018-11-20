@@ -18,6 +18,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Internal.Syntax
 import Language.Python.Syntax.CommaSep
+import Language.Python.Syntax.Comment
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Numbers
 import Language.Python.Syntax.Operator.Binary

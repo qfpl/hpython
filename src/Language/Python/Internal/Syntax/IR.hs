@@ -33,8 +33,8 @@ import Data.Monoid ((<>))
 import Data.Validation (Validation(..))
 
 import Language.Python.Internal.Syntax.AugAssign
-import Language.Python.Internal.Syntax.Comment
 import Language.Python.Syntax.CommaSep
+import Language.Python.Syntax.Comment
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Import
 import Language.Python.Syntax.ModuleNames

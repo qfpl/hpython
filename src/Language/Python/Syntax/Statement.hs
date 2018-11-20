@@ -52,8 +52,8 @@ import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Optics.Validated
 import Language.Python.Internal.Syntax.AugAssign
-import Language.Python.Internal.Syntax.Comment
 import Language.Python.Syntax.CommaSep
+import Language.Python.Syntax.Comment
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Import

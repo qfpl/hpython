@@ -27,7 +27,6 @@ import Data.Bifunctor (first)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import Data.Validation (Validation, bindValidation, fromEither)
-import Data.Void (Void)
 import Text.Megaparsec (eof)
 
 import Language.Python.Internal.Lexer
@@ -51,7 +50,7 @@ import qualified Language.Python.Internal.Syntax.IR as IR
 parseModule
   :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
-     , AsParseError e (PyToken SrcInfo) Void
+     , AsParseError e (PyToken SrcInfo)
      , AsIRError e SrcInfo
      )
   => FilePath
@@ -70,7 +69,7 @@ parseModule fp input =
 parseStatement
   :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
-     , AsParseError e (PyToken SrcInfo) Void
+     , AsParseError e (PyToken SrcInfo)
      , AsIRError e SrcInfo
      )
   => FilePath
@@ -91,7 +90,7 @@ parseStatement fp input =
 parseExprList
   :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
-     , AsParseError e (PyToken SrcInfo) Void
+     , AsParseError e (PyToken SrcInfo)
      , AsIRError e SrcInfo
      )
   => FilePath
@@ -110,7 +109,7 @@ parseExprList fp input =
 parseExpr
   :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
-     , AsParseError e (PyToken SrcInfo) Void
+     , AsParseError e (PyToken SrcInfo)
      , AsIRError e SrcInfo
      )
   => FilePath

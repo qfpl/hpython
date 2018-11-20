@@ -13,7 +13,6 @@ where
 import Control.Lens.Prism (prism')
 import Data.Set (Set)
 import Data.List.NonEmpty (NonEmpty)
-import Data.Void (Void)
 import Text.Megaparsec.Error (ErrorItem(..))
 import Text.Megaparsec.Pos (SourcePos(..))
 
@@ -59,7 +58,7 @@ instance AsTabError (ParseError a) a where
           IncorrectDedent a -> Just a
           _ -> Nothing)
 
-instance AsParseError (ParseError a) (PyToken a) Void where
+instance AsParseError (ParseError a) (PyToken a) where
   _ParseError =
     prism'
       (\(a, b, c) -> ParseError a b c)

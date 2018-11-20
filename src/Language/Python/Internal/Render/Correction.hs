@@ -163,17 +163,19 @@ naps p = go (,) (,)
 correctBackslashEscapesRaw :: [PyChar] -> [PyChar]
 correctBackslashEscapesRaw [] = []
 correctBackslashEscapesRaw [x] = [x]
-correctBackslashEscapesRaw (x:y:ys) =
+correctBackslashEscapesRaw(x:y:ys) =
   case x of
     Char_lit '\\' ->
       case y of
         Char_esc_doublequote -> Char_esc_bslash : y : correctBackslashEscapesRaw ys
         Char_esc_singlequote -> Char_esc_bslash : y : correctBackslashEscapesRaw ys
-        Char_esc_bslash -> Char_esc_bslash : y : correctBackslashEscapesRaw ys
-        Char_lit '\\' -> Char_esc_bslash : correctBackslashEscapesRaw ys
+        Char_esc_bslash -> Char_esc_bslash : correctBackslashEscapesRaw (Char_lit '\\' : ys)
         _ -> x : correctBackslashEscapesRaw (y : ys)
     _ -> x : correctBackslashEscapesRaw (y : ys)
 
+-- | It turns out that raw strings can only ever be constructed with an even number
+-- of trailing backslash characters. This functon corrects raw strings with an
+-- odd number of trailing backslash characters
 correctBackslashesRaw :: [PyChar] -> [PyChar]
 correctBackslashesRaw ps =
   let

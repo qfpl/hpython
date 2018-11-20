@@ -115,7 +115,7 @@ instance Stream PyTokens where
 
   takeWhile_ f = coerce (span f)
 
-class AsParseError s t e | s -> t e where
+class AsParseError s t | s -> t where
   _ParseError
     :: Prism'
          s
@@ -125,7 +125,7 @@ class AsParseError s t e | s -> t e where
          )
 
 fromParseError
-  :: AsParseError s t e
+  :: AsParseError s t
   => Megaparsec.ParseError t e
   -> s
 fromParseError Megaparsec.FancyError{} = error "there are none of these"
@@ -135,7 +135,7 @@ type Parser = Parsec Void PyTokens
 
 {-# inline runParser #-}
 runParser
-  :: AsParseError e (PyToken SrcInfo) Void
+  :: AsParseError e (PyToken SrcInfo)
   => String
   -> Parser a
   -> [PyToken SrcInfo]

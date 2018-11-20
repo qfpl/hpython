@@ -475,3 +475,20 @@ prop_fulltrip_37 =
     let str = "None,*None"
 
     void $ shouldBeParseSuccess parseExprList str
+
+prop_fulltrip_38 :: Property
+prop_fulltrip_38 =
+  withTests 1 . property $ do
+    let str =
+          showExpr $
+          String ()
+            (RawStringLiteral ()
+               Prefix_r
+               LongString
+               SingleQuote
+               [Char_esc_bslash, Char_lit '\\'] [] :|
+            [])
+    annotateShow str
+
+    res <- shouldBeParseSuccess parseExpr str
+    str === showExpr (() <$ res)

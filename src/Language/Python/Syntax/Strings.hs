@@ -40,7 +40,7 @@ data QuoteType
   | DoubleQuote
   deriving (Eq, Ord, Show)
 
--- | Three paris of quotations or one?
+-- | Three pairs of quotations or one?
 --
 -- @
 -- """Long string"""

@@ -5,6 +5,10 @@ License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
 Stability   : experimental
 Portability : non-portable
+
+The abstract syntax tree for Python.
+
+Key datatypes include 'Module', 'Statement', and 'Expr'.
 -}
 
 module Language.Python.Syntax

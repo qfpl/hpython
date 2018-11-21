@@ -22,7 +22,7 @@ module Language.Python.Internal.Lexer
   , SrcInfo(..), initialSrcInfo, withSrcInfo
     -- * Errors
   , AsLexicalError(..), unsafeFromLexicalError, Parsec.ParseError(..)
-  , AsTabError(..), fromTabError, TabError(..)
+  , AsTabError(..), AsIncorrectDedent(..), fromTabError, TabError(..)
     -- * Miscellaneous
   , tokenize
   , insertTabs
@@ -590,9 +590,15 @@ data TabError a
 
 class AsTabError s a | s -> a where
   _TabError :: Prism' s a
+
+class AsIncorrectDedent s a | s -> a where
   _IncorrectDedent :: Prism' s a
 
-fromTabError :: AsTabError s a => TabError a -> s
+fromTabError
+  :: ( AsTabError s a
+     , AsIncorrectDedent s a
+     )
+  => TabError a -> s
 fromTabError (TabError a) = _TabError # a
 fromTabError (IncorrectDedent a) = _IncorrectDedent # a
 
@@ -704,13 +710,27 @@ chunked = go FingerTree.empty
     go leaps (Level i a : is) =
       TkLevel a (Indents (splitIndents leaps $ NonEmpty.toList i ^. from indentWhitespaces) a) : go leaps is
 
-insertTabs :: (Semigroup a, AsTabError s a) => a -> [PyToken a] -> Either s [PyToken a]
-insertTabs a = first fromTabError . fmap chunked . indentation a . logicalLines
+insertTabs
+  :: ( Semigroup a
+     , AsTabError s a
+     , AsIncorrectDedent s a
+     )
+  => a
+  -> [PyToken a]
+  -> Either s [PyToken a]
+insertTabs a =
+  first fromTabError .
+  fmap chunked .
+  indentation a .
+  logicalLines
 
 -- | Tokenize an input file, inserting indent/level/dedent tokens in appropriate
 -- positions according to the block structure.
 tokenizeWithTabs
-  :: (AsLexicalError s Char, AsTabError s SrcInfo)
+  :: ( AsLexicalError s Char
+     , AsTabError s SrcInfo
+     , AsIncorrectDedent s SrcInfo
+     )
   => FilePath
   -> Text.Text
   -> Either s [PyToken SrcInfo]

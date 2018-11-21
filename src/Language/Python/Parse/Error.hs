@@ -3,7 +3,8 @@
 module Language.Python.Parse.Error
   ( ParseError(..)
     -- * Classy Prisms
-  , AsLexicalError(..), AsTabError(..), AsIRError(..), AsParseError(..)
+  , AsLexicalError(..), AsTabError(..), AsIncorrectDedent(..)
+  , AsIRError(..), AsParseError(..)
     -- * Megaparsec re-exports
   , ErrorItem(..)
   , SourcePos(..)
@@ -16,7 +17,8 @@ import Data.List.NonEmpty (NonEmpty)
 import Text.Megaparsec.Error (ErrorItem(..))
 import Text.Megaparsec.Pos (SourcePos(..))
 
-import Language.Python.Internal.Lexer (AsLexicalError(..), AsTabError(..))
+import Language.Python.Internal.Lexer
+  (AsLexicalError(..), AsTabError(..), AsIncorrectDedent(..))
 import Language.Python.Internal.Parse (AsParseError(..))
 import Language.Python.Internal.Syntax.IR (AsIRError(..))
 import Language.Python.Internal.Token (PyToken)
@@ -51,6 +53,8 @@ instance AsTabError (ParseError a) a where
       (\case
           TabError a -> Just a
           _ -> Nothing)
+
+instance AsIncorrectDedent (ParseError a) a where
   _IncorrectDedent =
     prism'
       IncorrectDedent

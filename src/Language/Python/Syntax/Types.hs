@@ -9,9 +9,188 @@ License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
 Stability   : experimental
 Portability : non-portable
+
+Datatypes for different parts of Python syntax
 -}
 
-module Language.Python.Syntax.Types where
+module Language.Python.Syntax.Types
+  ( -- * Parameters
+    -- ** Positional parameters
+    PositionalParam(..)
+    -- *** Lenses
+  , ppAnn
+  , ppName
+  , ppType
+    -- ** Starred Parameters
+  , StarParam(..)
+    -- *** Lenses
+  , spAnn
+  , spWhitespace
+  , spName
+  , spType
+    -- ** Keyword parameters
+  , KeywordParam(..)
+    -- *** Lenses
+  , kpAnn
+  , kpName
+  , kpType
+  , kpEquals
+  , kpExpr
+    -- * Compound statements
+    -- ** Function definitions
+  , Fundef(..)
+    -- *** Lenses
+  , fdAnn
+  , fdDecorators
+  , fdIndents
+  , fdAsync
+  , fdDefSpaces
+  , fdName
+  , fdLeftParenSpaces
+  , fdParameters
+  , fdRightParenSpaces
+  , fdReturnType
+  , fdBody
+    -- ** Class definitions
+  , ClassDef(..)
+    -- *** Lenses
+  , cdAnn
+  , cdDecorators
+  , cdIndents
+  , cdClass
+  , cdName
+  , cdArguments
+  , cdBody
+    -- ** @if@ statements
+  , If(..)
+    -- *** Lenses
+  , ifAnn
+  , ifIndents
+  , ifIf
+  , ifCond
+  , ifBody
+  , ifElifs
+  , ifElse
+    -- ** @elif@
+  , Elif(..)
+    -- *** Lenses
+  , elifIndents
+  , elifElif
+  , elifCond
+  , elifBody
+    -- ** @for@ statements
+  , For(..)
+    -- *** Lenses
+  , forAnn
+  , forIndents
+  , forAsync
+  , forFor
+  , forBinder
+  , forIn
+  , forCollection
+  , forBody
+  , forElse
+    -- ** @while@ statements
+  , While(..)
+    -- *** Lenses
+  , whileAnn
+  , whileIndents
+  , whileWhile
+  , whileCond
+  , whileBody
+  , whileElse
+    -- ** @try ... except ... else ... finally@
+  , TryExcept(..)
+    -- *** Lenses
+  , teAnn
+  , teIndents
+  , teTry
+  , teBody
+  , teExcepts
+  , teElse
+  , teFinally
+    -- *** @except@
+  , Except(..)
+    -- **** Lenses
+  , exceptIndents
+  , exceptExcept
+  , exceptExceptAs
+  , exceptBody
+    -- ** @try ... finally@
+  , TryFinally(..)
+    -- *** Lenses
+  , tfAnn
+  , tfIndents
+  , tfTry
+  , tfBody
+  , tfFinally
+    -- ** @finally@
+  , Finally(..)
+    -- *** Lenses
+  , finallyIndents
+  , finallyFinally
+  , finallyBody
+    -- ** @with@ statements
+  , With(..)
+    -- *** Lenses
+  , withAnn
+  , withIndents
+  , withAsync
+  , withWith
+  , withItems
+  , withBody
+    -- ** @else@
+  , Else(..)
+    -- *** Lenses
+  , elseIndents
+  , elseElse
+  , elseBody
+    -- * Expressions
+    -- ** @None@
+  , None(..)
+    -- *** Lenses
+  , noneAnn
+  , noneWhitespace
+    -- ** Function calls
+  , Call(..)
+    -- *** Lenses
+  , callAnn
+  , callFunction
+  , callLeftParen
+  , callArguments
+  , callRightParen
+    -- ** Tuples
+  , Tuple(..)
+    -- *** Lenses
+  , tupleAnn
+  , tupleHead
+  , tupleComma
+  , tupleTail
+    -- *** Tuple items
+    -- **** Unpacking
+  , TupleUnpack(..)
+    -- ***** Lenses
+  , tupleUnpackAnn
+  , tupleUnpackParens
+  , tupleUnpackWhitespace
+  , tupleUnpackValue
+    -- ** Lists
+  , List(..)
+    -- *** Lenses
+  , listAnn
+  , listWhitespaceLeft
+  , listBody
+  , listWhitespaceRight
+    -- *** List items
+    -- **** Unpacking
+  , ListUnpack(..)
+    -- ***** Lenses
+  , listUnpackAnn
+  , listUnpackParens
+  , listUnpackWhitespace
+  , listUnpackValue
+  )
+where
 
 import Control.Lens.TH (makeLenses)
 import Data.List.NonEmpty (NonEmpty)

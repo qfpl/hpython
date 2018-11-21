@@ -24,10 +24,15 @@ module Language.Python.Optics
     -- ** Assignment
   , assignTargets
     -- * Compound statements
+    -- ** Function defintions
   , _Fundef
+    -- ** Class defintions
   , _ClassDef
+    -- ** @while@ statements
   , _While
+    -- ** @for@ statements
   , _For
+    -- ** @with@ statements
   , _With
     -- ** @if@ statements
   , _If
@@ -45,8 +50,11 @@ module Language.Python.Optics
   , _KeywordParam
   , _StarParam
     -- * Expressions
+    -- ** Identifiers
   , _Ident
+    -- ** @None@
   , _None
+    -- ** Function calls
   , _Call
     -- ** Tuples
   , _Tuple

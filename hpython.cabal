@@ -65,6 +65,7 @@ flag development
 library
   exposed-modules:     Data.Type.Set
                      , Data.Validate.Monadic
+                     , Language.Python
                      , Language.Python.DSL
                      , Language.Python.Internal.Lexer
                      , Language.Python.Internal.Parse

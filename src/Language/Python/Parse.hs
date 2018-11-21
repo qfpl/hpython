@@ -51,6 +51,7 @@ import qualified Language.Python.Internal.Syntax.IR as IR
 parseModule
   :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
+     , AsIncorrectDedent e SrcInfo
      , AsParseError e (PyToken SrcInfo)
      , AsIRError e SrcInfo
      )
@@ -70,6 +71,7 @@ parseModule fp input =
 parseStatement
   :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
+     , AsIncorrectDedent e SrcInfo
      , AsParseError e (PyToken SrcInfo)
      , AsIRError e SrcInfo
      )
@@ -91,6 +93,7 @@ parseStatement fp input =
 parseExprList
   :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
+     , AsIncorrectDedent e SrcInfo
      , AsParseError e (PyToken SrcInfo)
      , AsIRError e SrcInfo
      )
@@ -110,6 +113,7 @@ parseExprList fp input =
 parseExpr
   :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
+     , AsIncorrectDedent e SrcInfo
      , AsParseError e (PyToken SrcInfo)
      , AsIRError e SrcInfo
      )

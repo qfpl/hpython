@@ -8,19 +8,29 @@ Portability : non-portable
 
 @hpython@ provides tools for working with Python source code.
 
-@Language.Python.DSL@: A DSL for writing Python programs
+@Language.Python.DSL@:
 
-@Language.Python.Optics@: Optics for working with Python sytnax trees
+    A DSL for writing Python programs
 
-@Language.Python.Parse@: Parse Python source into a syntax tree
+@Language.Python.Optics@:
 
-@Language.Python.Render@: Pretty print Python syntax trees
+    Optics for working with Python sytnax trees
 
-@Language.Python.Syntax@: The data structures that represent Python programs, like
-'Statement' and 'Expr'
+@Language.Python.Parse@:
 
-@Language.Python.Validate@: Validate aspects of Python syntax trees, like
-indentation, syntax, or scope
+    Parse Python source into a syntax tree
+
+@Language.Python.Render@:
+
+    Pretty print Python syntax trees
+
+@Language.Python.Syntax@:
+
+    The data structures that represent Python programs, like 'Statement' and 'Expr'
+
+@Language.Python.Validate@:
+
+    Validate aspects of Python syntax trees, like indentation, syntax, or scope
 
 -}
 

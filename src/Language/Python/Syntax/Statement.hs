@@ -16,15 +16,40 @@ Portability : non-portable
 -}
 
 module Language.Python.Syntax.Statement
-  ( Statement (..), HasStatements (..)
-  , SimpleStatement (..)
-  , CompoundStatement (..)
-  , SmallStatement (..)
-  , Block (..), HasBlocks (..), blockBlankLines, blockHead, blockTail
-  , Suite (..), Colon (..)
-  , WithItem (..)
-  , Decorator (..)
-  , ExceptAs (..), exceptAsAnn, exceptAsExpr, exceptAsName
+  ( -- * Statements
+    Statement(..)
+    -- ** Traversals
+  , HasStatements(..)
+    -- * Decorators
+  , Decorator(..)
+    -- ** Compound statements
+  , CompoundStatement(..)
+    -- ** Small statements
+  , SmallStatement(..)
+    -- ** Simple statements
+  , SimpleStatement(..)
+    -- *** @with ... as ...@
+  , WithItem(..)
+    -- **** Lenses
+  , withItemAnn
+  , withItemValue
+  , withItemBinder
+    -- *** @except ... as ...@
+  , ExceptAs (..)
+    -- **** Lenses
+  , exceptAsAnn
+  , exceptAsExpr
+  , exceptAsName
+    -- * Suites
+  , Suite(..)
+    -- * Blocks
+  , Block(..)
+    -- ** Lenses
+  , blockBlankLines
+  , blockHead
+  , blockTail
+    -- ** Traversals
+  , HasBlocks(..)
   )
 where
 
@@ -615,5 +640,6 @@ instance HasTrailingNewline CompoundStatement where
       With a b c d e f ->
         With a b c d e $ setTrailingNewline f n
 
+makeLenses ''WithItem
 makeLenses ''ExceptAs
 makeLenses ''Block

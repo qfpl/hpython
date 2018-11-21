@@ -198,7 +198,8 @@ import Data.List.NonEmpty (NonEmpty)
 import Language.Python.Syntax.CommaSep (Comma, CommaSep, CommaSep1, CommaSep1')
 import Language.Python.Syntax.Expr (Arg, Expr, ListItem, Param, TupleItem)
 import Language.Python.Syntax.Ident (Ident)
-import Language.Python.Syntax.Statement (Colon, Decorator, ExceptAs, Suite, WithItem)
+import Language.Python.Syntax.Punctuation (Colon)
+import Language.Python.Syntax.Statement (Decorator, ExceptAs, Suite, WithItem)
 import Language.Python.Syntax.Whitespace
 
 data Fundef v a

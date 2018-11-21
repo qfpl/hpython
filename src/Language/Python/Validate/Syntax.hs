@@ -94,6 +94,7 @@ import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Import
 import Language.Python.Syntax.Module
+import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace

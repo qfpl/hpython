@@ -12,8 +12,10 @@ Portability : non-portable
 -}
 
 module Language.Python.Validate.Indentation
-  ( module Language.Python.Validate.Indentation.Error
+  ( module Data.Validation
+  , module Language.Python.Validate.Indentation.Error
   , Indentation
+  , ValidateIndentation
   , runValidateIndentation
   , validateModuleIndentation
   , validateStatementIndentation
@@ -32,6 +34,8 @@ module Language.Python.Validate.Indentation
   )
 where
 
+import Data.Validation
+
 import Control.Lens.Fold ((^?!), folded)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Prism (_Right)
@@ -46,7 +50,6 @@ import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Type.Set
 import Unsafe.Coerce (unsafeCoerce)
-import Data.Validation (Validation(..))
 import Data.Validate.Monadic (ValidateM(..), liftVM0, errorVM, errorVM1)
 import qualified Data.List.NonEmpty as NonEmpty
 

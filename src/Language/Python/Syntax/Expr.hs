@@ -4,7 +4,6 @@
 {-# language MultiParamTypeClasses, FlexibleInstances #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language ExistentialQuantification #-}
-{-# language TemplateHaskell #-}
 
 {-|
 Module      : Language.Python.Syntax.Expr
@@ -22,7 +21,11 @@ module Language.Python.Syntax.Expr
   , Param (..), paramAnn, paramType, paramName
   , Arg (..), argExpr
     -- * Comprehension expressions
-  , Comprehension (..), CompIf (..), CompFor (..), DictItem (..), Subscript (..), ListItem (..), SetItem (..), TupleItem (..)
+  , Comprehension (..), CompIf (..), CompFor (..)
+    -- * Collection items
+  , DictItem (..), ListItem (..), SetItem (..), TupleItem (..)
+    -- * Subscripts
+  , Subscript (..)
   )
 where
 
@@ -266,8 +269,9 @@ instance Traversable (e v) => Traversable (Comprehension e v) where
     traverse f c <*>
     traverse (bitraverse (traverse f) (traverse f)) d
 
+-- | A condition inside a comprehension, e.g. @[x for x in xs if even(x)]@
 data CompIf (v :: [*]) a
-  = CompIf a [Whitespace] (Expr v a) -- ^ 'if' <any_spaces> <expr>
+  = CompIf a [Whitespace] (Expr v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasTrailingWhitespace (CompIf v a) where
@@ -276,8 +280,9 @@ instance HasTrailingWhitespace (CompIf v a) where
       (\(CompIf _ _ a) -> a ^. trailingWhitespace)
       (\(CompIf a b c) ws -> CompIf a b $ c & trailingWhitespace .~ ws)
 
+-- | A nested comprehesion, e.g. @[(x, y) for x in xs for y in ys]@
 data CompFor (v :: [*]) a
-  = CompFor a [Whitespace] (Expr v a) [Whitespace] (Expr v a) -- ^ 'for' <any_spaces> <targets> 'in' <any_spaces> <expr>
+  = CompFor a [Whitespace] (Expr v a) [Whitespace] (Expr v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance HasTrailingWhitespace (CompFor v a) where
@@ -286,6 +291,9 @@ instance HasTrailingWhitespace (CompFor v a) where
       (\(CompFor _ _ _ _ a) -> a ^. trailingWhitespace)
       (\(CompFor a b c d e) ws -> CompFor a b c d $ e & trailingWhitespace .~ ws)
 
+-- | @a : b@ or @**a@
+--
+-- Used to construct dictionaries, e.g. @{ 1: a, 2: b, **c }@
 data DictItem (v :: [*]) a
   = DictItem
   { _dictItemAnn :: a
@@ -305,6 +313,9 @@ instance HasTrailingWhitespace (DictItem v a) where
       (\(DictItem _ _ _ a) -> a ^. trailingWhitespace)
       (\(DictItem a b c d) ws -> DictItem a b c (d & trailingWhitespace .~ ws))
 
+-- | Syntax for things that can be used as subscripts (inside the square brackets)
+--
+-- e.g. @a[b]@, @a[:]@, @a[b:]@, @a[:b]@, @a[b:c]@, @a[b:c:d]@
 data Subscript (v :: [*]) a
   = SubscriptExpr (Expr v a)
   | SubscriptSlice
@@ -348,6 +359,9 @@ instance HasTrailingWhitespace (Subscript v a) where
                   Nothing -> (b, c, Just (Colon ws, f))
                   Just g -> (b, c, Just (e, Just $ g & trailingWhitespace .~ ws)))
 
+-- | @a@ or @*a@
+--
+-- Used to construct lists, e.g. @[ 1, 'x', **c ]@
 data ListItem (v :: [*]) a
   = ListItem
   { _listItemAnn :: a
@@ -377,6 +391,9 @@ instance HasTrailingWhitespace (ListItem v a) where
            ListUnpack b [] d e -> ListUnpack b [] d $ e & trailingWhitespace .~ ws
            ListUnpack b ((c, _) : rest) e f -> ListUnpack b ((c, ws) : rest) e f)
 
+-- | @a@ or @*a@
+--
+-- Used to construct sets, e.g. @{ 1, 'x', **c }@
 data SetItem (v :: [*]) a
   = SetItem
   { _setItemAnn :: a
@@ -406,6 +423,9 @@ instance HasTrailingWhitespace (SetItem v a) where
            SetUnpack b [] d e -> SetUnpack b [] d $ e & trailingWhitespace .~ ws
            SetUnpack b ((c, _) : rest) e f -> SetUnpack b ((c, ws) : rest) e f)
 
+-- | @a@ or @*a@
+--
+-- Used to construct tuples, e.g. @(1, 'x', **c)@
 data TupleItem (v :: [*]) a
   = TupleItem
   { _tupleItemAnn :: a
@@ -793,7 +813,8 @@ instance Plated (Expr '[] a) where; plate = gplate
 instance HasExprs Expr where
   _Exprs = id
 
--- | @shouldGroupLeft op left@ returns true if @left@ needs to be parenthesised
+-- |
+-- @shouldGroupLeft op left@ returns true if @left@ needs to be parenthesised
 -- when it is the left argument of @op@
 shouldGroupLeft :: BinOp a -> Expr v a -> Bool
 shouldGroupLeft op left =
@@ -821,7 +842,8 @@ shouldGroupLeft op left =
   in
     leftf || leftf'
 
--- | @shouldGroupRight op right@ returns true if @right@ needs to be parenthesised
+-- |
+-- @shouldGroupRight op right@ returns true if @right@ needs to be parenthesised
 -- when it is the right argument of @op@
 shouldGroupRight :: BinOp a -> Expr v a -> Bool
 shouldGroupRight op right =

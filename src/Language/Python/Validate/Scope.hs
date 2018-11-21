@@ -16,8 +16,10 @@ Portability : non-portable
 -}
 
 module Language.Python.Validate.Scope
-  ( module Language.Python.Validate.Scope.Error
+  ( module Data.Validation
+  , module Language.Python.Validate.Scope.Error
   , Scope
+  , ValidateScope
   , ScopeContext(..), scGlobalScope, scLocalScope, scImmediateScope
   , initialScopeContext
   , runValidateScope
@@ -49,6 +51,8 @@ module Language.Python.Validate.Scope
   )
 where
 
+import Data.Validation
+
 import Control.Arrow ((&&&))
 import Control.Applicative ((<|>))
 import Control.Lens.Cons (snoc)
@@ -72,7 +76,6 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Map.Strict (Map)
 import Data.String (fromString)
 import Data.Type.Set (Nub)
-import Data.Validation (Validation)
 import Data.Validate.Monadic (ValidateM(..), runValidateM, bindVM, liftVM0, errorVM1)
 import Unsafe.Coerce (unsafeCoerce)
 

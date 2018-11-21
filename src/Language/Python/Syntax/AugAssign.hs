@@ -49,7 +49,7 @@ data AugAssignOp
   | MinusEq
   -- | @*=@
   | StarEq
-  -- | @@=@
+  -- | @\@=@
   | AtEq
   -- | @/=@
   | SlashEq

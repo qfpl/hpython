@@ -18,9 +18,11 @@ Portability : non-portable
 -}
 
 module Language.Python.Validate.Syntax
-  ( module Language.Python.Validate.Syntax.Error
+  ( module Data.Validation
+  , module Language.Python.Validate.Syntax.Error
   , reservedWords
   , Syntax
+  , ValidateSyntax
   , SyntaxContext(..), inLoop, inFunction, inGenerator, inParens
   , initialSyntaxContext
   , runValidateSyntax
@@ -54,6 +56,8 @@ module Language.Python.Validate.Syntax
   )
 where
 
+import Data.Validation
+
 import Control.Applicative ((<|>), liftA2)
 import Control.Lens.Cons (snoc, _init)
 import Control.Lens.Fold
@@ -78,7 +82,6 @@ import Data.List.NonEmpty (NonEmpty(..), (<|))
 import Data.Maybe (isJust, isNothing, fromMaybe)
 import Data.Semigroup (Semigroup(..))
 import Data.Type.Set (Nub, Member)
-import Data.Validation (Validation(..))
 import Data.Validate.Monadic (ValidateM(..), bindVM, liftVM0, liftVM1, errorVM, errorVM1)
 import Unsafe.Coerce (unsafeCoerce)
 

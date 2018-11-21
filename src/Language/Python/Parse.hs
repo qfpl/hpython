@@ -12,7 +12,8 @@ Portability : non-portable
 -}
 
 module Language.Python.Parse
-  ( Parser
+  ( module Language.Python.Parse.Error
+  , Parser
   , parseModule
   , parseStatement
   , parseExpr
@@ -30,17 +31,17 @@ import Data.Validation (Validation, bindValidation, fromEither)
 import Text.Megaparsec (eof)
 
 import Language.Python.Internal.Lexer
-  ( AsLexicalError(..), AsTabError(..)
-  , SrcInfo(..), initialSrcInfo, withSrcInfo
+  ( SrcInfo(..), initialSrcInfo, withSrcInfo
   , tokenize, insertTabs
   )
 import Language.Python.Internal.Token (PyToken)
 import Language.Python.Internal.Parse
-  ( AsParseError, Parser, runParser, level, module_, statement, exprOrStarList
+  ( Parser, runParser, level, module_, statement, exprOrStarList
   , expr, space
   )
-import Language.Python.Syntax.Expr (Expr)
 import Language.Python.Internal.Syntax.IR (AsIRError)
+import Language.Python.Parse.Error
+import Language.Python.Syntax.Expr (Expr)
 import Language.Python.Syntax.Module (Module)
 import Language.Python.Syntax.Statement (Statement)
 import Language.Python.Syntax.Whitespace (Indents (..))

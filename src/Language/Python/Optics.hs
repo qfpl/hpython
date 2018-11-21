@@ -13,20 +13,61 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Optics where
+module Language.Python.Optics
+  ( module Language.Python.Optics.Validated
+  , -- * Indentation
+    HasIndents(..)
+  , _Indent
+    -- * Newlines
+  , HasNewlines(..)
+    -- * Simple statements
+    -- ** Assignment
+  , assignTargets
+    -- * Compound statements
+  , _Fundef
+  , _ClassDef
+  , _While
+  , _For
+  , _With
+    -- ** @if@ statements
+  , _If
+  , _Elif
+    -- ** @try@ statements
+  , _TryExcept
+  , _TryFinally
+  , _Finally
+  , _Except
+  , AsTry(..)
+    -- ** @else@
+  , _Else
+    -- * Parameters
+  , _PositionalParam
+  , _KeywordParam
+  , _StarParam
+    -- * Expressions
+  , _Ident
+  , _None
+  , _Call
+    -- ** Tuples
+  , _Tuple
+  , _TupleUnpack
+  , tupleItems
+    -- ** Lists
+  , _List
+  , _ListUnpack
+  , listItems
+  )
+where
 
-import Control.Lens.Fold (Fold)
 import Control.Lens.Getter ((^.), view)
 import Control.Lens.Iso (Iso', iso, from)
-import Control.Lens.Setter ((.~))
 import Control.Lens.Traversal (Traversal, Traversal', traverseOf)
 import Control.Lens.Tuple (_2, _3, _4)
 import Control.Lens.Prism (Prism, _Right, prism)
 import Data.Coerce (coerce)
-import Data.Function ((&))
 
 import Language.Python.Internal.Token (PyToken(..))
-import Language.Python.Optics.Validated (unvalidated)
+import Language.Python.Optics.Validated
 import Language.Python.Syntax.Expr (Expr (..), TupleItem (TupleUnpack), ListItem (ListUnpack), Param (..), _Exprs)
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Module
@@ -254,9 +295,6 @@ _Ident =
 
 _Indent :: HasIndents s a => Traversal' s [Whitespace]
 _Indent = _Indents.indentsValue.traverse.indentWhitespaces
-
-noIndents :: HasIndents s a => Fold s s
-noIndents f s = f $ s & _Indents.indentsValue .~ []
 
 class HasIndents s a | s -> a where
   _Indents :: Traversal' s (Indents a)

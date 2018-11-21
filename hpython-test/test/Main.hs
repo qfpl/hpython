@@ -156,7 +156,7 @@ validateExprSyntax' = runValidateSyntax initialSyntaxContext [] . validateExprSy
 
 validateExprIndentation'
   :: Expr '[] a
-  -> Validation (NonEmpty (IndentationError '[] a)) (Expr '[Indentation] a)
+  -> Validation (NonEmpty (IndentationError a)) (Expr '[Indentation] a)
 validateExprIndentation' = runValidateIndentation . validateExprIndentation
 
 validateStatementSyntax'
@@ -167,7 +167,7 @@ validateStatementSyntax' =
 
 validateStatementIndentation'
   :: Statement '[] a
-  -> Validation (NonEmpty (IndentationError '[] a)) (Statement '[Indentation] a)
+  -> Validation (NonEmpty (IndentationError a)) (Statement '[Indentation] a)
 validateStatementIndentation' = runValidateIndentation . validateStatementIndentation
 
 validateModuleSyntax'
@@ -178,7 +178,7 @@ validateModuleSyntax' =
 
 validateModuleIndentation'
   :: Module '[] a
-  -> Validation (NonEmpty (IndentationError '[] a)) (Module '[Indentation] a)
+  -> Validation (NonEmpty (IndentationError a)) (Module '[Indentation] a)
 validateModuleIndentation' = runValidateIndentation . validateModuleIndentation
 
 expr_printparseprint_print :: Property

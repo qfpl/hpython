@@ -107,6 +107,9 @@ instance HasTrailingWhitespace a => HasTrailingWhitespace (NonEmpty a) where
            x' : xs' -> NonEmpty.cons x $ (x' :| xs') & trailingWhitespace .~ ws)
 
 -- | A newline that may be following a statement-containing thing
+--
+-- Some forms /always/ have a trailing newline, which is why this class isn't just
+-- @trailingNewline :: 'Lens'' (s v a) ('Maybe' 'Newline')@
 class HasTrailingNewline (s :: [*] -> * -> *) where
   trailingNewline :: Traversal' (s v a) Newline
   setTrailingNewline :: s v a -> Newline -> s v a

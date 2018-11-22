@@ -518,8 +518,8 @@ instance HasTrailingNewline Statement where
 
   setTrailingNewline s n =
     case s of
-      SimpleStatement i a -> SimpleStatement i $ a & trailingNewline .~ n
-      CompoundStatement c -> CompoundStatement $ c & trailingNewline .~ n
+      SimpleStatement i a -> SimpleStatement i $ setTrailingNewline a n
+      CompoundStatement c -> CompoundStatement $ setTrailingNewline c n
 
 instance HasTrailingNewline SimpleStatement where
   trailingNewline f (MkSimpleStatement a b c d e) =

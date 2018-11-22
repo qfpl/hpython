@@ -60,7 +60,7 @@ syntaxValidateModule
 syntaxValidateModule x =
   case runValidateIndentation $ validateModuleIndentation x of
     Failure errs -> do
-      annotateShow (errs :: NonEmpty (IndentationError '[] ()))
+      annotateShow (errs :: NonEmpty (IndentationError ()))
       failure
     Success a ->
       pure $ runValidateSyntax initialSyntaxContext [] (validateModuleSyntax a)
@@ -74,7 +74,7 @@ syntaxValidateStatement
 syntaxValidateStatement x =
   case runValidateIndentation $ validateStatementIndentation x of
     Failure errs -> do
-      annotateShow (errs :: NonEmpty (IndentationError '[] ()))
+      annotateShow (errs :: NonEmpty (IndentationError ()))
       failure
     Success a ->
       pure $ runValidateSyntax initialSyntaxContext [] (validateStatementSyntax a)
@@ -88,7 +88,7 @@ syntaxValidateExpr
 syntaxValidateExpr x =
   case runValidateIndentation $ validateExprIndentation x of
     Failure errs -> do
-      annotateShow (errs :: NonEmpty (IndentationError '[] ()))
+      annotateShow (errs :: NonEmpty (IndentationError ()))
       failure
     Success a ->
       pure $ runValidateSyntax initialSyntaxContext [] (validateExprSyntax a)

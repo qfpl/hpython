@@ -25,7 +25,7 @@ fullyValidate
 fullyValidate x =
   case runValidateIndentation $ validateStatementIndentation x of
     Failure errs -> do
-      annotateShow (errs :: NonEmpty (IndentationError '[] ()))
+      annotateShow (errs :: NonEmpty (IndentationError ()))
       failure
     Success a ->
       case runValidateSyntax initialSyntaxContext [] (validateStatementSyntax a) of

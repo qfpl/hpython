@@ -72,7 +72,7 @@ doRoundtrip file = do
   py <- shouldBeParseSuccess parseModule file
   case runValidateIndentation $ validateModuleIndentation py of
     Failure errs -> do
-      annotateShow (errs :: NonEmpty (IndentationError '[] SrcInfo))
+      annotateShow (errs :: NonEmpty (IndentationError SrcInfo))
       failure
     Success res ->
       case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of

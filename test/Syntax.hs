@@ -11,6 +11,7 @@ import Language.Python.Render (showStatement, showExpr)
 import Language.Python.Parse (parseModule, parseStatement, parseExpr)
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
+import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace

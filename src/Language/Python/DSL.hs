@@ -349,9 +349,10 @@ import Control.Lens.Iso (from)
 import Control.Lens.Lens (Lens')
 import Control.Lens.Prism (_Right, _Just)
 import Control.Lens.Review ((#))
-import Control.Lens.Setter ((.~), (<>~), (?~), (%~), Setter', over)
+import Control.Lens.Setter ((.~), (<>~), (?~), (%~), Setter', set, over)
 import Control.Lens.Traversal (traverseOf)
 import Control.Lens.Tuple (_2)
+import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.String (fromString)
 import Data.List.NonEmpty (NonEmpty(..))
@@ -585,7 +586,18 @@ instance HasPositional Arg Expr where; p_ = PositionalArg ()
 instance HasKeyword Arg where; k_ a = KeywordArg () a []
 
 class HasParameters s where
-  setParameters :: [Raw Param] -> Raw s -> Raw s
+  -- | A faux-Lens that allows targeting 'Param's in-between existing formatting,
+  -- and adding appropriate formatting when extra parameters are introduced.
+  --
+  -- >>> 'Language.Python.Render.showStatement' myStatement
+  -- \"def a(b ,  c   ):\\n    pass\"
+  --
+  -- >>> 'Language.Python.Render.showStatement' (myStatement '&' '_Fundef' '.' 'parameters_' '.~' ['p_' \"d\", 'p_' \"e\"]
+  -- \"def a(d ,  e   ):\\n    pass\"
+  --
+  -- >>> 'Language.Python.Render.showStatement' (myStatement '&' '_Fundef' '.' 'parameters_' '.~' ['p_' \"d\", 'p_' \"e\", 'p_' \"f\"]
+  -- \"def a(d ,  e   , f):\\n    pass\"
+  parameters_ :: Functor f => ([Raw Param] -> f [Raw Param]) -> Raw s -> f (Raw s)
   parameters :: Lens' (Raw s) (CommaSep (Raw Param))
 
 class HasArguments s where
@@ -644,7 +656,10 @@ mkGetBody thing bodyField indentsField code =
           Block x y z -> fmap (Line . Left) x <> (Line (Right y) : fmap Line z)) $
   fromMaybe
     (error $ "malformed indentation in " <> thing <> " body")
-    (traverseOf _Indents (fmap doDedent . subtractStart (indentsField code)) (bodyField code))
+    (traverseOf
+       _Indents
+       (fmap doDedent . subtractStart (indentsField code))
+       (bodyField code))
 
 instance HasBody Fundef where
   body = fdBody
@@ -652,7 +667,30 @@ instance HasBody Fundef where
   getBody = mkGetBody "function" _fdBody _fdIndents
 
 instance HasParameters Fundef where
-  setParameters p = fdParameters .~ listToCommaSep p
+  parameters_ f e = flip (set fdParameters) e . go ps <$> ps'
+    where
+      ps = e ^. fdParameters
+      ps' = f $ toList ps
+
+      go :: CommaSep (Raw Param) -> [Raw Param] -> CommaSep (Raw Param)
+      go CommaSepNone [] = CommaSepNone
+      go CommaSepNone (x:xs) = listToCommaSep $ x:xs
+      go CommaSepOne{} [] = CommaSepNone
+      go (CommaSepOne a) [x] =
+        CommaSepOne $ x & trailingWhitespace .~ (a ^. trailingWhitespace)
+      go (CommaSepOne a) (x:xs) =
+        listToCommaSep $ (x & trailingWhitespace .~ (a ^. trailingWhitespace)) :xs
+      go CommaSepMany{} [] = CommaSepNone
+      go (CommaSepMany a b CommaSepNone) [x] =
+        CommaSepMany
+          (x & trailingWhitespace .~ (a ^. trailingWhitespace))
+          b
+          CommaSepNone
+      go (CommaSepMany a _ _) [x] =
+        CommaSepOne (x & trailingWhitespace .~ (a ^. trailingWhitespace))
+      go (CommaSepMany a b c) (x:xs) =
+        CommaSepMany (x & trailingWhitespace .~ (a ^. trailingWhitespace)) b $ go c xs
+
   parameters = fdParameters
 
 -- | Create a minimal valid function definition

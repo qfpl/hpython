@@ -3,8 +3,14 @@ module DSL (dslTests) where
 
 import Hedgehog
 
-import Language.Python.Render (showExpr)
+import Control.Lens ((.~))
+import Data.Function ((&))
+
 import Language.Python.DSL
+import Language.Python.Render (showExpr)
+import Language.Python.Syntax.CommaSep (CommaSep(..))
+import Language.Python.Syntax.Punctuation (Comma(..))
+import Language.Python.Syntax.Whitespace (Whitespace(..))
 
 dslTests :: Group
 dslTests = $$discover
@@ -145,3 +151,97 @@ prop_subscript_16 =
             ]
         ]
     showExpr expr  === "a[(slice(1, None, None), 2),]"
+
+prop_parameters_1 :: Property
+prop_parameters_1 =
+  withTests 1 . property $ do
+    let
+      st = def_ "a" [] [line_ pass_]
+
+      params1 =
+        CommaSepMany (p_ "test1") (Comma $ replicate 5 Space) $
+        CommaSepMany (p_ "test2") (Comma $ replicate 3 Space) $
+        CommaSepNone
+      st1 = st & _Fundef.fdParameters .~ params1
+
+      params2 =
+        CommaSepMany (p_ "test3") (Comma $ replicate 5 Space) $
+        CommaSepMany (p_ "test4") (Comma $ replicate 3 Space) $
+        CommaSepNone
+      st2 = st & _Fundef.fdParameters .~ params2
+
+    (st1 & _Fundef.parameters_ .~ [p_ "test3", p_ "test4"]) === st2
+
+prop_parameters_2 :: Property
+prop_parameters_2 =
+  withTests 1 . property $ do
+    let
+      st = def_ "a" [] [line_ pass_]
+
+      params1 =
+        CommaSepMany (p_ "test1") (Comma $ replicate 5 Space) $
+        CommaSepMany (p_ "test2") (Comma $ replicate 3 Space) $
+        CommaSepNone
+      st1 = st & _Fundef.fdParameters .~ params1
+
+      params2 =
+        CommaSepMany (p_ "test3") (Comma $ replicate 5 Space) $
+        CommaSepMany (p_ "test4") (Comma $ replicate 3 Space) $
+        CommaSepOne (p_ "test5")
+      st2 = st & _Fundef.fdParameters .~ params2
+
+    (st1 & _Fundef.parameters_ .~ [p_ "test3", p_ "test4", p_ "test5"]) === st2
+
+prop_parameters_3 :: Property
+prop_parameters_3 =
+  withTests 1 . property $ do
+    let
+      st = def_ "a" [] [line_ pass_]
+
+      params1 =
+        CommaSepMany (p_ "test1") (Comma $ replicate 5 Space) $
+        CommaSepMany (p_ "test2") (Comma $ replicate 3 Space) $
+        CommaSepNone
+      st1 = st & _Fundef.fdParameters .~ params1
+
+      params2 = CommaSepOne (p_ "test3")
+      st2 = st & _Fundef.fdParameters .~ params2
+
+    (st1 & _Fundef.parameters_ .~ [p_ "test3"]) === st2
+
+prop_parameters_4 :: Property
+prop_parameters_4 =
+  withTests 1 . property $ do
+    let
+      st = def_ "a" [] [line_ pass_]
+
+      params1 =
+        CommaSepMany (p_ "test1") (Comma $ replicate 5 Space) $
+        CommaSepOne (p_ "test2")
+      st1 = st & _Fundef.fdParameters .~ params1
+
+      params2 =
+        CommaSepMany (p_ "test3") (Comma $ replicate 5 Space) $
+        CommaSepOne (p_ "test4")
+      st2 = st & _Fundef.fdParameters .~ params2
+
+    (st1 & _Fundef.parameters_ .~ [p_ "test3", p_ "test4"]) === st2
+
+prop_parameters_5 :: Property
+prop_parameters_5 =
+  withTests 1 . property $ do
+    let
+      st = def_ "a" [] [line_ pass_]
+
+      params1 =
+        CommaSepMany (p_ "test1") (Comma $ replicate 5 Space) $
+        CommaSepOne (p_ "test2")
+      st1 = st & _Fundef.fdParameters .~ params1
+
+      params2 =
+        CommaSepMany (p_ "test3") (Comma $ replicate 5 Space) $
+        CommaSepMany (p_ "test4") (Comma [Space]) $
+        CommaSepOne (p_ "test5")
+      st2 = st & _Fundef.fdParameters .~ params2
+
+    (st1 & _Fundef.parameters_ .~ [p_ "test3", p_ "test4", p_ "test5"]) === st2

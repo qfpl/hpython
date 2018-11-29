@@ -35,8 +35,7 @@ fixMutableDefaultArguments input = do
 
   pure $
     _Fundef #
-      (function &
-       setParameters newparams &
+      ((function & parameters_ .~ newparams) &
        modifyBody
          (replicate 4 Space)
          (conditionalAssignments <>))

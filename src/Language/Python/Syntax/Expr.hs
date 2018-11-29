@@ -45,6 +45,7 @@ import Data.Coerce (coerce)
 import Data.Digit.Integral (integralDecDigits)
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty)
+import Data.Maybe (isNothing)
 import Data.Monoid ((<>))
 import Data.String (IsString(..))
 import GHC.Generics (Generic)
@@ -118,6 +119,44 @@ data Param (v :: [*]) a
   , _paramType :: Maybe (Colon, Expr v a)
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance HasTrailingWhitespace (Param v a) where
+  trailingWhitespace =
+    lens
+      (\case
+          PositionalParam _ a b ->
+            maybe (a ^. trailingWhitespace) (^. _2.trailingWhitespace) b
+          KeywordParam _ _ _ _ a -> a ^. trailingWhitespace
+          StarParam _ a b c ->
+            maybe
+              a
+              (\i ->
+                 maybe
+                   (i ^. trailingWhitespace)
+                   (^. _2.trailingWhitespace)
+                   c)
+              b
+          DoubleStarParam _ _ a b ->
+            maybe
+              (a ^. trailingWhitespace)
+              (^. _2.trailingWhitespace)
+              b)
+      (\p ws -> case p of
+          PositionalParam a b c ->
+            PositionalParam a
+              (if isNothing c then b & trailingWhitespace .~ ws else b)
+              (c & _Just._2.trailingWhitespace .~ ws)
+          KeywordParam a b c d e ->
+            KeywordParam a b c d $ e & trailingWhitespace .~ ws
+          StarParam a b c d ->
+            StarParam a
+              (if isNothing c && isNothing d then ws else b)
+              (if isNothing d then c & _Just.trailingWhitespace .~ ws else c)
+              (d & _Just._2.trailingWhitespace .~ ws)
+          DoubleStarParam a b c d ->
+            DoubleStarParam a b
+              (if isNothing d then c & trailingWhitespace .~ ws else c)
+              (d & _Just._2.trailingWhitespace .~ ws))
 
 -- | Lens on the syntrax tree annotation on a parameter
 paramAnn :: Lens' (Param v a) a
@@ -778,15 +817,15 @@ instance HasTrailingWhitespace (Expr v a) where
           Bool a b _ -> Bool a b ws
           String a v -> String a (v & trailingWhitespace .~ ws)
           Not a b c -> Not a b (c & trailingWhitespace .~ ws)
-          Tuple a e _ Nothing -> Tuple a (coerce e) (Comma ws) Nothing
-          Tuple a b c@(Comma ws) (Just cs) ->
+          Tuple a b _ Nothing -> Tuple a (coerce b) (Comma ws) Nothing
+          Tuple a b c (Just cs) ->
             Tuple a (coerce b) c (Just $ cs & trailingWhitespace .~ ws)
           DictComp a b c _ -> DictComp a b c ws
           Dict a b c _ -> Dict a b c ws
           SetComp a b c _ -> SetComp a b c ws
           Set a b c _ -> Set a b c ws
           Generator a b -> Generator a $ b & trailingWhitespace .~ ws
-          Await a b c -> Not a b (c & trailingWhitespace .~ ws))
+          Await a b c -> Await a b (c & trailingWhitespace .~ ws))
 
 instance IsString (Expr '[] ()) where
   fromString s = Ident $ MkIdent () s []

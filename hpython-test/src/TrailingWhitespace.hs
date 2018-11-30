@@ -7,6 +7,7 @@ import Control.Lens.Setter ((.~))
 import Data.Char (isSpace)
 import Data.Foldable (traverse_)
 import Data.Function ((&))
+import Data.Semigroup ((<>))
 import Data.Text (Text)
 import Language.Python.Internal.Render
   (showRenderOutput, renderWhitespace, renderParam)

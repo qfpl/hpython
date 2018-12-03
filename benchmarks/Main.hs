@@ -24,7 +24,7 @@ parseCheckSeq name = do
       Success a -> pure a
   case runValidateIndentation $ validateModuleIndentation py of
     Failure errs ->
-      print (errs :: NonEmpty (IndentationError '[] SrcInfo)) *> exitFailure
+      print (errs :: NonEmpty (IndentationError SrcInfo)) *> exitFailure
     Success res ->
       case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
         Failure errs' ->

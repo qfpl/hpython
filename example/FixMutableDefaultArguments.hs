@@ -4,14 +4,12 @@ module FixMutableDefaultArguments where
 import Control.Lens.Fold ((^..), (^?), filtered, folded, anyOf)
 import Control.Lens.Getter (getting)
 import Control.Lens.Review ((#))
-import Control.Lens.Setter ((.~))
+import Control.Lens.Setter ((.~), over)
 import Data.Function ((&))
 import Data.Semigroup ((<>))
 
-import Language.Python.Optics
 import Language.Python.DSL
-import Language.Python.Syntax.Expr (Expr (..), _Exprs)
-import Language.Python.Syntax.Whitespace (Whitespace (Space))
+import Language.Python.Syntax.Expr (Expr(..), _Exprs)
 
 fixMutableDefaultArguments :: Raw Statement -> Maybe (Raw Statement)
 fixMutableDefaultArguments input = do
@@ -36,9 +34,7 @@ fixMutableDefaultArguments input = do
   pure $
     _Fundef #
       ((function & parameters_ .~ newparams) &
-       modifyBody
-         (replicate 4 Space)
-         (conditionalAssignments <>))
+       over body_ (conditionalAssignments <>))
   where
     isMutable :: Raw Expr -> Bool
     isMutable Unit{} = False

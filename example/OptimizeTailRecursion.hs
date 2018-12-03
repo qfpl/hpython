@@ -10,7 +10,7 @@ import Control.Lens.Getter ((^.), to)
 import Control.Lens.Plated (cosmos, transform, transformOn)
 import Control.Lens.Prism (_Just)
 import Control.Lens.Review ((#))
-import Control.Lens.Setter ((%~))
+import Control.Lens.Setter ((%~), (.~))
 import Control.Lens.Tuple (_2, _3)
 import Data.Foldable (toList)
 import Data.Function ((&))
@@ -21,12 +21,11 @@ import Language.Python.Optics
 import Language.Python.DSL
 import Language.Python.Syntax.Expr (Expr (..), _Exprs, argExpr, paramName)
 import Language.Python.Syntax.Statement (CompoundStatement (..), Statement (..), SimpleStatement (..), SmallStatement (..), _Statements)
-import Language.Python.Syntax.Whitespace (Whitespace (Space))
 
 optimizeTailRecursion :: Raw Statement -> Maybe (Raw Statement)
 optimizeTailRecursion st = do
   function <- st ^? _Fundef
-  let functionBody = toList $ getBody function
+  let functionBody = function ^. body_
   bodyLast <- lastStatement functionBody
 
   let
@@ -40,8 +39,12 @@ optimizeTailRecursion st = do
       Just $
       _Fundef #
         (function &
-         setBody (replicate 4 Space)
-           (zipWith (\a b -> line_ (var_ (a <> "__tr") .= var_ b)) paramNames paramNames <>
+         body_ .~
+           (zipWith
+              (\a b -> line_ (var_ (a <> "__tr") .= var_ b))
+              paramNames
+              paramNames <>
+
             [ line_ ("__res__tr" .= none_)
             , line_ . while_ true_ .
               transformOn (traverse._Exprs) (renameIn paramNames "__tr") $
@@ -66,7 +69,7 @@ optimizeTailRecursion st = do
     hasTC :: String -> Raw Statement -> Bool
     hasTC name st =
       case st of
-        CompoundStatement (If _ _ _ e sts [] sts') ->
+        CompoundStatement (If _ _ _ _ sts [] sts') ->
           allOf _last (hasTC name) (sts ^.. _Statements) ||
           allOf _last (hasTC name) (sts' ^.. _Just._3._Statements)
         SimpleStatement _ (MkSimpleStatement s ss _ _ _) ->
@@ -87,9 +90,9 @@ optimizeTailRecursion st = do
       | Just ifSt <- st ^? _If
       , hasTC name st =
           let
-            ifBodyLines = toList $ getBody ifSt
+            ifBodyLines = toList $ ifSt ^. body_
           in
-            case ifSt ^? to getElse._Just.to getBody of
+            case ifSt ^? to getElse._Just.body_ of
               Nothing ->
                 [ line_ $
                   if_ (ifSt ^. ifCond)
@@ -99,7 +102,7 @@ optimizeTailRecursion st = do
               Just sts'' ->
                 [ line_ $
                   if_ (ifSt ^. ifCond)
-                    ((toList (getBody ifSt) ^?! _init) <>
+                    ((ifSt ^?! body_.to toList._init) <>
                      looped name params (ifBodyLines ^?! _last._Statements)) &
                   else_
                     ((toList sts'' ^?! _init) <>
@@ -116,13 +119,10 @@ optimizeTailRecursion st = do
                   case initExps of
                     [] -> []
                     first : rest ->
-                      let
-                        lss = last ss
-                      in
-                        [ line_ $
-                          SimpleStatement idnts
-                          (MkSimpleStatement (first ^. _2) rest sc cmt nl)
-                        ]
+                      [ line_ $
+                        SimpleStatement idnts
+                        (MkSimpleStatement (first ^. _2) rest sc cmt nl)
+                      ]
               in
                 case lastExp of
                   Return _ _ e ->

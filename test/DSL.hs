@@ -3,14 +3,16 @@ module DSL (dslTests) where
 
 import Hedgehog
 
-import Control.Lens ((.~))
+import Control.Lens.Fold ((^?))
+import Control.Lens.Setter ((.~), over)
 import Data.Function ((&))
 
 import Language.Python.DSL
+import Language.Python.Optics (_Indent)
 import Language.Python.Render (showExpr)
 import Language.Python.Syntax.CommaSep (CommaSep(..))
 import Language.Python.Syntax.Punctuation (Comma(..))
-import Language.Python.Syntax.Whitespace (Whitespace(..))
+import Language.Python.Syntax.Whitespace (Whitespace(..), Indents(..))
 
 dslTests :: Group
 dslTests = $$discover
@@ -245,3 +247,66 @@ prop_parameters_5 =
       st2 = st & _Fundef.fdParameters .~ params2
 
     (st1 & _Fundef.parameters_ .~ [p_ "test3", p_ "test4", p_ "test5"]) === st2
+
+prop_body_1 :: Property
+prop_body_1 =
+  withTests 1 . property $ do
+    let
+      st = def_ "a" [] [line_ pass_]
+
+    st ^? _Fundef.fdIndents === Just (Indents [] ())
+    over (_Fundef.body_) id st === st
+
+prop_body_2 :: Property
+prop_body_2 =
+  withTests 1 . property $ do
+    let
+      st = def_ "a" [] [line_ pass_]
+
+    st ^? _Fundef.body_ === Just [line_ pass_]
+
+prop_body_3 :: Property
+prop_body_3 =
+  withTests 1 . property $ do
+    let
+      stInner = def_ "b" [] [line_ pass_]
+      stOuter = def_ "a" [] [line_ pass_, line_ stInner]
+
+      newIndent = replicate 10 Space
+
+    (stOuter & _Indent .~ newIndent) ^? _Fundef.body_ ===
+      Just
+      [ line_ $ pass_ & _Indent .~ newIndent
+      , line_ $ stInner & _Indent .~ newIndent
+      ]
+
+prop_body_4 :: Property
+prop_body_4 =
+  withTests 1 . property $ do
+    let
+      newIndent = replicate 10 Space
+
+      stInner = def_ "b" [] [line_ pass_]
+
+      outerBody =
+        [ line_ pass_
+        , line_ stInner
+        ]
+
+      outerBody' =
+        [ line_ $ pass_ & _Indent .~ newIndent
+        , line_ $ stInner & _Indent .~ newIndent
+        ]
+
+      stOuter = def_ "a" [] outerBody & _Indent .~ newIndent
+
+      finalBody =
+        [ line_ pass_
+        , line_ $ stInner & _Indent .~ newIndent
+        , line_ pass_
+        ]
+
+      stFinal' = def_ "a" [] finalBody & _Indent .~ newIndent
+
+    stOuter ^? _Fundef.body_ === Just outerBody'
+    (stOuter & _Fundef.body_ .~ finalBody) === stFinal'

@@ -39,7 +39,7 @@ import Data.FingerTree (FingerTree, Measured(..), fromList)
 import Data.List (stripPrefix)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Monoid (Monoid, Endo(..), Dual(..))
-import Data.Semigroup (Semigroup)
+import Data.Semigroup (Semigroup, (<>))
 import GHC.Exts (IsList(..))
 
 import qualified Data.List.NonEmpty as NonEmpty

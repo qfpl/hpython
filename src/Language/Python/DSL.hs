@@ -23,8 +23,11 @@ passing @['line_' 'pass_']@
 module Language.Python.DSL
   ( (&)
   , Raw
+  , Module
   , Statement
   , Expr
+    -- * Modules
+  , module_
     -- * Identifiers
   , id_
   , Ident(..)
@@ -369,6 +372,7 @@ import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
+import Language.Python.Syntax.Module
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Punctuation
@@ -384,6 +388,13 @@ type Raw f = f '[] ()
 -- cases we can use 'id_' to provide the extra type information
 id_ :: String -> Raw Ident
 id_ = fromString
+
+module_ :: [Raw Line] -> Raw Module
+module_ [] = ModuleEmpty
+module_ (a:as) =
+  case unLine a of
+    Left (bl, nl) -> ModuleBlank bl nl $ module_ as
+    Right a -> ModuleStatement a $ module_ as
 
 -- | One or more lines of Python code
 newtype Line v a

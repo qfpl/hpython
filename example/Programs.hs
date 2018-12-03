@@ -9,12 +9,12 @@ import Data.List.NonEmpty (NonEmpty(..))
 
 import Language.Python.DSL
 
-import Language.Python.Syntax.Module (Module (..))
-import Language.Python.Syntax.CommaSep (Comma (..), CommaSep (..), CommaSep1' (..))
-import Language.Python.Syntax.Expr (Arg (..), Expr (..), Param (..))
-import Language.Python.Syntax.Punctuation (Colon (..))
-import Language.Python.Syntax.Statement (Block (..), CompoundStatement (..), SimpleStatement (..), SmallStatement (..), Statement (..), Suite (..))
-import Language.Python.Syntax.Whitespace (Blank (..), Indents (..), Newline (..), Whitespace (..), indentWhitespaces)
+import Language.Python.Syntax.Module (Module(..))
+import Language.Python.Syntax.CommaSep (Comma(..), CommaSep(..), CommaSep1'(..))
+import Language.Python.Syntax.Expr (Arg(..), Expr(..), Param(..))
+import Language.Python.Syntax.Punctuation (Colon(..))
+import Language.Python.Syntax.Statement (Block(..), CompoundStatement(..), SimpleStatement(..), SmallStatement(..), Statement(..), Suite(..))
+import Language.Python.Syntax.Whitespace (Indents(..), Newline(..), Whitespace(..), indentWhitespaces)
 
 -- |
 -- @
@@ -126,16 +126,18 @@ yes =
 
 everything :: Raw Module
 everything =
-  ModuleStatement append_to $
-  ModuleBlank (Blank () [] Nothing) LF $
+  module_
+  [ line_ append_to
+  , blank_
 
-  ModuleStatement append_to' $
-  ModuleBlank (Blank () [] Nothing) LF $
+  , line_ append_to'
+  , blank_
 
-  ModuleStatement fact_tr $
-  ModuleBlank (Blank () [] Nothing) LF $
+  , line_ fact_tr
+  , blank_
 
-  ModuleStatement spin $
-  ModuleBlank (Blank () [] Nothing) LF $
+  , line_ spin
+  , blank_
 
-  ModuleStatement yes ModuleEmpty
+  , line_ yes
+  ]

@@ -28,6 +28,11 @@ module Language.Python.Syntax.Types
   , spWhitespace
   , spName
   , spType
+    -- ** Unnamed Starred Parameters
+  , UnnamedStarParam(..)
+    -- *** Lenses
+  , uspAnn
+  , uspWhitespace
     -- ** Keyword parameters
   , KeywordParam(..)
     -- *** Lenses
@@ -259,10 +264,17 @@ data StarParam v a
   = MkStarParam
   { _spAnn :: a
   , _spWhitespace :: [Whitespace]
-  , _spName :: Maybe (Ident v a)
+  , _spName :: Ident v a
   , _spType :: Maybe (Colon, Expr v a)
   } deriving (Eq, Show)
 makeLenses ''StarParam
+
+data UnnamedStarParam (v :: [*]) a
+  = MkUnnamedStarParam
+  { _uspAnn :: a
+  , _uspWhitespace :: [Whitespace]
+  } deriving (Eq, Show)
+makeLenses ''UnnamedStarParam
 
 data Call v a
   = MkCall

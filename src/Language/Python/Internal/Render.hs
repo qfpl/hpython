@@ -1506,12 +1506,15 @@ renderParam (PositionalParam _ name mty) = do
 renderParam (StarParam _ ws name mty) = do
   singleton $ TkStar ()
   traverse_ renderWhitespace ws
-  traverse_ renderIdent name
+  renderIdent name
   traverse_
     (\(c, ty) -> do
         renderColon c
         parensTupleGenerator ty)
     mty
+renderParam (UnnamedStarParam _ ws) = do
+  singleton $ TkStar ()
+  traverse_ renderWhitespace ws
 renderParam (DoubleStarParam _ ws name mty) = do
   singleton $ TkDoubleStar ()
   traverse_ renderWhitespace ws

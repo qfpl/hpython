@@ -419,6 +419,7 @@ validateParamScope (KeywordParam a ident mty ws2 expr) =
 validateParamScope (StarParam a b c d) =
   StarParam a b (coerce c) <$>
   traverseOf (traverse._2) validateExprScope d
+validateParamScope (UnnamedStarParam a b) = pure $ UnnamedStarParam a b
 validateParamScope (DoubleStarParam a b c d) =
   DoubleStarParam a b (coerce c) <$>
   traverseOf (traverse._2) validateExprScope d

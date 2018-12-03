@@ -105,9 +105,15 @@ data Param (v :: [*]) a
   { _paramAnn :: a
   -- '*' spaces
   , _unsafeStarParamWhitespace :: [Whitespace]
-  , _unsafeStarParamName :: Maybe (Ident v a)
+  , _unsafeStarParamName :: Ident v a
   -- ':' spaces <expr>
   , _paramType :: Maybe (Colon, Expr v a)
+  }
+  -- | @def foo(*):@
+  | UnnamedStarParam
+  { _paramAnn :: a
+  -- '*' spaces
+  , _unsafeUnnamedStarParamWhitespace :: [Whitespace]
   }
   -- | @def foo(**dict):@
   | DoubleStarParam
@@ -127,15 +133,12 @@ instance HasTrailingWhitespace (Param v a) where
           PositionalParam _ a b ->
             maybe (a ^. trailingWhitespace) (^. _2.trailingWhitespace) b
           KeywordParam _ _ _ _ a -> a ^. trailingWhitespace
-          StarParam _ a b c ->
+          UnnamedStarParam _ a -> a
+          StarParam _ _ b c ->
             maybe
-              a
-              (\i ->
-                 maybe
-                   (i ^. trailingWhitespace)
-                   (^. _2.trailingWhitespace)
-                   c)
-              b
+              (b ^. trailingWhitespace)
+              (^. _2.trailingWhitespace)
+              c
           DoubleStarParam _ _ a b ->
             maybe
               (a ^. trailingWhitespace)
@@ -148,10 +151,11 @@ instance HasTrailingWhitespace (Param v a) where
               (c & _Just._2.trailingWhitespace .~ ws)
           KeywordParam a b c d e ->
             KeywordParam a b c d $ e & trailingWhitespace .~ ws
+          UnnamedStarParam a _ -> UnnamedStarParam a ws
           StarParam a b c d ->
             StarParam a
-              (if isNothing c && isNothing d then ws else b)
-              (if isNothing d then c & _Just.trailingWhitespace .~ ws else c)
+              (if isNothing d then ws else b)
+              (if isNothing d then c & trailingWhitespace .~ ws else c)
               (d & _Just._2.trailingWhitespace .~ ws)
           DoubleStarParam a b c d ->
             DoubleStarParam a b
@@ -179,7 +183,16 @@ paramType
        (Maybe (Colon, Expr v a))
        (Maybe (Colon, Expr '[] a))
 paramType =
-  lens _paramType (\s a -> (s ^. unvalidated) { _paramType = a})
+  lens
+    (\case
+        UnnamedStarParam{} -> Nothing
+        a -> _paramType a)
+    (\s ty -> case s ^. unvalidated of
+       PositionalParam a b _ -> PositionalParam a b ty
+       KeywordParam a b _ c d -> KeywordParam a b ty c d
+       StarParam a b c _ -> StarParam a b c ty
+       UnnamedStarParam a b -> UnnamedStarParam a b
+       DoubleStarParam a b c _ -> DoubleStarParam a b c ty)
 
 -- | (affine) 'Control.Lens.Traversal.Traversal' on the name of a parameter
 --
@@ -205,7 +218,8 @@ paramName f (KeywordParam a b c d e) =
   f b
 paramName f (StarParam a b c d) =
   (\c' -> StarParam a b c' (over (mapped._2) (view unvalidated) d)) <$>
-  traverse f c
+  f c
+paramName _ (UnnamedStarParam a b) = pure $ UnnamedStarParam a b
 paramName f (DoubleStarParam a b c d) =
   (\c' -> DoubleStarParam a b c' (over (mapped._2) (view unvalidated) d)) <$>
   f c
@@ -220,6 +234,7 @@ instance HasExprs Param where
     PositionalParam a (coerce b) <$> traverseOf (traverse._2) f c
   _Exprs f (StarParam a b c d) =
     StarParam a b (coerce c) <$> traverseOf (traverse._2) f d
+  _Exprs _ (UnnamedStarParam a b) = pure $ UnnamedStarParam a b
   _Exprs f (DoubleStarParam a b c d) =
     DoubleStarParam a b (coerce c) <$> traverseOf (traverse._2) f d
 

@@ -16,8 +16,9 @@ Portability : non-portable
 
 module Language.Python.Internal.Parse where
 
-import Control.Applicative (Alternative, (<|>), optional, many, some)
-import Control.Lens.Getter ((^.))
+import Control.Applicative (Alternative, (<|>), optional, many, some, liftA2)
+import Control.Lens.Cons (snoc)
+import Control.Lens.Getter ((^.), view)
 import Control.Lens.Prism (Prism')
 import Control.Lens.Review ((#))
 import Control.Monad (void)
@@ -1052,10 +1053,12 @@ untypedParam =
 
   <|>
 
-  (\(a, b) -> StarParam (pyTokenAnn a) b) <$>
+  (\(a, b) ->
+     maybe
+       (UnnamedStarParam (pyTokenAnn a) b)
+       (\c -> StarParam (pyTokenAnn a) b c Nothing)) <$>
   token anySpace (\case; TkStar{} -> True; _ -> False) "*" <*>
-  optional (identifier anySpace) <*>
-  pure Nothing
+  optional (identifier anySpace)
 
   <|>
 
@@ -1064,39 +1067,73 @@ untypedParam =
   identifier anySpace <*>
   pure Nothing
 
-typedParam :: MonadParsec e PyTokens m => m (Param SrcInfo)
-typedParam =
+tyAnn :: MonadParsec e PyTokens m => m (Colon, Expr SrcInfo)
+tyAnn =
+  (,) <$>
+  (Colon . snd <$> token anySpace (\case; TkColon{} -> True; _ -> False) ":") <*>
+  expr anySpace
+
+tpPositional :: MonadParsec e PyTokens m => m (Param SrcInfo)
+tpPositional =
   (\a b ->
-     maybe
-       (PositionalParam (_identAnn a) a b)
-       (uncurry $ KeywordParam (_identAnn a) a b)) <$>
+    maybe
+      (PositionalParam (_identAnn a) a b)
+      (uncurry $ KeywordParam (_identAnn a) a b)) <$>
   identifier anySpace <*>
   optional tyAnn <*>
   optional
     ((,) <$>
-     (snd <$> token anySpace (\case; TkEq{} -> True; _ -> False) "=") <*>
-     expr anySpace)
+    (snd <$> token anySpace (\case; TkEq{} -> True; _ -> False) "=") <*>
+    expr anySpace)
 
-  <|>
-
+tpStar :: MonadParsec e PyTokens m => m (Param SrcInfo)
+tpStar =
   (\(a, b) ->
-     maybe
-       (StarParam (pyTokenAnn a) b Nothing Nothing)
-       (\(c, d) -> StarParam (pyTokenAnn a) b (Just c) d)) <$>
+    maybe
+      (UnnamedStarParam (pyTokenAnn a) b)
+      (uncurry $ StarParam (pyTokenAnn a) b)) <$>
   token anySpace (\case; TkStar{} -> True; _ -> False) "*" <*>
   optional ((,) <$> identifier anySpace <*> optional tyAnn)
 
-  <|>
-
+tpDoubleStar :: MonadParsec e PyTokens m => m (Param SrcInfo)
+tpDoubleStar =
   (\(a, b) -> DoubleStarParam (pyTokenAnn a) b) <$>
   token anySpace (\case; TkDoubleStar{} -> True; _ -> False) "**" <*>
   identifier anySpace <*>
   optional tyAnn
-  where
-    tyAnn =
-      (,) <$>
-      (Colon . snd <$> token anySpace (\case; TkColon{} -> True; _ -> False) ":") <*>
-      expr anySpace
+
+typedParams :: MonadParsec e PyTokens m => m (CommaSep (Param SrcInfo))
+typedParams =
+  fmap (view _CommaSep) . optional $
+
+  (\a b c -> (a, b <> c, Nothing)) <$>
+  tpPositional <*>
+  many (try ((,) <$> fmap snd (comma anySpace)) <*> tpPositional) <*>
+  ((\a b -> maybe (a : b) (\c -> a : snoc b c)) <$>
+   (try ((,) <$> (snd <$> comma anySpace)) <*> tpStar) <*>
+   many (try ((,) <$> (snd <$> comma anySpace)) <*> tpPositional) <*>
+   optional ((,) <$> (snd <$> comma anySpace) <*> tpDoubleStar)
+
+   <|>
+
+   pure <$> liftA2 (,) (snd <$> comma anySpace) tpDoubleStar
+
+   <|>
+
+   pure [])
+
+  <|>
+
+  (,,) <$>
+  tpStar <*>
+  ((\a -> maybe a (a `snoc`)) <$>
+   many (try ((,) <$> (snd <$> comma anySpace)) <*> tpPositional) <*>
+   optional ((,) <$> (snd <$> comma anySpace) <*> tpDoubleStar)) <*>
+  pure Nothing
+
+  <|>
+
+  (\a -> (a, [], Nothing)) <$> tpDoubleStar
 
 arg :: MonadParsec e PyTokens m => m (Arg SrcInfo)
 arg =
@@ -1320,7 +1357,7 @@ compoundStatement pIndent indentBefore =
       token space (\case; TkDef{} -> True; _ -> False) "def" <*>
       identifier space <*>
       fmap snd (token anySpace (\case; TkLeftParen{} -> True; _ -> False) "(") <*>
-      commaSep anySpace typedParam <*>
+      typedParams <*>
       fmap snd (token space (\case; TkRightParen{} -> True; _ -> False) ")") <*>
       optional
         ((,) <$>

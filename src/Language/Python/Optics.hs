@@ -173,6 +173,19 @@ _StarParam =
         StarParam a b c d -> Right (MkStarParam a b c d)
         a -> Left $ a ^. unvalidated)
 
+_UnnamedStarParam
+  :: Prism
+       (Param v a)
+       (Param '[] a)
+       (UnnamedStarParam v a)
+       (UnnamedStarParam '[] a)
+_UnnamedStarParam =
+  prism
+    (\(MkUnnamedStarParam a b) -> UnnamedStarParam a b)
+    (\case
+        UnnamedStarParam a b -> Right (MkUnnamedStarParam a b)
+        a -> Left $ a ^. unvalidated)
+
 _Fundef
   :: Prism
        (Statement v a)

@@ -1,10 +1,12 @@
 {-# language DataKinds #-}
 module FixMutableDefaultArguments where
 
-import Control.Lens.Fold ((^..), (^?), filtered, folded, anyOf)
+import Control.Lens.Cons (_head)
+import Control.Lens.Fold ((^..), (^?), filtered, folded, anyOf, has)
 import Control.Lens.Getter (getting)
 import Control.Lens.Review ((#))
-import Control.Lens.Setter ((.~), over)
+import Control.Lens.Setter ((.~), (%~))
+import Control.Monad (guard)
 import Data.Function ((&))
 import Data.Semigroup ((<>))
 
@@ -15,12 +17,13 @@ fixMutableDefaultArguments :: Raw Statement -> Maybe (Raw Statement)
 fixMutableDefaultArguments input = do
   function <- input ^? _Fundef
 
-  let paramsList = function ^.. parameters.folded
-  _ <- paramsList ^? folded._KeywordParam.filtered (isMutable._kpExpr)
-
   let
+    paramsList = function ^.. parameters.folded
     targetParams = paramsList ^.. folded._KeywordParam.filtered (isMutable._kpExpr)
 
+  guard $ has _head targetParams
+
+  let
     conditionalAssignments =
       (\(pname, value) ->
          line_ $ if_ (var_ pname `is_` none_) [ line_ (var_ pname .= value) ]) <$>
@@ -33,8 +36,9 @@ fixMutableDefaultArguments input = do
 
   pure $
     _Fundef #
-      ((function & parameters_ .~ newparams) &
-       over body_ (conditionalAssignments <>))
+      (function &
+       parameters_ .~ newparams &
+       body_ %~ (conditionalAssignments <>))
   where
     isMutable :: Raw Expr -> Bool
     isMutable Unit{} = False

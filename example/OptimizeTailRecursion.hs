@@ -132,7 +132,7 @@ optimizeTailRecursion st = do
                         , name' == name ->
                             newSts <>
                             fmap
-                              (\a -> line_ (var_ (a <> "__tr__old") .= (var_ $ a <> "__tr")))
+                              (\a -> line_ (var_ (a <> "__tr__old") .= var_ (a <> "__tr")))
                               params <>
                             zipWith
                               (\a b -> line_ (var_ (a <> "__tr") .= b))
@@ -143,7 +143,8 @@ optimizeTailRecursion st = do
                                 (call ^.. callArguments.folded.folded.argExpr))
                       _ ->
                         newSts <>
-                        maybe [] (\e' -> [ line_ ("__res__tr" .= e') ]) e <> [ line_ break_ ]
+                        maybe [] (\e' -> [ line_ ("__res__tr" .= e') ]) e <>
+                        [ line_ break_ ]
                   Expr _ e
                     | isTailCall name e -> newSts <> [line_ pass_]
                   _ -> [line_ st]

@@ -8,6 +8,7 @@ import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
 
 import Language.Python.DSL
+
 import Language.Python.Syntax.Module (Module (..))
 import Language.Python.Syntax.CommaSep (Comma (..), CommaSep (..), CommaSep1' (..))
 import Language.Python.Syntax.Expr (Arg (..), Expr (..), Param (..))
@@ -22,7 +23,7 @@ import Language.Python.Syntax.Whitespace (Blank (..), Indents (..), Newline (..)
 --   return to
 -- @
 --
--- Written without the DSL
+-- Written without the DSL (not recommended!)
 append_to :: Raw Statement
 append_to =
   CompoundStatement $
@@ -94,8 +95,10 @@ fact_tr =
   [ line_ $
     def_ "go" [p_ "n", p_ "acc"]
       [ line_ $
-        if_ ("n" .== 0) ([line_ $ return_ (var_ "acc")] :: [Raw Line]) &
-        else_ [line_ . return_ $ call_ "go" [p_ $ "n" .- 1, p_ $ "n" .* "acc"]]
+        if_ ("n" .== 0)
+          [line_ $ return_ (var_ "acc")] &
+        else_
+          [line_ . return_ $ call_ "go" [p_ $ "n" .- 1, p_ $ "n" .* "acc"]]
       ]
   , line_ . return_ $ call_ "go" [p_ "n", p_ 1]
   ]

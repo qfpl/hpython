@@ -32,7 +32,7 @@ prop_syntax_1 =
         -- lambda *: None
         Lambda ()
           [Space]
-          (CommaSepMany (StarParam () [] Nothing Nothing) (Comma []) CommaSepNone)
+          (CommaSepMany (UnnamedStarParam () []) (Comma []) CommaSepNone)
           (Colon [Space])
           (None () [])
     res <- syntaxValidateExpr e
@@ -116,3 +116,19 @@ prop_syntax_7 =
       s = "def a(b): global b"
     e <- shouldBeParseSuccess parseModule s
     shouldBeFailure =<< syntaxValidateModule (() <$ e)
+
+prop_syntax_8 :: Property
+prop_syntax_8 =
+  withTests 1 . property $ do
+    let
+      s = "def a(*): pass"
+    e <- shouldBeParseSuccess parseModule s
+    shouldBeFailure =<< syntaxValidateModule (() <$ e)
+
+prop_syntax_9 :: Property
+prop_syntax_9 =
+  withTests 1 . property $ do
+    let
+      s = "def a(*, b=None): pass"
+    e <- shouldBeParseSuccess parseModule s
+    void . shouldBeSuccess =<< syntaxValidateModule (() <$ e)

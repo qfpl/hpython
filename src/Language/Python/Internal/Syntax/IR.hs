@@ -201,8 +201,13 @@ data Param a
   { _paramAnn :: a
   -- '*' spaces
   , _unsafeStarParamWhitespace :: [Whitespace]
-  , _unsafeStarParamName :: Maybe (Ident '[] a)
+  , _unsafeStarParamName :: Ident '[] a
   , _paramType :: Maybe (Colon, Expr a)
+  }
+  | UnnamedStarParam
+  { _paramAnn :: a
+  -- '*' spaces
+  , _unsafeUnnamedStarParamWhitespace :: [Whitespace]
   }
   | DoubleStarParam
   { _paramAnn :: a
@@ -736,6 +741,7 @@ fromIR_param p =
       fromIR_expr e
     StarParam a b c d ->
       Syntax.StarParam a b c <$> traverseOf (traverse._2) fromIR_expr d
+    UnnamedStarParam a b -> pure $ Syntax.UnnamedStarParam a b
     DoubleStarParam a b c d ->
       Syntax.DoubleStarParam a b c <$> traverseOf (traverse._2) fromIR_expr d
 

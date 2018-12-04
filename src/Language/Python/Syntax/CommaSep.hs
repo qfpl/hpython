@@ -11,12 +11,12 @@ Portability : non-portable
 -}
 
 module Language.Python.Syntax.CommaSep
-  ( Comma (..)
-  , CommaSep (..)
+  ( Comma(..)
+  , CommaSep(..), _CommaSep
   , appendCommaSep, maybeToCommaSep, listToCommaSep
-  , CommaSep1 (..)
+  , CommaSep1(..)
   , commaSep1Head, appendCommaSep1, listToCommaSep1, listToCommaSep1'
-  , CommaSep1' (..)
+  , CommaSep1'(..)
   , _CommaSep1'
   )
 where
@@ -123,6 +123,30 @@ data CommaSep1' a
   = CommaSepOne1' a (Maybe Comma)
   | CommaSepMany1' a Comma (CommaSep1' a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
+
+-- | Iso to unpack a 'CommaSep'
+_CommaSep
+  :: Iso
+       (Maybe (a, [(Comma, a)], Maybe Comma))
+       (Maybe (b, [(Comma, b)], Maybe Comma))
+       (CommaSep a)
+       (CommaSep b)
+_CommaSep = iso toCs fromCs
+  where
+    toCs :: Maybe (a, [(Comma, a)], Maybe Comma) -> CommaSep a
+    toCs Nothing = CommaSepNone
+    toCs (Just (a, b, c)) =
+      case b of
+        [] -> maybe (CommaSepOne a) (\c' -> CommaSepMany a c' CommaSepNone) c
+        (d, e):ds -> CommaSepMany a d $ toCs (Just (e, ds, c))
+
+    fromCs :: CommaSep a -> Maybe (a, [(Comma, a)], Maybe Comma)
+    fromCs CommaSepNone = Nothing
+    fromCs (CommaSepOne a) = Just (a, [], Nothing)
+    fromCs (CommaSepMany a b c) =
+      case fromCs c of
+        Nothing -> Just (a, [], Just b)
+        Just (x, y, z) -> Just (a, (b, x) : y, z)
 
 -- | Iso to unpack a 'CommaSep1''
 _CommaSep1'

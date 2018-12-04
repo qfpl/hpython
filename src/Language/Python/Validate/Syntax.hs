@@ -1176,30 +1176,30 @@ validateParamsSyntax isLambda e =
              validateIdentSyntax name <*>
              checkTy a mty)
             (go (_identValue name:names) bsa bkw params)
-    go names bsa bkw (StarParam a ws mname mty : params)
-      | Just name <- mname, _identValue name `elem` names =
+    go names bsa bkw (StarParam a _ name mty : params)
+      | _identValue name `elem` names =
           errorVM1 (_DuplicateArgument # (a, _identValue name)) <*>
           validateIdentSyntax name <*>
           checkTy a mty <*>
           go
             (_identValue name:names)
-            (if isNothing mname then HaveSeenEmptyStarArg (Just a) else bsa)
+            bsa
             bkw
             params
       | otherwise =
-          liftA2
-            (:)
-            (StarParam a ws <$>
-             traverse validateIdentSyntax mname <*
-             (case (mname, mty) of
-                (Nothing, Just{}) -> errorVM1 (_TypedUnnamedStarParam # a)
-                _ -> pure ()) <*>
-             checkTy a mty)
-            (go
-               (maybe names (\n -> _identValue n : names) mname)
-               (if isNothing mname then HaveSeenEmptyStarArg (Just a) else bsa)
-               bkw
-               params)
+          validateIdentSyntax name *>
+          checkTy a mty *>
+          go
+            (_identValue name:names)
+            bsa
+            bkw
+            params
+    go names _ bkw (UnnamedStarParam a _ : params) =
+      go
+        names
+        (HaveSeenEmptyStarArg $ Just a)
+        bkw
+        params
     go names bsa bkw@(HaveSeenKeywordArg True) (PositionalParam a name mty : params) =
       let
         name' = _identValue name

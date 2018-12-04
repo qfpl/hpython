@@ -37,6 +37,7 @@ module Language.Python.DSL
   , identWhitespace
     -- * Starred values
   , HasStar(..)
+  , star_
     -- * Double-starred values
   , HasDoubleStar(..)
     -- * @as@ syntax
@@ -484,9 +485,12 @@ instance HasColon Expr DictItem where
 --
 -- @('.:') :: 'Raw' 'Param' -> 'Raw' 'Expr' -> 'Raw' 'Param'@
 --
+-- 'star_' can be annotated using '.:', but it will have no effect on the output program,
+-- as unnamed starred parameters cannot have type annotations.
+--
 -- See 'def_'
 instance HasColon Param Param where
-  (.:) p t = p { _paramType = Just (Colon [Space], t) }
+  (.:) p t = p & paramType ?~ (Colon [Space], t)
 
 -- | Positional parameters/arguments
 --
@@ -502,7 +506,7 @@ class HasPositional p v | p -> v, v -> p where
 
 -- | See 'def_'
 instance HasStar Ident Param where
-  s_ i = StarParam () [] (Just i) Nothing
+  s_ i = StarParam () [] i Nothing
 
 -- | See 'def_'
 instance HasDoubleStar Ident Param where
@@ -522,6 +526,14 @@ class HasKeyword p where
 
 class HasStar s t | t -> s where
   s_ :: Raw s -> Raw t
+
+-- | Unnamed starred parameter
+--
+-- >>> def_ "a" [ p_ "b", star_ ] [ line_ pass_ ]
+-- def a(b, *):
+--     pass
+star_ :: Raw Param
+star_ = UnnamedStarParam () []
 
 class HasDoubleStar s t | t -> s where
   ss_ :: Raw s -> Raw t

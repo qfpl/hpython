@@ -11,6 +11,11 @@ License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
 Stability   : experimental
 Portability : non-portable
+
+This module only exists as our current best solution to decoupling parts of the
+concrete syntax from abstract syntax. You won't need to care about its existence
+and hopefully it will be deleted soon.
+
 -}
 
 module Language.Python.Internal.Syntax.IR where
@@ -52,7 +57,9 @@ import qualified Language.Python.Syntax.Statement as Syntax
 class AsIRError s a | s -> a where
   _InvalidUnpacking :: Prism' s a
 
-data IRError a = InvalidUnpacking a
+data IRError a
+  -- | Unpacking ( @*value@ ) was used in an invalid position
+  = InvalidUnpacking a
   deriving (Eq, Show)
 
 fromIRError :: AsIRError s a => IRError a -> s

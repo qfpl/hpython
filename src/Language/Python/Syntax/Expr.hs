@@ -511,11 +511,17 @@ instance HasTrailingWhitespace (TupleItem v a) where
 
 -- | This large sum type covers all valid Python /expressions/
 data Expr (v :: [*]) a
+  -- | @()@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#parenthesized-forms
   = Unit
   { _unsafeExprAnn :: a
   , _unsafeUnitWhitespaceInner :: [Whitespace]
   , _unsafeUnitWhitespaceRight :: [Whitespace]
   }
+  -- | @lambda x, y: x@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#lambda
   | Lambda
   { _unsafeExprAnn :: a
   , _unsafeLambdaWhitespace :: [Whitespace]
@@ -523,17 +529,28 @@ data Expr (v :: [*]) a
   , _unsafeLambdaColon :: Colon
   , _unsafeLambdaBody :: Expr v a
   }
+  -- | @yield@
+  --
+  -- @yield a@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#yield-expressions
   | Yield
   { _unsafeExprAnn :: a
   , _unsafeYieldWhitespace :: [Whitespace]
   , _unsafeYieldValue :: Maybe (Expr v a)
   }
+  -- | @yield from a@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#yield-expressions
   | YieldFrom
   { _unsafeExprAnn :: a
   , _unsafeYieldWhitespace :: [Whitespace]
   , _unsafeFromWhitespace :: [Whitespace]
   , _unsafeYieldFromValue :: Expr v a
   }
+  -- | @a if b else c@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#conditional-expressions
   | Ternary
   { _unsafeExprAnn :: a
   -- expr
@@ -547,6 +564,9 @@ data Expr (v :: [*]) a
   -- expr
   , _unsafeTernaryElse :: Expr v a
   }
+  -- | @[a for b in c if d]@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#list-displays
   | ListComp
   { _unsafeExprAnn :: a
   -- [ spaces
@@ -556,6 +576,9 @@ data Expr (v :: [*]) a
   -- ] spaces
   , _unsafeListCompWhitespaceRight :: [Whitespace]
   }
+  -- | @[a, b, c]@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#list-displays
   | List
   { _unsafeExprAnn :: a
   -- [ spaces
@@ -565,6 +588,9 @@ data Expr (v :: [*]) a
   -- ] spaces
   , _unsafeListWhitespaceRight :: [Whitespace]
   }
+  -- | @{a: b for c in d if e}@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#dictionary-displays
   | DictComp
   { _unsafeExprAnn :: a
   -- { spaces
@@ -574,12 +600,20 @@ data Expr (v :: [*]) a
   -- } spaces
   , _unsafeDictCompWhitespaceRight :: [Whitespace]
   }
+  -- | @{}@
+  --
+  -- @{a: 1, b: 2, c: 3}@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#dictionary-displays
   | Dict
   { _unsafeExprAnn :: a
   , _unsafeDictWhitespaceLeft :: [Whitespace]
   , _unsafeDictValues :: Maybe (CommaSep1' (DictItem v a))
   , _unsafeDictWhitespaceRight :: [Whitespace]
   }
+  -- | @{a for b in c if d}@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#set-displays
   | SetComp
   { _unsafeExprAnn :: a
   -- { spaces
@@ -589,12 +623,18 @@ data Expr (v :: [*]) a
   -- } spaces
   , _unsafeSetCompWhitespaceRight :: [Whitespace]
   }
+  -- | @{a, b, c}@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#set-displays
   | Set
   { _unsafeExprAnn :: a
   , _unsafeSetWhitespaceLeft :: [Whitespace]
   , _unsafeSetValues :: CommaSep1' (SetItem v a)
   , _unsafeSetWhitespaceRight :: [Whitespace]
   }
+  -- | @a.b@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#attribute-references
   | Deref
   { _unsafeExprAnn :: a
   -- expr
@@ -604,6 +644,15 @@ data Expr (v :: [*]) a
   -- ident
   , _unsafeDerefValueRight :: Ident v a
   }
+  -- | @a[b]@
+  --
+  -- @a[:]@
+  --
+  -- @a[:, b:]@
+  --
+  -- etc.
+  --
+  -- https://docs.python.org/3/reference/expressions.html#subscriptions
   | Subscript
   { _unsafeExprAnn :: a
   -- expr
@@ -615,6 +664,9 @@ data Expr (v :: [*]) a
   -- ] spaces
   , _unsafeSubscriptWhitespaceRight :: [Whitespace]
   }
+  -- | @f(x)@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#calls
   | Call
   { _unsafeExprAnn :: a
   -- expr
@@ -626,20 +678,50 @@ data Expr (v :: [*]) a
   -- ) spaces
   , _unsafeCallWhitespaceRight :: [Whitespace]
   }
+  -- | @None@
+  --
+  -- https://docs.python.org/3/library/constants.html#None
   | None
   { _unsafeExprAnn :: a
   , _unsafeNoneWhitespace :: [Whitespace]
   }
+  -- | @...@
+  --
+  -- https://docs.python.org/3/library/constants.html#Ellipsis
   | Ellipsis
   { _unsafeExprAnn :: a
   , _unsafeEllipsisWhitespace :: [Whitespace]
   }
+  -- | @a + b@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#the-power-operator
+  --
+  -- https://docs.python.org/3/reference/expressions.html#binary-arithmetic-operations
+  --
+  -- https://docs.python.org/3/reference/expressions.html#shifting-operations
+  --
+  -- https://docs.python.org/3/reference/expressions.html#binary-bitwise-operations
+  --
+  -- https://docs.python.org/3/reference/expressions.html#comparisons
+  --
+  -- https://docs.python.org/3/reference/expressions.html#membership-test-operations
+  --
+  -- https://docs.python.org/3/reference/expressions.html#is-not
+  --
+  -- https://docs.python.org/3/reference/expressions.html#boolean-operations
   | BinOp
   { _unsafeExprAnn :: a
   , _unsafeBinOpExprLeft :: Expr v a
   , _unsafeBinOpOp :: BinOp a
   , _unsafeBinOpExprRight :: Expr v a
   }
+  -- | @-a@
+  --
+  -- @~a@
+  --
+  -- @+a@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#unary-arithmetic-and-bitwise-operations
   | UnOp
   { _unsafeExprAnn :: a
   , _unsafeUnOpOp :: UnOp a
@@ -654,33 +736,80 @@ data Expr (v :: [*]) a
   -- ) spaces
   , _unsafeParensWhitespaceAfter :: [Whitespace]
   }
+  -- | @a@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#atom-identifiers
   | Ident
   { _unsafeIdentValue :: Ident v a
   }
+  -- | @1@
+  --
+  -- @0xF3A
+  --
+  -- @0o177
+  --
+  -- @0b1011@
+  --
+  -- https://docs.python.org/3/reference/lexical_analysis.html#grammar-token-integer
   | Int
   { _unsafeExprAnn :: a
   , _unsafeIntValue :: IntLiteral a
   , _unsafeIntWhitespace :: [Whitespace]
   }
+  -- | @1.@
+  --
+  -- @3.14@
+  --
+  -- @10e100@
+  --
+  -- https://docs.python.org/3/reference/lexical_analysis.html#floating-point-literals
   | Float
   { _unsafeExprAnn :: a
   , _unsafeFloatValue :: FloatLiteral a
   , _unsafeFloatWhitespace :: [Whitespace]
   }
+  -- | @10j@
+  --
+  -- @5.j@
+  --
+  -- https://docs.python.org/3/reference/lexical_analysis.html#floating-point-literals
   | Imag
   { _unsafeExprAnn :: a
   , _unsafeImagValue :: ImagLiteral a
   , _unsafeImagWhitespace :: [Whitespace]
   }
+  -- | @True@
+  --
+  -- @False@
+  --
+  -- https://docs.python.org/3/library/constants.html#True
+  --
+  -- https://docs.python.org/3/library/constants.html#False
   | Bool
   { _unsafeExprAnn :: a
   , _unsafeBoolValue :: Bool
   , _unsafeBoolWhitespace :: [Whitespace]
   }
+  -- | @\"asdf\"@
+  --
+  -- @b\"asdf\"@
+  --
+  -- @\"asdf\" \'asdf\'@
+  --
+  -- @\'\'\'asdf\'\'\'@
+  --
+  -- https://docs.python.org/3/reference/lexical_analysis.html#grammar-token-stringliteral
   | String
   { _unsafeExprAnn :: a
   , _unsafeStringValue :: NonEmpty (StringLiteral a)
   }
+  -- | @a, b, c@
+  --
+  -- @(a, b)@
+  --
+  -- @(a,)@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#expression-lists
   | Tuple
   { _unsafeExprAnn :: a
   -- expr
@@ -690,15 +819,24 @@ data Expr (v :: [*]) a
   -- [exprs]
   , _unsafeTupleTail :: Maybe (CommaSep1' (TupleItem v a))
   }
+  -- | @not a@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#boolean-operations
   | Not
   { _unsafeExprAnn :: a
   , _unsafeNotWhitespace :: [Whitespace]
   , _unsafeNotValue :: Expr v a
   }
+  -- | @(a for b in c)2
+  --
+  -- https://docs.python.org/3/reference/expressions.html#generator-expressions
   | Generator
   { _unsafeExprAnn :: a
   , _generatorValue :: Comprehension Expr v a
   }
+  -- | @await a@
+  --
+  -- https://docs.python.org/3/reference/expressions.html#await
   | Await
   { _unsafeExprAnn :: a
   , _unsafeAwaitWhitespace :: [Whitespace]

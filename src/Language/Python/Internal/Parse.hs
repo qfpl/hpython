@@ -14,7 +14,88 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Internal.Parse where
+module Language.Python.Internal.Parse
+  ( Parser
+  , runParser
+    -- * Stream type
+  , PyTokens(..)
+    -- * Errors
+  , AsParseError(..)
+  , unsafeFromParseError
+    -- * Parsers
+  , token
+    -- ** Symbols
+  , comma
+  , rightParen
+  , colon
+  , semicolon
+  , star
+  , doubleStar
+    -- ** Atomic forms
+  , identifier
+  , bool
+  , none
+  , ellipsis
+  , integer
+  , float
+  , imag
+  , stringOrBytes
+    -- ** Compound forms
+  , arg
+  , binOp
+  , commaSep
+  , commaSep1
+  , commaSep1'
+  , commaSepRest
+  , compIf
+  , compFor
+  , compoundStatement
+  , decorator
+  , decoratorValue
+  , decorators
+  , expr
+  , exprList
+  , exprListComp
+  , exprNoCond
+  , exprComp
+  , exprOrStarList
+  , lambda
+  , lambdaNoCond
+  , module_
+  , orExpr
+  , orExprList
+  , orTest
+  , simpleStatement
+  , someParams
+  , smallStatement
+  , starExpr
+  , statement
+  , suite
+  , tpPositional
+  , tpStar
+  , tpDoubleStar
+  , tyAnn
+  , typedParams
+  , untypedParams
+  , upPositional
+  , upStar
+  , upDoubleStar
+  , yieldExpr
+    -- ** Formatting
+  , anySpace
+  , space
+  , eol
+  , continued
+  , newline
+  , indent
+  , dedent
+  , level
+  , blank
+  , comment
+    -- ** Miscellaneous combinators
+  , sepBy1'
+  )
+where
 
 import Control.Applicative (Alternative, (<|>), optional, many, some)
 import Control.Lens.Cons (snoc)
@@ -30,6 +111,7 @@ import Data.List.NonEmpty (NonEmpty, some1)
 import Data.Proxy (Proxy(..))
 import Data.Set (Set)
 import Data.Void (Void)
+import GHC.Stack (HasCallStack)
 import Text.Megaparsec
   ( (<?>), MonadParsec, Parsec, Stream(..), SourcePos(..), eof, try, lookAhead
   , notFollowedBy
@@ -127,24 +209,28 @@ class AsParseError s t | s -> t where
          , Set (Megaparsec.ErrorItem t)
          )
 
-fromParseError
-  :: AsParseError s t
+-- | Convert a concrete 'Megaparsec.ParseError' to a value that has an instance of 'AsParseError'
+--
+-- This function is partial because our parser will never use 'Megaparsec.FancyError'
+unsafeFromParseError
+  :: (HasCallStack, AsParseError s t)
   => Megaparsec.ParseError t e
   -> s
-fromParseError Megaparsec.FancyError{} = error "there are none of these"
-fromParseError (Megaparsec.TrivialError pos a b) = _ParseError # (pos, a, b)
+unsafeFromParseError Megaparsec.FancyError{} = error "there are none of these"
+unsafeFromParseError (Megaparsec.TrivialError pos a b) = _ParseError # (pos, a, b)
 
 type Parser = Parsec Void PyTokens
 
+-- | Run a parser on some input
 {-# inline runParser #-}
 runParser
   :: AsParseError e (PyToken SrcInfo)
-  => String
-  -> Parser a
-  -> [PyToken SrcInfo]
+  => FilePath -- ^ File name
+  -> Parser a -- ^ Parser
+  -> [PyToken SrcInfo] -- ^ Input to parse
   -> Either e a
 runParser file p input =
-  first fromParseError $ Megaparsec.parse p file (PyTokens input)
+  first unsafeFromParseError $ Megaparsec.parse p file (PyTokens input)
 
 eol :: MonadParsec e PyTokens m => m Newline
 eol =
@@ -295,7 +381,6 @@ compFor =
   (snd <$> token anySpace (\case; TkIn{} -> True; _ -> False) "in") <*>
   orTest anySpace
 
--- | (',' x)* [',']
 commaSepRest :: MonadParsec e PyTokens m => m b -> m ([(Comma, b)], Maybe Comma)
 commaSepRest x = do
   c <- optional $ snd <$> comma anySpace

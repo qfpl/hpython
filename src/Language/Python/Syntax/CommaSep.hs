@@ -118,6 +118,7 @@ listToCommaSep1 (a :| as) = go (a:as)
     go (x:xs) = CommaSepMany1 x (Comma [Space]) $ go xs
 
 -- | Non-empty 'CommaSep', optionally terminated by a comma
+--
 -- Assumes that the contents consumes trailing whitespace
 data CommaSep1' a
   = CommaSepOne1' a (Maybe Comma)

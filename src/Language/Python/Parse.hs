@@ -48,6 +48,9 @@ import Language.Python.Syntax.Whitespace (Indents (..))
 
 import qualified Language.Python.Internal.Syntax.IR as IR
 
+-- | Parse a module
+--
+-- https://docs.python.org/3/reference/toplevel_components.html#file-input
 parseModule
   :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
@@ -55,8 +58,8 @@ parseModule
      , AsParseError e (PyToken SrcInfo)
      , AsIRError e SrcInfo
      )
-  => FilePath
-  -> Text
+  => FilePath -- ^ File name
+  -> Text -- ^ Input to parse
   -> Validation (NonEmpty e) (Module '[] SrcInfo)
 parseModule fp input =
   let
@@ -68,6 +71,9 @@ parseModule fp input =
   in
     fromEither (first pure ir) `bindValidation` IR.fromIR
 
+-- | Parse a statement
+--
+-- https://docs.python.org/3/reference/compound_stmts.html#grammar-token-statement
 parseStatement
   :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
@@ -75,8 +81,8 @@ parseStatement
      , AsParseError e (PyToken SrcInfo)
      , AsIRError e SrcInfo
      )
-  => FilePath
-  -> Text
+  => FilePath -- ^ File name
+  -> Text -- ^ Input to parse
   -> Validation (NonEmpty e) (Statement '[] SrcInfo)
 parseStatement fp input =
   let
@@ -90,6 +96,9 @@ parseStatement fp input =
   where
     tlIndent = level <|> withSrcInfo (pure $ Indents [])
 
+-- | Parse an expression list (unparenthesised tuple)
+--
+-- https://docs.python.org/3.5/reference/expressions.html#grammar-token-expression_list
 parseExprList
   :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
@@ -97,8 +106,8 @@ parseExprList
      , AsParseError e (PyToken SrcInfo)
      , AsIRError e SrcInfo
      )
-  => FilePath
-  -> Text
+  => FilePath -- ^ File name
+  -> Text -- ^ Input to parse
   -> Validation (NonEmpty e) (Expr '[] SrcInfo)
 parseExprList fp input =
   let
@@ -110,6 +119,9 @@ parseExprList fp input =
   in
     fromEither (first pure ir) `bindValidation` IR.fromIR_expr
 
+-- | Parse an expression
+--
+-- https://docs.python.org/3.5/reference/expressions.html#grammar-token-expression
 parseExpr
   :: ( AsLexicalError e Char
      , AsTabError e SrcInfo
@@ -117,8 +129,8 @@ parseExpr
      , AsParseError e (PyToken SrcInfo)
      , AsIRError e SrcInfo
      )
-  => FilePath
-  -> Text
+  => FilePath -- ^ File name
+  -> Text -- ^ Input to parse
   -> Validation (NonEmpty e) (Expr '[] SrcInfo)
 parseExpr fp input =
   let

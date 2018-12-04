@@ -10,7 +10,7 @@ import Control.Lens.Fold
 import Control.Lens.Getter
 import Control.Lens.Iso (from)
 import Control.Lens.Plated
-import Control.Lens.Prism (_Just, _Nothing)
+import Control.Lens.Prism (_Just)
 import Control.Lens.Setter
 import Control.Lens.Tuple
 import Control.Lens.TH
@@ -28,7 +28,6 @@ import qualified Data.List.NonEmpty as NonEmpty
 
 import GHC.Stack
 
-import Language.Python.Syntax.Types (spType)
 import Language.Python.Optics
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
@@ -270,20 +269,20 @@ genStarParam
   => Bool -- ^ This is for a lambda
   -> [String]
   -> m (Param '[] ())
-genStarParam isLambda positionals =
-  Gen.scale (max 0 . subtract 1) $ do
-    ident <- Gen.maybe $ Gen.filter (\i -> _identValue i `notElem` positionals) genIdent
-    mty <-
-      if isLambda
-      then pure Nothing
-      else
-        case ident of
-          Nothing -> pure Nothing
-          _ -> sizedMaybe ((,) <$> genColonAny <*> genExpr)
-    StarParam () <$>
-      genWhitespaces <*>
-      pure ident <*>
-      pure mty
+genStarParam isLambda positionals = Gen.choice [namedStarParam, unnamedStarParam]
+  where
+    unnamedStarParam = UnnamedStarParam () <$> genWhitespaces
+    namedStarParam =
+      Gen.scale (max 0 . subtract 1) $ do
+        ident <- Gen.filter (\i -> _identValue i `notElem` positionals) genIdent
+        mty <-
+          if isLambda
+          then pure Nothing
+          else sizedMaybe ((,) <$> genColonAny <*> genExpr)
+        StarParam () <$>
+          genWhitespaces <*>
+          pure ident <*>
+          pure mty
 
 genDoubleStarParam
   :: (MonadGen m, MonadState GenState m)
@@ -313,7 +312,7 @@ genParams isLambda =
     pparamNames'' = pparamNames' <> kwparams ^.. folded.paramName.identValue
   in do
     kwparams' <-
-      if has (folded._StarParam.spType._Nothing) sp && null kwparams
+      if has (folded._UnnamedStarParam) sp && null kwparams
       then CommaSepOne <$> genKeywordParam isLambda pparamNames'
       else pure kwparams
 

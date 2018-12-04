@@ -8,12 +8,13 @@ import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
 
 import Language.Python.DSL
-import Language.Python.Syntax.Module (Module (..))
-import Language.Python.Syntax.CommaSep (Comma (..), CommaSep (..), CommaSep1' (..))
-import Language.Python.Syntax.Expr (Arg (..), Expr (..), Param (..))
-import Language.Python.Syntax.Punctuation (Colon (..))
-import Language.Python.Syntax.Statement (Block (..), CompoundStatement (..), SimpleStatement (..), SmallStatement (..), Statement (..), Suite (..))
-import Language.Python.Syntax.Whitespace (Blank (..), Indents (..), Newline (..), Whitespace (..), indentWhitespaces)
+
+import Language.Python.Syntax.Module (Module(..))
+import Language.Python.Syntax.CommaSep (Comma(..), CommaSep(..), CommaSep1'(..))
+import Language.Python.Syntax.Expr (Arg(..), Expr(..), Param(..))
+import Language.Python.Syntax.Punctuation (Colon(..))
+import Language.Python.Syntax.Statement (Block(..), CompoundStatement(..), SimpleStatement(..), SmallStatement(..), Statement(..), Suite(..))
+import Language.Python.Syntax.Whitespace (Indents(..), Newline(..), Whitespace(..), indentWhitespaces)
 
 -- |
 -- @
@@ -22,7 +23,7 @@ import Language.Python.Syntax.Whitespace (Blank (..), Indents (..), Newline (..)
 --   return to
 -- @
 --
--- Written without the DSL
+-- Written without the DSL (not recommended!)
 append_to :: Raw Statement
 append_to =
   CompoundStatement $
@@ -94,8 +95,10 @@ fact_tr =
   [ line_ $
     def_ "go" [p_ "n", p_ "acc"]
       [ line_ $
-        if_ ("n" .== 0) ([line_ $ return_ (var_ "acc")] :: [Raw Line]) &
-        else_ [line_ . return_ $ call_ "go" [p_ $ "n" .- 1, p_ $ "n" .* "acc"]]
+        if_ ("n" .== 0)
+          [line_ $ return_ (var_ "acc")] &
+        else_
+          [line_ . return_ $ call_ "go" [p_ $ "n" .- 1, p_ $ "n" .* "acc"]]
       ]
   , line_ . return_ $ call_ "go" [p_ "n", p_ 1]
   ]
@@ -123,16 +126,18 @@ yes =
 
 everything :: Raw Module
 everything =
-  ModuleStatement append_to $
-  ModuleBlank (Blank () [] Nothing) LF $
+  module_
+  [ line_ append_to
+  , blank_
 
-  ModuleStatement append_to' $
-  ModuleBlank (Blank () [] Nothing) LF $
+  , line_ append_to'
+  , blank_
 
-  ModuleStatement fact_tr $
-  ModuleBlank (Blank () [] Nothing) LF $
+  , line_ fact_tr
+  , blank_
 
-  ModuleStatement spin $
-  ModuleBlank (Blank () [] Nothing) LF $
+  , line_ spin
+  , blank_
 
-  ModuleStatement yes ModuleEmpty
+  , line_ yes
+  ]

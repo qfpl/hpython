@@ -21,11 +21,13 @@ module Language.Python.Internal.Lexer
     -- * Source Information
   , SrcInfo(..), initialSrcInfo, withSrcInfo
     -- * Errors
-  , AsLexicalError(..), unsafeFromLexicalError, Parsec.ParseError(..)
+  , AsLexicalError(..), unsafeFromLexicalError
   , AsTabError(..), AsIncorrectDedent(..), fromTabError, TabError(..)
     -- * Miscellaneous
   , tokenize
   , insertTabs
+    -- * Megaparsec re-exports
+  , Parsec.ParseError(..)
   )
 where
 
@@ -461,6 +463,9 @@ class AsLexicalError s t | s -> t where
          , Set (Parsec.ErrorItem t)
          )
 
+-- | Convert a concrete 'ParseError' to a value that has an instance of 'AsLexicalError'
+--
+-- This function is partial, because our parser will never use 'Parsec.FancyError'
 unsafeFromLexicalError
   :: ( HasCallStack
      , AsLexicalError s t
@@ -471,10 +476,12 @@ unsafeFromLexicalError (Parsec.TrivialError a b c) = _LexicalError # (a, b, c)
 unsafeFromLexicalError Parsec.FancyError{} = error "'fancy error' used in lexer"
 
 {-# noinline tokenize #-}
+-- | Convert some input to a sequence of tokens. Indent and dedent tokens are not added
+-- (see 'insertTabs')
 tokenize
   :: AsLexicalError e Char
-  => FilePath
-  -> Text.Text
+  => FilePath -- ^ File name
+  -> Text.Text -- ^ Input to tokenize
   -> Either e [PyToken SrcInfo]
 tokenize fp = first unsafeFromLexicalError . parse (unParsecT tokens) fp
   where
@@ -584,7 +591,22 @@ isBlankToken TkNewline{} = True
 isBlankToken _ = False
 
 data TabError a
+  -- | Tabs and spaces were used inconsistently
   = TabError a
+  -- | The dedent at the end of a block doesn't match and preceding indents
+  --
+  -- e.g.
+  --
+  -- @
+  -- def a():
+  --     if b:
+  --         pass
+  --     else:
+  --         pass
+  --   pass
+  -- @
+  --
+  -- The final line will cause an 'IncorrectDedent' error
   | IncorrectDedent a
   deriving (Eq, Show)
 
@@ -594,6 +616,7 @@ class AsTabError s a | s -> a where
 class AsIncorrectDedent s a | s -> a where
   _IncorrectDedent :: Prism' s a
 
+-- | Convert a concrete 'TabError' to a value that has an instance of 'AsTabError'
 fromTabError
   :: ( AsTabError s a
      , AsIncorrectDedent s a
@@ -710,13 +733,16 @@ chunked = go FingerTree.empty
     go leaps (Level i a : is) =
       TkLevel a (Indents (splitIndents leaps $ NonEmpty.toList i ^. from indentWhitespaces) a) : go leaps is
 
+-- | Insert indent and dedent tokens
+--
+-- https://docs.python.org/3.5/reference/lexical_analysis.html#indentation
 insertTabs
   :: ( Semigroup a
      , AsTabError s a
      , AsIncorrectDedent s a
      )
-  => a
-  -> [PyToken a]
+  => a -- ^ Initial source annotation
+  -> [PyToken a] -- ^ Token stream
   -> Either s [PyToken a]
 insertTabs a =
   first fromTabError .
@@ -724,14 +750,14 @@ insertTabs a =
   indentation a .
   logicalLines
 
--- | Tokenize an input file, inserting indent/level/dedent tokens in appropriate
+-- | Tokenize an input file, inserting indent\/level\/dedent tokens in appropriate
 -- positions according to the block structure.
 tokenizeWithTabs
   :: ( AsLexicalError s Char
      , AsTabError s SrcInfo
      , AsIncorrectDedent s SrcInfo
      )
-  => FilePath
-  -> Text.Text
+  => FilePath -- ^ File name
+  -> Text.Text -- ^ Input to tokenize
   -> Either s [PyToken SrcInfo]
 tokenizeWithTabs fp = insertTabs (initialSrcInfo fp) <=< tokenize fp

@@ -11,6 +11,9 @@ License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
 Stability   : experimental
 Portability : non-portable
+
+Optics for manipulating Python syntax trees
+
 -}
 
 module Language.Python.Optics
@@ -48,6 +51,7 @@ module Language.Python.Optics
     -- * Parameters
   , _PositionalParam
   , _KeywordParam
+  , _UnnamedStarParam
   , _StarParam
     -- * Expressions
     -- ** Identifiers
@@ -171,6 +175,19 @@ _StarParam =
     (\(MkStarParam a b c d) -> StarParam a b c d)
     (\case
         StarParam a b c d -> Right (MkStarParam a b c d)
+        a -> Left $ a ^. unvalidated)
+
+_UnnamedStarParam
+  :: Prism
+       (Param v a)
+       (Param '[] a)
+       (UnnamedStarParam v a)
+       (UnnamedStarParam '[] a)
+_UnnamedStarParam =
+  prism
+    (\(MkUnnamedStarParam a b) -> UnnamedStarParam a b)
+    (\case
+        UnnamedStarParam a b -> Right (MkUnnamedStarParam a b)
         a -> Left $ a ^. unvalidated)
 
 _Fundef
@@ -301,10 +318,62 @@ _Ident =
         Ident a -> Right a
         a -> Left $ a ^. unvalidated)
 
+-- | 'Traversal'' targeting the indent-chunks in a structure
+--
+-- e.g.
+--
+-- This is one indent chunk:
+--
+-- @
+-- def a():
+--     pass
+--     if b:
+--         pass
+-- ^^^^
+-- @
+--
+-- and this is another
+--
+-- @
+-- def a():
+--     pass
+--     if b:
+--         pass
+--     ^^^^
+-- @
 _Indent :: HasIndents s a => Traversal' s [Whitespace]
 _Indent = _Indents.indentsValue.traverse.indentWhitespaces
 
 class HasIndents s a | s -> a where
+  -- | 'Traversal'' targeting the indentation inside a structure
+  --
+  -- Note: whitespace inside \'enclosed forms\' (such as lists or tuples) is not
+  -- considered indentation.
+  --
+  -- e.g.
+  --
+  -- In the following code, there is only one chunk of indentation:
+  --
+  -- @
+  -- def a():
+  --     [ b
+  --     , c
+  --     , d
+  --     ]
+  -- @
+  --
+  -- it's here:
+  --
+  -- @
+  -- def a():
+  --     [ b
+  -- ^^^^
+  --     , c
+  --     , d
+  --     ]
+  -- @
+  --
+  -- The rest is whitespace that is internal to the list.
   _Indents :: Traversal' s (Indents a)
 
 instance HasIndents (PyToken a) a where
@@ -494,6 +563,7 @@ instance HasIndents (CompoundStatement '[] a) a where
         _Indents fun e
 
 class HasNewlines s where
+  -- | 'Traversal'' targeting all of thie 'Newline's in a structure
   _Newlines :: Traversal' (s v a) Newline
 
 instance HasNewlines Block where

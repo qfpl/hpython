@@ -135,5 +135,4 @@ prop_printer_7 =
         StringLiteral () Nothing ShortString DoubleQuote s [] :|
         []
 
-    correctBackslashes s === [Char_newline, Char_esc_bslash, Char_esc_doublequote]
     showExpr e === "\"\\newline\\\\\\\"\""

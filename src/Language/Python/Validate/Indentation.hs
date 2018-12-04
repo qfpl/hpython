@@ -14,15 +14,18 @@ Portability : non-portable
 module Language.Python.Validate.Indentation
   ( module Data.Validation
   , module Language.Python.Validate.Indentation.Error
-  , Indentation
-  , ValidateIndentation
-  , runValidateIndentation
+    -- * Main validation functions
+  , Indentation, ValidateIndentation, runValidateIndentation
   , validateModuleIndentation
   , validateStatementIndentation
   , validateExprIndentation
     -- * Miscellany
+    -- ** Extra types
   , NextIndent(..)
+    -- ** Extra functions
+  , equivalentIndentation
   , runValidateIndentation'
+    -- ** Validation functions
   , validateArgsIndentation
   , validateBlockIndentation
   , validateCompoundStatementIndentation
@@ -30,7 +33,6 @@ module Language.Python.Validate.Indentation
   , validateExceptAsIndentation
   , validateParamsIndentation
   , validateSuiteIndentation
-  , equivalentIndentation
   )
 where
 

@@ -24,17 +24,34 @@ import Language.Python.Internal.Syntax.IR (AsIRError(..))
 import Language.Python.Internal.Token (PyToken)
 
 data ParseError a
+  -- | An error occured during tokenization (this is a re-packed megaparsec error)
   = LexicalError
       (NonEmpty SourcePos)
       (Maybe (ErrorItem Char))
       (Set (ErrorItem Char))
+  -- | An error occured during parsing (this is a re-packed megaparsec error)
   | ParseError
       (NonEmpty SourcePos)
       (Maybe (ErrorItem (PyToken a)))
       (Set (ErrorItem (PyToken a)))
+  -- | Tabs and spaces were used inconsistently
   | TabError a
+  -- | The dedent at the end of a block doesn't match and preceding indents
+  --
+  -- e.g.
+  --
+  -- @
+  -- def a():
+  --     if b:
+  --         pass
+  --     else:
+  --         pass
+  --   pass
+  -- @
+  --
+  -- The final line will cause an 'IncorrectDedent' error
   | IncorrectDedent a
-  | ExpectedDedent a
+  -- | Unpacking ( @*value@ ) was used in an invalid position
   | InvalidUnpacking a
   deriving (Eq, Show)
 

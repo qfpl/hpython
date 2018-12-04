@@ -32,7 +32,9 @@ where
 
 import Control.Lens.Cons (_init, _last)
 import Control.Lens.Fold ((^..), folded, traverseOf_)
+import Control.Lens.Getter ((^.))
 import Control.Lens.Review ((#))
+import Control.Lens.Setter ((.~))
 import Control.Monad.Writer.Strict (Writer, execWriter, writer)
 import Control.Monad.Reader (ReaderT, runReaderT, local, ask)
 import Data.Bifoldable (bitraverse_, bitraverse_)
@@ -40,6 +42,7 @@ import Data.Char (ord)
 import Data.Digit.Char (charHeXaDeCiMaL, charOctal)
 import Data.Digit.Hexadecimal.MixedCase (HeXDigit(..))
 import Data.DList (DList)
+import Data.Function ((&))
 import Data.Foldable (toList, traverse_)
 import Data.Maybe (isNothing)
 import Data.Semigroup (Semigroup(..))
@@ -140,23 +143,32 @@ brackets = between (singleton $ TkLeftBracket ()) (singleton $ TkRightBracket ()
 braces :: RenderOutput a -> RenderOutput a
 braces = between (singleton $ TkLeftBrace ()) (singleton $ TkRightBrace ())
 
+-- | Parenthesise a term, but put its trailing whitespace *outside* the parens
+parensDistTWS
+  :: HasTrailingWhitespace s
+  => (s -> RenderOutput ())
+  -> s -> RenderOutput ()
+parensDistTWS f a = do
+  parens $ f (a & trailingWhitespace .~ [])
+  traverse_ renderWhitespace (a ^. trailingWhitespace)
+
 parensTuple :: Expr v a -> RenderOutput ()
 parensTuple e =
   case e of
-    Tuple{} -> parens $ renderExpr e
+    Tuple{} -> parensDistTWS renderExpr e
     _ -> renderExpr e
 
 parensGenerator :: Expr v a -> RenderOutput ()
 parensGenerator e =
   case e of
-    Generator{} -> parens $ renderExpr e
+    Generator{} -> parensDistTWS renderExpr e
     _ -> renderExpr e
 
 parensTupleGenerator :: Expr v a -> RenderOutput ()
 parensTupleGenerator e =
   case e of
-    Tuple{} -> parens $ renderExpr e
-    Generator{} -> parens $ renderExpr e
+    Tuple{} -> parensDistTWS renderExpr e
+    Generator{} -> parensDistTWS renderExpr e
     _ -> renderExpr e
 
 escapeChars :: [(Char, Char)]
@@ -611,8 +623,8 @@ renderIdent (MkIdent _ a b) = do
   traverse_ renderWhitespace b
 
 parensTernaryLambda :: (Expr v a -> RenderOutput ()) -> Expr v a -> RenderOutput ()
-parensTernaryLambda _ e@Ternary{} = parens $ renderExpr e
-parensTernaryLambda _ e@Lambda{} = parens $ renderExpr e
+parensTernaryLambda _ e@Ternary{} = parensDistTWS renderExpr e
+parensTernaryLambda _ e@Lambda{} = parensDistTWS renderExpr e
 parensTernaryLambda f e = f e
 
 renderCompFor :: CompFor v a -> RenderOutput ()
@@ -620,7 +632,7 @@ renderCompFor (CompFor _ ws1 ex1 ws2 ex2) = do
   singleton $ TkFor ()
   traverse_ renderWhitespace ws1
   (case ex1 of
-     Not{} -> parens $ renderExpr ex1
+     Not{} -> parensDistTWS renderExpr ex1
      _ -> parensGenerator ex1)
   singleton $ TkIn ()
   traverse_ renderWhitespace ws2
@@ -650,10 +662,10 @@ renderDictItem (DictUnpack _ a b) = do
   singleton $ TkDoubleStar ()
   traverse_ renderWhitespace a
   case b of
-    BinOp _ _ BoolAnd{} _ -> parens $ renderExpr b
-    BinOp _ _ BoolOr{} _ -> parens $ renderExpr b
-    BinOp _ _ op _ | isComparison op -> parens $ renderExpr b
-    Not{} -> parens $ renderExpr b
+    BinOp _ _ BoolAnd{} _ -> parensDistTWS renderExpr b
+    BinOp _ _ BoolOr{} _ -> parensDistTWS renderExpr b
+    BinOp _ _ op _ | isComparison op -> parensDistTWS renderExpr b
+    Not{} -> parensDistTWS renderExpr b
     _ -> parensTernaryLambda parensTupleGenerator b
 
 renderStringLiteral :: StringLiteral a -> RenderOutput ()
@@ -673,7 +685,7 @@ renderStringLiteral (RawBytesLiteral _ a b c d e) = do
 renderSubscript :: Subscript v a -> RenderOutput ()
 renderSubscript (SubscriptExpr a) =
   case a of
-    Await{} -> parens $ renderExpr a
+    Await{} -> parensDistTWS renderExpr a
     _ -> parensTupleGenerator a
 renderSubscript (SubscriptSlice a b c d) = do
   traverse_ parensTupleGenerator a
@@ -691,7 +703,7 @@ renderYield re (Yield _ a b) = do
   traverse_ renderWhitespace a
   traverse_
     (\x -> case x of
-       Generator{} -> parens $ renderExpr x
+       Generator{} -> parensDistTWS renderExpr x
        _ -> re x)
     b
 renderYield re (YieldFrom _ a b c) = do
@@ -700,18 +712,18 @@ renderYield re (YieldFrom _ a b c) = do
   singleton $ TkFrom ()
   traverse_ renderWhitespace b
   case c of
-    Generator{} -> parens $ renderExpr c
-    Tuple{} -> parens $ renderExpr c
+    Generator{} -> parensDistTWS renderExpr c
+    Tuple{} -> parensDistTWS renderExpr c
     _ -> re c
 renderYield re e = re e
 
 renderUnpackTarget :: Expr v a -> RenderOutput ()
 renderUnpackTarget e =
   case e of
-    BinOp _ _ BoolAnd{} _ -> parens $ renderExpr e
-    BinOp _ _ BoolOr{} _ -> parens $ renderExpr e
-    BinOp _ _ op _ | isComparison op -> parens $ renderExpr e
-    Not{} -> parens $ renderExpr e
+    BinOp _ _ BoolAnd{} _ -> parensDistTWS renderExpr e
+    BinOp _ _ BoolOr{} _ -> parensDistTWS renderExpr e
+    BinOp _ _ op _ | isComparison op -> parensDistTWS renderExpr e
+    Not{} -> parensDistTWS renderExpr e
     _ -> parensTernaryLambda parensTupleGenerator e
 
 renderNestedParens
@@ -884,11 +896,11 @@ renderExpr (Lambda _ a b c d) = do
   renderParams b
   renderColon c
   parensTupleGenerator d
-renderExpr e@Yield{} = parens $ renderYield parensTupleGenerator e
-renderExpr e@YieldFrom{} = parens $ renderYield parensTupleGenerator e
+renderExpr e@Yield{} = parensDistTWS (renderYield parensTupleGenerator) e
+renderExpr e@YieldFrom{} = parensDistTWS (renderYield parensTupleGenerator) e
 renderExpr (Ternary _ a b c d e) = do
   (case a of
-     Generator{} -> parens $ renderExpr a
+     Generator{} -> parensDistTWS renderExpr a
      _ -> parensTupleGenerator a)
   singleton $ TkIf ()
   traverse_ renderWhitespace b
@@ -898,12 +910,12 @@ renderExpr (Ternary _ a b c d e) = do
   parensTupleGenerator e
 renderExpr (Subscript _ a b c d) = do
   (case a of
-     BinOp{} -> parens $ renderExpr a
-     UnOp{} -> parens $ renderExpr a
-     Not{} -> parens $ renderExpr a
-     Ternary{} -> parens $ renderExpr a
-     Lambda{} -> parens $ renderExpr a
-     Await{} -> parens $ renderExpr a
+     BinOp{} -> parensDistTWS renderExpr a
+     UnOp{} -> parensDistTWS renderExpr a
+     Not{} -> parensDistTWS renderExpr a
+     Ternary{} -> parensDistTWS renderExpr a
+     Lambda{} -> parensDistTWS renderExpr a
+     Await{} -> parensDistTWS renderExpr a
      _ -> parensTupleGenerator a)
   brackets $ do
     traverse_ renderWhitespace b
@@ -913,10 +925,10 @@ renderExpr (Not _ ws e) = do
   singleton $ TkNot ()
   traverse_ renderWhitespace ws
   case e of
-    BinOp _ _ BoolAnd{} _ -> parens $ renderExpr e
-    BinOp _ _ BoolOr{} _ -> parens $ renderExpr e
-    Ternary{} -> parens $ renderExpr e
-    Lambda{} -> parens $ renderExpr e
+    BinOp _ _ BoolAnd{} _ -> parensDistTWS renderExpr e
+    BinOp _ _ BoolOr{} _ -> parensDistTWS renderExpr e
+    Ternary{} -> parensDistTWS renderExpr e
+    Lambda{} -> parensDistTWS renderExpr e
     _ -> parensTupleGenerator e
 renderExpr (Parens _ ws1 e ws2) = do
   parens $ do
@@ -930,11 +942,11 @@ renderExpr (UnOp _ op expr) = do
   renderUnOp op
   case expr of
     BinOp _ _ Exp{} _ -> parensTupleGenerator expr
-    BinOp{} -> parens $ renderExpr expr
-    Deref _ Int{} _ _ -> parens $ renderExpr expr
-    Not{} -> parens $ renderExpr expr
-    Ternary{} -> parens $ renderExpr expr
-    Lambda{} -> parens $ renderExpr expr
+    BinOp{} -> parensDistTWS renderExpr expr
+    Deref _ Int{} _ _ -> parensDistTWS renderExpr expr
+    Not{} -> parensDistTWS renderExpr expr
+    Ternary{} -> parensDistTWS renderExpr expr
+    Lambda{} -> parensDistTWS renderExpr expr
     _ -> parensTupleGenerator expr
 renderExpr (String _ vs) =
   traverse_ renderStringLiteral $ correctAdjacentStrings vs
@@ -958,19 +970,19 @@ renderExpr (ListComp _ ws1 comp ws2) = do
     traverse_ renderWhitespace ws1
     renderComprehension
       (\e -> case e of
-          Yield{} -> parens $ renderExpr e
-          YieldFrom{} -> parens $ renderExpr e
+          Yield{} -> parensDistTWS renderExpr e
+          YieldFrom{} -> parensDistTWS renderExpr e
           _ -> parensTupleGenerator e)
       comp
   traverse_ renderWhitespace ws2
 renderExpr (Call _ expr ws args ws2) = do
   (case expr of
-     UnOp{} -> parens $ renderExpr expr
-     BinOp{} -> parens $ renderExpr expr
-     Tuple{} -> parens $ renderExpr expr
-     Not{} -> parens $ renderExpr expr
-     Ternary{} -> parens $ renderExpr expr
-     Lambda{} -> parens $ renderExpr expr
+     UnOp{} -> parensDistTWS renderExpr expr
+     BinOp{} -> parensDistTWS renderExpr expr
+     Tuple{} -> parensDistTWS renderExpr expr
+     Not{} -> parensDistTWS renderExpr expr
+     Ternary{} -> parensDistTWS renderExpr expr
+     Lambda{} -> parensDistTWS renderExpr expr
      _ -> parensGenerator expr)
   parens $ do
     traverse_ renderWhitespace ws
@@ -978,14 +990,14 @@ renderExpr (Call _ expr ws args ws2) = do
   traverse_ renderWhitespace ws2
 renderExpr (Deref _ expr ws name) = do
   (case expr of
-     Int{} -> parens $ renderExpr expr
-     BinOp{} -> parens $ renderExpr expr
-     Tuple{} -> parens $ renderExpr expr
-     Not{} -> parens $ renderExpr expr
-     UnOp{} -> parens $ renderExpr expr
-     Ternary{} -> parens $ renderExpr expr
-     Lambda{} -> parens $ renderExpr expr
-     Await{} -> parens $ renderExpr expr
+     Int{} -> parensDistTWS renderExpr expr
+     BinOp{} -> parensDistTWS renderExpr expr
+     Tuple{} -> parensDistTWS renderExpr expr
+     Not{} -> parensDistTWS renderExpr expr
+     UnOp{} -> parensDistTWS renderExpr expr
+     Ternary{} -> parensDistTWS renderExpr expr
+     Lambda{} -> parensDistTWS renderExpr expr
+     Await{} -> parensDistTWS renderExpr expr
      _ -> parensGenerator expr)
   singleton $ TkDot ()
   traverse_ renderWhitespace ws
@@ -997,11 +1009,15 @@ renderExpr (Ellipsis _ ws) = do
   singleton $ TkEllipsis ()
   traverse_ renderWhitespace ws
 renderExpr (BinOp _ e1 op e2) = do
-  (if shouldGroupLeft op e1 then parens else id)
-    (parensTernaryLambda parensGenerator e1)
+  if shouldGroupLeft op e1
+    then parensDistTWS renderExpr e1
+    else parensTernaryLambda parensGenerator e1
+
   renderBinOp op
-  (if shouldGroupRight op e2 then parens else id)
-    (parensTernaryLambda parensGenerator e2)
+
+  if shouldGroupRight op e2
+    then parensDistTWS renderExpr e2
+    else parensTernaryLambda parensGenerator e2
 renderExpr (Tuple _ a ws c) =
   renderTupleItems $
   case c of
@@ -1030,21 +1046,21 @@ renderExpr (Set _ a b c) = do
 renderExpr (Generator _ a) =
   renderComprehension
     (\e -> case e of
-        Yield{} -> parens $ renderExpr e
-        YieldFrom{} -> parens $ renderExpr e
+        Yield{} -> parensDistTWS renderExpr e
+        YieldFrom{} -> parensDistTWS renderExpr e
         _ -> parensTupleGenerator e)
     a
 renderExpr (Await _ ws expr) = do
   singleton $ TkIdent "await" ()
   traverse_ renderWhitespace ws
   (case expr of
-     UnOp{} -> parens $ renderExpr expr
-     BinOp{} -> parens $ renderExpr expr
-     Tuple{} -> parens $ renderExpr expr
-     Not{} -> parens $ renderExpr expr
-     Ternary{} -> parens $ renderExpr expr
-     Lambda{} -> parens $ renderExpr expr
-     Await{} -> parens $ renderExpr expr
+     UnOp{} -> parensDistTWS renderExpr expr
+     BinOp{} -> parensDistTWS renderExpr expr
+     Tuple{} -> parensDistTWS renderExpr expr
+     Not{} -> parensDistTWS renderExpr expr
+     Ternary{} -> parensDistTWS renderExpr expr
+     Lambda{} -> parensDistTWS renderExpr expr
+     Await{} -> parensDistTWS renderExpr expr
      _ -> parensGenerator expr)
 
 renderModuleName :: ModuleName v a -> RenderOutput ()
@@ -1168,10 +1184,10 @@ renderSmallStatement (Del _ ws vals) = do
   traverse_ renderWhitespace ws
   renderCommaSep1'
     (\a -> case a of
-        BinOp{} -> parens $ renderExpr a
-        Not{} -> parens $ renderExpr a
-        Ternary{} -> parens $ renderExpr a
-        Lambda{} -> parens $ renderExpr a
+        BinOp{} -> parensDistTWS renderExpr a
+        Not{} -> parensDistTWS renderExpr a
+        Ternary{} -> parensDistTWS renderExpr a
+        Lambda{} -> parensDistTWS renderExpr a
         _ -> parensTupleGenerator a)
     vals
 renderSmallStatement (Import _ ws ns) = do
@@ -1461,23 +1477,7 @@ renderArg _ (DoubleStarArg _ ws expr) = do
   parensTupleGenerator expr
 
 renderParams :: CommaSep (Param v a) -> RenderOutput ()
-renderParams = go False
-  where
-    go :: Bool -> CommaSep (Param v a) -> RenderOutput ()
-    go _ CommaSepNone = pure ()
-    go _ (CommaSepOne a) = renderParam a
-    go sawStar (CommaSepMany a c b) = do
-      let
-        sawStar' =
-          case a of
-            StarParam{} -> True;
-            DoubleStarParam{} -> True
-            _ -> sawStar
-      renderParam a
-      (case b of
-          CommaSepNone | sawStar' -> pure ()
-          _ -> renderComma c)
-      go sawStar' b
+renderParams = renderCommaSep renderParam . correctParams
 
 renderParam :: Param v a -> RenderOutput ()
 renderParam (PositionalParam _ name mty) = do
@@ -1490,12 +1490,15 @@ renderParam (PositionalParam _ name mty) = do
 renderParam (StarParam _ ws name mty) = do
   singleton $ TkStar ()
   traverse_ renderWhitespace ws
-  traverse_ renderIdent name
+  renderIdent name
   traverse_
     (\(c, ty) -> do
         renderColon c
         parensTupleGenerator ty)
     mty
+renderParam (UnnamedStarParam _ ws) = do
+  singleton $ TkStar ()
+  traverse_ renderWhitespace ws
 renderParam (DoubleStarParam _ ws name mty) = do
   singleton $ TkDoubleStar ()
   traverse_ renderWhitespace ws

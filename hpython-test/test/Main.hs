@@ -32,6 +32,9 @@ import qualified Hedgehog.Range as Range
 import qualified Generators.General as General
 import qualified Generators.Correct as Correct
 
+import TrailingWhitespace (trailingWhitespaceTests)
+import Printer (printerTests)
+
 runPython3 :: (MonadTest m, MonadIO m) => FilePath -> Bool -> Text -> m ()
 runPython3 path shouldSucceed str = do
   () <- liftIO $ StrictText.writeFile path str
@@ -219,20 +222,22 @@ statement_printparseprint_print =
 main :: IO ()
 main =
   do
-    result <- checkParallel group
+    results <- traverse checkParallel groups
     removeFile file
-    when (not result)
-      exitFailure
+    unless (and results) exitFailure
   where
     file = "hedgehog-test.py"
-    group =
-      Group "main tests"
-        [ ("Haskell String to Python String", withTests 500 $ string_correct file)
-        , ("Syntax checking for expressions", withTests 500 $ syntax_expr file)
-        , ("Syntax checking for statements", withTests 500 $ syntax_statement file)
-        , ("Syntax checking for modules", withTests 500 $ syntax_modul file)
-        , ("Correct generator for expressions", withTests 500 $ correct_syntax_expr file)
-        , ("Correct generator for statements", withTests 500 $ correct_syntax_statement file)
-        , ("Print/Parse idempotent expressions", withTests 500 $ expr_printparseprint_print)
-        , ("Print/Parse idempotent statements", withTests 500 $ statement_printparseprint_print)
-        ]
+    groups =
+      [ printerTests
+      , trailingWhitespaceTests
+      , Group "main tests"
+          [ ("Haskell String to Python String", withTests 500 $ string_correct file)
+          , ("Syntax checking for expressions", withTests 500 $ syntax_expr file)
+          , ("Syntax checking for statements", withTests 500 $ syntax_statement file)
+          , ("Syntax checking for modules", withTests 500 $ syntax_modul file)
+          , ("Correct generator for expressions", withTests 500 $ correct_syntax_expr file)
+          , ("Correct generator for statements", withTests 500 $ correct_syntax_statement file)
+          , ("Print/Parse idempotent expressions", withTests 500 $ expr_printparseprint_print)
+          , ("Print/Parse idempotent statements", withTests 500 $ statement_printparseprint_print)
+          ]
+      ]

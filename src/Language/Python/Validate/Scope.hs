@@ -18,20 +18,23 @@ Portability : non-portable
 module Language.Python.Validate.Scope
   ( module Data.Validation
   , module Language.Python.Validate.Scope.Error
-  , Scope
-  , ValidateScope
-  , ScopeContext(..), scGlobalScope, scLocalScope, scImmediateScope
-  , initialScopeContext
-  , runValidateScope
+    -- * Main validation functions
+  , Scope, ValidateScope, runValidateScope
   , validateModuleScope
   , validateStatementScope
   , validateExprScope
     -- * Miscellany
+    -- ** Extra types
+  , ScopeContext(..), scGlobalScope, scLocalScope, scImmediateScope
+  , runValidateScope'
+  , initialScopeContext
   , Binding(..)
+    -- ** Extra functions
   , inScope
   , extendScope
   , locallyOver
   , locallyExtendOver
+    -- ** Validation functions
   , validateArgScope
   , validateAssignExprScope
   , validateBlockScope
@@ -109,8 +112,11 @@ initialScopeContext = ScopeContext Map.empty Map.empty Map.empty
 
 type ValidateScope ann e = ValidateM (NonEmpty e) (State (ScopeContext ann))
 
-runValidateScope :: ScopeContext ann -> ValidateScope ann e a -> Validation (NonEmpty e) a
-runValidateScope s = flip evalState s . runValidateM
+runValidateScope :: ValidateScope ann e a -> Validation (NonEmpty e) a
+runValidateScope = runValidateScope' initialScopeContext
+
+runValidateScope' :: ScopeContext ann -> ValidateScope ann e a -> Validation (NonEmpty e) a
+runValidateScope' s = flip evalState s . runValidateM
 
 extendScope
   :: Setter' (ScopeContext ann) (Map ByteString ann)
@@ -419,6 +425,7 @@ validateParamScope (KeywordParam a ident mty ws2 expr) =
 validateParamScope (StarParam a b c d) =
   StarParam a b (coerce c) <$>
   traverseOf (traverse._2) validateExprScope d
+validateParamScope (UnnamedStarParam a b) = pure $ UnnamedStarParam a b
 validateParamScope (DoubleStarParam a b c d) =
   DoubleStarParam a b (coerce c) <$>
   traverseOf (traverse._2) validateExprScope d

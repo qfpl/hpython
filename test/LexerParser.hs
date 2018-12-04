@@ -492,3 +492,10 @@ prop_fulltrip_38 =
 
     res <- shouldBeParseSuccess parseExpr str
     str === showExpr (() <$ res)
+
+prop_fulltrip_39 :: Property
+prop_fulltrip_39 =
+  withTests 1 . property $ do
+    let str = "def a(*b, *): pass"
+
+    shouldBeParseFailure parseStatement str

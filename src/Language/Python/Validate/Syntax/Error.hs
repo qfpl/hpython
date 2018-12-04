@@ -43,7 +43,6 @@ data SyntaxError (v :: [*]) a
   | InvalidDictUnpacking a
   | InvalidSetUnpacking a
   | TypedParamInLambda a
-  | TypedUnnamedStarParam a
   | AsyncWithOutsideCoroutine a
   | AsyncForOutsideCoroutine a
   | YieldFromInsideCoroutine a

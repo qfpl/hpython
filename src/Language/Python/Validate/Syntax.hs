@@ -20,20 +20,23 @@ Portability : non-portable
 module Language.Python.Validate.Syntax
   ( module Data.Validation
   , module Language.Python.Validate.Syntax.Error
-  , reservedWords
-  , Syntax
-  , ValidateSyntax
-  , SyntaxContext(..), inLoop, inFunction, inGenerator, inParens
-  , initialSyntaxContext
-  , runValidateSyntax
+    -- * Main validation functions
+  , Syntax, ValidateSyntax, runValidateSyntax
   , validateModuleSyntax
   , validateStatementSyntax
   , validateExprSyntax
     -- * Miscellany
+    -- ** Extra types
+  , SyntaxContext(..), FunctionInfo(..), inLoop, inFunction, inGenerator, inParens
+  , runValidateSyntax'
+  , initialSyntaxContext
+    -- ** Extra functions
+  , reservedWords
   , canAssignTo
   , deleteBy'
   , deleteFirstsBy'
   , localNonlocals
+    -- ** Validation functions
   , validateArgsSyntax
   , validateBlockSyntax
   , validateCompoundStatementSyntax
@@ -167,8 +170,11 @@ makeLenses ''SyntaxContext
 
 type ValidateSyntax e = ValidateM (NonEmpty e) (ReaderT SyntaxContext (State [String]))
 
-runValidateSyntax :: SyntaxContext -> [String] -> ValidateSyntax e a -> Validation (NonEmpty e) a
-runValidateSyntax ctxt nlscope =
+runValidateSyntax :: ValidateSyntax e a -> Validation (NonEmpty e) a
+runValidateSyntax = runValidateSyntax' initialSyntaxContext []
+
+runValidateSyntax' :: SyntaxContext -> [String] -> ValidateSyntax e a -> Validation (NonEmpty e) a
+runValidateSyntax' ctxt nlscope =
   flip evalState nlscope .
   flip runReaderT ctxt . getCompose .
   unValidateM
@@ -1176,30 +1182,30 @@ validateParamsSyntax isLambda e =
              validateIdentSyntax name <*>
              checkTy a mty)
             (go (_identValue name:names) bsa bkw params)
-    go names bsa bkw (StarParam a ws mname mty : params)
-      | Just name <- mname, _identValue name `elem` names =
+    go names bsa bkw (StarParam a _ name mty : params)
+      | _identValue name `elem` names =
           errorVM1 (_DuplicateArgument # (a, _identValue name)) <*>
           validateIdentSyntax name <*>
           checkTy a mty <*>
           go
             (_identValue name:names)
-            (if isNothing mname then HaveSeenEmptyStarArg (Just a) else bsa)
+            bsa
             bkw
             params
       | otherwise =
-          liftA2
-            (:)
-            (StarParam a ws <$>
-             traverse validateIdentSyntax mname <*
-             (case (mname, mty) of
-                (Nothing, Just{}) -> errorVM1 (_TypedUnnamedStarParam # a)
-                _ -> pure ()) <*>
-             checkTy a mty)
-            (go
-               (maybe names (\n -> _identValue n : names) mname)
-               (if isNothing mname then HaveSeenEmptyStarArg (Just a) else bsa)
-               bkw
-               params)
+          validateIdentSyntax name *>
+          checkTy a mty *>
+          go
+            (_identValue name:names)
+            bsa
+            bkw
+            params
+    go names _ bkw (UnnamedStarParam a _ : params) =
+      go
+        names
+        (HaveSeenEmptyStarArg $ Just a)
+        bkw
+        params
     go names bsa bkw@(HaveSeenKeywordArg True) (PositionalParam a name mty : params) =
       let
         name' = _identValue name

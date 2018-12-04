@@ -14,10 +14,92 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Internal.Parse where
+module Language.Python.Internal.Parse
+  ( Parser
+  , runParser
+    -- * Stream type
+  , PyTokens(..)
+    -- * Errors
+  , AsParseError(..)
+  , unsafeFromParseError
+    -- * Parsers
+  , token
+    -- ** Symbols
+  , comma
+  , rightParen
+  , colon
+  , semicolon
+  , star
+  , doubleStar
+    -- ** Atomic forms
+  , identifier
+  , bool
+  , none
+  , ellipsis
+  , integer
+  , float
+  , imag
+  , stringOrBytes
+    -- ** Compound forms
+  , arg
+  , binOp
+  , commaSep
+  , commaSep1
+  , commaSep1'
+  , commaSepRest
+  , compIf
+  , compFor
+  , compoundStatement
+  , decorator
+  , decoratorValue
+  , decorators
+  , expr
+  , exprList
+  , exprListComp
+  , exprNoCond
+  , exprComp
+  , exprOrStarList
+  , lambda
+  , lambdaNoCond
+  , module_
+  , orExpr
+  , orExprList
+  , orTest
+  , simpleStatement
+  , someParams
+  , smallStatement
+  , starExpr
+  , statement
+  , suite
+  , tpPositional
+  , tpStar
+  , tpDoubleStar
+  , tyAnn
+  , typedParams
+  , untypedParams
+  , upPositional
+  , upStar
+  , upDoubleStar
+  , yieldExpr
+    -- ** Formatting
+  , anySpace
+  , space
+  , eol
+  , continued
+  , newline
+  , indent
+  , dedent
+  , level
+  , blank
+  , comment
+    -- ** Miscellaneous combinators
+  , sepBy1'
+  )
+where
 
 import Control.Applicative (Alternative, (<|>), optional, many, some)
-import Control.Lens.Getter ((^.))
+import Control.Lens.Cons (snoc)
+import Control.Lens.Getter ((^.), view)
 import Control.Lens.Prism (Prism')
 import Control.Lens.Review ((#))
 import Control.Monad (void)
@@ -29,8 +111,11 @@ import Data.List.NonEmpty (NonEmpty, some1)
 import Data.Proxy (Proxy(..))
 import Data.Set (Set)
 import Data.Void (Void)
+import GHC.Stack (HasCallStack)
 import Text.Megaparsec
-  ((<?>), MonadParsec, Parsec, Stream(..), SourcePos(..), eof, try, lookAhead)
+  ( (<?>), MonadParsec, Parsec, Stream(..), SourcePos(..), eof, try, lookAhead
+  , notFollowedBy
+  )
 import Text.Megaparsec.Char (satisfy)
 
 
@@ -124,24 +209,28 @@ class AsParseError s t | s -> t where
          , Set (Megaparsec.ErrorItem t)
          )
 
-fromParseError
-  :: AsParseError s t
+-- | Convert a concrete 'Megaparsec.ParseError' to a value that has an instance of 'AsParseError'
+--
+-- This function is partial because our parser will never use 'Megaparsec.FancyError'
+unsafeFromParseError
+  :: (HasCallStack, AsParseError s t)
   => Megaparsec.ParseError t e
   -> s
-fromParseError Megaparsec.FancyError{} = error "there are none of these"
-fromParseError (Megaparsec.TrivialError pos a b) = _ParseError # (pos, a, b)
+unsafeFromParseError Megaparsec.FancyError{} = error "there are none of these"
+unsafeFromParseError (Megaparsec.TrivialError pos a b) = _ParseError # (pos, a, b)
 
 type Parser = Parsec Void PyTokens
 
+-- | Run a parser on some input
 {-# inline runParser #-}
 runParser
   :: AsParseError e (PyToken SrcInfo)
-  => String
-  -> Parser a
-  -> [PyToken SrcInfo]
+  => FilePath -- ^ File name
+  -> Parser a -- ^ Parser
+  -> [PyToken SrcInfo] -- ^ Input to parse
   -> Either e a
 runParser file p input =
-  first fromParseError $ Megaparsec.parse p file (PyTokens input)
+  first unsafeFromParseError $ Megaparsec.parse p file (PyTokens input)
 
 eol :: MonadParsec e PyTokens m => m Newline
 eol =
@@ -292,7 +381,6 @@ compFor =
   (snd <$> token anySpace (\case; TkIn{} -> True; _ -> False) "in") <*>
   orTest anySpace
 
--- | (',' x)* [',']
 commaSepRest :: MonadParsec e PyTokens m => m b -> m ([(Comma, b)], Maybe Comma)
 commaSepRest x = do
   c <- optional $ snd <$> comma anySpace
@@ -315,10 +403,13 @@ exprComp ws =
   expr ws <*>
   optional ((,) <$> compFor <*> many (Left <$> compFor <|> Right <$> compIf))
 
+star :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, [Whitespace])
+star sp = token sp (\case; TkStar{} -> True; _ -> False) "*"
+
 starExpr :: MonadParsec e PyTokens m => m Whitespace -> m (Expr SrcInfo)
 starExpr ws =
   (\(tk, sp) -> StarExpr (pyTokenAnn tk) sp) <$>
-  token ws (\case; TkStar{} -> True; _ -> False) "*" <*>
+  star ws <*>
   orExpr ws
 
 exprListComp :: MonadParsec e PyTokens m => m Whitespace -> m (Expr SrcInfo)
@@ -441,7 +532,7 @@ lambda :: MonadParsec e PyTokens m => m Whitespace -> m (Expr SrcInfo)
 lambda ws =
   (\(tk, s) -> Lambda (pyTokenAnn tk) s) <$>
   token ws (\case; TkLambda{} -> True; _ -> False) "lambda" <*>
-  commaSep ws untypedParam <*>
+  untypedParams ws <*>
   (Colon . snd <$> token ws (\case; TkColon{} -> True; _ -> False) ":") <*>
   expr ws
 
@@ -449,7 +540,7 @@ lambdaNoCond :: MonadParsec e PyTokens m => m Whitespace -> m (Expr SrcInfo)
 lambdaNoCond ws =
   (\(tk, s) -> Lambda (pyTokenAnn tk) s) <$>
   token ws (\case; TkLambda{} -> True; _ -> False) "lambda" <*>
-  commaSep ws untypedParam <*>
+  untypedParams ws <*>
   (Colon . snd <$> token ws (\case; TkColon{} -> True; _ -> False) ":") <*>
   exprNoCond ws
 
@@ -468,6 +559,18 @@ expr ws =
      expr ws)
   <|>
   lambda ws
+
+rightParen
+  :: MonadParsec e PyTokens m
+  => m Whitespace
+  -> m (PyToken SrcInfo, [Whitespace])
+rightParen sp = token sp (\case; TkRightParen{} -> True; _ -> False) ")"
+
+doubleStar
+  :: MonadParsec e PyTokens m
+  => m Whitespace
+  -> m (PyToken SrcInfo, [Whitespace])
+doubleStar sp = token sp (\case; TkDoubleStar{} -> True; _ -> False) "**"
 
 orExpr :: MonadParsec e PyTokens m => m Whitespace -> m (Expr SrcInfo)
 orExpr ws =
@@ -512,7 +615,7 @@ orExpr ws =
 
     termOp =
       (\(tk, ws) -> Multiply (pyTokenAnn tk) ws) <$>
-      token ws (\case; TkStar{} -> True; _ -> False) "*"
+      star ws
 
       <|>
 
@@ -550,7 +653,8 @@ orExpr ws =
 
     powerOp =
       (\(tk, ws) -> Exp (pyTokenAnn tk) ws) <$>
-      token ws (\case; TkDoubleStar{} -> True; _ -> False) "**"
+      doubleStar ws
+
     power =
       (\a -> maybe a (uncurry $ BinOp (a ^. exprAnn) a)) <$>
       atomExpr <*>
@@ -583,7 +687,7 @@ orExpr ws =
       (\a b c d -> Call (d ^. exprAnn) d a b c) <$>
       (snd <$> token anySpace (\case; TkLeftParen{} -> True; _ -> False) "(") <*>
       optional (commaSep1' anySpace arg) <*>
-      (snd <$> token ws (\case; TkRightParen{} -> True; _ -> False) ")")
+      (snd <$> rightParen ws)
 
       <|>
 
@@ -611,7 +715,7 @@ orExpr ws =
          Just ex -> Parens (pyTokenAnn tk) s ex sps) <$>
       token anySpace (\case; TkLeftParen{} -> True; _ -> False) "(" <*>
       optional (yieldExpr anySpace <|> exprListComp anySpace) <*>
-      (snd <$> token ws (\case; TkRightParen{} -> True; _ -> False) ")")
+      (snd <$> rightParen ws)
 
     list =
       (\(tk, sp1) ->
@@ -638,7 +742,7 @@ orExpr ws =
 
     doubleStarExpr ws =
       (\(tk, sp) -> DictUnpack (pyTokenAnn tk) sp) <$>
-      token ws (\case; TkDoubleStar{} -> True; _ -> False) "**" <*>
+      doubleStar ws <*>
       orExpr ws
 
     dictItem =
@@ -911,14 +1015,14 @@ smallStatement =
 
         importTargets =
           (\(tk, s) -> ImportAll (pyTokenAnn tk) s) <$>
-          token space (\case; TkStar{} -> True; _ -> False) "*"
+          star space
 
           <|>
 
           (\(tk, s) -> ImportSomeParens (pyTokenAnn tk) s) <$>
           token anySpace (\case; TkLeftParen{} -> True; _ -> False) "(" <*>
           commaSep1' anySpace (importAs anySpace _identAnn (identifier anySpace)) <*>
-          (snd <$> token space (\case; TkRightParen{} -> True; _ -> False) ")")
+          (snd <$> rightParen space)
 
           <|>
 
@@ -1037,66 +1141,137 @@ commaSep1' ws pa =
     from a [] b = CommaSepOne1' a b
     from a ((b, c) : bs) d = CommaSepMany1' a b $ from c bs d
 
-untypedParam :: MonadParsec e PyTokens m => m (Param SrcInfo)
-untypedParam =
-  (\a b ->
-     maybe
-       (PositionalParam (_identAnn a) a b)
-       (uncurry $ KeywordParam (_identAnn a) a b)) <$>
-  identifier anySpace <*>
-  pure Nothing <*>
+someParams
+  :: MonadParsec e PyTokens m
+  => m (Param SrcInfo)
+  -> m (Param SrcInfo)
+  -> m (Param SrcInfo)
+  -> m (CommaSep (Param SrcInfo))
+someParams paramPositional paramStar paramDoubleStar =
+  fmap (view _CommaSep) . optional $
+
+  (\a b c ->
+     case c of
+       Just (d, e) ->
+         case e of
+           Nothing -> (a, b, Just d)
+           Just f ->
+             case f of
+               Left (g, h, i) -> (a, b ++ (d, g) : maybe h (snoc h) i, Nothing)
+               Right g -> (a, snoc b (d, g), Nothing)
+       Nothing -> (a, b, Nothing)) <$>
+
+  paramPositional <*>
+
+  many commaPositional <*>
+
   optional
     ((,) <$>
-     (snd <$> token anySpace (\case; TkEq{} -> True; _ -> False) "=") <*>
-     expr anySpace)
+     (snd <$> comma anySpace) <*>
+     optional
+       (Left <$>
+        ((,,) <$> paramStar <*> many commaPositional <*> optional commaDoubleStar)
+
+        <|>
+
+        Right <$> paramDoubleStar))
 
   <|>
 
-  (\(a, b) -> StarParam (pyTokenAnn a) b) <$>
-  token anySpace (\case; TkStar{} -> True; _ -> False) "*" <*>
-  optional (identifier anySpace) <*>
-  pure Nothing
+  (\a b -> (a, b, Nothing)) <$>
+  paramStar <*>
+  ((\a -> maybe a (a `snoc`)) <$>
+   many commaPositional <*>
+   optional commaDoubleStar)
 
   <|>
 
-  (\(a, b) -> DoubleStarParam (pyTokenAnn a) b) <$>
-  token anySpace (\case; TkDoubleStar{} -> True; _ -> False) "**" <*>
-  identifier anySpace <*>
-  pure Nothing
+  (\a -> (a, [], Nothing)) <$> paramDoubleStar
 
-typedParam :: MonadParsec e PyTokens m => m (Param SrcInfo)
-typedParam =
+  where
+    commaPositional =
+      try
+        ((,) <$>
+         fmap snd (comma anySpace) <*
+         notFollowedBy
+           (star anySpace <|>
+            doubleStar anySpace <|>
+            rightParen space)) <*>
+      paramPositional
+
+    commaDoubleStar =
+      (,) <$> (snd <$> comma anySpace) <*> paramDoubleStar
+
+upPositional :: MonadParsec e PyTokens m => m Whitespace -> m (Param SrcInfo)
+upPositional ws =
+  (\a ->
+    maybe
+      (PositionalParam (_identAnn a) a Nothing)
+      (uncurry $ KeywordParam (_identAnn a) a Nothing)) <$>
+  identifier ws <*>
+  optional
+    ((,) <$>
+    (snd <$> token ws (\case; TkEq{} -> True; _ -> False) "=") <*>
+    expr ws)
+
+upStar :: MonadParsec e PyTokens m => m Whitespace -> m (Param SrcInfo)
+upStar ws =
+  (\(a, b) ->
+    maybe
+      (UnnamedStarParam (pyTokenAnn a) b)
+      (uncurry $ StarParam (pyTokenAnn a) b)) <$>
+  star ws <*>
+  optional ((\a -> (a, Nothing)) <$> identifier ws)
+
+upDoubleStar :: MonadParsec e PyTokens m => m Whitespace -> m (Param SrcInfo)
+upDoubleStar ws =
+  (\(a, b) c -> DoubleStarParam (pyTokenAnn a) b c Nothing) <$>
+  doubleStar ws <*>
+  identifier ws
+
+untypedParams
+  :: MonadParsec e PyTokens m
+  => m Whitespace
+  -> m (CommaSep (Param SrcInfo))
+untypedParams ws = someParams (upPositional ws) (upStar ws) (upDoubleStar ws)
+
+tyAnn :: MonadParsec e PyTokens m => m (Colon, Expr SrcInfo)
+tyAnn =
+  (,) <$>
+  (Colon . snd <$> token anySpace (\case; TkColon{} -> True; _ -> False) ":") <*>
+  expr anySpace
+
+tpPositional :: MonadParsec e PyTokens m => m (Param SrcInfo)
+tpPositional =
   (\a b ->
-     maybe
-       (PositionalParam (_identAnn a) a b)
-       (uncurry $ KeywordParam (_identAnn a) a b)) <$>
+    maybe
+      (PositionalParam (_identAnn a) a b)
+      (uncurry $ KeywordParam (_identAnn a) a b)) <$>
   identifier anySpace <*>
   optional tyAnn <*>
   optional
     ((,) <$>
-     (snd <$> token anySpace (\case; TkEq{} -> True; _ -> False) "=") <*>
-     expr anySpace)
+    (snd <$> token anySpace (\case; TkEq{} -> True; _ -> False) "=") <*>
+    expr anySpace)
 
-  <|>
-
+tpStar :: MonadParsec e PyTokens m => m (Param SrcInfo)
+tpStar =
   (\(a, b) ->
-     maybe
-       (StarParam (pyTokenAnn a) b Nothing Nothing)
-       (\(c, d) -> StarParam (pyTokenAnn a) b (Just c) d)) <$>
-  token anySpace (\case; TkStar{} -> True; _ -> False) "*" <*>
+    maybe
+      (UnnamedStarParam (pyTokenAnn a) b)
+      (uncurry $ StarParam (pyTokenAnn a) b)) <$>
+  star anySpace <*>
   optional ((,) <$> identifier anySpace <*> optional tyAnn)
 
-  <|>
-
+tpDoubleStar :: MonadParsec e PyTokens m => m (Param SrcInfo)
+tpDoubleStar =
   (\(a, b) -> DoubleStarParam (pyTokenAnn a) b) <$>
-  token anySpace (\case; TkDoubleStar{} -> True; _ -> False) "**" <*>
+  doubleStar anySpace <*>
   identifier anySpace <*>
   optional tyAnn
-  where
-    tyAnn =
-      (,) <$>
-      (Colon . snd <$> token anySpace (\case; TkColon{} -> True; _ -> False) ":") <*>
-      expr anySpace
+
+typedParams :: MonadParsec e PyTokens m => m (CommaSep (Param SrcInfo))
+typedParams = someParams tpPositional tpStar tpDoubleStar
 
 arg :: MonadParsec e PyTokens m => m (Arg SrcInfo)
 arg =
@@ -1118,13 +1293,13 @@ arg =
   <|>
 
   (\(a, b) -> StarArg (pyTokenAnn a) b) <$>
-  token anySpace (\case; TkStar{} -> True; _ -> False) "*" <*>
+  star anySpace <*>
   expr anySpace
 
   <|>
 
   (\(a, b) -> DoubleStarArg (pyTokenAnn a) b) <$>
-  token anySpace (\case; TkDoubleStar{} -> True; _ -> False) "**" <*>
+  doubleStar anySpace <*>
   expr anySpace
 
 decoratorValue :: MonadParsec e PyTokens m => m (Expr SrcInfo)
@@ -1140,7 +1315,7 @@ decoratorValue = do
     (,,) <$>
     (snd <$> token anySpace (\case; TkLeftParen{} -> True; _ -> False) "(") <*>
     optional (commaSep1' anySpace arg) <*>
-    (snd <$> token space (\case; TkRightParen{} -> True; _ -> False) ")")
+    (snd <$> rightParen space)
   let
     derefs =
       foldl
@@ -1214,7 +1389,7 @@ compoundStatement pIndent indentBefore =
         ((,,) <$>
          (snd <$> token anySpace (\case; TkLeftParen{} -> True; _ -> False) "(") <*>
          optional (commaSep1' anySpace arg) <*>
-         (snd <$> token space (\case; TkRightParen{} -> True; _ -> False) ")")) <*>
+         (snd <$> rightParen space)) <*>
       suite
 
     ifSt =
@@ -1320,8 +1495,8 @@ compoundStatement pIndent indentBefore =
       token space (\case; TkDef{} -> True; _ -> False) "def" <*>
       identifier space <*>
       fmap snd (token anySpace (\case; TkLeftParen{} -> True; _ -> False) "(") <*>
-      commaSep anySpace typedParam <*>
-      fmap snd (token space (\case; TkRightParen{} -> True; _ -> False) ")") <*>
+      typedParams <*>
+      fmap snd (rightParen space) <*>
       optional
         ((,) <$>
          (snd <$> token space (\case; TkRightArrow{} -> True; _ -> False) "->") <*>

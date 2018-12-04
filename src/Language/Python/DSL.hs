@@ -17,13 +17,17 @@ passing @['line_' 'pass_']@
 {-# language LambdaCase #-}
 {-# language RankNTypes #-}
 {-# language RecordWildCards #-}
+{-# language TemplateHaskell #-}
 {-# language TypeFamilies #-}
 {-# language UndecidableInstances #-}
 module Language.Python.DSL
   ( (&)
   , Raw
+  , Module
   , Statement
   , Expr
+    -- * Modules
+  , module_
     -- * Identifiers
   , id_
   , Ident(..)
@@ -33,6 +37,7 @@ module Language.Python.DSL
   , identWhitespace
     -- * Starred values
   , HasStar(..)
+  , star_
     -- * Double-starred values
   , HasDoubleStar(..)
     -- * @as@ syntax
@@ -84,7 +89,6 @@ module Language.Python.DSL
   , Line(..)
     -- ** Block bodies
   , HasBody(..)
-  , modifyBody
     -- ** Function definitions
   , def_
   , Fundef(..)
@@ -339,19 +343,25 @@ module Language.Python.DSL
   , (.//)
   , (.%)
   , (.**)
+    -- * Miscellaneous
+  , linesToBlock
+  , blockToLines
   )
 where
 
 import Control.Applicative ((<|>))
-import Control.Lens.Fold ((^..), (^?), folded)
-import Control.Lens.Getter ((^.))
+import Control.Lens.Fold ((^..), (^?), folded, lengthOf)
+import Control.Lens.Getter ((^.), to)
 import Control.Lens.Iso (from)
 import Control.Lens.Lens (Lens')
 import Control.Lens.Prism (_Right, _Just)
 import Control.Lens.Review ((#))
-import Control.Lens.Setter ((.~), (<>~), (?~), (%~), Setter', over)
-import Control.Lens.Traversal (traverseOf)
+import Control.Lens.Setter ((.~), (<>~), (?~), (%~), Setter', set, over, mapped)
+import Control.Lens.TH (makeWrapped)
+import Control.Lens.Traversal (Traversal', traverseOf)
 import Control.Lens.Tuple (_2)
+import Control.Lens.Wrapped (_Wrapped)
+import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.String (fromString)
 import Data.List.NonEmpty (NonEmpty(..))
@@ -363,6 +373,7 @@ import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
+import Language.Python.Syntax.Module
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Punctuation
@@ -379,11 +390,19 @@ type Raw f = f '[] ()
 id_ :: String -> Raw Ident
 id_ = fromString
 
+module_ :: [Raw Line] -> Raw Module
+module_ [] = ModuleEmpty
+module_ (a:as) =
+  case unLine a of
+    Left (bl, nl) -> ModuleBlank bl nl $ module_ as
+    Right a -> ModuleStatement a $ module_ as
+
 -- | One or more lines of Python code
 newtype Line v a
   = Line
   { unLine :: Either (Blank a, Newline) (Statement v a)
   } deriving (Eq, Show)
+makeWrapped ''Line
 
 -- | Create a blank 'Line'
 blank_ :: Raw Line
@@ -426,88 +445,30 @@ instance HasExprs Line where
 instance HasStatements Line where
   _Statements f (Line a) = Line <$> _Right f a
 
--- |
--- @forall ws s. id ~ getBody . flip (setBody ws) s@
---
--- @forall ws. let f x = setBody ws (getBody x) x in f ~ f . f@
 class HasBody s where
-  -- | Set the block body of some code, first indententing the block by a specified amount,
-  -- then indenting it by the level of its parent
+  -- | A faux-Lens that targets lines in the body of some statement-piece, but
+  -- does so \'around\' indentation.
   --
-  -- For example, if we wanted to set the body of @function_b@ to
-  --
-  -- @
-  -- while True:
-  --   pass
-  -- @
-  --
-  -- in
-  --
-  -- @
-  -- def function_a():
-  --   def function_b():
+  -- >>> def_ "a" [] [ line_ pass_, line_ pass_ ]
+  -- def a ():
   --     pass
-  --     if True:
-  --       pass
-  --     else:
-  --       pass
-  -- @
-  --
-  -- then we would get
-  --
-  -- @
-  -- def function_a():
-  --   def function_b():
-  --     while True:
-  --       pass
-  -- @
-  setBody
-    :: [Whitespace] -- ^ Indentation scheme for the new lines
-    -> [Raw Line] -- ^ Lines to become the new body
-    -> Raw s -- ^ Current code
-    -> Raw s
-
-  -- | View the block body of some code without the indentation from its outer context
-  --
-  -- For example, if we ran 'getBody' @function_b@ in this code:
-  --
-  -- @
-  -- def function_a():
-  --   def function_b():
   --     pass
-  --     if True:
-  --       pass
-  --     else:
-  --       pass
-  -- @
   --
-  -- then we would get
-  --
-  -- @
+  -- >>> def_ "a" [] [ line_ pass_, line_ pass_ ] ^. body_
   -- pass
-  -- if True:
-  --   pass
-  -- else:
-  --   pass
-  -- @
-  getBody :: Raw s -> [Raw Line]
+  -- pass
+  --
+  -- >>> def_ "a" [] [ line_ pass_, line_ pass_ ] & body_ .~ [ line_ $ var_ "b" += 1 ]
+  -- def a():
+  --     b += 1
+  --
+  -- >>> def_ "a" [] [ line_ pass_, line_ pass_ ] & body_ <>~ [ line_ $ var_ "b" += 1 ]
+  -- def a():
+  --     pass
+  --     pass
+  --     b += 1
+  body_ :: Functor f => ([Raw Line] -> f [Raw Line]) -> Raw s -> f (Raw s)
   body :: Lens' (Raw s) (Raw Suite)
-
-doIndent :: [Whitespace] -> [Indent] -> [Indent]
-doIndent ws a = ws ^. from indentWhitespaces : a
-
-doDedent :: Indents a -> Indents a
-doDedent i@(Indents [] _) = i
-doDedent (Indents (_:b) c) = Indents b c
-
--- | Modify the block body of some code
-modifyBody
-  :: HasBody s
-  => [Whitespace] -- ^ New indentation scheme
-  -> ([Raw Line] -> [Raw Line]) -- ^ Modification function
-  -> Raw s -- ^ Existing code
-  -> Raw s
-modifyBody ws f fun = setBody ws (f $ getBody fun) fun
 
 class HasColon s t | s -> t, t -> s where
   (.:) :: Raw s -> Raw Expr -> Raw t
@@ -524,9 +485,12 @@ instance HasColon Expr DictItem where
 --
 -- @('.:') :: 'Raw' 'Param' -> 'Raw' 'Expr' -> 'Raw' 'Param'@
 --
+-- 'star_' can be annotated using '.:', but it will have no effect on the output program,
+-- as unnamed starred parameters cannot have type annotations.
+--
 -- See 'def_'
 instance HasColon Param Param where
-  (.:) p t = p { _paramType = Just (Colon [Space], t) }
+  (.:) p t = p & paramType ?~ (Colon [Space], t)
 
 -- | Positional parameters/arguments
 --
@@ -542,7 +506,7 @@ class HasPositional p v | p -> v, v -> p where
 
 -- | See 'def_'
 instance HasStar Ident Param where
-  s_ i = StarParam () [] (Just i) Nothing
+  s_ i = StarParam () [] i Nothing
 
 -- | See 'def_'
 instance HasDoubleStar Ident Param where
@@ -562,6 +526,14 @@ class HasKeyword p where
 
 class HasStar s t | t -> s where
   s_ :: Raw s -> Raw t
+
+-- | Unnamed starred parameter
+--
+-- >>> def_ "a" [ p_ "b", star_ ] [ line_ pass_ ]
+-- def a(b, *):
+--     pass
+star_ :: Raw Param
+star_ = UnnamedStarParam () []
 
 class HasDoubleStar s t | t -> s where
   ss_ :: Raw s -> Raw t
@@ -585,7 +557,18 @@ instance HasPositional Arg Expr where; p_ = PositionalArg ()
 instance HasKeyword Arg where; k_ a = KeywordArg () a []
 
 class HasParameters s where
-  setParameters :: [Raw Param] -> Raw s -> Raw s
+  -- | A faux-Lens that allows targeting 'Param's in-between existing formatting,
+  -- and adding appropriate formatting when extra parameters are introduced.
+  --
+  -- >>> 'Language.Python.Render.showStatement' myStatement
+  -- \"def a(b ,  c   ):\\n    pass\"
+  --
+  -- >>> 'Language.Python.Render.showStatement' (myStatement '&' '_Fundef' '.' 'parameters_' '.~' ['p_' \"d\", 'p_' \"e\"]
+  -- \"def a(d ,  e   ):\\n    pass\"
+  --
+  -- >>> 'Language.Python.Render.showStatement' (myStatement '&' '_Fundef' '.' 'parameters_' '.~' ['p_' \"d\", 'p_' \"e\", 'p_' \"f\"]
+  -- \"def a(d ,  e   , f):\\n    pass\"
+  parameters_ :: Functor f => ([Raw Param] -> f [Raw Param]) -> Raw s -> f (Raw s)
   parameters :: Lens' (Raw s) (CommaSep (Raw Param))
 
 class HasArguments s where
@@ -613,46 +596,189 @@ instance HasDecorators Fundef where
 
   getDecorators code = code ^.. fdDecorators.folded._Exprs
 
-mkSetBody
-  :: HasIndents (Raw s) ()
-  => Setter' (Raw s) (Raw Suite)
-  -> (Raw s -> Indents ())
-  -> [Whitespace]
-  -> [Raw Line]
-  -> Raw s
-  -> Raw s
-mkSetBody bodyField indentsField ws new code =
-  code &
-  bodyField .~
-    over
-      (_Indents.indentsValue)
-      ((indentsField code ^. indentsValue <>) . doIndent ws)
-      (SuiteMany () (Colon []) Nothing LF $ toBlock new)
+blockToLines :: Raw Block -> [Raw Line]
+blockToLines (Block x y z) = fmap (Line . Left) x <> (Line (Right y) : fmap Line z)
 
-mkGetBody
-  :: HasIndents (Raw s) ()
-  => String
-  -> (Raw s -> Raw Suite)
-  -> (Raw s -> Indents ())
-  -> Raw s
-  -> [Raw Line]
-mkGetBody thing bodyField indentsField code =
-  (\case
-      SuiteOne _ _ a  -> [ line_ a ]
-      SuiteMany _ _ _ _ d ->
-        case d of
-          Block x y z -> fmap (Line . Left) x <> (Line (Right y) : fmap Line z)) $
-  fromMaybe
-    (error $ "malformed indentation in " <> thing <> " body")
-    (traverseOf _Indents (fmap doDedent . subtractStart (indentsField code)) (bodyField code))
+mkBody_
+  :: Traversal' (Raw s) (Indents ())
+  -> Lens' (Raw s) (Raw Suite)
+  -> forall f. Functor f => ([Raw Line] -> f [Raw Line]) -> Raw s -> f (Raw s)
+mkBody_ gIndents gBody f e =
+  (\ls -> e & gBody._Blocks .~ mkNewBlock allIndents ls id) <$> blLines'
+  where
+    -- | The default indent amount is the indentation level of the first statement
+    -- in a block. If the first statement has no indentation, it defaults to 4
+    -- spaces.
+    defaultIndent =
+      fromMaybe
+        (Indents [replicate 4 Space ^. from indentWhitespaces] ())
+        (e ^? gIndents)
+
+    -- | The number of indentation chunks that precede the lines we're focusing on.
+    --
+    -- It's one more than @defaultIndent@.
+    --
+    -- For example, if we're looking at this code, which is inside some larger
+    -- context:
+    --
+    -- @
+    --     def a():
+    --       pass
+    -- @
+    --
+    -- @defaultIndent@ refers to this part:
+    --
+    -- @
+    --      def a():
+    --  ^^^^
+    -- @
+    --
+    -- It's a single chunk. The code body has 2 (= one + 1) chunks:
+    --
+    -- @
+    --     def a():
+    --       pass
+    -- ^^^^
+    -- @
+    --
+    -- and
+    --
+    -- @
+    --     def a():
+    --       pass
+    --     ^^
+    -- @
+    --
+    -- So we will need to drop/take two chunks from the beginning of each line in
+    -- the body.
+    numChunks = lengthOf (indentsValue.folded) defaultIndent + 1
+
+    -- | The lines of the block
+    blLines = e ^.. gBody._Blocks.to blockToLines.folded
+
+    -- | The lines of the block, with leading indentation chopped off appropriately
+    --
+    -- For example:
+    --
+    -- @
+    --   def a():
+    --      pass
+    --      pass
+    -- @
+    --
+    -- the unprocessed lines are:
+    --
+    -- @
+    --      pass
+    --      pass
+    -- @
+    --
+    -- so the processed lines should be:
+    --
+    -- @
+    --   pass
+    --   pass
+    -- @
+    blLines' =
+      f $
+      over
+        (mapped._Wrapped._Right._Indents.indentsValue)
+        (drop numChunks)
+        blLines
+
+    -- | @defaultNewIndent@ is the amount of indentation that 'new' lines should get.
+    -- 'New' lines are only introduced when we set the @[Raw Line]@ to a list longer
+    -- than its original value.
+    --
+    -- @allIndents@ is a list of indentation corresponding to the indents of the old
+    -- @[Raw Line]@
+    defaultNewIndent :: Indents (); allIndents :: [Indents ()]
+    (defaultNewIndent, allIndents) =
+      foldr
+        (\a (di, as) ->
+           maybe
+             (di, di : as)
+             (\x -> (x, x : as))
+             (a ^? to unLine._Right._Indents.to (indentsValue %~ take numChunks)))
+        (defaultIndent, [])
+        blLines
+
+    -- | @mkNewBlock@ zips the old indentation with the new lines, but if the new
+    -- list of lines is longer than the old one then the extra lines at the end
+    -- are indented by @defaultNewIndent@
+    mkNewBlock
+      :: [Indents ()]
+      -> [Raw Line]
+      -> (Raw Block -> Raw Block)
+      -> Raw Block
+    mkNewBlock [] [] k =
+      k $ Block [] (pass_ & _Indents %~ (defaultNewIndent <>)) []
+    mkNewBlock (a:_) [] k =
+      k $ Block [] (pass_ & _Indents %~ (a <>)) []
+    mkNewBlock [] [b] k =
+      k $
+      either
+        (\w -> Block [w] (pass_ & _Indents %~ (defaultNewIndent <>)) [])
+        (\w -> Block [] (w & _Indents %~ (defaultNewIndent <>)) [])
+        (unLine b)
+    mkNewBlock (a:_) [b] k =
+      k $
+      either
+        (\w -> Block [w] (pass_ & _Indents %~ (a <>)) [])
+        (\w -> Block [] (w & _Indents %~ (a <>)) [])
+        (unLine b)
+    mkNewBlock [] (b:bs) k =
+      mkNewBlock [] bs $
+      \(Block x y z) ->
+        k $
+        either
+          (\w -> Block (w:x) y z)
+          (\w ->
+             Block []
+               (w & _Indents %~ (defaultNewIndent <>))
+               ((Left <$> x) <> (Right y:z)))
+          (unLine b)
+    mkNewBlock (a:as) (b:bs) k =
+      mkNewBlock as bs $
+      \(Block x y z) ->
+        k $
+        either
+          (\w -> Block (w:x) y z)
+          (\w ->
+              Block []
+                (w & _Indents %~ (a <>))
+                ((Left <$> x) <> (Right y:z)))
+          (unLine b)
 
 instance HasBody Fundef where
   body = fdBody
-  setBody = mkSetBody fdBody _fdIndents
-  getBody = mkGetBody "function" _fdBody _fdIndents
+  body_ = mkBody_ fdIndents fdBody
 
 instance HasParameters Fundef where
-  setParameters p = fdParameters .~ listToCommaSep p
+  parameters_ f e = flip (set fdParameters) e . go ps <$> ps'
+    where
+      ps = e ^. fdParameters
+      ps' = f $ toList ps
+
+      go :: CommaSep (Raw Param) -> [Raw Param] -> CommaSep (Raw Param)
+      go CommaSepNone [] = CommaSepNone
+      go CommaSepNone (x:xs) = listToCommaSep $ x:xs
+      go CommaSepOne{} [] = CommaSepNone
+      go (CommaSepOne a) [x] =
+        CommaSepOne $ x & trailingWhitespace .~ (a ^. trailingWhitespace)
+      go (CommaSepOne a) (x:xs) =
+        listToCommaSep $ (x & trailingWhitespace .~ (a ^. trailingWhitespace)) :xs
+      go CommaSepMany{} [] = CommaSepNone
+      go (CommaSepMany a b CommaSepNone) [x] =
+        CommaSepMany
+          (x & trailingWhitespace .~ (a ^. trailingWhitespace))
+          b
+          CommaSepNone
+      go (CommaSepMany a _ _) [x] =
+        CommaSepOne (x & trailingWhitespace .~ (a ^. trailingWhitespace))
+      go (CommaSepMany a b c) (x:xs) =
+        CommaSepMany (x & trailingWhitespace .~ (a ^. trailingWhitespace)) b $ go c xs
+
   parameters = fdParameters
 
 -- | Create a minimal valid function definition
@@ -669,7 +795,7 @@ mkFundef name body =
   , _fdParameters = CommaSepNone
   , _fdRightParenSpaces = []
   , _fdReturnType = Nothing
-  , _fdBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
+  , _fdBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
   }
 
 -- |
@@ -1056,14 +1182,19 @@ pos_ = UnOp () (Positive () [])
 compl_ :: Raw Expr -> Raw Expr
 compl_ = UnOp () (Complement () [])
 
-toBlock :: [Raw Line] -> Block '[] ()
-toBlock =
-  over
-    (_Indents.indentsValue)
-    (doIndent $ replicate 4 Space) .
-    go
+-- | Convert a list of 'Line's to a 'Block', giving them 4 spaces of indentation
+linesToBlockIndented :: [Raw Line] -> Block '[] ()
+linesToBlockIndented = over _Indents (indentIt $ replicate 4 Space) . linesToBlock
+
+-- | Convert a list of 'Line's to a 'Block', without indenting them
+linesToBlock :: [Raw Line] -> Block '[] ()
+linesToBlock = go
   where
     go [] = Block [] pass_ []
+    go [y] =
+      case unLine y of
+        Left l -> Block [l] pass_ []
+        Right st -> Block [] st []
     go (y:ys) =
       case unLine y of
         Left l ->
@@ -1073,8 +1204,7 @@ toBlock =
 
 instance HasBody While where
   body = whileBody
-  setBody = mkSetBody whileBody _whileIndents
-  getBody = mkGetBody "while" _whileBody _whileIndents
+  body_ = mkBody_ whileIndents whileBody
 
 instance HasElse While where
   getElse = mkGetElse _whileIndents _whileElse
@@ -1088,7 +1218,7 @@ mkWhile cond body =
   , _whileIndents = Indents [] ()
   , _whileWhile = [Space]
   , _whileCond = cond
-  , _whileBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
+  , _whileBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
   , _whileElse = Nothing
   }
 
@@ -1103,25 +1233,22 @@ mkIf cond body =
   , _ifIndents = Indents [] ()
   , _ifIf = [Space]
   , _ifCond = cond
-  , _ifBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
+  , _ifBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
   , _ifElifs = []
   , _ifElse = Nothing
   }
 
 instance HasBody Elif where
   body = elifBody
-  setBody = mkSetBody elifBody _elifIndents
-  getBody = mkGetBody "elif" _elifBody _elifIndents
+  body_ = mkBody_ elifIndents elifBody 
 
 instance HasBody Else where
   body = elseBody
-  setBody = mkSetBody elseBody _elseIndents
-  getBody = mkGetBody "else" _elseBody _elseIndents
+  body_ = mkBody_ elseIndents elseBody 
 
 instance HasBody If where
   body = ifBody
-  setBody = mkSetBody ifBody _ifIndents
-  getBody = mkGetBody "if" _ifBody _ifIndents
+  body_ = mkBody_ ifIndents ifBody 
 
 -- |
 -- @'if_' :: 'Raw' 'Expr' -> ['Raw' 'Line'] -> 'Raw' 'If'@
@@ -1157,7 +1284,7 @@ mkElif cond body =
   { _elifIndents = Indents [] ()
   , _elifElif = [Space]
   , _elifCond = cond
-  , _elifBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
+  , _elifBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
   }
 
 elif_ :: Raw Expr -> [Raw Line] -> Raw If -> Raw If
@@ -1169,7 +1296,7 @@ mkElse body =
   MkElse
   { _elseIndents = Indents [] ()
   , _elseElse = []
-  , _elseBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
+  , _elseBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
   }
 
 class HasElse s where
@@ -1351,7 +1478,7 @@ mkFor binder collection body =
       fromMaybe
         (CommaSepOne1' (Unit () [] []) Nothing)
         (listToCommaSep1' collection)
-  , _forBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
+  , _forBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
   , _forElse = Nothing
   }
 
@@ -1369,8 +1496,7 @@ forSt_ val vals block = _For # mkFor val vals block
 
 instance HasBody For where
   body = forBody
-  setBody = mkSetBody forBody _forIndents
-  getBody = mkGetBody "for" _forBody _forIndents
+  body_ = mkBody_ forIndents forBody 
 
 instance AsLine For where
   line_ = line_ . (_For #)
@@ -1390,7 +1516,7 @@ mkFinally body =
   MkFinally
   { _finallyIndents = Indents [] ()
   , _finallyFinally = []
-  , _finallyBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
+  , _finallyBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
   }
 
 -- | Create a minimal valid 'Except'
@@ -1400,7 +1526,7 @@ mkExcept body =
   { _exceptIndents = Indents [] ()
   , _exceptExcept = []
   , _exceptExceptAs = Nothing
-  , _exceptBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
+  , _exceptBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
   }
 
 -- | Create a minimal valid 'TryExcept'
@@ -1410,7 +1536,7 @@ mkTryExcept body except =
   { _teAnn = ()
   , _teIndents = Indents [] ()
   , _teTry = [Space]
-  , _teBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
+  , _teBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
   , _teExcepts = pure except
   , _teElse = Nothing
   , _teFinally = Nothing
@@ -1423,7 +1549,7 @@ mkTryFinally body fBody =
   { _tfAnn = ()
   , _tfIndents = Indents [] ()
   , _tfTry = [Space]
-  , _tfBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
+  , _tfBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
   , _tfFinally = mkFinally fBody
   }
 
@@ -1438,8 +1564,7 @@ instance HasFinally TryFinally where
 
 instance HasBody TryExcept where
   body = teBody
-  setBody = mkSetBody teBody _teIndents
-  getBody = mkGetBody "try except" _teBody _teIndents
+  body_ = mkBody_ teIndents teBody 
 
 -- | @try ... except@ with optional @else@ and optional @finally@
 tryE_ :: [Raw Line] -> Raw Except -> Raw TryExcept
@@ -1447,8 +1572,7 @@ tryE_ = mkTryExcept
 
 instance HasBody TryFinally where
   body = tfBody
-  setBody = mkSetBody tfBody _tfIndents
-  getBody = mkGetBody "try finally" _tfBody _tfIndents
+  body_ = mkBody_ tfIndents tfBody 
 
 -- |
 -- @
@@ -1597,13 +1721,12 @@ mkClassDef name body =
   , _cdClass = Space :| []
   , _cdName = name
   , _cdArguments = Nothing
-  , _cdBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
+  , _cdBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
   }
 
 instance HasBody ClassDef where
   body = cdBody
-  setBody = mkSetBody cdBody _cdIndents
-  getBody = mkGetBody "class" _cdBody _cdIndents
+  body_ = mkBody_ cdIndents cdBody 
 
 instance HasDecorators ClassDef where
   decorators = cdDecorators
@@ -1635,7 +1758,7 @@ mkWith items body =
   , _withAsync = Nothing
   , _withWith = [Space]
   , _withItems = listToCommaSep1 items
-  , _withBody = SuiteMany () (Colon []) Nothing LF $ toBlock body
+  , _withBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
   }
 
 -- |
@@ -1677,8 +1800,7 @@ instance AsWithItem WithItem where
 
 instance HasBody With where
   body = withBody
-  setBody = mkSetBody withBody _withIndents
-  getBody = mkGetBody "with" _withBody _withIndents
+  body_ = mkBody_ withIndents withBody 
 
 instance HasAsync With where
   async_ = withAsync ?~ pure Space

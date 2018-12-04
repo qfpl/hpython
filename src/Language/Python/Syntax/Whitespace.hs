@@ -19,14 +19,15 @@ module Language.Python.Syntax.Whitespace
   , Blank(..)
   , HasTrailingWhitespace(..)
   , HasTrailingNewline(..)
+    -- * Indentation
   , IndentLevel, getIndentLevel, indentLevel, absoluteIndentLevel
-  , Indent(..), indentWhitespaces
+  , Indent(..), indentWhitespaces, indentIt, dedentIt
   , Indents(..), indentsValue, indentsAnn, subtractStart
   )
 where
 
 import Control.Lens.Iso (Iso', iso, from)
-import Control.Lens.Getter (view)
+import Control.Lens.Getter ((^.), view)
 import Control.Lens.Lens (Lens', lens)
 import Control.Lens.Setter ((.~))
 import Control.Lens.TH (makeLenses)
@@ -38,7 +39,7 @@ import Data.FingerTree (FingerTree, Measured(..), fromList)
 import Data.List (stripPrefix)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Monoid (Monoid, Endo(..), Dual(..))
-import Data.Semigroup (Semigroup)
+import Data.Semigroup (Semigroup, (<>))
 import GHC.Exts (IsList(..))
 
 import qualified Data.List.NonEmpty as NonEmpty
@@ -171,6 +172,15 @@ instance IsList Indent where
   toList = view indentWhitespaces
   fromList = view $ from indentWhitespaces
 
+-- | Indent some indentation by a chunk
+indentIt :: [Whitespace] -> Indents a -> Indents a
+indentIt ws (Indents a b) = Indents (ws ^. from indentWhitespaces : a) b
+
+-- | Deent some indentation by a chunk
+dedentIt :: Indents a -> Indents a
+dedentIt i@(Indents [] _) = i
+dedentIt (Indents (_:b) c) = Indents b c
+
 -- | An 'Indent' is isomorphic to a list of 'Whitespace'
 indentWhitespaces :: Iso' Indent [Whitespace]
 indentWhitespaces =
@@ -188,6 +198,9 @@ data Indents a
   { _indentsValue :: [Indent]
   , _indentsAnn :: a
   } deriving (Eq, Show, Functor, Foldable, Traversable)
+
+instance Semigroup a => Semigroup (Indents a) where
+  Indents a b <> Indents c d = Indents (a <> c) (b <> d)
 
 makeLenses ''Indents
 deriveEq1 ''Indents

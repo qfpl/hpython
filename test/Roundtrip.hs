@@ -14,7 +14,6 @@ import Hedgehog
 import System.FilePath ((</>))
 
 import qualified Data.Text.IO as StrictText
--- import qualified Data.Text as Strict
 
 import Language.Python.Internal.Lexer (SrcInfo)
 import Language.Python.Render (showModule)
@@ -22,7 +21,7 @@ import Language.Python.Parse (parseModule)
 import Language.Python.Validate
   ( Indentation, IndentationError, SyntaxError
   , runValidateIndentation, validateModuleIndentation, runValidateSyntax
-  , validateModuleSyntax, initialSyntaxContext
+  , validateModuleSyntax
   )
 
 import Helpers (shouldBeParseSuccess)
@@ -75,11 +74,10 @@ doRoundtrip file = do
       annotateShow (errs :: NonEmpty (IndentationError SrcInfo))
       failure
     Success res ->
-      case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
+      case runValidateSyntax (validateModuleSyntax res) of
         Failure errs' -> do
           annotateShow (errs' :: NonEmpty (SyntaxError '[Indentation] SrcInfo))
           failure
         Success _ -> do
           annotateShow py
-          -- Strict.lines (showModule py) === Strict.lines file
           showModule py === file

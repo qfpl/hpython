@@ -26,7 +26,7 @@ parseCheckSeq name = do
     Failure errs ->
       print (errs :: NonEmpty (IndentationError SrcInfo)) *> exitFailure
     Success res ->
-      case runValidateSyntax initialSyntaxContext [] (validateModuleSyntax res) of
+      case runValidateSyntax (validateModuleSyntax res) of
         Failure errs' ->
           print (errs' :: (NonEmpty (SyntaxError '[Indentation] SrcInfo))) *> exitFailure
         Success a -> pure $ seq a ()

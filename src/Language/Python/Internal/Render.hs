@@ -1477,23 +1477,7 @@ renderArg _ (DoubleStarArg _ ws expr) = do
   parensTupleGenerator expr
 
 renderParams :: CommaSep (Param v a) -> RenderOutput ()
-renderParams = go False
-  where
-    go :: Bool -> CommaSep (Param v a) -> RenderOutput ()
-    go _ CommaSepNone = pure ()
-    go _ (CommaSepOne a) = renderParam a
-    go sawStar (CommaSepMany a c b) = do
-      let
-        sawStar' =
-          case a of
-            StarParam{} -> True;
-            DoubleStarParam{} -> True
-            _ -> sawStar
-      renderParam a
-      (case b of
-          CommaSepNone | sawStar' -> pure ()
-          _ -> renderComma c)
-      go sawStar' b
+renderParams = renderCommaSep renderParam . correctParams
 
 renderParam :: Param v a -> RenderOutput ()
 renderParam (PositionalParam _ name mty) = do

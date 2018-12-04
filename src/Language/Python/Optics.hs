@@ -48,6 +48,7 @@ module Language.Python.Optics
     -- * Parameters
   , _PositionalParam
   , _KeywordParam
+  , _UnnamedStarParam
   , _StarParam
     -- * Expressions
     -- ** Identifiers

@@ -154,7 +154,7 @@ instance HasTrailingWhitespace (Param v a) where
           UnnamedStarParam a _ -> UnnamedStarParam a ws
           StarParam a b c d ->
             StarParam a
-              (if isNothing d then ws else b)
+              b
               (if isNothing d then c & trailingWhitespace .~ ws else c)
               (d & _Just._2.trailingWhitespace .~ ws)
           DoubleStarParam a b c d ->

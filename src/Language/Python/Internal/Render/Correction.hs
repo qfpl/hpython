@@ -23,7 +23,7 @@ module Language.Python.Internal.Render.Correction where
 import Control.Lens.Fold (hasn't)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Plated (transform)
-import Control.Lens.Setter ((.~))
+import Control.Lens.Setter ((.~), (<>~))
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Semigroup ((<>))
@@ -33,10 +33,26 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
 
 import Language.Python.Internal.Token
+import Language.Python.Syntax.CommaSep
+import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Numbers
 import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
+
+-- | Trailing commas can only be present in a parameter list of entirely
+-- positional arguments. This removes the bad trailing comma, and appends
+-- the comma's trailing whitespace to the previous token
+correctParams :: CommaSep (Param v a) -> CommaSep (Param v a)
+correctParams CommaSepNone = CommaSepNone
+correctParams (CommaSepOne a) = CommaSepOne a
+correctParams (CommaSepMany a (Comma b) c) =
+  case c of
+    CommaSepNone ->
+      case a of
+        PositionalParam{} -> CommaSepMany a (Comma b) c
+        _ -> CommaSepOne (a & trailingWhitespace <>~ b)
+    _ -> CommaSepMany a (Comma b) (correctParams c)
 
 correctSpaces :: (PyToken () -> Text) -> [PyToken ()] -> [PyToken ()]
 correctSpaces f =

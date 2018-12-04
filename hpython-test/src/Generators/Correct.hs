@@ -10,7 +10,7 @@ import Control.Lens.Fold
 import Control.Lens.Getter
 import Control.Lens.Iso (from)
 import Control.Lens.Plated
-import Control.Lens.Prism (_Just, _Nothing)
+import Control.Lens.Prism (_Just)
 import Control.Lens.Setter
 import Control.Lens.Tuple
 import Control.Lens.TH
@@ -28,7 +28,6 @@ import qualified Data.List.NonEmpty as NonEmpty
 
 import GHC.Stack
 
-import Language.Python.Syntax.Types (spType)
 import Language.Python.Optics
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
@@ -313,7 +312,7 @@ genParams isLambda =
     pparamNames'' = pparamNames' <> kwparams ^.. folded.paramName.identValue
   in do
     kwparams' <-
-      if has (folded._StarParam.spType._Nothing) sp && null kwparams
+      if has (folded._UnnamedStarParam) sp && null kwparams
       then CommaSepOne <$> genKeywordParam isLambda pparamNames'
       else pure kwparams
 

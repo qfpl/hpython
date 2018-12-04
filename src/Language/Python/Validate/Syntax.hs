@@ -20,20 +20,23 @@ Portability : non-portable
 module Language.Python.Validate.Syntax
   ( module Data.Validation
   , module Language.Python.Validate.Syntax.Error
-  , reservedWords
-  , Syntax
-  , ValidateSyntax
-  , SyntaxContext(..), inLoop, inFunction, inGenerator, inParens
-  , initialSyntaxContext
-  , runValidateSyntax
+    -- * Main validation functions
+  , Syntax, ValidateSyntax, runValidateSyntax
   , validateModuleSyntax
   , validateStatementSyntax
   , validateExprSyntax
     -- * Miscellany
+    -- ** Extra types
+  , SyntaxContext(..), FunctionInfo(..), inLoop, inFunction, inGenerator, inParens
+  , runValidateSyntax'
+  , initialSyntaxContext
+    -- ** Extra functions
+  , reservedWords
   , canAssignTo
   , deleteBy'
   , deleteFirstsBy'
   , localNonlocals
+    -- ** Validation functions
   , validateArgsSyntax
   , validateBlockSyntax
   , validateCompoundStatementSyntax
@@ -167,8 +170,11 @@ makeLenses ''SyntaxContext
 
 type ValidateSyntax e = ValidateM (NonEmpty e) (ReaderT SyntaxContext (State [String]))
 
-runValidateSyntax :: SyntaxContext -> [String] -> ValidateSyntax e a -> Validation (NonEmpty e) a
-runValidateSyntax ctxt nlscope =
+runValidateSyntax :: ValidateSyntax e a -> Validation (NonEmpty e) a
+runValidateSyntax = runValidateSyntax' initialSyntaxContext []
+
+runValidateSyntax' :: SyntaxContext -> [String] -> ValidateSyntax e a -> Validation (NonEmpty e) a
+runValidateSyntax' ctxt nlscope =
   flip evalState nlscope .
   flip runReaderT ctxt . getCompose .
   unValidateM

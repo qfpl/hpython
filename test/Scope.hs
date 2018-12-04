@@ -28,11 +28,11 @@ fullyValidate x =
       annotateShow (errs :: NonEmpty (IndentationError ()))
       failure
     Success a ->
-      case runValidateSyntax initialSyntaxContext [] (validateStatementSyntax a) of
+      case runValidateSyntax (validateStatementSyntax a) of
         Failure errs -> do
           annotateShow (errs :: NonEmpty (SyntaxError '[Indentation] ()))
           failure
-        Success a' -> pure $ runValidateScope initialScopeContext (validateStatementScope a')
+        Success a' -> pure $ runValidateScope (validateStatementScope a')
 
 prop_scope_1 :: Property
 prop_scope_1 =

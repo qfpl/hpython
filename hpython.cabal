@@ -96,6 +96,7 @@ library
                      , Language.Python.Syntax.Types
                      , Language.Python.Syntax.Whitespace
                      , Language.Python.Validate
+                     , Language.Python.Validate.Error
                      , Language.Python.Validate.Scope
                      , Language.Python.Validate.Scope.Error
                      , Language.Python.Validate.Syntax

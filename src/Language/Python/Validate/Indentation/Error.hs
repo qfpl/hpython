@@ -32,9 +32,16 @@ data IndentationError a
   deriving (Eq, Show)
 
 class AsTabError s a => AsIndentationError s a | s -> a where
+  _IndentationError :: Prism' s (IndentationError a)
+
   _ExpectedGreaterThan :: Prism' s ([Indent], Indents a)
+  _ExpectedGreaterThan = _IndentationError._ExpectedGreaterThan
+
   _ExpectedEqualTo :: Prism' s ([Indent], Indents a)
+  _ExpectedEqualTo = _IndentationError._ExpectedEqualTo
+
   _EmptyContinuedLine :: Prism' s a
+  _EmptyContinuedLine = _IndentationError._EmptyContinuedLine
 
 instance AsTabError (IndentationError a) a where
   _TabError =
@@ -45,6 +52,8 @@ instance AsTabError (IndentationError a) a where
           _ -> Nothing)
 
 instance AsIndentationError (IndentationError a) a where
+  _IndentationError = id
+
   _ExpectedGreaterThan =
     prism'
       (uncurry ExpectedGreaterThan)

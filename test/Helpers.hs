@@ -63,7 +63,7 @@ syntaxValidateModule x =
       annotateShow (errs :: NonEmpty (IndentationError ()))
       failure
     Success a ->
-      pure $ runValidateSyntax initialSyntaxContext [] (validateModuleSyntax a)
+      pure $ runValidateSyntax (validateModuleSyntax a)
 
 syntaxValidateStatement
   :: Statement '[] ()
@@ -77,7 +77,7 @@ syntaxValidateStatement x =
       annotateShow (errs :: NonEmpty (IndentationError ()))
       failure
     Success a ->
-      pure $ runValidateSyntax initialSyntaxContext [] (validateStatementSyntax a)
+      pure $ runValidateSyntax (validateStatementSyntax a)
 
 syntaxValidateExpr
   :: Expr '[] ()
@@ -91,7 +91,7 @@ syntaxValidateExpr x =
       annotateShow (errs :: NonEmpty (IndentationError ()))
       failure
     Success a ->
-      pure $ runValidateSyntax initialSyntaxContext [] (validateExprSyntax a)
+      pure $ runValidateSyntax (validateExprSyntax a)
 
 shouldBeFailure :: MonadTest m => Validation e a -> m ()
 shouldBeFailure res =

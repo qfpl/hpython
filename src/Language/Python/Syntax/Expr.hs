@@ -16,16 +16,17 @@ Portability : non-portable
 
 module Language.Python.Syntax.Expr
   ( -- * Expressions
-    Expr (..), HasExprs (..), exprAnn, shouldGroupLeft, shouldGroupRight
+    Expr(..), HasExprs(..), exprAnn, shouldGroupLeft, shouldGroupRight
     -- * Parameters and arguments
-  , Param (..), paramAnn, paramType, paramName
-  , Arg (..), argExpr
+  , Param(..), paramAnn, paramType_, paramType, paramName
+  , Arg(..), argExpr
     -- * Comprehension expressions
-  , Comprehension (..), CompIf (..), CompFor (..)
+    -- | https://docs.python.org/3/reference/expressions.html#grammar-token-comprehension
+  , Comprehension(..), CompIf(..), CompFor(..)
     -- * Collection items
-  , DictItem (..), ListItem (..), SetItem (..), TupleItem (..)
+  , DictItem(..), ListItem(..), SetItem(..), TupleItem(..)
     -- * Subscripts
-  , Subscript (..)
+  , Subscript(..)
   )
 where
 
@@ -67,12 +68,14 @@ import Language.Python.Syntax.Whitespace
 
 We can't 'coerce' 'Expr's because the @v@ parameter is considered to have a
 nominal role, due to datatypes like 'Comprehension'. We only ever use @v@ in
-as a phantom in 'Expr', so 'unsafeCoerce :: Expr v a -> Expr '[]' is safe.
+as a phantom in 'Expr', so 'unsafeCoerce :: Expr v a -> Expr '[] a' is safe.
 
 -}
 instance Validated Expr where; unvalidated = to unsafeCoerce
 instance Validated Param where; unvalidated = to unsafeCoerce
 instance Validated Arg where; unvalidated = to unsafeCoerce
+instance Validated DictItem where; unvalidated = to unsafeCoerce
+instance Validated SetItem where; unvalidated = to unsafeCoerce
 instance Validated TupleItem where; unvalidated = to unsafeCoerce
 instance Validated ListItem where; unvalidated = to unsafeCoerce
 
@@ -166,9 +169,12 @@ instance HasTrailingWhitespace (Param v a) where
 paramAnn :: Lens' (Param v a) a
 paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
 
--- | Lens on the optional Python type annotation which may follow a parameter
+-- | A faux-lens on the optional Python type annotation which may follow a parameter
 --
--- This lens, like many others in hpython, loses validation information
+-- This is not a lawful 'Lens' because setting an 'UnnamedStarParam''s type won't
+-- have any effect.
+--
+-- This optic, like many others in hpython, loses validation information
 -- (the @v@ type parameter)
 --
 -- The following is an example, where @int@ is the paramtype:
@@ -176,13 +182,11 @@ paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
 -- @
 -- def foo(x: int):
 -- @
-paramType
-  :: Lens
-       (Param v a)
-       (Param '[] a)
-       (Maybe (Colon, Expr v a))
-       (Maybe (Colon, Expr '[] a))
-paramType =
+paramType_
+  :: Functor f
+  => (Maybe (Colon, Expr v a) -> f (Maybe (Colon, Expr '[] a)))
+  -> Param v a -> f (Param '[] a)
+paramType_ =
   lens
     (\case
         UnnamedStarParam{} -> Nothing
@@ -193,6 +197,10 @@ paramType =
        StarParam a b c _ -> StarParam a b c ty
        UnnamedStarParam a b -> UnnamedStarParam a b
        DoubleStarParam a b c _ -> DoubleStarParam a b c ty)
+
+-- | 'Traversal' targeting the Python type annotations which may follow a parameter
+paramType :: Traversal (Param v a) (Param '[] a) (Colon, Expr v a) (Colon, Expr '[] a)
+paramType = paramType_._Just
 
 -- | (affine) 'Control.Lens.Traversal.Traversal' on the name of a parameter
 --
@@ -348,6 +356,8 @@ instance HasTrailingWhitespace (CompFor v a) where
 -- | @a : b@ or @**a@
 --
 -- Used to construct dictionaries, e.g. @{ 1: a, 2: b, **c }@
+--
+-- https://docs.python.org/3/reference/expressions.html#dictionary-displays
 data DictItem (v :: [*]) a
   = DictItem
   { _dictItemAnn :: a
@@ -369,7 +379,21 @@ instance HasTrailingWhitespace (DictItem v a) where
 
 -- | Syntax for things that can be used as subscripts (inside the square brackets)
 --
--- e.g. @a[b]@, @a[:]@, @a[b:]@, @a[:b]@, @a[b:c]@, @a[b:c:d]@
+-- e.g.
+--
+-- @a[b]@
+--
+-- @a[:]@
+--
+-- @a[b:]@
+--
+-- @a[:b]@
+--
+-- @a[b:c]@
+--
+-- @a[b:c:d]@
+--
+-- https://docs.python.org/3/reference/expressions.html#subscriptions
 data Subscript (v :: [*]) a
   = SubscriptExpr (Expr v a)
   | SubscriptSlice
@@ -416,6 +440,8 @@ instance HasTrailingWhitespace (Subscript v a) where
 -- | @a@ or @*a@
 --
 -- Used to construct lists, e.g. @[ 1, 'x', **c ]@
+--
+-- https://docs.python.org/3/reference/expressions.html#list-displays
 data ListItem (v :: [*]) a
   = ListItem
   { _listItemAnn :: a
@@ -448,6 +474,8 @@ instance HasTrailingWhitespace (ListItem v a) where
 -- | @a@ or @*a@
 --
 -- Used to construct sets, e.g. @{ 1, 'x', **c }@
+--
+-- https://docs.python.org/3/reference/expressions.html#set-displays
 data SetItem (v :: [*]) a
   = SetItem
   { _setItemAnn :: a
@@ -827,7 +855,7 @@ data Expr (v :: [*]) a
   , _unsafeNotWhitespace :: [Whitespace]
   , _unsafeNotValue :: Expr v a
   }
-  -- | @(a for b in c)2
+  -- | @(a for b in c)@
   --
   -- https://docs.python.org/3/reference/expressions.html#generator-expressions
   | Generator

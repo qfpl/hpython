@@ -5,6 +5,8 @@ License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
 Stability   : experimental
 Portability : non-portable
+
+These types are used throughout the syntax tree to help preserve formatting.
 -}
 
 module Language.Python.Syntax.Punctuation where

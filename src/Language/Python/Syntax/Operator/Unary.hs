@@ -20,8 +20,11 @@ import Language.Python.Syntax.Whitespace
 -- | An 'UnOp' is a unary operator in Python, such as @-@ for negation.
 -- An operator is stored with an annotation and its trailing whitespace.
 data UnOp a
+  -- | @-a@
   = Negate a [Whitespace]
+  -- | @+a@
   | Positive a [Whitespace]
+  -- | @~a@
   | Complement a [Whitespace]
   deriving (Eq, Show, Functor, Foldable, Traversable)
 

@@ -1,4 +1,5 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DataKinds #-}
 {-# language LambdaCase #-}
 
 {-|
@@ -14,16 +15,25 @@ Syntax used in import statements
 https://docs.python.org/3.5/reference/simple_stmts.html#the-import-statement
 -}
 
-module Language.Python.Syntax.Import where
+module Language.Python.Syntax.Import
+  ( ImportAs(..)
+  , ImportTargets(..)
+    -- * Lenses
+  , importAsAnn
+  , importAsName
+  , importAsQual
+  )
+where
 
 import Control.Lens.Getter ((^.), getting)
-import Control.Lens.Lens (lens)
+import Control.Lens.Lens (Lens, Lens', lens)
 import Control.Lens.Prism (_Just)
 import Control.Lens.Setter ((.~))
 import Control.Lens.Tuple (_2)
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty)
 
+import Language.Python.Optics.Validated
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Whitespace
@@ -33,14 +43,33 @@ import Language.Python.Syntax.Whitespace
 -- Used in:
 --
 -- @import a as b@
+--
 -- @from a import b as c, d as e@
+--
 -- @from a import (b as c, d as e)@
 data ImportAs e v a
-  = ImportAs a (e a) (Maybe (NonEmpty Whitespace, Ident v a))
+  = ImportAs
+  { _importAsAnn :: a
+  , _importAsName :: e a
+  , _importAsQual :: Maybe (NonEmpty Whitespace, Ident v a)
+  }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-importAsAnn :: ImportAs e v a -> a
-importAsAnn (ImportAs a _ _) = a
+instance Validated (ImportAs e)
+
+importAsAnn :: Lens' (ImportAs e v a) a
+importAsAnn = lens _importAsAnn (\s a -> s { _importAsAnn = a })
+
+importAsName :: Lens (ImportAs e v a) (ImportAs e' '[] a) (e a) (e' a)
+importAsName = lens _importAsName (\s a -> (s ^. unvalidated) { _importAsName = a })
+
+importAsQual
+  :: Lens
+       (ImportAs e v a)
+       (ImportAs e '[] a)
+       (Maybe (NonEmpty Whitespace, Ident v a))
+       (Maybe (NonEmpty Whitespace, Ident '[] a))
+importAsQual = lens _importAsQual (\s a -> (s ^. unvalidated) { _importAsQual = a })
 
 instance HasTrailingWhitespace (e a) => HasTrailingWhitespace (ImportAs e v a) where
   trailingWhitespace =

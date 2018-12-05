@@ -377,12 +377,11 @@ import Language.Python.Syntax.Module
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Punctuation
+import Language.Python.Syntax.Raw
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Types
 import Language.Python.Syntax.Whitespace
-
-type Raw f = f '[] ()
 
 -- | 'Ident' has an 'Data.String.IsString' instance, but when a type class dispatches on
 -- an 'Ident' we will run into ambiguity if we try to use @OverloadedStrings@. In these
@@ -490,7 +489,7 @@ instance HasColon Expr DictItem where
 --
 -- See 'def_'
 instance HasColon Param Param where
-  (.:) p t = p & paramType ?~ (Colon [Space], t)
+  (.:) p t = p & paramType_ ?~ (Colon [Space], t)
 
 -- | Positional parameters/arguments
 --

@@ -14,7 +14,8 @@ Portability : non-portable
 -}
 
 module Language.Python.Syntax.Whitespace
-  ( Newline(..)
+  ( -- * Whitespace
+    Newline(..)
   , Whitespace(..)
   , Blank(..)
   , HasTrailingWhitespace(..)
@@ -88,10 +89,7 @@ data Whitespace
   | Comment (Comment ())
   deriving (Eq, Ord, Show)
 
--- | An important convention in hpython that helps unambiguously track
--- whitespace in the syntax tree is for each syntactic element to own the
--- whitespace which immediately follows it. They do /not/ own the whitespace
--- which precedes them, as this would cause ambiguity.
+-- | Every syntactic element contains the whitespace that immediately follows it.
 --
 -- This type class lets us access this trailing whitespace in many different
 -- types throughout hpython.
@@ -107,7 +105,7 @@ instance HasTrailingWhitespace a => HasTrailingWhitespace (NonEmpty a) where
            [] -> (x & trailingWhitespace .~ ws) :| xs
            x' : xs' -> NonEmpty.cons x $ (x' :| xs') & trailingWhitespace .~ ws)
 
--- | A newline that may be following a statement-containing thing
+-- | A statement-containing thing may have a trailing newline
 --
 -- Some forms /always/ have a trailing newline, which is why this class isn't just
 -- @trailingNewline :: 'Lens'' (s v a) ('Maybe' 'Newline')@

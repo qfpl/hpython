@@ -91,7 +91,7 @@ correctAdjacentStrings (a:|b:cs) =
     _stringLiteralQuoteType a == _stringLiteralQuoteType b &&
     _stringLiteralStringType a == _stringLiteralStringType b &&
     null (a ^. trailingWhitespace) &&
-    not (hasStringPrefix b)
+    not (hasPrefix b)
   then
     NonEmpty.cons (a & trailingWhitespace .~ [Space]) (correctAdjacentStrings $ b :| cs)
   else

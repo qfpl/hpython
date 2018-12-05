@@ -16,7 +16,34 @@ Python string literals.
 See <https://docs.python.org/3.5/reference/lexical_analysis.html#string-and-bytes-literals>
 -}
 
-module Language.Python.Syntax.Strings where
+module Language.Python.Syntax.Strings
+  ( -- * Datatypes
+    -- ** Characters
+    PyChar(..)
+  , fromHaskellString
+    -- ** String information
+  , QuoteType(..)
+  , StringType(..)
+    -- ** String prefixes
+  , StringPrefix(..)
+  , RawStringPrefix(..)
+  , BytesPrefix(..)
+  , RawBytesPrefix(..)
+  , hasPrefix
+    -- ** String literals
+  , StringLiteral(..)
+    -- *** Lenses
+  , stringLiteralValue
+    -- * Rendering
+  , showQuoteType
+  , showStringPrefix
+  , showRawStringPrefix
+  , showBytesPrefix
+  , showRawBytesPrefix
+    -- * Extra functions
+  , isEscape
+  )
+where
 
 import Control.Lens.Lens (lens)
 import Control.Lens.TH (makeLensesFor)
@@ -88,11 +115,11 @@ data RawBytesPrefix
 
 -- | Most types of 'StringLiteral' have prefixes. Plain old strings may have
 -- an optional prefix, but it is meaningless.
-hasStringPrefix :: StringLiteral a -> Bool
-hasStringPrefix RawStringLiteral{} = True
-hasStringPrefix RawBytesLiteral{} = True
-hasStringPrefix (StringLiteral _ a _ _ _ _) = isJust a
-hasStringPrefix BytesLiteral{} = True
+hasPrefix :: StringLiteral a -> Bool
+hasPrefix RawStringLiteral{} = True
+hasPrefix RawBytesLiteral{} = True
+hasPrefix (StringLiteral _ a _ _ _ _) = isJust a
+hasPrefix BytesLiteral{} = True
 
 -- | A 'StringLiteral', complete with a prefix, information about
 -- quote type and number, and a list of 'PyChar's.
@@ -151,16 +178,23 @@ instance HasTrailingWhitespace (StringLiteral a) where
 -- | A character in a string literal. This is a large sum type, with a
 -- catch-all of a Haskell 'Char'.
 data PyChar
+  -- | @\\newline@
   = Char_newline
+  -- | @\\1@
   | Char_octal1 OctDigit
+  -- | @\\12@
   | Char_octal2 OctDigit OctDigit
+  -- | @\\123@
   | Char_octal3 OctDigit OctDigit OctDigit
+  -- | @\\xFb@
   | Char_hex HeXDigit HeXDigit
+  -- | @\\u12aD@
   | Char_uni16
       HeXDigit
       HeXDigit
       HeXDigit
       HeXDigit
+  -- | @\\Udeadbeef@
   | Char_uni32
       HeXDigit
       HeXDigit
@@ -170,16 +204,27 @@ data PyChar
       HeXDigit
       HeXDigit
       HeXDigit
+  -- | @\\\\@
   | Char_esc_bslash
+  -- | @\\\'@
   | Char_esc_singlequote
+  -- | @\\\"@
   | Char_esc_doublequote
+  -- | @\\a@
   | Char_esc_a
+  -- | @\\b@
   | Char_esc_b
+  -- | @\\f@
   | Char_esc_f
+  -- | @\\n@
   | Char_esc_n
+  -- | @\\r@
   | Char_esc_r
+  -- | @\\t@
   | Char_esc_t
+  -- | @\\v@
   | Char_esc_v
+  -- | Any character
   | Char_lit Char
   deriving (Eq, Ord, Show)
 
@@ -209,7 +254,8 @@ isEscape c =
 -- | Convert a Haskell string to a list of 'PyChar'. This is useful when
 -- writing Python in Haskell.
 fromHaskellString :: String -> [PyChar]
-fromHaskellString = fmap
+fromHaskellString =
+  fmap
   (\c -> case c of
     '\\' -> Char_esc_bslash
     '\'' -> Char_esc_singlequote

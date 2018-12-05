@@ -10,6 +10,10 @@ License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
 Stability   : experimental
 Portability : non-portable
+
+This module contains a datatype for binary operators and a precedence table
+with associated operations. This presentation of operators is simpler and more
+flexible than hard-coding them into the syntax tree.
 -}
 
 module Language.Python.Syntax.Operator.Binary where
@@ -26,30 +30,55 @@ import Language.Python.Syntax.Whitespace
 --
 -- The type variable allows annotations, but it can simply be made @()@ for an unannotated @BinOp@.
 data BinOp a
+  -- | @a is b@
   = Is a [Whitespace]
+  -- | @a is not b@
   | IsNot a [Whitespace] [Whitespace]
+  -- | @a in b@
   | In a [Whitespace]
+  -- | @a not in b@
   | NotIn a [Whitespace] [Whitespace]
+  -- | @a - b@
   | Minus a [Whitespace]
+  -- | @a ** b@
   | Exp a [Whitespace]
+  -- | @a and b@
   | BoolAnd a [Whitespace]
+  -- | @a or b@
   | BoolOr a [Whitespace]
+  -- | @a == b@
   | Equals a [Whitespace]
+  -- | @a < b@
   | Lt a [Whitespace]
+  -- | @a <= b@
   | LtEquals a [Whitespace]
+  -- | @a > b@
   | Gt a [Whitespace]
+  -- | @a >= b@
   | GtEquals a [Whitespace]
+  -- | @a != b@
   | NotEquals a [Whitespace]
+  -- | @a * b@
   | Multiply a [Whitespace]
+  -- | @a / b@
   | Divide a [Whitespace]
+  -- | @a // b@
   | FloorDivide a [Whitespace]
+  -- | @a % b@
   | Percent a [Whitespace]
+  -- | @a + b@
   | Plus a [Whitespace]
+  -- | @a | b@
   | BitOr a [Whitespace]
+  -- | @a ^ b@
   | BitXor a [Whitespace]
+  -- | @a & b@
   | BitAnd a [Whitespace]
+  -- | @a << b@
   | ShiftLeft a [Whitespace]
+  -- | @a >> b@
   | ShiftRight a [Whitespace]
+  -- | @a @ b@
   | At a [Whitespace]
   deriving (Eq, Show, Functor, Foldable, Traversable)
 

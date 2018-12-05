@@ -11,17 +11,30 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Syntax.Ident where
+module Language.Python.Syntax.Ident
+  ( Ident(..)
+    -- * Lenses
+  , identAnn
+  , identValue
+  , identWhitespace
+    -- * Extra functions
+  , isIdentifierStart
+  , isIdentifierChar
+  )
+where
 
 import Control.Lens.Lens (Lens, lens)
 import Data.Char (isDigit, isLetter)
 import Data.String (IsString(..))
 
 import Language.Python.Optics.Validated (Validated)
+import Language.Python.Syntax.Raw
 import Language.Python.Syntax.Whitespace
 
 -- | An identifier. Like many types in hpython, it has an optional annotation
 -- and tracks its trailing whitespace.
+--
+-- 'Raw' 'Ident's have an 'IsString' instance.
 --
 -- See <https://docs.python.org/3.5/reference/lexical_analysis.html#identifiers>
 data Ident (v :: [*]) a
@@ -45,7 +58,7 @@ isIdentifierChar = do
   b <- isDigit
   pure $ a || b
 
-instance IsString (Ident '[] ()) where
+instance IsString (Raw Ident) where
   fromString s = MkIdent () s []
 
 identValue :: Lens (Ident v a) (Ident '[] a) String String
@@ -55,9 +68,9 @@ identAnn :: Lens (Ident v a) (Ident v a) a a
 identAnn = lens _identAnn (\s a -> s { _identAnn = a })
 
 identWhitespace :: Lens (Ident v a) (Ident v a) [Whitespace] [Whitespace]
-identWhitespace = lens _identWhitespace (\s a -> s { _identWhitespace = a })
+identWhitespace = lens _identWhitespace (\s ws -> s { _identWhitespace = ws })
 
 instance HasTrailingWhitespace (Ident v a) where
-  trailingWhitespace = lens (\(MkIdent _ _ ws) -> ws) (\(MkIdent a b _) ws -> MkIdent a b ws)
+  trailingWhitespace = identWhitespace
 
 instance Validated Ident where

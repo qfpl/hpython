@@ -1026,7 +1026,7 @@ smallStatement =
 
           <|>
 
-          (\a -> ImportSome (importAsAnn $ commaSep1Head a) a) <$>
+          (\a -> ImportSome (commaSep1Head a ^. importAsAnn) a) <$>
           commaSep1 space (importAs space _identAnn (identifier space))
 
         importFrom =

@@ -37,7 +37,13 @@ import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Whitespace
 
--- | See <https://docs.python.org/3.5/tutorial/modules.html#intra-package-references>
+-- | @.a.b@
+--
+-- @.@
+--
+-- @...@
+--
+--See <https://docs.python.org/3.5/tutorial/modules.html#intra-package-references>
 data RelativeModuleName v a
   = RelativeWithName [Dot] (ModuleName v a)
   | Relative (NonEmpty Dot)
@@ -58,6 +64,10 @@ instance HasTrailingWhitespace (RelativeModuleName v a) where
 
 -- | A module name. It can be a single segment, or a sequence of them which
 -- are implicitly separated by period character.
+--
+-- @a@
+--
+-- @a.b@
 data ModuleName v a
   = ModuleNameOne a (Ident v a)
   | ModuleNameMany a (Ident v a) Dot (ModuleName v a)

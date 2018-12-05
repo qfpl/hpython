@@ -95,7 +95,7 @@ instance Validated WithItem where; unvalidated = to unsafeCoerce
 instance Validated ExceptAs where; unvalidated = to unsafeCoerce
 instance Validated Decorator where; unvalidated = to unsafeCoerce
 
--- | 'Traversal' over all the statements in a term
+-- | 'Traversal' over all the 'Statement's in a term
 class HasStatements s where
   _Statements :: Traversal (s v a) (s '[] a) (Statement v a) (Statement '[] a)
 
@@ -103,9 +103,9 @@ class HasStatements s where
 -- 'Suite'.
 data Block (v :: [*]) a
   = Block
-  { _blockBlankLines :: [(Blank a, Newline)]
-  , _blockHead :: Statement v a
-  , _blockTail :: [Either (Blank a, Newline) (Statement v a)]
+  { _blockBlankLines :: [(Blank a, Newline)] -- ^ Blank lines at the beginning of the block
+  , _blockHead :: Statement v a -- ^ The first statement of the block
+  , _blockTail :: [Either (Blank a, Newline) (Statement v a)] -- ^ The remaining items of the block, which may be statements or blank lines
   } deriving (Eq, Show)
 
 instance Functor (Block v) where
@@ -128,8 +128,8 @@ instance Traversable (Block v) where
     traverse f b <*>
     traverse (bitraverse (traverseOf (_1.traverse) f) (traverse f)) c
 
--- | Classy 'Traversal' for 'Block's
 class HasBlocks s where
+  -- | 'Traversal' targeting all the 'Block's in a structure
   _Blocks :: Traversal (s v a) (s '[] a) (Block v a) (Block '[] a)
 
 instance HasBlocks Suite where
@@ -196,6 +196,8 @@ data SimpleStatement (v :: [*]) a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 -- | A 'Statement' is either a 'SimpleStatement' or a 'CompoundStatement'
+--
+-- https://docs.python.org/3.5/reference/compound_stmts.html#compound-statements
 data Statement (v :: [*]) a
   = SimpleStatement (Indents a) (SimpleStatement v a)
   | CompoundStatement (CompoundStatement v a)
@@ -262,29 +264,71 @@ instance Plated (Statement '[] a) where
 --
 -- See @small_stmt@ at <https://docs.python.org/3.5/reference/grammar.html>
 data SmallStatement (v :: [*]) a
+  -- | @\'return\' \<spaces\> [\<expr\>]@
+  --
+  -- https://docs.python.org/3.5/reference/simple_stmts.html#the-return-statement
   = Return a [Whitespace] (Maybe (Expr v a))
+  -- | @\<expr\>@
+  --
+  -- https://docs.python.org/3.5/reference/simple_stmts.html#expression-statements
   | Expr a (Expr v a)
+  -- | @\<expr\> (\'=\' \<spaces\> \<expr\>)+@
+  --
+  -- https://docs.python.org/3.5/reference/simple_stmts.html#assignment-statements
   | Assign a (Expr v a) (NonEmpty ([Whitespace], Expr v a))
+  -- | @\<expr\> \<augassign\> \<expr\>@
+  --
+  -- https://docs.python.org/3.5/reference/simple_stmts.html#augmented-assignment-statements
   | AugAssign a (Expr v a) (AugAssign a) (Expr v a)
+  -- | @\'pass\' \<spaces\>@
+  --
+  -- https://docs.python.org/3.5/reference/simple_stmts.html#the-pass-statement
   | Pass a [Whitespace]
+  -- | @\'break\' \<spaces\>@
+  --
+  -- https://docs.python.org/3.5/reference/simple_stmts.html#the-break-statement
   | Break a [Whitespace]
+  -- | @\'continue\' \<spaces\>@
+  --
+  -- https://docs.python.org/3.5/reference/simple_stmts.html#the-continue-statement
   | Continue a [Whitespace]
+  -- | @\'global\' \<spaces\> \<idents\>@
+  --
+  -- https://docs.python.org/3.5/reference/simple_stmts.html#the-global-statement
   | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
+  -- | @\'nonlocal\' \<spaces\> \<idents\>@
+  --
+  -- https://docs.python.org/3.5/reference/simple_stmts.html#the-nonlocal-statement
   | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
+  -- | @\'del\' \<spaces\> \<exprs\>@
+  --
+  -- https://docs.python.org/3.5/reference/simple_stmts.html#the-del-statement
   | Del a [Whitespace] (CommaSep1' (Expr v a))
+  -- | @\'import\' \<spaces\> \<modulenames\>@
+  --
+  -- https://docs.python.org/3.5/reference/simple_stmts.html#the-import-statement
   | Import
       a
       (NonEmpty Whitespace)
       (CommaSep1 (ImportAs (ModuleName v) v a))
+  -- | @\'from\' \<spaces\> \<relative_module_name\> \'import\' \<spaces\> \<import_targets\>@
+  --
+  -- https://docs.python.org/3.5/reference/simple_stmts.html#the-import-statement
   | From
       a
       [Whitespace]
       (RelativeModuleName v a)
       [Whitespace]
       (ImportTargets v a)
+  -- | @\'raise\' \<spaces\> [\<expr\> [\'as\' \<spaces\> \<expr\>]]@
+  --
+  -- https://docs.python.org/3.5/reference/simple_stmts.html#the-raise-statement
   | Raise a
       [Whitespace]
       (Maybe (Expr v a, Maybe ([Whitespace], Expr v a)))
+  -- | @\'assert\' \<spaces\> \<expr\> [\',\' \<spaces\> \<expr\>]@
+  --
+  -- https://docs.python.org/3.5/reference/simple_stmts.html#the-assert-statement
   | Assert a
       [Whitespace]
       (Expr v a)
@@ -317,8 +361,8 @@ instance HasExprs SmallStatement where
 data ExceptAs (v :: [*]) a
   = ExceptAs
   { _exceptAsAnn :: a
-  , _exceptAsExpr :: Expr v a
-  , _exceptAsName :: Maybe ([Whitespace], Ident v a)
+  , _exceptAsExpr :: Expr v a -- ^ @\<expr\>@
+  , _exceptAsName :: Maybe ([Whitespace], Ident v a) -- ^ @[\'as\' \<ident\>]@
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -338,8 +382,8 @@ data Suite (v :: [*]) a
 data WithItem (v :: [*]) a
   = WithItem
   { _withItemAnn :: a
-  , _withItemValue :: Expr v a
-  , _withItemBinder :: Maybe ([Whitespace], Expr v a)
+  , _withItemValue :: Expr v a -- ^ @\<expr\>@
+  , _withItemBinder :: Maybe ([Whitespace], Expr v a) -- ^ @[\'as\' \<spaces\> \<expr\>]@
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -351,21 +395,24 @@ data WithItem (v :: [*]) a
 data Decorator (v :: [*]) a
   = Decorator
   { _decoratorAnn :: a
-  , _decoratorIndents :: Indents a
-  , _decoratorWhitespaceLeft :: [Whitespace]
-  , _decoratorExpr :: Expr v a
-  , _decoratorComment :: Maybe (Comment a)
-  , _decoratorNewline :: Newline
-  , _decoratorBlankLines :: [(Blank a, Newline)]
+  , _decoratorIndents :: Indents a -- ^ Preceding indentation
+  , _decoratorWhitespaceLeft :: [Whitespace] -- ^ @\'\@\' \<spaces\>@
+  , _decoratorExpr :: Expr v a -- ^ @\<expr\>@
+  , _decoratorComment :: Maybe (Comment a) -- ^ Trailing comment
+  , _decoratorNewline :: Newline -- ^ Trailing newline
+  , _decoratorBlankLines :: [(Blank a, Newline)] -- ^ Trailing blank lines
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 -- | See <https://docs.python.org/3.5/reference/compound_stmts.html>
 data CompoundStatement (v :: [*]) a
+  -- | https://docs.python.org/3.5/reference/compound_stmts.html#function-definitions
+  --
+  -- https://docs.python.org/3.5/reference/compound_stmts.html#coroutine-function-definition
   = Fundef
   { _csAnn :: a
-  , _unsafeCsFundefDecorators :: [Decorator v a]
-  , _csIndents :: Indents a
+  , _unsafeCsFundefDecorators :: [Decorator v a] -- ^ Preceding 'Decorator's
+  , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsFundefAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
   , _unsafeCsFundefDef :: NonEmpty Whitespace -- ^ @\'def\' \<spaces\>@
   , _unsafeCsFundefName :: Ident v a -- ^ @\<ident\>@
@@ -375,45 +422,52 @@ data CompoundStatement (v :: [*]) a
   , _unsafeCsFundefReturnType :: Maybe ([Whitespace], Expr v a) -- ^ @[\'->\' \<spaces\> \<expr\>]@
   , _unsafeCsFundefBody :: Suite v a -- ^ @\<suite\>@
   }
+  -- | https://docs.python.org/3.5/reference/compound_stmts.html#the-if-statement
   | If
   { _csAnn :: a
-  , _csIndents :: Indents a
+  , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsIfIf :: [Whitespace] -- ^ @\'if\' \<spaces\>@
   , _unsafeCsIfCond :: Expr v a -- ^ @\<expr\>@
   , _unsafeCsIfBody :: Suite v a -- ^ @\<suite\>@
   , _unsafeCsIfElifs :: [(Indents a, [Whitespace], Expr v a, Suite v a)] -- ^ @(\'elif\' \<spaces\> \<expr\> \<suite\>)*@
   , _unsafeCsIfElse :: Maybe (Indents a, [Whitespace], Suite v a) -- ^ @[\'else\' \<spaces\> \<suite\>]@
   }
+  -- | https://docs.python.org/3.5/reference/compound_stmts.html#the-while-statement
   | While
   { _csAnn :: a
-  , _csIndents :: Indents a
+  , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsWhileWhile :: [Whitespace] -- ^ @\'while\' \<spaces\>@
   , _unsafeCsWhileCond :: Expr v a -- ^ @\<expr\>@
   , _unsafeCsWhileBody :: Suite v a -- ^ @\<suite\>@
   , _unsafeCsWhileElse
     :: Maybe (Indents a, [Whitespace], Suite v a) -- ^ @[\'else\' \<spaces\> \<suite\>]@
   }
+  -- | https://docs.python.org/3.5/reference/compound_stmts.html#the-try-statement
   | TryExcept
   { _csAnn :: a
-  , _csIndents :: Indents a
+  , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsTryExceptTry :: [Whitespace] -- ^ @\'try\' \<spaces\>@
   , _unsafeCsTryExceptBody :: Suite v a -- ^ @\<suite\>@
   , _unsafeCsTryExceptExcepts :: NonEmpty (Indents a, [Whitespace], Maybe (ExceptAs v a), Suite v a) -- ^ @(\'except\' \<spaces\> \<except_as\> \<suite\>)+@
   , _unsafeCsTryExceptElse :: Maybe (Indents a, [Whitespace], Suite v a) -- ^ @[\'else\' \<spaces\> \<suite\>]@
   , _unsafeCsTryExceptFinally :: Maybe (Indents a, [Whitespace], Suite v a) -- ^ @[\'finally\' \<spaces\> \<suite\>]@
   }
+  -- | https://docs.python.org/3.5/reference/compound_stmts.html#the-try-statement
   | TryFinally
   { _csAnn :: a
-  , _csIndents :: Indents a
+  , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsTryFinallyTry :: [Whitespace] -- ^ @\'try\' \<spaces\>@
   , _unsafeCsTryFinallyTryBody :: Suite v a -- ^ @\<suite\>@
   , _unsafeCsTryFinallyFinallyIndents :: Indents a
   , _unsafeCsTryFinallyFinally :: [Whitespace] -- ^ @\'finally\' \<spaces\>@
   , _unsafeCsTryFinallyFinallyBody :: Suite v a -- ^ @\<suite\>@
   }
+  -- | https://docs.python.org/3.5/reference/compound_stmts.html#the-for-statement
+  --
+  -- https://docs.python.org/3.5/reference/compound_stmts.html#the-async-for-statement
   | For
   { _csAnn :: a
-  , _csIndents :: Indents a
+  , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsForAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
   , _unsafeCsForFor :: [Whitespace] -- ^ @\'for\' \<spaces\>@
   , _unsafeCsForBinder :: Expr v a -- ^ @\<expr\>@
@@ -422,18 +476,22 @@ data CompoundStatement (v :: [*]) a
   , _unsafeCsForBody :: Suite v a -- ^ @\<suite\>@
   , _unsafeCsForElse :: Maybe (Indents a, [Whitespace], Suite v a) -- ^ @[\'else\' \<spaces\> \<suite\>]@
   }
+  -- | https://docs.python.org/3.5/reference/compound_stmts.html#class-definitions
   | ClassDef
   { _csAnn :: a
-  , _unsafeCsClassDefDecorators :: [Decorator v a]
-  , _csIndents :: Indents a
+  , _unsafeCsClassDefDecorators :: [Decorator v a] -- ^ Preceding 'Decorator's
+  , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsClassDefClass :: NonEmpty Whitespace -- ^ @\'class\' \<spaces\>@
   , _unsafeCsClassDefName :: Ident v a -- ^ @\<ident\>@
   , _unsafeCsClassDefArguments :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace]) -- ^ @[\'(\' \<spaces\> [\<args\>] \')\' \<spaces\>]@
   , _unsafeCsClassDefBody :: Suite v a -- ^ @\<suite\>@
   }
+  -- | https://docs.python.org/3.5/reference/compound_stmts.html#the-with-statement
+  --
+  -- https://docs.python.org/3.5/reference/compound_stmts.html#the-async-with-statement
   | With
   { _csAnn :: a
-  , _csIndents :: Indents a
+  , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsWithAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
   , _unsafeCsWithWith :: [Whitespace] -- ^ @\'with\' \<spaces\>@
   , _unsafeCsWithItems :: CommaSep1 (WithItem v a) -- ^ @\<with_items\>@

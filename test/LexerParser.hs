@@ -499,3 +499,10 @@ prop_fulltrip_39 =
     let str = "def a(*b, *): pass"
 
     shouldBeParseFailure parseStatement str
+
+prop_fulltrip_40 :: Property
+prop_fulltrip_40 =
+  withTests 1 . property $ do
+    let str = "def a():\n    yield op, oparg"
+    res <- shouldBeParseSuccess parseStatement str
+    str === showStatement (() <$ res)

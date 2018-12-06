@@ -701,7 +701,7 @@ renderYield :: (Expr v a -> RenderOutput ()) -> Expr v a -> RenderOutput ()
 renderYield re (Yield _ a b) = do
   singleton $ TkYield ()
   traverse_ renderWhitespace a
-  traverse_
+  renderCommaSep
     (\x -> case x of
        Generator{} -> parensDistTWS renderExpr x
        _ -> re x)

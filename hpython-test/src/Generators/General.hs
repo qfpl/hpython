@@ -299,14 +299,14 @@ genExpr' isExp =
         genExpr
         genExpr
         genExpr
-    , Yield () <$> genWhitespaces <*> sizedMaybe genExpr
+    , Yield () <$> genWhitespaces <*> sizedCommaSep genExpr
     , YieldFrom () <$> genWhitespaces <*> genWhitespaces <*> genExpr
     , Gen.subtermM
         genExpr
         (\a ->
            Lambda () <$>
            genWhitespaces <*>
-           genSizedCommaSep (genParam genExpr) <*>
+           sizedCommaSep (genParam genExpr) <*>
            genColon <*>
            pure a)
     ]
@@ -379,7 +379,7 @@ genCompoundStatement =
            genWhitespaces <*> pure b <*>
            genWhitespaces <*> pure c <*> pure d)
         (sizedList genDecorator)
-        (genSizedCommaSep $ genParam genExpr)
+        (sizedCommaSep $ genParam genExpr)
         (sizedMaybe $ (,) <$> genWhitespaces <*> genExpr)
         (genSuite genSmallStatement genBlock)
     , sized4M

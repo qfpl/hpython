@@ -12,7 +12,7 @@ Portability : non-portable
 
 module Language.Python.Syntax.CommaSep
   ( Comma(..)
-  , CommaSep(..), _CommaSep
+  , CommaSep(..), _CommaSep, csTrailingWhitespace
   , appendCommaSep, maybeToCommaSep, listToCommaSep
   , CommaSep1(..)
   , commaSep1Head, appendCommaSep1, listToCommaSep1, listToCommaSep1'
@@ -25,6 +25,7 @@ import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (Iso, iso)
 import Control.Lens.Lens (lens)
 import Control.Lens.Setter ((.~))
+import Control.Lens.Traversal (Traversal')
 import Data.Coerce (coerce)
 import Data.Function ((&))
 import Data.Functor (($>))
@@ -41,6 +42,21 @@ data CommaSep a
   | CommaSepOne a
   | CommaSepMany a Comma (CommaSep a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
+
+-- | 'Traversal' targeting the trailing whitespace in a comma separated list.
+--
+-- This can't be an instance of 'HasTrailingWhitespace' because 'CommaSepNone' never
+-- has trailing whitespace.
+csTrailingWhitespace
+  :: HasTrailingWhitespace a
+  => Traversal' (CommaSep a) [Whitespace]
+csTrailingWhitespace _ CommaSepNone = pure CommaSepNone
+csTrailingWhitespace f (CommaSepOne a) = CommaSepOne <$> trailingWhitespace f a
+csTrailingWhitespace f (CommaSepMany a (Comma b) CommaSepNone) =
+  (\b' -> CommaSepMany a (Comma b') CommaSepNone) <$> f b
+csTrailingWhitespace f (CommaSepMany a b c) =
+  CommaSepMany a b <$> csTrailingWhitespace f c
+
 
 -- | Convert a maybe to a singleton or nullary 'CommaSep'
 maybeToCommaSep :: Maybe a -> CommaSep a

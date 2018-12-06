@@ -54,10 +54,10 @@ prop_syntax_2 =
             [] CommaSepNone [] Nothing .
           SuiteMany () (Colon []) Nothing LF $
           Block []
-            (SimpleStatement (Indents [i] ()) $
-             MkSimpleStatement (Pass () []) [] Nothing Nothing Nothing)
-            [Right . SimpleStatement (Indents [i] ()) $
-             MkSimpleStatement (Pass () []) [] Nothing Nothing Nothing]
+            (SmallStatement (Indents [i] ()) $
+             MkSmallStatement (Pass () []) [] Nothing Nothing Nothing)
+            [Right . SmallStatement (Indents [i] ()) $
+             MkSmallStatement (Pass () []) [] Nothing Nothing Nothing]
     res <- shouldBeParseSuccess parseStatement (showStatement e)
     res' <- shouldBeParseSuccess parseStatement (showStatement res)
     void res === void res'

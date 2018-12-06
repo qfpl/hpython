@@ -29,14 +29,14 @@ import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
 import Generators.Sized
 
-genSimpleStatement
+genSmallStatement
   :: MonadGen m
-  => m (SmallStatement '[] ())
-  -> m (SimpleStatement '[] ())
-genSimpleStatement gss =
+  => m (SimpleStatement '[] ())
+  -> m (SmallStatement '[] ())
+genSmallStatement gss =
   sized2M
     (\a b -> 
-      MkSimpleStatement a b <$>
+      MkSmallStatement a b <$>
       Gen.maybe genWhitespaces <*>
       Gen.maybe genComment <*>
       Gen.maybe genNewline)
@@ -45,7 +45,7 @@ genSimpleStatement gss =
 
 genSuite
   :: MonadGen m
-  => m (SmallStatement '[] ())
+  => m (SimpleStatement '[] ())
   -> m (Block '[] ())
   -> m (Suite '[] ())
 genSuite gss gb =
@@ -55,7 +55,7 @@ genSuite gss gb =
     Gen.maybe genComment <*>
     genNewline <*>
     gb
-  , SuiteOne () <$> genColon <*> genSimpleStatement gss
+  , SuiteOne () <$> genColon <*> genSmallStatement gss
   ]
 
 genUnOp :: MonadGen m => m (UnOp ())

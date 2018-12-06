@@ -386,21 +386,21 @@ genColon = Colon <$> genWhitespaces
 genColonAny :: MonadGen m => m Colon
 genColonAny = Colon <$> genAnyWhitespaces
 
-genSizedCommaSep :: MonadGen m => m a -> m (CommaSep a)
-genSizedCommaSep ma = Gen.sized $ \n ->
-  if n <= 1
-  then pure CommaSepNone
-  else
-    Gen.resize (n-1) $
-    Gen.choice
-      [ CommaSepOne <$> ma
-      , Gen.sized $ \n -> do
-          n' <- Gen.integral (Range.constant 1 (n-1))
-          a <- Gen.resize n' ma
-          Gen.subtermM
-            (Gen.resize (n - n') $ genSizedCommaSep ma)
-            (\b -> CommaSepMany a <$> genComma <*> pure b)
+sizedCommaSep :: MonadGen m => m a -> m (CommaSep a)
+sizedCommaSep m = do
+  ls <- sizedList m
+  go ls
+  where
+    go [] = pure CommaSepNone
+    go [x] =
+      Gen.choice
+      [ (\c -> CommaSepMany x c CommaSepNone) <$> genComma
+      , pure $ CommaSepOne x
       ]
+    go (x:xs) =
+      CommaSepMany x <$>
+      genComma <*>
+      go xs
 
 genSizedCommaSep1 :: MonadGen m => m a -> m (CommaSep1 a)
 genSizedCommaSep1 ma = Gen.sized $ \n ->

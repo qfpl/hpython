@@ -1872,8 +1872,8 @@ lambda_ params =
     (listToCommaSep params)
     (Colon [Space])
 
-yield_ :: Maybe (Raw Expr) -> Raw Expr
-yield_ a = Yield () (maybe [] (const [Space]) a) a
+yield_ :: [Raw Expr] -> Raw Expr
+yield_ as = Yield () (foldr (\_ _ -> [Space]) [] as) (listToCommaSep as)
 
 yieldFrom_ :: Raw Expr -> Raw Expr
 yieldFrom_ = YieldFrom () [Space] [Space]

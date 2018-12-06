@@ -565,7 +565,7 @@ data Expr (v :: [*]) a
   | Yield
   { _unsafeExprAnn :: a
   , _unsafeYieldWhitespace :: [Whitespace]
-  , _unsafeYieldValue :: Maybe (Expr v a)
+  , _unsafeYieldValue :: CommaSep (Expr v a)
   }
   -- | @yield from a@
   --
@@ -944,8 +944,8 @@ instance HasTrailingWhitespace (Expr v a) where
       (\case
           Unit _ _ a -> a
           Lambda _ _ _ _ a -> a ^. trailingWhitespace
-          Yield _ ws Nothing -> ws
-          Yield _ _ (Just e) -> e ^. trailingWhitespace
+          Yield _ ws CommaSepNone -> ws
+          Yield _ _ e -> e ^?! csTrailingWhitespace
           YieldFrom _ _ _ e -> e ^. trailingWhitespace
           Ternary _ _ _ _ _ e -> e ^. trailingWhitespace
           None _ ws -> ws
@@ -977,8 +977,8 @@ instance HasTrailingWhitespace (Expr v a) where
         case e of
           Unit a b _ -> Unit a b ws
           Lambda a b c d f -> Lambda a b c d (f & trailingWhitespace .~ ws)
-          Yield a _ Nothing -> Yield a ws Nothing
-          Yield a b (Just c) -> Yield a b (Just $ c & trailingWhitespace .~ ws)
+          Yield a _ CommaSepNone -> Yield a ws CommaSepNone
+          Yield a b c -> Yield a b (c & csTrailingWhitespace .~ ws)
           YieldFrom a b c d -> YieldFrom a b c (d & trailingWhitespace .~ ws)
           Ternary a b c d e f -> Ternary a b c d e (f & trailingWhitespace .~ ws)
           None a _ -> None a ws

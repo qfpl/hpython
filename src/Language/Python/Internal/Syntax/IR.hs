@@ -323,7 +323,7 @@ data Expr a
   | Yield
   { _unsafeExprAnn :: a
   , _unsafeYieldWhitespace :: [Whitespace]
-  , _unsafeYieldValue :: Maybe (Expr a)
+  , _unsafeYieldValue :: CommaSep (Expr a)
   }
   | YieldFrom
   { _unsafeExprAnn :: a

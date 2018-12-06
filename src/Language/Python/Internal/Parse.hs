@@ -526,7 +526,7 @@ yieldExpr ws =
       (snd <$> token ws (\case; TkFrom{} -> True; _ -> False) "from") <*>
       expr ws)
      <|>
-   Right <$> optional (exprList ws))
+   Right <$> commaSep ws (expr ws))
 
 lambda :: MonadParsec e PyTokens m => m Whitespace -> m (Expr SrcInfo)
 lambda ws =

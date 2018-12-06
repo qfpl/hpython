@@ -307,7 +307,7 @@ genParams isLambda =
   sizedBind (sizedMaybe $ genStarParam isLambda pparamNames) $ \sp ->
   let pparamNames' = pparamNames <> (sp ^.. _Just.paramName.identValue) in
 
-  sizedBind (genSizedCommaSep (genKeywordParam isLambda pparamNames')) $ \kwparams ->
+  sizedBind (sizedCommaSep (genKeywordParam isLambda pparamNames')) $ \kwparams ->
   let
     pparamNames'' = pparamNames' <> kwparams ^.. folded.paramName.identValue
   in do
@@ -604,7 +604,7 @@ genExpr' isExp = do
      ] ++
      [ Yield () <$>
          (NonEmpty.toList <$> genWhitespaces1) <*>
-         sizedMaybe genExpr
+         sizedCommaSep genExpr
      | (isInFunction || isInGenerator) && not isInAsyncFunction
      ] ++
      [ YieldFrom () <$>

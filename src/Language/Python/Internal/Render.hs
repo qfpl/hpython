@@ -704,6 +704,7 @@ renderYield re (Yield _ a b) = do
   traverse_
     (\x -> case x of
        Generator{} -> parensDistTWS renderExpr x
+       Tuple{} -> parensDistTWS renderExpr x
        _ -> re x)
     b
 renderYield re (YieldFrom _ a b c) = do

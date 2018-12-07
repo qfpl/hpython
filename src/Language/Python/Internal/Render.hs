@@ -23,7 +23,7 @@ module Language.Python.Internal.Render
   , parens, braces, brackets
   , renderWhitespace, renderCommaSep, renderCommaSep1, renderCommaSep1'
   , renderIdent, renderComment, renderModuleName, renderDot, renderRelativeModuleName
-  , renderImportAs, renderImportTargets, renderSmallStatement, renderCompoundStatement
+  , renderImportAs, renderImportTargets, renderSimpleStatement, renderCompoundStatement
   , renderBlock, renderIndent, renderIndents, renderExceptAs, renderArg, renderParam
   , renderParams, renderCompFor, renderCompIf, renderComprehension, renderBinOp, renderUnOp
   , renderSubscript, renderPyChars, escapeChars, intToHex
@@ -1122,8 +1122,8 @@ renderAugAssign aa = do
     DoubleSlashEq -> TkDoubleSlashEq ()
   traverse_ renderWhitespace (_augAssignWhitespace aa)
 
-renderSmallStatement :: SmallStatement v a -> RenderOutput ()
-renderSmallStatement (Assert _ b c d) = do
+renderSimpleStatement :: SimpleStatement v a -> RenderOutput ()
+renderSimpleStatement (Assert _ b c d) = do
   singleton $ TkAssert ()
   traverse_ renderWhitespace b
   parensTupleGenerator c
@@ -1132,7 +1132,7 @@ renderSmallStatement (Assert _ b c d) = do
         renderComma a
         parensTupleGenerator b)
     d
-renderSmallStatement (Raise _ ws x) = do
+renderSimpleStatement (Raise _ ws x) = do
   singleton $ TkRaise ()
   traverse_ renderWhitespace ws
   traverse_
@@ -1145,12 +1145,12 @@ renderSmallStatement (Raise _ ws x) = do
             parensTupleGenerator e)
          c)
     x
-renderSmallStatement (Return _ ws expr) = do
+renderSimpleStatement (Return _ ws expr) = do
   singleton $ TkReturn ()
   traverse_ renderWhitespace ws
   traverse_ parensGenerator expr
-renderSmallStatement (Expr _ expr) = renderYield parensGenerator expr
-renderSmallStatement (Assign _ lvalue rvalues) = do
+renderSimpleStatement (Expr _ expr) = renderYield parensGenerator expr
+renderSimpleStatement (Assign _ lvalue rvalues) = do
   renderExpr lvalue
   traverse_
     (\(ws2, rvalue) -> do
@@ -1158,28 +1158,28 @@ renderSmallStatement (Assign _ lvalue rvalues) = do
        traverse_ renderWhitespace ws2
        renderYield parensGenerator rvalue)
     rvalues
-renderSmallStatement (AugAssign _ lvalue as rvalue) = do
+renderSimpleStatement (AugAssign _ lvalue as rvalue) = do
   renderExpr lvalue
   renderAugAssign as
   parensTupleGenerator rvalue
-renderSmallStatement (Pass _ ws) = do
+renderSimpleStatement (Pass _ ws) = do
   singleton $ TkPass ()
   traverse_ renderWhitespace ws
-renderSmallStatement (Continue _ ws) = do
+renderSimpleStatement (Continue _ ws) = do
   singleton $ TkContinue ()
   traverse_ renderWhitespace ws
-renderSmallStatement (Break _ ws) = do
+renderSimpleStatement (Break _ ws) = do
   singleton $ TkBreak ()
   traverse_ renderWhitespace ws
-renderSmallStatement (Global _ ws ids) = do
+renderSimpleStatement (Global _ ws ids) = do
   singleton $ TkGlobal ()
   traverse_ renderWhitespace ws
   renderCommaSep1 renderIdent ids
-renderSmallStatement (Nonlocal _ ws ids) = do
+renderSimpleStatement (Nonlocal _ ws ids) = do
   singleton $ TkNonlocal ()
   traverse_ renderWhitespace ws
   renderCommaSep1 renderIdent ids
-renderSmallStatement (Del _ ws vals) = do
+renderSimpleStatement (Del _ ws vals) = do
   singleton $ TkDel ()
   traverse_ renderWhitespace ws
   renderCommaSep1'
@@ -1190,11 +1190,11 @@ renderSmallStatement (Del _ ws vals) = do
         Lambda{} -> parensDistTWS renderExpr a
         _ -> parensTupleGenerator a)
     vals
-renderSmallStatement (Import _ ws ns) = do
+renderSimpleStatement (Import _ ws ns) = do
   singleton $ TkImport ()
   traverse_ renderWhitespace ws
   renderCommaSep1 (renderImportAs renderModuleName) ns
-renderSmallStatement (From _ ws1 name ws3 ns) = do
+renderSimpleStatement (From _ ws1 name ws3 ns) = do
   singleton $ TkFrom ()
   traverse_ renderWhitespace ws1
   renderRelativeModuleName name
@@ -1240,7 +1240,7 @@ renderSuite (SuiteMany _ a b c d) = do
 renderSuite (SuiteOne _ a b) = do
   renderColon a
   fin <- isFinal
-  renderSimpleStatement $ correctTrailingNewline fin b
+  renderSmallStatement $ correctTrailingNewline fin b
 
 renderDecorator :: Decorator v a -> RenderOutput ()
 renderDecorator (Decorator _ a b c d e f) = do
@@ -1422,14 +1422,14 @@ renderWithItem (WithItem _ a b) = do
 renderIndent :: Indent -> RenderOutput ()
 renderIndent (MkIndent ws) = traverse_ renderWhitespace $ toList ws
 
-renderSimpleStatement :: SimpleStatement v a -> RenderOutput ()
-renderSimpleStatement (MkSimpleStatement s ss sc cmt nl) = do
-  renderSmallStatement s
+renderSmallStatement :: SmallStatement v a -> RenderOutput ()
+renderSmallStatement (MkSmallStatement s ss sc cmt nl) = do
+  renderSimpleStatement s
   traverse_
     (\(b, c) -> do
        singleton $ TkSemicolon ()
        traverse_ renderWhitespace b
-       renderSmallStatement c)
+       renderSimpleStatement c)
     ss
   traverse_
     (\b -> do
@@ -1441,10 +1441,10 @@ renderSimpleStatement (MkSimpleStatement s ss sc cmt nl) = do
 
 renderStatement :: Statement v a -> RenderOutput ()
 renderStatement (CompoundStatement c) = renderCompoundStatement c
-renderStatement (SimpleStatement idnts s) = do
+renderStatement (SmallStatement idnts s) = do
   renderIndents idnts
   fin <- isFinal
-  renderSimpleStatement $ correctTrailingNewline fin s
+  renderSmallStatement $ correctTrailingNewline fin s
 
 renderExceptAs :: ExceptAs v a -> RenderOutput ()
 renderExceptAs (ExceptAs _ e f) = do

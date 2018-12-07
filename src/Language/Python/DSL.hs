@@ -490,14 +490,14 @@ blank_ = Line $ Left (Blank () [] Nothing, LF)
 class AsLine s where
   line_ :: Raw s -> Raw Line
 
-instance AsLine SimpleStatement where
-  line_ ss =
-    Line . Right $ SimpleStatement (Indents [] ()) ss
-
 instance AsLine SmallStatement where
   line_ ss =
-    Line . Right . SimpleStatement (Indents [] ()) $
-    MkSimpleStatement ss [] Nothing Nothing (Just LF)
+    Line . Right $ SmallStatement (Indents [] ()) ss
+
+instance AsLine SimpleStatement where
+  line_ ss =
+    Line . Right . SmallStatement (Indents [] ()) $
+    MkSmallStatement ss [] Nothing Nothing (Just LF)
 
 instance AsLine CompoundStatement where
   line_ = Line . Right . CompoundStatement
@@ -957,9 +957,9 @@ call_ expr args =
 -- return a
 return_ :: Raw Expr -> Raw Statement
 return_ e =
-  SimpleStatement
+  SmallStatement
     (Indents [] ())
-    (MkSimpleStatement (Return () [Space] $ Just e) [] Nothing Nothing (Just LF))
+    (MkSmallStatement (Return () [Space] $ Just e) [] Nothing Nothing (Just LF))
 
 -- | Turns an 'Expr' into a 'Statement'
 --
@@ -967,9 +967,9 @@ return_ e =
 -- 3
 expr_ :: Raw Expr -> Raw Statement
 expr_ e =
-  SimpleStatement
+  SmallStatement
     (Indents [] ())
-    (MkSimpleStatement (Expr () e) [] Nothing Nothing (Just LF))
+    (MkSmallStatement (Expr () e) [] Nothing Nothing (Just LF))
 
 -- |
 -- >>> list_ [li_ $ var_ "a"]
@@ -1399,9 +1399,9 @@ int_ = fromInteger
 -- pass
 pass_ :: Raw Statement
 pass_ =
-  SimpleStatement
+  SmallStatement
     (Indents [] ())
-    (MkSimpleStatement (Pass () []) [] Nothing Nothing (Just LF))
+    (MkSmallStatement (Pass () []) [] Nothing Nothing (Just LF))
 
 -- | Create a minimal valid 'Elif'
 mkElif :: Raw Expr -> [Raw Line] -> Raw Elif
@@ -1471,9 +1471,9 @@ instance HasElse If where
 
 break_ :: Raw Statement
 break_ =
-  SimpleStatement
+  SmallStatement
     (Indents [] ())
-    (MkSimpleStatement (Break () []) [] Nothing Nothing (Just LF))
+    (MkSmallStatement (Break () []) [] Nothing Nothing (Just LF))
 
 -- |
 -- >>> true_
@@ -1525,9 +1525,9 @@ longStr'_ s =
 
 mkAugAssign :: AugAssignOp -> Raw Expr -> Raw Expr -> Raw Statement
 mkAugAssign at a b =
-  SimpleStatement
+  SmallStatement
     (Indents [] ())
-    (MkSimpleStatement
+    (MkSmallStatement
        (AugAssign () (a & trailingWhitespace .~ [Space]) (MkAugAssign at () [Space]) b)
        []
        Nothing
@@ -1544,9 +1544,9 @@ mkAugAssign at a b =
 chainEq :: Raw Expr -> [Raw Expr] -> Raw Statement
 chainEq t [] = expr_ t
 chainEq t (a:as) =
-  SimpleStatement
+  SmallStatement
     (Indents [] ())
-    (MkSimpleStatement
+    (MkSmallStatement
        (Assign () t $ (,) [Space] <$> (a :| as))
        []
        Nothing
@@ -1556,9 +1556,9 @@ chainEq t (a:as) =
 -- | @a = b@
 (.=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.=) a b =
-  SimpleStatement
+  SmallStatement
     (Indents [] ())
-    (MkSimpleStatement
+    (MkSmallStatement
        (Assign () (a & trailingWhitespace .~ [Space]) $ pure ([Space], b))
        []
        Nothing

@@ -698,23 +698,16 @@ renderSubscript (SubscriptSlice a b c d) = do
     d
 
 renderYield :: (Expr v a -> RenderOutput ()) -> Expr v a -> RenderOutput ()
-renderYield re (Yield _ a b) = do
+renderYield _ (Yield _ a b) = do
   singleton $ TkYield ()
   traverse_ renderWhitespace a
-  renderCommaSep
-    (\x -> case x of
-       Generator{} -> parensDistTWS renderExpr x
-       _ -> re x)
-    b
-renderYield re (YieldFrom _ a b c) = do
+  renderCommaSep parensTupleGenerator b
+renderYield _ (YieldFrom _ a b c) = do
   singleton $ TkYield ()
   traverse_ renderWhitespace a
   singleton $ TkFrom ()
   traverse_ renderWhitespace b
-  case c of
-    Generator{} -> parensDistTWS renderExpr c
-    Tuple{} -> parensDistTWS renderExpr c
-    _ -> re c
+  parensTupleGenerator c
 renderYield re e = re e
 
 renderUnpackTarget :: Expr v a -> RenderOutput ()

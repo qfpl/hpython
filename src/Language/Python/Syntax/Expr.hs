@@ -129,6 +129,9 @@ data Param (v :: [*]) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+instance IsString (Param '[] ()) where
+  fromString a = PositionalParam () (fromString a) Nothing
+
 instance HasTrailingWhitespace (Param v a) where
   trailingWhitespace =
     lens
@@ -560,6 +563,8 @@ data Expr (v :: [*]) a
   -- | @yield@
   --
   -- @yield a@
+  --
+  -- @yield a, b@
   --
   -- https://docs.python.org/3/reference/expressions.html#yield-expressions
   | Yield

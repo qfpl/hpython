@@ -124,6 +124,32 @@ yes =
   , line_ $ call_ "yes" []
   ]
 
+counter :: Raw Statement
+counter =
+  class_ "Counter" []
+  [ line_ $
+    def_ "__init__" ["self"]
+      [line_ ("self" /> "x" .= 0)]
+
+  , blank_
+
+  , line_ $
+    def_ "incr" ["self"]
+      [line_ ("self" /> "x" .+= 1)]
+
+  , blank_
+
+  , line_ $
+    def_ "reset" ["self"]
+      [line_ ("self" /> "x" .= 0)]
+
+  , blank_
+
+  , line_ $
+    def_ "get" ["self"]
+      [line_ $ return_ ("self" /> "x")]
+  ]
+
 everything :: Raw Module
 everything =
   module_
@@ -140,4 +166,7 @@ everything =
   , blank_
 
   , line_ yes
+  , blank_
+
+  , line_ counter
   ]

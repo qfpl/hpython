@@ -47,8 +47,7 @@ module Language.Python.DSL
     -- * @for@ syntax
   , HasFor(..)
     -- * @in@ syntax
-  , HasIn(..)
-  , In(..)
+  , HasIn(..), In(..), InList(..)
     -- * @:@ syntax
   , HasColon(..)
     -- * Comprehensions
@@ -135,11 +134,6 @@ module Language.Python.DSL
   , (.>>=)
   , (.**=)
   , (.//=)
-  , (.>)
-  , (.>=)
-  , (.<)
-  , (.<=)
-  , (.!=)
     -- ** Exceptions
   , tryE_
   , tryF_
@@ -192,11 +186,64 @@ module Language.Python.DSL
   , withBody
     -- ** Flow control
     -- *** 'Else' clauses
+    -- | 'If', 'While', 'For', and 'TryExcept' statements can have an 'Else'
+    -- component.
+    --
+    -- 'else_' is considered to be a modifier on these structures.
+    --
+    -- \-\-\-
+    --
+    -- 'If' ... 'Else':
+    --
+    -- >>> if_ false_ [line_ pass_] & else_ [line_ pass_]
+    -- if False:
+    --     pass
+    -- else:
+    --     pass
+    --
+    -- \-\-\-
+    --
+    -- 'While' ... 'Else':
+    --
+    -- >>> while_ false_ [line_ pass_] & else_ [line_ pass_]
+    -- while False:
+    --     pass
+    -- else:
+    --     pass
+    --
+    -- \-\-\-
+    --
+    -- 'For' ... 'Else':
+    --
+    -- >>> for_ (var_ "a" `in_` [var_ b]) [line_ pass_] & else_ [line_ pass_]
+    -- for a in b:
+    --     pass
+    -- else:
+    --     pass
+    --
+    -- \-\-\-
+    --
+    -- 'TryExcept' ... 'Else':
+    --
+    -- >>> tryE_ [line_ pass_] & except_ [line_ pass_] & else_ [line_ pass_]
+    -- try:
+    --     pass
+    -- except:
+    --     pass
+    -- else:
+    --     pass
   , else_
   , HasElse(..)
     -- *** Break
   , break_
     -- *** For loops
+    -- | 'For' loops are built using 'for_' syntax:
+    --
+    -- >>> for_ (var_ "a" `in_` [1, 2, 3]) [line_ (call_ "print" [var_ "a"])]
+    -- for a in 1, 2, 3:
+    --     print(a)
+    --
+    -- See also: 'HasFor'
   , forSt_
   , For(..)
   , _For
@@ -247,8 +294,6 @@ module Language.Python.DSL
   , expr_
   , var_
     -- ** @await@
-  , and_
-  , or_
   , await_
     -- ** @... if ... else ...@
   , ifThenElse_
@@ -285,7 +330,9 @@ module Language.Python.DSL
   , noneWhitespace
     -- *** Strings 
   , str_
+  , str'_
   , longStr_
+  , longStr'_
     -- *** Integers
   , int_
     -- *** Booleans
@@ -326,18 +373,38 @@ module Language.Python.DSL
   , pos_
   , compl_
     -- ** Binary operators
+    -- | Comparison, bitwise, and arithmetic operators have precedences that are
+    -- consistent with their Python counterparts. This meansPython expressions can
+    -- be translated to Haskell with minimal parentheses.
+    --
+    -- Note: this doesn't apply to unary operators (because Haskell doesn't have
+    -- unary operators), or the boolean operations 'and_' and 'or_' (because we ran
+    -- out of precedence levels)
+
+    -- *** Boolean operations
+  , or_
+  , and_
+
+    -- *** Comparison operations
   , is_
   , isNot_
   , notIn_
-  , (.*)
-  , (.-)
-  , (.+)
   , (.==)
+  , (.>)
+  , (.>=)
+  , (.<)
+  , (.<=)
+  , (.!=)
+    -- *** Bitwise operations
   , (.|)
   , (.^)
   , (.&)
   , (.<<)
   , (.>>)
+    -- *** Arithmetic operations
+  , (.-)
+  , (.+)
+  , (.*)
   , (.@)
   , (./)
   , (.//)
@@ -389,6 +456,18 @@ import Language.Python.Syntax.Whitespace
 id_ :: String -> Raw Ident
 id_ = fromString
 
+-- | Create a 'Module'
+--
+-- >>> module_
+-- >>> [ line_ $ def_ "a" [] [line_ pass_]
+-- >>> , blank_
+-- >>> , line_ $ def_ "b" [] [line_ pass_]
+-- >>> ]
+-- def a():
+--     pass
+-- <BLANKLINE>
+-- def b():
+--     pass
 module_ :: [Raw Line] -> Raw Module
 module_ [] = ModuleEmpty
 module_ (a:as) =
@@ -511,6 +590,9 @@ instance HasStar Ident Param where
 instance HasDoubleStar Ident Param where
   ss_ i = DoubleStarParam () [] i Nothing
 
+class HasStar s t | t -> s where
+  s_ :: Raw s -> Raw t
+
 -- | See 'call_'
 instance HasStar Expr Arg where
   s_ = StarArg () []
@@ -520,11 +602,16 @@ instance HasDoubleStar Expr Arg where
   ss_ = DoubleStarArg () []
 
 -- | Keyword parameters/arguments
+--
+-- @
+-- p_ :: 'Raw' 'Expr' -> 'Raw' 'Expr' -> 'Raw' 'Arg'
+-- @
+--
+-- @
+-- p_ :: 'Raw' 'Ident' -> 'Raw' 'Expr' -> 'Raw' 'Param'
+-- @
 class HasKeyword p where
   k_ :: Raw Ident -> Raw Expr -> Raw p
-
-class HasStar s t | t -> s where
-  s_ :: Raw s -> Raw t
 
 -- | Unnamed starred parameter
 --
@@ -559,14 +646,14 @@ class HasParameters s where
   -- | A faux-Lens that allows targeting 'Param's in-between existing formatting,
   -- and adding appropriate formatting when extra parameters are introduced.
   --
-  -- >>> 'Language.Python.Render.showStatement' myStatement
-  -- \"def a(b ,  c   ):\\n    pass\"
+  -- >>> showStatement myStatement
+  -- "def a(b ,  c   ):\n    pass"
   --
-  -- >>> 'Language.Python.Render.showStatement' (myStatement '&' '_Fundef' '.' 'parameters_' '.~' ['p_' \"d\", 'p_' \"e\"]
-  -- \"def a(d ,  e   ):\\n    pass\"
+  -- >>> showStatement (myStatement '&' '_Fundef' '.' 'parameters_' '.~' ['p_' "d", 'p_' "e"]
+  -- "def a(d ,  e   ):\n    pass"
   --
-  -- >>> 'Language.Python.Render.showStatement' (myStatement '&' '_Fundef' '.' 'parameters_' '.~' ['p_' \"d\", 'p_' \"e\", 'p_' \"f\"]
-  -- \"def a(d ,  e   , f):\\n    pass\"
+  -- >>> showStatement (myStatement '&' '_Fundef' '.' 'parameters_' '.~' ['p_' "d", 'p_' "e", 'p_' "f"]
+  -- "def a(d ,  e   , f):\n    pass"
   parameters_ :: Functor f => ([Raw Param] -> f [Raw Param]) -> Raw s -> f (Raw s)
   parameters :: Lens' (Raw s) (CommaSep (Raw Param))
 
@@ -865,12 +952,19 @@ call_ expr args =
       a:as -> Just $ (a, zip (repeat (Comma [Space])) as, Nothing) ^. _CommaSep1'
   }
 
+-- |
+-- >>> return_ (var_ "a")
+-- return a
 return_ :: Raw Expr -> Raw Statement
 return_ e =
   SimpleStatement
     (Indents [] ())
     (MkSimpleStatement (Return () [Space] $ Just e) [] Nothing Nothing (Just LF))
 
+-- | Turns an 'Expr' into a 'Statement'
+--
+-- >>> expr_ (int_ 3)
+-- 3
 expr_ :: Raw Expr -> Raw Statement
 expr_ e =
   SimpleStatement
@@ -893,6 +987,7 @@ class AsList s where
   list_ :: s -> Raw Expr
 
 class AsListItem s where
+  -- | Create a 'ListItem'
   li_ :: Raw s -> Raw ListItem
 
 instance AsListItem ListItem where
@@ -962,6 +1057,7 @@ class AsSet s where
   set_ :: s -> Raw Expr
 
 class AsSetItem s where
+  -- | Create a 'SetItem'
   si_ :: Raw s -> Raw SetItem
 
 instance AsSetItem SetItem where
@@ -1037,13 +1133,31 @@ is_ :: Raw Expr -> Raw Expr -> Raw Expr
 is_ = mkBinOp $ Is ()
 infixl 1 `is_`
 
+-- |
+-- >>> var_ "a" `in_` var_ "b"
+-- a in b
 data In v a = MkIn (Expr v a) (Expr v a)
+
+-- |
+-- >>> var_ "a" `in_` [var_ "b", var_ "c"]
+-- a in b, c
 data InList v a = MkInList (Expr v a) [Expr v a]
 
-class HasIn a x | a -> x where
+class HasIn a x | a -> x, x -> a where
   in_ :: Raw Expr -> x -> Raw a
-
 infixl 1 `in_`
+
+-- | @a and b@
+--
+-- Does not have a precedence
+and_ :: Raw Expr -> Raw Expr -> Raw Expr
+and_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolAnd () [Space])
+
+-- | @a or b@
+--
+-- Does not have a precedence
+or_ :: Raw Expr -> Raw Expr -> Raw Expr
+or_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolOr () [Space])
 
 -- |
 -- >>> var_ "a" `in_` var_ "b"
@@ -1164,7 +1278,9 @@ infixl 7 .%
 (.**) = mkBinOp $ Exp ()
 infixr 8 .**
 
--- | @a.b@
+-- |
+-- >>> var_ "a" /> var_ "b"
+-- a.b
 (/>) :: Raw Expr -> Raw Ident -> Raw Expr
 (/>) a = Deref () a []
 infixl 9 />
@@ -1182,11 +1298,11 @@ compl_ :: Raw Expr -> Raw Expr
 compl_ = UnOp () (Complement () [])
 
 -- | Convert a list of 'Line's to a 'Block', giving them 4 spaces of indentation
-linesToBlockIndented :: [Raw Line] -> Block '[] ()
+linesToBlockIndented :: [Raw Line] -> Raw Block
 linesToBlockIndented = over _Indents (indentIt $ replicate 4 Space) . linesToBlock
 
 -- | Convert a list of 'Line's to a 'Block', without indenting them
-linesToBlock :: [Raw Line] -> Block '[] ()
+linesToBlock :: [Raw Line] -> Raw Block
 linesToBlock = go
   where
     go [] = Block [] pass_ []
@@ -1264,12 +1380,23 @@ ifThen_ = mkIf
 var_ :: String -> Raw Expr
 var_ s = Ident $ MkIdent () s []
 
+-- |
+-- >>> none_
+-- None
 none_ :: Raw Expr
 none_ = None () []
 
+-- | @'Raw' 'Expr'@ has a 'Num' instance, but sometimes we need to name integers
+-- explicitly
+--
+-- >>> int_ 10
+-- 10
 int_ :: Integer -> Raw Expr
 int_ = fromInteger
 
+-- |
+-- >>> pass_
+-- pass
 pass_ :: Raw Statement
 pass_ =
   SimpleStatement
@@ -1348,27 +1475,53 @@ break_ =
     (Indents [] ())
     (MkSimpleStatement (Break () []) [] Nothing Nothing (Just LF))
 
+-- |
+-- >>> true_
+-- True
 true_ :: Raw Expr
 true_ = Bool () True []
 
+-- |
+-- >>> false_
+-- False
 false_ :: Raw Expr
 false_ = Bool () False []
 
-and_ :: Raw Expr -> Raw Expr -> Raw Expr
-and_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolAnd () [Space])
-
-or_ :: Raw Expr -> Raw Expr -> Raw Expr
-or_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolOr () [Space])
-
+-- | Double-quoted string
+--
+-- >>> str_ "asdf"
+-- "asdf"
 str_ :: String -> Raw Expr
 str_ s =
   String () . pure $
   StringLiteral () Nothing ShortString DoubleQuote (Char_lit <$> s) []
 
+-- | Single-quoted string
+--
+-- >>> str_ "asdf"
+-- 'asdf'
+str'_ :: String -> Raw Expr
+str'_ s =
+  String () . pure $
+  StringLiteral () Nothing ShortString SingleQuote (Char_lit <$> s) []
+
+-- | Long double-quoted string
+--
+-- >>> longStr_ "asdf"
+-- """asdf"""
 longStr_ :: String -> Raw Expr
 longStr_ s =
   String () . pure $
   StringLiteral () Nothing LongString DoubleQuote (Char_lit <$> s) []
+
+-- | Long single-quoted string
+--
+-- >>> longStr'_ "asdf"
+-- '''asdf'''
+longStr'_ :: String -> Raw Expr
+longStr'_ s =
+  String () . pure $
+  StringLiteral () Nothing LongString SingleQuote (Char_lit <$> s) []
 
 mkAugAssign :: AugAssignOp -> Raw Expr -> Raw Expr -> Raw Statement
 mkAugAssign at a b =
@@ -1400,6 +1553,7 @@ chainEq t (a:as) =
        Nothing
        (Just LF))
 
+-- | @a = b@
 (.=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.=) a b =
   SimpleStatement
@@ -1412,54 +1566,67 @@ chainEq t (a:as) =
        (Just LF))
 infix 0 .=
 
+-- | @a += b@
 (.+=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.+=) = mkAugAssign PlusEq
 infix 0 .+=
 
+-- | @a -= b@
 (.-=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.-=) = mkAugAssign MinusEq
 infix 0 .-=
 
+-- | @a *= b@
 (.*=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.*=) = mkAugAssign StarEq
 infix 0 .*=
 
+-- | @a @= b@
 (.@=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.@=) = mkAugAssign AtEq
 infix 0 .@=
 
+-- | @a /= b@
 (./=) :: Raw Expr -> Raw Expr -> Raw Statement
 (./=) = mkAugAssign SlashEq
 infix 0 ./=
 
+-- | @a %= b@
 (.%=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.%=) = mkAugAssign PercentEq
 infix 0 .%=
 
+-- | @a &= b@
 (.&=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.&=) = mkAugAssign AmpersandEq
 infix 0 .&=
 
+-- | @a |= b@
 (.|=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.|=) = mkAugAssign PipeEq
 infix 0 .|=
 
+-- | @a ^= b@
 (.^=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.^=) = mkAugAssign CaretEq
 infix 0 .^=
 
+-- | @a <<= b@
 (.<<=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.<<=) = mkAugAssign ShiftLeftEq
 infix 0 .<<=
 
+-- | @a >>= b@
 (.>>=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.>>=) = mkAugAssign ShiftRightEq
 infix 0 .>>=
 
+-- | @a **= b@
 (.**=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.**=) = mkAugAssign DoubleStarEq
 infix 0 .**=
 
+-- | @a //= b@
 (.//=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.//=) = mkAugAssign DoubleSlashEq
 infix 0 .//=
@@ -1482,12 +1649,12 @@ mkFor binder collection body =
   }
 
 -- |
--- @'for_' :: 'Raw' 'In' -> ['Raw' 'Line'] -> 'Raw' 'Statement'@
+-- @'for_' :: 'Raw' 'InList' -> ['Raw' 'Line'] -> 'Raw' 'Statement'@
 --
--- >>> for_ (var_ "a" `in_` var_ "b") [line_ (var_ "c" .+= var_ "a")]
+-- >>> for_ (var_ "a" `in_` [var_ "b"]) [line_ (var_ "c" .+= var_ "a")]
 -- for a in b:
 --     c += a
-instance (l ~ Raw Line, s ~ Raw Statement) => HasFor ([l] -> s) InList where
+instance (l ~ [Raw Line], s ~ Statement) => HasFor (l -> Raw s) InList where
   for_ (MkInList a b) = forSt_ a b
 
 forSt_ :: Raw Expr -> [Raw Expr] -> [Raw Line] -> Raw Statement
@@ -1495,7 +1662,7 @@ forSt_ val vals block = _For # mkFor val vals block
 
 instance HasBody For where
   body = forBody
-  body_ = mkBody_ forIndents forBody 
+  body_ = mkBody_ forIndents forBody
 
 instance AsLine For where
   line_ = line_ . (_For #)
@@ -1700,6 +1867,10 @@ class As s t u | s t -> u, u -> s t where
 instance As Expr Ident ExceptAs where
   as_ e name = ExceptAs () e $ Just ([Space], name)
 
+-- |
+-- >>> class_ "A" [] [line_ pass_]
+-- class A:
+--     pass
 class_ :: Raw Ident -> [Raw Arg] -> [Raw Line] -> Raw Statement
 class_ name args body =
   _ClassDef #
@@ -1804,10 +1975,14 @@ instance HasBody With where
 instance HasAsync With where
   async_ = withAsync ?~ pure Space
 
+-- |
+-- >>> ellipsis_
+-- ...
 ellipsis_ :: Raw Expr
 ellipsis_ = Ellipsis () []
 
 class AsTupleItem e where
+  -- | Create a 'TupleItem'
   ti_ :: Raw e -> Raw TupleItem
 
 -- | See 'tuple_'
@@ -1844,6 +2019,9 @@ tuple_ (a:as) =
       Tuple () a (Comma [Space]) . Just $
       (b, zip (repeat (Comma [Space])) bs, Nothing) ^. _CommaSep1'
 
+-- |
+-- >>> await (var_ "a")
+-- await a
 await_ :: Raw Expr -> Raw Expr
 await_ = Await () [Space]
 
@@ -1872,9 +2050,21 @@ lambda_ params =
     (listToCommaSep params)
     (Colon [Space])
 
+-- |
+-- >>> yield_ []
+-- yield
+--
+-- >>> yield_ [var_ "a"]
+-- yield a
+--
+-- >>> yield_ [var_ "a", var_ "b"]
+-- yield a, b
 yield_ :: [Raw Expr] -> Raw Expr
 yield_ as = Yield () (foldr (\_ _ -> [Space]) [] as) (listToCommaSep as)
 
+-- |
+-- >>> yieldFrom_ (var_ "a")
+-- yield from a
 yieldFrom_ :: Raw Expr -> Raw Expr
 yieldFrom_ = YieldFrom () [Space] [Space]
 
@@ -1888,7 +2078,7 @@ yieldFrom_ = YieldFrom () [Space] [Space]
 fullSlice_ :: Raw Expr
 fullSlice_ = slice_ Nothing Nothing Nothing
 
--- | Slice with *step* x
+-- | Slice with *step* @x@
 --
 -- >>> subs_ (var_ "a") (sliceS_ $ int_ (-1))
 -- a[::-1]
@@ -1898,7 +2088,7 @@ fullSlice_ = slice_ Nothing Nothing Nothing
 sliceS_ :: Raw Expr -> Raw Expr
 sliceS_ x = slice_ Nothing Nothing (Just x)
 
--- | Slice *from* x
+-- | Slice *from* @x@
 --
 -- >>> subs_ (var_ "a") (sliceF_ $ int_ 0)
 -- a[1:]
@@ -1908,7 +2098,7 @@ sliceS_ x = slice_ Nothing Nothing (Just x)
 sliceF_ :: Raw Expr -> Raw Expr
 sliceF_ x = slice_ (Just x) Nothing Nothing
 
--- | Slice *from* x, with *step* y
+-- | Slice *from* @x@, with *step* @y@
 --
 -- >>> subs_ (var_ "a") (sliceFS_ (int_ 0) (int_ 2))
 -- a[1::2]
@@ -1918,7 +2108,7 @@ sliceF_ x = slice_ (Just x) Nothing Nothing
 sliceFS_ :: Raw Expr -> Raw Expr -> Raw Expr
 sliceFS_ x y = slice_ (Just x) Nothing (Just y)
 
--- | Slice *to* x
+-- | Slice /To/ @x@
 --
 -- >>> subs_ (var_ "a") (sliceT_ $ int_ 10)
 -- a[:10]
@@ -1928,7 +2118,7 @@ sliceFS_ x y = slice_ (Just x) Nothing (Just y)
 sliceT_ :: Raw Expr -> Raw Expr
 sliceT_ x = slice_ Nothing (Just x) Nothing
 
--- | Slice *to* x, with *step* y
+-- | Slice /To/ @x@, with /Step/ @y@
 --
 -- >>> subs_ (var_ "a") (sliceTS_ (int_ 10) (int_ 2))
 -- a[:10:2]
@@ -1938,7 +2128,7 @@ sliceT_ x = slice_ Nothing (Just x) Nothing
 sliceTS_ :: Raw Expr -> Raw Expr -> Raw Expr
 sliceTS_ x y = slice_ Nothing (Just x) (Just y)
 
--- | Slice *from* x *to* y
+-- | Slice /From/ @x@ /To/ @y@
 --
 -- >>> subs_ (var_ "a") (sliceFT_ (int_ 1) (int_ 10))
 -- a[1:10]
@@ -1948,7 +2138,7 @@ sliceTS_ x y = slice_ Nothing (Just x) (Just y)
 sliceFT_ :: Raw Expr -> Raw Expr -> Raw Expr
 sliceFT_ x y = slice_ (Just x) (Just y) Nothing
 
--- | Slice *from* x *to* y, with *step* z
+-- | Slice /From/ @x@ /To/ @y@, with /Step/ @z@
 --
 -- >>> subs_ (var_ "a") (sliceFTS_ (int_ 1) (int_ 10) (int_ 2))
 -- a[1:10:2]
@@ -1960,8 +2150,8 @@ sliceFTS_ x y z = slice_ (Just x) (Just y) (Just z)
 
 -- | A slice object
 --
--- Represents a call to a functionc named \"slice\", with 3 arguments.
--- If an argument is a 'Nothing' then it becomes a @None@, and if the argument is a
+-- Represents a call to a function named @slice@, with 3 arguments.
+-- If an argument is a 'Nothing' then it becomes 'None', and if the argument is a
 -- 'Just' then the contents are extracted.
 slice_ :: Maybe (Raw Expr) -> Maybe (Raw Expr) -> Maybe (Raw Expr) -> Raw Expr
 slice_ a b c =

@@ -1130,6 +1130,7 @@ validateArgsSyntax e = unsafeCoerce e <$ go [] False False (toList e)
          validateExprSyntax expr)
         (go names seenKeyword True args)
 
+newtype HaveSeenStarArg = HaveSeenStarArg Bool
 newtype HaveSeenKeywordArg = HaveSeenKeywordArg Bool
 newtype HaveSeenEmptyStarArg a = HaveSeenEmptyStarArg (Maybe a)
 
@@ -1142,7 +1143,12 @@ validateParamsSyntax
   -> ValidateSyntax e (CommaSep (Param (Nub (Syntax ': v)) a))
 validateParamsSyntax isLambda e =
   unsafeCoerce e <$
-  go [] (HaveSeenEmptyStarArg Nothing) (HaveSeenKeywordArg False) (toList e)
+  go
+    []
+    (HaveSeenStarArg False)
+    (HaveSeenEmptyStarArg Nothing)
+    (HaveSeenKeywordArg False)
+    (toList e)
   where
     checkTy
       :: ( AsSyntaxError e v a
@@ -1161,52 +1167,81 @@ validateParamsSyntax isLambda e =
          , Member Indentation v
          )
       => [String] -- identifiers that we've seen
+      -> HaveSeenStarArg -- have we seen a star argument?
       -> HaveSeenEmptyStarArg a -- have we seen an empty star argument?
       -> HaveSeenKeywordArg -- have we seen a keyword parameter?
       -> [Param v a]
       -> ValidateSyntax e [Param (Nub (Syntax ': v)) a]
-    go _ (HaveSeenEmptyStarArg b) _ [] =
+    go _ _ (HaveSeenEmptyStarArg b) _ [] =
       case b of
         Nothing -> pure []
         Just b' -> errorVM1 $ _NoKeywordsAfterEmptyStarArg # b'
-    go names bsa bkw@(HaveSeenKeywordArg False) (PositionalParam a name mty : params)
+    go names bsa besa bkw@(HaveSeenKeywordArg False) (PositionalParam a name mty : params)
       | _identValue name `elem` names =
           errorVM1 (_DuplicateArgument # (a, _identValue name)) <*>
           validateIdentSyntax name <*>
           checkTy a mty <*>
-          go (_identValue name:names) bsa bkw params
+          go (_identValue name:names) bsa besa bkw params
       | otherwise =
           liftA2
             (:)
             (PositionalParam a <$>
              validateIdentSyntax name <*>
              checkTy a mty)
-            (go (_identValue name:names) bsa bkw params)
-    go names bsa bkw (StarParam a _ name mty : params)
+            (go (_identValue name:names) bsa besa bkw params)
+    go names (HaveSeenStarArg b) besa bkw (StarParam a _ name mty : params)
       | _identValue name `elem` names =
-          errorVM1 (_DuplicateArgument # (a, _identValue name)) <*>
-          validateIdentSyntax name <*>
-          checkTy a mty <*>
-          go
-            (_identValue name:names)
-            bsa
-            bkw
-            params
+          if b
+          then
+            errorVM1 (_ManyStarredParams # a) <*>
+            errorVM1 (_DuplicateArgument # (a, _identValue name)) <*>
+            validateIdentSyntax name <*>
+            checkTy a mty <*>
+            go
+              (_identValue name:names)
+              (HaveSeenStarArg True)
+              besa
+              bkw
+              params
+          else
+            errorVM1 (_DuplicateArgument # (a, _identValue name)) <*>
+            validateIdentSyntax name <*>
+            checkTy a mty <*>
+            go
+              (_identValue name:names)
+              (HaveSeenStarArg True)
+              besa
+              bkw
+              params
       | otherwise =
-          validateIdentSyntax name *>
-          checkTy a mty *>
-          go
-            (_identValue name:names)
-            bsa
-            bkw
-            params
-    go names _ bkw (UnnamedStarParam a _ : params) =
+          if b
+          then
+            errorVM1 (_ManyStarredParams # a) <*>
+            validateIdentSyntax name *>
+            checkTy a mty *>
+            go
+              (_identValue name:names)
+              (HaveSeenStarArg True)
+              besa
+              bkw
+              params
+          else
+            validateIdentSyntax name *>
+            checkTy a mty *>
+            go
+              (_identValue name:names)
+              (HaveSeenStarArg True)
+              besa
+              bkw
+              params
+    go names bsa _ bkw (UnnamedStarParam a _ : params) =
       go
         names
+        bsa
         (HaveSeenEmptyStarArg $ Just a)
         bkw
         params
-    go names bsa bkw@(HaveSeenKeywordArg True) (PositionalParam a name mty : params) =
+    go names bsa besa bkw@(HaveSeenKeywordArg True) (PositionalParam a name mty : params) =
       let
         name' = _identValue name
         errs =
@@ -1216,12 +1251,12 @@ validateParamsSyntax isLambda e =
       in
         errorVM errs <*>
         checkTy a mty <*>
-        go (name':names) bsa bkw params
-    go names _ _ (KeywordParam a name mty ws2 expr : params)
+        go (name':names) bsa besa bkw params
+    go names bsa _ _ (KeywordParam a name mty ws2 expr : params)
       | _identValue name `elem` names =
           errorVM1 (_DuplicateArgument # (a, _identValue name)) <*>
           checkTy a mty <*>
-          go names (HaveSeenEmptyStarArg Nothing) (HaveSeenKeywordArg True) params
+          go names bsa (HaveSeenEmptyStarArg Nothing) (HaveSeenKeywordArg True) params
       | otherwise =
           liftA2 (:)
             (KeywordParam a <$>
@@ -1231,27 +1266,28 @@ validateParamsSyntax isLambda e =
              validateExprSyntax expr)
             (go
                (_identValue name:names)
+               bsa
                (HaveSeenEmptyStarArg Nothing)
                (HaveSeenKeywordArg True)
                params)
-    go names bsa bkw [DoubleStarParam a ws name mty]
+    go names bsa besa bkw [DoubleStarParam a ws name mty]
       | _identValue name `elem` names =
           errorVM1 (_DuplicateArgument # (a, _identValue name)) <*>
           checkTy a mty <*
-          go names bsa bkw []
+          go names bsa besa bkw []
       | otherwise =
           fmap pure $
           DoubleStarParam a ws <$>
           validateIdentSyntax name <*>
           checkTy a mty <*
-          go names bsa bkw []
-    go names bsa bkw (DoubleStarParam a _ name mty : _) =
+          go names bsa besa bkw []
+    go names bsa besa bkw (DoubleStarParam a _ name mty : _) =
       (if _identValue name `elem` names
        then errorVM1 (_DuplicateArgument # (a, _identValue name))
        else pure ()) *>
       errorVM1 (_UnexpectedDoubleStarParam # (a, _identValue name)) <*>
       checkTy a mty <*
-      go names bsa bkw []
+      go names bsa besa bkw []
 
 validateModuleSyntax
   :: ( AsSyntaxError e v a

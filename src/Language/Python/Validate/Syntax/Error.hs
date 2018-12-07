@@ -55,6 +55,7 @@ data SyntaxError (v :: [*]) a
   | WildcardImportInDefinition a
   | NoKeywordsAfterEmptyStarArg a
   | ManyStarredTargets a
+  | ManyStarredParams a
   | ContinueInsideFinally a
   | ParameterMarkedGlobal a String
   deriving (Eq, Show)

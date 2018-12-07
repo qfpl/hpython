@@ -7,6 +7,7 @@ import Hedgehog
 import Control.Lens.Iso (from)
 import Control.Lens.Getter ((^.))
 import Control.Monad (void)
+import Language.Python.DSL
 import Language.Python.Render (showStatement, showExpr)
 import Language.Python.Parse (parseModule, parseStatement, parseExpr)
 import Language.Python.Syntax.CommaSep
@@ -18,7 +19,7 @@ import Language.Python.Syntax.Whitespace
 
 import Helpers
   ( shouldBeParseSuccess, shouldBeFailure, shouldBeSuccess
-  , syntaxValidateExpr, syntaxValidateModule
+  , syntaxValidateExpr, syntaxValidateStatement, syntaxValidateModule
   )
 
 syntaxTests :: Group
@@ -132,3 +133,15 @@ prop_syntax_9 =
       s = "def a(*, b=None): pass"
     e <- shouldBeParseSuccess parseModule s
     void . shouldBeSuccess =<< syntaxValidateModule (() <$ e)
+
+prop_syntax_10 :: Property
+prop_syntax_10 =
+  withTests 1 . property $ do
+    let e = def_ "a" [s_ "b", s_ "c"] [line_ pass_]
+    void . shouldBeFailure =<< syntaxValidateStatement e
+
+prop_syntax_11 :: Property
+prop_syntax_11 =
+  withTests 1 . property $ do
+    let e = lambda_ [s_ "a", s_ "b"] (var_ "a")
+    void . shouldBeFailure =<< syntaxValidateExpr e

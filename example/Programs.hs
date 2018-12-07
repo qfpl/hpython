@@ -13,7 +13,7 @@ import Language.Python.Syntax.Module (Module(..))
 import Language.Python.Syntax.CommaSep (Comma(..), CommaSep(..), CommaSep1'(..))
 import Language.Python.Syntax.Expr (Arg(..), Expr(..), Param(..))
 import Language.Python.Syntax.Punctuation (Colon(..))
-import Language.Python.Syntax.Statement (Block(..), CompoundStatement(..), SimpleStatement(..), SmallStatement(..), Statement(..), Suite(..))
+import Language.Python.Syntax.Statement (Block(..), CompoundStatement(..), SmallStatement(..), SimpleStatement(..), Statement(..), Suite(..))
 import Language.Python.Syntax.Whitespace (Indents(..), Newline(..), Whitespace(..), indentWhitespaces)
 
 -- |
@@ -39,9 +39,9 @@ append_to =
     Nothing
     (SuiteMany () (Colon []) Nothing LF $
      Block []
-     ( SimpleStatement
+     ( SmallStatement
          (Indents [replicate 4 Space ^. from indentWhitespaces] ())
-         (MkSimpleStatement
+         (MkSmallStatement
           (Expr () $
            Call ()
              (Deref () (Ident "to") [] "append")
@@ -54,9 +54,9 @@ append_to =
           (Just LF))
      )
      [ Right $
-         SimpleStatement
+         SmallStatement
            (Indents [replicate 4 Space ^. from indentWhitespaces] ())
-           (MkSimpleStatement
+           (MkSmallStatement
             (Return () [Space] (Just $ Ident "to"))
             []
             Nothing

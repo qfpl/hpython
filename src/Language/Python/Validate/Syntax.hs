@@ -50,7 +50,7 @@ module Language.Python.Validate.Syntax
   , validateListItemSyntax
   , validateParamsSyntax
   , validateSetItemSyntax
-  , validateSmallStatementSyntax
+  , validateSimpleStatementSyntax
   , validateStringLiteralSyntax
   , validateSubscriptSyntax
   , validateSuiteSyntax
@@ -633,7 +633,7 @@ validateSuiteSyntax (SuiteMany a b c d e) =
 validateSuiteSyntax (SuiteOne a b c) =
   SuiteOne a <$>
   validateColon a b <*>
-  validateSimpleStatementSyntax c
+  validateSmallStatementSyntax c
 
 validateDecoratorSyntax
   :: ( AsSyntaxError e v a
@@ -853,18 +853,18 @@ validateImportTargetsSyntax (ImportSomeParens a ws1 cs ws2) =
      traverse (validateImportAsSyntax validateIdentSyntax) cs) <*>
   validateWhitespace a ws2
 
-validateSmallStatementSyntax
+validateSimpleStatementSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
      )
-  => SmallStatement v a
-  -> ValidateSyntax e (SmallStatement (Nub (Syntax ': v)) a)
-validateSmallStatementSyntax (Assert a b c d) =
+  => SimpleStatement v a
+  -> ValidateSyntax e (SimpleStatement (Nub (Syntax ': v)) a)
+validateSimpleStatementSyntax (Assert a b c d) =
   Assert a <$>
   validateWhitespace a b <*>
   validateExprSyntax c <*>
   traverseOf (traverse._2) validateExprSyntax d
-validateSmallStatementSyntax (Raise a ws f) =
+validateSimpleStatementSyntax (Raise a ws f) =
   Raise a <$>
   validateWhitespace a ws <*>
   traverse
@@ -878,7 +878,7 @@ validateSmallStatementSyntax (Raise a ws f) =
             validateExprSyntax e)
          c)
     f
-validateSmallStatementSyntax (Return a ws expr) =
+validateSimpleStatementSyntax (Return a ws expr) =
   ask `bindVM` \sctxt ->
     case _inFunction sctxt of
       Just{} ->
@@ -886,10 +886,10 @@ validateSmallStatementSyntax (Return a ws expr) =
         validateWhitespace a ws <*>
         traverse validateExprSyntax expr
       _ -> errorVM1 (_ReturnOutsideFunction # a)
-validateSmallStatementSyntax (Expr a expr) =
+validateSimpleStatementSyntax (Expr a expr) =
   Expr a <$>
   validateExprSyntax expr
-validateSmallStatementSyntax (Assign a lvalue rs) =
+validateSimpleStatementSyntax (Assign a lvalue rs) =
   ask `bindVM` \sctxt ->
     let
       assigns =
@@ -911,7 +911,7 @@ validateSmallStatementSyntax (Assign a lvalue rs) =
        (\(ws, b) -> (,) <$> validateWhitespace a ws <*> validateExprSyntax b)
          (NonEmpty.last rs)) <*
       liftVM0 (modify (assigns ++))
-validateSmallStatementSyntax (AugAssign a lvalue aa rvalue) =
+validateSimpleStatementSyntax (AugAssign a lvalue aa rvalue) =
   AugAssign a <$>
   (if canAssignTo lvalue
     then case lvalue of
@@ -922,16 +922,16 @@ validateSmallStatementSyntax (AugAssign a lvalue aa rvalue) =
     else errorVM1 (_CannotAssignTo # (a, lvalue))) <*>
   pure aa <*>
   validateExprSyntax rvalue
-validateSmallStatementSyntax (Pass a ws) =
+validateSimpleStatementSyntax (Pass a ws) =
   Pass a <$> validateWhitespace a ws
-validateSmallStatementSyntax (Break a ws) =
+validateSimpleStatementSyntax (Break a ws) =
   Break a <$
   (ask `bindVM` \sctxt ->
      if _inLoop sctxt
      then pure ()
      else errorVM1 (_BreakOutsideLoop # a)) <*>
   validateWhitespace a ws
-validateSmallStatementSyntax (Continue a ws) =
+validateSimpleStatementSyntax (Continue a ws) =
   Continue a <$
   (ask `bindVM` \sctxt ->
      (if _inLoop sctxt
@@ -941,7 +941,7 @@ validateSmallStatementSyntax (Continue a ws) =
       then errorVM1 (_ContinueInsideFinally # a)
       else pure ())) <*>
   validateWhitespace a ws
-validateSmallStatementSyntax (Global a ws ids) =
+validateSimpleStatementSyntax (Global a ws ids) =
   ask `bindVM` \ctx ->
   let
     params = ctx ^.. inFunction.folded.functionParams.folded
@@ -957,7 +957,7 @@ validateSmallStatementSyntax (Global a ws ids) =
           else pure ()) *>
          validateIdentSyntax i)
       ids
-validateSmallStatementSyntax (Nonlocal a ws ids) =
+validateSimpleStatementSyntax (Nonlocal a ws ids) =
   ask `bindVM` \sctxt ->
   get `bindVM` \nls ->
   (case deleteFirstsBy' (\a -> (==) (a ^. unvalidated.identValue)) (ids ^.. folded) nls of
@@ -969,7 +969,7 @@ validateSmallStatementSyntax (Nonlocal a ws ids) =
       case intersect params (ids ^.. folded.unvalidated.identValue) of
         [] -> Nonlocal a ws <$> traverse validateIdentSyntax ids
         bad -> errorVM1 (_ParametersNonlocal # (a, bad))
-validateSmallStatementSyntax (Del a ws ids) =
+validateSimpleStatementSyntax (Del a ws ids) =
   Del a ws <$>
   traverse
     (\x ->
@@ -978,9 +978,9 @@ validateSmallStatementSyntax (Del a ws ids) =
        then pure ()
        else errorVM1 $ _CannotDelete # (a, x))
     ids
-validateSmallStatementSyntax (Import a ws mns) =
+validateSimpleStatementSyntax (Import a ws mns) =
   Import a ws <$> traverse (pure . coerce) mns
-validateSmallStatementSyntax (From a ws1 mn ws2 ts) =
+validateSimpleStatementSyntax (From a ws1 mn ws2 ts) =
   From a ws1 (coerce mn) <$>
   validateWhitespace a ws2 <*>
   validateImportTargetsSyntax ts
@@ -1022,16 +1022,16 @@ canDelete Deref{} = True
 canDelete Subscript{} = True
 canDelete Ident{} = True
 
-validateSimpleStatementSyntax
+validateSmallStatementSyntax
   :: ( AsSyntaxError e v a
      , Member Indentation v
      )
-  => SimpleStatement v a
-  -> ValidateSyntax e (SimpleStatement (Nub (Syntax ': v)) a)
-validateSimpleStatementSyntax (MkSimpleStatement s ss sc cmt nl) =
-  (\s' ss' -> MkSimpleStatement s' ss' sc cmt nl) <$>
-  validateSmallStatementSyntax s <*>
-  traverseOf (traverse._2) validateSmallStatementSyntax ss
+  => SmallStatement v a
+  -> ValidateSyntax e (SmallStatement (Nub (Syntax ': v)) a)
+validateSmallStatementSyntax (MkSmallStatement s ss sc cmt nl) =
+  (\s' ss' -> MkSmallStatement s' ss' sc cmt nl) <$>
+  validateSimpleStatementSyntax s <*>
+  traverseOf (traverse._2) validateSimpleStatementSyntax ss
 
 validateStatementSyntax
   :: ( AsSyntaxError e v a
@@ -1041,8 +1041,8 @@ validateStatementSyntax
   -> ValidateSyntax e (Statement (Nub (Syntax ': v)) a)
 validateStatementSyntax (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementSyntax c
-validateStatementSyntax (SimpleStatement idnts a) =
-  SimpleStatement idnts <$> validateSimpleStatementSyntax a
+validateStatementSyntax (SmallStatement idnts a) =
+  SmallStatement idnts <$> validateSmallStatementSyntax a
 
 canAssignTo :: Expr v a -> Bool
 canAssignTo None{} = False

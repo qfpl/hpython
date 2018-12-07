@@ -83,7 +83,7 @@ import Language.Python.Optics.Validated
 import Language.Python.Syntax.Expr (Expr (..), TupleItem (TupleUnpack), ListItem (ListUnpack), Param (..), _Exprs)
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Module
-import Language.Python.Syntax.Statement (Block (..), CompoundStatement (..), Decorator (..), ExceptAs (..), SimpleStatement (..), Statement (..), Suite (..), _Statements)
+import Language.Python.Syntax.Statement (Block (..), CompoundStatement (..), Decorator (..), ExceptAs (..), SmallStatement (..), Statement (..), Suite (..), _Statements)
 import Language.Python.Syntax.Types
 import Language.Python.Syntax.Whitespace
 
@@ -447,12 +447,12 @@ instance HasIndents (Elif '[] a) a where
 instance HasIndents (Else '[] a) a where
   _Indents f (MkElse a b c) = MkElse <$> f a <*> pure b <*> _Indents f c
 
-instance HasIndents (SimpleStatement '[] a) a where
-  _Indents _ (MkSimpleStatement a b c d e) =
-    pure $ MkSimpleStatement a b c d e
+instance HasIndents (SmallStatement '[] a) a where
+  _Indents _ (MkSmallStatement a b c d e) =
+    pure $ MkSmallStatement a b c d e
 
 instance HasIndents (Statement '[] a) a where
-  _Indents f (SimpleStatement idnt a) = SimpleStatement <$> f idnt <*> _Indents f a
+  _Indents f (SmallStatement idnt a) = SmallStatement <$> f idnt <*> _Indents f a
   _Indents f (CompoundStatement c) = CompoundStatement <$> _Indents f c
 
 instance HasIndents (Block '[] a) a where
@@ -613,14 +613,14 @@ instance HasNewlines CompoundStatement where
         _Newlines fun e
       With a b asyncWs c d e -> With a b asyncWs c (coerce d) <$> _Newlines fun e
 
-instance HasNewlines SimpleStatement where
-  _Newlines f (MkSimpleStatement s ss sc cmt nl) =
-    MkSimpleStatement s ss sc cmt <$> traverse f nl
+instance HasNewlines SmallStatement where
+  _Newlines f (MkSmallStatement s ss sc cmt nl) =
+    MkSmallStatement s ss sc cmt <$> traverse f nl
 
 instance HasNewlines Statement where
   _Newlines f (CompoundStatement c) =
     CompoundStatement <$> _Newlines f c
-  _Newlines f (SimpleStatement i a) = SimpleStatement i <$> _Newlines f a
+  _Newlines f (SmallStatement i a) = SmallStatement i <$> _Newlines f a
 
 instance HasNewlines Module where
   _Newlines f = go

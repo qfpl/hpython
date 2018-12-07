@@ -1234,10 +1234,10 @@ validateParamsSyntax isLambda e =
               besa
               bkw
               params
-    go names bsa _ bkw (UnnamedStarParam a _ : params) =
+    go names _ _ bkw (UnnamedStarParam a _ : params) =
       go
         names
-        bsa
+        (HaveSeenStarArg True)
         (HaveSeenEmptyStarArg $ Just a)
         bkw
         params

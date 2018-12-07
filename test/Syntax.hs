@@ -145,3 +145,27 @@ prop_syntax_11 =
   withTests 1 . property $ do
     let e = lambda_ [s_ "a", s_ "b"] (var_ "a")
     void . shouldBeFailure =<< syntaxValidateExpr e
+
+prop_syntax_12 :: Property
+prop_syntax_12 =
+  withTests 1 . property $ do
+    let e = def_ "a" [star_, s_ "b"] [line_ pass_]
+    void . shouldBeFailure =<< syntaxValidateStatement e
+
+prop_syntax_13 :: Property
+prop_syntax_13 =
+  withTests 1 . property $ do
+    let e = lambda_ [star_, s_ "a"] (var_ "b")
+    void . shouldBeFailure =<< syntaxValidateExpr e
+
+prop_syntax_14 :: Property
+prop_syntax_14 =
+  withTests 1 . property $ do
+    let e = def_ "a" [star_, k_ "b" none_, s_ "c"] [line_ pass_]
+    void . shouldBeFailure =<< syntaxValidateStatement e
+
+prop_syntax_15 :: Property
+prop_syntax_15 =
+  withTests 1 . property $ do
+    let e = lambda_ [star_, k_ "a" none_, s_ "b"] (var_ "c")
+    void . shouldBeFailure =<< syntaxValidateExpr e

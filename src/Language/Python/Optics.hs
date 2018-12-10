@@ -1,6 +1,8 @@
 {-# language DataKinds #-}
+{-# language FlexibleContexts #-}
 {-# language FunctionalDependencies, MultiParamTypeClasses #-}
 {-# language FlexibleInstances #-}
+{-# language InstanceSigs, ScopedTypeVariables #-}
 {-# language PolyKinds #-}
 {-# language LambdaCase #-}
 
@@ -18,11 +20,10 @@ Optics for manipulating Python syntax trees
 
 module Language.Python.Optics
   ( module Language.Python.Optics.Validated
+  , module Language.Python.Optics.Newlines
   , -- * Indentation
     HasIndents(..)
   , _Indent
-    -- * Newlines
-  , HasNewlines(..)
     -- * Simple statements
     -- ** Assignment
   , assignTargets
@@ -73,17 +74,15 @@ where
 
 import Control.Lens.Getter ((^.), view)
 import Control.Lens.Iso (Iso', iso, from)
-import Control.Lens.Traversal (Traversal, Traversal', traverseOf)
-import Control.Lens.Tuple (_2, _3, _4)
-import Control.Lens.Prism (Prism, _Right, prism)
-import Data.Coerce (coerce)
+import Control.Lens.Traversal (Traversal, Traversal')
+import Control.Lens.Prism (Prism, prism)
 
 import Language.Python.Internal.Token (PyToken(..))
+import Language.Python.Optics.Newlines
 import Language.Python.Optics.Validated
-import Language.Python.Syntax.Expr (Expr (..), TupleItem (TupleUnpack), ListItem (ListUnpack), Param (..), _Exprs)
+import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
-import Language.Python.Syntax.Module
-import Language.Python.Syntax.Statement (Block (..), CompoundStatement (..), Decorator (..), ExceptAs (..), SmallStatement (..), Statement (..), Suite (..), _Statements)
+import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Types
 import Language.Python.Syntax.Whitespace
 
@@ -562,75 +561,6 @@ instance HasIndents (CompoundStatement '[] a) a where
         fun b <*>
         _Indents fun e
 
-class HasNewlines s where
-  -- | 'Traversal'' targeting all of thie 'Newline's in a structure
-  _Newlines :: Traversal' (s v a) Newline
-
-instance HasNewlines Block where
-  _Newlines f (Block a b c) =
-    Block <$>
-    (traverse._2) f a <*>
-    _Newlines f b <*>
-    (traverse._Right._Newlines) f c
-
-instance HasNewlines Suite where
-  _Newlines fun (SuiteOne a b c) = SuiteOne a b <$> _Newlines fun c
-  _Newlines f (SuiteMany a b c d e) = SuiteMany a b c <$> f d <*> _Newlines f e
-
-instance HasNewlines Decorator where
-  _Newlines fun (Decorator a b c d e f g) =
-    Decorator a b c d e <$> fun f <*> (traverse._2) fun g
-
-instance HasNewlines CompoundStatement where
-  _Newlines fun s =
-    case s of
-      Fundef ann decos idnt asyncWs ws1 name ws2 params ws3 mty s ->
-        (\decos' -> Fundef ann decos' idnt asyncWs ws1 name ws2 params ws3 mty) <$>
-        (traverse._Newlines) fun decos <*>
-        _Newlines fun s
-      If idnt ann ws1 cond s elifs els ->
-        If idnt ann ws1 cond <$>
-        _Newlines fun s <*>
-        traverseOf (traverse._4._Newlines) fun elifs <*>
-        traverseOf (traverse._3._Newlines) fun els
-      While idnt ann ws1 cond s els ->
-        While idnt ann ws1 cond <$>
-        _Newlines fun s <*>
-        traverseOf (traverse._3._Newlines) fun els
-      TryExcept idnt a b c f k l ->
-        TryExcept idnt a b <$> _Newlines fun c <*>
-        traverseOf (traverse._4._Newlines) fun f <*>
-        traverseOf (traverse._3._Newlines) fun k <*>
-        traverseOf (traverse._3._Newlines) fun l
-      TryFinally idnt a b c idnt2 f g ->
-        TryFinally idnt a b <$> _Newlines fun c <*> pure idnt2 <*>
-        pure f <*> _Newlines fun g
-      For idnt a asyncWs b c d e f g ->
-        For idnt a asyncWs b c d e <$> _Newlines fun f <*> (traverse._3._Newlines) fun g
-      ClassDef a decos idnt b c d e ->
-        (\decos' -> ClassDef a decos' idnt b (coerce c) (coerce d)) <$>
-        traverse (_Newlines fun) decos <*>
-        _Newlines fun e
-      With a b asyncWs c d e -> With a b asyncWs c (coerce d) <$> _Newlines fun e
-
-instance HasNewlines SmallStatement where
-  _Newlines f (MkSmallStatement s ss sc cmt nl) =
-    MkSmallStatement s ss sc cmt <$> traverse f nl
-
-instance HasNewlines Statement where
-  _Newlines f (CompoundStatement c) =
-    CompoundStatement <$> _Newlines f c
-  _Newlines f (SmallStatement i a) = SmallStatement i <$> _Newlines f a
-
-instance HasNewlines Module where
-  _Newlines f = go
-    where
-      go ModuleEmpty = pure ModuleEmpty
-      go (ModuleBlankFinal a) = pure $ ModuleBlankFinal a
-      go (ModuleBlank a b c) =
-        ModuleBlank a <$> f b <*> go c
-      go (ModuleStatement a b) =
-        ModuleStatement <$> _Newlines f a <*> go b
 
 assignTargets :: Traversal (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
 assignTargets f e =

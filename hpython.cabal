@@ -74,6 +74,7 @@ library
                      , Language.Python.Internal.Token
                      , Language.Python.Internal.Syntax.IR
                      , Language.Python.Optics
+                     , Language.Python.Optics.Newlines
                      , Language.Python.Optics.Validated
                      , Language.Python.Parse
                      , Language.Python.Parse.Error

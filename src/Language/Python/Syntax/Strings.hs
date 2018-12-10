@@ -33,7 +33,10 @@ module Language.Python.Syntax.Strings
     -- ** String literals
   , StringLiteral(..)
     -- *** Lenses
+  , stringLiteralStringType
+  , stringLiteralQuoteType
   , stringLiteralValue
+  , stringLiteralWhitespace
     -- * Rendering
   , showQuoteType
   , showStringPrefix
@@ -306,4 +309,10 @@ showQuoteType qt =
     DoubleQuote -> '\"'
     SingleQuote -> '\''
 
-makeLensesFor [("_stringLiteralValue", "stringLiteralValue")] ''StringLiteral
+makeLensesFor
+  [ ("_stringLiteralValue", "stringLiteralValue")
+  , ("_stringLiteralStringType", "stringLiteralStringType")
+  , ("_stringLiteralQuoteType", "stringLiteralQuoteType")
+  , ("_stringLiteralWhitespace", "stringLiteralWhitespace")
+  ]
+  ''StringLiteral

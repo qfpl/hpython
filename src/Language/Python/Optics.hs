@@ -317,6 +317,39 @@ _Ident =
         Ident a -> Right a
         a -> Left $ a ^. unvalidated)
 
+-- | 'Traversal' targeting the variables that would modified as a result of an assignment
+--
+-- Here are some examples of assignment targets:
+--
+-- @
+-- a = b
+-- ^
+-- @
+--
+-- @
+-- (a, b, c) = d
+--  ^  ^  ^
+-- @
+--
+-- @
+-- [a, b, *c] = d
+--  ^  ^   ^
+-- @
+--
+-- These expressions have variables on the left hand side of the @=@, but those variables
+-- don't count as assignment targets:
+--
+-- @
+-- a[b] = c
+-- @
+--
+-- @
+-- a(b) = c
+-- @
+--
+-- @
+-- {a: b} = c
+-- @
 assignTargets :: Traversal (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
 assignTargets f e =
   case e of

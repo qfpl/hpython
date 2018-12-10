@@ -169,3 +169,9 @@ prop_syntax_15 =
   withTests 1 . property $ do
     let e = lambda_ [star_, k_ "a" none_, s_ "b"] (var_ "c")
     void . shouldBeFailure =<< syntaxValidateExpr e
+
+prop_syntax_16 :: Property
+prop_syntax_16 =
+  withTests 1 . property $ do
+    let e = lambda_ [star_, star_, k_ "a" none_] (var_ "c")
+    void . shouldBeFailure =<< syntaxValidateExpr e

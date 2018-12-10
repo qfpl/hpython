@@ -1234,13 +1234,23 @@ validateParamsSyntax isLambda e =
               besa
               bkw
               params
-    go names _ _ bkw (UnnamedStarParam a _ : params) =
-      go
-        names
-        (HaveSeenStarArg True)
-        (HaveSeenEmptyStarArg $ Just a)
-        bkw
-        params
+    go names (HaveSeenStarArg b) _ bkw (UnnamedStarParam a _ : params) =
+      if b
+      then
+        errorVM1 (_ManyStarredParams # a) <*>
+        go
+          names
+          (HaveSeenStarArg True)
+          (HaveSeenEmptyStarArg $ Just a)
+          bkw
+          params
+      else
+        go
+          names
+          (HaveSeenStarArg True)
+          (HaveSeenEmptyStarArg $ Just a)
+          bkw
+          params
     go names bsa besa bkw@(HaveSeenKeywordArg True) (PositionalParam a name mty : params) =
       let
         name' = _identValue name

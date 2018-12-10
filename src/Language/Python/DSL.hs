@@ -1337,8 +1337,8 @@ mkWhile cond body =
   , _whileElse = Nothing
   }
 
-while_ :: Raw Expr -> [Raw Line] -> Raw Statement
-while_ e sts = _While # mkWhile e sts
+while_ :: Raw Expr -> [Raw Line] -> Raw While
+while_ = mkWhile
 
 -- | Create a minimal valid 'If'
 mkIf :: Raw Expr -> [Raw Line] -> Raw If
@@ -1468,6 +1468,10 @@ instance HasElse For where
 instance HasElse If where
   getElse = mkGetElse _ifIndents _ifElse
   setElse = mkSetElse _ifIndents ifElse
+
+instance HasElse TryExcept where
+  getElse = mkGetElse _teIndents _teElse
+  setElse = mkSetElse _teIndents teElse
 
 break_ :: Raw Statement
 break_ =
@@ -1654,11 +1658,11 @@ mkFor binder collection body =
 -- >>> for_ (var_ "a" `in_` [var_ "b"]) [line_ (var_ "c" .+= var_ "a")]
 -- for a in b:
 --     c += a
-instance (l ~ [Raw Line], s ~ Statement) => HasFor (l -> Raw s) InList where
-  for_ (MkInList a b) = forSt_ a b
+instance (l ~ [Raw Line], s ~ Raw For) => HasFor (l -> s) InList where
+  for_ (MkInList a b) = mkFor a b
 
-forSt_ :: Raw Expr -> [Raw Expr] -> [Raw Line] -> Raw Statement
-forSt_ val vals block = _For # mkFor val vals block
+forSt_ :: Raw Expr -> [Raw Expr] -> [Raw Line] -> Raw For
+forSt_ = mkFor
 
 instance HasBody For where
   body = forBody

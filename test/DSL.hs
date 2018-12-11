@@ -8,7 +8,7 @@ import Control.Lens.Setter ((.~), over)
 import Data.Function ((&))
 
 import Language.Python.DSL
-import Language.Python.Optics (_Indent)
+import Language.Python.Optics
 import Language.Python.Render (showExpr)
 import Language.Python.Syntax.CommaSep (CommaSep(..))
 import Language.Python.Syntax.Punctuation (Comma(..))
@@ -206,7 +206,7 @@ prop_parameters_3 =
         CommaSepNone
       st1 = st & _Fundef.fdParameters .~ params1
 
-      params2 = CommaSepOne (p_ "test3")
+      params2 = CommaSepMany (p_ "test3") (Comma $ replicate 5 Space) CommaSepNone
       st2 = st & _Fundef.fdParameters .~ params2
 
     (st1 & _Fundef.parameters_ .~ [p_ "test3"]) === st2

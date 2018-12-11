@@ -6,10 +6,13 @@ import Hedgehog
 
 import Control.Lens.Iso (from)
 import Control.Lens.Getter ((^.))
+import Control.Lens.Review ((#))
 import Control.Monad (void)
+
 import Language.Python.DSL
-import Language.Python.Render (showStatement, showExpr)
+import Language.Python.Optics
 import Language.Python.Parse (parseModule, parseStatement, parseExpr)
+import Language.Python.Render (showStatement, showExpr)
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Punctuation
@@ -137,7 +140,7 @@ prop_syntax_9 =
 prop_syntax_10 :: Property
 prop_syntax_10 =
   withTests 1 . property $ do
-    let e = def_ "a" [s_ "b", s_ "c"] [line_ pass_]
+    let e = _Fundef # def_ "a" [s_ "b", s_ "c"] [line_ pass_]
     void . shouldBeFailure =<< syntaxValidateStatement e
 
 prop_syntax_11 :: Property
@@ -149,7 +152,7 @@ prop_syntax_11 =
 prop_syntax_12 :: Property
 prop_syntax_12 =
   withTests 1 . property $ do
-    let e = def_ "a" [star_, s_ "b"] [line_ pass_]
+    let e = _Fundef # def_ "a" [star_, s_ "b"] [line_ pass_]
     void . shouldBeFailure =<< syntaxValidateStatement e
 
 prop_syntax_13 :: Property
@@ -161,7 +164,7 @@ prop_syntax_13 =
 prop_syntax_14 :: Property
 prop_syntax_14 =
   withTests 1 . property $ do
-    let e = def_ "a" [star_, k_ "b" none_, s_ "c"] [line_ pass_]
+    let e = _Fundef # def_ "a" [star_, k_ "b" none_, s_ "c"] [line_ pass_]
     void . shouldBeFailure =<< syntaxValidateStatement e
 
 prop_syntax_15 :: Property

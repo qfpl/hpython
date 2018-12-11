@@ -92,7 +92,6 @@ module Language.Python.DSL
     -- ** Function definitions
   , def_
   , Fundef(..)
-  , _Fundef
   , mkFundef
     -- *** Lenses
   , fdAnn
@@ -109,7 +108,6 @@ module Language.Python.DSL
     -- ** Class definitions
   , class_
   , ClassDef(..)
-  , _ClassDef
   , mkClassDef
     -- *** Lenses
   , cdAnn
@@ -141,18 +139,14 @@ module Language.Python.DSL
   , ExceptSyntax(..)
   , FinallySyntax(..)
   , TryExcept(..)
-  , _TryExcept
   , mkTryExcept
   , TryFinally(..)
-  , _TryFinally
   , mkTryFinally
   , ExceptAs(..)
   , AsExceptAs(..)
   , Except(..)
-  , _Except
   , mkExcept
   , Finally(..)
-  , _Finally
   , mkFinally
     -- *** Lenses
   , teAnn
@@ -173,7 +167,6 @@ module Language.Python.DSL
   , with_
   , withItem_
   , With(..)
-  , _With
   , mkWith
   , AsWithItem(..)
   , WithItem(..)
@@ -252,13 +245,10 @@ module Language.Python.DSL
   , ifThen_
   , elif_
   , If(..)
-  , _If
   , mkIf
   , Elif(..)
-  , _Elif
   , mkElif
   , Else(..)
-  , _Else
   , mkElse
     -- **** Lenses
   , ifAnn
@@ -282,7 +272,6 @@ module Language.Python.DSL
     -- *** While loops
   , while_
   , While(..)
-  , _While
   , mkWhile
     -- **** Lenses
   , whileAnn
@@ -306,13 +295,11 @@ module Language.Python.DSL
     -- ** Tuples
   , tuple_
   , Tuple(..)
-  , _Tuple
   , AsTupleItem(..)
   , TupleItem()
     -- ** Function calls
   , call_
   , Call(..)
-  , _Call
   , mkCall
     -- *** Lenses
   , callAnn
@@ -328,7 +315,7 @@ module Language.Python.DSL
     -- **** Lenses
   , noneAnn
   , noneWhitespace
-    -- *** Strings 
+    -- *** Strings
   , str_
   , str'_
   , longStr_
@@ -501,6 +488,12 @@ instance AsLine SimpleStatement where
 
 instance AsLine CompoundStatement where
   line_ = Line . Right . CompoundStatement
+
+instance AsLine ClassDef where
+  line_ = line_ @Statement . (_ClassDef #)
+
+instance AsLine Fundef where
+  line_ = line_ @Statement . (_Fundef #)
 
 instance AsLine If where
   line_ = line_ @Statement . (_If #)
@@ -918,9 +911,8 @@ mkFundef name body =
 -- >>> def_ "f" [p_ "x" .: "String"] [line_ $ return_ "x"]
 -- def f(x: String):
 --     return x
-def_ :: Raw Ident -> [Raw Param] -> [Raw Line] -> Raw Statement
-def_ name params body =
-  _Fundef # (mkFundef name body) { _fdParameters = listToCommaSep params }
+def_ :: Raw Ident -> [Raw Param] -> [Raw Line] -> Raw Fundef
+def_ name params body = (mkFundef name body) { _fdParameters = listToCommaSep params }
 
 -- | Create a minimal valid 'Call'
 mkCall :: Raw Expr -> Raw Call
@@ -1917,9 +1909,8 @@ instance As Expr Ident ExceptAs where
 -- >>> class_ "A" [] [line_ pass_]
 -- class A:
 --     pass
-class_ :: Raw Ident -> [Raw Arg] -> [Raw Line] -> Raw Statement
+class_ :: Raw Ident -> [Raw Arg] -> [Raw Line] -> Raw ClassDef
 class_ name args body =
-  _ClassDef #
   (mkClassDef name body) {
     _cdArguments =
       case args of
@@ -1995,8 +1986,8 @@ mkWith items body =
 -- >>> with_ [withItem_ e Nothing] [line_ $ var_ "b"]
 -- with a:
 --     b
-with_ :: AsWithItem e => NonEmpty (Raw e) -> [Raw Line] -> Raw Statement
-with_ items body = _With # mkWith (toWithItem <$> items) body
+with_ :: AsWithItem e => NonEmpty (Raw e) -> [Raw Line] -> Raw With
+with_ items = mkWith (toWithItem <$> items)
 
 withItem_ :: Raw Expr -> Maybe (Raw Expr) -> Raw WithItem
 withItem_ a b = WithItem () a ((,) [Space] <$> b)

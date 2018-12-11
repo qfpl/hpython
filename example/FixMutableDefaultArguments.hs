@@ -11,6 +11,7 @@ import Data.Function ((&))
 import Data.Semigroup ((<>))
 
 import Language.Python.DSL
+import Language.Python.Optics
 import Language.Python.Syntax.Expr (Expr(..), _Exprs)
 
 fixMutableDefaultArguments :: Raw Statement -> Maybe (Raw Statement)

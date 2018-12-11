@@ -4,10 +4,12 @@ module Programs where
 
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
+import Control.Lens.Review ((#))
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
 
 import Language.Python.DSL
+import Language.Python.Optics
 
 import Language.Python.Syntax.Module (Module(..))
 import Language.Python.Syntax.CommaSep (Comma(..), CommaSep(..), CommaSep1'(..))
@@ -72,7 +74,7 @@ append_to =
 -- @
 --
 -- Written with the DSL
-append_to' :: Raw Statement
+append_to' :: Raw Fundef
 append_to' =
   def_ "append_to" [ p_ "element", k_ "to" (list_ []) ]
     [ line_ $ call_ ("to" /> "append") [ "element" ]
@@ -89,7 +91,7 @@ append_to' =
 --       go(n-1, n*acc)
 --   return go(n, 1)
 -- @
-fact_tr :: Raw Statement
+fact_tr :: Raw Fundef
 fact_tr =
   def_ "fact" [p_ "n"]
   [ line_ $
@@ -108,7 +110,7 @@ fact_tr =
 -- def spin():
 --   spin()
 -- @
-spin :: Raw Statement
+spin :: Raw Fundef
 spin = def_ "spin" [] [line_ $ call_ "spin" []]
 
 -- |
@@ -117,14 +119,14 @@ spin = def_ "spin" [] [line_ $ call_ "spin" []]
 --   print("yes")
 --   yes()
 -- @
-yes :: Raw Statement
+yes :: Raw Fundef
 yes =
   def_ "yes" []
   [ line_ $ call_ "print" [p_ $ str_ "yes"]
   , line_ $ call_ "yes" []
   ]
 
-counter :: Raw Statement
+counter :: Raw ClassDef
 counter =
   class_ "Counter" []
   [ line_ $
@@ -152,6 +154,7 @@ counter =
 
 exceptions :: Raw Statement
 exceptions =
+  _Fundef #
   def_ "exceptions" []
   [ line_ $
     tryE_ [line_ pass_] &

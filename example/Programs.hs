@@ -150,6 +150,44 @@ counter =
       [line_ $ return_ ("self" /> "x")]
   ]
 
+exceptions :: Raw Statement
+exceptions =
+  def_ "exceptions" []
+  [ line_ $
+    tryE_ [line_ pass_] &
+      except_ [line_ pass_]
+  , blank_
+
+  , line_ $
+    tryE_ [line_ pass_] &
+      exceptAs_ (var_ "a" `as_` id_ "b") [line_ pass_]
+  , blank_
+
+  , line_ $
+    tryE_ [line_ pass_] &
+      exceptAs_ (var_ "a" `as_` id_ "b") [line_ pass_] &
+      finally_ [line_ pass_]
+  , blank_
+
+  , line_ $
+    tryE_ [line_ pass_] &
+      exceptAs_ (var_ "a" `as_` id_ "b") [line_ pass_] &
+      else_ [line_ pass_] &
+      finally_ [line_ pass_]
+  , blank_
+
+  , line_ $ tryF_ [line_ pass_] [line_ pass_]
+  , blank_
+
+  , line_ $ tryF_ [line_ pass_] & finally_ [line_ pass_]
+  , blank_
+
+  , line_ $
+    tryF_ [line_ pass_] [line_ pass_] &
+      exceptAs_ (var_ "a" `as_` id_ "b") [line_ pass_] &
+      else_ [line_ pass_]
+  ]
+
 everything :: Raw Module
 everything =
   module_
@@ -169,4 +207,7 @@ everything =
   , blank_
 
   , line_ counter
+  , blank_
+
+  , line_ exceptions
   ]

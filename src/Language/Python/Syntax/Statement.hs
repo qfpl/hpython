@@ -89,6 +89,7 @@ import Language.Python.Syntax.Whitespace
 instance Validated Statement where; unvalidated = to unsafeCoerce
 instance Validated SmallStatement where; unvalidated = to unsafeCoerce
 instance Validated SimpleStatement where; unvalidated = to unsafeCoerce
+instance Validated CompoundStatement where; unvalidated = to unsafeCoerce
 instance Validated Block where; unvalidated = to unsafeCoerce
 instance Validated Suite where; unvalidated = to unsafeCoerce
 instance Validated WithItem where; unvalidated = to unsafeCoerce

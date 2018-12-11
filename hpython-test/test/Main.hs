@@ -32,8 +32,9 @@ import qualified Hedgehog.Range as Range
 import qualified Generators.General as General
 import qualified Generators.Correct as Correct
 
-import TrailingWhitespace (trailingWhitespaceTests)
+import DSL (dslTests)
 import Printer (printerTests)
+import TrailingWhitespace (trailingWhitespaceTests)
 
 runPython3 :: (MonadTest m, MonadIO m) => FilePath -> Bool -> Text -> m ()
 runPython3 path shouldSucceed str = do
@@ -228,7 +229,8 @@ main =
   where
     file = "hedgehog-test.py"
     groups =
-      [ printerTests
+      [ dslTests
+      , printerTests
       , trailingWhitespaceTests
       , Group "main tests"
           [ ("Haskell String to Python String", withTests 500 $ string_correct file)

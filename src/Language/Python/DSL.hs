@@ -60,8 +60,10 @@ module Language.Python.DSL
   , Guard(..)
     -- * Parameters and arguments
     -- ** Parameters
+  , Param(..)
   , ParametersSyntax(..)
     -- ** Arguments
+  , Arg(..)
   , ArgumentsSyntax(..)
     -- ** Positional
   , PositionalSyntax(..)
@@ -652,10 +654,10 @@ class ParametersSyntax s where
   -- >>> showStatement myStatement
   -- "def a(b ,  c   ):\n    pass"
   --
-  -- >>> showStatement (myStatement & _Fundef . parameters_ .~ [p_ "d", p_ "e"]
+  -- >>> showStatement (myStatement & _Fundef.parameters_ .~ [p_ "d", p_ "e"]
   -- "def a(d ,  e   ):\n    pass"
   --
-  -- >>> showStatement (myStatement & _Fundef . parameters_ .~ [p_ "d", p_ "e", p_ "f"]
+  -- >>> showStatement (myStatement & _Fundef.parameters_ .~ [p_ "d", p_ "e", p_ "f"]
   -- "def a(d ,  e   , f):\n    pass"
   --
   -- \-\-\-
@@ -1038,7 +1040,7 @@ instance ForSyntax (Raw CompFor) In where
 -- |
 -- @'for_' :: 'Raw' 'In' -> 'Raw' 'Guard'@
 --
--- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") [for_ $ var_ "c" \`in_\` var_ "d"]
+-- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") [for_ $ var_ "c" `in_` var_ "d"]
 -- a for a in b for c in d
 instance ForSyntax (Raw Guard) In where
   for_ (MkIn a b) = MkGuard . Left $ CompFor () [Space] a [Space] b

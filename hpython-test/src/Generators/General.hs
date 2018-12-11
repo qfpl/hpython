@@ -4,13 +4,15 @@ module Generators.General where
 import Control.Applicative
 import Control.Lens.Getter
 import Control.Lens.Iso (from)
+import Control.Lens.Review (review)
 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
+import Language.Python.DSL
+import Language.Python.Optics
 import Language.Python.Syntax.Expr
-import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Import
 import Language.Python.Syntax.Module
 import Language.Python.Syntax.Operator.Binary
@@ -366,22 +368,26 @@ genDecorator =
   genNewline <*>
   Gen.list (Range.constant 0 10) ((,) <$> genBlank <*> genNewline)
 
+genFundef :: MonadGen m => m (Raw Fundef)
+genFundef =
+  sized4M
+    (\a b c d ->
+        MkFundef () a <$> genIndents <*>
+        Gen.maybe genWhitespaces1 <*>
+        genWhitespaces1 <*> genIdent <*>
+        genWhitespaces <*> pure b <*>
+        genWhitespaces <*> pure c <*> pure d)
+    (sizedList genDecorator)
+    (sizedCommaSep $ genParam genExpr)
+    (sizedMaybe $ (,) <$> genWhitespaces <*> genExpr)
+    (genSuite genSimpleStatement genBlock)
+
 genCompoundStatement
   :: MonadGen m
   => m (CompoundStatement '[] ())
 genCompoundStatement =
   sizedRecursive
-    [ sized4M
-        (\a b c d ->
-           Fundef () a <$> genIndents <*>
-           Gen.maybe genWhitespaces1 <*>
-           genWhitespaces1 <*> genIdent <*>
-           genWhitespaces <*> pure b <*>
-           genWhitespaces <*> pure c <*> pure d)
-        (sizedList genDecorator)
-        (sizedCommaSep $ genParam genExpr)
-        (sizedMaybe $ (,) <$> genWhitespaces <*> genExpr)
-        (genSuite genSimpleStatement genBlock)
+    [ review _Fundef <$> genFundef
     , sized4M
         (\a b c d ->
            If <$> pure () <*> genIndents <*> genWhitespaces <*>

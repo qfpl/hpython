@@ -654,6 +654,27 @@ class ParametersSyntax s where
   --
   -- >>> showStatement (myStatement & _Fundef . parameters_ .~ [p_ "d", p_ "e", p_ "f"]
   -- "def a(d ,  e   , f):\n    pass"
+  --
+  -- \-\-\-
+  --
+  -- It's not a 'Lens' because repeated 'set's can drop trailing commas, violating
+  -- the 'Lens' laws. For example:
+  --
+  -- >>> someFunction
+  -- def a(b, c,):
+  --     pass
+  --
+  -- >>> set parameters_ [var_ "d", var_ "e"] someFunction
+  -- def a(d, e,):
+  --     pass
+  --
+  -- >>> set parameters_ [] someFunction
+  -- def a():
+  --     pass
+  --
+  -- >>> set parameters_ [var_ "d", var_ "e"] (set parameters_ [] someFunction)
+  -- def a(d, e):
+  --     pass
   parameters_ :: Functor f => ([Raw Param] -> f [Raw Param]) -> Raw s -> f (Raw s)
   parameters :: Lens' (Raw s) (CommaSep (Raw Param))
 
@@ -855,13 +876,6 @@ instance ParametersSyntax Fundef where
       go (CommaSepOne a) (x:xs) =
         listToCommaSep $ (x & trailingWhitespace .~ (a ^. trailingWhitespace)) :xs
       go CommaSepMany{} [] = CommaSepNone
-      go (CommaSepMany a b CommaSepNone) [x] =
-        CommaSepMany
-          (x & trailingWhitespace .~ (a ^. trailingWhitespace))
-          b
-          CommaSepNone
-      go (CommaSepMany a _ _) [x] =
-        CommaSepOne (x & trailingWhitespace .~ (a ^. trailingWhitespace))
       go (CommaSepMany a b c) (x:xs) =
         CommaSepMany (x & trailingWhitespace .~ (a ^. trailingWhitespace)) b $ go c xs
 

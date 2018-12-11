@@ -28,25 +28,25 @@ module Language.Python.Optics
     -- ** Assignment
   , assignTargets
     -- * Compound statements
-    -- ** Function defintions
-  , _Fundef
+  , HasCompoundStatement(..)
+    -- ** Function definitions
+  , HasFundef(..)
     -- ** Class defintions
-  , _ClassDef
+  , HasClassDef(..)
     -- ** @while@ statements
-  , _While
+  , HasWhile(..)
     -- ** @for@ statements
-  , _For
+  , HasFor(..)
     -- ** @with@ statements
-  , _With
+  , HasWith(..)
     -- ** @if@ statements
-  , _If
+  , HasIf(..)
   , _Elif
     -- ** @try@ statements
-  , _TryExcept
-  , _TryFinally
+  , HasTryExcept(..)
+  , HasTryFinally(..)
   , _Finally
   , _Except
-  , AsTry(..)
     -- ** @else@
   , _Else
     -- * Parameters
@@ -189,35 +189,57 @@ _UnnamedStarParam =
         UnnamedStarParam a b -> Right (MkUnnamedStarParam a b)
         a -> Left $ a ^. unvalidated)
 
-_Fundef
-  :: Prism
-       (Statement v a)
-       (Statement '[] a)
-       (Fundef v a)
-       (Fundef '[] a)
-_Fundef =
-  prism
-    (\(MkFundef idnt a b c d e f g h i j) ->
-       CompoundStatement (Fundef idnt a b c d e f g h i j))
-    (\case
-        CompoundStatement (Fundef idnt a b c d e f g h i j) ->
-          Right $ MkFundef idnt a b c d e f g h i j
-        a -> Left $ a ^. unvalidated)
+class HasCompoundStatement s where
+  _CompoundStatement :: Prism (s v a) (s '[] a) (CompoundStatement v a) (CompoundStatement '[] a)
 
-_While
-  :: Prism
-       (Statement v a)
-       (Statement '[] a)
-       (While v a)
-       (While '[] a)
-_While =
-  prism
-    (\(MkWhile a b c d e f) ->
-       CompoundStatement (While a b c d e $ view _Else <$> f))
-    (\case
-        CompoundStatement (While a b c d e f) ->
-          Right . MkWhile a b c d e $ view (from _Else) <$> f
-        a -> Left $ a ^. unvalidated)
+instance HasCompoundStatement CompoundStatement where
+  _CompoundStatement = id
+
+instance HasCompoundStatement Statement where
+  _CompoundStatement =
+    prism
+      CompoundStatement
+      (\case
+          CompoundStatement a -> Right a
+          a -> Left (a ^. unvalidated))
+
+class HasFundef s where
+  _Fundef :: Prism (s v a) (s '[] a) (Fundef v a) (Fundef '[] a)
+
+instance HasFundef Fundef where
+  _Fundef = id
+
+instance HasFundef CompoundStatement where
+  _Fundef =
+    prism
+      (\(MkFundef idnt a b c d e f g h i j) ->
+         Fundef idnt a b c d e f g h i j)
+      (\case
+          Fundef idnt a b c d e f g h i j ->
+            Right $ MkFundef idnt a b c d e f g h i j
+          a -> Left $ a ^. unvalidated)
+
+instance HasFundef Statement where
+  _Fundef = _CompoundStatement._Fundef
+
+class HasWhile s where
+  _While :: Prism (s v a) (s '[] a) (While v a) (While '[] a)
+
+instance HasWhile While where
+  _While = id
+
+instance HasWhile CompoundStatement where
+  _While =
+    prism
+      (\(MkWhile a b c d e f) ->
+        While a b c d e $ view _Else <$> f)
+      (\case
+          While a b c d e f ->
+            Right . MkWhile a b c d e $ view (from _Else) <$> f
+          a -> Left $ a ^. unvalidated)
+
+instance HasWhile Statement where
+  _While = _CompoundStatement._While
 
 _Else :: Iso' (Else v a) (Indents a, [Whitespace], Suite v a)
 _Else = iso (\(MkElse a b c) -> (a, b, c)) (\(a, b, c) -> MkElse a b c)
@@ -231,59 +253,85 @@ _Finally = iso (\(MkFinally a b c) -> (a, b, c)) (\(a, b, c) -> MkFinally a b c)
 _Except :: Iso' (Except v a) (Indents a, [Whitespace], Maybe (ExceptAs v a), Suite v a)
 _Except = iso (\(MkExcept a b c d) -> (a, b, c, d)) (\(a, b, c, d) -> MkExcept a b c d)
 
-_If :: Prism (Statement v a) (Statement '[] a) (If v a) (If '[] a)
-_If =
-  prism
-    (\(MkIf a b c d e f g) ->
-       CompoundStatement (If a b c d e (view _Elif <$> f) (view _Else <$> g)))
-    (\case
-        CompoundStatement (If a b c d e f g) ->
-          Right $ MkIf a b c d e (view (from _Elif) <$> f) (view (from _Else) <$> g)
-        a -> Left $ a ^. unvalidated)
+class HasIf s where
+  _If :: Prism (s v a) (s '[] a) (If v a) (If '[] a)
 
-class AsTry s where
-  _Try :: Prism (Statement v a) (Statement '[] a) (s v a) (s '[] a)
+instance HasIf If where
+  _If = id
 
-instance AsTry TryExcept where
-  _Try = _TryExcept
+instance HasIf CompoundStatement where
+  _If =
+    prism
+      (\(MkIf a b c d e f g) ->
+        If a b c d e (view _Elif <$> f) (view _Else <$> g))
+      (\case
+          If a b c d e f g ->
+            Right $ MkIf a b c d e (view (from _Elif) <$> f) (view (from _Else) <$> g)
+          a -> Left $ a ^. unvalidated)
 
-instance AsTry TryFinally where
-  _Try = _TryFinally
+instance HasIf Statement where
+  _If = _CompoundStatement._If
 
-_TryExcept :: Prism (Statement v a) (Statement '[] a) (TryExcept v a) (TryExcept '[] a)
-_TryExcept =
-  prism
-    (\(MkTryExcept a b c d e f g) ->
-       CompoundStatement $
-       TryExcept a b c d (view _Except <$> e) (view _Else <$> f) (view _Finally <$> g))
-    (\case
-        CompoundStatement (TryExcept a b c d e f g) ->
-          Right $
-          MkTryExcept a b c d
-            (view (from _Except) <$> e)
-            (view (from _Else) <$> f)
-            (view (from _Finally) <$> g)
-        a -> Left $ a ^. unvalidated)
+class HasTryExcept s where
+  _TryExcept :: Prism (s v a) (s '[] a) (TryExcept v a) (TryExcept '[] a)
 
-_TryFinally :: Prism (Statement v a) (Statement '[] a) (TryFinally v a) (TryFinally '[] a)
-_TryFinally =
-  prism
-    (\(MkTryFinally a b c d e) ->
-       CompoundStatement $ (\(x, y, z) -> TryFinally a b c d x y z) (e ^. _Finally))
-    (\case
-        CompoundStatement (TryFinally a b c d e f g) ->
-          Right $ MkTryFinally a b c d ((e, f, g) ^. from _Finally)
-        a -> Left $ a ^. unvalidated)
+instance HasTryExcept TryExcept where
+  _TryExcept = id
 
-_For :: Prism (Statement v a) (Statement '[] a) (For v a) (For '[] a)
-_For =
-  prism
-    (\(MkFor a b c d e f g h i) ->
-       CompoundStatement (For a b c d e f g h (view _Else <$> i)))
-    (\case
-        CompoundStatement (For a b c d e f g h i) ->
-          Right $ MkFor a b c d e f g h (view (from _Else) <$> i)
-        a -> Left $ a ^. unvalidated)
+instance HasTryExcept CompoundStatement where
+  _TryExcept =
+    prism
+      (\(MkTryExcept a b c d e f g) ->
+        TryExcept a b c d (view _Except <$> e) (view _Else <$> f) (view _Finally <$> g))
+      (\case
+          TryExcept a b c d e f g ->
+            Right $
+            MkTryExcept a b c d
+              (view (from _Except) <$> e)
+              (view (from _Else) <$> f)
+              (view (from _Finally) <$> g)
+          a -> Left $ a ^. unvalidated)
+
+instance HasTryExcept Statement where
+  _TryExcept = _CompoundStatement._TryExcept
+
+class HasTryFinally s where
+  _TryFinally :: Prism (s v a) (s '[] a) (TryFinally v a) (TryFinally '[] a)
+
+instance HasTryFinally TryFinally where
+  _TryFinally = id
+
+instance HasTryFinally CompoundStatement where
+  _TryFinally =
+    prism
+      (\(MkTryFinally a b c d e) ->
+        (\(x, y, z) -> TryFinally a b c d x y z) (e ^. _Finally))
+      (\case
+          TryFinally a b c d e f g ->
+            Right $ MkTryFinally a b c d ((e, f, g) ^. from _Finally)
+          a -> Left $ a ^. unvalidated)
+
+instance HasTryFinally Statement where
+  _TryFinally = _CompoundStatement._TryFinally
+
+class HasFor s where
+  _For :: Prism (s v a) (s '[] a) (For v a) (For '[] a)
+
+instance HasFor For where
+  _For = id
+
+instance HasFor CompoundStatement where
+  _For =
+    prism
+      (\(MkFor a b c d e f g h i) ->
+        For a b c d e f g h (view _Else <$> i))
+      (\case
+          For a b c d e f g h i ->
+            Right $ MkFor a b c d e f g h (view (from _Else) <$> i)
+          a -> Left $ a ^. unvalidated)
+
+instance HasFor Statement where
+  _For = _CompoundStatement._For
 
 _Call :: Prism (Expr v a) (Expr '[] a) (Call v a) (Call '[] a)
 _Call =
@@ -293,21 +341,39 @@ _Call =
         Call a b c d e -> Right $ MkCall a b c d e
         a -> Left $ a ^. unvalidated)
 
-_ClassDef :: Prism (Statement v a) (Statement '[] a) (ClassDef v a) (ClassDef '[] a)
-_ClassDef =
-  prism
-    (\(MkClassDef a b c d e f g) -> CompoundStatement $ ClassDef a b c d e f g)
-    (\case
-        CompoundStatement (ClassDef a b c d e f g) -> Right $ MkClassDef a b c d e f g
-        a -> Left $ a ^. unvalidated)
+class HasClassDef s where
+  _ClassDef :: Prism (s v a) (s '[] a) (ClassDef v a) (ClassDef '[] a)
 
-_With :: Prism (Statement v a) (Statement '[] a) (With v a) (With '[] a)
-_With =
-  prism
-    (\(MkWith a b c d e f) -> CompoundStatement $ With a b c d e f)
-    (\case
-        CompoundStatement (With a b c d e f) -> Right $ MkWith a b c d e f
-        a -> Left $ a ^. unvalidated)
+instance HasClassDef ClassDef where
+  _ClassDef = id
+
+instance HasClassDef CompoundStatement where
+  _ClassDef =
+    prism
+      (\(MkClassDef a b c d e f g) -> ClassDef a b c d e f g)
+      (\case
+          ClassDef a b c d e f g -> Right $ MkClassDef a b c d e f g
+          a -> Left $ a ^. unvalidated)
+
+instance HasClassDef Statement where
+  _ClassDef = _CompoundStatement._ClassDef
+
+class HasWith s where
+  _With :: Prism (s v a) (s '[] a) (With v a) (With '[] a)
+
+instance HasWith With where
+  _With = id
+
+instance HasWith CompoundStatement where
+  _With =
+    prism
+      (\(MkWith a b c d e f) -> With a b c d e f)
+      (\case
+          With a b c d e f -> Right $ MkWith a b c d e f
+          a -> Left $ a ^. unvalidated)
+
+instance HasWith Statement where
+  _With = _CompoundStatement._With
 
 _Ident :: Prism (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
 _Ident =

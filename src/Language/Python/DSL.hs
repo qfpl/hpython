@@ -538,6 +538,16 @@ class BodySyntax s where
   --     pass
   --     pass
   --     b += 1
+  --
+  -- >>> def_ "a" [] [ line_ pass_, line_ pass_ ] & body_ .~ []
+  -- def a():
+  --     pass
+  --
+  -- \-\-\-
+  --
+  -- It's a fake 'Lens' because it violates some of the laws. The most obvious violation is
+  -- that setting the 'body_' to the empty list actually sets it to a singleton list containing
+  -- 'pass_'. (This is because blocks must contain one or more statements)
   body_ :: Functor f => ([Raw Line] -> f [Raw Line]) -> Raw s -> f (Raw s)
   body :: Lens' (Raw s) (Raw Suite)
 

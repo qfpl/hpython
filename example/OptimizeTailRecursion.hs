@@ -16,7 +16,6 @@ import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.Semigroup ((<>))
 
-
 import Language.Python.Optics
 import Language.Python.DSL
 import Language.Python.Syntax.Expr (Expr (..), _Exprs, argExpr, paramName)

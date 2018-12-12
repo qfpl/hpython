@@ -1,9 +1,4 @@
-def b():
-    a = 2
-    del a
-    def c():
-        nonlocal a
-        a = 3
-    c()
-    return a
-print(b())
+x = 1
+for x in [2]:
+  pass
+print(x)

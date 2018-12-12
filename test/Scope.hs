@@ -21,7 +21,7 @@ fullyValidate
   :: Statement '[] ()
   -> PropertyT IO
        (Validation
-          (NonEmpty (ScopeError '[Syntax, Indentation] ()))
+          (NonEmpty (ScopeError ()))
           (Statement '[Scope, Syntax, Indentation] ()))
 fullyValidate x =
   case runValidateIndentation $ validateStatementIndentation x of
@@ -31,7 +31,7 @@ fullyValidate x =
     Success a ->
       case runValidateSyntax (validateStatementSyntax a) of
         Failure errs -> do
-          annotateShow (errs :: NonEmpty (SyntaxError '[Indentation] ()))
+          annotateShow (errs :: NonEmpty (SyntaxError ()))
           failure
         Success a' -> pure $ runValidateScope (validateStatementScope a')
 

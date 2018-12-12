@@ -33,8 +33,8 @@ import Language.Python.Validate.Syntax
 
 validateModuleAll
   :: ( AsIndentationError e a
-     , AsSyntaxError e '[Indentation] a
-     , AsScopeError e '[Syntax, Indentation] a
+     , AsSyntaxError e a
+     , AsScopeError e a
      )
   => Module '[] a -- ^ 'Module' to validate
   -> Validation (NonEmpty e) (Module '[Scope, Syntax, Indentation] a)
@@ -43,8 +43,8 @@ validateModuleAll =
 
 validateStatementAll
   :: ( AsIndentationError e a
-     , AsSyntaxError e '[Indentation] a
-     , AsScopeError e '[Syntax, Indentation] a
+     , AsSyntaxError e a
+     , AsScopeError e a
      )
   => Statement '[] a -- ^ 'Statement' to validate
   -> Validation (NonEmpty e) (Statement '[Scope, Syntax, Indentation] a)
@@ -53,8 +53,8 @@ validateStatementAll =
 
 validateExprAll
   :: ( AsIndentationError e a
-     , AsSyntaxError e '[Indentation] a
-     , AsScopeError e '[Syntax, Indentation] a
+     , AsSyntaxError e a
+     , AsScopeError e a
      )
   => Expr '[] a -- ^ 'Expr' to validate
   -> Validation (NonEmpty e) (Expr '[Scope, Syntax, Indentation] a)
@@ -74,8 +74,8 @@ validateExprAll =
 -- @
 validateAll
   :: ( AsIndentationError e a
-     , AsSyntaxError e '[Indentation] a
-     , AsScopeError e '[Syntax, Indentation] a
+     , AsSyntaxError e a
+     , AsScopeError e a
      )
   => (s '[] a -> ValidateIndentation e (s '[Indentation] a)) -- ^ Indentation validator
   -> (s '[Indentation] a -> ValidateSyntax e (s '[Syntax, Indentation] a)) -- ^ Syntax validator

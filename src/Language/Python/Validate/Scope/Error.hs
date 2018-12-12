@@ -16,13 +16,13 @@ module Language.Python.Validate.Scope.Error where
 import Control.Lens.TH
 import Language.Python.Syntax.Ident
 
-data ScopeError (v :: [*]) a
+data ScopeError a
   = FoundNonlocal a
   | FoundGlobal a
   | DeletedIdent a
-  | FoundDynamic a (Ident v a)
-  | NotInScope (Ident v a)
-  | BadShadowing (Ident v a)
+  | FoundDynamic a (Ident '[] a)
+  | NotInScope (Ident '[] a)
+  | BadShadowing (Ident '[] a)
   deriving (Eq, Show)
 
 makeClassyPrisms ''ScopeError

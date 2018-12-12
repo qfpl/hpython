@@ -55,7 +55,7 @@ syntaxValidateModule
   :: Module '[] ()
   -> PropertyT IO
        (Validation
-          (NonEmpty (SyntaxError '[Indentation] ()))
+          (NonEmpty (SyntaxError ()))
           (Module '[Syntax, Indentation] ()))
 syntaxValidateModule x =
   case runValidateIndentation $ validateModuleIndentation x of
@@ -69,7 +69,7 @@ syntaxValidateStatement
   :: Statement '[] ()
   -> PropertyT IO
        (Validation
-          (NonEmpty (SyntaxError '[Indentation] ()))
+          (NonEmpty (SyntaxError ()))
           (Statement '[Syntax, Indentation] ()))
 syntaxValidateStatement x =
   case runValidateIndentation $ validateStatementIndentation x of
@@ -83,7 +83,7 @@ syntaxValidateExpr
   :: Expr '[] ()
   -> PropertyT IO
        (Validation
-          (NonEmpty (SyntaxError '[Indentation] ()))
+          (NonEmpty (SyntaxError ()))
           (Expr '[Syntax, Indentation] ()))
 syntaxValidateExpr x =
   case runValidateIndentation $ validateExprIndentation x of
@@ -139,8 +139,8 @@ shouldBeParseError line col tk res =
 
 shouldBeSyntaxError
   :: (MonadTest m, Show a)
-  => SyntaxError v ()
-  -> Validation (NonEmpty (SyntaxError v ())) a
+  => SyntaxError ()
+  -> Validation (NonEmpty (SyntaxError ())) a
   -> m ()
 shouldBeSyntaxError err res =
   case res ^? _Failure.folded of

@@ -19,7 +19,7 @@ import Language.Python.Internal.Lexer (SrcInfo)
 import Language.Python.Render (showModule)
 import Language.Python.Parse (parseModule)
 import Language.Python.Validate
-  ( Indentation, IndentationError, SyntaxError
+  ( IndentationError, SyntaxError
   , runValidateIndentation, validateModuleIndentation, runValidateSyntax
   , validateModuleSyntax
   )
@@ -76,7 +76,7 @@ doRoundtrip file = do
     Success res ->
       case runValidateSyntax (validateModuleSyntax res) of
         Failure errs' -> do
-          annotateShow (errs' :: NonEmpty (SyntaxError '[Indentation] SrcInfo))
+          annotateShow (errs' :: NonEmpty (SyntaxError SrcInfo))
           failure
         Success _ -> do
           annotateShow py

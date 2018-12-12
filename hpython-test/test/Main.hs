@@ -155,7 +155,7 @@ string_correct path =
 
 validateExprSyntax'
   :: Expr '[Indentation] a
-  -> Validation (NonEmpty (SyntaxError '[Indentation] a)) (Expr '[Syntax, Indentation] a)
+  -> Validation (NonEmpty (SyntaxError a)) (Expr '[Syntax, Indentation] a)
 validateExprSyntax' = runValidateSyntax . validateExprSyntax
 
 validateExprIndentation'
@@ -165,7 +165,7 @@ validateExprIndentation' = runValidateIndentation . validateExprIndentation
 
 validateStatementSyntax'
   :: Statement '[Indentation] a
-  -> Validation (NonEmpty (SyntaxError '[Indentation] a)) (Statement '[Syntax, Indentation] a)
+  -> Validation (NonEmpty (SyntaxError a)) (Statement '[Syntax, Indentation] a)
 validateStatementSyntax' =
   runValidateSyntax . validateStatementSyntax
 
@@ -176,7 +176,7 @@ validateStatementIndentation' = runValidateIndentation . validateStatementIndent
 
 validateModuleSyntax'
   :: Module '[Indentation] a
-  -> Validation (NonEmpty (SyntaxError '[Indentation] a)) (Module '[Syntax, Indentation] a)
+  -> Validation (NonEmpty (SyntaxError a)) (Module '[Syntax, Indentation] a)
 validateModuleSyntax' =
   runValidateSyntax . validateModuleSyntax
 

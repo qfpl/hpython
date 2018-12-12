@@ -177,7 +177,7 @@ inScope s = do
     ((,) Dirty <$> inls)
 
 validateExceptAsScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => ExceptAs v a
   -> ValidateScope a e (ExceptAs (Nub (Scope ': v)) a)
 validateExceptAsScope (ExceptAs ann e f) =
@@ -186,7 +186,7 @@ validateExceptAsScope (ExceptAs ann e f) =
   pure (over (mapped._2) coerce f)
 
 validateSuiteScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => Suite v a
   -> ValidateScope a e (Suite (Nub (Scope ': v)) a)
 validateSuiteScope (SuiteMany ann a b c d) = SuiteMany ann a b c <$> validateBlockScope d
@@ -194,7 +194,7 @@ validateSuiteScope (SuiteOne ann a b) =
   SuiteOne ann a <$> validateSmallStatementScope b
 
 validateDecoratorScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => Decorator v a
   -> ValidateScope a e (Decorator (Nub (Scope ': v)) a)
 validateDecoratorScope (Decorator a b c d e f g) =
@@ -203,7 +203,7 @@ validateDecoratorScope (Decorator a b c d e f g) =
 
 validateCompoundStatementScope
   :: forall e v a
-   . AsScopeError e v a
+   . AsScopeError e a
   => CompoundStatement v a
   -> ValidateScope a e (CompoundStatement (Nub (Scope ': v)) a)
 validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params ws3 mty s) =
@@ -319,7 +319,7 @@ validateCompoundStatementScope (With a b asyncWs c d e) =
     validateSuiteScope e
 
 validateSimpleStatementScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => SimpleStatement v a
   -> ValidateScope a e (SimpleStatement (Nub (Scope ': v)) a)
 validateSimpleStatementScope (Assert a b c d) =
@@ -368,7 +368,7 @@ validateSimpleStatementScope s@Import{} = pure $ unsafeCoerce s
 validateSimpleStatementScope s@From{} = pure $ unsafeCoerce s
 
 validateSmallStatementScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => SmallStatement v a
   -> ValidateScope a e (SmallStatement (Nub (Scope ': v)) a)
 validateSmallStatementScope (MkSmallStatement s ss sc cmt nl) =
@@ -377,7 +377,7 @@ validateSmallStatementScope (MkSmallStatement s ss sc cmt nl) =
   traverseOf (traverse._2) validateSimpleStatementScope ss
 
 validateStatementScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => Statement v a
   -> ValidateScope a e (Statement (Nub (Scope ': v)) a)
 validateStatementScope (CompoundStatement c) =
@@ -386,7 +386,7 @@ validateStatementScope (SmallStatement idnts a) =
   SmallStatement idnts <$> validateSmallStatementScope a
 
 validateIdentScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => Ident v a
   -> ValidateScope a e (Ident (Nub (Scope ': v)) a)
 validateIdentScope i =
@@ -394,11 +394,11 @@ validateIdentScope i =
   \context ->
   case context of
     Just (Clean, _) -> pure $ coerce i
-    Just (Dirty, ann)-> errorVM1 (_FoundDynamic # (ann, i))
-    Nothing -> errorVM1 (_NotInScope # i)
+    Just (Dirty, ann)-> errorVM1 (_FoundDynamic # (ann, i ^. unvalidated))
+    Nothing -> errorVM1 (_NotInScope # (i ^. unvalidated))
 
 validateArgScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => Arg v a
   -> ValidateScope a e (Arg (Nub (Scope ': v)) a)
 validateArgScope (PositionalArg a e) =
@@ -411,7 +411,7 @@ validateArgScope (DoubleStarArg a ws e) =
   DoubleStarArg a ws <$> validateExprScope e
 
 validateParamScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => Param v a
   -> ValidateScope a e (Param (Nub (Scope ': v)) a)
 validateParamScope (PositionalParam a ident mty) =
@@ -431,7 +431,7 @@ validateParamScope (DoubleStarParam a b c d) =
   traverseOf (traverse._2) validateExprScope d
 
 validateBlockScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => Block v a
   -> ValidateScope a e (Block (Nub (Scope ': v)) a)
 validateBlockScope (Block x b bs) =
@@ -440,7 +440,7 @@ validateBlockScope (Block x b bs) =
   traverseOf (traverse._Right) validateStatementScope bs
 
 validateComprehensionScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => (ex v a -> ValidateScope a e (ex (Nub (Scope ': v)) a))
   -> Comprehension ex v a
   -> ValidateScope a e (Comprehension ex (Nub (Scope ': v)) a)
@@ -452,7 +452,7 @@ validateComprehensionScope f (Comprehension a b c d) =
     f b
   where
     validateCompForScope
-      :: AsScopeError e v a
+      :: AsScopeError e a
       => CompFor v a
       -> ValidateScope a e (CompFor (Nub (Scope ': v)) a)
     validateCompForScope (CompFor a b c d e) =
@@ -463,14 +463,14 @@ validateComprehensionScope f (Comprehension a b c d) =
         (c ^.. unvalidated.assignTargets.to (_identAnn &&& _identValue))
 
     validateCompIfScope
-      :: AsScopeError e v a
+      :: AsScopeError e a
       => CompIf v a
       -> ValidateScope a e (CompIf (Nub (Scope ': v)) a)
     validateCompIfScope (CompIf a b c) =
       CompIf a b <$> validateExprScope c
 
 validateAssignExprScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => Expr v a
   -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
 validateAssignExprScope (Subscript a e1 ws1 e2 ws2) =
@@ -527,7 +527,7 @@ validateAssignExprScope e@Await{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Ternary{} = pure $ unsafeCoerce e
 
 validateDictItemScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => DictItem v a
   -> ValidateScope a e (DictItem (Nub (Scope ': v)) a)
 validateDictItemScope (DictItem a b c d) =
@@ -538,7 +538,7 @@ validateDictItemScope (DictUnpack a b c) =
   DictUnpack a b <$> validateExprScope c
 
 validateSubscriptScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => Subscript v a
   -> ValidateScope a e (Subscript (Nub (Scope ': v)) a)
 validateSubscriptScope (SubscriptExpr e) = SubscriptExpr <$> validateExprScope e
@@ -549,28 +549,28 @@ validateSubscriptScope (SubscriptSlice a b c d) =
   traverseOf (traverse._2.traverse) validateExprScope d
 
 validateListItemScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => ListItem v a
   -> ValidateScope a e (ListItem (Nub (Scope ': v)) a)
 validateListItemScope (ListItem a b) = ListItem a <$> validateExprScope b
 validateListItemScope (ListUnpack a b c d) = ListUnpack a b c <$> validateExprScope d
 
 validateSetItemScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => SetItem v a
   -> ValidateScope a e (SetItem (Nub (Scope ': v)) a)
 validateSetItemScope (SetItem a b) = SetItem a <$> validateExprScope b
 validateSetItemScope (SetUnpack a b c d) = SetUnpack a b c <$> validateExprScope d
 
 validateTupleItemScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => TupleItem v a
   -> ValidateScope a e (TupleItem (Nub (Scope ': v)) a)
 validateTupleItemScope (TupleItem a b) = TupleItem a <$> validateExprScope b
 validateTupleItemScope (TupleUnpack a b c d) = TupleUnpack a b c <$> validateExprScope d
 
 validateExprScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => Expr v a
   -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
 validateExprScope (Lambda a b c d e) =
@@ -655,7 +655,7 @@ validateExprScope (Set a b c d) =
   (\c' -> Set a b c' d) <$> traverse validateSetItemScope c
 
 validateModuleScope
-  :: AsScopeError e v a
+  :: AsScopeError e a
   => Module v a
   -> ValidateScope a e (Module (Nub (Scope ': v)) a)
 validateModuleScope m =

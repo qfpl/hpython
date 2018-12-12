@@ -88,7 +88,6 @@ prop_fundef_body_lens =
     genFundef
     (Gen.choice [pure blank_, line_ <$> genStatement])
 
-
 prop_fundef_parameters_lens :: Property
 prop_fundef_parameters_lens =
   property $

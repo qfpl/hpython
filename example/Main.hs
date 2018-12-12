@@ -7,6 +7,7 @@ import Programs
 import FixMutableDefaultArguments
 import OptimizeTailRecursion
 import Indentation
+import Validation
 
 import Language.Python.Render (showModule)
 import Language.Python.Syntax.Statement (_Statements)
@@ -42,3 +43,7 @@ main = do
       rewriteOn _Statements fixMutableDefaultArguments .
       rewriteOn _Statements optimizeTailRecursion $
       everything
+
+  section $ do
+    putStrLn "Validated\n"
+    doValidating

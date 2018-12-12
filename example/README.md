@@ -16,6 +16,10 @@ A function that refactors occurrences of mutable default arguments
 
 A function that refactors tail-recursive functions into loops
 
+## `Validation.hs`
+
+An example of validating some Python programs
+
 ## `Main.hs`
 
 Runs all the functions we defined and prints the results

@@ -4,16 +4,18 @@ module Programs where
 
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
+import Control.Lens.Review ((#))
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
 
 import Language.Python.DSL
+import Language.Python.Optics
 
 import Language.Python.Syntax.Module (Module(..))
 import Language.Python.Syntax.CommaSep (Comma(..), CommaSep(..), CommaSep1'(..))
 import Language.Python.Syntax.Expr (Arg(..), Expr(..), Param(..))
 import Language.Python.Syntax.Punctuation (Colon(..))
-import Language.Python.Syntax.Statement (Block(..), CompoundStatement(..), SimpleStatement(..), SmallStatement(..), Statement(..), Suite(..))
+import Language.Python.Syntax.Statement (Block(..), CompoundStatement(..), SmallStatement(..), SimpleStatement(..), Statement(..), Suite(..))
 import Language.Python.Syntax.Whitespace (Indents(..), Newline(..), Whitespace(..), indentWhitespaces)
 
 -- |
@@ -39,9 +41,9 @@ append_to =
     Nothing
     (SuiteMany () (Colon []) Nothing LF $
      Block []
-     ( SimpleStatement
+     ( SmallStatement
          (Indents [replicate 4 Space ^. from indentWhitespaces] ())
-         (MkSimpleStatement
+         (MkSmallStatement
           (Expr () $
            Call ()
              (Deref () (Ident "to") [] "append")
@@ -54,9 +56,9 @@ append_to =
           (Just LF))
      )
      [ Right $
-         SimpleStatement
+         SmallStatement
            (Indents [replicate 4 Space ^. from indentWhitespaces] ())
-           (MkSimpleStatement
+           (MkSmallStatement
             (Return () [Space] (Just $ Ident "to"))
             []
             Nothing
@@ -72,7 +74,7 @@ append_to =
 -- @
 --
 -- Written with the DSL
-append_to' :: Raw Statement
+append_to' :: Raw Fundef
 append_to' =
   def_ "append_to" [ p_ "element", k_ "to" (list_ []) ]
     [ line_ $ call_ ("to" /> "append") [ "element" ]
@@ -89,7 +91,7 @@ append_to' =
 --       go(n-1, n*acc)
 --   return go(n, 1)
 -- @
-fact_tr :: Raw Statement
+fact_tr :: Raw Fundef
 fact_tr =
   def_ "fact" [p_ "n"]
   [ line_ $
@@ -108,7 +110,7 @@ fact_tr =
 -- def spin():
 --   spin()
 -- @
-spin :: Raw Statement
+spin :: Raw Fundef
 spin = def_ "spin" [] [line_ $ call_ "spin" []]
 
 -- |
@@ -117,11 +119,76 @@ spin = def_ "spin" [] [line_ $ call_ "spin" []]
 --   print("yes")
 --   yes()
 -- @
-yes :: Raw Statement
+yes :: Raw Fundef
 yes =
   def_ "yes" []
   [ line_ $ call_ "print" [p_ $ str_ "yes"]
   , line_ $ call_ "yes" []
+  ]
+
+counter :: Raw ClassDef
+counter =
+  class_ "Counter" []
+  [ line_ $
+    def_ "__init__" ["self"]
+      [line_ ("self" /> "x" .= 0)]
+
+  , blank_
+
+  , line_ $
+    def_ "incr" ["self"]
+      [line_ ("self" /> "x" .+= 1)]
+
+  , blank_
+
+  , line_ $
+    def_ "reset" ["self"]
+      [line_ ("self" /> "x" .= 0)]
+
+  , blank_
+
+  , line_ $
+    def_ "get" ["self"]
+      [line_ $ return_ ("self" /> "x")]
+  ]
+
+exceptions :: Raw Statement
+exceptions =
+  _Fundef #
+  def_ "exceptions" []
+  [ line_ $
+    tryE_ [line_ pass_] &
+      except_ [line_ pass_]
+  , blank_
+
+  , line_ $
+    tryE_ [line_ pass_] &
+      exceptAs_ (var_ "a" `as_` id_ "b") [line_ pass_]
+  , blank_
+
+  , line_ $
+    tryE_ [line_ pass_] &
+      exceptAs_ (var_ "a" `as_` id_ "b") [line_ pass_] &
+      finally_ [line_ pass_]
+  , blank_
+
+  , line_ $
+    tryE_ [line_ pass_] &
+      exceptAs_ (var_ "a" `as_` id_ "b") [line_ pass_] &
+      else_ [line_ pass_] &
+      finally_ [line_ pass_]
+  , blank_
+
+  , line_ $ tryF_ [line_ pass_] [line_ pass_]
+  , blank_
+
+  , line_ $ tryF_ [line_ pass_] & finally_ [line_ pass_]
+  , blank_
+
+  , line_ $
+    tryF_ [line_ pass_] [line_ pass_] &
+      exceptAs_ (var_ "a" `as_` id_ "b") [line_ pass_] &
+      else_ [line_ pass_]
   ]
 
 everything :: Raw Module
@@ -140,4 +207,10 @@ everything =
   , blank_
 
   , line_ yes
+  , blank_
+
+  , line_ counter
+  , blank_
+
+  , line_ exceptions
   ]

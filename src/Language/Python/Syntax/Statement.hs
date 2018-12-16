@@ -87,8 +87,9 @@ import Language.Python.Syntax.Whitespace
 
 -- See note [unsafeCoerce Validation] in Language.Python.Internal.Syntax.Expr
 instance Validated Statement where; unvalidated = to unsafeCoerce
-instance Validated SimpleStatement where; unvalidated = to unsafeCoerce
 instance Validated SmallStatement where; unvalidated = to unsafeCoerce
+instance Validated SimpleStatement where; unvalidated = to unsafeCoerce
+instance Validated CompoundStatement where; unvalidated = to unsafeCoerce
 instance Validated Block where; unvalidated = to unsafeCoerce
 instance Validated Suite where; unvalidated = to unsafeCoerce
 instance Validated WithItem where; unvalidated = to unsafeCoerce
@@ -185,27 +186,28 @@ instance HasStatements Suite where
   _Statements _ (SuiteOne a b c) = pure $ SuiteOne a b (c ^. unvalidated)
   _Statements f (SuiteMany a b c d e) = SuiteMany a b c d <$> _Statements f e
 
--- | See <https://docs.python.org/3.5/reference/simple_stmts.html>
-data SimpleStatement (v :: [*]) a
-  = MkSimpleStatement
-      (SmallStatement v a)
-      [([Whitespace], SmallStatement v a)]
+-- | See @simpl_stmt@ at <https://docs.python.org/3.5/reference/grammar.html>. The grammar
+-- has the terminology mixed up - it should really be called @small_stmt@ there.
+data SmallStatement (v :: [*]) a
+  = MkSmallStatement
+      (SimpleStatement v a)
+      [([Whitespace], SimpleStatement v a)]
       (Maybe [Whitespace])
       (Maybe (Comment a))
       (Maybe Newline)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
--- | A 'Statement' is either a 'SimpleStatement' or a 'CompoundStatement'
+-- | A 'Statement' is either a 'SmallStatement' or a 'CompoundStatement'
 --
 -- https://docs.python.org/3.5/reference/compound_stmts.html#compound-statements
 data Statement (v :: [*]) a
-  = SimpleStatement (Indents a) (SimpleStatement v a)
+  = SmallStatement (Indents a) (SmallStatement v a)
   | CompoundStatement (CompoundStatement v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-instance HasExprs SimpleStatement where
-  _Exprs f (MkSimpleStatement s ss a b c) =
-    MkSimpleStatement <$>
+instance HasExprs SmallStatement where
+  _Exprs f (MkSmallStatement s ss a b c) =
+    MkSmallStatement <$>
     _Exprs f s <*>
     (traverse._2._Exprs) f ss <*>
     pure a <*>
@@ -213,23 +215,23 @@ instance HasExprs SimpleStatement where
     pure c
 
 instance HasExprs Statement where
-  _Exprs f (SimpleStatement idnt a) = SimpleStatement idnt <$> _Exprs f a
+  _Exprs f (SmallStatement idnt a) = SmallStatement idnt <$> _Exprs f a
   _Exprs f (CompoundStatement c) = CompoundStatement <$> _Exprs f c
 
-instance HasBlocks SimpleStatement where
-  _Blocks _ (MkSimpleStatement a b c d e) =
+instance HasBlocks SmallStatement where
+  _Blocks _ (MkSmallStatement a b c d e) =
     pure $
-    MkSimpleStatement
+    MkSmallStatement
       (a ^. unvalidated)
       (over (mapped._2) (view unvalidated) b)
       c d e
 
 instance HasBlocks Statement where
   _Blocks f (CompoundStatement c) = CompoundStatement <$> _Blocks f c
-  _Blocks f (SimpleStatement idnt a) = SimpleStatement idnt <$> _Blocks f a
+  _Blocks f (SmallStatement idnt a) = SmallStatement idnt <$> _Blocks f a
 
 instance Plated (Statement '[] a) where
-  plate _ (SimpleStatement idnt s) = pure $ SimpleStatement idnt s
+  plate _ (SmallStatement idnt s) = pure $ SmallStatement idnt s
   plate fun (CompoundStatement s) =
     CompoundStatement <$>
     case s of
@@ -260,10 +262,8 @@ instance Plated (Statement '[] a) where
         ClassDef idnt a decos b c d <$> _Statements fun e
       With a b asyncWs c d e -> With a b asyncWs c (coerce d) <$> _Statements fun e
 
--- | Roughly, these are statements that can be chained together on a single line
---
--- See @small_stmt@ at <https://docs.python.org/3.5/reference/grammar.html>
-data SmallStatement (v :: [*]) a
+-- | https://docs.python.org/3.5/reference/simple_stmts.html
+data SimpleStatement (v :: [*]) a
   -- | @\'return\' \<spaces\> [\<expr\>]@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#the-return-statement
@@ -335,9 +335,9 @@ data SmallStatement (v :: [*]) a
       (Maybe (Comma, Expr v a))
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
-instance Plated (SmallStatement '[] a) where; plate = gplate
+instance Plated (SimpleStatement '[] a) where; plate = gplate
 
-instance HasExprs SmallStatement where
+instance HasExprs SimpleStatement where
   _Exprs f (Assert a b c d) = Assert a b <$> f c <*> traverseOf (traverse._2) f d
   _Exprs f (Raise a ws x) =
     Raise a ws <$>
@@ -369,8 +369,8 @@ data ExceptAs (v :: [*]) a
 -- | A compound statement consists of one or more clauses.
 -- A clause consists of a header and a suite.
 data Suite (v :: [*]) a
-  -- ':' <space> simplestatement
-  = SuiteOne a Colon (SimpleStatement v a)
+  -- ':' <space> smallStatement
+  = SuiteOne a Colon (SmallStatement v a)
   | SuiteMany a
       -- ':' <spaces> [comment] <newline>
       Colon (Maybe (Comment a)) Newline
@@ -570,19 +570,19 @@ instance HasExprs CompoundStatement where
 instance HasTrailingNewline Statement where
   trailingNewline f x =
     case x of
-      SimpleStatement a b -> SimpleStatement a <$> trailingNewline f b
+      SmallStatement a b -> SmallStatement a <$> trailingNewline f b
       CompoundStatement c -> CompoundStatement <$> trailingNewline f c
 
   setTrailingNewline s n =
     case s of
-      SimpleStatement i a -> SimpleStatement i $ setTrailingNewline a n
+      SmallStatement i a -> SmallStatement i $ setTrailingNewline a n
       CompoundStatement c -> CompoundStatement $ setTrailingNewline c n
 
-instance HasTrailingNewline SimpleStatement where
-  trailingNewline f (MkSimpleStatement a b c d e) =
-    MkSimpleStatement a b c d <$> traverse f e
-  setTrailingNewline (MkSimpleStatement a b c d _) n =
-    MkSimpleStatement a b c d (Just n)
+instance HasTrailingNewline SmallStatement where
+  trailingNewline f (MkSmallStatement a b c d e) =
+    MkSmallStatement a b c d <$> traverse f e
+  setTrailingNewline (MkSmallStatement a b c d _) n =
+    MkSmallStatement a b c d (Just n)
 
 instance HasTrailingNewline Suite where
   trailingNewline f x =

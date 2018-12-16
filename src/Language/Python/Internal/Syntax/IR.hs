@@ -65,17 +65,17 @@ data IRError a
 fromIRError :: AsIRError s a => IRError a -> s
 fromIRError (InvalidUnpacking a) = _InvalidUnpacking # a
 
-data SimpleStatement a
-  = MkSimpleStatement
-      (SmallStatement a)
-      [([Whitespace], SmallStatement a)]
+data SmallStatement a
+  = MkSmallStatement
+      (SimpleStatement a)
+      [([Whitespace], SimpleStatement a)]
       (Maybe [Whitespace])
       (Maybe (Comment a))
       (Maybe Newline)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Statement a
-  = SimpleStatement (Indents a) (SimpleStatement a)
+  = SmallStatement (Indents a) (SmallStatement a)
   | CompoundStatement (CompoundStatement a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -159,7 +159,7 @@ data CompoundStatement a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-data SmallStatement a
+data SimpleStatement a
   = Return a [Whitespace] (Maybe (Expr a))
   | Expr a (Expr a)
   | Assign a (Expr a) (NonEmpty ([Whitespace], Expr a))
@@ -323,7 +323,7 @@ data Expr a
   | Yield
   { _unsafeExprAnn :: a
   , _unsafeYieldWhitespace :: [Whitespace]
-  , _unsafeYieldValue :: Maybe (Expr a)
+  , _unsafeYieldValue :: CommaSep (Expr a)
   }
   | YieldFrom
   { _unsafeExprAnn :: a
@@ -571,8 +571,8 @@ exprAnn =
         Await _ a b -> Not ann a b)
 
 data Suite a
-  -- ':' <space> simplestatement
-  = SuiteOne a Colon (SimpleStatement a)
+  -- ':' <space> smallStatement
+  = SuiteOne a Colon (SmallStatement a)
   | SuiteMany a
       -- ':' <spaces> [comment] <newline>
       Colon (Maybe (Comment a)) Newline
@@ -729,7 +729,7 @@ fromIR_suite
 fromIR_suite s =
   case s of
     SuiteOne a b c ->
-      Syntax.SuiteOne a b <$> fromIR_simpleStatement c
+      Syntax.SuiteOne a b <$> fromIR_smallStatement c
     SuiteMany a b c d e ->
       Syntax.SuiteMany a b c d <$> fromIR_block e
 
@@ -850,14 +850,14 @@ fromIR_compIf
 fromIR_compIf (CompIf a b c) =
   Syntax.CompIf a b <$> fromIR_expr c
 
-fromIR_simpleStatement
+fromIR_smallStatement
   :: AsIRError e a
-  => SimpleStatement a
-  -> Validation (NonEmpty e) (Syntax.SimpleStatement '[] a)
-fromIR_simpleStatement (MkSimpleStatement b c d e f) =
-  (\b' c' -> Syntax.MkSimpleStatement b' c' d e f) <$>
-  fromIR_smallStatement b <*>
-  traverseOf (traverse._2) fromIR_smallStatement c
+  => SmallStatement a
+  -> Validation (NonEmpty e) (Syntax.SmallStatement '[] a)
+fromIR_smallStatement (MkSmallStatement b c d e f) =
+  (\b' c' -> Syntax.MkSmallStatement b' c' d e f) <$>
+  fromIR_SimpleStatement b <*>
+  traverseOf (traverse._2) fromIR_SimpleStatement c
 
 fromIR_statement
   :: AsIRError e a
@@ -865,16 +865,16 @@ fromIR_statement
   -> Validation (NonEmpty e) (Syntax.Statement '[] a)
 fromIR_statement ex =
   case ex of
-    SimpleStatement i a ->
-      Syntax.SimpleStatement i <$> fromIR_simpleStatement a
+    SmallStatement i a ->
+      Syntax.SmallStatement i <$> fromIR_smallStatement a
     CompoundStatement a ->
       Syntax.CompoundStatement <$> fromIR_compoundStatement a
 
-fromIR_smallStatement
+fromIR_SimpleStatement
   :: AsIRError e a
-  => SmallStatement a
-  -> Validation (NonEmpty e) (Syntax.SmallStatement '[] a)
-fromIR_smallStatement ex =
+  => SimpleStatement a
+  -> Validation (NonEmpty e) (Syntax.SimpleStatement '[] a)
+fromIR_SimpleStatement ex =
   case ex of
     Assign a b c ->
       Syntax.Assign a <$>

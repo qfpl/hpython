@@ -74,6 +74,8 @@ library
                      , Language.Python.Internal.Token
                      , Language.Python.Internal.Syntax.IR
                      , Language.Python.Optics
+                     , Language.Python.Optics.Indents
+                     , Language.Python.Optics.Newlines
                      , Language.Python.Optics.Validated
                      , Language.Python.Parse
                      , Language.Python.Parse.Error
@@ -137,6 +139,7 @@ executable example
                      , FixMutableDefaultArguments
                      , OptimizeTailRecursion
                      , Programs
+                     , Validation
   hs-source-dirs:      example
   build-depends:       base >=4.9 && <5, lens, hpython, text
   default-language:    Haskell2010

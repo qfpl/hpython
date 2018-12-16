@@ -6,13 +6,16 @@ import Control.Monad (void)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as Text
 
+import Language.Python.DSL
 import Language.Python.Render
 import Language.Python.Parse (parseModule, parseStatement, parseExpr, parseExprList)
+import Language.Python.Syntax.CommaSep (CommaSep(..), Comma(..))
 import Language.Python.Syntax.Expr (Expr(..))
 import Language.Python.Syntax.Strings
   ( StringLiteral(..), StringType(..), QuoteType(..), PyChar(..)
   , RawBytesPrefix(..), RawStringPrefix(..)
   )
+import Language.Python.Syntax.Whitespace (Whitespace(..))
 
 import Helpers (shouldBeParseSuccess, shouldBeParseFailure)
 
@@ -499,3 +502,42 @@ prop_fulltrip_39 =
     let str = "def a(*b, *): pass"
 
     shouldBeParseFailure parseStatement str
+
+prop_fulltrip_40 :: Property
+prop_fulltrip_40 =
+  withTests 1 . property $ do
+    let str = "def a():\n    yield op, oparg"
+    res <- shouldBeParseSuccess parseStatement str
+    str === showStatement (() <$ res)
+
+prop_fulltrip_41 :: Property
+prop_fulltrip_41 =
+  withTests 1 . property $ do
+    let
+      s = "def a(*a, *b): pass"
+    shouldBeParseFailure parseModule s
+
+prop_fulltrip_42 :: Property
+prop_fulltrip_42 =
+  withTests 1 . property $ do
+    let
+      s = "lambda *a, *b: pass"
+    shouldBeParseFailure parseModule s
+
+prop_fulltrip_43 :: Property
+prop_fulltrip_43 =
+  withTests 1 . property $ do
+    let
+      e =
+        Yield
+        { _unsafeExprAnn = ()
+        , _unsafeYieldWhitespace = [Space]
+        , _unsafeYieldValue =
+            CommaSepMany (Ident (MkIdent () "a" [])) (Comma [Space]) $
+            CommaSepMany (tuple_ [ti_ $ var_ "b"]) (Comma []) $
+            CommaSepNone
+        }
+      -- yield a, (b,),
+      str = showExpr e
+    res <- shouldBeParseSuccess parseExpr str
+    str === showExpr (() <$ res)

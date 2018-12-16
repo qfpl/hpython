@@ -4,13 +4,15 @@ module Generators.General where
 import Control.Applicative
 import Control.Lens.Getter
 import Control.Lens.Iso (from)
+import Control.Lens.Review (review)
 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
+import Language.Python.DSL
+import Language.Python.Optics
 import Language.Python.Syntax.Expr
-import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Import
 import Language.Python.Syntax.Module
 import Language.Python.Syntax.Operator.Binary
@@ -299,20 +301,20 @@ genExpr' isExp =
         genExpr
         genExpr
         genExpr
-    , Yield () <$> genWhitespaces <*> sizedMaybe genExpr
+    , Yield () <$> genWhitespaces <*> sizedCommaSep genExpr
     , YieldFrom () <$> genWhitespaces <*> genWhitespaces <*> genExpr
     , Gen.subtermM
         genExpr
         (\a ->
            Lambda () <$>
            genWhitespaces <*>
-           genSizedCommaSep (genParam genExpr) <*>
+           sizedCommaSep (genParam genExpr) <*>
            genColon <*>
            pure a)
     ]
 
-genSmallStatement :: MonadGen m => m (SmallStatement '[] ())
-genSmallStatement =
+genSimpleStatement :: MonadGen m => m (SimpleStatement '[] ())
+genSimpleStatement =
   sizedRecursive
     [ Pass () <$> genWhitespaces
     , Break () <$> genWhitespaces
@@ -366,51 +368,55 @@ genDecorator =
   genNewline <*>
   Gen.list (Range.constant 0 10) ((,) <$> genBlank <*> genNewline)
 
+genFundef :: MonadGen m => m (Raw Fundef)
+genFundef =
+  sized4M
+    (\a b c d ->
+        MkFundef () a <$> genIndents <*>
+        Gen.maybe genWhitespaces1 <*>
+        genWhitespaces1 <*> genIdent <*>
+        genWhitespaces <*> pure b <*>
+        genWhitespaces <*> pure c <*> pure d)
+    (sizedList genDecorator)
+    (sizedCommaSep $ genParam genExpr)
+    (sizedMaybe $ (,) <$> genWhitespaces <*> genExpr)
+    (genSuite genSimpleStatement genBlock)
+
 genCompoundStatement
   :: MonadGen m
   => m (CompoundStatement '[] ())
 genCompoundStatement =
   sizedRecursive
-    [ sized4M
-        (\a b c d ->
-           Fundef () a <$> genIndents <*>
-           Gen.maybe genWhitespaces1 <*>
-           genWhitespaces1 <*> genIdent <*>
-           genWhitespaces <*> pure b <*>
-           genWhitespaces <*> pure c <*> pure d)
-        (sizedList genDecorator)
-        (genSizedCommaSep $ genParam genExpr)
-        (sizedMaybe $ (,) <$> genWhitespaces <*> genExpr)
-        (genSuite genSmallStatement genBlock)
+    [ review _Fundef <$> genFundef
     , sized4M
         (\a b c d ->
            If <$> pure () <*> genIndents <*> genWhitespaces <*>
            pure a <*> pure b <*> pure c <*> pure d)
         genExpr
-        (genSuite genSmallStatement genBlock)
+        (genSuite genSimpleStatement genBlock)
         (sizedList $
          sized2M
            (\a b -> (,,,) <$> genIndents <*> genWhitespaces <*> pure a <*> pure b)
            genExpr
-           (genSuite genSmallStatement genBlock))
+           (genSuite genSimpleStatement genBlock))
         (sizedMaybe $
          (,,) <$>
-         genIndents <*> genWhitespaces <*> genSuite genSmallStatement genBlock)
+         genIndents <*> genWhitespaces <*> genSuite genSimpleStatement genBlock)
     , sized3M
         (\a b c ->
            While <$>
            pure () <*> genIndents <*>
            genWhitespaces <*> pure a <*> pure b <*> pure c)
         genExpr
-        (genSuite genSmallStatement genBlock)
+        (genSuite genSimpleStatement genBlock)
         (sizedMaybe $
          (,,) <$>
-         genIndents <*> genWhitespaces <*> genSuite genSmallStatement genBlock)
+         genIndents <*> genWhitespaces <*> genSuite genSimpleStatement genBlock)
     , sized4M
         (\a b c d ->
            TryExcept <$> pure () <*> genIndents <*> genWhitespaces <*>
            pure a <*> pure b <*> pure c <*> pure d)
-        (genSuite genSmallStatement genBlock)
+        (genSuite genSimpleStatement genBlock)
         (sizedNonEmpty $
          sized2M
            (\a b ->
@@ -419,13 +425,13 @@ genCompoundStatement =
                 (ExceptAs () <$> pure a <*> Gen.maybe ((,) <$> genWhitespaces <*> genIdent)) <*>
               pure b)
            genExpr
-           (genSuite genSmallStatement genBlock))
+           (genSuite genSimpleStatement genBlock))
         (sizedMaybe $
          (,,) <$> genIndents <*> genWhitespaces <*>
-         genSuite genSmallStatement genBlock)
+         genSuite genSimpleStatement genBlock)
         (sizedMaybe $
          (,,) <$> genIndents <*> genWhitespaces <*>
-         genSuite genSmallStatement genBlock)
+         genSuite genSimpleStatement genBlock)
     , sized2M
         (\a b -> 
            TryFinally <$>
@@ -436,8 +442,8 @@ genCompoundStatement =
            genIndents <*>
            genWhitespaces <*>
            pure b)
-        (genSuite genSmallStatement genBlock)
-        (genSuite genSmallStatement genBlock)
+        (genSuite genSimpleStatement genBlock)
+        (genSuite genSimpleStatement genBlock)
     , sized3M
         (\a b c ->
            ClassDef () a <$> genIndents <*> genWhitespaces1 <*> genIdent <*>
@@ -445,7 +451,7 @@ genCompoundStatement =
            pure c)
         (sizedList genDecorator)
         (sizedMaybe $ genSizedCommaSep1' $ genArg genExpr)
-        (genSuite genSmallStatement genBlock)
+        (genSuite genSimpleStatement genBlock)
     , sized4M
         (\a b c d ->
            For <$>
@@ -455,10 +461,10 @@ genCompoundStatement =
            pure c <*> pure d)
         genExpr
         (genSizedCommaSep1' genExpr)
-        (genSuite genSmallStatement genBlock)
+        (genSuite genSimpleStatement genBlock)
         (sizedMaybe $
          (,,) <$>
-         genIndents <*> genWhitespaces <*> genSuite genSmallStatement genBlock)
+         genIndents <*> genWhitespaces <*> genSuite genSimpleStatement genBlock)
     , sized2M
         (\a b ->
            With <$>
@@ -468,14 +474,14 @@ genCompoundStatement =
          WithItem () <$>
          genExpr <*>
          sizedMaybe ((,) <$> genWhitespaces <*> genExpr))
-        (genSuite genSmallStatement genBlock)
+        (genSuite genSimpleStatement genBlock)
     ]
     []
 
 genStatement :: MonadGen m => m (Statement '[] ())
 genStatement =
   sizedRecursive
-    [ SimpleStatement <$> genIndents <*> genSimpleStatement genSmallStatement ]
+    [ SmallStatement <$> genIndents <*> genSmallStatement genSimpleStatement ]
     [ CompoundStatement <$> genCompoundStatement ]
 
 genIndent :: MonadGen m => m Indent

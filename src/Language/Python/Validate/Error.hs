@@ -13,28 +13,28 @@ import Language.Python.Validate.Indentation.Error
 import Language.Python.Validate.Scope.Error
 import Language.Python.Validate.Syntax.Error
 
-data ValidationError v a
+data ValidationError a
   = IndentationError (IndentationError a)
-  | ScopeError (ScopeError v a)
-  | SyntaxError (SyntaxError v a)
+  | ScopeError (ScopeError a)
+  | SyntaxError (SyntaxError a)
   deriving (Eq, Show)
 
-instance AsTabError (ValidationError v a) a where
+instance AsTabError (ValidationError a) a where
   _TabError = _IndentationError._TabError
 
-instance AsIndentationError (ValidationError v a) a where
+instance AsIndentationError (ValidationError a) a where
   _IndentationError =
     prism'
       IndentationError
       (\case; IndentationError a -> Just a; _ -> Nothing)
 
-instance AsScopeError (ValidationError v a) v a where
+instance AsScopeError (ValidationError a) a where
   _ScopeError =
     prism'
       ScopeError
       (\case; ScopeError a -> Just a; _ -> Nothing)
 
-instance AsSyntaxError (ValidationError v a) v a where
+instance AsSyntaxError (ValidationError a) a where
   _SyntaxError =
     prism'
       SyntaxError

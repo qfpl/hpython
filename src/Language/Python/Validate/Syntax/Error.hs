@@ -17,14 +17,15 @@ import Control.Lens.TH
 import Language.Python.Syntax.Expr (Expr)
 import Language.Python.Syntax.Ident (Ident)
 
-data SyntaxError (v :: [*]) a
-  = PositionalAfterKeywordArg a (Expr v a)
-  | PositionalAfterKeywordUnpacking a (Expr v a)
+data SyntaxError a
+  = PositionalAfterKeywordArg a (Expr '[] a)
+  | PositionalAfterKeywordUnpacking a (Expr '[] a)
+  | CannotAssignTo a (Expr '[] a)
+  | CannotDelete a (Expr '[] a)
+  | CannotAugAssignTo a (Expr '[] a)
+  | NoBindingNonlocal (Ident '[] a)
   | PositionalAfterKeywordParam a String
   | UnexpectedDoubleStarParam a String
-  | CannotAssignTo a (Expr v a)
-  | CannotDelete a (Expr v a)
-  | CannotAugAssignTo a (Expr v a)
   | DuplicateArgument a String
   | UnexpectedNewline a
   | UnexpectedComment a
@@ -36,7 +37,6 @@ data SyntaxError (v :: [*]) a
   | ReturnOutsideFunction a
   | NonlocalOutsideFunction a
   | ParametersNonlocal a [String]
-  | NoBindingNonlocal (Ident v a)
   | Can'tJoinStringAndBytes a
   | YieldOutsideGenerator a
   | MalformedDecorator a
@@ -55,6 +55,7 @@ data SyntaxError (v :: [*]) a
   | WildcardImportInDefinition a
   | NoKeywordsAfterEmptyStarArg a
   | ManyStarredTargets a
+  | ManyStarredParams a
   | ContinueInsideFinally a
   | ParameterMarkedGlobal a String
   deriving (Eq, Show)

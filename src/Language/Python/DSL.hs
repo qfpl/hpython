@@ -18,6 +18,7 @@ passing @['line_' 'pass_']@
 {-# language RankNTypes #-}
 {-# language RecordWildCards #-}
 {-# language TemplateHaskell #-}
+{-# language TypeApplications #-}
 {-# language TypeFamilies #-}
 {-# language UndecidableInstances #-}
 module Language.Python.DSL
@@ -28,6 +29,10 @@ module Language.Python.DSL
   , Expr
     -- * Modules
   , module_
+    -- * Lines of code
+  , blank_
+  , AsLine(..)
+  , Line(..)
     -- * Identifiers
   , id_
   , Ident(..)
@@ -36,31 +41,32 @@ module Language.Python.DSL
   , identValue
   , identWhitespace
     -- * Starred values
-  , HasStar(..)
+  , StarSyntax(..)
   , star_
     -- * Double-starred values
-  , HasDoubleStar(..)
+  , DoubleStarSyntax(..)
     -- * @as@ syntax
   , As(..)
     -- * @if@ syntax
-  , HasIf(..)
+  , IfSyntax(..)
     -- * @for@ syntax
-  , HasFor(..)
+  , ForSyntax(..)
     -- * @in@ syntax
-  , HasIn(..)
-  , In(..)
+  , InSyntax(..), In(..), InList(..)
     -- * @:@ syntax
-  , HasColon(..)
+  , ColonSyntax(..)
     -- * Comprehensions
   , comp_
   , Guard(..)
     -- * Parameters and arguments
     -- ** Parameters
-  , HasParameters(..)
+  , Param(..)
+  , ParametersSyntax(..)
     -- ** Arguments
-  , HasArguments(..)
+  , Arg(..)
+  , ArgumentsSyntax(..)
     -- ** Positional
-  , HasPositional(..)
+  , PositionalSyntax(..)
   , PositionalParam(..)
   , _PositionalParam
     -- *** Lenses
@@ -68,7 +74,7 @@ module Language.Python.DSL
   , ppName
   , ppType
     -- ** Keyword
-  , HasKeyword(..)
+  , KeywordSyntax(..)
   , KeywordParam(..)
   , _KeywordParam
     -- *** Lenses
@@ -79,20 +85,15 @@ module Language.Python.DSL
   , kpExpr
     -- * Decorators
   , decorated_
-  , HasDecorators(..)
+  , DecoratorsSyntax(..)
     -- * Statements
     -- ** @async@
-  , HasAsync(..)
-    -- ** Lines of code
-  , blank_
-  , AsLine(..)
-  , Line(..)
+  , AsyncSyntax(..)
     -- ** Block bodies
-  , HasBody(..)
+  , BodySyntax(..)
     -- ** Function definitions
   , def_
   , Fundef(..)
-  , _Fundef
   , mkFundef
     -- *** Lenses
   , fdAnn
@@ -109,7 +110,6 @@ module Language.Python.DSL
     -- ** Class definitions
   , class_
   , ClassDef(..)
-  , _ClassDef
   , mkClassDef
     -- *** Lenses
   , cdAnn
@@ -135,30 +135,20 @@ module Language.Python.DSL
   , (.>>=)
   , (.**=)
   , (.//=)
-  , (.>)
-  , (.>=)
-  , (.<)
-  , (.<=)
-  , (.!=)
     -- ** Exceptions
   , tryE_
   , tryF_
-  , HasExcept(..)
-  , HasFinally(..)
-  , AsTry(..)
+  , ExceptSyntax(..)
+  , FinallySyntax(..)
   , TryExcept(..)
-  , _TryExcept
   , mkTryExcept
   , TryFinally(..)
-  , _TryFinally
   , mkTryFinally
   , ExceptAs(..)
   , AsExceptAs(..)
   , Except(..)
-  , _Except
   , mkExcept
   , Finally(..)
-  , _Finally
   , mkFinally
     -- *** Lenses
   , teAnn
@@ -179,7 +169,6 @@ module Language.Python.DSL
   , with_
   , withItem_
   , With(..)
-  , _With
   , mkWith
   , AsWithItem(..)
   , WithItem(..)
@@ -192,11 +181,64 @@ module Language.Python.DSL
   , withBody
     -- ** Flow control
     -- *** 'Else' clauses
+    -- | 'If', 'While', 'For', and 'TryExcept' statements can have an 'Else'
+    -- component.
+    --
+    -- 'else_' is considered to be a modifier on these structures.
+    --
+    -- \-\-\-
+    --
+    -- 'If' ... 'Else':
+    --
+    -- >>> if_ false_ [line_ pass_] & else_ [line_ pass_]
+    -- if False:
+    --     pass
+    -- else:
+    --     pass
+    --
+    -- \-\-\-
+    --
+    -- 'While' ... 'Else':
+    --
+    -- >>> while_ false_ [line_ pass_] & else_ [line_ pass_]
+    -- while False:
+    --     pass
+    -- else:
+    --     pass
+    --
+    -- \-\-\-
+    --
+    -- 'For' ... 'Else':
+    --
+    -- >>> for_ (var_ "a" `in_` [var_ b]) [line_ pass_] & else_ [line_ pass_]
+    -- for a in b:
+    --     pass
+    -- else:
+    --     pass
+    --
+    -- \-\-\-
+    --
+    -- 'TryExcept' ... 'Else':
+    --
+    -- >>> tryE_ [line_ pass_] & except_ [line_ pass_] & else_ [line_ pass_]
+    -- try:
+    --     pass
+    -- except:
+    --     pass
+    -- else:
+    --     pass
   , else_
-  , HasElse(..)
+  , ElseSyntax(..)
     -- *** Break
   , break_
     -- *** For loops
+    -- | 'For' loops are built using 'for_' syntax:
+    --
+    -- >>> for_ (var_ "a" `in_` [1, 2, 3]) [line_ (call_ "print" [var_ "a"])]
+    -- for a in 1, 2, 3:
+    --     print(a)
+    --
+    -- See also: 'ForSyntax'
   , forSt_
   , For(..)
   , _For
@@ -205,13 +247,10 @@ module Language.Python.DSL
   , ifThen_
   , elif_
   , If(..)
-  , _If
   , mkIf
   , Elif(..)
-  , _Elif
   , mkElif
   , Else(..)
-  , _Else
   , mkElse
     -- **** Lenses
   , ifAnn
@@ -235,7 +274,6 @@ module Language.Python.DSL
     -- *** While loops
   , while_
   , While(..)
-  , _While
   , mkWhile
     -- **** Lenses
   , whileAnn
@@ -247,8 +285,6 @@ module Language.Python.DSL
   , expr_
   , var_
     -- ** @await@
-  , and_
-  , or_
   , await_
     -- ** @... if ... else ...@
   , ifThenElse_
@@ -261,13 +297,11 @@ module Language.Python.DSL
     -- ** Tuples
   , tuple_
   , Tuple(..)
-  , _Tuple
   , AsTupleItem(..)
   , TupleItem()
     -- ** Function calls
   , call_
   , Call(..)
-  , _Call
   , mkCall
     -- *** Lenses
   , callAnn
@@ -283,9 +317,11 @@ module Language.Python.DSL
     -- **** Lenses
   , noneAnn
   , noneWhitespace
-    -- *** Strings 
+    -- *** Strings
   , str_
+  , str'_
   , longStr_
+  , longStr'_
     -- *** Integers
   , int_
     -- *** Booleans
@@ -326,18 +362,38 @@ module Language.Python.DSL
   , pos_
   , compl_
     -- ** Binary operators
+    -- | Comparison, bitwise, and arithmetic operators have precedences that are
+    -- consistent with their Python counterparts. This meansPython expressions can
+    -- be translated to kellSyntax with minimal parentheses.
+    --
+    -- Note: this doesn't apply to unary operators (because kellSyntax doesn't have
+    -- unary operators), or the boolean operations 'and_' and 'or_' (because we ran
+    -- out of precedence levels)
+
+    -- *** Boolean operations
+  , or_
+  , and_
+
+    -- *** Comparison operations
   , is_
   , isNot_
   , notIn_
-  , (.*)
-  , (.-)
-  , (.+)
   , (.==)
+  , (.>)
+  , (.>=)
+  , (.<)
+  , (.<=)
+  , (.!=)
+    -- *** Bitwise operations
   , (.|)
   , (.^)
   , (.&)
   , (.<<)
   , (.>>)
+    -- *** Arithmetic operations
+  , (.-)
+  , (.+)
+  , (.*)
   , (.@)
   , (./)
   , (.//)
@@ -389,6 +445,18 @@ import Language.Python.Syntax.Whitespace
 id_ :: String -> Raw Ident
 id_ = fromString
 
+-- | Create a 'Module'
+--
+-- >>> module_
+-- >>> [ line_ $ def_ "a" [] [line_ pass_]
+-- >>> , blank_
+-- >>> , line_ $ def_ "b" [] [line_ pass_]
+-- >>> ]
+-- def a():
+--     pass
+-- <BLANKLINE>
+-- def b():
+--     pass
 module_ :: [Raw Line] -> Raw Module
 module_ [] = ModuleEmpty
 module_ (a:as) =
@@ -411,26 +479,32 @@ blank_ = Line $ Left (Blank () [] Nothing, LF)
 class AsLine s where
   line_ :: Raw s -> Raw Line
 
-instance AsLine SimpleStatement where
-  line_ ss =
-    Line . Right $ SimpleStatement (Indents [] ()) ss
-
 instance AsLine SmallStatement where
   line_ ss =
-    Line . Right . SimpleStatement (Indents [] ()) $
-    MkSimpleStatement ss [] Nothing Nothing (Just LF)
+    Line . Right $ SmallStatement (Indents [] ()) ss
+
+instance AsLine SimpleStatement where
+  line_ ss =
+    Line . Right . SmallStatement (Indents [] ()) $
+    MkSmallStatement ss [] Nothing Nothing (Just LF)
 
 instance AsLine CompoundStatement where
   line_ = Line . Right . CompoundStatement
 
+instance AsLine ClassDef where
+  line_ = line_ @Statement . (_ClassDef #)
+
+instance AsLine Fundef where
+  line_ = line_ @Statement . (_Fundef #)
+
 instance AsLine If where
-  line_ = line_ . (_If #)
+  line_ = line_ @Statement . (_If #)
 
 instance AsLine While where
-  line_ = line_ . (_While #)
+  line_ = line_ @Statement . (_While #)
 
 instance AsLine With where
-  line_ = line_ . (_With #)
+  line_ = line_ @Statement . (_With #)
 
 instance AsLine Statement where
   line_ = Line . Right
@@ -444,7 +518,7 @@ instance HasExprs Line where
 instance HasStatements Line where
   _Statements f (Line a) = Line <$> _Right f a
 
-class HasBody s where
+class BodySyntax s where
   -- | A faux-Lens that targets lines in the body of some statement-piece, but
   -- does so \'around\' indentation.
   --
@@ -466,10 +540,20 @@ class HasBody s where
   --     pass
   --     pass
   --     b += 1
+  --
+  -- >>> def_ "a" [] [ line_ pass_, line_ pass_ ] & body_ .~ []
+  -- def a():
+  --     pass
+  --
+  -- \-\-\-
+  --
+  -- It's a fake 'Lens' because it violates some of the laws. The most obvious violation is
+  -- that setting the 'body_' to the empty list actually sets it to a singleton list containing
+  -- 'pass_'. (This is because blocks must contain one or more statements)
   body_ :: Functor f => ([Raw Line] -> f [Raw Line]) -> Raw s -> f (Raw s)
   body :: Lens' (Raw s) (Raw Suite)
 
-class HasColon s t | s -> t, t -> s where
+class ColonSyntax s t | s -> t, t -> s where
   (.:) :: Raw s -> Raw Expr -> Raw t
 
 infix 0 .:
@@ -477,7 +561,7 @@ infix 0 .:
 -- | Constructing dictionary items
 --
 -- @('.:') :: 'Raw' 'Expr' -> 'Raw' 'Expr' -> 'Raw' 'DictItem'@
-instance HasColon Expr DictItem where
+instance ColonSyntax Expr DictItem where
   (.:) a = DictItem () a (Colon [Space])
 
 -- | Function parameter type annotations
@@ -488,7 +572,7 @@ instance HasColon Expr DictItem where
 -- as unnamed starred parameters cannot have type annotations.
 --
 -- See 'def_'
-instance HasColon Param Param where
+instance ColonSyntax Param Param where
   (.:) p t = p & paramType_ ?~ (Colon [Space], t)
 
 -- | Positional parameters/arguments
@@ -500,31 +584,39 @@ instance HasColon Param Param where
 -- @
 -- p_ :: 'Raw' 'Ident' -> 'Raw' 'Param'
 -- @
-class HasPositional p v | p -> v, v -> p where
+class PositionalSyntax p v | p -> v, v -> p where
   p_ :: Raw v -> Raw p
 
 -- | See 'def_'
-instance HasStar Ident Param where
+instance StarSyntax Ident Param where
   s_ i = StarParam () [] i Nothing
 
 -- | See 'def_'
-instance HasDoubleStar Ident Param where
+instance DoubleStarSyntax Ident Param where
   ss_ i = DoubleStarParam () [] i Nothing
 
+class StarSyntax s t | t -> s where
+  s_ :: Raw s -> Raw t
+
 -- | See 'call_'
-instance HasStar Expr Arg where
+instance StarSyntax Expr Arg where
   s_ = StarArg () []
 
 -- | See 'call_'
-instance HasDoubleStar Expr Arg where
+instance DoubleStarSyntax Expr Arg where
   ss_ = DoubleStarArg () []
 
 -- | Keyword parameters/arguments
-class HasKeyword p where
+--
+-- @
+-- p_ :: 'Raw' 'Expr' -> 'Raw' 'Expr' -> 'Raw' 'Arg'
+-- @
+--
+-- @
+-- p_ :: 'Raw' 'Ident' -> 'Raw' 'Expr' -> 'Raw' 'Param'
+-- @
+class KeywordSyntax p where
   k_ :: Raw Ident -> Raw Expr -> Raw p
-
-class HasStar s t | t -> s where
-  s_ :: Raw s -> Raw t
 
 -- | Unnamed starred parameter
 --
@@ -534,58 +626,79 @@ class HasStar s t | t -> s where
 star_ :: Raw Param
 star_ = UnnamedStarParam () []
 
-class HasDoubleStar s t | t -> s where
+class DoubleStarSyntax s t | t -> s where
   ss_ :: Raw s -> Raw t
 
 -- | See 'dict_'
-instance HasDoubleStar Expr DictItem where
+instance DoubleStarSyntax Expr DictItem where
   ss_ = DictUnpack () []
 
 -- | See 'def_'
-instance HasPositional Param Ident where
+instance PositionalSyntax Param Ident where
   p_ i = PositionalParam () i Nothing
 
 -- | See 'def_'
-instance HasKeyword Param where
+instance KeywordSyntax Param where
   k_ a = KeywordParam () a Nothing []
 
 -- | See 'call_'
-instance HasPositional Arg Expr where; p_ = PositionalArg ()
+instance PositionalSyntax Arg Expr where; p_ = PositionalArg ()
 
 -- | See 'call_'
-instance HasKeyword Arg where; k_ a = KeywordArg () a []
+instance KeywordSyntax Arg where; k_ a = KeywordArg () a []
 
-class HasParameters s where
+class ParametersSyntax s where
   -- | A faux-Lens that allows targeting 'Param's in-between existing formatting,
   -- and adding appropriate formatting when extra parameters are introduced.
   --
-  -- >>> 'Language.Python.Render.showStatement' myStatement
-  -- \"def a(b ,  c   ):\\n    pass\"
+  -- >>> showStatement myStatement
+  -- "def a(b ,  c   ):\n    pass"
   --
-  -- >>> 'Language.Python.Render.showStatement' (myStatement '&' '_Fundef' '.' 'parameters_' '.~' ['p_' \"d\", 'p_' \"e\"]
-  -- \"def a(d ,  e   ):\\n    pass\"
+  -- >>> showStatement (myStatement & _Fundef.parameters_ .~ [p_ "d", p_ "e"]
+  -- "def a(d ,  e   ):\n    pass"
   --
-  -- >>> 'Language.Python.Render.showStatement' (myStatement '&' '_Fundef' '.' 'parameters_' '.~' ['p_' \"d\", 'p_' \"e\", 'p_' \"f\"]
-  -- \"def a(d ,  e   , f):\\n    pass\"
+  -- >>> showStatement (myStatement & _Fundef.parameters_ .~ [p_ "d", p_ "e", p_ "f"]
+  -- "def a(d ,  e   , f):\n    pass"
+  --
+  -- \-\-\-
+  --
+  -- It's not a 'Lens' because repeated 'set's can drop trailing commas, violating
+  -- the 'Lens' laws. For example:
+  --
+  -- >>> someFunction
+  -- def a(b, c,):
+  --     pass
+  --
+  -- >>> set parameters_ [var_ "d", var_ "e"] someFunction
+  -- def a(d, e,):
+  --     pass
+  --
+  -- >>> set parameters_ [] someFunction
+  -- def a():
+  --     pass
+  --
+  -- >>> set parameters_ [var_ "d", var_ "e"] (set parameters_ [] someFunction)
+  -- def a(d, e):
+  --     pass
   parameters_ :: Functor f => ([Raw Param] -> f [Raw Param]) -> Raw s -> f (Raw s)
   parameters :: Lens' (Raw s) (CommaSep (Raw Param))
 
-class HasArguments s where
+class ArgumentsSyntax s where
   setArguments :: [Raw Arg] -> Raw s -> Raw s
   getArguments :: Raw s -> [Raw Arg]
 
-class HasDecorators s where
+class DecoratorsSyntax s where
   setDecorators :: [Raw Expr] -> Raw s -> Raw s
   getDecorators :: Raw s -> [Raw Expr]
   decorators :: Lens' (Raw s) [Raw Decorator]
 
-decorated_ :: HasDecorators s => [Raw Expr] -> Raw s -> Raw s
+decorated_ :: DecoratorsSyntax s => [Raw Expr] -> Raw s -> Raw s
 decorated_ = setDecorators
 
 exprsToDecorators :: Indents () -> [Raw Expr] -> [Raw Decorator]
 exprsToDecorators is = fmap (\e -> Decorator () is [] e Nothing LF [])
 
-instance HasDecorators Fundef where
+instance DecoratorsSyntax Fundef where
   decorators = fdDecorators
 
   setDecorators new code =
@@ -749,11 +862,11 @@ mkBody_ gIndents gBody f e =
                 ((Left <$> x) <> (Right y:z)))
           (unLine b)
 
-instance HasBody Fundef where
+instance BodySyntax Fundef where
   body = fdBody
   body_ = mkBody_ fdIndents fdBody
 
-instance HasParameters Fundef where
+instance ParametersSyntax Fundef where
   parameters_ f e = flip (set fdParameters) e . go ps <$> ps'
     where
       ps = e ^. fdParameters
@@ -768,13 +881,6 @@ instance HasParameters Fundef where
       go (CommaSepOne a) (x:xs) =
         listToCommaSep $ (x & trailingWhitespace .~ (a ^. trailingWhitespace)) :xs
       go CommaSepMany{} [] = CommaSepNone
-      go (CommaSepMany a b CommaSepNone) [x] =
-        CommaSepMany
-          (x & trailingWhitespace .~ (a ^. trailingWhitespace))
-          b
-          CommaSepNone
-      go (CommaSepMany a _ _) [x] =
-        CommaSepOne (x & trailingWhitespace .~ (a ^. trailingWhitespace))
       go (CommaSepMany a b c) (x:xs) =
         CommaSepMany (x & trailingWhitespace .~ (a ^. trailingWhitespace)) b $ go c xs
 
@@ -817,9 +923,8 @@ mkFundef name body =
 -- >>> def_ "f" [p_ "x" .: "String"] [line_ $ return_ "x"]
 -- def f(x: String):
 --     return x
-def_ :: Raw Ident -> [Raw Param] -> [Raw Line] -> Raw Statement
-def_ name params body =
-  _Fundef # (mkFundef name body) { _fdParameters = listToCommaSep params }
+def_ :: Raw Ident -> [Raw Param] -> [Raw Line] -> Raw Fundef
+def_ name params body = (mkFundef name body) { _fdParameters = listToCommaSep params }
 
 -- | Create a minimal valid 'Call'
 mkCall :: Raw Expr -> Raw Call
@@ -832,7 +937,7 @@ mkCall e =
   , _callRightParen = []
   }
 
-instance HasArguments Call where
+instance ArgumentsSyntax Call where
   setArguments args code =
     code
     { _callArguments =
@@ -865,17 +970,24 @@ call_ expr args =
       a:as -> Just $ (a, zip (repeat (Comma [Space])) as, Nothing) ^. _CommaSep1'
   }
 
+-- |
+-- >>> return_ (var_ "a")
+-- return a
 return_ :: Raw Expr -> Raw Statement
 return_ e =
-  SimpleStatement
+  SmallStatement
     (Indents [] ())
-    (MkSimpleStatement (Return () [Space] $ Just e) [] Nothing Nothing (Just LF))
+    (MkSmallStatement (Return () [Space] $ Just e) [] Nothing Nothing (Just LF))
 
+-- | Turns an 'Expr' into a 'Statement'
+--
+-- >>> expr_ (int_ 3)
+-- 3
 expr_ :: Raw Expr -> Raw Statement
 expr_ e =
-  SimpleStatement
+  SmallStatement
     (Indents [] ())
-    (MkSimpleStatement (Expr () e) [] Nothing Nothing (Just LF))
+    (MkSmallStatement (Expr () e) [] Nothing Nothing (Just LF))
 
 -- |
 -- >>> list_ [li_ $ var_ "a"]
@@ -893,6 +1005,7 @@ class AsList s where
   list_ :: s -> Raw Expr
 
 class AsListItem s where
+  -- | Create a 'ListItem'
   li_ :: Raw s -> Raw ListItem
 
 instance AsListItem ListItem where
@@ -902,7 +1015,7 @@ instance AsListItem Expr where
   li_ = ListItem ()
 
 -- | See 'list_'
-instance HasStar Expr ListItem where
+instance StarSyntax Expr ListItem where
   s_ = ListUnpack () [] []
 
 instance e ~ Raw ListItem => AsList [e] where
@@ -913,7 +1026,7 @@ instance e ~ Comprehension Expr => AsList (Raw e) where
 
 newtype Guard v a = MkGuard { unGuard :: Either (CompFor v a) (CompIf v a) }
 
-class HasFor a x | a -> x where
+class ForSyntax a x | a -> x where
   for_ :: Raw x -> a
 
 -- |
@@ -921,18 +1034,18 @@ class HasFor a x | a -> x where
 --
 -- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") []
 -- a for a in b
-instance HasFor (Raw CompFor) In where
+instance ForSyntax (Raw CompFor) In where
   for_ (MkIn a b) = CompFor () [Space] a [Space] b
 
 -- |
 -- @'for_' :: 'Raw' 'In' -> 'Raw' 'Guard'@
 --
--- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") [for_ $ var_ "c" \`in_\` var_ "d"]
+-- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") [for_ $ var_ "c" `in_` var_ "d"]
 -- a for a in b for c in d
-instance HasFor (Raw Guard) In where
+instance ForSyntax (Raw Guard) In where
   for_ (MkIn a b) = MkGuard . Left $ CompFor () [Space] a [Space] b
 
-class HasIf a where
+class IfSyntax a where
   if_ :: Raw Expr -> a
 
 -- |
@@ -940,7 +1053,7 @@ class HasIf a where
 --
 -- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") [if_ $ var_ "c" .== var_ "d"]
 -- a for a in b if c == d
-instance HasIf (Raw Guard) where
+instance IfSyntax (Raw Guard) where
   if_ = MkGuard . Right . CompIf () [Space]
 
 -- |
@@ -962,6 +1075,7 @@ class AsSet s where
   set_ :: s -> Raw Expr
 
 class AsSetItem s where
+  -- | Create a 'SetItem'
   si_ :: Raw s -> Raw SetItem
 
 instance AsSetItem SetItem where
@@ -971,7 +1085,7 @@ instance AsSetItem Expr where
   si_ = SetItem ()
 
 -- | See 'set_'
-instance HasStar Expr SetItem where
+instance StarSyntax Expr SetItem where
   s_ = SetUnpack () [] []
 
 instance e ~ Raw SetItem => AsSet [e] where
@@ -1037,22 +1151,40 @@ is_ :: Raw Expr -> Raw Expr -> Raw Expr
 is_ = mkBinOp $ Is ()
 infixl 1 `is_`
 
+-- |
+-- >>> var_ "a" `in_` var_ "b"
+-- a in b
 data In v a = MkIn (Expr v a) (Expr v a)
+
+-- |
+-- >>> var_ "a" `in_` [var_ "b", var_ "c"]
+-- a in b, c
 data InList v a = MkInList (Expr v a) [Expr v a]
 
-class HasIn a x | a -> x where
+class InSyntax a x | a -> x, x -> a where
   in_ :: Raw Expr -> x -> Raw a
-
 infixl 1 `in_`
+
+-- | @a and b@
+--
+-- Does not have a precedence
+and_ :: Raw Expr -> Raw Expr -> Raw Expr
+and_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolAnd () [Space])
+
+-- | @a or b@
+--
+-- Does not have a precedence
+or_ :: Raw Expr -> Raw Expr -> Raw Expr
+or_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolOr () [Space])
 
 -- |
 -- >>> var_ "a" `in_` var_ "b"
 -- a in b
-instance HasIn Expr (Raw Expr) where
+instance InSyntax Expr (Raw Expr) where
   in_ = mkBinOp $ In ()
 
 -- | See 'for_'
-instance e ~ Raw Expr => HasIn InList [e] where
+instance e ~ Raw Expr => InSyntax InList [e] where
   in_ = MkInList
 
 -- | @a not in b@
@@ -1164,7 +1296,9 @@ infixl 7 .%
 (.**) = mkBinOp $ Exp ()
 infixr 8 .**
 
--- | @a.b@
+-- |
+-- >>> var_ "a" /> var_ "b"
+-- a.b
 (/>) :: Raw Expr -> Raw Ident -> Raw Expr
 (/>) a = Deref () a []
 infixl 9 />
@@ -1182,11 +1316,11 @@ compl_ :: Raw Expr -> Raw Expr
 compl_ = UnOp () (Complement () [])
 
 -- | Convert a list of 'Line's to a 'Block', giving them 4 spaces of indentation
-linesToBlockIndented :: [Raw Line] -> Block '[] ()
+linesToBlockIndented :: [Raw Line] -> Raw Block
 linesToBlockIndented = over _Indents (indentIt $ replicate 4 Space) . linesToBlock
 
 -- | Convert a list of 'Line's to a 'Block', without indenting them
-linesToBlock :: [Raw Line] -> Block '[] ()
+linesToBlock :: [Raw Line] -> Raw Block
 linesToBlock = go
   where
     go [] = Block [] pass_ []
@@ -1201,11 +1335,11 @@ linesToBlock = go
             Block a b c -> Block (l:a) b c
         Right st -> Block [] st (unLine <$> ys)
 
-instance HasBody While where
+instance BodySyntax While where
   body = whileBody
   body_ = mkBody_ whileIndents whileBody
 
-instance HasElse While where
+instance ElseSyntax While where
   getElse = mkGetElse _whileIndents _whileElse
   setElse = mkSetElse _whileIndents whileElse
 
@@ -1221,8 +1355,8 @@ mkWhile cond body =
   , _whileElse = Nothing
   }
 
-while_ :: Raw Expr -> [Raw Line] -> Raw Statement
-while_ e sts = _While # mkWhile e sts
+while_ :: Raw Expr -> [Raw Line] -> Raw While
+while_ = mkWhile
 
 -- | Create a minimal valid 'If'
 mkIf :: Raw Expr -> [Raw Line] -> Raw If
@@ -1237,15 +1371,15 @@ mkIf cond body =
   , _ifElse = Nothing
   }
 
-instance HasBody Elif where
+instance BodySyntax Elif where
   body = elifBody
   body_ = mkBody_ elifIndents elifBody 
 
-instance HasBody Else where
+instance BodySyntax Else where
   body = elseBody
   body_ = mkBody_ elseIndents elseBody 
 
-instance HasBody If where
+instance BodySyntax If where
   body = ifBody
   body_ = mkBody_ ifIndents ifBody 
 
@@ -1255,7 +1389,7 @@ instance HasBody If where
 -- >>> if_ (var_ "a" .< 10) [var_ "a" .+= 1]
 -- if a < 10:
 --     a += 1
-instance (l ~ Raw Line, s ~ Raw If) => HasIf ([l] -> s) where
+instance (l ~ Raw Line, s ~ Raw If) => IfSyntax ([l] -> s) where
   if_ = mkIf
 
 ifThen_ :: Raw Expr -> [Raw Line] -> Raw If
@@ -1264,17 +1398,28 @@ ifThen_ = mkIf
 var_ :: String -> Raw Expr
 var_ s = Ident $ MkIdent () s []
 
+-- |
+-- >>> none_
+-- None
 none_ :: Raw Expr
 none_ = None () []
 
+-- | @'Raw' 'Expr'@ has a 'Num' instance, but sometimes we need to name integers
+-- explicitly
+--
+-- >>> int_ 10
+-- 10
 int_ :: Integer -> Raw Expr
 int_ = fromInteger
 
+-- |
+-- >>> pass_
+-- pass
 pass_ :: Raw Statement
 pass_ =
-  SimpleStatement
+  SmallStatement
     (Indents [] ())
-    (MkSimpleStatement (Pass () []) [] Nothing Nothing (Just LF))
+    (MkSmallStatement (Pass () []) [] Nothing Nothing (Just LF))
 
 -- | Create a minimal valid 'Elif'
 mkElif :: Raw Expr -> [Raw Line] -> Raw Elif
@@ -1298,11 +1443,11 @@ mkElse body =
   , _elseBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
   }
 
-class HasElse s where
+class ElseSyntax s where
   getElse :: Raw s -> Maybe (Raw Else)
   setElse :: [Whitespace] -> Maybe (Raw Else) -> Raw s -> Raw s
 
-else_ :: HasElse s => [Raw Line] -> Raw s -> Raw s
+else_ :: ElseSyntax s => [Raw Line] -> Raw s -> Raw s
 else_ body = setElse (replicate 4 Space) $ Just (mkElse body)
 
 mkGetElse
@@ -1334,47 +1479,77 @@ mkSetElse indentLevel elseField _ new code =
        (indentLevel code ^. indentsValue <>)
        new)
 
-instance HasElse For where
+instance ElseSyntax For where
   getElse = mkGetElse _forIndents _forElse
   setElse = mkSetElse _forIndents forElse
 
-instance HasElse If where
+instance ElseSyntax If where
   getElse = mkGetElse _ifIndents _ifElse
   setElse = mkSetElse _ifIndents ifElse
 
+instance ElseSyntax TryExcept where
+  getElse = mkGetElse _teIndents _teElse
+  setElse = mkSetElse _teIndents teElse
+
 break_ :: Raw Statement
 break_ =
-  SimpleStatement
+  SmallStatement
     (Indents [] ())
-    (MkSimpleStatement (Break () []) [] Nothing Nothing (Just LF))
+    (MkSmallStatement (Break () []) [] Nothing Nothing (Just LF))
 
+-- |
+-- >>> true_
+-- True
 true_ :: Raw Expr
 true_ = Bool () True []
 
+-- |
+-- >>> false_
+-- False
 false_ :: Raw Expr
 false_ = Bool () False []
 
-and_ :: Raw Expr -> Raw Expr -> Raw Expr
-and_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolAnd () [Space])
-
-or_ :: Raw Expr -> Raw Expr -> Raw Expr
-or_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolOr () [Space])
-
+-- | Double-quoted string
+--
+-- >>> str_ "asdf"
+-- "asdf"
 str_ :: String -> Raw Expr
 str_ s =
   String () . pure $
   StringLiteral () Nothing ShortString DoubleQuote (Char_lit <$> s) []
 
+-- | Single-quoted string
+--
+-- >>> str_ "asdf"
+-- 'asdf'
+str'_ :: String -> Raw Expr
+str'_ s =
+  String () . pure $
+  StringLiteral () Nothing ShortString SingleQuote (Char_lit <$> s) []
+
+-- | Long double-quoted string
+--
+-- >>> longStr_ "asdf"
+-- """asdf"""
 longStr_ :: String -> Raw Expr
 longStr_ s =
   String () . pure $
   StringLiteral () Nothing LongString DoubleQuote (Char_lit <$> s) []
 
+-- | Long single-quoted string
+--
+-- >>> longStr'_ "asdf"
+-- '''asdf'''
+longStr'_ :: String -> Raw Expr
+longStr'_ s =
+  String () . pure $
+  StringLiteral () Nothing LongString SingleQuote (Char_lit <$> s) []
+
 mkAugAssign :: AugAssignOp -> Raw Expr -> Raw Expr -> Raw Statement
 mkAugAssign at a b =
-  SimpleStatement
+  SmallStatement
     (Indents [] ())
-    (MkSimpleStatement
+    (MkSmallStatement
        (AugAssign () (a & trailingWhitespace .~ [Space]) (MkAugAssign at () [Space]) b)
        []
        Nothing
@@ -1391,20 +1566,21 @@ mkAugAssign at a b =
 chainEq :: Raw Expr -> [Raw Expr] -> Raw Statement
 chainEq t [] = expr_ t
 chainEq t (a:as) =
-  SimpleStatement
+  SmallStatement
     (Indents [] ())
-    (MkSimpleStatement
+    (MkSmallStatement
        (Assign () t $ (,) [Space] <$> (a :| as))
        []
        Nothing
        Nothing
        (Just LF))
 
+-- | @a = b@
 (.=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.=) a b =
-  SimpleStatement
+  SmallStatement
     (Indents [] ())
-    (MkSimpleStatement
+    (MkSmallStatement
        (Assign () (a & trailingWhitespace .~ [Space]) $ pure ([Space], b))
        []
        Nothing
@@ -1412,54 +1588,67 @@ chainEq t (a:as) =
        (Just LF))
 infix 0 .=
 
+-- | @a += b@
 (.+=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.+=) = mkAugAssign PlusEq
 infix 0 .+=
 
+-- | @a -= b@
 (.-=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.-=) = mkAugAssign MinusEq
 infix 0 .-=
 
+-- | @a *= b@
 (.*=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.*=) = mkAugAssign StarEq
 infix 0 .*=
 
+-- | @a @= b@
 (.@=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.@=) = mkAugAssign AtEq
 infix 0 .@=
 
+-- | @a /= b@
 (./=) :: Raw Expr -> Raw Expr -> Raw Statement
 (./=) = mkAugAssign SlashEq
 infix 0 ./=
 
+-- | @a %= b@
 (.%=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.%=) = mkAugAssign PercentEq
 infix 0 .%=
 
+-- | @a &= b@
 (.&=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.&=) = mkAugAssign AmpersandEq
 infix 0 .&=
 
+-- | @a |= b@
 (.|=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.|=) = mkAugAssign PipeEq
 infix 0 .|=
 
+-- | @a ^= b@
 (.^=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.^=) = mkAugAssign CaretEq
 infix 0 .^=
 
+-- | @a <<= b@
 (.<<=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.<<=) = mkAugAssign ShiftLeftEq
 infix 0 .<<=
 
+-- | @a >>= b@
 (.>>=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.>>=) = mkAugAssign ShiftRightEq
 infix 0 .>>=
 
+-- | @a **= b@
 (.**=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.**=) = mkAugAssign DoubleStarEq
 infix 0 .**=
 
+-- | @a //= b@
 (.//=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.//=) = mkAugAssign DoubleSlashEq
 infix 0 .//=
@@ -1482,31 +1671,31 @@ mkFor binder collection body =
   }
 
 -- |
--- @'for_' :: 'Raw' 'In' -> ['Raw' 'Line'] -> 'Raw' 'Statement'@
+-- @'for_' :: 'Raw' 'InList' -> ['Raw' 'Line'] -> 'Raw' 'Statement'@
 --
--- >>> for_ (var_ "a" `in_` var_ "b") [line_ (var_ "c" .+= var_ "a")]
+-- >>> for_ (var_ "a" `in_` [var_ "b"]) [line_ (var_ "c" .+= var_ "a")]
 -- for a in b:
 --     c += a
-instance (l ~ Raw Line, s ~ Raw Statement) => HasFor ([l] -> s) InList where
-  for_ (MkInList a b) = forSt_ a b
+instance (l ~ [Raw Line], s ~ Raw For) => ForSyntax (l -> s) InList where
+  for_ (MkInList a b) = mkFor a b
 
-forSt_ :: Raw Expr -> [Raw Expr] -> [Raw Line] -> Raw Statement
-forSt_ val vals block = _For # mkFor val vals block
+forSt_ :: Raw Expr -> [Raw Expr] -> [Raw Line] -> Raw For
+forSt_ = mkFor
 
-instance HasBody For where
+instance BodySyntax For where
   body = forBody
-  body_ = mkBody_ forIndents forBody 
+  body_ = mkBody_ forIndents forBody
 
 instance AsLine For where
-  line_ = line_ . (_For #)
+  line_ = line_ @Statement . (_For #)
 
-class HasAsync s where
+class AsyncSyntax s where
   async_ :: Raw s -> Raw s
 
-instance HasAsync Fundef where
+instance AsyncSyntax Fundef where
   async_ = fdAsync ?~ pure Space
 
-instance HasAsync For where
+instance AsyncSyntax For where
   async_ = forAsync ?~ pure Space
 
 -- | Create a minimal valid 'Finally'
@@ -1552,34 +1741,62 @@ mkTryFinally body fBody =
   , _tfFinally = mkFinally fBody
   }
 
-class HasFinally s where
-  finally_ :: [Raw Line] -> Raw s -> Raw s
+class FinallySyntax s t | s -> t where
+  finally_ :: [Raw Line] -> s -> Raw t
 
-instance HasFinally TryExcept where
+-- |
+-- >>> tryE_ [line_ pass_] & finally_ [line_ pass_]
+-- try:
+--     pass
+-- finally:
+--     pass
+--
+-- >>> tryF_ [line_ pass_] [line_ (a .+= 1)] & finally_ [line_ pass_]
+-- try:
+--     pass
+-- finally:
+--     pass
+--
+-- >>> tryF_ [line_ pass_] & finally_ [line_ pass_]
+-- try:
+--     pass
+-- finally:
+--     pass
+instance FinallySyntax (Raw TryExcept) TryExcept where
   finally_ body = teFinally ?~ mkFinally body
 
-instance HasFinally TryFinally where
+instance FinallySyntax (Raw TryFinally) TryFinally where
   finally_ body = tfFinally .~ mkFinally body
 
-instance HasBody TryExcept where
+instance (a ~ [Raw Line], b ~ Raw TryFinally) => FinallySyntax (a -> b) TryFinally where
+  finally_ body f = f body
+
+instance BodySyntax TryExcept where
   body = teBody
-  body_ = mkBody_ teIndents teBody 
+  body_ = mkBody_ teIndents teBody
 
 -- | @try ... except@ with optional @else@ and optional @finally@
+--
+-- >>> tryE_ [line_ pass_] [line_ ("a" .+= 1)]
+-- try:
+--     pass
+-- except
+--     a += 1
 tryE_ :: [Raw Line] -> Raw Except -> Raw TryExcept
 tryE_ = mkTryExcept
 
-instance HasBody TryFinally where
+instance BodySyntax TryFinally where
   body = tfBody
   body_ = mkBody_ tfIndents tfBody 
 
 -- |
--- @
+-- @try ... finally@
+--
+-- >>> tryF_ [line_ pass_] [line_ ("a" .+= 1)]
 -- try:
---     ...
+--     pass
 -- finally:
---     ...
--- @
+--     a += 1
 tryF_ :: [Raw Line] -> [Raw Line] -> Raw TryFinally
 tryF_ = mkTryFinally
 
@@ -1592,7 +1809,7 @@ instance AsExceptAs ExceptAs where
 instance AsExceptAs Expr where
   toExceptAs e = ExceptAs () e Nothing
 
-class HasExcept s where
+class ExceptSyntax s where
   except_ :: [Raw Line] -> s -> Raw TryExcept
   -- | You can use 'exceptAs_' without a binder:
   --
@@ -1614,20 +1831,20 @@ class HasExcept s where
 -- |
 -- @'except_' :: ['Raw' 'Line'] -> ('Raw' 'Except' -> 'Raw' 'TryExcept') -> 'Raw' 'TryExcept'@
 --
--- @'exceptAs_' :: AsExceptAs => 'Raw' e -> ['Raw' 'Line'] -> ('Raw' 'Except' -> 'Raw' 'TryExcept') -> 'Raw' 'TryExcept'@
+-- @'exceptAs_' :: 'AsExceptAs' e => 'Raw' e -> ['Raw' 'Line'] -> ('Raw' 'Except' -> 'Raw' 'TryExcept') -> 'Raw' 'TryExcept'@
 --
--- >>> _Try # (tryE_ [var_ "a" .= 2] & except_ [var_ "a" .= 3])
+-- >>> tryE_ [var_ "a" .= 2] & except_ [var_ "a" .= 3]
 -- try:
 --     a = 2
 -- except:
 --     a = 3
 --
--- >>> _Try # (tryE_ [var_ "a" .= 2] & exceptAs_ (var_ "Exception" `as_` id_ "b") [var_ "a" .= 3]
+-- >>> tryE_ [var_ "a" .= 2] & exceptAs_ (var_ "Exception" `as_` id_ "b") [var_ "a" .= 3]
 -- try:
 --     a = 2
 -- except Exception as b:
 --     a = 3
-instance (e ~ Raw Except, s ~ Raw TryExcept) => HasExcept (e -> s) where
+instance (e ~ Raw Except, s ~ Raw TryExcept) => ExceptSyntax (e -> s) where
   except_ body f = f $ mkExcept body
   exceptAs_ ea body f = f $ mkExcept body & exceptExceptAs ?~ toExceptAs ea
 
@@ -1645,7 +1862,7 @@ instance (e ~ Raw Except, s ~ Raw TryExcept) => HasExcept (e -> s) where
 -- (someTryStatement :: 'Raw' 'TryExcept') '&'
 --   'exceptAs_' ('var_' \"Exception\" \``as_`\` 'id_' "b") ['line_' 'pass_']
 -- @
-instance HasExcept (Raw TryExcept) where
+instance ExceptSyntax (Raw TryExcept) where
   except_ body = teExcepts %~ (<> pure (mkExcept body))
   exceptAs_ ea body =
     teExcepts %~ (<> pure (mkExcept body & exceptExceptAs ?~ toExceptAs ea))
@@ -1664,7 +1881,7 @@ instance HasExcept (Raw TryExcept) where
 -- (someTryStatement :: 'Raw' 'TryFinally') '&'
 --   'exceptAs_' ('var_' \"Exception\" \``as_`\` 'id_' "b") ['line_' 'pass_']
 -- @
-instance HasExcept (Raw TryFinally) where
+instance ExceptSyntax (Raw TryFinally) where
   except_ body MkTryFinally{..} =
     MkTryExcept
     { _teAnn = _tfAnn
@@ -1688,10 +1905,10 @@ instance HasExcept (Raw TryFinally) where
     }
 
 instance AsLine TryExcept where
-  line_ = line_ . (_TryExcept #)
+  line_ = line_ @Statement . (_TryExcept #)
 
 instance AsLine TryFinally where
-  line_ = line_ . (_TryFinally #)
+  line_ = line_ @Statement . (_TryFinally #)
 
 class As s t u | s t -> u, u -> s t where
   as_ :: Raw s -> Raw t -> Raw u
@@ -1700,9 +1917,12 @@ class As s t u | s t -> u, u -> s t where
 instance As Expr Ident ExceptAs where
   as_ e name = ExceptAs () e $ Just ([Space], name)
 
-class_ :: Raw Ident -> [Raw Arg] -> [Raw Line] -> Raw Statement
+-- |
+-- >>> class_ "A" [] [line_ pass_]
+-- class A:
+--     pass
+class_ :: Raw Ident -> [Raw Arg] -> [Raw Line] -> Raw ClassDef
 class_ name args body =
-  _ClassDef #
   (mkClassDef name body) {
     _cdArguments =
       case args of
@@ -1723,11 +1943,11 @@ mkClassDef name body =
   , _cdBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
   }
 
-instance HasBody ClassDef where
+instance BodySyntax ClassDef where
   body = cdBody
   body_ = mkBody_ cdIndents cdBody 
 
-instance HasDecorators ClassDef where
+instance DecoratorsSyntax ClassDef where
   decorators = cdDecorators
 
   setDecorators new code =
@@ -1737,7 +1957,7 @@ instance HasDecorators ClassDef where
 
   getDecorators code = code ^.. cdDecorators.folded._Exprs
 
-instance HasArguments ClassDef where
+instance ArgumentsSyntax ClassDef where
   setArguments args code =
     code
     { _cdArguments =
@@ -1778,8 +1998,8 @@ mkWith items body =
 -- >>> with_ [withItem_ e Nothing] [line_ $ var_ "b"]
 -- with a:
 --     b
-with_ :: AsWithItem e => NonEmpty (Raw e) -> [Raw Line] -> Raw Statement
-with_ items body = _With # mkWith (toWithItem <$> items) body
+with_ :: AsWithItem e => NonEmpty (Raw e) -> [Raw Line] -> Raw With
+with_ items = mkWith (toWithItem <$> items)
 
 withItem_ :: Raw Expr -> Maybe (Raw Expr) -> Raw WithItem
 withItem_ a b = WithItem () a ((,) [Space] <$> b)
@@ -1797,21 +2017,25 @@ instance AsWithItem Expr where
 instance AsWithItem WithItem where
   toWithItem = id
 
-instance HasBody With where
+instance BodySyntax With where
   body = withBody
   body_ = mkBody_ withIndents withBody 
 
-instance HasAsync With where
+instance AsyncSyntax With where
   async_ = withAsync ?~ pure Space
 
+-- |
+-- >>> ellipsis_
+-- ...
 ellipsis_ :: Raw Expr
 ellipsis_ = Ellipsis () []
 
 class AsTupleItem e where
+  -- | Create a 'TupleItem'
   ti_ :: Raw e -> Raw TupleItem
 
 -- | See 'tuple_'
-instance HasStar Expr TupleItem where
+instance StarSyntax Expr TupleItem where
   s_ = TupleUnpack () [] []
 
 instance AsTupleItem Expr where
@@ -1844,6 +2068,9 @@ tuple_ (a:as) =
       Tuple () a (Comma [Space]) . Just $
       (b, zip (repeat (Comma [Space])) bs, Nothing) ^. _CommaSep1'
 
+-- |
+-- >>> await (var_ "a")
+-- await a
 await_ :: Raw Expr -> Raw Expr
 await_ = Await () [Space]
 
@@ -1872,9 +2099,21 @@ lambda_ params =
     (listToCommaSep params)
     (Colon [Space])
 
-yield_ :: Maybe (Raw Expr) -> Raw Expr
-yield_ a = Yield () (maybe [] (const [Space]) a) a
+-- |
+-- >>> yield_ []
+-- yield
+--
+-- >>> yield_ [var_ "a"]
+-- yield a
+--
+-- >>> yield_ [var_ "a", var_ "b"]
+-- yield a, b
+yield_ :: [Raw Expr] -> Raw Expr
+yield_ as = Yield () (foldr (\_ _ -> [Space]) [] as) (listToCommaSep as)
 
+-- |
+-- >>> yieldFrom_ (var_ "a")
+-- yield from a
 yieldFrom_ :: Raw Expr -> Raw Expr
 yieldFrom_ = YieldFrom () [Space] [Space]
 
@@ -1888,7 +2127,7 @@ yieldFrom_ = YieldFrom () [Space] [Space]
 fullSlice_ :: Raw Expr
 fullSlice_ = slice_ Nothing Nothing Nothing
 
--- | Slice with *step* x
+-- | Slice with *step* @x@
 --
 -- >>> subs_ (var_ "a") (sliceS_ $ int_ (-1))
 -- a[::-1]
@@ -1898,7 +2137,7 @@ fullSlice_ = slice_ Nothing Nothing Nothing
 sliceS_ :: Raw Expr -> Raw Expr
 sliceS_ x = slice_ Nothing Nothing (Just x)
 
--- | Slice *from* x
+-- | Slice *from* @x@
 --
 -- >>> subs_ (var_ "a") (sliceF_ $ int_ 0)
 -- a[1:]
@@ -1908,7 +2147,7 @@ sliceS_ x = slice_ Nothing Nothing (Just x)
 sliceF_ :: Raw Expr -> Raw Expr
 sliceF_ x = slice_ (Just x) Nothing Nothing
 
--- | Slice *from* x, with *step* y
+-- | Slice *from* @x@, with *step* @y@
 --
 -- >>> subs_ (var_ "a") (sliceFS_ (int_ 0) (int_ 2))
 -- a[1::2]
@@ -1918,7 +2157,7 @@ sliceF_ x = slice_ (Just x) Nothing Nothing
 sliceFS_ :: Raw Expr -> Raw Expr -> Raw Expr
 sliceFS_ x y = slice_ (Just x) Nothing (Just y)
 
--- | Slice *to* x
+-- | Slice /To/ @x@
 --
 -- >>> subs_ (var_ "a") (sliceT_ $ int_ 10)
 -- a[:10]
@@ -1928,7 +2167,7 @@ sliceFS_ x y = slice_ (Just x) Nothing (Just y)
 sliceT_ :: Raw Expr -> Raw Expr
 sliceT_ x = slice_ Nothing (Just x) Nothing
 
--- | Slice *to* x, with *step* y
+-- | Slice /To/ @x@, with /Step/ @y@
 --
 -- >>> subs_ (var_ "a") (sliceTS_ (int_ 10) (int_ 2))
 -- a[:10:2]
@@ -1938,7 +2177,7 @@ sliceT_ x = slice_ Nothing (Just x) Nothing
 sliceTS_ :: Raw Expr -> Raw Expr -> Raw Expr
 sliceTS_ x y = slice_ Nothing (Just x) (Just y)
 
--- | Slice *from* x *to* y
+-- | Slice /From/ @x@ /To/ @y@
 --
 -- >>> subs_ (var_ "a") (sliceFT_ (int_ 1) (int_ 10))
 -- a[1:10]
@@ -1948,7 +2187,7 @@ sliceTS_ x y = slice_ Nothing (Just x) (Just y)
 sliceFT_ :: Raw Expr -> Raw Expr -> Raw Expr
 sliceFT_ x y = slice_ (Just x) (Just y) Nothing
 
--- | Slice *from* x *to* y, with *step* z
+-- | Slice /From/ @x@ /To/ @y@, with /Step/ @z@
 --
 -- >>> subs_ (var_ "a") (sliceFTS_ (int_ 1) (int_ 10) (int_ 2))
 -- a[1:10:2]
@@ -1960,8 +2199,8 @@ sliceFTS_ x y z = slice_ (Just x) (Just y) (Just z)
 
 -- | A slice object
 --
--- Represents a call to a functionc named \"slice\", with 3 arguments.
--- If an argument is a 'Nothing' then it becomes a @None@, and if the argument is a
+-- Represents a call to a function named @slice@, with 3 arguments.
+-- If an argument is a 'Nothing' then it becomes 'None', and if the argument is a
 -- 'Just' then the contents are extracted.
 slice_ :: Maybe (Raw Expr) -> Maybe (Raw Expr) -> Maybe (Raw Expr) -> Raw Expr
 slice_ a b c =

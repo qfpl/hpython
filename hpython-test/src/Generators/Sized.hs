@@ -94,7 +94,9 @@ sizedNonEmpty ma = sized2 (:|) ma (sizedList ma)
 sizedMaybe :: MonadGen m => m a -> m (Maybe a)
 sizedMaybe ma =
   Gen.sized $ \n ->
-    if n == 0 then pure Nothing else Gen.maybe (Gen.resize (max 0 $ n-1) ma)
+    if n == 0
+    then pure Nothing
+    else Gen.maybe (Gen.resize (max 0 $ n-1) ma)
 
 sizedRecursive :: (HasCallStack, MonadGen m) => [m a] -> [m a] -> m a
 sizedRecursive bases recs =

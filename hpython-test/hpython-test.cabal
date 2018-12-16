@@ -34,6 +34,7 @@ library
     Generators.Correct
     Generators.General
     Generators.Sized
+    DSL
     Printer
     TrailingWhitespace
   build-depends:       base >=4.9 && <4.13

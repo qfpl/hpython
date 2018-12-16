@@ -4,34 +4,35 @@ Haskell-based language tools for Python
 
 <img src="http://i.imgur.com/0h9dFhl.png" width="300px"/>
 
+`hpython` provides an abstract syntax tree for Python 3.5, along with a parser, printer,
+and syntax checker. It also exposes optics for working with the AST, and a DSL for writing
+Python programs directly in Haskell.
+
+## Features
+
+* Formatting-preserving syntax tree
+* Parser and printer, with round-trip laws: 
+  * `print ∘ parse ≡ id`
+  * `(parse ∘ print) ∘ (parse ∘ print) ≡ parse ∘ print`
+* Optics for manipulating the syntax tree
+* Indentation, syntax, and scope checking
+* The syntax tree is indexed by its level of validation, to distinguish between syntactically
+  valid Python and unvalidated code
+* Convenient DSL for building Python programs
+
 ## Examples
 
 See the `example` directory
 
-## `hpython` contains proofs of concept for a few of ideas:
+## Development Pipeline
 
-### Validation Stages
+* Support other versions of Python while re-using as much common code as possible
+* Style configs for the DSL
+* Human readable validation errors, with source spans
 
-Using phantom types and type-level sets to re-use the same abstract syntax tree, but
-recieve different validation guarantees. A Python program begins in the "unvalidated"
-state (type-level empty set). Then, increasing levels of validation are imposed, and its
-level of validation is updated to reflect this (members are added to the set).
+## Contribution
 
-This also means that "un-validating" data has no runtime cost.
+Feel free to file an issue or pull request on Github, or contact us at:
 
-### Optics-based Refactoring
-
-Prisms for the syntax tree: prisms can be used to match on a tree with any validation level,
-but can only be used to construct unvalidated terms. We can't be sure that we didn't build
-an invalid tree.
-
-Where possible, datatypes in the abstract syntax tree have instances of
-[Plated](https://hackage.haskell.org/package/lens/docs/Control-Lens-Plated.html). Alongside
-the prisms, this provides a powerful API for rewriting arbitrary terms.
-
-### Python 2 and 3 compatibility
-
-There is a subset of Python programs which are compatible with both Python 2 and 3. It would
-be nice if we could talk about this difference at the type level.
-
-Coming soon (maybe).
+IRC - #qfpl on Freenode
+Email - <oᴉ˙ldɟb@llǝʞsɐɥ>

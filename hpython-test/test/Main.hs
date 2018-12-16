@@ -32,8 +32,9 @@ import qualified Hedgehog.Range as Range
 import qualified Generators.General as General
 import qualified Generators.Correct as Correct
 
-import TrailingWhitespace (trailingWhitespaceTests)
+import DSL (dslTests)
 import Printer (printerTests)
+import TrailingWhitespace (trailingWhitespaceTests)
 
 runPython3 :: (MonadTest m, MonadIO m) => FilePath -> Bool -> Text -> m ()
 runPython3 path shouldSucceed str = do
@@ -154,7 +155,7 @@ string_correct path =
 
 validateExprSyntax'
   :: Expr '[Indentation] a
-  -> Validation (NonEmpty (SyntaxError '[Indentation] a)) (Expr '[Syntax, Indentation] a)
+  -> Validation (NonEmpty (SyntaxError a)) (Expr '[Syntax, Indentation] a)
 validateExprSyntax' = runValidateSyntax . validateExprSyntax
 
 validateExprIndentation'
@@ -164,7 +165,7 @@ validateExprIndentation' = runValidateIndentation . validateExprIndentation
 
 validateStatementSyntax'
   :: Statement '[Indentation] a
-  -> Validation (NonEmpty (SyntaxError '[Indentation] a)) (Statement '[Syntax, Indentation] a)
+  -> Validation (NonEmpty (SyntaxError a)) (Statement '[Syntax, Indentation] a)
 validateStatementSyntax' =
   runValidateSyntax . validateStatementSyntax
 
@@ -175,7 +176,7 @@ validateStatementIndentation' = runValidateIndentation . validateStatementIndent
 
 validateModuleSyntax'
   :: Module '[Indentation] a
-  -> Validation (NonEmpty (SyntaxError '[Indentation] a)) (Module '[Syntax, Indentation] a)
+  -> Validation (NonEmpty (SyntaxError a)) (Module '[Syntax, Indentation] a)
 validateModuleSyntax' =
   runValidateSyntax . validateModuleSyntax
 
@@ -228,7 +229,8 @@ main =
   where
     file = "hedgehog-test.py"
     groups =
-      [ printerTests
+      [ dslTests
+      , printerTests
       , trailingWhitespaceTests
       , Group "main tests"
           [ ("Haskell String to Python String", withTests 500 $ string_correct file)

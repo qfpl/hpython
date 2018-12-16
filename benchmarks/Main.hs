@@ -28,7 +28,7 @@ parseCheckSeq name = do
     Success res ->
       case runValidateSyntax (validateModuleSyntax res) of
         Failure errs' ->
-          print (errs' :: (NonEmpty (SyntaxError '[Indentation] SrcInfo))) *> exitFailure
+          print (errs' :: (NonEmpty (SyntaxError SrcInfo))) *> exitFailure
         Success a -> pure $ seq a ()
 
 tokenizeSeq :: FilePath -> IO ()

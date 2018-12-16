@@ -16,11 +16,10 @@ import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.Semigroup ((<>))
 
-
 import Language.Python.Optics
 import Language.Python.DSL
 import Language.Python.Syntax.Expr (Expr (..), _Exprs, argExpr, paramName)
-import Language.Python.Syntax.Statement (CompoundStatement (..), Statement (..), SimpleStatement (..), SmallStatement (..), _Statements)
+import Language.Python.Syntax.Statement (CompoundStatement (..), Statement (..), SmallStatement (..), SimpleStatement (..), _Statements)
 
 optimizeTailRecursion :: Raw Statement -> Maybe (Raw Statement)
 optimizeTailRecursion st = do
@@ -72,7 +71,7 @@ optimizeTailRecursion st = do
         CompoundStatement (If _ _ _ _ sts [] sts') ->
           allOf _last (hasTC name) (sts ^.. _Statements) ||
           allOf _last (hasTC name) (sts' ^.. _Just._3._Statements)
-        SimpleStatement _ (MkSimpleStatement s ss _ _ _) ->
+        SmallStatement _ (MkSmallStatement s ss _ _ _) ->
           case last (s : fmap (^. _2) ss) of
             Return _ _ (Just e) -> isTailCall name e
             -- Return _ _ Nothing -> True
@@ -111,7 +110,7 @@ optimizeTailRecursion st = do
       | otherwise =
           case st of
             CompoundStatement{} -> [line_ st]
-            SimpleStatement idnts (MkSimpleStatement s ss sc cmt nl) ->
+            SmallStatement idnts (MkSmallStatement s ss sc cmt nl) ->
               let
                 initExps = foldr (\_ _ -> init ss) [] ss
                 lastExp = foldrOf (folded._2) (\_ _ -> last ss ^. _2) s ss
@@ -120,8 +119,8 @@ optimizeTailRecursion st = do
                     [] -> []
                     first : rest ->
                       [ line_ $
-                        SimpleStatement idnts
-                        (MkSimpleStatement (first ^. _2) rest sc cmt nl)
+                        SmallStatement idnts
+                        (MkSmallStatement (first ^. _2) rest sc cmt nl)
                       ]
               in
                 case lastExp of

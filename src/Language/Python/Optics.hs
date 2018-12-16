@@ -1,6 +1,8 @@
 {-# language DataKinds #-}
-{-# language FunctionalDependencies, MultiParamTypeClasses #-}
+{-# language FlexibleContexts #-}
+{-# language MultiParamTypeClasses #-}
 {-# language FlexibleInstances #-}
+{-# language InstanceSigs, ScopedTypeVariables #-}
 {-# language PolyKinds #-}
 {-# language LambdaCase #-}
 
@@ -18,34 +20,33 @@ Optics for manipulating Python syntax trees
 
 module Language.Python.Optics
   ( module Language.Python.Optics.Validated
-  , -- * Indentation
-    HasIndents(..)
-  , _Indent
+    -- * Indentation
+  , module Language.Python.Optics.Indents
     -- * Newlines
-  , HasNewlines(..)
+  , module Language.Python.Optics.Newlines
     -- * Simple statements
     -- ** Assignment
   , assignTargets
     -- * Compound statements
-    -- ** Function defintions
-  , _Fundef
+  , HasCompoundStatement(..)
+    -- ** Function definitions
+  , HasFundef(..)
     -- ** Class defintions
-  , _ClassDef
+  , HasClassDef(..)
     -- ** @while@ statements
-  , _While
+  , HasWhile(..)
     -- ** @for@ statements
-  , _For
+  , HasFor(..)
     -- ** @with@ statements
-  , _With
+  , HasWith(..)
     -- ** @if@ statements
-  , _If
+  , HasIf(..)
   , _Elif
     -- ** @try@ statements
-  , _TryExcept
-  , _TryFinally
+  , HasTryExcept(..)
+  , HasTryFinally(..)
   , _Finally
   , _Except
-  , AsTry(..)
     -- ** @else@
   , _Else
     -- * Parameters
@@ -73,17 +74,15 @@ where
 
 import Control.Lens.Getter ((^.), view)
 import Control.Lens.Iso (Iso', iso, from)
-import Control.Lens.Traversal (Traversal, Traversal', traverseOf)
-import Control.Lens.Tuple (_2, _3, _4)
-import Control.Lens.Prism (Prism, _Right, prism)
-import Data.Coerce (coerce)
+import Control.Lens.Traversal (Traversal)
+import Control.Lens.Prism (Prism, prism)
 
-import Language.Python.Internal.Token (PyToken(..))
+import Language.Python.Optics.Indents
+import Language.Python.Optics.Newlines
 import Language.Python.Optics.Validated
-import Language.Python.Syntax.Expr (Expr (..), TupleItem (TupleUnpack), ListItem (ListUnpack), Param (..), _Exprs)
+import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
-import Language.Python.Syntax.Module
-import Language.Python.Syntax.Statement (Block (..), CompoundStatement (..), Decorator (..), ExceptAs (..), SimpleStatement (..), Statement (..), Suite (..), _Statements)
+import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Types
 import Language.Python.Syntax.Whitespace
 
@@ -190,35 +189,57 @@ _UnnamedStarParam =
         UnnamedStarParam a b -> Right (MkUnnamedStarParam a b)
         a -> Left $ a ^. unvalidated)
 
-_Fundef
-  :: Prism
-       (Statement v a)
-       (Statement '[] a)
-       (Fundef v a)
-       (Fundef '[] a)
-_Fundef =
-  prism
-    (\(MkFundef idnt a b c d e f g h i j) ->
-       CompoundStatement (Fundef idnt a b c d e f g h i j))
-    (\case
-        CompoundStatement (Fundef idnt a b c d e f g h i j) ->
-          Right $ MkFundef idnt a b c d e f g h i j
-        a -> Left $ a ^. unvalidated)
+class HasCompoundStatement s where
+  _CompoundStatement :: Prism (s v a) (s '[] a) (CompoundStatement v a) (CompoundStatement '[] a)
 
-_While
-  :: Prism
-       (Statement v a)
-       (Statement '[] a)
-       (While v a)
-       (While '[] a)
-_While =
-  prism
-    (\(MkWhile a b c d e f) ->
-       CompoundStatement (While a b c d e $ view _Else <$> f))
-    (\case
-        CompoundStatement (While a b c d e f) ->
-          Right . MkWhile a b c d e $ view (from _Else) <$> f
-        a -> Left $ a ^. unvalidated)
+instance HasCompoundStatement CompoundStatement where
+  _CompoundStatement = id
+
+instance HasCompoundStatement Statement where
+  _CompoundStatement =
+    prism
+      CompoundStatement
+      (\case
+          CompoundStatement a -> Right a
+          a -> Left (a ^. unvalidated))
+
+class HasFundef s where
+  _Fundef :: Prism (s v a) (s '[] a) (Fundef v a) (Fundef '[] a)
+
+instance HasFundef Fundef where
+  _Fundef = id
+
+instance HasFundef CompoundStatement where
+  _Fundef =
+    prism
+      (\(MkFundef idnt a b c d e f g h i j) ->
+         Fundef idnt a b c d e f g h i j)
+      (\case
+          Fundef idnt a b c d e f g h i j ->
+            Right $ MkFundef idnt a b c d e f g h i j
+          a -> Left $ a ^. unvalidated)
+
+instance HasFundef Statement where
+  _Fundef = _CompoundStatement._Fundef
+
+class HasWhile s where
+  _While :: Prism (s v a) (s '[] a) (While v a) (While '[] a)
+
+instance HasWhile While where
+  _While = id
+
+instance HasWhile CompoundStatement where
+  _While =
+    prism
+      (\(MkWhile a b c d e f) ->
+        While a b c d e $ view _Else <$> f)
+      (\case
+          While a b c d e f ->
+            Right . MkWhile a b c d e $ view (from _Else) <$> f
+          a -> Left $ a ^. unvalidated)
+
+instance HasWhile Statement where
+  _While = _CompoundStatement._While
 
 _Else :: Iso' (Else v a) (Indents a, [Whitespace], Suite v a)
 _Else = iso (\(MkElse a b c) -> (a, b, c)) (\(a, b, c) -> MkElse a b c)
@@ -232,59 +253,85 @@ _Finally = iso (\(MkFinally a b c) -> (a, b, c)) (\(a, b, c) -> MkFinally a b c)
 _Except :: Iso' (Except v a) (Indents a, [Whitespace], Maybe (ExceptAs v a), Suite v a)
 _Except = iso (\(MkExcept a b c d) -> (a, b, c, d)) (\(a, b, c, d) -> MkExcept a b c d)
 
-_If :: Prism (Statement v a) (Statement '[] a) (If v a) (If '[] a)
-_If =
-  prism
-    (\(MkIf a b c d e f g) ->
-       CompoundStatement (If a b c d e (view _Elif <$> f) (view _Else <$> g)))
-    (\case
-        CompoundStatement (If a b c d e f g) ->
-          Right $ MkIf a b c d e (view (from _Elif) <$> f) (view (from _Else) <$> g)
-        a -> Left $ a ^. unvalidated)
+class HasIf s where
+  _If :: Prism (s v a) (s '[] a) (If v a) (If '[] a)
 
-class AsTry s where
-  _Try :: Prism (Statement v a) (Statement '[] a) (s v a) (s '[] a)
+instance HasIf If where
+  _If = id
 
-instance AsTry TryExcept where
-  _Try = _TryExcept
+instance HasIf CompoundStatement where
+  _If =
+    prism
+      (\(MkIf a b c d e f g) ->
+        If a b c d e (view _Elif <$> f) (view _Else <$> g))
+      (\case
+          If a b c d e f g ->
+            Right $ MkIf a b c d e (view (from _Elif) <$> f) (view (from _Else) <$> g)
+          a -> Left $ a ^. unvalidated)
 
-instance AsTry TryFinally where
-  _Try = _TryFinally
+instance HasIf Statement where
+  _If = _CompoundStatement._If
 
-_TryExcept :: Prism (Statement v a) (Statement '[] a) (TryExcept v a) (TryExcept '[] a)
-_TryExcept =
-  prism
-    (\(MkTryExcept a b c d e f g) ->
-       CompoundStatement $
-       TryExcept a b c d (view _Except <$> e) (view _Else <$> f) (view _Finally <$> g))
-    (\case
-        CompoundStatement (TryExcept a b c d e f g) ->
-          Right $
-          MkTryExcept a b c d
-            (view (from _Except) <$> e)
-            (view (from _Else) <$> f)
-            (view (from _Finally) <$> g)
-        a -> Left $ a ^. unvalidated)
+class HasTryExcept s where
+  _TryExcept :: Prism (s v a) (s '[] a) (TryExcept v a) (TryExcept '[] a)
 
-_TryFinally :: Prism (Statement v a) (Statement '[] a) (TryFinally v a) (TryFinally '[] a)
-_TryFinally =
-  prism
-    (\(MkTryFinally a b c d e) ->
-       CompoundStatement $ (\(x, y, z) -> TryFinally a b c d x y z) (e ^. _Finally))
-    (\case
-        CompoundStatement (TryFinally a b c d e f g) ->
-          Right $ MkTryFinally a b c d ((e, f, g) ^. from _Finally)
-        a -> Left $ a ^. unvalidated)
+instance HasTryExcept TryExcept where
+  _TryExcept = id
 
-_For :: Prism (Statement v a) (Statement '[] a) (For v a) (For '[] a)
-_For =
-  prism
-    (\(MkFor a b c d e f g h i) ->
-       CompoundStatement (For a b c d e f g h (view _Else <$> i)))
-    (\case
-        CompoundStatement (For a b c d e f g h i) ->
-          Right $ MkFor a b c d e f g h (view (from _Else) <$> i)
-        a -> Left $ a ^. unvalidated)
+instance HasTryExcept CompoundStatement where
+  _TryExcept =
+    prism
+      (\(MkTryExcept a b c d e f g) ->
+        TryExcept a b c d (view _Except <$> e) (view _Else <$> f) (view _Finally <$> g))
+      (\case
+          TryExcept a b c d e f g ->
+            Right $
+            MkTryExcept a b c d
+              (view (from _Except) <$> e)
+              (view (from _Else) <$> f)
+              (view (from _Finally) <$> g)
+          a -> Left $ a ^. unvalidated)
+
+instance HasTryExcept Statement where
+  _TryExcept = _CompoundStatement._TryExcept
+
+class HasTryFinally s where
+  _TryFinally :: Prism (s v a) (s '[] a) (TryFinally v a) (TryFinally '[] a)
+
+instance HasTryFinally TryFinally where
+  _TryFinally = id
+
+instance HasTryFinally CompoundStatement where
+  _TryFinally =
+    prism
+      (\(MkTryFinally a b c d e) ->
+        (\(x, y, z) -> TryFinally a b c d x y z) (e ^. _Finally))
+      (\case
+          TryFinally a b c d e f g ->
+            Right $ MkTryFinally a b c d ((e, f, g) ^. from _Finally)
+          a -> Left $ a ^. unvalidated)
+
+instance HasTryFinally Statement where
+  _TryFinally = _CompoundStatement._TryFinally
+
+class HasFor s where
+  _For :: Prism (s v a) (s '[] a) (For v a) (For '[] a)
+
+instance HasFor For where
+  _For = id
+
+instance HasFor CompoundStatement where
+  _For =
+    prism
+      (\(MkFor a b c d e f g h i) ->
+        For a b c d e f g h (view _Else <$> i))
+      (\case
+          For a b c d e f g h i ->
+            Right $ MkFor a b c d e f g h (view (from _Else) <$> i)
+          a -> Left $ a ^. unvalidated)
+
+instance HasFor Statement where
+  _For = _CompoundStatement._For
 
 _Call :: Prism (Expr v a) (Expr '[] a) (Call v a) (Call '[] a)
 _Call =
@@ -294,21 +341,39 @@ _Call =
         Call a b c d e -> Right $ MkCall a b c d e
         a -> Left $ a ^. unvalidated)
 
-_ClassDef :: Prism (Statement v a) (Statement '[] a) (ClassDef v a) (ClassDef '[] a)
-_ClassDef =
-  prism
-    (\(MkClassDef a b c d e f g) -> CompoundStatement $ ClassDef a b c d e f g)
-    (\case
-        CompoundStatement (ClassDef a b c d e f g) -> Right $ MkClassDef a b c d e f g
-        a -> Left $ a ^. unvalidated)
+class HasClassDef s where
+  _ClassDef :: Prism (s v a) (s '[] a) (ClassDef v a) (ClassDef '[] a)
 
-_With :: Prism (Statement v a) (Statement '[] a) (With v a) (With '[] a)
-_With =
-  prism
-    (\(MkWith a b c d e f) -> CompoundStatement $ With a b c d e f)
-    (\case
-        CompoundStatement (With a b c d e f) -> Right $ MkWith a b c d e f
-        a -> Left $ a ^. unvalidated)
+instance HasClassDef ClassDef where
+  _ClassDef = id
+
+instance HasClassDef CompoundStatement where
+  _ClassDef =
+    prism
+      (\(MkClassDef a b c d e f g) -> ClassDef a b c d e f g)
+      (\case
+          ClassDef a b c d e f g -> Right $ MkClassDef a b c d e f g
+          a -> Left $ a ^. unvalidated)
+
+instance HasClassDef Statement where
+  _ClassDef = _CompoundStatement._ClassDef
+
+class HasWith s where
+  _With :: Prism (s v a) (s '[] a) (With v a) (With '[] a)
+
+instance HasWith With where
+  _With = id
+
+instance HasWith CompoundStatement where
+  _With =
+    prism
+      (\(MkWith a b c d e f) -> With a b c d e f)
+      (\case
+          With a b c d e f -> Right $ MkWith a b c d e f
+          a -> Left $ a ^. unvalidated)
+
+instance HasWith Statement where
+  _With = _CompoundStatement._With
 
 _Ident :: Prism (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
 _Ident =
@@ -318,320 +383,39 @@ _Ident =
         Ident a -> Right a
         a -> Left $ a ^. unvalidated)
 
--- | 'Traversal'' targeting the indent-chunks in a structure
+-- | 'Traversal' targeting the variables that would modified as a result of an assignment
 --
--- e.g.
---
--- This is one indent chunk:
+-- Here are some examples of assignment targets:
 --
 -- @
--- def a():
---     pass
---     if b:
---         pass
--- ^^^^
+-- a = b
+-- ^
 -- @
 --
--- and this is another
+-- @
+-- (a, b, c) = d
+--  ^  ^  ^
+-- @
 --
 -- @
--- def a():
---     pass
---     if b:
---         pass
---     ^^^^
+-- [a, b, *c] = d
+--  ^  ^   ^
 -- @
-_Indent :: HasIndents s a => Traversal' s [Whitespace]
-_Indent = _Indents.indentsValue.traverse.indentWhitespaces
-
-class HasIndents s a | s -> a where
-  -- | 'Traversal'' targeting the indentation inside a structure
-  --
-  -- Note: whitespace inside \'enclosed forms\' (such as lists or tuples) is not
-  -- considered indentation.
-  --
-  -- e.g.
-  --
-  -- In the following code, there is only one chunk of indentation:
-  --
-  -- @
-  -- def a():
-  --     [ b
-  --     , c
-  --     , d
-  --     ]
-  -- @
-  --
-  -- it's here:
-  --
-  -- @
-  -- def a():
-  --     [ b
-  -- ^^^^
-  --     , c
-  --     , d
-  --     ]
-  -- @
-  --
-  -- The rest is whitespace that is internal to the list.
-  _Indents :: Traversal' s (Indents a)
-
-instance HasIndents (PyToken a) a where
-  _Indents f (TkIndent a i) = TkIndent a <$> f i
-  _Indents f (TkLevel a i) = TkLevel a <$> f i
-  _Indents _ a = pure a
-
-instance HasIndents (Fundef '[] a) a where
-  _Indents fun (MkFundef a b c d e f g h i j k) =
-    (\b' c' -> MkFundef a b' c' d e f g h i j) <$>
-    (traverse._Indents) fun b <*>
-    fun c <*>
-    _Indents fun k
-
-instance HasIndents (For '[] a) a where
-  _Indents fun (MkFor a b c d e f g h i) =
-    (\b' -> MkFor a b' c d e f g) <$>
-    fun b <*>
-    _Indents fun h <*>
-    (traverse._Indents) fun i
-
-instance HasIndents (TryFinally '[] a) a where
-  _Indents fun (MkTryFinally a b c d e) =
-    (\b' -> MkTryFinally a b' c) <$>
-    fun b <*>
-    _Indents fun d <*>
-    _Indents fun e
-
-instance HasIndents (TryExcept '[] a) a where
-  _Indents fun (MkTryExcept a b c d e f g) =
-    (\b' -> MkTryExcept a b' c) <$>
-    fun b <*>
-    _Indents fun d <*>
-    (traverse._Indents) fun e <*>
-    (traverse._Indents) fun f <*>
-    (traverse._Indents) fun g
-
-instance HasIndents (Except '[] a) a where
-  _Indents fun (MkExcept a b c d) =
-    (\a' -> MkExcept a' b c) <$>
-    fun a <*>
-    _Indents fun d
-
-instance HasIndents (Finally '[] a) a where
-  _Indents fun (MkFinally a b c) =
-    (\a' -> MkFinally a' b) <$>
-    fun a <*>
-    _Indents fun c
-
-instance HasIndents (If '[] a) a where
-  _Indents fun (MkIf a b c d e f g) =
-    (\b' -> MkIf a b' c d) <$>
-    fun b <*>
-    _Indents fun e <*>
-    (traverse._Indents) fun f <*>
-    (traverse._Indents) fun g
-
-instance HasIndents (While '[] a) a where
-  _Indents fun (MkWhile a b c d e f) =
-    (\b' -> MkWhile a b' c d) <$>
-    fun b <*>
-    _Indents fun e <*>
-    (traverse._Indents) fun f
-
-instance HasIndents (Elif '[] a) a where
-  _Indents fun (MkElif a b c d) =
-    (\a' -> MkElif a' b c) <$>
-    fun a <*>
-    _Indents fun d
-
-instance HasIndents (Else '[] a) a where
-  _Indents f (MkElse a b c) = MkElse <$> f a <*> pure b <*> _Indents f c
-
-instance HasIndents (SimpleStatement '[] a) a where
-  _Indents _ (MkSimpleStatement a b c d e) =
-    pure $ MkSimpleStatement a b c d e
-
-instance HasIndents (Statement '[] a) a where
-  _Indents f (SimpleStatement idnt a) = SimpleStatement <$> f idnt <*> _Indents f a
-  _Indents f (CompoundStatement c) = CompoundStatement <$> _Indents f c
-
-instance HasIndents (Block '[] a) a where
-  _Indents = _Statements._Indents
-
-instance HasIndents (Suite '[] a) a where
-  _Indents _ (SuiteOne a b c) = pure $ SuiteOne a b c
-  _Indents f (SuiteMany a b c d e) = SuiteMany a b c d <$> _Indents f e
-
-instance HasIndents (Decorator '[] a) a where
-  _Indents fun (Decorator a b c d e f g) =
-    (\b' -> Decorator a b' c d e f g) <$>
-    fun b
-
-instance HasIndents (ClassDef '[] a) a where
-  _Indents fun (MkClassDef a b c d e f g) =
-    (\b' c' -> MkClassDef a b' c' d e f) <$>
-    (traverse._Indents) fun b <*>
-    fun c <*>
-    _Indents fun g
-
-instance HasIndents (With '[] a) a where
-  _Indents fun (MkWith a b c d e f) =
-    (\b' -> MkWith a b' c d e) <$>
-    fun b <*>
-    _Indents fun f
-
-instance HasIndents (CompoundStatement '[] a) a where
-  _Indents fun s =
-    case s of
-      Fundef a decos idnt asyncWs b c d e f g h ->
-        (\decos' idnt' -> Fundef a decos' idnt' asyncWs b c d e f g) <$>
-        (traverse._Indents) fun decos <*>
-        fun idnt <*>
-        _Indents fun h
-      If a idnt b c d elifs e ->
-        (\idnt' -> If a idnt' b c) <$>
-        fun idnt <*>
-        _Indents fun d <*>
-        traverse
-          (\(idnt, a, b, c) ->
-             (\idnt'  -> (,,,) idnt' a b) <$>
-             fun idnt <*>
-             _Indents fun c)
-          elifs <*>
-        traverse
-          (\(idnt, a, b) ->
-             (\idnt' -> (,,) idnt' a) <$>
-             fun idnt <*>
-             _Indents fun b)
-          e
-      While a idnt b c d e ->
-        (\idnt' -> While a idnt' b c) <$>
-        fun idnt <*>
-        _Indents fun d <*>
-        traverse
-          (\(idnt, a, b) ->
-             (\idnt' -> (,,) idnt' a) <$>
-             fun idnt <*>
-             _Indents fun b)
-          e
-      TryExcept a idnt b c d e f ->
-        (\idnt' -> TryExcept a idnt' b) <$>
-        fun idnt <*>
-        _Indents fun c <*>
-        traverse
-          (\(idnt, a, b, c) ->
-             (\idnt' -> (,,,) idnt' a b) <$>
-             fun idnt <*>
-             _Indents fun c)
-          d <*>
-        traverse
-          (\(idnt, a, b) ->
-             (\idnt' -> (,,) idnt' a) <$>
-             fun idnt <*>
-             _Indents fun b)
-          e <*>
-        traverse
-          (\(idnt, a, b) ->
-             (\idnt' -> (,,) idnt' a) <$>
-             fun idnt <*>
-             _Indents fun b)
-          f
-      TryFinally a idnt b c idnt2 d e ->
-        (\idnt' c' idnt2' -> TryFinally a idnt' b c' idnt2' d) <$>
-        fun idnt <*>
-        _Indents fun c <*>
-        fun idnt2 <*>
-        _Indents fun e
-      For a idnt asyncWs b c d e f g ->
-        (\idnt' -> For a idnt' asyncWs b c d e) <$>
-        fun idnt <*>
-        _Indents fun f <*>
-        traverse
-          (\(idnt, a, b) ->
-             (\idnt' -> (,,) idnt' a) <$>
-             fun idnt <*>
-             _Indents fun b)
-          g
-      ClassDef a decos idnt b c d e ->
-        (\decos' idnt' -> ClassDef a decos' idnt' b c d) <$>
-        traverse (_Indents fun) decos <*>
-        fun idnt <*>
-        _Indents fun e
-      With a b asyncWs c d e ->
-        (\b' -> With a b' asyncWs c d) <$>
-        fun b <*>
-        _Indents fun e
-
-class HasNewlines s where
-  -- | 'Traversal'' targeting all of thie 'Newline's in a structure
-  _Newlines :: Traversal' (s v a) Newline
-
-instance HasNewlines Block where
-  _Newlines f (Block a b c) =
-    Block <$>
-    (traverse._2) f a <*>
-    _Newlines f b <*>
-    (traverse._Right._Newlines) f c
-
-instance HasNewlines Suite where
-  _Newlines fun (SuiteOne a b c) = SuiteOne a b <$> _Newlines fun c
-  _Newlines f (SuiteMany a b c d e) = SuiteMany a b c <$> f d <*> _Newlines f e
-
-instance HasNewlines Decorator where
-  _Newlines fun (Decorator a b c d e f g) =
-    Decorator a b c d e <$> fun f <*> (traverse._2) fun g
-
-instance HasNewlines CompoundStatement where
-  _Newlines fun s =
-    case s of
-      Fundef ann decos idnt asyncWs ws1 name ws2 params ws3 mty s ->
-        (\decos' -> Fundef ann decos' idnt asyncWs ws1 name ws2 params ws3 mty) <$>
-        (traverse._Newlines) fun decos <*>
-        _Newlines fun s
-      If idnt ann ws1 cond s elifs els ->
-        If idnt ann ws1 cond <$>
-        _Newlines fun s <*>
-        traverseOf (traverse._4._Newlines) fun elifs <*>
-        traverseOf (traverse._3._Newlines) fun els
-      While idnt ann ws1 cond s els ->
-        While idnt ann ws1 cond <$>
-        _Newlines fun s <*>
-        traverseOf (traverse._3._Newlines) fun els
-      TryExcept idnt a b c f k l ->
-        TryExcept idnt a b <$> _Newlines fun c <*>
-        traverseOf (traverse._4._Newlines) fun f <*>
-        traverseOf (traverse._3._Newlines) fun k <*>
-        traverseOf (traverse._3._Newlines) fun l
-      TryFinally idnt a b c idnt2 f g ->
-        TryFinally idnt a b <$> _Newlines fun c <*> pure idnt2 <*>
-        pure f <*> _Newlines fun g
-      For idnt a asyncWs b c d e f g ->
-        For idnt a asyncWs b c d e <$> _Newlines fun f <*> (traverse._3._Newlines) fun g
-      ClassDef a decos idnt b c d e ->
-        (\decos' -> ClassDef a decos' idnt b (coerce c) (coerce d)) <$>
-        traverse (_Newlines fun) decos <*>
-        _Newlines fun e
-      With a b asyncWs c d e -> With a b asyncWs c (coerce d) <$> _Newlines fun e
-
-instance HasNewlines SimpleStatement where
-  _Newlines f (MkSimpleStatement s ss sc cmt nl) =
-    MkSimpleStatement s ss sc cmt <$> traverse f nl
-
-instance HasNewlines Statement where
-  _Newlines f (CompoundStatement c) =
-    CompoundStatement <$> _Newlines f c
-  _Newlines f (SimpleStatement i a) = SimpleStatement i <$> _Newlines f a
-
-instance HasNewlines Module where
-  _Newlines f = go
-    where
-      go ModuleEmpty = pure ModuleEmpty
-      go (ModuleBlankFinal a) = pure $ ModuleBlankFinal a
-      go (ModuleBlank a b c) =
-        ModuleBlank a <$> f b <*> go c
-      go (ModuleStatement a b) =
-        ModuleStatement <$> _Newlines f a <*> go b
-
+--
+-- These expressions have variables on the left hand side of the @=@, but those variables
+-- don't count as assignment targets:
+--
+-- @
+-- a[b] = c
+-- @
+--
+-- @
+-- a(b) = c
+-- @
+--
+-- @
+-- {a: b} = c
+-- @
 assignTargets :: Traversal (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
 assignTargets f e =
   case e of

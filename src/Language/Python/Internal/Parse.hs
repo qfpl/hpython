@@ -65,9 +65,9 @@ module Language.Python.Internal.Parse
   , orExpr
   , orExprList
   , orTest
-  , simpleStatement
-  , someParams
   , smallStatement
+  , someParams
+  , simpleStatement
   , starExpr
   , statement
   , suite
@@ -526,7 +526,7 @@ yieldExpr ws =
       (snd <$> token ws (\case; TkFrom{} -> True; _ -> False) "from") <*>
       expr ws)
      <|>
-   Right <$> optional (exprList ws))
+   Right <$> commaSep ws (expr ws))
 
 lambda :: MonadParsec e PyTokens m => m Whitespace -> m (Expr SrcInfo)
 lambda ws =
@@ -823,8 +823,8 @@ orExpr ws =
       Ident <$> identifier ws <|>
       parensOrUnit
 
-smallStatement :: MonadParsec e PyTokens m => m (SmallStatement SrcInfo)
-smallStatement =
+simpleStatement :: MonadParsec e PyTokens m => m (SimpleStatement SrcInfo)
+simpleStatement =
   returnSt <|>
   passSt <|>
   breakSt <|>
@@ -1050,12 +1050,12 @@ sepBy1' val sep = go
       val <*>
       optional ((,) <$> sep <*> optional go)
 
-simpleStatement
+smallStatement
   :: MonadParsec e PyTokens m
-  => m (SimpleStatement SrcInfo)
-simpleStatement =
-  (\(a, b, c) d -> MkSimpleStatement a b c d) <$>
-  sepBy1' smallStatement (snd <$> semicolon space) <*>
+  => m (SmallStatement SrcInfo)
+smallStatement =
+  (\(a, b, c) d -> MkSmallStatement a b c d) <$>
+  sepBy1' simpleStatement (snd <$> semicolon space) <*>
   optional comment <*>
   optional eol
 
@@ -1068,7 +1068,7 @@ statement pIndent indentBefore =
   -- It's important to parse compound statements first, because the 'async' keyword
   -- is actually an identifier and we'll have to backtrack
   CompoundStatement <$> compoundStatement pIndent indentBefore <|>
-  SimpleStatement indentBefore <$> simpleStatement
+  SmallStatement indentBefore <$> smallStatement
 
 blank :: MonadParsec e PyTokens m => m (Blank SrcInfo)
 blank =
@@ -1088,7 +1088,7 @@ suite =
        (SuiteOne (pyTokenAnn tk) s)
        (\(a, b,c ) -> SuiteMany (pyTokenAnn tk) s a b c)) <$>
   colon space <*>
-  (Left <$> simpleStatement
+  (Left <$> smallStatement
 
     <|>
 

@@ -12,6 +12,10 @@ Functions that refactor program indentation
 
 A function that refactors occurrences of mutable default arguments
 
+## `Validation.hs`
+
+An example of validating some Python programs
+
 ## `OptimizeTailRecursion.hs`
 
 A function that refactors tail-recursive functions into loops

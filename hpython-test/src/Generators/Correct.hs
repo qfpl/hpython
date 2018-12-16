@@ -313,7 +313,7 @@ genParams isLambda =
   in do
     kwparams' <-
       if has (folded._UnnamedStarParam) sp && null kwparams
-      then CommaSepOne <$> genKeywordParam isLambda pparamNames'
+      then CommaSepOne <$> genKeywordParam isLambda pparamNames''
       else pure kwparams
 
     sizedBind (sizedMaybe $ genDoubleStarParam isLambda pparamNames'') $ \dsp ->

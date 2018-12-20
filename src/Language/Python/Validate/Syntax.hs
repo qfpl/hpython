@@ -265,27 +265,27 @@ validateComma
   => a
   -> Comma
   -> ValidateSyntax e Comma
-validateComma a (Comma ws) = Comma <$> validateWhitespace a ws
+validateComma a (MkComma ws) = MkComma <$> validateWhitespace a ws
 
 validateColon
   :: (AsSyntaxError e a)
   => a
   -> Colon
   -> ValidateSyntax e Colon
-validateColon a (Colon ws) = Colon <$> validateWhitespace a ws
+validateColon a (MkColon ws) = MkColon <$> validateWhitespace a ws
 
 validateSemicolon
   :: AsSyntaxError e a
   => Semicolon a
   -> ValidateSyntax e (Semicolon a)
-validateSemicolon (Semicolon a ws) = Semicolon a <$> validateWhitespace a ws
+validateSemicolon (MkSemicolon a ws) = MkSemicolon a <$> validateWhitespace a ws
 
 validateEquals
   :: AsSyntaxError e a
   => a
   -> Equals
   -> ValidateSyntax e Equals
-validateEquals a (Equals ws) = Equals <$> validateWhitespace a ws
+validateEquals a (MkEquals ws) = MkEquals <$> validateWhitespace a ws
 
 validateAssignmentSyntax
   :: ( AsSyntaxError e a

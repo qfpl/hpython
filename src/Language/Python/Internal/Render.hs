@@ -587,7 +587,7 @@ renderNewline :: Newline -> PyToken ()
 renderNewline nl = TkNewline nl ()
 
 renderComma :: Comma -> RenderOutput ()
-renderComma (Comma ws) = do
+renderComma (MkComma ws) = do
   singleton $ TkComma ()
   traverse_ renderWhitespace ws
 
@@ -1069,7 +1069,7 @@ renderModuleName (ModuleNameMany _ n dot rest) = do
   renderModuleName rest
 
 renderDot :: Dot -> RenderOutput ()
-renderDot (Dot ws) = do
+renderDot (MkDot ws) = do
   singleton $ TkDot ()
   traverse_ renderWhitespace ws
 
@@ -1222,17 +1222,17 @@ renderBlock (Block a b c) = do
     c
 
 renderSemicolon :: Semicolon a -> RenderOutput ()
-renderSemicolon (Semicolon _ ws) = do
+renderSemicolon (MkSemicolon _ ws) = do
   singleton $ TkSemicolon ()
   traverse_ renderWhitespace ws
 
 renderEquals :: Equals -> RenderOutput ()
-renderEquals (Equals ws) = do
+renderEquals (MkEquals ws) = do
   singleton $ TkEq ()
   traverse_ renderWhitespace ws
 
 renderColon :: Colon -> RenderOutput ()
-renderColon (Colon ws) = do
+renderColon (MkColon ws) = do
   singleton $ TkColon ()
   traverse_ renderWhitespace ws
 

@@ -533,8 +533,8 @@ prop_fulltrip_43 =
         { _unsafeExprAnn = ()
         , _unsafeYieldWhitespace = [Space]
         , _unsafeYieldValue =
-            CommaSepMany (Ident (MkIdent () "a" [])) (Comma [Space]) $
-            CommaSepMany (tuple_ [ti_ $ var_ "b"]) (Comma []) $
+            CommaSepMany (Ident (MkIdent () "a" [])) (MkComma [Space]) $
+            CommaSepMany (tuple_ [ti_ $ var_ "b"]) (MkComma []) $
             CommaSepNone
         }
       -- yield a, (b,),

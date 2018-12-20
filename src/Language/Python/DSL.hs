@@ -562,7 +562,7 @@ infix 0 .:
 --
 -- @('.:') :: 'Raw' 'Expr' -> 'Raw' 'Expr' -> 'Raw' 'DictItem'@
 instance ColonSyntax Expr DictItem where
-  (.:) a = DictItem () a (Colon [Space])
+  (.:) a = DictItem () a (MkColon [Space])
 
 -- | Function parameter type annotations
 --
@@ -573,7 +573,7 @@ instance ColonSyntax Expr DictItem where
 --
 -- See 'def_'
 instance ColonSyntax Param Param where
-  (.:) p t = p & paramType_ ?~ (Colon [Space], t)
+  (.:) p t = p & paramType_ ?~ (MkColon [Space], t)
 
 -- | Positional parameters/arguments
 --
@@ -900,7 +900,7 @@ mkFundef name body =
   , _fdParameters = CommaSepNone
   , _fdRightParenSpaces = []
   , _fdReturnType = Nothing
-  , _fdBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
+  , _fdBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
   }
 
 -- |
@@ -943,7 +943,7 @@ instance ArgumentsSyntax Call where
     { _callArguments =
         case args of
           [] -> Nothing
-          a:as -> Just $ (a, zip (repeat (Comma [Space])) as, Nothing) ^. _CommaSep1'
+          a:as -> Just $ (a, zip (repeat (MkComma [Space])) as, Nothing) ^. _CommaSep1'
     }
 
   getArguments code = _callArguments code ^.. folded.folded
@@ -967,7 +967,7 @@ call_ expr args =
   { _callArguments = 
     case args of
       [] -> Nothing
-      a:as -> Just $ (a, zip (repeat (Comma [Space])) as, Nothing) ^. _CommaSep1'
+      a:as -> Just $ (a, zip (repeat (MkComma [Space])) as, Nothing) ^. _CommaSep1'
   }
 
 -- |
@@ -1092,7 +1092,7 @@ instance e ~ Raw SetItem => AsSet [e] where
   set_ es =
     case es of
       [] -> call_ (var_ "set") []
-      a:as -> Set () [] ((a, zip (repeat (Comma [Space])) as, Nothing) ^. _CommaSep1') []
+      a:as -> Set () [] ((a, zip (repeat (MkComma [Space])) as, Nothing) ^. _CommaSep1') []
 
 instance e ~ Comprehension SetItem => AsSet (Raw e) where
   set_ c = SetComp () [] c []
@@ -1135,7 +1135,7 @@ instance e ~ Raw DictItem => AsDict [e] where
     []
     (case ds of
        [] -> Nothing
-       a:as -> Just $ (a, zip (repeat (Comma [Space])) as, Nothing) ^. _CommaSep1')
+       a:as -> Just $ (a, zip (repeat (MkComma [Space])) as, Nothing) ^. _CommaSep1')
     []
 
 -- |
@@ -1351,7 +1351,7 @@ mkWhile cond body =
   , _whileIndents = Indents [] ()
   , _whileWhile = [Space]
   , _whileCond = cond
-  , _whileBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
+  , _whileBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
   , _whileElse = Nothing
   }
 
@@ -1366,7 +1366,7 @@ mkIf cond body =
   , _ifIndents = Indents [] ()
   , _ifIf = [Space]
   , _ifCond = cond
-  , _ifBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
+  , _ifBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
   , _ifElifs = []
   , _ifElse = Nothing
   }
@@ -1428,7 +1428,7 @@ mkElif cond body =
   { _elifIndents = Indents [] ()
   , _elifElif = [Space]
   , _elifCond = cond
-  , _elifBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
+  , _elifBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
   }
 
 elif_ :: Raw Expr -> [Raw Line] -> Raw If -> Raw If
@@ -1440,7 +1440,7 @@ mkElse body =
   MkElse
   { _elseIndents = Indents [] ()
   , _elseElse = []
-  , _elseBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
+  , _elseBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
   }
 
 class ElseSyntax s where
@@ -1569,7 +1569,7 @@ chainEq t (a:as) =
   SmallStatement
     (Indents [] ())
     (MkSmallStatement
-       (Assign () t $ (,) (Equals [Space]) <$> (a :| as))
+       (Assign () t $ (,) (MkEquals [Space]) <$> (a :| as))
        []
        Nothing
        Nothing
@@ -1581,7 +1581,7 @@ chainEq t (a:as) =
   SmallStatement
     (Indents [] ())
     (MkSmallStatement
-       (Assign () (a & trailingWhitespace .~ [Space]) $ pure (Equals [Space], b))
+       (Assign () (a & trailingWhitespace .~ [Space]) $ pure (MkEquals [Space], b))
        []
        Nothing
        Nothing
@@ -1666,7 +1666,7 @@ mkFor binder collection body =
       fromMaybe
         (CommaSepOne1' (Unit () [] []) Nothing)
         (listToCommaSep1' collection)
-  , _forBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
+  , _forBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
   , _forElse = Nothing
   }
 
@@ -1704,7 +1704,7 @@ mkFinally body =
   MkFinally
   { _finallyIndents = Indents [] ()
   , _finallyFinally = []
-  , _finallyBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
+  , _finallyBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
   }
 
 -- | Create a minimal valid 'Except'
@@ -1714,7 +1714,7 @@ mkExcept body =
   { _exceptIndents = Indents [] ()
   , _exceptExcept = []
   , _exceptExceptAs = Nothing
-  , _exceptBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
+  , _exceptBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
   }
 
 -- | Create a minimal valid 'TryExcept'
@@ -1724,7 +1724,7 @@ mkTryExcept body except =
   { _teAnn = ()
   , _teIndents = Indents [] ()
   , _teTry = [Space]
-  , _teBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
+  , _teBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
   , _teExcepts = pure except
   , _teElse = Nothing
   , _teFinally = Nothing
@@ -1737,7 +1737,7 @@ mkTryFinally body fBody =
   { _tfAnn = ()
   , _tfIndents = Indents [] ()
   , _tfTry = [Space]
-  , _tfBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
+  , _tfBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
   , _tfFinally = mkFinally fBody
   }
 
@@ -1927,7 +1927,7 @@ class_ name args body =
     _cdArguments =
       case args of
         [] -> Nothing
-        a:as -> Just ([], Just $ (a, zip (repeat (Comma [Space])) as, Nothing) ^. _CommaSep1', [])
+        a:as -> Just ([], Just $ (a, zip (repeat (MkComma [Space])) as, Nothing) ^. _CommaSep1', [])
   }
 
 -- | Create a minimal 'ClassDef'
@@ -1940,7 +1940,7 @@ mkClassDef name body =
   , _cdClass = Space :| []
   , _cdName = name
   , _cdArguments = Nothing
-  , _cdBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
+  , _cdBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
   }
 
 instance BodySyntax ClassDef where
@@ -1963,7 +1963,7 @@ instance ArgumentsSyntax ClassDef where
     { _cdArguments =
         case args of
           [] -> Nothing
-          a:as -> Just ([], Just $ (a, zip (repeat (Comma [Space])) as, Nothing) ^. _CommaSep1', [])
+          a:as -> Just ([], Just $ (a, zip (repeat (MkComma [Space])) as, Nothing) ^. _CommaSep1', [])
     }
 
   getArguments code = _cdArguments code ^.. folded._2.folded.folded
@@ -1977,7 +1977,7 @@ mkWith items body =
   , _withAsync = Nothing
   , _withWith = [Space]
   , _withItems = listToCommaSep1 items
-  , _withBody = SuiteMany () (Colon []) Nothing LF $ linesToBlockIndented body
+  , _withBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
   }
 
 -- |
@@ -2063,10 +2063,10 @@ tuple_ :: [Raw TupleItem] -> Raw Expr
 tuple_ [] = Unit () [] []
 tuple_ (a:as) =
   case as of
-    [] -> Tuple () (ti_ a) (Comma []) Nothing
+    [] -> Tuple () (ti_ a) (MkComma []) Nothing
     b:bs ->
-      Tuple () a (Comma [Space]) . Just $
-      (b, zip (repeat (Comma [Space])) bs, Nothing) ^. _CommaSep1'
+      Tuple () a (MkComma [Space]) . Just $
+      (b, zip (repeat (MkComma [Space])) bs, Nothing) ^. _CommaSep1'
 
 -- |
 -- >>> await (var_ "a")
@@ -2097,7 +2097,7 @@ lambda_ params =
   Lambda ()
     (if null params then [] else [Space])
     (listToCommaSep params)
-    (Colon [Space])
+    (MkColon [Space])
 
 -- |
 -- >>> yield_ []
@@ -2268,19 +2268,19 @@ subs_ a e =
             Just "slice" ->
               pure $ case c ^.. callArguments.folded.folded of
                 [PositionalArg _ x] ->
-                  SubscriptSlice Nothing (Colon []) (Just x) Nothing
+                  SubscriptSlice Nothing (MkColon []) (Just x) Nothing
                 [PositionalArg _ x, PositionalArg _ y] ->
                   SubscriptSlice
                     (noneToMaybe x)
-                    (Colon [])
+                    (MkColon [])
                     (noneToMaybe y)
                     Nothing
                 [PositionalArg _ x, PositionalArg _ y, PositionalArg _ z] ->
                   SubscriptSlice
                     (noneToMaybe x)
-                    (Colon [])
+                    (MkColon [])
                     (noneToMaybe y)
-                    ((,) (Colon []) . Just <$> noneToMaybe z)
+                    ((,) (MkColon []) . Just <$> noneToMaybe z)
                 _ -> SubscriptExpr e
             _ -> Nothing
 

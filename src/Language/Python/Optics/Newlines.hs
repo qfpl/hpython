@@ -87,22 +87,22 @@ instance HasNewlines (Block v a) where
     _Newlines f c
 
 instance HasNewlines Colon where
-  _Newlines f (Colon a) = Colon <$> _Newlines f a
+  _Newlines f (MkColon a) = MkColon <$> _Newlines f a
 
 instance HasNewlines Dot where
-  _Newlines f (Dot a) = Dot <$> _Newlines f a
+  _Newlines f (MkDot a) = MkDot <$> _Newlines f a
 
 instance HasNewlines Comma where
-  _Newlines f (Comma a) = Comma <$> _Newlines f a
+  _Newlines f (MkComma a) = MkComma <$> _Newlines f a
 
 instance HasNewlines At where
   _Newlines f (MkAt a) = MkAt <$> _Newlines f a
 
 instance HasNewlines (Semicolon a) where
-  _Newlines f (Semicolon a b) = Semicolon a <$> _Newlines f b
+  _Newlines f (MkSemicolon a b) = MkSemicolon a <$> _Newlines f b
 
 instance HasNewlines Equals where
-  _Newlines f (Equals a) = Equals <$> _Newlines f a
+  _Newlines f (MkEquals a) = MkEquals <$> _Newlines f a
 
 instance HasNewlines (Suite v a) where
   _Newlines f (SuiteOne a b c) = SuiteOne a b <$> _Newlines f c

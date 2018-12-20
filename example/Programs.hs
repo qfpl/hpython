@@ -34,12 +34,12 @@ append_to =
     (Space :| [])
     "append_to"
     []
-    ( CommaSepMany (PositionalParam () "element" Nothing) (Comma [Space]) $
+    ( CommaSepMany (PositionalParam () "element" Nothing) (MkComma [Space]) $
       CommaSepOne (KeywordParam () "to" Nothing [] (List () [] Nothing []))
     )
     []
     Nothing
-    (SuiteMany () (Colon []) Nothing LF $
+    (SuiteMany () (MkColon []) Nothing LF $
      Block []
      ( SmallStatement
          (Indents [replicate 4 Space ^. from indentWhitespaces] ())

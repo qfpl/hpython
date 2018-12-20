@@ -1,3 +1,4 @@
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-|
 Module      : Language.Python.Syntax.Punctuation
 Copyright   : (C) CSIRO 2017-2018
@@ -40,10 +41,10 @@ instance HasTrailingWhitespace Colon where
   trailingWhitespace =
     lens (\(Colon ws) -> ws) (\_ ws -> Colon ws)
 
-newtype Semicolon
-  = Semicolon [Whitespace]
-  deriving (Eq, Show)
+data Semicolon a
+  = Semicolon a [Whitespace]
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
-instance HasTrailingWhitespace Semicolon where
+instance HasTrailingWhitespace (Semicolon a) where
   trailingWhitespace =
-    lens (\(Semicolon ws) -> ws) (\_ ws -> Semicolon ws)
+    lens (\(Semicolon _ ws) -> ws) (\(Semicolon a _) ws -> Semicolon a ws)

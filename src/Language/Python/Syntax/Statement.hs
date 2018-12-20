@@ -191,8 +191,8 @@ instance HasStatements Suite where
 data SmallStatement (v :: [*]) a
   = MkSmallStatement
       (SimpleStatement v a)
-      [(Semicolon, SimpleStatement v a)]
-      (Maybe Semicolon)
+      [(Semicolon a, SimpleStatement v a)]
+      (Maybe (Semicolon a))
       (Maybe (Comment a))
       (Maybe Newline)
   deriving (Eq, Show, Functor, Foldable, Traversable)

@@ -267,6 +267,12 @@ validateColon
   -> ValidateSyntax e Colon
 validateColon a (Colon ws) = Colon <$> validateWhitespace a ws
 
+validateSemicolon
+  :: AsSyntaxError e a
+  => Semicolon a
+  -> ValidateSyntax e (Semicolon a)
+validateSemicolon (Semicolon a ws) = Semicolon a <$> validateWhitespace a ws
+
 validateAssignmentSyntax
   :: ( AsSyntaxError e a
      , Member Indentation v
@@ -1024,9 +1030,10 @@ validateSmallStatementSyntax
   => SmallStatement v a
   -> ValidateSyntax e (SmallStatement (Nub (Syntax ': v)) a)
 validateSmallStatementSyntax (MkSmallStatement s ss sc cmt nl) =
-  (\s' ss' -> MkSmallStatement s' ss' sc cmt nl) <$>
+  (\s' ss' sc' -> MkSmallStatement s' ss' sc' cmt nl) <$>
   validateSimpleStatementSyntax s <*>
-  traverseOf (traverse._2) validateSimpleStatementSyntax ss
+  traverse (bitraverse validateSemicolon validateSimpleStatementSyntax) ss <*>
+  traverse validateSemicolon sc
 
 validateStatementSyntax
   :: ( AsSyntaxError e a

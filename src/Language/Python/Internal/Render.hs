@@ -1217,8 +1217,8 @@ renderBlock (Block a b c) = do
       (final . renderStatement))
     c
 
-renderSemicolon :: Semicolon -> RenderOutput ()
-renderSemicolon (Semicolon ws) = do
+renderSemicolon :: Semicolon a -> RenderOutput ()
+renderSemicolon (Semicolon _ ws) = do
   singleton $ TkSemicolon ()
   traverse_ renderWhitespace ws
 

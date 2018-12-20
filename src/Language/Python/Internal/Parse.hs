@@ -1116,9 +1116,10 @@ colon ws = second Colon <$> token ws (\case; TkColon{} -> True; _ -> False) ":"
 semicolon
   :: MonadParsec e PyTokens m
   => m Whitespace
-  -> m (PyToken SrcInfo, Semicolon)
+  -> m (PyToken SrcInfo, Semicolon SrcInfo)
 semicolon ws =
-  second Semicolon <$> token ws (\case; TkSemicolon{} -> True; _ -> False) ";"
+  (\(a, b) -> (a, Semicolon (pyTokenAnn a) b)) <$>
+  token ws (\case; TkSemicolon{} -> True; _ -> False) ";"
 
 commaSep :: MonadParsec e PyTokens m => m Whitespace -> m a -> m (CommaSep a)
 commaSep ws pa =

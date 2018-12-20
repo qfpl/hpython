@@ -68,8 +68,8 @@ fromIRError (InvalidUnpacking a) = _InvalidUnpacking # a
 data SmallStatement a
   = MkSmallStatement
       (SimpleStatement a)
-      [([Whitespace], SimpleStatement a)]
-      (Maybe [Whitespace])
+      [(Semicolon, SimpleStatement a)]
+      (Maybe Semicolon)
       (Maybe (Comment a))
       (Maybe Newline)
   deriving (Eq, Show, Functor, Foldable, Traversable)

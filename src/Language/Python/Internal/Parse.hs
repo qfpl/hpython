@@ -1113,8 +1113,12 @@ comma ws = second Comma <$> token ws (\case; TkComma{} -> True; _ -> False) ","
 colon :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Colon)
 colon ws = second Colon <$> token ws (\case; TkColon{} -> True; _ -> False) ":"
 
-semicolon :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, [Whitespace])
-semicolon ws = token ws (\case; TkSemicolon{} -> True; _ -> False) ";"
+semicolon
+  :: MonadParsec e PyTokens m
+  => m Whitespace
+  -> m (PyToken SrcInfo, Semicolon)
+semicolon ws =
+  second Semicolon <$> token ws (\case; TkSemicolon{} -> True; _ -> False) ";"
 
 commaSep :: MonadParsec e PyTokens m => m Whitespace -> m a -> m (CommaSep a)
 commaSep ws pa =

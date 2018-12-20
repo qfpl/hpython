@@ -1217,6 +1217,11 @@ renderBlock (Block a b c) = do
       (final . renderStatement))
     c
 
+renderSemicolon :: Semicolon -> RenderOutput ()
+renderSemicolon (Semicolon ws) = do
+  singleton $ TkSemicolon ()
+  traverse_ renderWhitespace ws
+
 renderColon :: Colon -> RenderOutput ()
 renderColon (Colon ws) = do
   singleton $ TkColon ()
@@ -1420,15 +1425,10 @@ renderSmallStatement (MkSmallStatement s ss sc cmt nl) = do
   renderSimpleStatement s
   traverse_
     (\(b, c) -> do
-       singleton $ TkSemicolon ()
-       traverse_ renderWhitespace b
+       renderSemicolon b
        renderSimpleStatement c)
     ss
-  traverse_
-    (\b -> do
-        singleton $ TkSemicolon ()
-        traverse_ renderWhitespace b)
-    sc
+  traverse_ renderSemicolon sc
   traverse_ renderComment cmt
   traverse_ (singleton . renderNewline) nl
 

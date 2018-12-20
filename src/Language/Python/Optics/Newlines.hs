@@ -95,6 +95,9 @@ instance HasNewlines Dot where
 instance HasNewlines Comma where
   _Newlines f (Comma a) = Comma <$> _Newlines f a
 
+instance HasNewlines Semicolon where
+  _Newlines f (Semicolon a) = Semicolon <$> _Newlines f a
+
 instance HasNewlines (Suite v a) where
   _Newlines f (SuiteOne a b c) = SuiteOne a b <$> _Newlines f c
   _Newlines f (SuiteMany a b c d e) =

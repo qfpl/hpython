@@ -39,3 +39,11 @@ newtype Colon
 instance HasTrailingWhitespace Colon where
   trailingWhitespace =
     lens (\(Colon ws) -> ws) (\_ ws -> Colon ws)
+
+newtype Semicolon
+  = Semicolon [Whitespace]
+  deriving (Eq, Show)
+
+instance HasTrailingWhitespace Semicolon where
+  trailingWhitespace =
+    lens (\(Semicolon ws) -> ws) (\_ ws -> Semicolon ws)

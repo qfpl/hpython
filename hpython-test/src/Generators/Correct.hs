@@ -684,7 +684,12 @@ genSimpleStatement = do
          genExpr
      , Global () <$>
        genWhitespaces1 <*>
-       genSizedCommaSep1 genIdent
+       genSizedCommaSep1
+         (maybe
+            id
+            (\(ps, _) -> Gen.filter ((`notElem` ps) . _identValue))
+            (_inFunction ctxt)
+            genIdent)
      , Del () <$>
        genWhitespaces <*>
        genSizedCommaSep1' genDeletable

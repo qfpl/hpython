@@ -487,7 +487,7 @@ orTest ws = binOp orOp andTest
 
       <|>
 
-      (\(tk, ws) -> Equals (pyTokenAnn tk) ws) <$>
+      (\(tk, ws) -> Eq (pyTokenAnn tk) ws) <$>
       token ws (\case; TkDoubleEq{} -> True; _ -> False) "=="
 
       <|>
@@ -497,7 +497,7 @@ orTest ws = binOp orOp andTest
 
       <|>
 
-      (\(tk, ws) -> LtEquals (pyTokenAnn tk) ws) <$>
+      (\(tk, ws) -> LtEq (pyTokenAnn tk) ws) <$>
       token ws (\case; TkLte{} -> True; _ -> False) "<="
 
       <|>
@@ -507,12 +507,12 @@ orTest ws = binOp orOp andTest
 
       <|>
 
-      (\(tk, ws) -> GtEquals (pyTokenAnn tk) ws) <$>
+      (\(tk, ws) -> GtEq (pyTokenAnn tk) ws) <$>
       token ws (\case; TkGte{} -> True; _ -> False) ">="
 
       <|>
 
-      (\(tk, ws) -> NotEquals (pyTokenAnn tk) ws) <$>
+      (\(tk, ws) -> NotEq (pyTokenAnn tk) ws) <$>
       token ws (\case; TkBangEq{} -> True; _ -> False) "!="
 
     comparison = binOp compOp $ orExpr ws
@@ -939,7 +939,7 @@ simpleStatement =
         (Left <$>
          some1
            ((,) <$>
-            (snd <$> token space (\case; TkEq{} -> True; _ -> False) "=") <*>
+            (snd <$> equals space) <*>
             (yieldExpr space <|> exprOrStarList space))
 
            <|>
@@ -1113,10 +1113,10 @@ comma ws = second Comma <$> token ws (\case; TkComma{} -> True; _ -> False) ","
 colon :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Colon)
 colon ws = second Colon <$> token ws (\case; TkColon{} -> True; _ -> False) ":"
 
-semicolon
-  :: MonadParsec e PyTokens m
-  => m Whitespace
-  -> m (PyToken SrcInfo, Semicolon SrcInfo)
+equals :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Equals)
+equals ws = second Equals <$> token ws (\case; TkEq{} -> True; _ -> False) "="
+
+semicolon :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Semicolon SrcInfo)
 semicolon ws =
   (\(a, b) -> (a, Semicolon (pyTokenAnn a) b)) <$>
   token ws (\case; TkSemicolon{} -> True; _ -> False) ";"

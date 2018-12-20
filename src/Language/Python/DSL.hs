@@ -1203,7 +1203,7 @@ not_ = Not () [Space]
 
 -- | @a == b@
 (.==) :: Raw Expr -> Raw Expr -> Raw Expr
-(.==) = mkBinOp $ Equals ()
+(.==) = mkBinOp $ Eq ()
 infixl 1 .==
 
 -- | @a < b@
@@ -1213,7 +1213,7 @@ infixl 1 .<
 
 -- | @a <= b@
 (.<=) :: Raw Expr -> Raw Expr -> Raw Expr
-(.<=) = mkBinOp $ LtEquals ()
+(.<=) = mkBinOp $ LtEq ()
 infixl 1 .<=
 
 -- | @a > b@
@@ -1223,12 +1223,12 @@ infixl 1 .>
 
 -- | @a >= b@
 (.>=) :: Raw Expr -> Raw Expr -> Raw Expr
-(.>=) = mkBinOp $ GtEquals ()
+(.>=) = mkBinOp $ GtEq ()
 infixl 1 .>=
 
 -- | @a != b@
 (.!=) :: Raw Expr -> Raw Expr -> Raw Expr
-(.!=) = mkBinOp $ NotEquals ()
+(.!=) = mkBinOp $ NotEq ()
 infixl 1 .!=
 
 -- | @a | b@
@@ -1569,7 +1569,7 @@ chainEq t (a:as) =
   SmallStatement
     (Indents [] ())
     (MkSmallStatement
-       (Assign () t $ (,) [Space] <$> (a :| as))
+       (Assign () t $ (,) (Equals [Space]) <$> (a :| as))
        []
        Nothing
        Nothing
@@ -1581,7 +1581,7 @@ chainEq t (a:as) =
   SmallStatement
     (Indents [] ())
     (MkSmallStatement
-       (Assign () (a & trailingWhitespace .~ [Space]) $ pure ([Space], b))
+       (Assign () (a & trailingWhitespace .~ [Space]) $ pure (Equals [Space], b))
        []
        Nothing
        Nothing

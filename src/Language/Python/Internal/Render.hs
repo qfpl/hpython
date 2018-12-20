@@ -1147,8 +1147,7 @@ renderSimpleStatement (Assign _ lvalue rvalues) = do
   renderExpr lvalue
   traverse_
     (\(ws2, rvalue) -> do
-       singleton $ TkEq ()
-       traverse_ renderWhitespace ws2
+       renderEquals ws2
        renderYield parensGenerator rvalue)
     rvalues
 renderSimpleStatement (AugAssign _ lvalue as rvalue) = do
@@ -1220,6 +1219,11 @@ renderBlock (Block a b c) = do
 renderSemicolon :: Semicolon a -> RenderOutput ()
 renderSemicolon (Semicolon _ ws) = do
   singleton $ TkSemicolon ()
+  traverse_ renderWhitespace ws
+
+renderEquals :: Equals -> RenderOutput ()
+renderEquals (Equals ws) = do
+  singleton $ TkEq ()
   traverse_ renderWhitespace ws
 
 renderColon :: Colon -> RenderOutput ()
@@ -1567,22 +1571,22 @@ renderBinOp (BoolAnd _ ws) = do
 renderBinOp (BoolOr _ ws) = do
   singleton $ TkOr ()
   traverse_ renderWhitespace ws
-renderBinOp (Equals _ ws) = do
+renderBinOp (Eq _ ws) = do
   singleton $ TkDoubleEq ()
   traverse_ renderWhitespace ws
 renderBinOp (Lt _ ws) = do
   singleton $ TkLt ()
   traverse_ renderWhitespace ws
-renderBinOp (LtEquals _ ws) = do
+renderBinOp (LtEq _ ws) = do
   singleton $ TkLte ()
   traverse_ renderWhitespace ws
 renderBinOp (Gt _ ws) = do
   singleton $ TkGt ()
   traverse_ renderWhitespace ws
-renderBinOp (GtEquals _ ws) = do
+renderBinOp (GtEq _ ws) = do
   singleton $ TkGte ()
   traverse_ renderWhitespace ws
-renderBinOp (NotEquals _ ws) = do
+renderBinOp (NotEq _ ws) = do
   singleton $ TkBangEq ()
   traverse_ renderWhitespace ws
 renderBinOp (Percent _ ws) = do

@@ -162,7 +162,7 @@ data CompoundStatement a
 data SimpleStatement a
   = Return a [Whitespace] (Maybe (Expr a))
   | Expr a (Expr a)
-  | Assign a (Expr a) (NonEmpty ([Whitespace], Expr a))
+  | Assign a (Expr a) (NonEmpty (Equals, Expr a))
   | AugAssign a (Expr a) (AugAssign a) (Expr a)
   | Pass a [Whitespace]
   | Break a [Whitespace]

@@ -273,6 +273,13 @@ validateSemicolon
   -> ValidateSyntax e (Semicolon a)
 validateSemicolon (Semicolon a ws) = Semicolon a <$> validateWhitespace a ws
 
+validateEquals
+  :: AsSyntaxError e a
+  => a
+  -> Equals
+  -> ValidateSyntax e Equals
+validateEquals a (Equals ws) = Equals <$> validateWhitespace a ws
+
 validateAssignmentSyntax
   :: ( AsSyntaxError e a
      , Member Indentation v
@@ -906,10 +913,10 @@ validateSimpleStatementSyntax (Assign a lvalue rs) =
        traverse
          (\(ws, b) ->
             (,) <$>
-            validateWhitespace a ws <*>
+            validateEquals a ws <*>
             validateAssignmentSyntax a b)
          (NonEmpty.init rs) <*>
-       (\(ws, b) -> (,) <$> validateWhitespace a ws <*> validateExprSyntax b)
+       (\(ws, b) -> (,) <$> validateEquals a ws <*> validateExprSyntax b)
          (NonEmpty.last rs)) <*
       liftVM0 (modify (assigns ++))
 validateSimpleStatementSyntax (AugAssign a lvalue aa rvalue) =

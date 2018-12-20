@@ -386,6 +386,9 @@ genColon = Colon <$> genWhitespaces
 genSemicolon :: MonadGen m => m (Semicolon ())
 genSemicolon = Semicolon () <$> genWhitespaces
 
+genEquals :: MonadGen m => m Equals
+genEquals = Equals <$> genWhitespaces
+
 genColonAny :: MonadGen m => m Colon
 genColonAny = Colon <$> genAnyWhitespaces
 

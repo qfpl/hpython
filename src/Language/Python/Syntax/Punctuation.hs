@@ -48,3 +48,11 @@ data Semicolon a
 instance HasTrailingWhitespace (Semicolon a) where
   trailingWhitespace =
     lens (\(Semicolon _ ws) -> ws) (\(Semicolon a _) ws -> Semicolon a ws)
+
+newtype Equals
+  = Equals [Whitespace]
+  deriving (Eq, Show)
+
+instance HasTrailingWhitespace Equals where
+  trailingWhitespace =
+    lens (\(Equals ws) -> ws) (\_ ws -> Equals ws)

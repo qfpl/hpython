@@ -672,11 +672,11 @@ genSimpleStatement = do
      [Break () <$> genWhitespaces | _inLoop ctxt] <>
      [Continue () <$> genWhitespaces | _inLoop ctxt && not (_inFinally ctxt)])
     ([ Expr () <$> genExpr
-     , sizedBind (sizedNonEmpty $ (,) <$> genWhitespaces <*> genAssignable) $ \a -> do
+     , sizedBind (sizedNonEmpty $ (,) <$> genEquals <*> genAssignable) $ \a -> do
          isInFunction <- use inFunction
          when (isJust isInFunction) $
            willBeNonlocals %= ((a ^.. folded._2.cosmos._Ident.identValue) ++)
-         sizedBind ((,) <$> genWhitespaces <*> genExpr) $ \b ->
+         sizedBind ((,) <$> genEquals <*> genExpr) $ \b ->
            pure $ Assign () (snd $ NonEmpty.head a) (NonEmpty.fromList $ snoc (NonEmpty.tail a) b)
      , sized2M
          (\a b -> AugAssign () a <$> genAugAssign <*> pure b)

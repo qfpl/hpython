@@ -98,6 +98,9 @@ instance HasNewlines Comma where
 instance HasNewlines (Semicolon a) where
   _Newlines f (Semicolon a b) = Semicolon a <$> _Newlines f b
 
+instance HasNewlines Equals where
+  _Newlines f (Equals a) = Equals <$> _Newlines f a
+
 instance HasNewlines (Suite v a) where
   _Newlines f (SuiteOne a b c) = SuiteOne a b <$> _Newlines f c
   _Newlines f (SuiteMany a b c d e) =
@@ -128,12 +131,12 @@ instance HasNewlines (BinOp a) where
       Exp a b -> Exp a <$> _Newlines f b
       BoolAnd a b -> BoolAnd a <$> _Newlines f b
       BoolOr a b -> BoolOr a <$> _Newlines f b
-      Equals a b -> Equals a <$> _Newlines f b
+      Eq a b -> Eq a <$> _Newlines f b
       Lt a b -> Lt a <$> _Newlines f b
-      LtEquals a b -> LtEquals a <$> _Newlines f b
+      LtEq a b -> LtEq a <$> _Newlines f b
       Gt a b -> Gt a <$> _Newlines f b
-      GtEquals a b -> GtEquals a <$> _Newlines f b
-      NotEquals a b -> NotEquals a <$> _Newlines f b
+      GtEq a b -> GtEq a <$> _Newlines f b
+      NotEq a b -> NotEq a <$> _Newlines f b
       Multiply a b -> Multiply a <$> _Newlines f b
       Divide a b -> Divide a <$> _Newlines f b
       FloorDivide a b -> FloorDivide a <$> _Newlines f b

@@ -275,7 +275,7 @@ data SimpleStatement (v :: [*]) a
   -- | @\<expr\> (\'=\' \<spaces\> \<expr\>)+@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#assignment-statements
-  | Assign a (Expr v a) (NonEmpty ([Whitespace], Expr v a))
+  | Assign a (Expr v a) (NonEmpty (Equals, Expr v a))
   -- | @\<expr\> \<augassign\> \<expr\>@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#augmented-assignment-statements

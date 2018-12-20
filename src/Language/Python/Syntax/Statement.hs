@@ -396,7 +396,7 @@ data Decorator (v :: [*]) a
   = Decorator
   { _decoratorAnn :: a
   , _decoratorIndents :: Indents a -- ^ Preceding indentation
-  , _decoratorWhitespaceLeft :: [Whitespace] -- ^ @\'\@\' \<spaces\>@
+  , _decoratorAt :: At -- ^ @\'\@\' \<spaces\>@
   , _decoratorExpr :: Expr v a -- ^ @\<expr\>@
   , _decoratorComment :: Maybe (Comment a) -- ^ Trailing comment
   , _decoratorNewline :: Newline -- ^ Trailing newline

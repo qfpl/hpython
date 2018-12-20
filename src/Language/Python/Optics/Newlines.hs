@@ -95,6 +95,9 @@ instance HasNewlines Dot where
 instance HasNewlines Comma where
   _Newlines f (Comma a) = Comma <$> _Newlines f a
 
+instance HasNewlines At where
+  _Newlines f (MkAt a) = MkAt <$> _Newlines f a
+
 instance HasNewlines (Semicolon a) where
   _Newlines f (Semicolon a b) = Semicolon a <$> _Newlines f b
 

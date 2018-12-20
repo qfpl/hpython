@@ -56,3 +56,11 @@ newtype Equals
 instance HasTrailingWhitespace Equals where
   trailingWhitespace =
     lens (\(Equals ws) -> ws) (\_ ws -> Equals ws)
+
+newtype At
+  = MkAt [Whitespace]
+  deriving (Eq, Show)
+
+instance HasTrailingWhitespace At where
+  trailingWhitespace =
+    lens (\(MkAt ws) -> ws) (\_ ws -> MkAt ws)

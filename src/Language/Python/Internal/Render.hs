@@ -591,6 +591,11 @@ renderComma (Comma ws) = do
   singleton $ TkComma ()
   traverse_ renderWhitespace ws
 
+renderAt :: At -> RenderOutput ()
+renderAt (MkAt ws) = do
+  singleton $ TkAt ()
+  traverse_ renderWhitespace ws
+
 renderCommaSep :: (a -> RenderOutput ()) -> CommaSep a -> RenderOutput ()
 renderCommaSep _ CommaSepNone = pure ()
 renderCommaSep f (CommaSepOne a) = f a
@@ -1247,8 +1252,7 @@ renderSuite (SuiteOne _ a b) = do
 renderDecorator :: Decorator v a -> RenderOutput ()
 renderDecorator (Decorator _ a b c d e f) = do
   renderIndents a
-  singleton $ TkAt ()
-  traverse_ renderWhitespace b
+  renderAt b
   renderExpr c
   traverse_ renderComment d
   singleton (renderNewline e)

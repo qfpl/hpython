@@ -253,6 +253,13 @@ validateWhitespace ann ws =
   then errorVM1 (_UnexpectedComment # ann)
   else pure ws
 
+validateAt
+  :: (AsSyntaxError e a)
+  => a
+  -> At
+  -> ValidateSyntax e At
+validateAt a (MkAt ws) = MkAt <$> validateWhitespace a ws
+
 validateComma
   :: (AsSyntaxError e a)
   => a
@@ -655,7 +662,7 @@ validateDecoratorSyntax
   -> ValidateSyntax e (Decorator (Nub (Syntax ': v)) a)
 validateDecoratorSyntax (Decorator a b c d e f g) =
   (\c' d' -> Decorator a b c' d' e f) <$>
-  validateWhitespace a c <*>
+  validateAt a c <*>
   isDecoratorValue d <*>
   traverseOf (traverse._1) validateBlankSyntax g
   where

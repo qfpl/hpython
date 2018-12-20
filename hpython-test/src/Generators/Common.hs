@@ -383,6 +383,9 @@ genComma = Comma <$> genWhitespaces
 genColon :: MonadGen m => m Colon
 genColon = Colon <$> genWhitespaces
 
+genAt :: MonadGen m => m At
+genAt = MkAt <$> genWhitespaces
+
 genSemicolon :: MonadGen m => m (Semicolon ())
 genSemicolon = Semicolon () <$> genWhitespaces
 

@@ -696,7 +696,7 @@ decorated_ :: DecoratorsSyntax s => [Raw Expr] -> Raw s -> Raw s
 decorated_ = setDecorators
 
 exprsToDecorators :: Indents () -> [Raw Expr] -> [Raw Decorator]
-exprsToDecorators is = fmap (\e -> Decorator () is [] e Nothing LF [])
+exprsToDecorators is = fmap (\e -> Decorator () is (MkAt []) e Nothing LF [])
 
 instance DecoratorsSyntax Fundef where
   decorators = fdDecorators

@@ -724,7 +724,7 @@ genDecorator :: (MonadGen m, MonadState GenState m) => m (Decorator '[] ())
 genDecorator =
   Decorator () <$>
   use currentIndentation <*>
-  genWhitespaces <*>
+  genAt <*>
   genDecoratorValue <*>
   Gen.maybe genComment <*>
   genNewline <*>

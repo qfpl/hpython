@@ -619,7 +619,7 @@ data Decorator a
   = Decorator
   { _decoratorAnn :: a
   , _decoratorIndents :: Indents a
-  , _decoratorWhitespaceLeft :: [Whitespace]
+  , _decoratorAt :: At
   , _decoratorExpr :: Expr a
   , _decoratorComment :: Maybe (Comment a)
   , _decoratorNewline :: Newline

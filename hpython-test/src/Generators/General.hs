@@ -362,7 +362,7 @@ genDecorator :: MonadGen m => m (Decorator '[] ())
 genDecorator =
   Decorator () <$>
   genIndents <*>
-  genWhitespaces <*>
+  genAt <*>
   genExpr <*>
   Gen.maybe genComment <*>
   genNewline <*>

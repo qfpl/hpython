@@ -349,6 +349,23 @@ level :: MonadParsec s PyTokens m => m (Indents SrcInfo)
 level =
   (\(TkLevel _ i) -> i) <$> satisfy (\case; TkLevel{} -> True; _ -> False) <?> "level indentation"
 
+comma :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Comma)
+comma ws = second Comma <$> token ws (\case; TkComma{} -> True; _ -> False) ","
+
+at :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, At)
+at ws = second MkAt <$> token ws (\case; TkAt{} -> True; _ -> False) "@"
+
+colon :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Colon)
+colon ws = second Colon <$> token ws (\case; TkColon{} -> True; _ -> False) ":"
+
+equals :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Equals)
+equals ws = second Equals <$> token ws (\case; TkEq{} -> True; _ -> False) "="
+
+semicolon :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Semicolon SrcInfo)
+semicolon ws =
+  (\(a, b) -> (a, Semicolon (pyTokenAnn a) b)) <$>
+  token ws (\case; TkSemicolon{} -> True; _ -> False) ";"
+
 exprList :: MonadParsec e PyTokens m => m Whitespace -> m (Expr SrcInfo)
 exprList ws =
   (\e -> maybe e (uncurry $ Tuple (e ^. exprAnn) e)) <$>
@@ -1107,20 +1124,6 @@ suite =
       Left <$> ((,) <$> blank <*> eol) <|>
       Right <$> (statement level =<< i)
 
-comma :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Comma)
-comma ws = second Comma <$> token ws (\case; TkComma{} -> True; _ -> False) ","
-
-colon :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Colon)
-colon ws = second Colon <$> token ws (\case; TkColon{} -> True; _ -> False) ":"
-
-equals :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Equals)
-equals ws = second Equals <$> token ws (\case; TkEq{} -> True; _ -> False) "="
-
-semicolon :: MonadParsec e PyTokens m => m Whitespace -> m (PyToken SrcInfo, Semicolon SrcInfo)
-semicolon ws =
-  (\(a, b) -> (a, Semicolon (pyTokenAnn a) b)) <$>
-  token ws (\case; TkSemicolon{} -> True; _ -> False) ";"
-
 commaSep :: MonadParsec e PyTokens m => m Whitespace -> m a -> m (CommaSep a)
 commaSep ws pa =
   (\a -> maybe (CommaSepOne a) (uncurry $ CommaSepMany a)) <$>
@@ -1338,7 +1341,7 @@ decorator
   -> m (Decorator SrcInfo)
 decorator indentBefore =
   (\(tk, spcs) a b -> Decorator (pyTokenAnn tk) indentBefore spcs a b) <$>
-  token space (\case; TkAt{} -> True; _ -> False) "@" <*>
+  at space <*>
   decoratorValue <*>
   optional comment <*>
   eol <*>

@@ -4,19 +4,12 @@ module Programs where
 
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
-import Control.Lens.Review ((#))
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
 
 import Language.Python.DSL
-import Language.Python.Optics
+import Language.Python.Syntax
 
-import Language.Python.Syntax.Module (Module(..))
-import Language.Python.Syntax.CommaSep (Comma(..), CommaSep(..), CommaSep1'(..))
-import Language.Python.Syntax.Expr (Arg(..), Expr(..), Param(..))
-import Language.Python.Syntax.Punctuation (Colon(..))
-import Language.Python.Syntax.Statement (Block(..), CompoundStatement(..), SmallStatement(..), SimpleStatement(..), Statement(..), Suite(..))
-import Language.Python.Syntax.Whitespace (Indents(..), Newline(..), Whitespace(..), indentWhitespaces)
 
 -- |
 -- @
@@ -152,9 +145,8 @@ counter =
       [line_ $ return_ ("self" /> "x")]
   ]
 
-exceptions :: Raw Statement
+exceptions :: Raw Fundef
 exceptions =
-  _Fundef #
   def_ "exceptions" []
   [ line_ $
     tryE_ [line_ pass_] &

@@ -25,12 +25,15 @@ module Language.Python.Internal.Parse
     -- * Parsers
   , token
     -- ** Symbols
-  , comma
-  , rightParen
+  , at
   , colon
+  , comma
+  , dot
+  , doubleStar
+  , equals
+  , rightParen
   , semicolon
   , star
-  , doubleStar
     -- ** Atomic forms
   , identifier
   , bool

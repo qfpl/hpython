@@ -3,7 +3,7 @@
 
 name:                hpython
 version:             0.1
-synopsis:            Syntax tree and DSL for Python
+synopsis:            Python language tools
 description:
   `hpython` provides an abstract syntax tree for Python 3.5, along with a parser,
   printer, and syntax checker. It also contains optics for working with the AST,
@@ -18,8 +18,8 @@ license:             BSD3
 license-file:        LICENCE
 author:              Isaac Elliott
 maintainer:          isaace71295@gmail.com
-copyright:           Copyright (c) 2017-2018, Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230.
-category:            Python, Language Tools
+copyright:           Copyright (c) 2017-2019, Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230.
+category:            Language
 build-type:          Simple
 extra-source-files:  ChangeLog.md
                      benchmarks/pypy.py

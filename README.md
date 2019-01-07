@@ -20,7 +20,7 @@ Python programs directly in Haskell.
 
 ## Examples
 
-See the `example` directory
+See [the `example` directory](https://github.com/qfpl/hpython/tree/master/example)
 
 ## FAQ
 

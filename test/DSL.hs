@@ -161,14 +161,14 @@ prop_parameters_1 =
       st = def_ "a" [] [line_ pass_]
 
       params1 =
-        CommaSepMany (p_ "test1") (Comma $ replicate 5 Space) $
-        CommaSepMany (p_ "test2") (Comma $ replicate 3 Space) $
+        CommaSepMany (p_ "test1") (MkComma $ replicate 5 Space) $
+        CommaSepMany (p_ "test2") (MkComma $ replicate 3 Space) $
         CommaSepNone
       st1 = st & _Fundef.fdParameters .~ params1
 
       params2 =
-        CommaSepMany (p_ "test3") (Comma $ replicate 5 Space) $
-        CommaSepMany (p_ "test4") (Comma $ replicate 3 Space) $
+        CommaSepMany (p_ "test3") (MkComma $ replicate 5 Space) $
+        CommaSepMany (p_ "test4") (MkComma $ replicate 3 Space) $
         CommaSepNone
       st2 = st & _Fundef.fdParameters .~ params2
 
@@ -181,14 +181,14 @@ prop_parameters_2 =
       st = def_ "a" [] [line_ pass_]
 
       params1 =
-        CommaSepMany (p_ "test1") (Comma $ replicate 5 Space) $
-        CommaSepMany (p_ "test2") (Comma $ replicate 3 Space) $
+        CommaSepMany (p_ "test1") (MkComma $ replicate 5 Space) $
+        CommaSepMany (p_ "test2") (MkComma $ replicate 3 Space) $
         CommaSepNone
       st1 = st & _Fundef.fdParameters .~ params1
 
       params2 =
-        CommaSepMany (p_ "test3") (Comma $ replicate 5 Space) $
-        CommaSepMany (p_ "test4") (Comma $ replicate 3 Space) $
+        CommaSepMany (p_ "test3") (MkComma $ replicate 5 Space) $
+        CommaSepMany (p_ "test4") (MkComma $ replicate 3 Space) $
         CommaSepOne (p_ "test5")
       st2 = st & _Fundef.fdParameters .~ params2
 
@@ -201,12 +201,12 @@ prop_parameters_3 =
       st = def_ "a" [] [line_ pass_]
 
       params1 =
-        CommaSepMany (p_ "test1") (Comma $ replicate 5 Space) $
-        CommaSepMany (p_ "test2") (Comma $ replicate 3 Space) $
+        CommaSepMany (p_ "test1") (MkComma $ replicate 5 Space) $
+        CommaSepMany (p_ "test2") (MkComma $ replicate 3 Space) $
         CommaSepNone
       st1 = st & _Fundef.fdParameters .~ params1
 
-      params2 = CommaSepMany (p_ "test3") (Comma $ replicate 5 Space) CommaSepNone
+      params2 = CommaSepMany (p_ "test3") (MkComma $ replicate 5 Space) CommaSepNone
       st2 = st & _Fundef.fdParameters .~ params2
 
     (st1 & _Fundef.parameters_ .~ [p_ "test3"]) === st2
@@ -218,12 +218,12 @@ prop_parameters_4 =
       st = def_ "a" [] [line_ pass_]
 
       params1 =
-        CommaSepMany (p_ "test1") (Comma $ replicate 5 Space) $
+        CommaSepMany (p_ "test1") (MkComma $ replicate 5 Space) $
         CommaSepOne (p_ "test2")
       st1 = st & _Fundef.fdParameters .~ params1
 
       params2 =
-        CommaSepMany (p_ "test3") (Comma $ replicate 5 Space) $
+        CommaSepMany (p_ "test3") (MkComma $ replicate 5 Space) $
         CommaSepOne (p_ "test4")
       st2 = st & _Fundef.fdParameters .~ params2
 
@@ -236,13 +236,13 @@ prop_parameters_5 =
       st = def_ "a" [] [line_ pass_]
 
       params1 =
-        CommaSepMany (p_ "test1") (Comma $ replicate 5 Space) $
+        CommaSepMany (p_ "test1") (MkComma $ replicate 5 Space) $
         CommaSepOne (p_ "test2")
       st1 = st & _Fundef.fdParameters .~ params1
 
       params2 =
-        CommaSepMany (p_ "test3") (Comma $ replicate 5 Space) $
-        CommaSepMany (p_ "test4") (Comma [Space]) $
+        CommaSepMany (p_ "test3") (MkComma $ replicate 5 Space) $
+        CommaSepMany (p_ "test4") (MkComma [Space]) $
         CommaSepOne (p_ "test5")
       st2 = st & _Fundef.fdParameters .~ params2
 

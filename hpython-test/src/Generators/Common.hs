@@ -35,13 +35,13 @@ genSmallStatement
   -> m (SmallStatement '[] ())
 genSmallStatement gss =
   sized2M
-    (\a b -> 
+    (\a b ->
       MkSmallStatement a b <$>
-      Gen.maybe genWhitespaces <*>
+      Gen.maybe genSemicolon <*>
       Gen.maybe genComment <*>
       Gen.maybe genNewline)
     gss
-    (sizedList $ (,) <$> genWhitespaces <*> gss)
+    (sizedList $ (,) <$> genSemicolon <*> gss)
 
 genSuite
   :: MonadGen m
@@ -375,16 +375,25 @@ genOp :: MonadGen m => m (BinOp ())
 genOp = Gen.element $ _opOperator <$> operatorTable
 
 genDot :: MonadGen m => m Dot
-genDot = Dot <$> genWhitespaces
+genDot = MkDot <$> genWhitespaces
 
 genComma :: MonadGen m => m Comma
-genComma = Comma <$> genWhitespaces
+genComma = MkComma <$> genWhitespaces
 
 genColon :: MonadGen m => m Colon
-genColon = Colon <$> genWhitespaces
+genColon = MkColon <$> genWhitespaces
+
+genAt :: MonadGen m => m At
+genAt = MkAt <$> genWhitespaces
+
+genSemicolon :: MonadGen m => m (Semicolon ())
+genSemicolon = MkSemicolon () <$> genWhitespaces
+
+genEquals :: MonadGen m => m Equals
+genEquals = MkEquals <$> genWhitespaces
 
 genColonAny :: MonadGen m => m Colon
-genColonAny = Colon <$> genAnyWhitespaces
+genColonAny = MkColon <$> genAnyWhitespaces
 
 sizedCommaSep :: MonadGen m => m a -> m (CommaSep a)
 sizedCommaSep m = do

@@ -2,9 +2,18 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                hpython
-version:             0.1.0.0
+version:             0.1
 synopsis:            Syntax tree and DSL for Python
-description:         Syntax tree and DSL for Python.
+description:
+  `hpython` provides an abstract syntax tree for Python 3.5, along with a parser,
+  printer, and syntax checker. It also contains optics for working with the AST,
+  and a DSL for writing Python programs directly in Haskell.
+  .
+  For a high-level overview of the library, see the @Language.Python@ module.
+  .
+  For code examples, see the [examples directory on GitHub](https://github.com/qfpl/hpython/tree/master/example).
+  .
+  For general information about the project, see the [project readme](https://github.com/qfpl/hpython/blob/master/README.md).
 license:             BSD3
 license-file:        LICENCE
 author:              Isaac Elliott
@@ -186,7 +195,7 @@ test-suite hpython-tests
                      , filepath
                      , hpython
                      , hedgehog >= 0.5 && < 0.7
-                     , lens
+                     , lens >= 4 && < 4.18
                      , text >=1.2 && <1.3
                      , megaparsec >=6.3 && < 7
                      , validation >= 1 && < 1.1

@@ -433,11 +433,11 @@ instance HasTrailingWhitespace (Subscript v a) where
             case d of
               Nothing ->
                 case c of
-                  Nothing -> (Colon ws, c, d)
+                  Nothing -> (MkColon ws, c, d)
                   Just e -> (b, Just $ e & trailingWhitespace .~ ws, d)
               Just (e, f) ->
                 case f of
-                  Nothing -> (b, c, Just (Colon ws, f))
+                  Nothing -> (b, c, Just (MkColon ws, f))
                   Just g -> (b, c, Just (e, Just $ g & trailingWhitespace .~ ws)))
 
 -- | @a@ or @*a@
@@ -970,7 +970,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Bool _ _ ws -> ws
           String _ v -> v ^. trailingWhitespace
           Not _ _ e -> e ^. trailingWhitespace
-          Tuple _ _ (Comma ws) Nothing -> ws
+          Tuple _ _ (MkComma ws) Nothing -> ws
           Tuple _ _ _ (Just cs) -> cs ^. trailingWhitespace
           DictComp _ _ _ ws -> ws
           Dict _ _ _ ws -> ws
@@ -1003,7 +1003,7 @@ instance HasTrailingWhitespace (Expr v a) where
           Bool a b _ -> Bool a b ws
           String a v -> String a (v & trailingWhitespace .~ ws)
           Not a b c -> Not a b (c & trailingWhitespace .~ ws)
-          Tuple a b _ Nothing -> Tuple a (coerce b) (Comma ws) Nothing
+          Tuple a b _ Nothing -> Tuple a (coerce b) (MkComma ws) Nothing
           Tuple a b c (Just cs) ->
             Tuple a (coerce b) c (Just $ cs & trailingWhitespace .~ ws)
           DictComp a b c _ -> DictComp a b c ws

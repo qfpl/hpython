@@ -68,8 +68,8 @@ fromIRError (InvalidUnpacking a) = _InvalidUnpacking # a
 data SmallStatement a
   = MkSmallStatement
       (SimpleStatement a)
-      [([Whitespace], SimpleStatement a)]
-      (Maybe [Whitespace])
+      [(Semicolon a, SimpleStatement a)]
+      (Maybe (Semicolon a))
       (Maybe (Comment a))
       (Maybe Newline)
   deriving (Eq, Show, Functor, Foldable, Traversable)
@@ -162,7 +162,7 @@ data CompoundStatement a
 data SimpleStatement a
   = Return a [Whitespace] (Maybe (Expr a))
   | Expr a (Expr a)
-  | Assign a (Expr a) (NonEmpty ([Whitespace], Expr a))
+  | Assign a (Expr a) (NonEmpty (Equals, Expr a))
   | AugAssign a (Expr a) (AugAssign a) (Expr a)
   | Pass a [Whitespace]
   | Break a [Whitespace]
@@ -619,7 +619,7 @@ data Decorator a
   = Decorator
   { _decoratorAnn :: a
   , _decoratorIndents :: Indents a
-  , _decoratorWhitespaceLeft :: [Whitespace]
+  , _decoratorAt :: At
   , _decoratorExpr :: Expr a
   , _decoratorComment :: Maybe (Comment a)
   , _decoratorNewline :: Newline

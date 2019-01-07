@@ -253,19 +253,39 @@ validateWhitespace ann ws =
   then errorVM1 (_UnexpectedComment # ann)
   else pure ws
 
+validateAt
+  :: (AsSyntaxError e a)
+  => a
+  -> At
+  -> ValidateSyntax e At
+validateAt a (MkAt ws) = MkAt <$> validateWhitespace a ws
+
 validateComma
   :: (AsSyntaxError e a)
   => a
   -> Comma
   -> ValidateSyntax e Comma
-validateComma a (Comma ws) = Comma <$> validateWhitespace a ws
+validateComma a (MkComma ws) = MkComma <$> validateWhitespace a ws
 
 validateColon
   :: (AsSyntaxError e a)
   => a
   -> Colon
   -> ValidateSyntax e Colon
-validateColon a (Colon ws) = Colon <$> validateWhitespace a ws
+validateColon a (MkColon ws) = MkColon <$> validateWhitespace a ws
+
+validateSemicolon
+  :: AsSyntaxError e a
+  => Semicolon a
+  -> ValidateSyntax e (Semicolon a)
+validateSemicolon (MkSemicolon a ws) = MkSemicolon a <$> validateWhitespace a ws
+
+validateEquals
+  :: AsSyntaxError e a
+  => a
+  -> Equals
+  -> ValidateSyntax e Equals
+validateEquals a (MkEquals ws) = MkEquals <$> validateWhitespace a ws
 
 validateAssignmentSyntax
   :: ( AsSyntaxError e a
@@ -642,7 +662,7 @@ validateDecoratorSyntax
   -> ValidateSyntax e (Decorator (Nub (Syntax ': v)) a)
 validateDecoratorSyntax (Decorator a b c d e f g) =
   (\c' d' -> Decorator a b c' d' e f) <$>
-  validateWhitespace a c <*>
+  validateAt a c <*>
   isDecoratorValue d <*>
   traverseOf (traverse._1) validateBlankSyntax g
   where
@@ -900,10 +920,10 @@ validateSimpleStatementSyntax (Assign a lvalue rs) =
        traverse
          (\(ws, b) ->
             (,) <$>
-            validateWhitespace a ws <*>
+            validateEquals a ws <*>
             validateAssignmentSyntax a b)
          (NonEmpty.init rs) <*>
-       (\(ws, b) -> (,) <$> validateWhitespace a ws <*> validateExprSyntax b)
+       (\(ws, b) -> (,) <$> validateEquals a ws <*> validateExprSyntax b)
          (NonEmpty.last rs)) <*
       liftVM0 (modify (assigns ++))
 validateSimpleStatementSyntax (AugAssign a lvalue aa rvalue) =
@@ -1024,9 +1044,10 @@ validateSmallStatementSyntax
   => SmallStatement v a
   -> ValidateSyntax e (SmallStatement (Nub (Syntax ': v)) a)
 validateSmallStatementSyntax (MkSmallStatement s ss sc cmt nl) =
-  (\s' ss' -> MkSmallStatement s' ss' sc cmt nl) <$>
+  (\s' ss' sc' -> MkSmallStatement s' ss' sc' cmt nl) <$>
   validateSimpleStatementSyntax s <*>
-  traverseOf (traverse._2) validateSimpleStatementSyntax ss
+  traverse (bitraverse validateSemicolon validateSimpleStatementSyntax) ss <*>
+  traverse validateSemicolon sc
 
 validateStatementSyntax
   :: ( AsSyntaxError e a

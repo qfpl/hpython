@@ -47,17 +47,17 @@ data BinOp a
   -- | @a or b@
   | BoolOr a [Whitespace]
   -- | @a == b@
-  | Equals a [Whitespace]
+  | Eq a [Whitespace]
   -- | @a < b@
   | Lt a [Whitespace]
   -- | @a <= b@
-  | LtEquals a [Whitespace]
+  | LtEq a [Whitespace]
   -- | @a > b@
   | Gt a [Whitespace]
   -- | @a >= b@
-  | GtEquals a [Whitespace]
+  | GtEq a [Whitespace]
   -- | @a != b@
-  | NotEquals a [Whitespace]
+  | NotEq a [Whitespace]
   -- | @a * b@
   | Multiply a [Whitespace]
   -- | @a / b@
@@ -98,12 +98,12 @@ instance HasTrailingWhitespace (BinOp a) where
          Divide _ a -> a
          FloorDivide _ a -> a
          Plus _ a -> a
-         Equals _ a -> a
+         Eq _ a -> a
          Lt _ a -> a
-         LtEquals _ a -> a
+         LtEq _ a -> a
          Gt _ a -> a
-         GtEquals _ a -> a
-         NotEquals _ a -> a
+         GtEq _ a -> a
+         NotEq _ a -> a
          BitOr _ a -> a
          BitXor _ a -> a
          BitAnd _ a -> a
@@ -125,18 +125,18 @@ instance HasTrailingWhitespace (BinOp a) where
            Divide a _ -> Divide a ws
            FloorDivide a _ -> FloorDivide a ws
            Plus a _ -> Plus a ws
-           Equals a _ -> Equals a ws
+           Eq a _ -> Eq a ws
            Lt a _ -> Lt a ws
-           LtEquals a _ -> LtEquals a ws
+           LtEq a _ -> LtEq a ws
            Gt a _ -> Gt a ws
-           GtEquals a _ -> GtEquals a ws
-           NotEquals a _ -> NotEquals a ws
+           GtEq a _ -> GtEq a ws
+           NotEq a _ -> NotEq a ws
            BitOr a _ -> BitOr a ws
            BitAnd a _ -> BitAnd a ws
            BitXor a _ -> BitXor a ws
            ShiftLeft a _ -> ShiftLeft a ws
            ShiftRight a _ -> ShiftRight a ws
-           Percent a _ -> Equals a ws
+           Percent a _ -> Eq a ws
            At a _ -> At a ws)
 
 -- | The associativity of an operator. Each operator is either left-associative or right associative.
@@ -172,12 +172,12 @@ operatorTable =
   , entry1 IsNot 10 L
   , entry In 10 L
   , entry1 NotIn 10 L
-  , entry Equals 10 L
+  , entry Eq 10 L
   , entry Lt 10 L
-  , entry LtEquals 10 L
+  , entry LtEq 10 L
   , entry Gt 10 L
-  , entry GtEquals 10 L
-  , entry NotEquals 10 L
+  , entry GtEq 10 L
+  , entry NotEq 10 L
   , entry BitOr 14 L
   , entry BitXor 15 L
   , entry BitAnd 16 L
@@ -206,12 +206,12 @@ sameOperator op op' =
     (IsNot{}, IsNot{}) -> True
     (In{}, In{}) -> True
     (NotIn{}, NotIn{}) -> True
-    (Equals{}, Equals{}) -> True
+    (Eq{}, Eq{}) -> True
     (Lt{}, Lt{}) -> True
-    (LtEquals{}, LtEquals{}) -> True
+    (LtEq{}, LtEq{}) -> True
     (Gt{}, Gt{}) -> True
-    (GtEquals{}, GtEquals{}) -> True
-    (NotEquals{}, NotEquals{}) -> True
+    (GtEq{}, GtEq{}) -> True
+    (NotEq{}, NotEq{}) -> True
     (Minus{}, Minus{}) -> True
     (Plus{}, Plus{}) -> True
     (Multiply{}, Multiply{}) -> True
@@ -235,12 +235,12 @@ isComparison a =
     IsNot{} -> True
     In{} -> True
     NotIn{} -> True
-    Equals{} -> True
+    Eq{} -> True
     Lt{} -> True
-    LtEquals{} -> True
+    LtEq{} -> True
     Gt{} -> True
-    GtEquals{} -> True
-    NotEquals{} -> True
+    GtEq{} -> True
+    NotEq{} -> True
     _ -> False
 
 -- | Retrieve the information for a given operator from the operator table.

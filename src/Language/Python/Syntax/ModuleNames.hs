@@ -82,7 +82,7 @@ _moduleNameAnn (ModuleNameMany a _ _ _) = a
 makeModuleName :: Ident v a -> [([Whitespace], Ident v a)] -> ModuleName v a
 makeModuleName i [] = ModuleNameOne (_identAnn i) i
 makeModuleName i ((a, b) : as) =
-  ModuleNameMany (_identAnn i) i (Dot a) $
+  ModuleNameMany (_identAnn i) i (MkDot a) $
   makeModuleName b as
 
 instance HasTrailingWhitespace (ModuleName v a) where

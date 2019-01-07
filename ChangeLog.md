@@ -1,5 +1,7 @@
 # Revision history for hpython
 
-## 0.1.0.0  -- YYYY-mm-dd
+## 0.1
 
-* First version. Released on an unsuspecting world.
+*2018-01-07*
+
+Initial release

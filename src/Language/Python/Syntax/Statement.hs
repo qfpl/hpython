@@ -191,8 +191,8 @@ instance HasStatements Suite where
 data SmallStatement (v :: [*]) a
   = MkSmallStatement
       (SimpleStatement v a)
-      [([Whitespace], SimpleStatement v a)]
-      (Maybe [Whitespace])
+      [(Semicolon a, SimpleStatement v a)]
+      (Maybe (Semicolon a))
       (Maybe (Comment a))
       (Maybe Newline)
   deriving (Eq, Show, Functor, Foldable, Traversable)
@@ -275,7 +275,7 @@ data SimpleStatement (v :: [*]) a
   -- | @\<expr\> (\'=\' \<spaces\> \<expr\>)+@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#assignment-statements
-  | Assign a (Expr v a) (NonEmpty ([Whitespace], Expr v a))
+  | Assign a (Expr v a) (NonEmpty (Equals, Expr v a))
   -- | @\<expr\> \<augassign\> \<expr\>@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#augmented-assignment-statements
@@ -396,7 +396,7 @@ data Decorator (v :: [*]) a
   = Decorator
   { _decoratorAnn :: a
   , _decoratorIndents :: Indents a -- ^ Preceding indentation
-  , _decoratorWhitespaceLeft :: [Whitespace] -- ^ @\'\@\' \<spaces\>@
+  , _decoratorAt :: At -- ^ @\'\@\' \<spaces\>@
   , _decoratorExpr :: Expr v a -- ^ @\<expr\>@
   , _decoratorComment :: Maybe (Comment a) -- ^ Trailing comment
   , _decoratorNewline :: Newline -- ^ Trailing newline

@@ -46,13 +46,13 @@ import Language.Python.Syntax.Whitespace
 correctParams :: CommaSep (Param v a) -> CommaSep (Param v a)
 correctParams CommaSepNone = CommaSepNone
 correctParams (CommaSepOne a) = CommaSepOne a
-correctParams (CommaSepMany a (Comma b) c) =
+correctParams (CommaSepMany a (MkComma b) c) =
   case c of
     CommaSepNone ->
       case a of
-        PositionalParam{} -> CommaSepMany a (Comma b) c
+        PositionalParam{} -> CommaSepMany a (MkComma b) c
         _ -> CommaSepOne (a & trailingWhitespace <>~ b)
-    _ -> CommaSepMany a (Comma b) (correctParams c)
+    _ -> CommaSepMany a (MkComma b) (correctParams c)
 
 correctSpaces :: (PyToken () -> Text) -> [PyToken ()] -> [PyToken ()]
 correctSpaces f =

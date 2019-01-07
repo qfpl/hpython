@@ -18,7 +18,7 @@ license:             BSD3
 license-file:        LICENCE
 author:              Isaac Elliott
 maintainer:          isaace71295@gmail.com
-copyright:           Copyright (c) 2017-2018, Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230.
+copyright:           Copyright (c) 2017-2019, Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230.
 category:            Language
 build-type:          Simple
 extra-source-files:  ChangeLog.md

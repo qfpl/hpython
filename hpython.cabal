@@ -74,6 +74,9 @@ flag development
 library
   exposed-modules:     Data.Type.Set
                      , Data.Validate.Monadic
+                     , Data.VFix
+                     , Data.VIdentity
+                     , Data.VTraversable
                      , Language.Python
                      , Language.Python.DSL
                      , Language.Python.Internal.Lexer
@@ -83,6 +86,7 @@ library
                      , Language.Python.Internal.Token
                      , Language.Python.Internal.Syntax.IR
                      , Language.Python.Optics
+                     , Language.Python.Optics.Expr
                      , Language.Python.Optics.Indents
                      , Language.Python.Optics.Newlines
                      , Language.Python.Optics.Validated
@@ -91,8 +95,10 @@ library
                      , Language.Python.Render
                      , Language.Python.Syntax
                      , Language.Python.Syntax.AugAssign
+                     , Language.Python.Syntax.Arg
                      , Language.Python.Syntax.CommaSep
                      , Language.Python.Syntax.Comment
+                     , Language.Python.Syntax.Comprehension
                      , Language.Python.Syntax.Expr
                      , Language.Python.Syntax.Ident
                      , Language.Python.Syntax.Import
@@ -101,6 +107,7 @@ library
                      , Language.Python.Syntax.Operator.Unary
                      , Language.Python.Syntax.ModuleNames
                      , Language.Python.Syntax.Numbers
+                     , Language.Python.Syntax.Param
                      , Language.Python.Syntax.Punctuation
                      , Language.Python.Syntax.Raw
                      , Language.Python.Syntax.Statement
@@ -132,6 +139,7 @@ library
                      , these >=0.7.4 && <0.8
                      , validation >= 1 && < 1.1
                      , parsers-megaparsec >=0.1 && <0.2
+                     , recursion-schemes >=5.1 && <5.2
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -Wall

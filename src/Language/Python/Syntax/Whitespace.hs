@@ -3,6 +3,7 @@
 {-# language TypeFamilies #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# language TemplateHaskell #-}
+{-# language UndecidableInstances #-}
 
 {-|
 Module      : Language.Python.Syntax.Whitespace
@@ -33,6 +34,7 @@ import Control.Lens.Lens (Lens', lens)
 import Control.Lens.Setter ((.~))
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (Traversal')
+import Control.Lens.Wrapped (_Wrapped)
 import Data.Deriving (deriveEq1, deriveOrd1)
 import Data.Foldable (toList)
 import Data.Function ((&))
@@ -45,6 +47,7 @@ import GHC.Exts (IsList(..))
 
 import qualified Data.List.NonEmpty as NonEmpty
 
+import Data.VFix (VFix(..))
 import Language.Python.Syntax.Comment (Comment)
 
 -- | A newline is either a carriage return, a line feed, or a carriage return
@@ -104,6 +107,9 @@ instance HasTrailingWhitespace a => HasTrailingWhitespace (NonEmpty a) where
          case xs of
            [] -> (x & trailingWhitespace .~ ws) :| xs
            x' : xs' -> NonEmpty.cons x $ (x' :| xs') & trailingWhitespace .~ ws)
+
+instance HasTrailingWhitespace (f (VFix f) v a) => HasTrailingWhitespace (VFix f v a) where
+  trailingWhitespace = _Wrapped.trailingWhitespace
 
 -- | A statement-containing thing may have a trailing newline
 --

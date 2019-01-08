@@ -27,7 +27,7 @@ module Language.Python.Syntax.Expr
     -- * Collection items
   , DictItem(..), ListItem(..), SetItem(..), TupleItem(..)
     -- * Subscripts
-  , Subscript(..)
+  , SubscriptItem(..)
   )
 where
 
@@ -48,7 +48,7 @@ import Unsafe.Coerce (unsafeCoerce)
 import Data.VFix
 import Data.VIdentity
 import Data.VTraversable
-import Language.Python.Optics.Expr (HasExprs(..))
+import Language.Python.Optics.Exprs (HasExprs(..))
 import Language.Python.Optics.Validated (Validated(..))
 import Language.Python.Syntax.Arg
 import Language.Python.Syntax.CommaSep
@@ -124,7 +124,7 @@ instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (DictItem exp
 -- @a[b:c:d]@
 --
 -- https://docs.python.org/3/reference/expressions.html#subscriptions
-data Subscript expr (v :: [*]) a
+data SubscriptItem expr (v :: [*]) a
   = SubscriptExpr (expr v a)
   | SubscriptSlice
       -- [expr]
@@ -137,7 +137,7 @@ data Subscript expr (v :: [*]) a
       (Maybe (Colon, Maybe (expr v a)))
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-instance VTraversable Subscript where
+instance VTraversable SubscriptItem where
   vtraverse f (SubscriptExpr a) = SubscriptExpr <$> f a
   vtraverse f (SubscriptSlice a b c d) =
     (\a' c' -> SubscriptSlice a' b c') <$>
@@ -145,7 +145,7 @@ instance VTraversable Subscript where
     traverse f c <*>
     (traverse._2.traverse) f d
 
-instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (Subscript expr v a) where
+instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (SubscriptItem expr v a) where
   trailingWhitespace =
     lens
       (\case
@@ -440,7 +440,7 @@ data ExprF expr (v :: [*]) a
   -- [ spaces
   , _unsafeSubscriptWhitespaceLeft :: [Whitespace]
   -- expr
-  , _unsafeSubscriptValueRight :: CommaSep1' (Subscript expr v a)
+  , _unsafeSubscriptValueRight :: CommaSep1' (SubscriptItem expr v a)
   -- ] spaces
   , _unsafeSubscriptWhitespaceRight :: [Whitespace]
   }
@@ -489,11 +489,11 @@ data ExprF expr (v :: [*]) a
   -- https://docs.python.org/3/reference/expressions.html#is-not
   --
   -- https://docs.python.org/3/reference/expressions.html#boolean-operations
-  | BinOp
+  | Binary
   { _unsafeExprAnn :: a
-  , _unsafeBinOpExprLeft :: expr v a
-  , _unsafeBinOpOp :: BinOp a
-  , _unsafeBinOpExprRight :: expr v a
+  , _unsafeBinaryExprLeft :: expr v a
+  , _unsafeBinaryOp :: BinOp a
+  , _unsafeBinaryExprRight :: expr v a
   }
   -- | @-a@
   --
@@ -502,10 +502,10 @@ data ExprF expr (v :: [*]) a
   -- @+a@
   --
   -- https://docs.python.org/3/reference/expressions.html#unary-arithmetic-and-bitwise-operations
-  | UnOp
+  | Unary
   { _unsafeExprAnn :: a
-  , _unsafeUnOpOp :: UnOp a
-  , _unsafeUnOpValue :: expr v a
+  , _unsafeUnaryOp :: UnOp a
+  , _unsafeUnaryValue :: expr v a
   }
   | Parens
   { _unsafeExprAnn :: a
@@ -612,7 +612,7 @@ data ExprF expr (v :: [*]) a
   -- https://docs.python.org/3/reference/expressions.html#generator-expressions
   | Generator
   { _unsafeExprAnn :: a
-  , _generatorValue :: Comprehension VIdentity expr v a
+  , _unsafeGeneratorValue :: Comprehension VIdentity expr v a
   }
   -- | @await a@
   --
@@ -655,11 +655,11 @@ instance VTraversable ExprF where
         (\b' d' -> Call a b' c d' e) <$>
         fun b <*>
         (traverse.traverse) (vtraverse fun) d
-      BinOp a b c d ->
-        (\b' -> BinOp a b' c) <$>
+      Binary a b c d ->
+        (\b' -> Binary a b' c) <$>
         fun b <*>
         fun d
-      UnOp a b c -> UnOp a b <$> fun c
+      Unary a b c -> Unary a b <$> fun c
       Parens a b c d -> (\c' -> Parens a b c' d) <$> fun c
       Ident a -> pure $ Ident a
       Int a b c -> pure $ Int a b c
@@ -702,8 +702,8 @@ exprAnn =
         Deref a _ _ _ -> a
         Subscript a _ _ _ _ -> a
         Call a _ _ _ _ -> a
-        BinOp a _ _ _ -> a
-        UnOp a _ _ -> a
+        Binary a _ _ _ -> a
+        Unary a _ _ -> a
         Parens a _ _ _ -> a
         Ident a -> a ^. identAnn
         Int a _ _ -> a
@@ -733,8 +733,8 @@ exprAnn =
         Deref _ a b c -> Deref ann a b c
         Subscript _ a b c d -> Subscript ann a b c d
         Call _ a b c d -> Call ann a b c d
-        BinOp _ a b c -> BinOp ann a b c
-        UnOp _ a b -> UnOp ann a b
+        Binary _ a b c -> Binary ann a b c
+        Unary _ a b -> Unary ann a b
         Parens _ a b c -> Parens ann a b c
         Ident a -> Ident $ a & identAnn .~ ann
         Int _ a b -> Int ann a b
@@ -768,8 +768,8 @@ instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (ExprF expr v
           Deref _ _ _ a -> a ^. trailingWhitespace
           Subscript _ _ _ _ ws -> ws
           Call _ _ _ _ ws -> ws
-          BinOp _ _ _ e -> e ^. trailingWhitespace
-          UnOp _ _ e -> e ^. trailingWhitespace
+          Binary _ _ _ e -> e ^. trailingWhitespace
+          Unary _ _ e -> e ^. trailingWhitespace
           Parens _ _ _ ws -> ws
           Ident a -> a ^. getting trailingWhitespace
           Int _ _ ws -> ws
@@ -801,8 +801,8 @@ instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (ExprF expr v
           Deref a b c d -> Deref a (coerce b) c (d & trailingWhitespace .~ ws)
           Subscript a b c d _ -> Subscript a (coerce b) c d ws
           Call a b c d _ -> Call a (coerce b) c (coerce d) ws
-          BinOp a b c e -> BinOp a (coerce b) c (e & trailingWhitespace .~ ws)
-          UnOp a b c -> UnOp a b (c & trailingWhitespace .~ ws)
+          Binary a b c e -> Binary a (coerce b) c (e & trailingWhitespace .~ ws)
+          Unary a b c -> Unary a b (c & trailingWhitespace .~ ws)
           Parens a b c _ -> Parens a b (coerce c) ws
           Ident a -> Ident $ a & trailingWhitespace .~ ws
           Int a b _ -> Int a b ws
@@ -829,16 +829,16 @@ instance Num (Expr '[] ()) where
     | n >= 0 = VIn $ Int () (IntLiteralDec () $ integralDecDigits n ^?! _Right) []
     | otherwise =
         VIn $
-        UnOp
+        Unary
           ()
           (Negate () [])
           (VIn $ Int () (IntLiteralDec () $ integralDecDigits (-n) ^?! _Right) [])
 
-  negate = VIn . UnOp () (Negate () [])
+  negate = VIn . Unary () (Negate () [])
 
-  (+) a = VIn . BinOp () (a & trailingWhitespace .~ [Space]) (Plus () [Space])
-  (*) a = VIn . BinOp () (a & trailingWhitespace .~ [Space]) (Multiply () [Space])
-  (-) a = VIn . BinOp () (a & trailingWhitespace .~ [Space]) (Minus () [Space])
+  (+) a = VIn . Binary () (a & trailingWhitespace .~ [Space]) (Plus () [Space])
+  (*) a = VIn . Binary () (a & trailingWhitespace .~ [Space]) (Multiply () [Space])
+  (-) a = VIn . Binary () (a & trailingWhitespace .~ [Space]) (Minus () [Space])
   signum = undefined
   abs = undefined
 
@@ -855,7 +855,7 @@ shouldGroupLeft op left =
 
     lEntry =
       case vout left of
-        BinOp _ _ lOp _ -> Just $ lookupOpEntry lOp operatorTable
+        Binary _ _ lOp _ -> Just $ lookupOpEntry lOp operatorTable
         _ -> Nothing
 
     leftf =
@@ -865,7 +865,7 @@ shouldGroupLeft op left =
 
     leftf' =
       case (vout left, op) of
-        (UnOp{}, Exp{}) -> True
+        (Unary{}, Exp{}) -> True
         (Tuple{}, _) -> True
         (Not{}, BoolAnd{}) -> False
         (Not{}, BoolOr{}) -> False
@@ -884,7 +884,7 @@ shouldGroupRight op right =
 
     rEntry =
       case vout right of
-        BinOp _ _ rOp _ -> Just $ lookupOpEntry rOp operatorTable
+        Binary _ _ rOp _ -> Just $ lookupOpEntry rOp operatorTable
         _ -> Nothing
 
     rightf =
@@ -901,3 +901,4 @@ shouldGroupRight op right =
         _ -> maybe False (\p -> p < entry ^. opPrec) (rEntry ^? _Just.opPrec)
   in
     rightf || rightf'
+

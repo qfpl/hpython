@@ -74,6 +74,7 @@ import Unsafe.Coerce (unsafeCoerce)
 
 import qualified Data.List.NonEmpty as NonEmpty
 
+import Language.Python.Optics.Exprs
 import Language.Python.Optics.Validated
 import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
@@ -205,7 +206,7 @@ data Statement (v :: [*]) a
   | CompoundStatement (CompoundStatement v a)
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-instance HasExprs SmallStatement where
+instance HasExprs SmallStatement Expr where
   _Exprs f (MkSmallStatement s ss a b c) =
     MkSmallStatement <$>
     _Exprs f s <*>
@@ -214,7 +215,7 @@ instance HasExprs SmallStatement where
     pure b <*>
     pure c
 
-instance HasExprs Statement where
+instance HasExprs Statement Expr where
   _Exprs f (SmallStatement idnt a) = SmallStatement idnt <$> _Exprs f a
   _Exprs f (CompoundStatement c) = CompoundStatement <$> _Exprs f c
 
@@ -337,7 +338,7 @@ data SimpleStatement (v :: [*]) a
 
 instance Plated (SimpleStatement '[] a) where; plate = gplate
 
-instance HasExprs SimpleStatement where
+instance HasExprs SimpleStatement Expr where
   _Exprs f (Assert a b c d) = Assert a b <$> f c <*> traverseOf (traverse._2) f d
   _Exprs f (Raise a ws x) =
     Raise a ws <$>
@@ -417,7 +418,7 @@ data CompoundStatement (v :: [*]) a
   , _unsafeCsFundefDef :: NonEmpty Whitespace -- ^ @\'def\' \<spaces\>@
   , _unsafeCsFundefName :: Ident v a -- ^ @\<ident\>@
   , _unsafeCsFundefLeftParen :: [Whitespace] -- ^ @\'(\' \<spaces\>@
-  , _unsafeCsFundefParameters :: CommaSep (Param v a) -- ^ @\<parameters\>@
+  , _unsafeCsFundefParameters :: CommaSep (Param Expr v a) -- ^ @\<parameters\>@
   , _unsafeCsFundefRightParen :: [Whitespace] -- ^ @\')\' \<spaces\>@
   , _unsafeCsFundefReturnType :: Maybe ([Whitespace], Expr v a) -- ^ @[\'->\' \<spaces\> \<expr\>]@
   , _unsafeCsFundefBody :: Suite v a -- ^ @\<suite\>@
@@ -483,7 +484,7 @@ data CompoundStatement (v :: [*]) a
   , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsClassDefClass :: NonEmpty Whitespace -- ^ @\'class\' \<spaces\>@
   , _unsafeCsClassDefName :: Ident v a -- ^ @\<ident\>@
-  , _unsafeCsClassDefArguments :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace]) -- ^ @[\'(\' \<spaces\> [\<args\>] \')\' \<spaces\>]@
+  , _unsafeCsClassDefArguments :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg Expr v a)), [Whitespace]) -- ^ @[\'(\' \<spaces\> [\<args\>] \')\' \<spaces\>]@
   , _unsafeCsClassDefBody :: Suite v a -- ^ @\<suite\>@
   }
   -- | https://docs.python.org/3.5/reference/compound_stmts.html#the-with-statement
@@ -499,24 +500,24 @@ data CompoundStatement (v :: [*]) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-instance HasExprs ExceptAs where
+instance HasExprs ExceptAs Expr where
   _Exprs f (ExceptAs ann e a) = ExceptAs ann <$> f e <*> pure (coerce a)
 
-instance HasExprs Block where
+instance HasExprs Block Expr where
   _Exprs f (Block a b c) =
     Block a <$> _Exprs f b <*> (traverse._Right._Exprs) f c
 
-instance HasExprs Suite where
+instance HasExprs Suite Expr where
   _Exprs f (SuiteOne a b c) = (\c' -> SuiteOne a b c') <$> _Exprs f c
   _Exprs f (SuiteMany a b c d e) = SuiteMany a b c d <$> _Exprs f e
 
-instance HasExprs WithItem where
+instance HasExprs WithItem Expr where
   _Exprs f (WithItem a b c) = WithItem a <$> f b <*> traverseOf (traverse._2) f c
 
-instance HasExprs Decorator where
+instance HasExprs Decorator Expr where
   _Exprs fun (Decorator a b c d e f g) = (\d' -> Decorator a b c d' e f g) <$> _Exprs fun d
 
-instance HasExprs CompoundStatement where
+instance HasExprs CompoundStatement Expr where
   _Exprs f (Fundef a decos idnt asyncWs ws1 name ws2 params ws3 mty s) =
     Fundef a <$>
     (traverse._Exprs) f decos <*>

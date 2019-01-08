@@ -1,3 +1,4 @@
+{-# language UndecidableInstances #-}
 {-|
 Module      : Language.Python.Optics.Newlines
 Copyright   : (C) CSIRO 2017-2019
@@ -9,10 +10,13 @@ Portability : non-portable
 module Language.Python.Optics.Newlines where
 
 import Control.Lens.Traversal (Traversal')
+import Control.Lens.Wrapped (_Wrapped)
 import Data.List.NonEmpty (NonEmpty(..))
 
 import qualified Data.FingerTree as FingerTree
 
+import Data.VFix
+import Data.VIdentity
 import Language.Python.Syntax
 
 {-
@@ -189,7 +193,7 @@ instance HasNewlines (Ident v a) where
 instance HasNewlines a => HasNewlines (Maybe a) where
   _Newlines = traverse._Newlines
 
-instance HasNewlines (Param v a) where
+instance HasNewlines (expr v a) => HasNewlines (Param expr v a) where
   _Newlines f (PositionalParam a b c) =
     PositionalParam a <$>
     _Newlines f b <*>
@@ -214,7 +218,7 @@ instance HasNewlines (Param v a) where
     _Newlines f c <*>
     _Newlines f d
 
-instance HasNewlines (Arg v a) where
+instance HasNewlines (expr v a) => HasNewlines (Arg expr v a) where
   _Newlines f (PositionalArg a b) =
     PositionalArg a <$>
     _Newlines f b
@@ -232,7 +236,7 @@ instance HasNewlines (Arg v a) where
     _Newlines f b <*>
     _Newlines f c
 
-instance HasNewlines (CompFor v a) where
+instance HasNewlines (expr v a) =>HasNewlines (CompFor expr v a) where
   _Newlines f (CompFor a b c d e) =
     CompFor a <$>
     _Newlines f b <*>
@@ -240,20 +244,20 @@ instance HasNewlines (CompFor v a) where
     _Newlines f d <*>
     _Newlines f e
 
-instance HasNewlines (CompIf v a) where
+instance HasNewlines (expr v a) => HasNewlines (CompIf expr v a) where
   _Newlines f (CompIf a b c) =
     CompIf a <$>
     _Newlines f b <*>
     _Newlines f c
 
-instance HasNewlines (e v a) => HasNewlines (Comprehension e v a) where
+instance (HasNewlines (h expr v a), HasNewlines (expr v a)) => HasNewlines (Comprehension h expr v a) where
   _Newlines f (Comprehension a b c d) =
     Comprehension a <$>
     _Newlines f b <*>
     _Newlines f c <*>
     _Newlines f d
 
-instance HasNewlines (TupleItem v a) where
+instance HasNewlines (expr v a) => HasNewlines (TupleItem expr v a) where
   _Newlines f (TupleItem a b) = TupleItem a <$> _Newlines f b
   _Newlines f (TupleUnpack a b c d) =
     TupleUnpack a <$>
@@ -261,7 +265,7 @@ instance HasNewlines (TupleItem v a) where
     _Newlines f c <*>
     _Newlines f d
 
-instance HasNewlines (ListItem v a) where
+instance HasNewlines (expr v a) => HasNewlines (ListItem expr v a) where
   _Newlines f (ListItem a b) = ListItem a <$> _Newlines f b
   _Newlines f (ListUnpack a b c d) =
     ListUnpack a <$>
@@ -269,7 +273,7 @@ instance HasNewlines (ListItem v a) where
     _Newlines f c <*>
     _Newlines f d
 
-instance HasNewlines (SetItem v a) where
+instance HasNewlines (expr v a) => HasNewlines (SetItem expr v a) where
   _Newlines f (SetItem a b) = SetItem a <$> _Newlines f b
   _Newlines f (SetUnpack a b c d) =
     SetUnpack a <$>
@@ -277,7 +281,7 @@ instance HasNewlines (SetItem v a) where
     _Newlines f c <*>
     _Newlines f d
 
-instance HasNewlines (DictItem v a) where
+instance HasNewlines (expr v a) => HasNewlines (DictItem expr v a) where
   _Newlines f (DictItem a b c d) =
     DictItem a <$>
     _Newlines f b <*>
@@ -288,7 +292,7 @@ instance HasNewlines (DictItem v a) where
     _Newlines f b <*>
     _Newlines f c
 
-instance HasNewlines (Subscript v a) where
+instance HasNewlines (expr v a) => HasNewlines (Subscript expr v a) where
   _Newlines f (SubscriptExpr a) = SubscriptExpr <$> _Newlines f a
   _Newlines f (SubscriptSlice a b c d) =
     SubscriptSlice <$>
@@ -303,106 +307,110 @@ instance HasNewlines a => HasNewlines (NonEmpty a) where
 instance HasNewlines (StringLiteral a) where
   _Newlines = stringLiteralWhitespace.traverse._Newlines
 
-instance HasNewlines (Expr v a) where
-  _Newlines fun = go
-    where
-      go e =
-        case e of
-          Unit a b c -> Unit a <$> _Newlines fun b <*> _Newlines fun c
-          Lambda a b c d e ->
-            Lambda a <$>
-            _Newlines fun b <*>
-            _Newlines fun c <*>
-            _Newlines fun d <*>
-            go e
-          Yield a b c ->
-            Yield a <$> _Newlines fun b <*> _Newlines fun c
-          YieldFrom a b c d ->
-            YieldFrom a <$> _Newlines fun b <*> _Newlines fun c <*> go d
-          Ternary a b c d e f ->
-            Ternary a <$>
-            go b <*>
-            _Newlines fun c <*>
-            go d <*>
-            _Newlines fun e <*>
-            go f
-          ListComp a b c d ->
-            ListComp a <$>
-            _Newlines fun b <*>
-            _Newlines fun c <*>
-            _Newlines fun d
-          List a b c d ->
-            List a <$>
-            _Newlines fun b <*>
-            _Newlines fun c <*>
-            _Newlines fun d
-          DictComp a b c d ->
-            DictComp a <$>
-            _Newlines fun b <*>
-            _Newlines fun c <*>
-            _Newlines fun d
-          Dict a b c d ->
-            Dict a <$>
-            _Newlines fun b <*>
-            _Newlines fun c <*>
-            _Newlines fun d
-          SetComp a b c d ->
-            SetComp a <$>
-            _Newlines fun b <*>
-            _Newlines fun c <*>
-            _Newlines fun d
-          Set a b c d ->
-            Set a <$>
-            _Newlines fun b <*>
-            _Newlines fun c <*>
-            _Newlines fun d
-          Deref a b c d ->
-            Deref a <$>
-            go b <*>
-            _Newlines fun c <*>
-            _Newlines fun d
-          Subscript a b c d e ->
-            Subscript a <$>
-            go b <*>
-            _Newlines fun c <*>
-            _Newlines fun d <*>
-            _Newlines fun e
-          Call a b c d e ->
-            Call a <$>
-            go b <*>
-            _Newlines fun c <*>
-            _Newlines fun d <*>
-            _Newlines fun e
-          None a b -> None a <$> _Newlines fun b
-          Ellipsis a b -> Ellipsis a <$> _Newlines fun b
-          BinOp a b c d ->
-            BinOp a <$>
-            go b <*>
-            _Newlines fun c <*>
-            go d
-          UnOp a b c ->
-            UnOp a <$>
-            _Newlines fun b <*>
-            go c
-          Parens a b c d ->
-            Parens a <$>
-            _Newlines fun b <*>
-            go c <*>
-            _Newlines fun d
-          Ident a -> Ident <$> _Newlines fun a
-          Int a b c -> Int a b <$> _Newlines fun c
-          Float a b c -> Float a b <$> _Newlines fun c
-          Imag a b c -> Imag a b <$> _Newlines fun c
-          Bool a b c -> Bool a b <$> _Newlines fun c
-          String a b -> String a <$> _Newlines fun b
-          Tuple a b c d ->
-            Tuple a <$>
-            _Newlines fun b <*>
-            _Newlines fun c <*>
-            _Newlines fun d
-          Not a b c -> Not a <$> _Newlines fun b <*> go c
-          Generator a b -> Generator a <$> _Newlines fun b
-          Await a b c -> Await a <$> _Newlines fun b <*> _Newlines fun c
+instance HasNewlines (expr v a) => HasNewlines (ExprF expr v a) where
+  _Newlines fun e =
+    case e of
+      Unit a b c -> Unit a <$> _Newlines fun b <*> _Newlines fun c
+      Lambda a b c d e ->
+        Lambda a <$>
+        _Newlines fun b <*>
+        _Newlines fun c <*>
+        _Newlines fun d <*>
+        _Newlines fun e
+      Yield a b c ->
+        Yield a <$> _Newlines fun b <*> _Newlines fun c
+      YieldFrom a b c d ->
+        YieldFrom a <$> _Newlines fun b <*> _Newlines fun c <*> _Newlines fun d
+      Ternary a b c d e f ->
+        Ternary a <$>
+        _Newlines fun b <*>
+        _Newlines fun c <*>
+        _Newlines fun d <*>
+        _Newlines fun e <*>
+        _Newlines fun f
+      ListComp a b c d ->
+        ListComp a <$>
+        _Newlines fun b <*>
+        _Newlines fun c <*>
+        _Newlines fun d
+      List a b c d ->
+        List a <$>
+        _Newlines fun b <*>
+        _Newlines fun c <*>
+        _Newlines fun d
+      DictComp a b c d ->
+        DictComp a <$>
+        _Newlines fun b <*>
+        _Newlines fun c <*>
+        _Newlines fun d
+      Dict a b c d ->
+        Dict a <$>
+        _Newlines fun b <*>
+        _Newlines fun c <*>
+        _Newlines fun d
+      SetComp a b c d ->
+        SetComp a <$>
+        _Newlines fun b <*>
+        _Newlines fun c <*>
+        _Newlines fun d
+      Set a b c d ->
+        Set a <$>
+        _Newlines fun b <*>
+        _Newlines fun c <*>
+        _Newlines fun d
+      Deref a b c d ->
+        Deref a <$>
+        _Newlines fun b <*>
+        _Newlines fun c <*>
+        _Newlines fun d
+      Subscript a b c d e ->
+        Subscript a <$>
+        _Newlines fun b <*>
+        _Newlines fun c <*>
+        _Newlines fun d <*>
+        _Newlines fun e
+      Call a b c d e ->
+        Call a <$>
+        _Newlines fun b <*>
+        _Newlines fun c <*>
+        _Newlines fun d <*>
+        _Newlines fun e
+      None a b -> None a <$> _Newlines fun b
+      Ellipsis a b -> Ellipsis a <$> _Newlines fun b
+      BinOp a b c d ->
+        BinOp a <$>
+        _Newlines fun b <*>
+        _Newlines fun c <*>
+        _Newlines fun d
+      UnOp a b c ->
+        UnOp a <$>
+        _Newlines fun b <*>
+        _Newlines fun c
+      Parens a b c d ->
+        Parens a <$>
+        _Newlines fun b <*>
+        _Newlines fun c <*>
+        _Newlines fun d
+      Ident a -> Ident <$> _Newlines fun a
+      Int a b c -> Int a b <$> _Newlines fun c
+      Float a b c -> Float a b <$> _Newlines fun c
+      Imag a b c -> Imag a b <$> _Newlines fun c
+      Bool a b c -> Bool a b <$> _Newlines fun c
+      String a b -> String a <$> _Newlines fun b
+      Tuple a b c d ->
+        Tuple a <$>
+        _Newlines fun b <*>
+        _Newlines fun c <*>
+        _Newlines fun d
+      Not a b c -> Not a <$> _Newlines fun b <*> _Newlines fun c
+      Generator a b -> Generator a <$> _Newlines fun b
+      Await a b c -> Await a <$> _Newlines fun b <*> _Newlines fun c
+
+instance HasNewlines (f v a) => HasNewlines (VIdentity f v a) where
+  _Newlines = _Wrapped._Newlines
+
+instance HasNewlines (f (VFix f) v a) => HasNewlines (VFix f v a) where
+  _Newlines = _Wrapped._Newlines
 
 instance HasNewlines (Decorator v a) where
   _Newlines fun (Decorator a b c d e f g) =

@@ -52,6 +52,7 @@ import Language.Python.Syntax.Whitespace
 
 import qualified Language.Python.Syntax.Module as Syntax
 import qualified Language.Python.Syntax.Expr as Syntax
+import qualified Language.Python.Syntax.Types as Syntax
 import qualified Language.Python.Syntax.Statement as Syntax
 
 class AsIRError s a | s -> a where
@@ -253,7 +254,7 @@ instance Traversable e => Traversable (Comprehension e) where
     traverse f c <*>
     traverse (bitraverse (traverse f) (traverse f)) d
 
-data Subscript a
+data SubscriptItem a
   = SubscriptExpr (Expr a)
   | SubscriptSlice
       -- [expr]
@@ -408,7 +409,7 @@ data Expr a
   -- [ spaces
   , _unsafeSubscriptWhitespaceLeft :: [Whitespace]
   -- expr
-  , _unsafeSubscriptValueRight :: CommaSep1' (Subscript a)
+  , _unsafeSubscriptValueRight :: CommaSep1' (SubscriptItem a)
   -- ] spaces
   , _unsafeSubscriptWhitespaceRight :: [Whitespace]
   }
@@ -431,16 +432,16 @@ data Expr a
   { _unsafeExprAnn :: a
   , _unsafeEllipsisWhitespace :: [Whitespace]
   }
-  | BinOp
+  | Binary
   { _unsafeExprAnn :: a
-  , _unsafeBinOpExprLeft :: Expr a
-  , _unsafeBinOpOp :: BinOp a
-  , _unsafeBinOpExprRight :: Expr a
+  , _unsafeBinaryExprLeft :: Expr a
+  , _unsafeBinaryOp :: BinOp a
+  , _unsafeBinaryExprRight :: Expr a
   }
-  | UnOp
+  | Unary
   { _unsafeExprAnn :: a
-  , _unsafeUnOpOp :: UnOp a
-  , _unsafeUnOpValue :: Expr a
+  , _unsafeUnaryOp :: UnOp a
+  , _unsafeUnaryValue :: Expr a
   }
   | Parens
   { _unsafeExprAnn :: a
@@ -520,8 +521,8 @@ exprAnn =
         Deref a _ _ _ -> a
         Subscript a _ _ _ _ -> a
         Call a _ _ _ _ -> a
-        BinOp a _ _ _ -> a
-        UnOp a _ _ -> a
+        Binary a _ _ _ -> a
+        Unary a _ _ -> a
         Parens a _ _ _ -> a
         Ident a -> a ^. identAnn
         Int a _ _ -> a
@@ -552,8 +553,8 @@ exprAnn =
         Deref _ a b c -> Deref ann a b c
         Subscript _ a b c d -> Subscript ann a b c d
         Call _ a b c d -> Call ann a b c d
-        BinOp _ a b c -> BinOp ann a b c
-        UnOp _ a b -> UnOp ann a b
+        Binary _ a b c -> Binary ann a b c
+        Unary _ a b -> Unary ann a b
         Parens _ a b c -> Parens ann a b c
         Ident a -> Ident $ a & identAnn .~ ann
         Int _ a b -> Int ann a b
@@ -656,71 +657,73 @@ fromIR_expr
 fromIR_expr ex =
   case ex of
     StarExpr{} -> Failure $ pure (_InvalidUnpacking # (ex ^. exprAnn))
-    Unit a b c -> pure $ Syntax.Unit a b c
+    Unit a b c -> pure $ _Unit # Syntax.MkUnit a b c
     Lambda a b c d e ->
-      (\c' -> Syntax.Lambda a b c' d) <$>
+      (\c' -> _Lambda # Syntax.MkLambda a b c' d) <$>
       traverse fromIR_param c <*>
       fromIR_expr e
-    Yield a b c -> Syntax.Yield a b <$> traverse fromIR_expr c
-    YieldFrom a b c d -> Syntax.YieldFrom a b c <$> fromIR_expr d
+    Yield a b c -> (_Yield #) . Syntax.MkYield a b <$> traverse fromIR_expr c
+    YieldFrom a b c d -> (_YieldFrom #) . Syntax.MkYieldFrom a b c <$> fromIR_expr d
     Ternary a b c d e f ->
-      (\b' d' -> Syntax.Ternary a b' c d' e) <$>
+      (\b' d' -> _Ternary # Syntax.MkTernary a b' c d' e) <$>
       fromIR_expr b <*>
       fromIR_expr d <*>
       fromIR_expr f
     ListComp a b c d ->
-      (\c' -> Syntax.ListComp a b c' d) <$>
-      fromIR_comprehension fromIR_expr c
+      (\c' -> _ListComp # Syntax.MkListComp a b c' d) <$>
+      fromIR_comprehension (_ . fromIR_expr) c
     List a b c d ->
-      (\c' -> Syntax.List a b c' d) <$>
+      (\c' -> _List # Syntax.MkList a b c' d) <$>
       traverseOf (traverse.traverse) fromIR_listItem c
     DictComp a b c d ->
-      (\c' -> Syntax.DictComp a b c' d) <$>
-      fromIR_comprehension fromIR_dictItem c
+      (\c' -> _DictComp # Syntax.MkDictComp a b c' d) <$>
+      fromIR_comprehension (_ . fromIR_dictItem) c
     Dict a b c d ->
-      (\c' -> Syntax.Dict a b c' d) <$>
+      (\c' -> _Dict # Syntax.MkDict a b c' d) <$>
       traverseOf (traverse.traverse) fromIR_dictItem c
     SetComp a b c d ->
-      (\c' -> Syntax.SetComp a b c' d) <$>
-      fromIR_comprehension fromIR_setItem c
+      (\c' -> _SetComp # Syntax.MkSetComp a b c' d) <$>
+      fromIR_comprehension (_ . fromIR_setItem) c
     Set a b c d ->
-      (\c' -> Syntax.Set a b c' d) <$>
+      (\c' -> _Set # Syntax.MkSet a b c' d) <$>
       traverse fromIR_setItem c
     Deref a b c d ->
-      (\b' -> Syntax.Deref a b' c d) <$>
+      (\b' -> _Deref # Syntax.MkDeref a b' c d) <$>
       fromIR_expr b
     Subscript a b c d e ->
-      (\b' d' -> Syntax.Subscript a b' c d' e) <$>
+      (\b' d' -> _Subscript # Syntax.MkSubscript a b' c d' e) <$>
       fromIR_expr b <*>
-      traverse fromIR_subscript d
+      traverse fromIR_subscriptItem d
     Call a b c d e ->
-      (\b' d' -> Syntax.Call a b' c d' e) <$>
+      (\b' d' -> _Call # Syntax.MkCall a b' c d' e) <$>
       fromIR_expr b <*>
       traverseOf (traverse.traverse) fromIR_arg d
-    None a b -> pure $ Syntax.None a b
-    Ellipsis a b -> pure $ Syntax.Ellipsis a b
-    BinOp a b c d ->
-      (\b' d' -> Syntax.BinOp a b' c d') <$>
+    None a b -> pure $ _None # Syntax.MkNone a b
+    Ellipsis a b -> pure $ _Ellipsis # Syntax.MkEllipsis a b
+    Binary a b c d ->
+      (\b' d' -> _Binary # Syntax.MkBinary a b' c d') <$>
       fromIR_expr b <*>
       fromIR_expr d
-    UnOp a b c ->
-      Syntax.UnOp a b <$> fromIR_expr c
+    Unary a b c ->
+      (_Unary #) . Syntax.MkUnary a b <$> fromIR_expr c
     Parens a b c d ->
-      (\c' -> Syntax.Parens a b c' d) <$>
+      (\c' -> _Parens # Syntax.MkParens a b c' d) <$>
       fromIR_expr c
-    Ident a -> pure $ Syntax.Ident a
-    Int a b c -> pure $ Syntax.Int a b c
-    Float a b c -> pure $ Syntax.Float a b c
-    Imag a b c -> pure $ Syntax.Imag a b c
-    Bool a b c -> pure $ Syntax.Bool a b c
-    String a b -> pure $ Syntax.String a b
+    Ident a -> pure $ _Ident # a
+    Int a b c -> pure $ _Int # Syntax.MkInt a b c
+    Float a b c -> pure $ _Float # Syntax.MkFloat a b c
+    Imag a b c -> pure $ _Imag # Syntax.MkImag a b c
+    Bool a b c -> pure $ _Bool # Syntax.MkBool a b c
+    String a b -> pure $ _String # Syntax.MkString a b
     Tuple a b c d ->
-      (\b' -> Syntax.Tuple a b' c) <$>
+      (\b' -> _Tuple # Syntax.MkTuple a b' c) <$>
       fromIR_tupleItem b <*>
       traverseOf (traverse.traverse) fromIR_tupleItem d
-    Not a b c -> Syntax.Not a b <$> fromIR_expr c
-    Generator a b -> Syntax.Generator a <$> fromIR_comprehension fromIR_expr b
-    Await a b c -> Syntax.Await a b <$> fromIR_expr c
+    Not a b c -> (_Not #) . Syntax.Not a b <$> fromIR_expr c
+    Generator a b ->
+      (_Generator #) . Syntax.MkGenerator a <$>
+      fromIR_comprehension (_ . fromIR_expr) b
+    Await a b c -> (_Await #) . Syntax.MkAwait a b <$> fromIR_expr c
 
 fromIR_suite
   :: AsIRError e a
@@ -736,7 +739,7 @@ fromIR_suite s =
 fromIR_param
   :: AsIRError e a
   => Param a
-  -> Validation (NonEmpty e) (Syntax.Param '[] a)
+  -> Validation (NonEmpty e) (Syntax.Param Syntax.Expr '[] a)
 fromIR_param p =
   case p of
     PositionalParam a b c ->
@@ -755,7 +758,7 @@ fromIR_param p =
 fromIR_arg
   :: AsIRError e a
   => Arg a
-  -> Validation (NonEmpty e) (Syntax.Arg '[] a)
+  -> Validation (NonEmpty e) (Syntax.Arg Syntax.Expr '[] a)
 fromIR_arg a =
   case a of
     PositionalArg a b -> Syntax.PositionalArg a <$> fromIR_expr b
@@ -790,9 +793,9 @@ fromIR_withItem (WithItem a b c) =
 
 fromIR_comprehension
   :: AsIRError e a
-  => (ex a -> Validation (NonEmpty e) (ex' '[] a))
+  => (ex a -> Validation (NonEmpty e) (h Syntax.Expr '[] a))
   -> Comprehension ex a
-  -> Validation (NonEmpty e) (Syntax.Comprehension ex' '[] a)
+  -> Validation (NonEmpty e) (Syntax.Comprehension h Syntax.Expr '[] a)
 fromIR_comprehension f (Comprehension a b c d) =
   Syntax.Comprehension a <$>
   f b <*>
@@ -802,7 +805,7 @@ fromIR_comprehension f (Comprehension a b c d) =
 fromIR_dictItem
   :: AsIRError e a
   => DictItem a
-  -> Validation (NonEmpty e) (Syntax.DictItem '[] a)
+  -> Validation (NonEmpty e) (Syntax.DictItem Syntax.Expr '[] a)
 fromIR_dictItem di =
   case di of
     DictItem a b c d ->
@@ -812,11 +815,11 @@ fromIR_dictItem di =
     DictUnpack a b c ->
       Syntax.DictUnpack a b <$> fromIR_expr c
 
-fromIR_subscript
+fromIR_subscriptItem
   :: AsIRError e a
-  => Subscript a
-  -> Validation (NonEmpty e) (Syntax.Subscript '[] a)
-fromIR_subscript s =
+  => SubscriptItem a
+  -> Validation (NonEmpty e) (Syntax.SubscriptItem Syntax.Expr '[] a)
+fromIR_subscriptItem s =
   case s of
     SubscriptExpr a -> Syntax.SubscriptExpr <$> fromIR_expr a
     SubscriptSlice a b c d ->
@@ -837,7 +840,7 @@ fromIR_block (Block a b c) =
 fromIR_compFor
   :: AsIRError e a
   => CompFor a
-  -> Validation (NonEmpty e) (Syntax.CompFor '[] a)
+  -> Validation (NonEmpty e) (Syntax.CompFor Syntax.Expr '[] a)
 fromIR_compFor (CompFor a b c d e) =
   (\c' -> Syntax.CompFor a b c' d) <$>
   fromIR_expr c <*>
@@ -846,7 +849,7 @@ fromIR_compFor (CompFor a b c d e) =
 fromIR_compIf
   :: AsIRError e a
   => CompIf a
-  -> Validation (NonEmpty e) (Syntax.CompIf '[] a)
+  -> Validation (NonEmpty e) (Syntax.CompIf Syntax.Expr '[] a)
 fromIR_compIf (CompIf a b c) =
   Syntax.CompIf a b <$> fromIR_expr c
 
@@ -958,7 +961,7 @@ fromIR_compoundStatement st =
 fromIR_listItem
   :: AsIRError e a
   => Expr a
-  -> Validation (NonEmpty e) (Syntax.ListItem '[] a)
+  -> Validation (NonEmpty e) (Syntax.ListItem Syntax.Expr '[] a)
 fromIR_listItem (StarExpr a b c) =
   Syntax.ListUnpack a [] b <$> fromIR_expr c
 fromIR_listItem (Parens a b c d) =
@@ -971,7 +974,7 @@ fromIR_listItem e = (\x -> Syntax.ListItem (x ^. Syntax.exprAnn) x) <$> fromIR_e
 fromIR_tupleItem
   :: AsIRError e a
   => Expr a
-  -> Validation (NonEmpty e) (Syntax.TupleItem '[] a)
+  -> Validation (NonEmpty e) (Syntax.TupleItem Syntax.Expr '[] a)
 fromIR_tupleItem (StarExpr a b c) =
   Syntax.TupleUnpack a [] b <$> fromIR_expr c
 fromIR_tupleItem (Parens a b c d) =
@@ -985,7 +988,7 @@ fromIR_tupleItem e =
 fromIR_setItem
   :: AsIRError e a
   => Expr a
-  -> Validation (NonEmpty e) (Syntax.SetItem '[] a)
+  -> Validation (NonEmpty e) (Syntax.SetItem Syntax.Expr '[] a)
 fromIR_setItem (StarExpr a b c) =
   Syntax.SetUnpack a [] b <$> fromIR_expr c
 fromIR_setItem (Parens a b c d) =

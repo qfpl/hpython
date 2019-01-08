@@ -151,11 +151,106 @@ module Language.Python.Syntax.Types
   , elseElse
   , elseBody
     -- * Expressions
+    -- ** Parenthesised expressions
+  , Parens(..)
+    -- *** Lenses
+  , parensAnn
+  , parensWhitespaceLeft
+  , parensValue
+  , parensWhitespaceAfter
+    -- ** @()@
+  , Unit(..)
+    -- *** Lenses
+  , unitAnn
+  , unitWhitespaceInner
+  , unitWhitespaceRight
     -- ** @None@
   , None(..)
     -- *** Lenses
   , noneAnn
   , noneWhitespace
+    -- ** @Ellipsis@
+  , Ellipsis(..)
+    -- *** Lenses
+  , ellipsisAnn
+  , ellipsisWhitespace
+    -- ** Booleans
+  , PyBool(..)
+    -- *** Lenses
+  , boolAnn
+  , boolValue
+  , boolWhitespace
+    -- ** Integers
+  , PyInt(..)
+    -- *** Lenses
+  , intAnn
+  , intValue
+  , intWhitespace
+    -- ** Floats
+  , PyFloat(..)
+    -- *** Lenses
+  , floatAnn
+  , floatValue
+  , floatWhitespace
+    -- ** Imaginary literals
+  , Imag(..)
+    -- *** Lenses
+  , imagAnn
+  , imagValue
+  , imagWhitespace
+    -- ** Strings
+  , PyString(..)
+    -- *** Lenses
+  , stringAnn
+  , stringValue
+    -- ** @lambda@
+  , Lambda(..)
+    -- *** Lenses
+  , lambdaAnn
+  , lambdaWhitespace
+  , lambdaArgs
+  , lambdaColon
+  , lambdaBody
+    -- ** @yield@
+  , Yield(..)
+    -- *** Lenses
+  , yieldAnn
+  , yieldWhitespace
+  , yieldValue
+    -- ** @yield ... from ... @
+  , YieldFrom(..)
+  , yfAnn
+  , yfYieldWhitespace
+  , yfFromWhitespace
+  , yfValue
+    -- ** @not@
+  , Not(..)
+    -- *** Lenses
+  , notAnn
+  , notWhitespace
+  , notValue
+    -- ** Unary operators
+  , Unary(..)
+    -- *** Lenses
+  , unaryAnn
+  , unaryOp
+  , unaryValue
+    -- ** Binary operators
+  , Binary(..)
+    -- *** Lenses
+  , binaryAnn
+  , binaryExprLeft
+  , binaryOp
+  , binaryRight
+    -- ** Ternary expression
+  , Ternary(..)
+    -- *** Lenses
+  , ternaryAnn
+  , ternaryValue
+  , ternaryIfWhitespace
+  , ternaryCond
+  , ternaryElseWhitespace
+  , ternaryElse
     -- ** Function calls
   , Call(..)
     -- *** Lenses
@@ -164,6 +259,21 @@ module Language.Python.Syntax.Types
   , callLeftParen
   , callArguments
   , callRightParen
+    -- ** Dereferencing
+  , Deref(..)
+    -- *** Lenses
+  , derefAnn
+  , derefValueLeft
+  , derefWhitespaceLeft
+  , derefValueRight
+    -- ** Subscripting
+  , Subscript(..)
+    -- *** Lenses
+  , subscriptAnn
+  , subscriptValueLeft
+  , subscriptWhitespaceLeft
+  , subscriptValueRight
+  , subscriptWhitespaceRight
     -- ** Tuples
   , Tuple(..)
     -- *** Lenses
@@ -186,6 +296,12 @@ module Language.Python.Syntax.Types
   , listWhitespaceLeft
   , listBody
   , listWhitespaceRight
+    -- ** List Comprehensions
+  , ListComp(..)
+  , lcAnn
+  , lcWhitespaceLeft
+  , lcValue
+  , lcWhitespaceRight
     -- *** List items
     -- **** Unpacking
   , ListUnpack(..)
@@ -194,17 +310,60 @@ module Language.Python.Syntax.Types
   , listUnpackParens
   , listUnpackWhitespace
   , listUnpackValue
+    -- ** Dictionaries
+  , Dict(..)
+  , dictAnn
+  , dictWhitespaceLeft
+  , dictValues
+  , dictWhitespaceRight
+    -- ** Dictionary Comprehensions
+  , DictComp(..)
+    -- *** Lenses
+  , dcAnn
+  , dcWhitespaceLeft
+  , dcValue
+  , dcWhitespaceRight
+    -- ** Sets
+  , Set(..)
+    -- *** Lenses
+  , setAnn
+  , setWhitespaceLeft
+  , setValues
+  , setWhitespaceRight
+    -- ** Set Comprehensions
+  , SetComp(..)
+    -- *** Lenses
+  , scAnn
+  , scWhitespaceLeft
+  , scValue
+  , scWhitespaceRight
+    -- ** Generators
+  , Generator(..)
+    -- *** Lenses
+  , generatorAnn
+  , generatorValue
+    -- ** @await@
+  , Await(..)
+    -- *** Lenses
+  , awaitAnn
+  , awaitWhitespace
+  , awaitValue
   )
 where
 
 import Control.Lens.TH (makeLenses)
 import Data.List.NonEmpty (NonEmpty)
 
-import Language.Python.Syntax.CommaSep (Comma, CommaSep, CommaSep1, CommaSep1')
-import Language.Python.Syntax.Expr (Arg, Expr, ListItem, Param, TupleItem)
-import Language.Python.Syntax.Ident (Ident)
-import Language.Python.Syntax.Punctuation (Colon)
-import Language.Python.Syntax.Statement (Decorator, ExceptAs, Suite, WithItem)
+import Data.VIdentity
+import Language.Python.Syntax.CommaSep
+import Language.Python.Syntax.Expr
+import Language.Python.Syntax.Ident
+import Language.Python.Syntax.Numbers
+import Language.Python.Syntax.Operator.Binary
+import Language.Python.Syntax.Operator.Unary
+import Language.Python.Syntax.Punctuation
+import Language.Python.Syntax.Statement
+import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
 
 data Fundef v a
@@ -216,7 +375,7 @@ data Fundef v a
   , _fdDefSpaces :: NonEmpty Whitespace
   , _fdName :: Ident v a
   , _fdLeftParenSpaces :: [Whitespace]
-  , _fdParameters :: CommaSep (Param v a)
+  , _fdParameters :: CommaSep (Param Expr v a)
   , _fdRightParenSpaces :: [Whitespace]
   , _fdReturnType :: Maybe ([Whitespace], Expr v a)
   , _fdBody :: Suite v a
@@ -242,30 +401,30 @@ data While v a
   } deriving (Eq, Show)
 makeLenses ''While
 
-data KeywordParam v a
+data KeywordParam expr v a
   = MkKeywordParam
   { _kpAnn :: a
   , _kpName :: Ident v a
-  , _kpType :: Maybe (Colon, Expr v a)
+  , _kpType :: Maybe (Colon, expr v a)
   , _kpEquals :: [Whitespace]
-  , _kpExpr :: Expr v a
+  , _kpExpr :: expr v a
   } deriving (Eq, Show)
 makeLenses ''KeywordParam
 
-data PositionalParam v a
+data PositionalParam expr v a
   = MkPositionalParam
   { _ppAnn :: a
   , _ppName :: Ident v a
-  , _ppType :: Maybe (Colon, Expr v a)
+  , _ppType :: Maybe (Colon, expr v a)
   } deriving (Eq, Show)
 makeLenses ''PositionalParam
 
-data StarParam v a
+data StarParam expr v a
   = MkStarParam
   { _spAnn :: a
   , _spWhitespace :: [Whitespace]
   , _spName :: Ident v a
-  , _spType :: Maybe (Colon, Expr v a)
+  , _spType :: Maybe (Colon, expr v a)
   } deriving (Eq, Show)
 makeLenses ''StarParam
 
@@ -276,15 +435,61 @@ data UnnamedStarParam (v :: [*]) a
   } deriving (Eq, Show)
 makeLenses ''UnnamedStarParam
 
-data Call v a
+data Call expr v a
   = MkCall
   { _callAnn :: a
-  , _callFunction :: Expr v a
+  , _callFunction :: expr v a
   , _callLeftParen :: [Whitespace]
-  , _callArguments :: Maybe (CommaSep1' (Arg v a))
+  , _callArguments :: Maybe (CommaSep1' (Arg expr v a))
   , _callRightParen :: [Whitespace]
   } deriving (Eq, Show)
 makeLenses ''Call
+
+data Lambda expr v a
+  = MkLambda
+  { _lambdaAnn :: a
+  , _lambdaWhitespace :: [Whitespace]
+  , _lambdaArgs :: CommaSep (Param expr v a)
+  , _lambdaColon :: Colon
+  , _lambdaBody :: expr v a
+  }
+makeLenses ''Lambda
+
+data Unit (v :: [*]) a
+  = MkUnit
+  { _unitAnn :: a
+  , _unitWhitespaceInner :: [Whitespace]
+  , _unitWhitespaceRight :: [Whitespace]
+  } deriving (Eq, Show)
+makeLenses ''Unit
+
+data Yield expr (v :: [*]) (a :: *)
+  = MkYield
+  { _yieldAnn :: a
+  , _yieldWhitespace :: [Whitespace]
+  , _yieldValue :: CommaSep (expr v a)
+  }
+makeLenses ''Yield
+
+data Ternary expr (v :: [*]) (a :: *)
+  = MkTernary
+  { _ternaryAnn :: a
+  , _ternaryValue :: expr v a
+  , _ternaryIfWhitespace :: [Whitespace]
+  , _ternaryCond :: expr v a
+  , _ternaryElseWhitespace :: [Whitespace]
+  , _ternaryElse :: expr v a
+  }
+makeLenses ''Ternary
+
+data YieldFrom expr (v :: [*]) (a :: *)
+  = MkYieldFrom
+  { _yfAnn :: a
+  , _yfYieldWhitespace :: [Whitespace]
+  , _yfFromWhitespace :: [Whitespace]
+  , _yfValue :: expr v a
+  }
+makeLenses ''YieldFrom
 
 data Elif v a
   = MkElif
@@ -367,7 +572,7 @@ data ClassDef v a
   , _cdIndents :: Indents a
   , _cdClass :: NonEmpty Whitespace
   , _cdName :: Ident v a
-  , _cdArguments :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg v a)), [Whitespace])
+  , _cdArguments :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg Expr v a)), [Whitespace])
   , _cdBody :: Suite v a
   } deriving (Eq, Show)
 makeLenses ''ClassDef
@@ -383,30 +588,39 @@ data With v a
   } deriving (Eq, Show)
 makeLenses ''With
 
-data Tuple v a
+data Tuple expr v a
   = MkTuple
   { _tupleAnn :: a
-  , _tupleHead :: TupleItem v a
+  , _tupleHead :: TupleItem expr v a
   , _tupleComma :: Comma
-  , _tupleTail :: Maybe (CommaSep1' (TupleItem v a))
+  , _tupleTail :: Maybe (CommaSep1' (TupleItem expr v a))
   } deriving (Eq, Show)
 makeLenses ''Tuple
 
-data List v a
+data List expr v a
   = MkList
   { _listAnn :: a
   , _listWhitespaceLeft :: [Whitespace]
-  , _listBody :: Maybe (CommaSep1' (ListItem v a))
+  , _listBody :: Maybe (CommaSep1' (ListItem expr v a))
   , _listWhitespaceRight :: [Whitespace]
   } deriving (Eq, Show)
 makeLenses ''List
 
-data ListUnpack v a
+data ListComp expr v a
+  = MkListComp
+  { _lcAnn :: a
+  , _lcWhitespaceLeft :: [Whitespace]
+  , _lcValue :: Comprehension VIdentity expr v a
+  , _lcWhitespaceRight :: [Whitespace]
+  }
+makeLenses ''ListComp
+
+data ListUnpack expr (v :: [*]) (a :: *)
   = MkListUnpack
   { _listUnpackAnn :: a
   , _listUnpackParens :: [([Whitespace], [Whitespace])]
   , _listUnpackWhitespace :: [Whitespace]
-  , _listUnpackValue :: Expr v a
+  , _listUnpackValue :: expr v a
   } deriving (Eq, Show)
 makeLenses ''ListUnpack
 
@@ -417,11 +631,161 @@ data None (v :: [*]) a
   } deriving (Eq, Show)
 makeLenses ''None
 
-data TupleUnpack v a
+data TupleUnpack expr (v :: [*]) (a :: *)
   = MkTupleUnpack
   { _tupleUnpackAnn :: a
   , _tupleUnpackParens :: [([Whitespace], [Whitespace])]
   , _tupleUnpackWhitespace :: [Whitespace]
-  , _tupleUnpackValue :: Expr v a
+  , _tupleUnpackValue :: expr v a
   } deriving (Eq, Show)
 makeLenses ''TupleUnpack
+
+data DictComp expr v a
+  = MkDictComp
+  { _dcAnn :: a
+  , _dcWhitespaceLeft :: [Whitespace]
+  , _dcValue :: Comprehension DictItem expr v a
+  , _dcWhitespaceRight :: [Whitespace]
+  }
+makeLenses ''DictComp
+
+data Dict expr v a
+  = MkDict
+  { _dictAnn :: a
+  , _dictWhitespaceLeft :: [Whitespace]
+  , _dictValues :: Maybe (CommaSep1' (DictItem expr v a))
+  , _dictWhitespaceRight :: [Whitespace]
+  }
+makeLenses ''Dict
+
+data SetComp expr v a
+  = MkSetComp
+  { _scAnn :: a
+  , _scWhitespaceLeft :: [Whitespace]
+  , _scValue :: Comprehension SetItem expr v a
+  , _scWhitespaceRight :: [Whitespace]
+  }
+makeLenses ''SetComp
+
+data Set expr v a
+  = MkSet
+  { _setAnn :: a
+  , _setWhitespaceLeft :: [Whitespace]
+  , _setValues :: CommaSep1' (SetItem expr v a)
+  , _setWhitespaceRight :: [Whitespace]
+  }
+makeLenses ''Set
+
+data Deref expr v a
+  = MkDeref
+  { _derefAnn :: a
+  , _derefValueLeft :: expr v a
+  , _derefWhitespaceLeft :: [Whitespace]
+  , _derefValueRight :: Ident v a
+  }
+makeLenses ''Deref
+
+data Subscript expr v a
+  = MkSubscript
+  { _subscriptAnn :: a
+  , _subscriptValueLeft :: expr v a
+  , _subscriptWhitespaceLeft :: [Whitespace]
+  , _subscriptValueRight :: CommaSep1' (SubscriptItem expr v a)
+  , _subscriptWhitespaceRight :: [Whitespace]
+  }
+makeLenses ''Subscript
+
+data Ellipsis (v :: [*]) (a :: *)
+  = MkEllipsis
+  { _ellipsisAnn :: a
+  , _ellipsisWhitespace :: [Whitespace]
+  }
+makeLenses ''Ellipsis
+
+data Binary expr (v :: [*]) (a :: *)
+  = MkBinary
+  { _binaryAnn :: a
+  , _binaryExprLeft :: expr v a
+  , _binaryOp :: BinOp a
+  , _binaryRight :: expr v a
+  }
+makeLenses ''Binary
+
+data Unary expr (v :: [*]) (a :: *)
+  = MkUnary
+  { _unaryAnn :: a
+  , _unaryOp :: UnOp a
+  , _unaryValue :: expr v a
+  }
+makeLenses ''Unary
+
+data Parens expr (v :: [*]) (a :: *)
+  = MkParens
+  { _parensAnn :: a
+  , _parensWhitespaceLeft :: [Whitespace]
+  , _parensValue :: expr v a
+  , _parensWhitespaceAfter :: [Whitespace]
+  }
+makeLenses ''Parens
+
+data PyInt (v :: [*]) (a :: *)
+  = MkInt
+  { _intAnn :: a
+  , _intValue :: IntLiteral a
+  , _intWhitespace :: [Whitespace]
+  }
+makeLenses ''PyInt
+
+data PyFloat (v :: [*]) (a :: *)
+  = MkFloat
+  { _floatAnn :: a
+  , _floatValue :: FloatLiteral a
+  , _floatWhitespace :: [Whitespace]
+  }
+makeLenses ''PyFloat
+
+data Imag (v :: [*]) (a :: *)
+  = MkImag
+  { _imagAnn :: a
+  , _imagValue :: ImagLiteral a
+  , _imagWhitespace :: [Whitespace]
+  }
+makeLenses ''Imag
+
+data PyBool (v :: [*]) (a :: *)
+  = MkBool
+  { _boolAnn :: a
+  , _boolValue :: Bool
+  , _boolWhitespace :: [Whitespace]
+  }
+makeLenses ''PyBool
+
+data PyString (v :: [*]) (a :: *)
+  = MkString
+  { _stringAnn :: a
+  , _stringValue :: NonEmpty (StringLiteral a)
+  }
+makeLenses ''PyString
+
+data Not expr (v :: [*]) (a :: *)
+  = MkNot
+  { _notAnn :: a
+  , _notWhitespace :: [Whitespace]
+  , _notValue :: expr v a
+  }
+makeLenses ''Not
+
+data Generator expr v a
+  = MkGenerator
+  { _generatorAnn :: a
+  , _generatorValue :: Comprehension VIdentity expr v a
+  }
+makeLenses ''Generator
+
+data Await expr (v :: [*]) (a :: *)
+  = MkAwait
+  { _awaitAnn :: a
+  , _awaitWhitespace :: [Whitespace]
+  , _awaitValue :: expr v a
+  }
+makeLenses ''Await

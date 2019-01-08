@@ -20,6 +20,11 @@ Optics for manipulating Python syntax trees
 
 module Language.Python.Optics
   ( module Language.Python.Optics.Validated
+    -- * Expressions
+    -- ** Classy Prisms
+  , module Language.Python.Optics.Expr
+    -- ** Classy Traversal
+  , module Language.Python.Optics.Exprs
     -- * Indentation
   , module Language.Python.Optics.Indents
     -- * Newlines
@@ -55,18 +60,10 @@ module Language.Python.Optics
   , _UnnamedStarParam
   , _StarParam
     -- * Expressions
-    -- ** Identifiers
-  , _Ident
-    -- ** @None@
-  , _None
-    -- ** Function calls
-  , _Call
     -- ** Tuples
-  , _Tuple
   , _TupleUnpack
   , tupleItems
     -- ** Lists
-  , _List
   , _ListUnpack
   , listItems
   )
@@ -75,8 +72,12 @@ where
 import Control.Lens.Getter ((^.), view)
 import Control.Lens.Iso (Iso', iso, from)
 import Control.Lens.Traversal (Traversal)
+import Control.Lens.Wrapped (_Wrapped)
 import Control.Lens.Prism (Prism, prism)
 
+import Data.VFix
+import Language.Python.Optics.Expr
+import Language.Python.Optics.Exprs
 import Language.Python.Optics.Indents
 import Language.Python.Optics.Newlines
 import Language.Python.Optics.Validated
@@ -86,7 +87,13 @@ import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Types
 import Language.Python.Syntax.Whitespace
 
-_TupleUnpack :: Prism (TupleItem v a) (TupleItem '[] a) (TupleUnpack v a) (TupleUnpack '[] a)
+_TupleUnpack
+  :: Validated expr
+  => Prism
+       (TupleItem expr v a)
+       (TupleItem expr '[] a)
+       (TupleUnpack expr v a)
+       (TupleUnpack expr '[] a)
 _TupleUnpack =
   prism
     (\(MkTupleUnpack a b c d) -> TupleUnpack a b c d)
@@ -94,21 +101,24 @@ _TupleUnpack =
        TupleUnpack a b c d -> Right $ MkTupleUnpack a b c d
        a -> Left $ a ^. unvalidated)
 
-_Tuple :: Prism (Expr v a) (Expr '[] a) (Tuple v a) (Tuple '[] a)
-_Tuple =
-  prism
-    (\(MkTuple a b c d) -> Tuple a b c d)
-    (\case
-        Tuple a b c d -> Right (MkTuple a b c d)
-        a -> Left $ a ^. unvalidated)
-
-tupleItems :: Traversal (Tuple v a) (Tuple '[] a) (TupleItem v a) (TupleItem '[] a)
+tupleItems
+  :: Traversal
+       (Tuple expr v a)
+       (Tuple expr '[] a)
+       (TupleItem expr v a)
+       (TupleItem expr '[] a)
 tupleItems f (MkTuple a b c d) =
   (\b' d' -> MkTuple a b' c d') <$>
   f b <*>
   (traverse.traverse) f d
 
-_ListUnpack :: Prism (ListItem v a) (ListItem '[] a) (ListUnpack v a) (ListUnpack '[] a)
+_ListUnpack
+  :: Validated expr
+  => Prism
+       (ListItem expr v a)
+       (ListItem expr '[] a)
+       (ListUnpack expr v a)
+       (ListUnpack expr '[] a)
 _ListUnpack =
   prism
     (\(MkListUnpack a b c d) -> ListUnpack a b c d)
@@ -116,33 +126,23 @@ _ListUnpack =
        ListUnpack a b c d -> Right $ MkListUnpack a b c d
        a -> Left $ a ^. unvalidated)
 
-_List :: Prism (Expr v a) (Expr '[] a) (List v a) (List '[] a)
-_List =
-  prism
-    (\(MkList a b c d) -> List a b c d)
-    (\case
-        List a b c d -> Right (MkList a b c d)
-        a -> Left $ a ^. unvalidated)
-
-listItems :: Traversal (List v a) (List '[] a) (ListItem v a) (ListItem '[] a)
+listItems
+  :: Traversal
+       (List expr v a)
+       (List expr '[] a)
+       (ListItem expr v a)
+       (ListItem expr '[] a)
 listItems f (MkList a b c d) =
   (\c' -> MkList a b c' d) <$>
   (traverse.traverse) f c
 
-_None :: Prism (Expr v a) (Expr '[] a) (None v a) (None '[] a)
-_None =
-  prism
-    (\(MkNone a b) -> None a b)
-    (\case
-        None a b -> Right (MkNone a b)
-        a -> Left $ a ^. unvalidated)
-
 _KeywordParam
-  :: Prism
-       (Param v a)
-       (Param '[] a)
-       (KeywordParam v a)
-       (KeywordParam '[] a)
+  :: Validated expr
+  => Prism
+       (Param expr v a)
+       (Param expr '[] a)
+       (KeywordParam expr v a)
+       (KeywordParam expr '[] a)
 _KeywordParam =
   prism
     (\(MkKeywordParam a b c d e) -> KeywordParam a b c d e)
@@ -151,11 +151,12 @@ _KeywordParam =
         a -> Left $ a ^. unvalidated)
 
 _PositionalParam
-  :: Prism
-       (Param v a)
-       (Param '[] a)
-       (PositionalParam v a)
-       (PositionalParam '[] a)
+  :: Validated expr
+  => Prism
+       (Param expr v a)
+       (Param expr '[] a)
+       (PositionalParam expr v a)
+       (PositionalParam expr '[] a)
 _PositionalParam =
   prism
     (\(MkPositionalParam a b c) -> PositionalParam a b c)
@@ -164,11 +165,12 @@ _PositionalParam =
         a -> Left $ a ^. unvalidated)
 
 _StarParam
-  :: Prism
-       (Param v a)
-       (Param '[] a)
-       (StarParam v a)
-       (StarParam '[] a)
+  :: Validated expr
+  => Prism
+       (Param expr v a)
+       (Param expr '[] a)
+       (StarParam expr v a)
+       (StarParam expr '[] a)
 _StarParam =
   prism
     (\(MkStarParam a b c d) -> StarParam a b c d)
@@ -177,9 +179,10 @@ _StarParam =
         a -> Left $ a ^. unvalidated)
 
 _UnnamedStarParam
-  :: Prism
-       (Param v a)
-       (Param '[] a)
+  :: Validated expr
+  => Prism
+       (Param expr v a)
+       (Param expr '[] a)
        (UnnamedStarParam v a)
        (UnnamedStarParam '[] a)
 _UnnamedStarParam =
@@ -333,14 +336,6 @@ instance HasFor CompoundStatement where
 instance HasFor Statement where
   _For = _CompoundStatement._For
 
-_Call :: Prism (Expr v a) (Expr '[] a) (Call v a) (Call '[] a)
-_Call =
-  prism
-    (\(MkCall a b c d e) -> Call a b c d e)
-    (\case
-        Call a b c d e -> Right $ MkCall a b c d e
-        a -> Left $ a ^. unvalidated)
-
 class HasClassDef s where
   _ClassDef :: Prism (s v a) (s '[] a) (ClassDef v a) (ClassDef '[] a)
 
@@ -377,6 +372,7 @@ instance HasWith Statement where
 
 _Ident :: Prism (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
 _Ident =
+  _Wrapped .
   prism
     Ident
     (\case
@@ -418,12 +414,12 @@ _Ident =
 -- @
 assignTargets :: Traversal (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
 assignTargets f e =
-  case e of
-    List a b c d -> (\c' -> List a b c' d) <$> (traverse.traverse._Exprs.assignTargets) f c
-    Parens a b c d -> (\c' -> Parens a b c' d) <$> assignTargets f c
-    Ident a -> Ident <$> f a
+  case vout e of
+    List a b c d -> (\c' -> VIn $ List a b c' d) <$> (traverse.traverse._Exprs.assignTargets) f c
+    Parens a b c d -> (\c' -> VIn $ Parens a b c' d) <$> assignTargets f c
+    Ident a -> VIn . Ident <$> f a
     Tuple a b c d ->
-      (\b' d' -> Tuple a b' c d') <$>
+      (\b' d' -> VIn $ Tuple a b' c d') <$>
       (_Exprs.assignTargets) f b <*>
       (traverse.traverse._Exprs.assignTargets) f d
     Unit{} -> pure $ e ^. unvalidated

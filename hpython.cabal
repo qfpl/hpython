@@ -87,6 +87,7 @@ library
                      , Language.Python.Internal.Syntax.IR
                      , Language.Python.Optics
                      , Language.Python.Optics.Expr
+                     , Language.Python.Optics.Exprs
                      , Language.Python.Optics.Indents
                      , Language.Python.Optics.Newlines
                      , Language.Python.Optics.Validated

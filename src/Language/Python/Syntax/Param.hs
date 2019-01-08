@@ -18,7 +18,7 @@ import Data.String (IsString(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 import Data.VTraversable
-import Language.Python.Optics.Expr
+import Language.Python.Optics.Exprs
 import Language.Python.Optics.Validated
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Punctuation

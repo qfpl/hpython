@@ -7,6 +7,16 @@
 {-# language TypeFamilies #-}
 {-# language TypeOperators #-}
 {-# language ScopedTypeVariables, TypeApplications #-}
+
+{-|
+Module      : Language.Python.Optics.Idents
+Copyright   : (C) CSIRO 2017-2019
+License     : BSD3
+Maintainer  : Isaac Elliott <isaace71295@gmail.com>
+Stability   : experimental
+Portability : non-portable
+-}
+
 module Language.Python.Optics.Idents (HasIdents(..)) where
 
 import Control.Lens.Iso (iso)

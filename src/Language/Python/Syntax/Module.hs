@@ -16,6 +16,7 @@ where
 
 import GHC.Generics (Generic)
 
+import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Whitespace
 
@@ -35,3 +36,6 @@ instance HasStatements Module where
       go (ModuleBlankFinal a) = pure $ ModuleBlankFinal a
       go (ModuleBlank a b c) = ModuleBlank a b <$> go c
       go (ModuleStatement a b) = ModuleStatement <$> f a <*> go b
+
+instance HasExprs Module where
+  _Exprs = _Statements._Exprs

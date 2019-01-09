@@ -9,7 +9,9 @@
   
 * Added `_Idents` traversal [non-breaking]
 
-* Annotations are now wrapped in the `Ann` type to aid generic deriving
+* Annotations are now wrapped in the `Ann` type to aid generic deriving [breaking]
+
+* Added `HasExprs` instance for `Module`
 
 ## 0.1.0.1
 

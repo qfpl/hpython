@@ -20,6 +20,8 @@ Optics for manipulating Python syntax trees
 
 module Language.Python.Optics
   ( module Language.Python.Optics.Validated
+    -- * Identifiers
+  , module Language.Python.Optics.Idents
     -- * Indentation
   , module Language.Python.Optics.Indents
     -- * Newlines
@@ -77,6 +79,7 @@ import Control.Lens.Iso (Iso', iso, from)
 import Control.Lens.Traversal (Traversal)
 import Control.Lens.Prism (Prism, prism)
 
+import Language.Python.Optics.Idents
 import Language.Python.Optics.Indents
 import Language.Python.Optics.Newlines
 import Language.Python.Optics.Validated

@@ -83,6 +83,7 @@ library
                      , Language.Python.Internal.Token
                      , Language.Python.Internal.Syntax.IR
                      , Language.Python.Optics
+                     , Language.Python.Optics.Idents
                      , Language.Python.Optics.Indents
                      , Language.Python.Optics.Newlines
                      , Language.Python.Optics.Validated
@@ -90,6 +91,7 @@ library
                      , Language.Python.Parse.Error
                      , Language.Python.Render
                      , Language.Python.Syntax
+                     , Language.Python.Syntax.Ann
                      , Language.Python.Syntax.AugAssign
                      , Language.Python.Syntax.CommaSep
                      , Language.Python.Syntax.Comment

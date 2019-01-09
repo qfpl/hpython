@@ -1,4 +1,4 @@
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language LambdaCase #-}
 {-# language TemplateHaskell #-}
 
@@ -41,6 +41,7 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Semigroup ((<>))
 import Data.Text (Text)
 import Data.These (These(..))
+import GHC.Generics (Generic)
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
@@ -86,22 +87,22 @@ data IntLiteral a
   , _unsafeIntLiteralHexUppercase :: Bool
   , _unsafeIntLiteralHexValue :: NonEmpty HeXDigit
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 deriveEq1 ''IntLiteral
 deriveOrd1 ''IntLiteral
 
 -- | Positive or negative, as in @-7@
-data Sign = Pos | Neg deriving (Eq, Ord, Show)
+data Sign = Pos | Neg deriving (Eq, Ord, Show, Generic)
 
 -- | When a floating point literal is in scientific notation, it includes the character
 -- @e@, which can be lower or upper case.
-data E = Ee | EE deriving (Eq, Ord, Show)
+data E = Ee | EE deriving (Eq, Ord, Show, Generic)
 
 -- | The exponent of a floating point literal.
 --
 -- An @e@, followed by an optional 'Sign', followed by at least one digit.
 data FloatExponent = FloatExponent E (Maybe Sign) (NonEmpty DecDigit)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 -- | A literal floating point value.
 --
@@ -146,7 +147,7 @@ data FloatLiteral a
   -- [ 'e' ['-' | '+'] [0-9]+ ]
   , _floatLiteralWholeExponent :: FloatExponent
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 deriveEq1 ''FloatLiteral
 deriveOrd1 ''FloatLiteral
 
@@ -174,7 +175,7 @@ data ImagLiteral a
   , _unsafeImagLiteralFloatValue :: FloatLiteral a
   , _imagLiteralUppercase :: Bool
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 deriveEq1 ''ImagLiteral
 deriveOrd1 ''ImagLiteral
 

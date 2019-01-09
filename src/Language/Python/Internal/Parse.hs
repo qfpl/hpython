@@ -128,6 +128,7 @@ import qualified Text.Megaparsec as Megaparsec
 import Language.Python.Internal.Lexer (SrcInfo(..), withSrcInfo)
 import Language.Python.Internal.Syntax.IR
 import Language.Python.Internal.Token
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Comment
@@ -1005,8 +1006,8 @@ simpleStatement =
              (snd <$> token space (\case; TkDot{} -> True; _ -> False) ".") <*>
              identifier space)
 
-        importAs ws getAnn p =
-          (\a -> ImportAs (getAnn a) a) <$>
+        importAs ws ann p =
+          (\a -> ImportAs (Ann $ ann a) a) <$>
           p <*>
           optional
             ((,) <$>
@@ -1028,28 +1029,32 @@ simpleStatement =
           token space (\case; TkEllipsis{} -> True; _ -> False) "..."
 
         relativeModuleName =
-          RelativeWithName [] <$> moduleName
+          withSrcInfo $
+          (\b ann -> RelativeWithName (Ann ann) [] b) <$> moduleName
 
           <|>
 
-          (\a -> maybe (Relative $ NonEmpty.fromList a) (RelativeWithName a)) <$>
+          (\a ->
+             maybe
+               (\ann -> Relative (Ann ann) $ NonEmpty.fromList a)
+               (\b ann -> RelativeWithName (Ann ann) a b)) <$>
           dots <*>
           optional moduleName
 
         importTargets =
-          (\(tk, s) -> ImportAll (pyTokenAnn tk) s) <$>
+          (\(tk, s) -> ImportAll (Ann $ pyTokenAnn tk) s) <$>
           star space
 
           <|>
 
-          (\(tk, s) -> ImportSomeParens (pyTokenAnn tk) s) <$>
+          (\(tk, s) -> ImportSomeParens (Ann $ pyTokenAnn tk) s) <$>
           token anySpace (\case; TkLeftParen{} -> True; _ -> False) "(" <*>
           commaSep1' anySpace (importAs anySpace _identAnn (identifier anySpace)) <*>
           (snd <$> rightParen space)
 
           <|>
 
-          (\a -> ImportSome (commaSep1Head a ^. importAsAnn) a) <$>
+          (\a -> ImportSome (Ann $ commaSep1Head a ^. importAsAnn) a) <$>
           commaSep1 space (importAs space _identAnn (identifier space))
 
         importFrom =

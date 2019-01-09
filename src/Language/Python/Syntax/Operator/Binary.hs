@@ -1,6 +1,6 @@
 {-# language LambdaCase #-}
 {-# language MultiParamTypeClasses, FlexibleInstances #-}
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language TemplateHaskell #-}
 
 {-|
@@ -23,6 +23,7 @@ import Control.Lens.Lens (lens)
 import Control.Lens.TH (makeLenses)
 import Data.Functor (($>))
 import Data.Semigroup ((<>))
+import GHC.Generics (Generic)
 
 import Language.Python.Syntax.Whitespace
 
@@ -80,7 +81,7 @@ data BinOp a
   | ShiftRight a [Whitespace]
   -- | @a @ b@
   | At a [Whitespace]
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 instance HasTrailingWhitespace (BinOp a) where
   trailingWhitespace =

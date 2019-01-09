@@ -1,4 +1,4 @@
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 
 {-|
 Module      : Language.Python.Syntax.Module
@@ -14,6 +14,8 @@ module Language.Python.Syntax.Module
   )
 where
 
+import GHC.Generics (Generic)
+
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Whitespace
 
@@ -24,7 +26,7 @@ data Module v a
   | ModuleBlankFinal (Blank a)
   | ModuleBlank (Blank a) Newline (Module v a)
   | ModuleStatement (Statement v a) (Module v a)
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 instance HasStatements Module where
   _Statements f = go

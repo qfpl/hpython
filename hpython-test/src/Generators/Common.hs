@@ -16,6 +16,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.These (These(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Comment
@@ -50,12 +51,12 @@ genSuite
   -> m (Suite '[] ())
 genSuite gss gb =
   Gen.choice
-  [ SuiteMany () <$>
+  [ SuiteMany (Ann ()) <$>
     genColon <*>
     Gen.maybe genComment <*>
     genNewline <*>
     gb
-  , SuiteOne () <$> genColon <*> genSmallStatement gss
+  , SuiteOne (Ann ()) <$> genColon <*> genSmallStatement gss
   ]
 
 genUnOp :: MonadGen m => m (UnOp ())
@@ -103,7 +104,7 @@ integralHeXDigits n =
 genSmallInt :: MonadGen m => m (Expr '[] ())
 genSmallInt = do
   n <- Gen.integral (Range.constant 0 100)
-  Int () <$>
+  Int (Ann ()) <$>
     Gen.choice
     [ pure $ IntLiteralDec () (integralDecDigits n ^?! _Right)
     , IntLiteralBin () <$> Gen.bool <*> pure (integralBinDigits n ^?! _Right)
@@ -113,16 +114,16 @@ genSmallInt = do
     genWhitespaces
 
 genUnit :: MonadGen m => m (Expr '[] ())
-genUnit = Unit () <$> genAnyWhitespaces <*> genWhitespaces
+genUnit = Unit (Ann ()) <$> genAnyWhitespaces <*> genWhitespaces
 
 genInt :: MonadGen m => m (Expr '[] ())
 genInt = do
   n <- Gen.integral (Range.constant (-2^32) (2^32))
   let
-    f = if n < 0 then (\a -> UnOp () <$> (Negate () <$> genWhitespaces) <*> a) else id
+    f = if n < 0 then (\a -> UnOp (Ann ()) <$> (Negate () <$> genWhitespaces) <*> a) else id
     n' = if n < 0 then -n - 1 else n
   f $
-    Int () <$>
+    Int (Ann ()) <$>
     Gen.choice
       [ pure $ IntLiteralDec () (integralDecDigits n' ^?! _Right)
       , IntLiteralBin () <$> Gen.bool <*> pure (integralBinDigits n' ^?! _Right)
@@ -136,7 +137,7 @@ genE = Gen.element [Ee, EE]
 
 genSmallFloat :: MonadGen m => m (Expr '[] ())
 genSmallFloat =
-  Float () <$>
+  Float (Ann ()) <$>
   Gen.choice
     [ FloatLiteralFull () <$>
       genDecs <*>
@@ -161,7 +162,7 @@ genSmallFloat =
 
 genImag :: MonadGen m => m (Expr '[] ())
 genImag =
-  Imag () <$>
+  Imag (Ann ()) <$>
   Gen.choice
     [ ImagLiteralInt () <$>
       genDecs <*>
@@ -202,7 +203,7 @@ genFloatLiteral =
 
 genFloat :: MonadGen m => m (Expr '[] ())
 genFloat =
-  Float () <$>
+  Float (Ann ()) <$>
   genFloatLiteral <*>
   genWhitespaces
 
@@ -363,13 +364,13 @@ genWhitespaces1 = do
   (:|) <$> Gen.element [Space, Tab] <*> genWhitespaces
 
 genNone :: MonadGen m => m (Expr '[] ())
-genNone = None () <$> genWhitespaces
+genNone = None (Ann ()) <$> genWhitespaces
 
 genEllipsis :: MonadGen m => m (Expr '[] ())
-genEllipsis = Ellipsis () <$> genWhitespaces
+genEllipsis = Ellipsis (Ann ()) <$> genWhitespaces
 
 genBool :: MonadGen m => m (Expr '[] ())
-genBool = Bool () <$> Gen.bool <*> genWhitespaces
+genBool = Bool (Ann ()) <$> Gen.bool <*> genWhitespaces
 
 genOp :: MonadGen m => m (BinOp ())
 genOp = Gen.element $ _opOperator <$> operatorTable
@@ -485,8 +486,8 @@ genBytesLiteral gChar =
 genTupleItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (TupleItem v ())
 genTupleItem ws ge =
   Gen.choice
-  [ TupleItem () <$> ge
-  , TupleUnpack () <$>
+  [ TupleItem (Ann ()) <$> ge
+  , TupleUnpack (Ann ()) <$>
     Gen.list (Range.constant 0 10) ((,) <$> genAnyWhitespaces <*> ws) <*>
     ws <*>
     ge
@@ -495,9 +496,9 @@ genTupleItem ws ge =
 genListItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (ListItem v ())
 genListItem ws ge =
   Gen.choice
-  [ ListItem () <$>
+  [ ListItem (Ann ()) <$>
     ge
-  , ListUnpack () <$>
+  , ListUnpack (Ann ()) <$>
     Gen.list (Range.constant 0 10) ((,) <$> genAnyWhitespaces <*> ws) <*>
     ws <*>
     ge
@@ -506,9 +507,9 @@ genListItem ws ge =
 genSetItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (SetItem v ())
 genSetItem ws ge =
   Gen.choice
-  [ SetItem () <$>
+  [ SetItem (Ann ()) <$>
     ge
-  , SetUnpack () <$>
+  , SetUnpack (Ann ()) <$>
     Gen.list (Range.constant 0 10) ((,) <$> genAnyWhitespaces <*> ws) <*>
     ws <*>
     ge
@@ -517,11 +518,11 @@ genSetItem ws ge =
 genDictItem :: MonadGen m => m (Expr v ()) -> m (DictItem v ())
 genDictItem ge =
   Gen.choice
-  [ DictItem () <$>
+  [ DictItem (Ann ()) <$>
     ge <*>
     genColonAny <*>
     ge
-  , DictUnpack () <$>
+  , DictUnpack (Ann ()) <$>
     genAnyWhitespaces <*>
     ge
   ]

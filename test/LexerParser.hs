@@ -9,6 +9,7 @@ import qualified Data.Text as Text
 import Language.Python.DSL
 import Language.Python.Render
 import Language.Python.Parse (parseModule, parseStatement, parseExpr, parseExprList)
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.CommaSep (CommaSep(..), Comma(..))
 import Language.Python.Syntax.Expr (Expr(..))
 import Language.Python.Syntax.Strings
@@ -288,7 +289,7 @@ prop_fulltrip_26 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
+          String (Ann ())
             (pure $
              RawBytesLiteral ()
                Prefix_br
@@ -306,7 +307,7 @@ prop_fulltrip_27 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
+          String (Ann ())
             (pure $
              RawStringLiteral ()
                Prefix_r
@@ -324,7 +325,7 @@ prop_fulltrip_28 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
+          String (Ann ())
             (pure $
              RawStringLiteral ()
                Prefix_r
@@ -342,7 +343,7 @@ prop_fulltrip_29 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
+          String (Ann ())
             (pure $
              RawStringLiteral ()
                Prefix_r
@@ -360,7 +361,7 @@ prop_fulltrip_30 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
+          String (Ann ())
             (pure $
              RawStringLiteral ()
                Prefix_r
@@ -385,7 +386,7 @@ prop_fulltrip_32 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
+          String (Ann ())
             (pure $
              RawStringLiteral ()
                Prefix_r
@@ -403,7 +404,7 @@ prop_fulltrip_33 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
+          String (Ann ())
             (pure $
              RawStringLiteral ()
                Prefix_r
@@ -421,7 +422,7 @@ prop_fulltrip_34 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
+          String (Ann ())
             (pure $
              RawStringLiteral ()
                Prefix_r
@@ -439,7 +440,7 @@ prop_fulltrip_35 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
+          String (Ann ())
             (pure $
              RawStringLiteral ()
                Prefix_r
@@ -460,7 +461,7 @@ prop_fulltrip_36 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
+          String (Ann ())
             (RawStringLiteral ()
                Prefix_r
                LongString
@@ -484,7 +485,7 @@ prop_fulltrip_38 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
+          String (Ann ())
             (RawStringLiteral ()
                Prefix_r
                LongString
@@ -530,7 +531,7 @@ prop_fulltrip_43 =
     let
       e =
         Yield
-        { _unsafeExprAnn = ()
+        { _unsafeExprAnn = Ann ()
         , _unsafeYieldWhitespace = [Space]
         , _unsafeYieldValue =
             CommaSepMany (Ident (MkIdent () "a" [])) (MkComma [Space]) $

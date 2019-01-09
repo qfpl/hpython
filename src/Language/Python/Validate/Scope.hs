@@ -87,6 +87,7 @@ import qualified Data.Map.Strict as Map
 
 import Language.Python.Optics
 import Language.Python.Optics.Validated (unvalidated)
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
@@ -353,8 +354,8 @@ validateSimpleStatementScope (AugAssign a l aa r) =
   (\l' -> AugAssign a l' aa) <$>
   validateExprScope l <*>
   validateExprScope r
-validateSimpleStatementScope (Global a _ _) = errorVM1 (_FoundGlobal # a)
-validateSimpleStatementScope (Nonlocal a _ _) = errorVM1 (_FoundNonlocal # a)
+validateSimpleStatementScope (Global a _ _) = errorVM1 (_FoundGlobal # getAnn a)
+validateSimpleStatementScope (Nonlocal a _ _) = errorVM1 (_FoundNonlocal # getAnn a)
 validateSimpleStatementScope (Del a ws cs) =
   Del a ws <$
   traverse_

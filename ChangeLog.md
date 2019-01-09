@@ -6,6 +6,10 @@
 
   It now drills down into collections, parameters, arguments, subscripts, and
   comprehensions
+  
+* Added `_Idents` traversal [non-breaking]
+
+* Annotations are now wrapped in the `Ann` type to aid generic deriving
 
 ## 0.1.0.1
 

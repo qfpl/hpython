@@ -9,6 +9,7 @@ import Data.Foldable (traverse_)
 import Data.List.NonEmpty (NonEmpty(..))
 import Language.Python.Render
 import Language.Python.Internal.Render.Correction
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Strings
 
@@ -22,7 +23,7 @@ prop_printer_1 =
   withTests 1 . property $ do
     let
       e1 =
-        String () $
+        String (Ann ()) $
         StringLiteral () Nothing ShortString SingleQuote [] [] :|
         [StringLiteral () Nothing ShortString SingleQuote [] []]
 
@@ -30,7 +31,7 @@ prop_printer_1 =
 
     let
       e2 =
-        String () $
+        String (Ann ()) $
         StringLiteral () Nothing ShortString DoubleQuote [] [] :|
         [StringLiteral () Nothing ShortString DoubleQuote [] []]
 
@@ -38,7 +39,7 @@ prop_printer_1 =
 
     let
       e3 =
-        String () $
+        String (Ann ()) $
         StringLiteral () Nothing ShortString SingleQuote [] [] :|
         [StringLiteral () Nothing ShortString DoubleQuote [] []]
 
@@ -46,7 +47,7 @@ prop_printer_1 =
 
     let
       e4 =
-        String () $
+        String (Ann ()) $
         StringLiteral () Nothing ShortString SingleQuote [] [] :|
         [StringLiteral () (Just Prefix_u) ShortString SingleQuote [] []]
 
@@ -118,7 +119,7 @@ prop_printer_6 =
     let
       s = [Char_lit '\\', Char_esc_bslash]
       e =
-        String () $
+        String (Ann ()) $
         RawBytesLiteral () Prefix_br ShortString SingleQuote s [] :|
         []
 
@@ -131,7 +132,7 @@ prop_printer_7 =
     let
       s = [Char_newline, Char_lit '\\', Char_esc_doublequote]
       e =
-        String () $
+        String (Ann ()) $
         StringLiteral () Nothing ShortString DoubleQuote s [] :|
         []
 

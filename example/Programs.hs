@@ -22,26 +22,26 @@ import Language.Python.Syntax
 append_to :: Raw Statement
 append_to =
   CompoundStatement $
-  Fundef () [] (Indents [] ())
+  Fundef (Ann ()) [] (Indents [] ())
     Nothing
     (Space :| [])
     "append_to"
     []
-    ( CommaSepMany (PositionalParam () "element" Nothing) (MkComma [Space]) $
-      CommaSepOne (KeywordParam () "to" Nothing [] (List () [] Nothing []))
+    ( CommaSepMany (PositionalParam (Ann ()) "element" Nothing) (MkComma [Space]) $
+      CommaSepOne (KeywordParam (Ann ()) "to" Nothing [] (List (Ann ()) [] Nothing []))
     )
     []
     Nothing
-    (SuiteMany () (MkColon []) Nothing LF $
+    (SuiteMany (Ann ()) (MkColon []) Nothing LF $
      Block []
      ( SmallStatement
          (Indents [replicate 4 Space ^. from indentWhitespaces] ())
          (MkSmallStatement
-          (Expr () $
-           Call ()
-             (Deref () (Ident "to") [] "append")
+          (Expr (Ann ()) $
+           Call (Ann ())
+             (Deref (Ann ()) (Ident "to") [] "append")
              []
-             (Just $ CommaSepOne1' (PositionalArg () (Ident "element")) Nothing)
+             (Just $ CommaSepOne1' (PositionalArg (Ann ()) (Ident "element")) Nothing)
              [])
           []
           Nothing
@@ -52,7 +52,7 @@ append_to =
          SmallStatement
            (Indents [replicate 4 Space ^. from indentWhitespaces] ())
            (MkSmallStatement
-            (Return () [Space] (Just $ Ident "to"))
+            (Return (Ann ()) [Space] (Just $ Ident "to"))
             []
             Nothing
             Nothing

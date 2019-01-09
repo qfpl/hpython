@@ -6,6 +6,8 @@ import Hedgehog
 import Control.Lens.Plated (transformOn)
 import Control.Lens.Setter ((.~), (<>~))
 import Control.Monad.IO.Class (liftIO)
+import Data.Function ((&))
+
 import qualified Data.Text.IO as Text
 
 import Language.Python.Parse (parseModule)
@@ -51,3 +53,13 @@ prop_optics_3 =
     str' <- liftIO $ Text.readFile "test/files/exprs_optics_out1.py"
     showModule
       (transformOn (_Statements._Exprs) (_Ident.identValue <>~ "_") tree) === str'
+
+prop_optics_4 :: Property
+prop_optics_4 =
+  withTests 1 . property $ do
+    str <- liftIO $ Text.readFile "test/files/idents_optics_in1.py"
+
+    tree <- shouldBeParseSuccess parseModule str
+
+    str' <- liftIO $ Text.readFile "test/files/idents_optics_out1.py"
+    showModule (tree & _Idents.identValue .~ "b") === str'

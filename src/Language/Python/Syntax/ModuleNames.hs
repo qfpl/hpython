@@ -1,4 +1,4 @@
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language DataKinds, FlexibleInstances, MultiParamTypeClasses #-}
 {-# language LambdaCase #-}
 
@@ -31,8 +31,11 @@ import Control.Lens.Setter ((.~))
 import Data.Coerce (coerce)
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
+import GHC.Generics (Generic)
+
 import qualified Data.List.NonEmpty as NonEmpty
 
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Whitespace
@@ -45,20 +48,20 @@ import Language.Python.Syntax.Whitespace
 --
 --See <https://docs.python.org/3.5/tutorial/modules.html#intra-package-references>
 data RelativeModuleName v a
-  = RelativeWithName [Dot] (ModuleName v a)
-  | Relative (NonEmpty Dot)
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  = RelativeWithName (Ann a) [Dot] (ModuleName v a)
+  | Relative (Ann a) (NonEmpty Dot)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 instance HasTrailingWhitespace (RelativeModuleName v a) where
   trailingWhitespace =
     lens
       (\case
-          RelativeWithName _ mn -> mn ^. trailingWhitespace
-          Relative (a :| as) -> (a : as) ^?! _last.trailingWhitespace)
+          RelativeWithName _ _ mn -> mn ^. trailingWhitespace
+          Relative _ (a :| as) -> (a : as) ^?! _last.trailingWhitespace)
       (\a ws -> case a of
-          RelativeWithName x mn -> RelativeWithName x (mn & trailingWhitespace .~ ws)
-          Relative (a :| as) ->
-            Relative .
+          RelativeWithName ann x mn -> RelativeWithName ann x (mn & trailingWhitespace .~ ws)
+          Relative ann (a :| as) ->
+            Relative ann .
             NonEmpty.fromList $
             (a : as) & _last.trailingWhitespace .~ ws)
 
@@ -69,20 +72,20 @@ instance HasTrailingWhitespace (RelativeModuleName v a) where
 --
 -- @a.b@
 data ModuleName v a
-  = ModuleNameOne a (Ident v a)
-  | ModuleNameMany a (Ident v a) Dot (ModuleName v a)
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  = ModuleNameOne (Ann a) (Ident v a)
+  | ModuleNameMany (Ann a) (Ident v a) Dot (ModuleName v a)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 -- | Get the annotation from a 'ModuleName'
 _moduleNameAnn :: ModuleName v a -> a
-_moduleNameAnn (ModuleNameOne a _) = a
-_moduleNameAnn (ModuleNameMany a _ _ _) = a
+_moduleNameAnn (ModuleNameOne a _) = getAnn a
+_moduleNameAnn (ModuleNameMany a _ _ _) = getAnn a
 
 -- | Convenience constructor for 'ModuleName'
 makeModuleName :: Ident v a -> [([Whitespace], Ident v a)] -> ModuleName v a
-makeModuleName i [] = ModuleNameOne (_identAnn i) i
+makeModuleName i [] = ModuleNameOne (Ann $ _identAnn i) i
 makeModuleName i ((a, b) : as) =
-  ModuleNameMany (_identAnn i) i (MkDot a) $
+  ModuleNameMany (Ann $ _identAnn i) i (MkDot a) $
   makeModuleName b as
 
 instance HasTrailingWhitespace (ModuleName v a) where

@@ -12,6 +12,7 @@ import qualified Hedgehog.Range as Range
 
 import Language.Python.DSL
 import Language.Python.Optics
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Import
 import Language.Python.Syntax.Module
@@ -29,7 +30,7 @@ genBlank = Blank () <$> genWhitespaces <*> Gen.maybe genComment
 
 genTuple :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
 genTuple expr =
-  Tuple () <$>
+  Tuple (Ann ()) <$>
   genTupleItem genWhitespaces expr <*>
   genComma <*>
   Gen.maybe (genSizedCommaSep1' $ genTupleItem genWhitespaces expr)
@@ -37,18 +38,18 @@ genTuple expr =
 genParam :: MonadGen m => m (Expr '[] ()) -> m (Param '[] ())
 genParam genExpr =
   sizedRecursive
-    [ StarParam () <$>
+    [ StarParam (Ann ()) <$>
       genWhitespaces <*>
       genIdent <*>
       sizedMaybe ((,) <$> genColonAny <*> genExpr)
-    , UnnamedStarParam () <$>
+    , UnnamedStarParam (Ann ()) <$>
       genWhitespaces
-    , DoubleStarParam () <$>
+    , DoubleStarParam (Ann ()) <$>
       genWhitespaces <*>
       genIdent <*>
       sizedMaybe ((,) <$> genColonAny <*> genExpr)
     ]
-    [ KeywordParam () <$>
+    [ KeywordParam (Ann ()) <$>
       genIdent <*>
       sizedMaybe ((,) <$> genColonAny <*> genExpr) <*>
       genWhitespaces <*>
@@ -58,10 +59,10 @@ genParam genExpr =
 genArg :: MonadGen m => m (Expr '[] ()) -> m (Arg '[] ())
 genArg genExpr =
   sizedRecursive
-    [ PositionalArg () <$> genExpr
-    , KeywordArg () <$> genIdent <*> genWhitespaces <*> genExpr
-    , StarArg () <$> genWhitespaces <*> genExpr
-    , DoubleStarArg () <$> genWhitespaces <*> genExpr
+    [ PositionalArg (Ann ()) <$> genExpr
+    , KeywordArg (Ann ()) <$> genIdent <*> genWhitespaces <*> genExpr
+    , StarArg (Ann ()) <$> genWhitespaces <*> genExpr
+    , DoubleStarArg (Ann ()) <$> genWhitespaces <*> genExpr
     ]
     []
 
@@ -76,8 +77,8 @@ genIdent =
 genModuleName :: MonadGen m => m (ModuleName '[] ())
 genModuleName =
   Gen.recursive Gen.choice
-  [ ModuleNameOne () <$> genIdent ]
-  [ ModuleNameMany () <$>
+  [ ModuleNameOne (Ann ()) <$> genIdent ]
+  [ ModuleNameMany (Ann ()) <$>
     genIdent <*>
     genDot <*>
     genModuleName
@@ -86,9 +87,9 @@ genModuleName =
 genRelativeModuleName :: MonadGen m => m (RelativeModuleName '[] ())
 genRelativeModuleName =
   Gen.choice
-  [ Relative <$>
+  [ Relative (Ann ()) <$>
     Gen.nonEmpty (Range.constant 1 10) genDot
-  , RelativeWithName <$>
+  , RelativeWithName (Ann ()) <$>
     Gen.list (Range.constant 1 10) genDot <*>
     genModuleName
   ]
@@ -96,10 +97,10 @@ genRelativeModuleName =
 genImportTargets :: MonadGen m => m (ImportTargets '[] ())
 genImportTargets =
   Gen.choice
-  [ ImportAll () <$> genWhitespaces
-  , ImportSome () <$>
+  [ ImportAll (Ann ()) <$> genWhitespaces
+  , ImportSome (Ann ()) <$>
     genSizedCommaSep1 (genImportAs genIdent genIdent)
-  , ImportSomeParens () <$>
+  , ImportSomeParens (Ann ()) <$>
     genWhitespaces <*>
     genSizedCommaSep1' (genImportAs genIdent genIdent) <*>
     genWhitespaces
@@ -122,7 +123,7 @@ genCompFor :: MonadGen m => m (CompFor '[] ())
 genCompFor =
   sized2M
     (\a b ->
-        (\ws1 ws2 -> CompFor () ws1 a ws2 b) <$>
+        (\ws1 ws2 -> CompFor (Ann ()) ws1 a ws2 b) <$>
         genWhitespaces <*>
         genWhitespaces)
     genExpr
@@ -130,14 +131,14 @@ genCompFor =
 
 genCompIf :: MonadGen m => m (CompIf '[] ())
 genCompIf =
-  CompIf () <$>
+  CompIf (Ann ()) <$>
   genWhitespaces <*>
   Gen.scale (max 0 . subtract 1) genExpr
 
 genComprehension :: MonadGen m => m (e '[] ()) -> m (Comprehension e '[] ())
 genComprehension me =
   sized3
-    (Comprehension ())
+    (Comprehension (Ann ()))
     me
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
@@ -157,7 +158,7 @@ genSubscript =
 genDictComp :: MonadGen m => m (Comprehension DictItem '[] ())
 genDictComp =
   sized3
-    (Comprehension ())
+    (Comprehension (Ann ()))
     (genDictItem genExpr)
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
@@ -165,7 +166,7 @@ genDictComp =
 genSetComp :: MonadGen m => m (Comprehension SetItem '[] ())
 genSetComp =
   sized3
-    (Comprehension ())
+    (Comprehension (Ann ()))
     (genSetItem genAnyWhitespaces genExpr)
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
@@ -224,7 +225,7 @@ genExpr' isExp =
     , if isExp then genSmallFloat else genFloat
     , genImag
     , Ident <$> genIdent
-    , String () <$>
+    , String (Ann ()) <$>
       Gen.nonEmpty
         (Range.constant 1 5)
         (Gen.choice
@@ -234,51 +235,51 @@ genExpr' isExp =
            , genRawBytesLiteral
            ])
     ]
-    [ List () <$>
+    [ List (Ann ()) <$>
       genWhitespaces <*>
       Gen.maybe (genSizedCommaSep1' $ genListItem genWhitespaces genExpr) <*>
       genWhitespaces
-    , Dict () <$>
+    , Dict (Ann ()) <$>
       genWhitespaces <*>
       sizedMaybe (genSizedCommaSep1' $ genDictItem genExpr) <*>
       genWhitespaces
-    , Set () <$>
+    , Set (Ann ()) <$>
       genWhitespaces <*>
       genSizedCommaSep1' (genSetItem genWhitespaces genExpr) <*>
       genWhitespaces
-    , ListComp () <$>
+    , ListComp (Ann ()) <$>
       genWhitespaces <*>
       genComprehension genExpr <*>
       genWhitespaces
-    , DictComp () <$>
+    , DictComp (Ann ()) <$>
       genWhitespaces <*>
       genDictComp <*>
       genWhitespaces
-    , SetComp () <$>
+    , SetComp (Ann ()) <$>
       genWhitespaces <*>
       genSetComp <*>
       genWhitespaces
-    , Generator () <$> genComprehension genExpr
+    , Generator (Ann ()) <$> genComprehension genExpr
     , Gen.subtermM
         genExpr
-        (\a -> Await () <$> genWhitespaces <*> pure a)
+        (\a -> Await (Ann ()) <$> genWhitespaces <*> pure a)
     , Gen.subtermM
         genExpr
         (\a ->
-            Deref () <$>
+            Deref (Ann ()) <$>
             pure a <*>
             genWhitespaces <*>
             genIdent)
     , sized2M
         (\a b ->
-           (\ws1 ws2 -> Call () a ws1 b ws2) <$>
+           (\ws1 ws2 -> Call (Ann ()) a ws1 b ws2) <$>
            genWhitespaces <*>
            genWhitespaces)
         genExpr
         (sizedMaybe . genSizedCommaSep1' $ genArg genExpr)
     , sized2M
         (\a b ->
-           (\ws1 ws2 -> Subscript () a ws1 b ws2) <$>
+           (\ws1 ws2 -> Subscript (Ann ()) a ws1 b ws2) <$>
            genWhitespaces <*>
            genWhitespaces)
         genExpr
@@ -286,27 +287,27 @@ genExpr' isExp =
     , sizedBind genExpr $ \a -> do
         op <- genOp
         sizedBind (genExpr' $ case op of; Exp{} -> True; _ -> False) $ \b ->
-          pure $ BinOp () a op b
+          pure $ BinOp (Ann ()) a op b
     , Gen.subtermM
         (genExpr' isExp)
-        (\a -> Parens () <$> genWhitespaces <*> pure a <*> genWhitespaces)
+        (\a -> Parens (Ann ()) <$> genWhitespaces <*> pure a <*> genWhitespaces)
     , genTuple genExpr
-    , Not () <$> genWhitespaces <*> genExpr
-    , UnOp () <$> genUnOp <*> genExpr
+    , Not (Ann ()) <$> genWhitespaces <*> genExpr
+    , UnOp (Ann ()) <$> genUnOp <*> genExpr
     , sized3M
         (\a b c ->
-           (\ws1 ws2 -> Ternary () a ws1 b ws2 c) <$>
+           (\ws1 ws2 -> Ternary (Ann ()) a ws1 b ws2 c) <$>
            genWhitespaces <*>
            genWhitespaces)
         genExpr
         genExpr
         genExpr
-    , Yield () <$> genWhitespaces <*> sizedCommaSep genExpr
-    , YieldFrom () <$> genWhitespaces <*> genWhitespaces <*> genExpr
+    , Yield (Ann ()) <$> genWhitespaces <*> sizedCommaSep genExpr
+    , YieldFrom (Ann ()) <$> genWhitespaces <*> genWhitespaces <*> genExpr
     , Gen.subtermM
         genExpr
         (\a ->
-           Lambda () <$>
+           Lambda (Ann ()) <$>
            genWhitespaces <*>
            sizedCommaSep (genParam genExpr) <*>
            genColon <*>
@@ -316,51 +317,51 @@ genExpr' isExp =
 genSimpleStatement :: MonadGen m => m (SimpleStatement '[] ())
 genSimpleStatement =
   sizedRecursive
-    [ Pass () <$> genWhitespaces
-    , Break () <$> genWhitespaces
-    , Continue () <$> genWhitespaces
+    [ Pass (Ann ()) <$> genWhitespaces
+    , Break (Ann ()) <$> genWhitespaces
+    , Continue (Ann ()) <$> genWhitespaces
     ]
-    [ Expr () <$> genExpr
+    [ Expr (Ann ()) <$> genExpr
     , sized2
-        (Assign ())
+        (Assign (Ann ()))
         genExpr
         (sizedNonEmpty ((,) <$> genEquals <*> genExpr))
     , sized2M
-        (\a b -> (\aa -> AugAssign () a aa b) <$> genAugAssign)
+        (\a b -> (\aa -> AugAssign (Ann ()) a aa b) <$> genAugAssign)
         genExpr
         genExpr
-    , Global () <$>
+    , Global (Ann ()) <$>
         genWhitespaces1 <*>
         genSizedCommaSep1 genIdent
-    , Del () <$>
+    , Del (Ann ()) <$>
       genWhitespaces <*>
       genSizedCommaSep1' genExpr
-    , Nonlocal () <$>
+    , Nonlocal (Ann ()) <$>
       genWhitespaces1 <*>
       genSizedCommaSep1 genIdent
-    , Return () <$>
+    , Return (Ann ()) <$>
       genWhitespaces <*>
       sizedMaybe genExpr
-    , Import () <$>
+    , Import (Ann ()) <$>
       genWhitespaces1 <*>
       genSizedCommaSep1 (genImportAs genModuleName genIdent)
-    , From () <$>
+    , From (Ann ()) <$>
       genWhitespaces <*>
       genRelativeModuleName <*>
       genWhitespaces <*>
       genImportTargets
-    , Raise () <$>
+    , Raise (Ann ()) <$>
       genWhitespaces <*>
       sizedMaybe ((,) <$> genExpr <*> Gen.maybe ((,) <$> genWhitespaces <*> genExpr))
     , sized2M
-        (\a b -> (\ws -> Assert () ws a b) <$> genWhitespaces)
+        (\a b -> (\ws -> Assert (Ann ()) ws a b) <$> genWhitespaces)
         genExpr
         (sizedMaybe ((,) <$> genComma <*> genExpr))
     ]
 
 genDecorator :: MonadGen m => m (Decorator '[] ())
 genDecorator =
-  Decorator () <$>
+  Decorator (Ann ()) <$>
   genIndents <*>
   genAt <*>
   genExpr <*>
@@ -372,7 +373,7 @@ genFundef :: MonadGen m => m (Raw Fundef)
 genFundef =
   sized4M
     (\a b c d ->
-        MkFundef () a <$> genIndents <*>
+        MkFundef (Ann ()) a <$> genIndents <*>
         Gen.maybe genWhitespaces1 <*>
         genWhitespaces1 <*> genIdent <*>
         genWhitespaces <*> pure b <*>
@@ -390,7 +391,7 @@ genCompoundStatement =
     [ review _Fundef <$> genFundef
     , sized4M
         (\a b c d ->
-           If <$> pure () <*> genIndents <*> genWhitespaces <*>
+           If (Ann ()) <$> genIndents <*> genWhitespaces <*>
            pure a <*> pure b <*> pure c <*> pure d)
         genExpr
         (genSuite genSimpleStatement genBlock)
@@ -404,8 +405,8 @@ genCompoundStatement =
          genIndents <*> genWhitespaces <*> genSuite genSimpleStatement genBlock)
     , sized3M
         (\a b c ->
-           While <$>
-           pure () <*> genIndents <*>
+           While (Ann ()) <$>
+           genIndents <*>
            genWhitespaces <*> pure a <*> pure b <*> pure c)
         genExpr
         (genSuite genSimpleStatement genBlock)
@@ -414,7 +415,7 @@ genCompoundStatement =
          genIndents <*> genWhitespaces <*> genSuite genSimpleStatement genBlock)
     , sized4M
         (\a b c d ->
-           TryExcept <$> pure () <*> genIndents <*> genWhitespaces <*>
+           TryExcept (Ann ()) <$> genIndents <*> genWhitespaces <*>
            pure a <*> pure b <*> pure c <*> pure d)
         (genSuite genSimpleStatement genBlock)
         (sizedNonEmpty $
@@ -422,7 +423,7 @@ genCompoundStatement =
            (\a b ->
               (,,,) <$> genIndents <*> genWhitespaces <*>
               Gen.maybe
-                (ExceptAs () <$> pure a <*> Gen.maybe ((,) <$> genWhitespaces <*> genIdent)) <*>
+                (ExceptAs (Ann ()) <$> pure a <*> Gen.maybe ((,) <$> genWhitespaces <*> genIdent)) <*>
               pure b)
            genExpr
            (genSuite genSimpleStatement genBlock))
@@ -434,8 +435,7 @@ genCompoundStatement =
          genSuite genSimpleStatement genBlock)
     , sized2M
         (\a b -> 
-           TryFinally <$>
-           pure () <*>
+           TryFinally (Ann ()) <$>
            genIndents <*>
            genWhitespaces <*>
            pure a <*>
@@ -446,7 +446,7 @@ genCompoundStatement =
         (genSuite genSimpleStatement genBlock)
     , sized3M
         (\a b c ->
-           ClassDef () a <$> genIndents <*> genWhitespaces1 <*> genIdent <*>
+           ClassDef (Ann ()) a <$> genIndents <*> genWhitespaces1 <*> genIdent <*>
            Gen.maybe ((,,) <$> genWhitespaces <*> pure b <*> genWhitespaces) <*>
            pure c)
         (sizedList genDecorator)
@@ -454,8 +454,8 @@ genCompoundStatement =
         (genSuite genSimpleStatement genBlock)
     , sized4M
         (\a b c d ->
-           For <$>
-           pure () <*> genIndents <*> Gen.maybe genWhitespaces1 <*>
+           For (Ann ()) <$>
+           genIndents <*> Gen.maybe genWhitespaces1 <*>
            genWhitespaces <*> pure a <*>
            genWhitespaces <*> pure b <*>
            pure c <*> pure d)
@@ -467,11 +467,11 @@ genCompoundStatement =
          genIndents <*> genWhitespaces <*> genSuite genSimpleStatement genBlock)
     , sized2M
         (\a b ->
-           With <$>
-           pure () <*> genIndents <*>
+           With (Ann ()) <$>
+           genIndents <*>
            Gen.maybe genWhitespaces1 <*> genWhitespaces <*> pure a <*> pure b)
         (genSizedCommaSep1 $
-         WithItem () <$>
+         WithItem (Ann ()) <$>
          genExpr <*>
          sizedMaybe ((,) <$> genWhitespaces <*> genExpr))
         (genSuite genSimpleStatement genBlock)
@@ -507,9 +507,9 @@ genModule =
         genModule
     ]
 
-genImportAs :: MonadGen m => m (e ()) -> m (Ident '[] ()) -> m (ImportAs e '[] ())
+genImportAs :: MonadGen m => m (e '[] ()) -> m (Ident '[] ()) -> m (ImportAs e '[] ())
 genImportAs me genIdent =
   sized2M
-    (\a b -> ImportAs () a <$> pure b)
+    (\a b -> ImportAs (Ann ()) a <$> pure b)
     me
     (sizedMaybe $ (,) <$> genWhitespaces1 <*> genIdent)

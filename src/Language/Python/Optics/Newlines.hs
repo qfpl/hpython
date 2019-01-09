@@ -46,18 +46,18 @@ instance (HasNewlines a, HasNewlines b, HasNewlines c, HasNewlines d) => HasNewl
     _Newlines f c <*>
     _Newlines f d
 
-instance HasNewlines (e a) => HasNewlines (ImportAs e v a) where
+instance HasNewlines (e v a) => HasNewlines (ImportAs e v a) where
   _Newlines f (ImportAs a b c) =
     ImportAs a <$>
     _Newlines f b <*>
     _Newlines f c
 
 instance HasNewlines (RelativeModuleName v a) where
-  _Newlines f (RelativeWithName a b) =
-    RelativeWithName <$>
+  _Newlines f (RelativeWithName ann a b) =
+    RelativeWithName ann <$>
     _Newlines f a <*>
     _Newlines f b
-  _Newlines f (Relative a) = Relative <$> _Newlines f a
+  _Newlines f (Relative ann a) = Relative ann <$> _Newlines f a
 
 instance (HasNewlines a, HasNewlines b) => HasNewlines (Either a b) where
   _Newlines f (Left a) = Left <$> _Newlines f a

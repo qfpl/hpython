@@ -1,4 +1,4 @@
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language LambdaCase #-}
 
 {-|
@@ -15,6 +15,8 @@ Unary operators
 module Language.Python.Syntax.Operator.Unary where
 
 import Control.Lens.Lens (lens)
+import GHC.Generics (Generic)
+
 import Language.Python.Syntax.Whitespace
 
 -- | An 'UnOp' is a unary operator in Python, such as @-@ for negation.
@@ -26,7 +28,7 @@ data UnOp a
   | Positive a [Whitespace]
   -- | @~a@
   | Complement a [Whitespace]
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 instance HasTrailingWhitespace (UnOp a) where
   trailingWhitespace =

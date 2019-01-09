@@ -200,6 +200,7 @@ where
 import Control.Lens.TH (makeLenses)
 import Data.List.NonEmpty (NonEmpty)
 
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.CommaSep (Comma, CommaSep, CommaSep1, CommaSep1')
 import Language.Python.Syntax.Expr (Arg, Expr, ListItem, Param, TupleItem)
 import Language.Python.Syntax.Ident (Ident)
@@ -209,7 +210,7 @@ import Language.Python.Syntax.Whitespace
 
 data Fundef v a
   = MkFundef
-  { _fdAnn :: a
+  { _fdAnn :: Ann a
   , _fdDecorators :: [Decorator v a]
   , _fdIndents :: Indents a
   , _fdAsync :: Maybe (NonEmpty Whitespace)
@@ -233,7 +234,7 @@ makeLenses ''Else
 
 data While v a
   = MkWhile
-  { _whileAnn :: a
+  { _whileAnn :: Ann a
   , _whileIndents :: Indents a
   , _whileWhile :: [Whitespace]
   , _whileCond :: Expr v a
@@ -244,7 +245,7 @@ makeLenses ''While
 
 data KeywordParam v a
   = MkKeywordParam
-  { _kpAnn :: a
+  { _kpAnn :: Ann a
   , _kpName :: Ident v a
   , _kpType :: Maybe (Colon, Expr v a)
   , _kpEquals :: [Whitespace]
@@ -254,7 +255,7 @@ makeLenses ''KeywordParam
 
 data PositionalParam v a
   = MkPositionalParam
-  { _ppAnn :: a
+  { _ppAnn :: Ann a
   , _ppName :: Ident v a
   , _ppType :: Maybe (Colon, Expr v a)
   } deriving (Eq, Show)
@@ -262,7 +263,7 @@ makeLenses ''PositionalParam
 
 data StarParam v a
   = MkStarParam
-  { _spAnn :: a
+  { _spAnn :: Ann a
   , _spWhitespace :: [Whitespace]
   , _spName :: Ident v a
   , _spType :: Maybe (Colon, Expr v a)
@@ -271,14 +272,14 @@ makeLenses ''StarParam
 
 data UnnamedStarParam (v :: [*]) a
   = MkUnnamedStarParam
-  { _uspAnn :: a
+  { _uspAnn :: Ann a
   , _uspWhitespace :: [Whitespace]
   } deriving (Eq, Show)
 makeLenses ''UnnamedStarParam
 
 data Call v a
   = MkCall
-  { _callAnn :: a
+  { _callAnn :: Ann a
   , _callFunction :: Expr v a
   , _callLeftParen :: [Whitespace]
   , _callArguments :: Maybe (CommaSep1' (Arg v a))
@@ -297,7 +298,7 @@ makeLenses ''Elif
 
 data If v a
   = MkIf
-  { _ifAnn :: a
+  { _ifAnn :: Ann a
   , _ifIndents :: Indents a
   , _ifIf :: [Whitespace]
   , _ifCond :: Expr v a
@@ -309,7 +310,7 @@ makeLenses ''If
 
 data For v a
   = MkFor
-  { _forAnn :: a
+  { _forAnn :: Ann a
   , _forIndents :: Indents a
   , _forAsync :: Maybe (NonEmpty Whitespace)
   , _forFor :: [Whitespace]
@@ -340,7 +341,7 @@ makeLenses ''Except
 
 data TryExcept v a
   = MkTryExcept
-  { _teAnn :: a
+  { _teAnn :: Ann a
   , _teIndents :: Indents a
   , _teTry :: [Whitespace]
   , _teBody :: Suite v a
@@ -352,7 +353,7 @@ makeLenses ''TryExcept
 
 data TryFinally v a
   = MkTryFinally
-  { _tfAnn :: a
+  { _tfAnn :: Ann a
   , _tfIndents :: Indents a
   , _tfTry :: [Whitespace]
   , _tfBody :: Suite v a
@@ -362,7 +363,7 @@ makeLenses ''TryFinally
 
 data ClassDef v a
   = MkClassDef
-  { _cdAnn :: a
+  { _cdAnn :: Ann a
   , _cdDecorators :: [Decorator v a]
   , _cdIndents :: Indents a
   , _cdClass :: NonEmpty Whitespace
@@ -374,7 +375,7 @@ makeLenses ''ClassDef
 
 data With v a
   = MkWith
-  { _withAnn :: a
+  { _withAnn :: Ann a
   , _withIndents :: Indents a
   , _withAsync :: Maybe (NonEmpty Whitespace)
   , _withWith :: [Whitespace]
@@ -385,7 +386,7 @@ makeLenses ''With
 
 data Tuple v a
   = MkTuple
-  { _tupleAnn :: a
+  { _tupleAnn :: Ann a
   , _tupleHead :: TupleItem v a
   , _tupleComma :: Comma
   , _tupleTail :: Maybe (CommaSep1' (TupleItem v a))
@@ -394,7 +395,7 @@ makeLenses ''Tuple
 
 data List v a
   = MkList
-  { _listAnn :: a
+  { _listAnn :: Ann a
   , _listWhitespaceLeft :: [Whitespace]
   , _listBody :: Maybe (CommaSep1' (ListItem v a))
   , _listWhitespaceRight :: [Whitespace]
@@ -403,7 +404,7 @@ makeLenses ''List
 
 data ListUnpack v a
   = MkListUnpack
-  { _listUnpackAnn :: a
+  { _listUnpackAnn :: Ann a
   , _listUnpackParens :: [([Whitespace], [Whitespace])]
   , _listUnpackWhitespace :: [Whitespace]
   , _listUnpackValue :: Expr v a
@@ -412,14 +413,14 @@ makeLenses ''ListUnpack
 
 data None (v :: [*]) a
   = MkNone
-  { _noneAnn :: a
+  { _noneAnn :: Ann a
   , _noneWhitespace :: [Whitespace]
   } deriving (Eq, Show)
 makeLenses ''None
 
 data TupleUnpack v a
   = MkTupleUnpack
-  { _tupleUnpackAnn :: a
+  { _tupleUnpackAnn :: Ann a
   , _tupleUnpackParens :: [([Whitespace], [Whitespace])]
   , _tupleUnpackWhitespace :: [Whitespace]
   , _tupleUnpackValue :: Expr v a

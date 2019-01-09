@@ -1,4 +1,4 @@
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-|
 Module      : Language.Python.Syntax.Punctuation
 Copyright   : (C) CSIRO 2017-2019
@@ -13,6 +13,7 @@ These types are used throughout the syntax tree to help preserve formatting.
 module Language.Python.Syntax.Punctuation where
 
 import Control.Lens.Lens (lens)
+import GHC.Generics (Generic)
 
 import Language.Python.Syntax.Whitespace
 
@@ -26,14 +27,14 @@ instance HasTrailingWhitespace Dot where
 
 -- | The venerable comma separator
 newtype Comma = MkComma [Whitespace]
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
 instance HasTrailingWhitespace Comma where
   trailingWhitespace =
     lens (\(MkComma ws) -> ws) (\_ ws -> MkComma ws)
 
 newtype Colon = MkColon [Whitespace]
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
 instance HasTrailingWhitespace Colon where
   trailingWhitespace =

@@ -7,6 +7,7 @@ import Programs
 import FixMutableDefaultArguments
 import OptimizeTailRecursion
 import Indentation
+import Recase
 import Validation
 
 import Language.Python.Render (showModule)
@@ -46,4 +47,8 @@ main = do
 
   section $ do
     putStrLn "Validated\n"
-    doValidating
+  doValidating
+
+  section $ do
+    putStrLn "Recased\n"
+  recase

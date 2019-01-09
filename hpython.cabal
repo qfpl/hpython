@@ -150,6 +150,7 @@ executable example
                      , FixMutableDefaultArguments
                      , OptimizeTailRecursion
                      , Programs
+                     , Recase
                      , Validation
   hs-source-dirs:      example
   build-depends:       base >=4.9 && <5, lens, hpython, text
@@ -159,7 +160,6 @@ executable example
                        -Wunused-imports
   if flag(development)
     ghc-options:       -Werror
-
 
 benchmark bench
   main-is:             Main.hs

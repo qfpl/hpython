@@ -17,6 +17,8 @@
 
 * Added IO-based `read-` functions to `Language.Python.Parse` [non-breaking]
 
+* Re-export `Data.Validation` from `Language.Python.Parse` [breaking]
+
 ## 0.1.0.1
 
 *2019-01-07*

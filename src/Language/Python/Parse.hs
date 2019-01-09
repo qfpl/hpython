@@ -12,7 +12,8 @@ Portability : non-portable
 -}
 
 module Language.Python.Parse
-  ( module Language.Python.Parse.Error
+  ( module Data.Validation
+  , module Language.Python.Parse.Error
   , Parser
     -- * Parsing some 'Text'
   , parseModule
@@ -33,7 +34,7 @@ import Control.Applicative ((<|>))
 import Data.Bifunctor (first)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
-import Data.Validation (Validation, bindValidation, fromEither)
+import Data.Validation
 import Text.Megaparsec (eof)
 
 import qualified Data.Text.IO as Text

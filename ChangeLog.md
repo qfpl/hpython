@@ -15,6 +15,8 @@
 
 * Added `HasStatements` instance for `Statement` [breaking]
 
+* Added IO-based `read-` functions to `Language.Python.Parse` [non-breaking]
+
 ## 0.1.0.1
 
 *2019-01-07*

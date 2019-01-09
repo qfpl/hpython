@@ -14,10 +14,16 @@ Portability : non-portable
 module Language.Python.Parse
   ( module Language.Python.Parse.Error
   , Parser
+    -- * Parsing some 'Text'
   , parseModule
   , parseStatement
   , parseExpr
   , parseExprList
+    -- * Parsing from a file
+  , readModule
+  , readStatement
+  , readExpr
+  , readExprList
     -- * Source Information
   , SrcInfo(..), initialSrcInfo
   )
@@ -29,6 +35,8 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import Data.Validation (Validation, bindValidation, fromEither)
 import Text.Megaparsec (eof)
+
+import qualified Data.Text.IO as Text
 
 import Language.Python.Internal.Lexer
   ( SrcInfo(..), initialSrcInfo, withSrcInfo
@@ -141,3 +149,59 @@ parseExpr fp input =
       runParser fp (expr space <* eof) tabbed
   in
     fromEither (first pure ir) `bindValidation` IR.fromIR_expr
+
+-- | Parse a module from a file
+--
+-- https://docs.python.org/3/reference/toplevel_components.html#file-input
+readModule
+  :: ( AsLexicalError e Char
+     , AsTabError e SrcInfo
+     , AsIncorrectDedent e SrcInfo
+     , AsParseError e (PyToken SrcInfo)
+     , AsIRError e SrcInfo
+     )
+  => FilePath -- ^ File to read
+  -> IO (Validation (NonEmpty e) (Module '[] SrcInfo))
+readModule fp = parseModule fp <$> Text.readFile fp
+
+-- | Parse a statement from a file
+--
+-- https://docs.python.org/3/reference/compound_stmts.html#grammar-token-statement
+readStatement
+  :: ( AsLexicalError e Char
+     , AsTabError e SrcInfo
+     , AsIncorrectDedent e SrcInfo
+     , AsParseError e (PyToken SrcInfo)
+     , AsIRError e SrcInfo
+     )
+  => FilePath -- ^ File to read
+  -> IO (Validation (NonEmpty e) (Statement '[] SrcInfo))
+readStatement fp = parseStatement fp <$> Text.readFile fp
+
+-- | Parse an expression from a file
+--
+-- https://docs.python.org/3.5/reference/expressions.html#grammar-token-expression
+readExpr
+  :: ( AsLexicalError e Char
+     , AsTabError e SrcInfo
+     , AsIncorrectDedent e SrcInfo
+     , AsParseError e (PyToken SrcInfo)
+     , AsIRError e SrcInfo
+     )
+  => FilePath -- ^ File to read
+  -> IO (Validation (NonEmpty e) (Expr '[] SrcInfo))
+readExpr fp = parseExpr fp <$> Text.readFile fp
+
+-- | Parse an expression list (unparenthesised tuple) from a file
+--
+-- https://docs.python.org/3.5/reference/expressions.html#grammar-token-expression_list
+readExprList
+  :: ( AsLexicalError e Char
+     , AsTabError e SrcInfo
+     , AsIncorrectDedent e SrcInfo
+     , AsParseError e (PyToken SrcInfo)
+     , AsIRError e SrcInfo
+     )
+  => FilePath -- ^ File to read
+  -> IO (Validation (NonEmpty e) (Expr '[] SrcInfo))
+readExprList fp = parseExprList fp <$> Text.readFile fp

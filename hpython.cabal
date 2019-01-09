@@ -35,6 +35,10 @@ extra-source-files:  ChangeLog.md
                      test/files/indent_optics_out.py
                      test/files/indent_optics_in2.py
                      test/files/indent_optics_out2.py
+                     test/files/exprs_optics_in2.py
+                     test/files/exprs_optics_out2.py
+                     test/files/idents_optics_in2.py
+                     test/files/idents_optics_out2.py
                      test/files/joblib.py
                      test/files/joblib2.py
                      test/files/mypy.py

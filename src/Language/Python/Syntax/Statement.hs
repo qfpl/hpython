@@ -206,6 +206,9 @@ data Statement (v :: [*]) a
   | CompoundStatement (CompoundStatement v a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasStatements Statement where
+  _Statements = id
+
 instance HasExprs SmallStatement where
   _Exprs f (MkSmallStatement s ss a b c) =
     MkSmallStatement <$>

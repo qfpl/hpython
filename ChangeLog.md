@@ -11,7 +11,9 @@
 
 * Annotations are now wrapped in the `Ann` type to aid generic deriving [breaking]
 
-* Added `HasExprs` instance for `Module`
+* Added `HasExprs` instance for `Module` [breaking]
+
+* Added `HasStatements` instance for `Statement` [breaking]
 
 ## 0.1.0.1
 

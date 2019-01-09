@@ -34,7 +34,7 @@ import Control.Lens.Cons (_last)
 import Control.Lens.Fold ((^?), (^?!))
 import Control.Lens.Getter ((^.), getting, to, view)
 import Control.Lens.Lens (Lens, Lens', lens)
-import Control.Lens.Plated (Plated(..), gplate)
+import Control.Lens.Plated (Plated(..))
 import Control.Lens.Prism (_Just, _Left, _Right)
 import Control.Lens.Setter ((.~), mapped, over)
 import Control.Lens.Traversal (Traversal, failing, traverseOf)
@@ -300,7 +300,10 @@ instance HasExprs Arg where
 -- x for y in z
 -- @
 data Comprehension e (v :: [*]) a
-  = Comprehension a (e v a) (CompFor v a) [Either (CompFor v a) (CompIf v a)] -- ^ <expr> <comp_for> (comp_for | comp_if)*
+  = Comprehension a
+      (e v a)
+      (CompFor v a)
+      [Either (CompFor v a) (CompIf v a)] -- ^ <expr> <comp_for> (comp_for | comp_if)*
   deriving (Eq, Show)
 
 instance HasTrailingWhitespace (Comprehension e v a) where
@@ -1033,7 +1036,155 @@ instance Num (Expr '[] ()) where
   signum = undefined
   abs = undefined
 
-instance Plated (Expr '[] a) where; plate = gplate
+instance Plated (Expr '[] a) where
+  plate fun e =
+    case e of
+      Unit{} -> pure e
+      Lambda a b c d e ->
+        (\c' -> Lambda a b c' d) <$>
+        (traverse.paramExpr) fun c <*>
+        fun e
+      Yield a b c ->
+        Yield a b <$> traverse fun c
+      YieldFrom a b c d ->
+        YieldFrom a b c <$> fun d
+      Ternary a b c d e f ->
+        (\b' d' -> Ternary a b' c d' e) <$>
+        fun b <*>
+        fun d <*>
+        fun f
+      None{} -> pure e
+      Ellipsis{} -> pure e
+      List a b c d ->
+        (\c' -> List a b c' d) <$>
+        (traverse.traverse.listItemExpr) fun c
+      ListComp a b c d ->
+        (\c' -> ListComp a b c' d) <$>
+        compExpr fun c
+      Deref a b c d ->
+        (\b' -> Deref a b' c d) <$>
+        fun b
+      Subscript a b c d e ->
+        (\b' d' -> Subscript a b' c d' e) <$>
+        fun b <*>
+        (traverse.subscriptExpr) fun d
+      Call a b c d e ->
+        (\b' d' -> Call a b' c d' e) <$>
+        fun b <*>
+        (traverse.traverse.argExpr) fun d
+      BinOp a b c d ->
+        (\b' -> BinOp a b' c) <$>
+        fun b <*>
+        fun d
+      UnOp a b c ->
+        UnOp a b <$> fun c
+      Parens a b c d ->
+        (\c' -> Parens a b c' d) <$>
+        fun c
+      Ident{} -> pure e
+      Int{} -> pure e
+      Float{} -> pure e
+      Imag{} -> pure e
+      Bool{} -> pure e
+      String{} -> pure e
+      Not a b c -> Not a b <$> fun c
+      Tuple a b c d ->
+        (\b' -> Tuple a b' c) <$>
+        tupleItemExpr fun b <*>
+        (traverse.traverse.tupleItemExpr) fun d
+      DictComp a b c d ->
+        (\c' -> DictComp a b c' d) <$>
+        dictCompExpr fun c
+      Dict a b c d ->
+        (\c' -> Dict a b c' d) <$>
+        (traverse.traverse.dictItemExpr) fun c
+      SetComp a b c d ->
+        (\c' -> SetComp a b c' d) <$>
+        setCompExpr fun c
+      Set a b c d ->
+        (\c' -> Set a b c' d) <$>
+        (traverse.setItemExpr) fun c
+      Generator a b -> Generator a <$> compExpr fun b
+      Await a b c -> Await a b <$> fun c
+    where
+      paramExpr fun' p =
+        case p of
+          PositionalParam a b c ->
+            PositionalParam a b <$>
+            (traverse._2) fun' c
+          KeywordParam a b c d e ->
+            (\c' -> KeywordParam a b c' d) <$>
+            (traverse._2) fun' c <*>
+            fun' e
+          UnnamedStarParam{} -> pure p
+          StarParam a b c d ->
+            StarParam a b c <$> (traverse._2) fun' d
+          DoubleStarParam a b c d ->
+            DoubleStarParam a b c <$> (traverse._2) fun' d
+
+      listItemExpr fun' li =
+        case li of
+          ListItem a b -> ListItem a <$> fun' b
+          ListUnpack a b c d -> ListUnpack a b c <$> fun' d
+
+      tupleItemExpr fun' ti =
+        case ti of
+          TupleItem a b -> TupleItem a <$> fun' b
+          TupleUnpack a b c d -> TupleUnpack a b c <$> fun' d
+
+      setItemExpr fun' si =
+        case si of
+          SetItem a b -> SetItem a <$> fun' b
+          SetUnpack a b c d -> SetUnpack a b c <$> fun' d
+
+      dictItemExpr fun' di =
+        case di of
+          DictItem a b c d ->
+            (\b' -> DictItem a b' c) <$>
+            fun' b <*>
+            fun' d
+          DictUnpack a b c -> DictUnpack a b <$> fun' c
+
+      compIfExpr fun' (CompIf a b c) = CompIf a b <$> fun' c
+
+      compForExpr fun' (CompFor a b c d e) =
+        (\c' -> CompFor a b c' d) <$>
+        fun' c <*>
+        fun' e
+
+      compExpr fun' (Comprehension a b c d) =
+        Comprehension a <$>
+        fun' b <*>
+        compForExpr fun' c <*>
+        traverse (bitraverse (compForExpr fun') (compIfExpr fun')) d
+
+      dictCompExpr fun' (Comprehension a b c d) =
+        Comprehension a <$>
+        dictItemExpr fun' b <*>
+        compForExpr fun' c <*>
+        traverse (bitraverse (compForExpr fun') (compIfExpr fun')) d
+
+      setCompExpr fun' (Comprehension a b c d) =
+        Comprehension a <$>
+        setItemExpr fun' b <*>
+        compForExpr fun' c <*>
+        traverse (bitraverse (compForExpr fun') (compIfExpr fun')) d
+
+      subscriptExpr fun' ss =
+        case ss of
+          SubscriptExpr a -> SubscriptExpr <$> fun' a
+          SubscriptSlice a b c d ->
+            (\a' -> SubscriptSlice a' b) <$>
+            traverse fun' a <*>
+            traverse fun' c <*>
+            (traverse._2.traverse) fun' d
+
+      argExpr fun' arg =
+        case arg of
+          PositionalArg a b -> PositionalArg a <$> fun' b
+          KeywordArg a b c d -> KeywordArg a b c <$> fun' d
+          StarArg a b c -> StarArg a b <$> fun' c
+          DoubleStarArg a b c -> DoubleStarArg a b <$> fun' c
 
 instance HasExprs Expr where
   _Exprs = id

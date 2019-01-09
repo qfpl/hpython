@@ -1,5 +1,12 @@
 # Revision history for hpython
 
+## Next Release
+
+* Improved Plated instance for exprs [breaking]
+
+  It now drills down into collections, parameters, arguments, subscripts, and
+  comprehensions
+
 ## 0.1.0.1
 
 *2019-01-07*

@@ -552,8 +552,8 @@ instance HasExprs CompoundStatement where
   _Exprs fun (TryFinally idnt a b c d e f) =
     TryFinally idnt a b <$> _Exprs fun c <*> pure d <*>
     pure e <*> _Exprs fun f
-  _Exprs fun (For idnt a asyncWs b c d e f g) =
-    For idnt a asyncWs b <$> fun c <*> pure d <*> traverse fun e <*>
+  _Exprs fun (For a idnt asyncWs b c d e f g) =
+    For a idnt asyncWs b <$> fun c <*> pure d <*> traverse fun e <*>
     _Exprs fun f <*>
     (traverse._3._Exprs) fun g
   _Exprs fun (ClassDef a decos idnt b c d e) =

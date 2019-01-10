@@ -1,9 +1,10 @@
 {-# language LambdaCase #-}
 {-# language DataKinds, KindSignatures #-}
-{-# language ScopedTypeVariables #-}
-{-# language MultiParamTypeClasses, FlexibleInstances #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language ExistentialQuantification #-}
+{-# language InstanceSigs, TypeApplications #-}
+{-# language MultiParamTypeClasses, FlexibleInstances #-}
+{-# language ScopedTypeVariables #-}
 
 {-|
 Module      : Language.Python.Syntax.Expr
@@ -16,7 +17,7 @@ Portability : non-portable
 
 module Language.Python.Syntax.Expr
   ( -- * Expressions
-    Expr(..), HasExprs(..), exprAnn, shouldGroupLeft, shouldGroupRight
+    Expr(..), HasExprs(..), shouldGroupLeft, shouldGroupRight
     -- * Parameters and arguments
   , Param(..), paramAnn, paramType_, paramType, paramName
   , Arg(..), argExpr
@@ -45,6 +46,7 @@ import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
 import Data.Digit.Integral (integralDecDigits)
 import Data.Function ((&))
+import Data.Generics.Product.Typed (typed)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (isNothing)
 import Data.Monoid ((<>))
@@ -129,6 +131,10 @@ data Param (v :: [*]) a
   , _paramType :: Maybe (Colon, Expr v a)
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (Param v) where
+  annot :: forall a. Lens' (Param v a) (Ann a)
+  annot = typed @(Ann a)
 
 instance IsString (Param '[] ()) where
   fromString a = PositionalParam (Ann ()) (fromString a) Nothing
@@ -283,6 +289,10 @@ data Arg (v :: [*]) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasAnn (Arg v) where
+  annot :: forall a. Lens' (Arg v a) (Ann a)
+  annot = typed @(Ann a)
+
 instance IsString (Arg '[] ()) where
   fromString = PositionalArg (Ann ()) . fromString
 
@@ -308,6 +318,10 @@ data Comprehension e (v :: [*]) a
       (CompFor v a)
       [Either (CompFor v a) (CompIf v a)] -- ^ <expr> <comp_for> (comp_for | comp_if)*
   deriving (Eq, Show, Generic)
+
+instance HasAnn (Comprehension e v) where
+  annot :: forall a. Lens' (Comprehension e v a) (Ann a)
+  annot = typed @(Ann a)
 
 instance HasTrailingWhitespace (Comprehension e v a) where
   trailingWhitespace =
@@ -345,6 +359,10 @@ data CompIf (v :: [*]) a
   = CompIf (Ann a) [Whitespace] (Expr v a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasAnn (CompIf v) where
+  annot :: forall a. Lens' (CompIf v a) (Ann a)
+  annot = typed @(Ann a)
+
 instance HasTrailingWhitespace (CompIf v a) where
   trailingWhitespace =
     lens
@@ -355,6 +373,10 @@ instance HasTrailingWhitespace (CompIf v a) where
 data CompFor (v :: [*]) a
   = CompFor (Ann a) [Whitespace] (Expr v a) [Whitespace] (Expr v a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (CompFor v) where
+  annot :: forall a. Lens' (CompFor v a) (Ann a)
+  annot = typed @(Ann a)
 
 instance HasTrailingWhitespace (CompFor v a) where
   trailingWhitespace =
@@ -379,6 +401,10 @@ data DictItem (v :: [*]) a
   , _unsafeDictItemUnpackWhitespace :: [Whitespace]
   , _unsafeDictItemUnpackValue :: Expr v a
   } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (DictItem v) where
+  annot :: forall a. Lens' (DictItem v a) (Ann a)
+  annot = typed @(Ann a)
 
 instance HasTrailingWhitespace (DictItem v a) where
   trailingWhitespace =
@@ -463,6 +489,10 @@ data ListItem (v :: [*]) a
   , _unsafeListUnpackValue :: Expr v a
   } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasAnn (ListItem v) where
+  annot :: forall a. Lens' (ListItem v a) (Ann a)
+  annot = typed @(Ann a)
+
 instance HasExprs ListItem where
   _Exprs f (ListItem a b) = ListItem a <$> f b
   _Exprs f (ListUnpack a b c d) = ListUnpack a b c <$> f d
@@ -497,6 +527,10 @@ data SetItem (v :: [*]) a
   , _unsafeSetUnpackValue :: Expr v a
   } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasAnn (SetItem v) where
+  annot :: forall a. Lens' (SetItem v a) (Ann a)
+  annot = typed @(Ann a)
+
 instance HasExprs SetItem where
   _Exprs f (SetItem a b) = SetItem a <$> f b
   _Exprs f (SetUnpack a b c d) = SetUnpack a b c <$> f d
@@ -528,6 +562,10 @@ data TupleItem (v :: [*]) a
   , _unsafeTupleUnpackWhitespace :: [Whitespace]
   , _unsafeTupleUnpackValue :: Expr v a
   } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (TupleItem v) where
+  annot :: forall a. Lens' (TupleItem v a) (Ann a)
+  annot = typed @(Ann a)
 
 instance HasExprs TupleItem where
   _Exprs f (TupleItem a b) = TupleItem a <$> f b
@@ -762,12 +800,12 @@ data Expr (v :: [*]) a
   --
   -- https://docs.python.org/3/reference/expressions.html#unary-arithmetic-and-bitwise-operations
   | UnOp
-  { _unsafeExprAnn :: Ann a
+  { _exprAnn :: Ann a
   , _unsafeUnOpOp :: UnOp a
   , _unsafeUnOpValue :: Expr v a
   }
   | Parens
-  { _unsafeExprAnn :: Ann a
+  { _exprAnn :: Ann a
   -- ( spaces
   , _unsafeParensWhitespaceLeft :: [Whitespace]
   -- expr
@@ -779,7 +817,8 @@ data Expr (v :: [*]) a
   --
   -- https://docs.python.org/3/reference/expressions.html#atom-identifiers
   | Ident
-  { _unsafeIdentValue :: Ident v a
+  { _exprAnn :: Ann a
+  , _unsafeIdentValue :: Ident v a
   }
   -- | @1@
   --
@@ -791,7 +830,7 @@ data Expr (v :: [*]) a
   --
   -- https://docs.python.org/3/reference/lexical_analysis.html#grammar-token-integer
   | Int
-  { _unsafeExprAnn :: Ann a
+  { _exprAnn :: Ann a
   , _unsafeIntValue :: IntLiteral a
   , _unsafeIntWhitespace :: [Whitespace]
   }
@@ -803,7 +842,7 @@ data Expr (v :: [*]) a
   --
   -- https://docs.python.org/3/reference/lexical_analysis.html#floating-point-literals
   | Float
-  { _unsafeExprAnn :: Ann a
+  { _exprAnn :: Ann a
   , _unsafeFloatValue :: FloatLiteral a
   , _unsafeFloatWhitespace :: [Whitespace]
   }
@@ -813,7 +852,7 @@ data Expr (v :: [*]) a
   --
   -- https://docs.python.org/3/reference/lexical_analysis.html#floating-point-literals
   | Imag
-  { _unsafeExprAnn :: Ann a
+  { _exprAnn :: Ann a
   , _unsafeImagValue :: ImagLiteral a
   , _unsafeImagWhitespace :: [Whitespace]
   }
@@ -825,7 +864,7 @@ data Expr (v :: [*]) a
   --
   -- https://docs.python.org/3/library/constants.html#False
   | Bool
-  { _unsafeExprAnn :: Ann a
+  { _exprAnn :: Ann a
   , _unsafeBoolValue :: Bool
   , _unsafeBoolWhitespace :: [Whitespace]
   }
@@ -839,7 +878,7 @@ data Expr (v :: [*]) a
   --
   -- https://docs.python.org/3/reference/lexical_analysis.html#grammar-token-stringliteral
   | String
-  { _unsafeExprAnn :: Ann a
+  { _exprAnn :: Ann a
   , _unsafeStringValue :: NonEmpty (StringLiteral a)
   }
   -- | @a, b, c@
@@ -850,7 +889,7 @@ data Expr (v :: [*]) a
   --
   -- https://docs.python.org/3/reference/expressions.html#expression-lists
   | Tuple
-  { _unsafeExprAnn :: Ann a
+  { _exprAnn :: Ann a
   -- expr
   , _unsafeTupleHead :: TupleItem v a
   -- , spaces
@@ -862,7 +901,7 @@ data Expr (v :: [*]) a
   --
   -- https://docs.python.org/3/reference/expressions.html#boolean-operations
   | Not
-  { _unsafeExprAnn :: Ann a
+  { _exprAnn :: Ann a
   , _unsafeNotWhitespace :: [Whitespace]
   , _unsafeNotValue :: Expr v a
   }
@@ -870,84 +909,22 @@ data Expr (v :: [*]) a
   --
   -- https://docs.python.org/3/reference/expressions.html#generator-expressions
   | Generator
-  { _unsafeExprAnn :: Ann a
+  { _exprAnn :: Ann a
   , _generatorValue :: Comprehension Expr v a
   }
   -- | @await a@
   --
   -- https://docs.python.org/3/reference/expressions.html#await
   | Await
-  { _unsafeExprAnn :: Ann a
+  { _exprAnn :: Ann a
   , _unsafeAwaitWhitespace :: [Whitespace]
   , _unsafeAwaitValue :: Expr v a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
--- | Lens on the top-level annotation in an expression
-exprAnn :: Lens' (Expr v a) a
-exprAnn =
-  lens
-    (\case
-        Unit a _ _ -> getAnn a
-        Lambda a _ _ _ _ -> getAnn a
-        Yield a _ _ -> getAnn a
-        YieldFrom a _ _ _ -> getAnn a
-        Ternary a _ _ _ _ _ -> getAnn a
-        None a _ -> getAnn a
-        Ellipsis a _ -> getAnn a
-        List a _ _ _ -> getAnn a
-        ListComp a _ _ _ -> getAnn a
-        Deref a _ _ _ -> getAnn a
-        Subscript a _ _ _ _ -> getAnn a
-        Call a _ _ _ _ -> getAnn a
-        BinOp a _ _ _ -> getAnn a
-        UnOp a _ _ -> getAnn a
-        Parens a _ _ _ -> getAnn a
-        Ident a -> a ^. identAnn
-        Int a _ _ -> getAnn a
-        Float a _ _ -> getAnn a
-        Imag a _ _ -> getAnn a
-        Bool a _ _ -> getAnn a
-        String a _ -> getAnn a
-        Not a _ _ -> getAnn a
-        Tuple a _ _ _ -> getAnn a
-        DictComp a _ _ _ -> getAnn a
-        Dict a _ _ _ -> getAnn a
-        SetComp a _ _ _ -> getAnn a
-        Set a _ _ _ -> getAnn a
-        Generator a _ -> getAnn a
-        Await a _ _ -> getAnn a)
-    (\e ann ->
-      case e of
-        Unit _ a b -> Unit (Ann ann) a b
-        Lambda _ a b c d -> Lambda (Ann ann) a b c d
-        Yield _ a b -> Yield (Ann ann) a b
-        YieldFrom _ a b c -> YieldFrom (Ann ann) a b c
-        Ternary _ a b c d e -> Ternary (Ann ann) a b c d e
-        None _ a -> None (Ann ann) a
-        Ellipsis _ a -> Ellipsis (Ann ann) a
-        List _ a b c -> List (Ann ann) a b c
-        ListComp _ a b c -> ListComp (Ann ann) a b c
-        Deref _ a b c -> Deref (Ann ann) a b c
-        Subscript _ a b c d -> Subscript (Ann ann) a b c d
-        Call _ a b c d -> Call (Ann ann) a b c d
-        BinOp _ a b c -> BinOp (Ann ann) a b c
-        UnOp _ a b -> UnOp (Ann ann) a b
-        Parens _ a b c -> Parens (Ann ann) a b c
-        Ident a -> Ident $ a & identAnn .~ ann
-        Int _ a b -> Int (Ann ann) a b
-        Float _ a b -> Float (Ann ann) a b
-        Imag _ a b -> Imag (Ann ann) a b
-        Bool _ a b -> Bool (Ann ann) a b
-        String _ a -> String (Ann ann) a
-        Not _ a b -> Not (Ann ann) a b
-        Tuple _ a b c -> Tuple (Ann ann) a b c
-        DictComp _ a b c -> DictComp (Ann ann) a b c
-        Dict _ a b c -> Dict (Ann ann) a b c
-        SetComp _ a b c -> SetComp (Ann ann) a b c
-        Set _ a b c -> Set (Ann ann) a b c
-        Generator _ a -> Generator (Ann ann) a
-        Await _ a b -> Not (Ann ann) a b)
+instance HasAnn (Expr v) where
+  annot :: forall a. Lens' (Expr v a) (Ann a)
+  annot = typed @(Ann a)
 
 instance HasTrailingWhitespace (Expr v a) where
   trailingWhitespace =
@@ -969,7 +946,7 @@ instance HasTrailingWhitespace (Expr v a) where
           BinOp _ _ _ e -> e ^. trailingWhitespace
           UnOp _ _ e -> e ^. trailingWhitespace
           Parens _ _ _ ws -> ws
-          Ident a -> a ^. getting trailingWhitespace
+          Ident _ a -> a ^. getting trailingWhitespace
           Int _ _ ws -> ws
           Float _ _ ws -> ws
           Imag _ _ ws -> ws
@@ -1002,7 +979,7 @@ instance HasTrailingWhitespace (Expr v a) where
           BinOp a b c e -> BinOp a (coerce b) c (e & trailingWhitespace .~ ws)
           UnOp a b c -> UnOp a b (c & trailingWhitespace .~ ws)
           Parens a b c _ -> Parens a b (coerce c) ws
-          Ident a -> Ident $ a & trailingWhitespace .~ ws
+          Ident a b -> Ident a $ b & trailingWhitespace .~ ws
           Int a b _ -> Int a b ws
           Float a b _ -> Float a b ws
           Imag a b _ -> Imag a b ws
@@ -1020,22 +997,22 @@ instance HasTrailingWhitespace (Expr v a) where
           Await a b c -> Await a b (c & trailingWhitespace .~ ws))
 
 instance IsString (Expr '[] ()) where
-  fromString s = Ident $ MkIdent () s []
+  fromString s = Ident (Ann ()) $ MkIdent (Ann ()) s []
 
 instance Num (Expr '[] ()) where
   fromInteger n
-    | n >= 0 = Int (Ann ()) (IntLiteralDec () $ integralDecDigits n ^?! _Right) []
+    | n >= 0 = Int (Ann ()) (IntLiteralDec (Ann ()) $ integralDecDigits n ^?! _Right) []
     | otherwise =
         UnOp
           (Ann ())
-          (Negate () [])
-          (Int (Ann ()) (IntLiteralDec () $ integralDecDigits (-n) ^?! _Right) [])
+          (Negate (Ann ()) [])
+          (Int (Ann ()) (IntLiteralDec (Ann ()) $ integralDecDigits (-n) ^?! _Right) [])
 
-  negate = UnOp (Ann ()) (Negate () [])
+  negate = UnOp (Ann ()) (Negate (Ann ()) [])
 
-  (+) a = BinOp (Ann ()) (a & trailingWhitespace .~ [Space]) (Plus () [Space])
-  (*) a = BinOp (Ann ()) (a & trailingWhitespace .~ [Space]) (Multiply () [Space])
-  (-) a = BinOp (Ann ()) (a & trailingWhitespace .~ [Space]) (Minus () [Space])
+  (+) a = BinOp (Ann ()) (a & trailingWhitespace .~ [Space]) (Plus (Ann ()) [Space])
+  (*) a = BinOp (Ann ()) (a & trailingWhitespace .~ [Space]) (Multiply (Ann ()) [Space])
+  (-) a = BinOp (Ann ()) (a & trailingWhitespace .~ [Space]) (Minus (Ann ()) [Space])
   signum = undefined
   abs = undefined
 

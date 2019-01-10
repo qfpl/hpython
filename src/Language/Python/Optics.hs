@@ -77,12 +77,13 @@ where
 import Control.Lens.Getter ((^.), view)
 import Control.Lens.Iso (Iso', iso, from)
 import Control.Lens.Traversal (Traversal)
-import Control.Lens.Prism (Prism, prism)
+import Control.Lens.Prism (Choice, Prism, prism)
 
 import Language.Python.Optics.Idents
 import Language.Python.Optics.Indents
 import Language.Python.Optics.Newlines
 import Language.Python.Optics.Validated
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Statement
@@ -378,12 +379,21 @@ instance HasWith CompoundStatement where
 instance HasWith Statement where
   _With = _CompoundStatement._With
 
-_Ident :: Prism (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
+-- |
+-- A faux-Prism for matching on the @Ident@ constructor of an 'Expr'.
+--
+-- It's not a Prism because:
+--
+-- When 'Control.Lens.Fold.preview'ing, it discards the 'Expr'\'s annotation, and when
+-- 'Control.Lens.Review.review'ing, it re-constructs an annotation from the supplied 'Language.Python.Syntax.Ident.Ident'
+--
+-- @'_Ident' :: 'Prism' ('Expr' v a) ('Expr' '[] a) ('Ident' v a) ('Ident' '[] a)@
+_Ident :: (Choice p, Applicative f) => p (Ident v a) (f (Ident '[] a)) -> p (Expr v a) (f (Expr '[] a))
 _Ident =
   prism
-    Ident
+    (\i -> Ident (i ^. annot) i)
     (\case
-        Ident a -> Right a
+        Ident _ a -> Right a
         a -> Left $ a ^. unvalidated)
 
 -- | 'Traversal' targeting the variables that would modified as a result of an assignment
@@ -424,7 +434,7 @@ assignTargets f e =
   case e of
     List a b c d -> (\c' -> List a b c' d) <$> (traverse.traverse._Exprs.assignTargets) f c
     Parens a b c d -> (\c' -> Parens a b c' d) <$> assignTargets f c
-    Ident a -> Ident <$> f a
+    Ident a b -> Ident a <$> f b
     Tuple a b c d ->
       (\b' d' -> Tuple a b' c d') <$>
       (_Exprs.assignTargets) f b <*>

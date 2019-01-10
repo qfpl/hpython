@@ -22,7 +22,7 @@ import Language.Python.Syntax
 append_to :: Raw Statement
 append_to =
   CompoundStatement $
-  Fundef (Ann ()) [] (Indents [] ())
+  Fundef (Ann ()) [] (Indents [] (Ann ()))
     Nothing
     (Space :| [])
     "append_to"
@@ -35,13 +35,13 @@ append_to =
     (SuiteMany (Ann ()) (MkColon []) Nothing LF $
      Block []
      ( SmallStatement
-         (Indents [replicate 4 Space ^. from indentWhitespaces] ())
+         (Indents [replicate 4 Space ^. from indentWhitespaces] (Ann ()))
          (MkSmallStatement
           (Expr (Ann ()) $
            Call (Ann ())
-             (Deref (Ann ()) (Ident "to") [] "append")
+             (Deref (Ann ()) (Ident (Ann ()) "to") [] "append")
              []
-             (Just $ CommaSepOne1' (PositionalArg (Ann ()) (Ident "element")) Nothing)
+             (Just $ CommaSepOne1' (PositionalArg (Ann ()) (Ident (Ann ()) "element")) Nothing)
              [])
           []
           Nothing
@@ -50,9 +50,9 @@ append_to =
      )
      [ Right $
          SmallStatement
-           (Indents [replicate 4 Space ^. from indentWhitespaces] ())
+           (Indents [replicate 4 Space ^. from indentWhitespaces] (Ann ()))
            (MkSmallStatement
-            (Return (Ann ()) [Space] (Just $ Ident "to"))
+            (Return (Ann ()) [Space] (Just $ Ident (Ann ()) "to"))
             []
             Nothing
             Nothing

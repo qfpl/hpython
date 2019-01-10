@@ -1,4 +1,5 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language LambdaCase #-}
 
 {-|
@@ -14,21 +15,27 @@ Unary operators
 
 module Language.Python.Syntax.Operator.Unary where
 
-import Control.Lens.Lens (lens)
+import Control.Lens.Lens (Lens', lens)
+import Data.Generics.Product.Typed (typed)
 import GHC.Generics (Generic)
 
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Whitespace
 
 -- | An 'UnOp' is a unary operator in Python, such as @-@ for negation.
 -- An operator is stored with an annotation and its trailing whitespace.
 data UnOp a
   -- | @-a@
-  = Negate a [Whitespace]
+  = Negate (Ann a) [Whitespace]
   -- | @+a@
-  | Positive a [Whitespace]
+  | Positive (Ann a) [Whitespace]
   -- | @~a@
-  | Complement a [Whitespace]
+  | Complement (Ann a) [Whitespace]
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn UnOp where
+  annot :: forall a. Lens' (UnOp a) (Ann a)
+  annot = typed @(Ann a)
 
 instance HasTrailingWhitespace (UnOp a) where
   trailingWhitespace =

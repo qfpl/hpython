@@ -10,6 +10,7 @@ import Data.Function ((&))
 import Language.Python.DSL
 import Language.Python.Optics
 import Language.Python.Render (showExpr)
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.CommaSep (CommaSep(..))
 import Language.Python.Syntax.Punctuation (Comma(..))
 import Language.Python.Syntax.Whitespace (Whitespace(..), Indents(..))
@@ -254,7 +255,7 @@ prop_body_1 =
     let
       st = def_ "a" [] [line_ pass_]
 
-    st ^? _Fundef.fdIndents === Just (Indents [] ())
+    st ^? _Fundef.fdIndents === Just (Indents [] (Ann ()))
     over (_Fundef.body_) id st === st
 
 prop_body_2 :: Property

@@ -474,7 +474,7 @@ makeWrapped ''Line
 
 -- | Create a blank 'Line'
 blank_ :: Raw Line
-blank_ = Line $ Left (Blank () [] Nothing, LF)
+blank_ = Line $ Left (Blank (Ann ()) [] Nothing, LF)
 
 -- | Convert some data to a 'Line'
 class AsLine s where
@@ -482,11 +482,11 @@ class AsLine s where
 
 instance AsLine SmallStatement where
   line_ ss =
-    Line . Right $ SmallStatement (Indents [] ()) ss
+    Line . Right $ SmallStatement (Indents [] (Ann ())) ss
 
 instance AsLine SimpleStatement where
   line_ ss =
-    Line . Right . SmallStatement (Indents [] ()) $
+    Line . Right . SmallStatement (Indents [] (Ann ())) $
     MkSmallStatement ss [] Nothing Nothing (Just LF)
 
 instance AsLine CompoundStatement where
@@ -511,7 +511,7 @@ instance AsLine Statement where
   line_ = Line . Right
 
 instance AsLine Expr where
-  line_ e = line_ $ Expr (Ann $ e ^. exprAnn) e
+  line_ e = line_ $ Expr (e ^. annot) e
 
 instance HasExprs Line where
   _Exprs f (Line a) = Line <$> (_Right._Exprs) f a
@@ -724,7 +724,7 @@ mkBody_ gIndents gBody f e =
     -- spaces.
     defaultIndent =
       fromMaybe
-        (Indents [replicate 4 Space ^. from indentWhitespaces] ())
+        (Indents [replicate 4 Space ^. from indentWhitespaces] (Ann ()))
         (e ^? gIndents)
 
     -- | The number of indentation chunks that precede the lines we're focusing on.
@@ -893,7 +893,7 @@ mkFundef name body =
   MkFundef
   { _fdAnn = Ann ()
   , _fdDecorators = []
-  , _fdIndents = Indents [] ()
+  , _fdIndents = Indents [] (Ann ())
   , _fdAsync = Nothing
   , _fdDefSpaces = pure Space
   , _fdName = name
@@ -977,7 +977,7 @@ call_ expr args =
 return_ :: Raw Expr -> Raw Statement
 return_ e =
   SmallStatement
-    (Indents [] ())
+    (Indents [] (Ann ()))
     (MkSmallStatement (Return (Ann ()) [Space] $ Just e) [] Nothing Nothing (Just LF))
 
 -- | Turns an 'Expr' into a 'Statement'
@@ -987,7 +987,7 @@ return_ e =
 expr_ :: Raw Expr -> Raw Statement
 expr_ e =
   SmallStatement
-    (Indents [] ())
+    (Indents [] (Ann ()))
     (MkSmallStatement (Expr (Ann ()) e) [] Nothing Nothing (Just LF))
 
 -- |
@@ -1149,7 +1149,7 @@ mkBinOp bop a = BinOp (Ann ()) (a & trailingWhitespace .~ [Space]) (bop [Space])
 
 -- | @a is b@
 is_ :: Raw Expr -> Raw Expr -> Raw Expr
-is_ = mkBinOp $ Is ()
+is_ = mkBinOp $ Is (Ann ())
 infixl 1 `is_`
 
 -- |
@@ -1170,19 +1170,19 @@ infixl 1 `in_`
 --
 -- Does not have a precedence
 and_ :: Raw Expr -> Raw Expr -> Raw Expr
-and_ a = BinOp (Ann ()) (a & trailingWhitespace .~ [Space]) (BoolAnd () [Space])
+and_ a = BinOp (Ann ()) (a & trailingWhitespace .~ [Space]) (BoolAnd (Ann ()) [Space])
 
 -- | @a or b@
 --
 -- Does not have a precedence
 or_ :: Raw Expr -> Raw Expr -> Raw Expr
-or_ a = BinOp (Ann ()) (a & trailingWhitespace .~ [Space]) (BoolOr () [Space])
+or_ a = BinOp (Ann ()) (a & trailingWhitespace .~ [Space]) (BoolOr (Ann ()) [Space])
 
 -- |
 -- >>> var_ "a" `in_` var_ "b"
 -- a in b
 instance InSyntax Expr (Raw Expr) where
-  in_ = mkBinOp $ In ()
+  in_ = mkBinOp $ In (Ann ())
 
 -- | See 'for_'
 instance e ~ Raw Expr => InSyntax InList [e] where
@@ -1190,12 +1190,12 @@ instance e ~ Raw Expr => InSyntax InList [e] where
 
 -- | @a not in b@
 notIn_ :: Raw Expr -> Raw Expr -> Raw Expr
-notIn_ = mkBinOp $ NotIn () [Space]
+notIn_ = mkBinOp $ NotIn (Ann ()) [Space]
 infixl 1 `notIn_`
 
 -- | @a is not b@
 isNot_ :: Raw Expr -> Raw Expr -> Raw Expr
-isNot_ = mkBinOp $ IsNot () [Space]
+isNot_ = mkBinOp $ IsNot (Ann ()) [Space]
 infixl 1 `isNot_`
 
 -- | @not a@
@@ -1204,57 +1204,57 @@ not_ = Not (Ann ()) [Space]
 
 -- | @a == b@
 (.==) :: Raw Expr -> Raw Expr -> Raw Expr
-(.==) = mkBinOp $ Eq ()
+(.==) = mkBinOp $ Eq (Ann ())
 infixl 1 .==
 
 -- | @a < b@
 (.<) :: Raw Expr -> Raw Expr -> Raw Expr
-(.<) = mkBinOp $ Lt ()
+(.<) = mkBinOp $ Lt (Ann ())
 infixl 1 .<
 
 -- | @a <= b@
 (.<=) :: Raw Expr -> Raw Expr -> Raw Expr
-(.<=) = mkBinOp $ LtEq ()
+(.<=) = mkBinOp $ LtEq (Ann ())
 infixl 1 .<=
 
 -- | @a > b@
 (.>) :: Raw Expr -> Raw Expr -> Raw Expr
-(.>) = mkBinOp $ Gt ()
+(.>) = mkBinOp $ Gt (Ann ())
 infixl 1 .>
 
 -- | @a >= b@
 (.>=) :: Raw Expr -> Raw Expr -> Raw Expr
-(.>=) = mkBinOp $ GtEq ()
+(.>=) = mkBinOp $ GtEq (Ann ())
 infixl 1 .>=
 
 -- | @a != b@
 (.!=) :: Raw Expr -> Raw Expr -> Raw Expr
-(.!=) = mkBinOp $ NotEq ()
+(.!=) = mkBinOp $ NotEq (Ann ())
 infixl 1 .!=
 
 -- | @a | b@
 (.|) :: Raw Expr -> Raw Expr -> Raw Expr
-(.|) = mkBinOp $ BitOr ()
+(.|) = mkBinOp $ BitOr (Ann ())
 infixl 2 .|
 
 -- | @a ^ b@
 (.^) :: Raw Expr -> Raw Expr -> Raw Expr
-(.^) = mkBinOp $ BitXor ()
+(.^) = mkBinOp $ BitXor (Ann ())
 infixl 3 .^
 
 -- | @a & b@
 (.&) :: Raw Expr -> Raw Expr -> Raw Expr 
-(.&) = mkBinOp $ BitAnd ()
+(.&) = mkBinOp $ BitAnd (Ann ())
 infixl 4 .&
 
 -- | @a << b@
 (.<<) :: Raw Expr -> Raw Expr -> Raw Expr 
-(.<<) = mkBinOp $ ShiftLeft ()
+(.<<) = mkBinOp $ ShiftLeft (Ann ())
 infixl 5 .<<
 
 -- | @a >> b@
 (.>>) :: Raw Expr -> Raw Expr -> Raw Expr 
-(.>>) = mkBinOp $ ShiftRight ()
+(.>>) = mkBinOp $ ShiftRight (Ann ())
 infixl 5 .>>
 
 -- | @a + b@
@@ -1274,27 +1274,27 @@ infixl 7 .*
 
 -- | @a \@ b@
 (.@) :: Raw Expr -> Raw Expr -> Raw Expr
-(.@) = mkBinOp $ At ()
+(.@) = mkBinOp $ At (Ann ())
 infixl 7 .@
 
 -- | @a / b@
 (./) :: Raw Expr -> Raw Expr -> Raw Expr
-(./) = mkBinOp $ Divide ()
+(./) = mkBinOp $ Divide (Ann ())
 infixl 7 ./
 
 -- | @a // b@
 (.//) :: Raw Expr -> Raw Expr -> Raw Expr
-(.//) = mkBinOp $ FloorDivide ()
+(.//) = mkBinOp $ FloorDivide (Ann ())
 infixl 7 .//
 
 -- | @a % b@
 (.%) :: Raw Expr -> Raw Expr -> Raw Expr
-(.%) = mkBinOp $ Percent ()
+(.%) = mkBinOp $ Percent (Ann ())
 infixl 7 .%
 
 -- | @a ** b@
 (.**) :: Raw Expr -> Raw Expr -> Raw Expr
-(.**) = mkBinOp $ Exp ()
+(.**) = mkBinOp $ Exp (Ann ())
 infixr 8 .**
 
 -- |
@@ -1310,11 +1310,11 @@ neg_ = negate
 
 -- | @+a@
 pos_ :: Raw Expr -> Raw Expr
-pos_ = UnOp (Ann ()) (Positive () [])
+pos_ = UnOp (Ann ()) (Positive (Ann ()) [])
 
 -- | @~a@
 compl_ :: Raw Expr -> Raw Expr
-compl_ = UnOp (Ann ()) (Complement () [])
+compl_ = UnOp (Ann ()) (Complement (Ann ()) [])
 
 -- | Convert a list of 'Line's to a 'Block', giving them 4 spaces of indentation
 linesToBlockIndented :: [Raw Line] -> Raw Block
@@ -1349,7 +1349,7 @@ mkWhile :: Raw Expr -> [Raw Line] -> Raw While
 mkWhile cond body =
   MkWhile
   { _whileAnn = Ann ()
-  , _whileIndents = Indents [] ()
+  , _whileIndents = Indents [] (Ann ())
   , _whileWhile = [Space]
   , _whileCond = cond
   , _whileBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
@@ -1364,7 +1364,7 @@ mkIf :: Raw Expr -> [Raw Line] -> Raw If
 mkIf cond body =
   MkIf
   { _ifAnn = Ann ()
-  , _ifIndents = Indents [] ()
+  , _ifIndents = Indents [] (Ann ())
   , _ifIf = [Space]
   , _ifCond = cond
   , _ifBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
@@ -1397,7 +1397,7 @@ ifThen_ :: Raw Expr -> [Raw Line] -> Raw If
 ifThen_ = mkIf
 
 var_ :: String -> Raw Expr
-var_ s = Ident $ MkIdent () s []
+var_ s = Ident (Ann ()) $ MkIdent (Ann ()) s []
 
 -- |
 -- >>> none_
@@ -1419,14 +1419,14 @@ int_ = fromInteger
 pass_ :: Raw Statement
 pass_ =
   SmallStatement
-    (Indents [] ())
+    (Indents [] (Ann ()))
     (MkSmallStatement (Pass (Ann ()) []) [] Nothing Nothing (Just LF))
 
 -- | Create a minimal valid 'Elif'
 mkElif :: Raw Expr -> [Raw Line] -> Raw Elif
 mkElif cond body =
   MkElif
-  { _elifIndents = Indents [] ()
+  { _elifIndents = Indents [] (Ann ())
   , _elifElif = [Space]
   , _elifCond = cond
   , _elifBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
@@ -1439,7 +1439,7 @@ elif_ cond body code = code & ifElifs <>~ [mkElif cond body]
 mkElse :: [Raw Line] -> Raw Else
 mkElse body =
   MkElse
-  { _elseIndents = Indents [] ()
+  { _elseIndents = Indents [] (Ann ())
   , _elseElse = []
   , _elseBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   }
@@ -1495,7 +1495,7 @@ instance ElseSyntax TryExcept where
 break_ :: Raw Statement
 break_ =
   SmallStatement
-    (Indents [] ())
+    (Indents [] (Ann ()))
     (MkSmallStatement (Break (Ann ()) []) [] Nothing Nothing (Just LF))
 
 -- |
@@ -1517,7 +1517,7 @@ false_ = Bool (Ann ()) False []
 str_ :: String -> Raw Expr
 str_ s =
   String (Ann ()) . pure $
-  StringLiteral () Nothing ShortString DoubleQuote (Char_lit <$> s) []
+  StringLiteral (Ann ()) Nothing ShortString DoubleQuote (Char_lit <$> s) []
 
 -- | Single-quoted string
 --
@@ -1526,7 +1526,7 @@ str_ s =
 str'_ :: String -> Raw Expr
 str'_ s =
   String (Ann ()) . pure $
-  StringLiteral () Nothing ShortString SingleQuote (Char_lit <$> s) []
+  StringLiteral (Ann ()) Nothing ShortString SingleQuote (Char_lit <$> s) []
 
 -- | Long double-quoted string
 --
@@ -1535,7 +1535,7 @@ str'_ s =
 longStr_ :: String -> Raw Expr
 longStr_ s =
   String (Ann ()) . pure $
-  StringLiteral () Nothing LongString DoubleQuote (Char_lit <$> s) []
+  StringLiteral (Ann ()) Nothing LongString DoubleQuote (Char_lit <$> s) []
 
 -- | Long single-quoted string
 --
@@ -1544,14 +1544,17 @@ longStr_ s =
 longStr'_ :: String -> Raw Expr
 longStr'_ s =
   String (Ann ()) . pure $
-  StringLiteral () Nothing LongString SingleQuote (Char_lit <$> s) []
+  StringLiteral (Ann ()) Nothing LongString SingleQuote (Char_lit <$> s) []
 
 mkAugAssign :: AugAssignOp -> Raw Expr -> Raw Expr -> Raw Statement
 mkAugAssign at a b =
   SmallStatement
-    (Indents [] ())
+    (Indents [] (Ann ()))
     (MkSmallStatement
-       (AugAssign (Ann ()) (a & trailingWhitespace .~ [Space]) (MkAugAssign at () [Space]) b)
+       (AugAssign
+          (Ann ())
+          (a & trailingWhitespace .~ [Space])
+          (MkAugAssign (Ann ()) at [Space]) b)
        []
        Nothing
        Nothing
@@ -1568,7 +1571,7 @@ chainEq :: Raw Expr -> [Raw Expr] -> Raw Statement
 chainEq t [] = expr_ t
 chainEq t (a:as) =
   SmallStatement
-    (Indents [] ())
+    (Indents [] (Ann ()))
     (MkSmallStatement
        (Assign (Ann ()) t $ (,) (MkEquals [Space]) <$> (a :| as))
        []
@@ -1580,7 +1583,7 @@ chainEq t (a:as) =
 (.=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.=) a b =
   SmallStatement
-    (Indents [] ())
+    (Indents [] (Ann ()))
     (MkSmallStatement
        (Assign (Ann ()) (a & trailingWhitespace .~ [Space]) $ pure (MkEquals [Space], b))
        []
@@ -1658,7 +1661,7 @@ mkFor :: Raw Expr -> [Raw Expr] -> [Raw Line] -> Raw For
 mkFor binder collection body =
   MkFor
   { _forAnn = Ann ()
-  , _forIndents = Indents [] ()
+  , _forIndents = Indents [] (Ann ())
   , _forAsync = Nothing
   , _forFor = [Space]
   , _forBinder = binder & trailingWhitespace .~ [Space]
@@ -1703,7 +1706,7 @@ instance AsyncSyntax For where
 mkFinally :: [Raw Line] -> Raw Finally
 mkFinally body =
   MkFinally
-  { _finallyIndents = Indents [] ()
+  { _finallyIndents = Indents [] (Ann ())
   , _finallyFinally = []
   , _finallyBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   }
@@ -1712,7 +1715,7 @@ mkFinally body =
 mkExcept :: [Raw Line] -> Raw Except
 mkExcept body =
   MkExcept
-  { _exceptIndents = Indents [] ()
+  { _exceptIndents = Indents [] (Ann ())
   , _exceptExcept = []
   , _exceptExceptAs = Nothing
   , _exceptBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
@@ -1723,7 +1726,7 @@ mkTryExcept :: [Raw Line] -> Raw Except -> Raw TryExcept
 mkTryExcept body except =
   MkTryExcept
   { _teAnn = Ann ()
-  , _teIndents = Indents [] ()
+  , _teIndents = Indents [] (Ann ())
   , _teTry = [Space]
   , _teBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   , _teExcepts = pure except
@@ -1736,7 +1739,7 @@ mkTryFinally :: [Raw Line] -> [Raw Line] -> Raw TryFinally
 mkTryFinally body fBody =
   MkTryFinally
   { _tfAnn = Ann ()
-  , _tfIndents = Indents [] ()
+  , _tfIndents = Indents [] (Ann ())
   , _tfTry = [Space]
   , _tfBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   , _tfFinally = mkFinally fBody
@@ -1937,7 +1940,7 @@ mkClassDef name body =
   MkClassDef
   { _cdAnn = Ann ()
   , _cdDecorators = []
-  , _cdIndents = Indents [] ()
+  , _cdIndents = Indents [] (Ann ())
   , _cdClass = Space :| []
   , _cdName = name
   , _cdArguments = Nothing
@@ -1974,7 +1977,7 @@ mkWith :: NonEmpty (Raw WithItem) -> [Raw Line] -> Raw With
 mkWith items body =
   MkWith
   { _withAnn = Ann ()
-  , _withIndents = Indents [] ()
+  , _withIndents = Indents [] (Ann ())
   , _withAsync = Nothing
   , _withWith = [Space]
   , _withItems = listToCommaSep1 items

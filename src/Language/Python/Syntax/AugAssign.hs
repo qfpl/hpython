@@ -1,4 +1,5 @@
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 
 {-|
 Module      : Language.Python.Syntax.AugAssign
@@ -11,8 +12,11 @@ Portability : non-portable
 
 module Language.Python.Syntax.AugAssign where
 
-import Control.Lens.Lens (lens)
+import Control.Lens.Lens (Lens', lens)
+import Data.Generics.Product.Typed (typed)
+import GHC.Generics
 
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Whitespace
 
 -- | Augmented assignments (PEP 203), such as:
@@ -31,11 +35,15 @@ import Language.Python.Syntax.Whitespace
 -- optional annotation, which can simply be @()@ if no annotation is desired.
 data AugAssign a
   = MkAugAssign
-  { _augAssignType :: AugAssignOp
-  , _augAssignAnn :: a
+  { _augAssignAnn :: Ann a
+  , _augAssignType :: AugAssignOp
   , _augAssignWhitespace :: [Whitespace]
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn AugAssign where
+  annot :: forall a. Lens' (AugAssign a) (Ann a)
+  annot = typed @(Ann a)
 
 instance HasTrailingWhitespace (AugAssign a) where
   trailingWhitespace =

@@ -1,4 +1,5 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language OverloadedStrings #-}
 {-# language LambdaCase #-}
 {-# language TemplateHaskell #-}
@@ -48,14 +49,16 @@ module Language.Python.Syntax.Strings
   )
 where
 
-import Control.Lens.Lens (lens)
+import Control.Lens.Lens (Lens', lens)
 import Control.Lens.TH (makeLensesFor)
 import Data.Digit.Octal (OctDigit)
 import Data.Digit.Hexadecimal.MixedCase (HeXDigit(..))
+import Data.Generics.Product.Typed (typed)
 import Data.Maybe (isJust)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Whitespace
 
 -- | Double or single quotation marks?
@@ -132,7 +135,7 @@ hasPrefix BytesLiteral{} = True
 -- trailing whitespace.
 data StringLiteral a
   = RawStringLiteral
-  { _stringLiteralAnn :: a
+  { _stringLiteralAnn :: Ann a
   , _unsafeRawStringLiteralPrefix :: RawStringPrefix
   , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
@@ -140,7 +143,7 @@ data StringLiteral a
   , _stringLiteralWhitespace :: [Whitespace]
   }
   | StringLiteral
-  { _stringLiteralAnn :: a
+  { _stringLiteralAnn :: Ann a
   , _unsafeStringLiteralPrefix :: Maybe StringPrefix
   , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
@@ -148,7 +151,7 @@ data StringLiteral a
   , _stringLiteralWhitespace :: [Whitespace]
   }
   | RawBytesLiteral
-  { _stringLiteralAnn :: a
+  { _stringLiteralAnn :: Ann a
   , _unsafeRawBytesLiteralPrefix :: RawBytesPrefix
   , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
@@ -156,7 +159,7 @@ data StringLiteral a
   , _stringLiteralWhitespace :: [Whitespace]
   }
   | BytesLiteral
-  { _stringLiteralAnn :: a
+  { _stringLiteralAnn :: Ann a
   , _unsafeBytesLiteralPrefix :: BytesPrefix
   , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
@@ -164,6 +167,10 @@ data StringLiteral a
   , _stringLiteralWhitespace :: [Whitespace]
   }
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn StringLiteral where
+  annot :: forall a. Lens' (StringLiteral a) (Ann a)
+  annot = typed @(Ann a)
 
 instance HasTrailingWhitespace (StringLiteral a) where
   trailingWhitespace =

@@ -50,6 +50,7 @@ import Language.Python.Internal.Parse
   )
 import Language.Python.Internal.Syntax.IR (AsIRError)
 import Language.Python.Parse.Error
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Expr (Expr)
 import Language.Python.Syntax.Module (Module)
 import Language.Python.Syntax.Statement (Statement)
@@ -103,7 +104,7 @@ parseStatement fp input =
   in
     fromEither (first pure ir) `bindValidation` IR.fromIR_statement
   where
-    tlIndent = level <|> withSrcInfo (pure $ Indents [])
+    tlIndent = level <|> withSrcInfo (pure $ Indents [] . Ann)
 
 -- | Parse an expression list (unparenthesised tuple)
 --

@@ -13,9 +13,11 @@ Portability : non-portable
 
 module Language.Python.Internal.Token where
 
+import Control.Lens.Getter ((^.))
 import Data.Deriving (deriveEq1, deriveOrd1)
 import Data.Functor.Classes (liftCompare, liftEq)
 
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Comment (Comment(..))
 import Language.Python.Syntax.Numbers
 import Language.Python.Syntax.Strings
@@ -177,9 +179,9 @@ pyTokenAnn tk =
     TkElif a -> a
     TkWhile a -> a
     TkAssert a -> a
-    TkInt a -> _intLiteralAnn a
-    TkFloat a -> _floatLiteralAnn a
-    TkImag a -> _imagLiteralAnn a
+    TkInt a -> a ^. annot_
+    TkFloat a -> a ^. annot_
+    TkImag a -> a ^. annot_
     TkIdent _ a -> a
     TkString _ _ _ _ a -> a
     TkBytes _ _ _ _ a -> a
@@ -206,7 +208,7 @@ pyTokenAnn tk =
     TkSemicolon a -> a
     TkComma a -> a
     TkDot a -> a
-    TkComment a -> _commentAnn a
+    TkComment a -> a ^. annot_
     TkStar a -> a
     TkDoubleStar a -> a
     TkSlash a -> a

@@ -291,7 +291,7 @@ prop_fulltrip_26 =
           showExpr $
           String (Ann ())
             (pure $
-             RawBytesLiteral ()
+             RawBytesLiteral (Ann ())
                Prefix_br
                LongString
                SingleQuote
@@ -309,7 +309,7 @@ prop_fulltrip_27 =
           showExpr $
           String (Ann ())
             (pure $
-             RawStringLiteral ()
+             RawStringLiteral (Ann ())
                Prefix_r
                LongString
                SingleQuote
@@ -327,7 +327,7 @@ prop_fulltrip_28 =
           showExpr $
           String (Ann ())
             (pure $
-             RawStringLiteral ()
+             RawStringLiteral (Ann ())
                Prefix_r
                ShortString
                DoubleQuote
@@ -345,7 +345,7 @@ prop_fulltrip_29 =
           showExpr $
           String (Ann ())
             (pure $
-             RawStringLiteral ()
+             RawStringLiteral (Ann ())
                Prefix_r
                ShortString
                DoubleQuote
@@ -363,7 +363,7 @@ prop_fulltrip_30 =
           showExpr $
           String (Ann ())
             (pure $
-             RawStringLiteral ()
+             RawStringLiteral (Ann ())
                Prefix_r
                ShortString
                DoubleQuote
@@ -388,7 +388,7 @@ prop_fulltrip_32 =
           showExpr $
           String (Ann ())
             (pure $
-             RawStringLiteral ()
+             RawStringLiteral (Ann ())
                Prefix_r
                LongString
                DoubleQuote
@@ -406,7 +406,7 @@ prop_fulltrip_33 =
           showExpr $
           String (Ann ())
             (pure $
-             RawStringLiteral ()
+             RawStringLiteral (Ann ())
                Prefix_r
                LongString
                DoubleQuote
@@ -424,7 +424,7 @@ prop_fulltrip_34 =
           showExpr $
           String (Ann ())
             (pure $
-             RawStringLiteral ()
+             RawStringLiteral (Ann ())
                Prefix_r
                LongString
                DoubleQuote
@@ -442,7 +442,7 @@ prop_fulltrip_35 =
           showExpr $
           String (Ann ())
             (pure $
-             RawStringLiteral ()
+             RawStringLiteral (Ann ())
                Prefix_r
                LongString
                DoubleQuote
@@ -462,7 +462,7 @@ prop_fulltrip_36 =
     let str =
           showExpr $
           String (Ann ())
-            (RawStringLiteral ()
+            (RawStringLiteral (Ann ())
                Prefix_r
                LongString
                SingleQuote
@@ -486,7 +486,7 @@ prop_fulltrip_38 =
     let str =
           showExpr $
           String (Ann ())
-            (RawStringLiteral ()
+            (RawStringLiteral (Ann ())
                Prefix_r
                LongString
                SingleQuote
@@ -534,7 +534,7 @@ prop_fulltrip_43 =
         { _unsafeExprAnn = Ann ()
         , _unsafeYieldWhitespace = [Space]
         , _unsafeYieldValue =
-            CommaSepMany (Ident (MkIdent () "a" [])) (MkComma [Space]) $
+            CommaSepMany (Ident (Ann ()) (MkIdent (Ann ()) "a" [])) (MkComma [Space]) $
             CommaSepMany (tuple_ [ti_ $ var_ "b"]) (MkComma []) $
             CommaSepNone
         }

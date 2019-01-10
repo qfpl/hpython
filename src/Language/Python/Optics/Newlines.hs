@@ -389,7 +389,7 @@ instance HasNewlines (Expr v a) where
             _Newlines fun b <*>
             go c <*>
             _Newlines fun d
-          Ident a -> Ident <$> _Newlines fun a
+          Ident a b -> Ident a <$> _Newlines fun b
           Int a b c -> Int a b <$> _Newlines fun c
           Float a b c -> Float a b <$> _Newlines fun c
           Imag a b c -> Imag a b <$> _Newlines fun c

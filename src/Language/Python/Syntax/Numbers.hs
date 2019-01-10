@@ -1,4 +1,5 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language LambdaCase #-}
 {-# language TemplateHaskell #-}
 
@@ -30,6 +31,7 @@ module Language.Python.Syntax.Numbers
   )
 where
 
+import Control.Lens.Lens (Lens')
 import Control.Lens.Review ((#))
 import Data.Deriving (deriveEq1, deriveOrd1)
 import Data.Digit.Binary (BinDigit)
@@ -37,6 +39,7 @@ import Data.Digit.Char (charHeXaDeCiMaL, charOctal, charBinary, charDecimal)
 import Data.Digit.Octal (OctDigit)
 import Data.Digit.Decimal (DecDigit)
 import Data.Digit.Hexadecimal.MixedCase (HeXDigit)
+import Data.Generics.Product.Typed (typed)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Semigroup ((<>))
 import Data.Text (Text)
@@ -45,6 +48,8 @@ import GHC.Generics (Generic)
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
+
+import Language.Python.Syntax.Ann
 
 -- | An integer literal value.
 --
@@ -60,14 +65,14 @@ data IntLiteral a
   --
   -- @1234@
   = IntLiteralDec
-  { _intLiteralAnn :: a
+  { _intLiteralAnn :: Ann a
   , _unsafeIntLiteralDecValue :: NonEmpty DecDigit
   }
   -- | Binary
   --
   -- @0b10110@
   | IntLiteralBin
-  { _intLiteralAnn :: a
+  { _intLiteralAnn :: Ann a
   , _unsafeIntLiteralBinUppercase :: Bool
   , _unsafeIntLiteralBinValue :: NonEmpty BinDigit
   }
@@ -75,7 +80,7 @@ data IntLiteral a
   --
   -- @0o1367@
   | IntLiteralOct
-  { _intLiteralAnn :: a
+  { _intLiteralAnn :: Ann a
   , _unsafeIntLiteralOctUppercase :: Bool
   , _unsafeIntLiteralOctValue :: NonEmpty OctDigit
   }
@@ -83,13 +88,17 @@ data IntLiteral a
   --
   -- @0x18B4f@
   | IntLiteralHex
-  { _intLiteralAnn :: a
+  { _intLiteralAnn :: Ann a
   , _unsafeIntLiteralHexUppercase :: Bool
   , _unsafeIntLiteralHexValue :: NonEmpty HeXDigit
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 deriveEq1 ''IntLiteral
 deriveOrd1 ''IntLiteral
+
+instance HasAnn IntLiteral where
+  annot :: forall a. Lens' (IntLiteral a) (Ann a)
+  annot = typed @(Ann a)
 
 -- | Positive or negative, as in @-7@
 data Sign = Pos | Neg deriving (Eq, Ord, Show, Generic)
@@ -120,7 +129,7 @@ data FloatLiteral a
   --
   -- @12.34e56@
   = FloatLiteralFull
-  { _floatLiteralAnn :: a
+  { _floatLiteralAnn :: Ann a
   , _floatLiteralFullLeft :: NonEmpty DecDigit
   , _floatLiteralFullRight
       :: Maybe (These (NonEmpty DecDigit) FloatExponent)
@@ -131,7 +140,7 @@ data FloatLiteral a
   --
   -- @.12e34@
   | FloatLiteralPoint
-  { _floatLiteralAnn :: a
+  { _floatLiteralAnn :: Ann a
   -- . [0-9]+
   , _floatLiteralPointRight :: NonEmpty DecDigit
   -- [ 'e' ['-' | '+'] [0-9]+ ]
@@ -141,7 +150,7 @@ data FloatLiteral a
   --
   -- @12e34@
   | FloatLiteralWhole
-  { _floatLiteralAnn :: a
+  { _floatLiteralAnn :: Ann a
   -- [0-9]+
   , _floatLiteralWholeRight :: NonEmpty DecDigit
   -- [ 'e' ['-' | '+'] [0-9]+ ]
@@ -151,6 +160,10 @@ data FloatLiteral a
 deriveEq1 ''FloatLiteral
 deriveOrd1 ''FloatLiteral
 
+instance HasAnn FloatLiteral where
+  annot :: forall a. Lens' (FloatLiteral a) (Ann a)
+  annot = typed @(Ann a)
+
 -- | Imaginary number literals
 --
 -- See <https://docs.python.org/3.5/reference/lexical_analysis.html#imaginary-literals>
@@ -159,7 +172,7 @@ data ImagLiteral a
   --
   -- @12j@
   = ImagLiteralInt
-  { _imagLiteralAnn :: a
+  { _imagLiteralAnn :: Ann a
   , _unsafeImagLiteralIntValue :: NonEmpty DecDigit
   , _imagLiteralUppercase :: Bool
   }
@@ -171,13 +184,17 @@ data ImagLiteral a
   --
   -- @.3j@
   | ImagLiteralFloat
-  { _imagLiteralAnn :: a
+  { _imagLiteralAnn :: Ann a
   , _unsafeImagLiteralFloatValue :: FloatLiteral a
   , _imagLiteralUppercase :: Bool
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 deriveEq1 ''ImagLiteral
 deriveOrd1 ''ImagLiteral
+
+instance HasAnn ImagLiteral where
+  annot :: forall a. Lens' (ImagLiteral a) (Ann a)
+  annot = typed @(Ann a)
 
 showIntLiteral :: IntLiteral a -> Text
 showIntLiteral (IntLiteralDec _ n) =

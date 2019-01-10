@@ -54,7 +54,7 @@ initialGenState =
   , _inLoop = False
   , _inClass = False
   , _inFinally = False
-  , _currentIndentation = Indents [] ()
+  , _currentIndentation = Indents [] (Ann ())
   }
 
 data GenState
@@ -91,7 +91,7 @@ localState m = do
 
 genBlank :: MonadGen m => m (Blank ())
 genBlank =
-  Blank () <$>
+  Blank (Ann ()) <$>
   Gen.list (Range.constant 0 10) (Gen.element [Space, Tab]) <*>
   Gen.maybe genComment
 
@@ -101,7 +101,7 @@ genIdent = do
   let reserved = reservedWords <> (if isAsync then ["async", "await"] else [])
   Gen.filter
     (\i -> not $ any (`isPrefixOf` _identValue i) reserved) $
-    MkIdent () <$>
+    MkIdent (Ann ()) <$>
     liftA2 (:)
       (Gen.choice [Gen.alpha, pure '_'])
       (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_'])) <*>
@@ -474,13 +474,13 @@ genExpr = genExpr' False
 genRawStringLiteral :: MonadGen m => m (StringLiteral ())
 genRawStringLiteral =
   Gen.choice
-  [ RawStringLiteral () <$>
+  [ RawStringLiteral (Ann ()) <$>
     genRawStringPrefix <*>
     pure LongString <*>
     genQuoteType <*>
     Gen.list (Range.constant 0 100) (genPyChar $ Gen.filter (/='\0') Gen.latin1)<*>
     genWhitespaces
-  , RawStringLiteral () <$>
+  , RawStringLiteral (Ann ()) <$>
     genRawStringPrefix <*>
     pure ShortString <*>
     genQuoteType <*>
@@ -493,13 +493,13 @@ genRawStringLiteral =
 genRawBytesLiteral :: MonadGen m => m (StringLiteral ())
 genRawBytesLiteral =
   Gen.choice
-  [ RawBytesLiteral () <$>
+  [ RawBytesLiteral (Ann ()) <$>
     genRawBytesPrefix <*>
     pure LongString <*>
     genQuoteType <*>
     Gen.list (Range.constant 0 100) (genPyChar $ Gen.filter (/='\0') Gen.latin1) <*>
     genWhitespaces
-  , RawBytesLiteral () <$>
+  , RawBytesLiteral (Ann ()) <$>
     genRawBytesPrefix <*>
     pure ShortString <*>
     genQuoteType <*>
@@ -544,7 +544,7 @@ genExpr' isExp = do
     , if isExp then genSmallInt else genInt
     , if isExp then genSmallFloat else genFloat
     , genImag
-    , Ident <$> genIdent
+    , Ident (Ann ()) <$> genIdent
     , genStringLiterals
     ]
     ([ genList genExpr
@@ -633,7 +633,7 @@ genSubscript =
 genDeletable :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genDeletable =
   sizedRecursive
-    [ Ident <$> genIdent
+    [ Ident (Ann ()) <$> genIdent
     ]
     [ genDeletableList genDeletable
     , genParens genDeletable
@@ -645,7 +645,7 @@ genDeletable =
 genAssignable :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genAssignable =
   sizedRecursive
-    [ Ident <$> genIdent
+    [ Ident (Ann ()) <$> genIdent
     ]
     [ genParens genAssignable
     , genAssignableList
@@ -657,7 +657,7 @@ genAssignable =
 genAugAssignable :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
 genAugAssignable =
   sizedRecursive
-    [ Ident <$> genIdent ]
+    [ Ident (Ann ()) <$> genIdent ]
     [ genDeref
     , genSubscript
     ]
@@ -717,7 +717,7 @@ genSimpleStatement = do
          nonlocals <- use currentNonlocals
          Nonlocal (Ann ()) <$>
            genWhitespaces1 <*>
-           genSizedCommaSep1 (Gen.element $ MkIdent () <$> nonlocals <*> pure [])
+           genSizedCommaSep1 (Gen.element $ MkIdent (Ann ()) <$> nonlocals <*> pure [])
      | isJust (_inFunction ctxt) && not (null nonlocals)
      ] ++
      [ Return (Ann ()) <$>
@@ -738,7 +738,7 @@ genDecorator =
   where
     genDecoratorValue =
       Gen.choice
-      [ Ident <$> genIdent
+      [ Ident (Ann()) <$> genIdent
       , sized2M
          (\a b -> (\ws1 -> Call (Ann ()) a ws1 b) <$> genWhitespaces <*> genWhitespaces)
          genDerefs
@@ -747,7 +747,7 @@ genDecorator =
 
     genDerefs =
       sizedRecursive
-      [ Ident <$> genIdent ]
+      [ Ident (Ann ()) <$> genIdent ]
       [ Deref (Ann ()) <$>
         genDerefs <*>
         genWhitespaces <*>

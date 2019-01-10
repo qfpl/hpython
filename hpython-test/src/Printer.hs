@@ -24,32 +24,32 @@ prop_printer_1 =
     let
       e1 =
         String (Ann ()) $
-        StringLiteral () Nothing ShortString SingleQuote [] [] :|
-        [StringLiteral () Nothing ShortString SingleQuote [] []]
+        StringLiteral (Ann ()) Nothing ShortString SingleQuote [] [] :|
+        [StringLiteral (Ann ()) Nothing ShortString SingleQuote [] []]
 
     showExpr e1 === "'' ''"
 
     let
       e2 =
         String (Ann ()) $
-        StringLiteral () Nothing ShortString DoubleQuote [] [] :|
-        [StringLiteral () Nothing ShortString DoubleQuote [] []]
+        StringLiteral (Ann ()) Nothing ShortString DoubleQuote [] [] :|
+        [StringLiteral (Ann ()) Nothing ShortString DoubleQuote [] []]
 
     showExpr e2 === "\"\" \"\""
 
     let
       e3 =
         String (Ann ()) $
-        StringLiteral () Nothing ShortString SingleQuote [] [] :|
-        [StringLiteral () Nothing ShortString DoubleQuote [] []]
+        StringLiteral (Ann ()) Nothing ShortString SingleQuote [] [] :|
+        [StringLiteral (Ann ()) Nothing ShortString DoubleQuote [] []]
 
     showExpr e3 === "''\"\""
 
     let
       e4 =
         String (Ann ()) $
-        StringLiteral () Nothing ShortString SingleQuote [] [] :|
-        [StringLiteral () (Just Prefix_u) ShortString SingleQuote [] []]
+        StringLiteral (Ann ()) Nothing ShortString SingleQuote [] [] :|
+        [StringLiteral (Ann ()) (Just Prefix_u) ShortString SingleQuote [] []]
 
     showExpr e4 === "''u''"
 
@@ -120,7 +120,7 @@ prop_printer_6 =
       s = [Char_lit '\\', Char_esc_bslash]
       e =
         String (Ann ()) $
-        RawBytesLiteral () Prefix_br ShortString SingleQuote s [] :|
+        RawBytesLiteral (Ann ()) Prefix_br ShortString SingleQuote s [] :|
         []
 
     correctBackslashes s === [Char_esc_bslash, Char_esc_bslash]
@@ -133,7 +133,7 @@ prop_printer_7 =
       s = [Char_newline, Char_lit '\\', Char_esc_doublequote]
       e =
         String (Ann ()) $
-        StringLiteral () Nothing ShortString DoubleQuote s [] :|
+        StringLiteral (Ann ()) Nothing ShortString DoubleQuote s [] :|
         []
 
     showExpr e === "\"\\newline\\\\\\\"\""

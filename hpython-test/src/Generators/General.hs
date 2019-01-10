@@ -26,7 +26,7 @@ import Generators.Common
 import Generators.Sized
 
 genBlank :: MonadGen m => m (Blank ())
-genBlank = Blank () <$> genWhitespaces <*> Gen.maybe genComment
+genBlank = Blank (Ann ()) <$> genWhitespaces <*> Gen.maybe genComment
 
 genTuple :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
 genTuple expr =
@@ -68,7 +68,7 @@ genArg genExpr =
 
 genIdent :: MonadGen m => m (Ident '[] ())
 genIdent =
-  MkIdent () <$>
+  MkIdent (Ann ()) <$>
   liftA2 (:)
     (Gen.choice [Gen.alpha, pure '_'])
     (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_'])) <*>
@@ -182,13 +182,13 @@ genPyChar' = genPyChar Gen.unicode
 genRawStringLiteral :: MonadGen m => m (StringLiteral ())
 genRawStringLiteral =
   Gen.choice
-  [ RawStringLiteral () <$>
+  [ RawStringLiteral (Ann ()) <$>
     genRawStringPrefix <*>
     pure LongString <*>
     genQuoteType <*>
     Gen.list (Range.constant 0 100) genPyChar' <*>
     genWhitespaces
-  , RawStringLiteral () <$>
+  , RawStringLiteral (Ann ()) <$>
     genRawStringPrefix <*>
     pure ShortString <*>
     genQuoteType <*>
@@ -199,13 +199,13 @@ genRawStringLiteral =
 genRawBytesLiteral :: MonadGen m => m (StringLiteral ())
 genRawBytesLiteral =
   Gen.choice
-  [ RawBytesLiteral () <$>
+  [ RawBytesLiteral (Ann ()) <$>
     genRawBytesPrefix <*>
     pure LongString <*>
     genQuoteType <*>
     Gen.list (Range.constant 0 100) genPyChar' <*>
     genWhitespaces
-  , RawBytesLiteral () <$>
+  , RawBytesLiteral (Ann ()) <$>
     genRawBytesPrefix <*>
     pure ShortString <*>
     genQuoteType <*>
@@ -224,7 +224,7 @@ genExpr' isExp =
     , if isExp then genSmallInt else genInt
     , if isExp then genSmallFloat else genFloat
     , genImag
-    , Ident <$> genIdent
+    , Ident (Ann ()) <$> genIdent
     , String (Ann ()) <$>
       Gen.nonEmpty
         (Range.constant 1 5)
@@ -489,7 +489,7 @@ genIndent =
   view (from indentWhitespaces) <$> genWhitespaces
 
 genIndents :: MonadGen m => m (Indents ())
-genIndents = (\is -> Indents is ()) <$> Gen.list (Range.constant 0 10) genIndent
+genIndents = (\is -> Indents is (Ann ())) <$> Gen.list (Range.constant 0 10) genIndent
 
 genModule :: MonadGen m => m (Module '[] ())
 genModule =

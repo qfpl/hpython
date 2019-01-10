@@ -130,6 +130,7 @@ library
                      , parsers >= 0.10 && < 0.13
                      , megaparsec >=6.3 && <7
                      , fingertree >=0.1 && <0.2
+                     , generic-lens >=1.0 && <1.2
                      , mtl >= 2.1 && < 2.3
                      , containers >=0.5.7.1 && <0.7
                      , deriving-compat >=0.4 && <0.6

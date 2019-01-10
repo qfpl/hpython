@@ -209,8 +209,8 @@ validateIdentSyntax
   => Ident v a
   -> ValidateSyntax e (Ident (Nub (Syntax ': v)) a)
 validateIdentSyntax (MkIdent a name ws)
-  | not (all isAscii name) = errorVM1 (_BadCharacter # (a, name))
-  | null name = errorVM1 (_EmptyIdentifier # a)
+  | not (all isAscii name) = errorVM1 (_BadCharacter # (getAnn a, name))
+  | null name = errorVM1 (_EmptyIdentifier # getAnn a)
   | otherwise =
       bindVM (view inFunction) $ \fi ->
         let
@@ -221,7 +221,7 @@ validateIdentSyntax (MkIdent a name ws)
             else []
         in
           if (name `elem` reserved)
-            then errorVM1 (_IdentifierReservedWord # (a, name))
+            then errorVM1 (_IdentifierReservedWord # (getAnn a, name))
             else pure $ MkIdent a name ws
 
 validateWhitespace
@@ -287,7 +287,8 @@ validateSemicolon
   :: AsSyntaxError e a
   => Semicolon a
   -> ValidateSyntax e (Semicolon a)
-validateSemicolon (MkSemicolon a ws) = MkSemicolon a <$> validateWhitespace a ws
+validateSemicolon (MkSemicolon a ws) =
+  MkSemicolon a <$> validateWhitespace (getAnn a) ws
 
 validateEquals
   :: AsSyntaxError e a
@@ -378,18 +379,18 @@ validateStringLiteralSyntax
   -> ValidateSyntax e (StringLiteral a)
 validateStringLiteralSyntax (StringLiteral a b c d e f) =
   StringLiteral a b c d <$>
-  traverse (validateStringPyChar a) e <*>
-  validateWhitespace a f
+  traverse (validateStringPyChar $ getAnn a) e <*>
+  validateWhitespace (getAnn a) f
 validateStringLiteralSyntax (BytesLiteral a b c d e f) =
   BytesLiteral a b c d <$>
-  traverse (validateBytesPyChar a) e <*>
-  validateWhitespace a f
+  traverse (validateBytesPyChar $ getAnn a) e <*>
+  validateWhitespace (getAnn a) f
 validateStringLiteralSyntax (RawStringLiteral a b c d e f) =
   RawStringLiteral a b c d e <$>
-  validateWhitespace a f
+  validateWhitespace (getAnn a) f
 validateStringLiteralSyntax (RawBytesLiteral a b c d e f) =
   RawBytesLiteral a b c d e <$>
-  validateWhitespace a f
+  validateWhitespace (getAnn a) f
 
 validateDictItemSyntax
   :: ( AsSyntaxError e a
@@ -557,7 +558,7 @@ validateExprSyntax (String a strLits) =
 validateExprSyntax (Int a n ws) = pure $ Int a n ws
 validateExprSyntax (Float a n ws) = pure $ Float a n ws
 validateExprSyntax (Imag a n ws) = pure $ Imag a n ws
-validateExprSyntax (Ident name) = Ident <$> validateIdentSyntax name
+validateExprSyntax (Ident a name) = Ident a <$> validateIdentSyntax name
 validateExprSyntax (List a ws1 exprs ws2) =
   List a ws1 <$>
   liftVM1
@@ -686,7 +687,7 @@ validateDecoratorSyntax (Decorator a b c d e f g) =
 validateBlankSyntax :: AsSyntaxError e a => Blank a -> ValidateSyntax e (Blank a)
 validateBlankSyntax (Blank a ws cmt) =
   (\ws' -> Blank a ws' cmt) <$>
-  validateWhitespace a ws
+  validateWhitespace (getAnn a) ws
 
 validateCompoundStatementSyntax
   :: forall e v a

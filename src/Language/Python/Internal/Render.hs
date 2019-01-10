@@ -957,7 +957,7 @@ renderExpr (Float _ n ws) = do
 renderExpr (Imag _ n ws) = do
   singleton $ TkImag (() <$ n)
   traverse_ renderWhitespace ws
-renderExpr (Ident name) = renderIdent name
+renderExpr (Ident _ name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) = do
   brackets $ do
     traverse_ renderWhitespace ws1

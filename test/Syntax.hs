@@ -52,16 +52,16 @@ prop_syntax_2 =
       e =
         CompoundStatement .
         Fundef (Ann ()) []
-          (Indents mempty ())
+          (Indents mempty (Ann ()))
           Nothing
           (pure Space)
             "test"
             [] CommaSepNone [] Nothing .
           SuiteMany (Ann ()) (MkColon []) Nothing LF $
           Block []
-            (SmallStatement (Indents [i] ()) $
+            (SmallStatement (Indents [i] (Ann ())) $
              MkSmallStatement (Pass (Ann ()) []) [] Nothing Nothing Nothing)
-            [Right . SmallStatement (Indents [i] ()) $
+            [Right . SmallStatement (Indents [i] (Ann ())) $
              MkSmallStatement (Pass (Ann ()) []) [] Nothing Nothing Nothing]
     res <- shouldBeParseSuccess parseStatement (showStatement e)
     res' <- shouldBeParseSuccess parseStatement (showStatement res)
@@ -82,7 +82,7 @@ prop_syntax_4 =
       e :: Expr '[] ()
       e =
         String (Ann ()) . pure $
-        StringLiteral ()
+        StringLiteral (Ann ())
           Nothing
         ShortString SingleQuote
         [Char_lit '\\', Char_lit 'u']
@@ -98,7 +98,7 @@ prop_syntax_5 =
       e :: Expr '[] ()
       e =
         String (Ann ()) . pure $
-        StringLiteral ()
+        StringLiteral (Ann ())
           Nothing
         ShortString SingleQuote
         [Char_lit '\\', Char_lit 'x']

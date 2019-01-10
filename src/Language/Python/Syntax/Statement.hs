@@ -2,6 +2,7 @@
 {-# language DataKinds, KindSignatures #-}
 {-# language MultiParamTypeClasses, FlexibleInstances #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language TypeFamilies #-}
 {-# language LambdaCase #-}
 {-# language UndecidableInstances #-}
@@ -56,6 +57,7 @@ where
 import Control.Lens.Cons (_last)
 import Control.Lens.Fold (foldMapOf, folded)
 import Control.Lens.Getter ((^.), to, view)
+import Control.Lens.Lens (Lens')
 import Control.Lens.Plated (Plated(..), gplate)
 import Control.Lens.Prism (_Right)
 import Control.Lens.Setter ((.~), over, mapped)
@@ -66,6 +68,7 @@ import Data.Bifoldable (bifoldMap)
 import Data.Bifunctor (bimap)
 import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
+import Data.Generics.Product.Typed (typed)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (isNothing)
 import Data.Monoid ((<>))
@@ -339,6 +342,10 @@ data SimpleStatement (v :: [*]) a
       (Maybe (Comma, Expr v a))
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasAnn (SimpleStatement v) where
+  annot :: forall a. Lens' (SimpleStatement v a) (Ann a)
+  annot = typed @(Ann a)
+
 instance Plated (SimpleStatement '[] a) where; plate = gplate
 
 instance HasExprs SimpleStatement where
@@ -370,6 +377,10 @@ data ExceptAs (v :: [*]) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasAnn (ExceptAs v) where
+  annot :: forall a. Lens' (ExceptAs v a) (Ann a)
+  annot = typed @(Ann a)
+
 -- | A compound statement consists of one or more clauses.
 -- A clause consists of a header and a suite.
 data Suite (v :: [*]) a
@@ -382,6 +393,10 @@ data Suite (v :: [*]) a
       (Block v a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasAnn (Suite v) where
+  annot :: forall a. Lens' (Suite v a) (Ann a)
+  annot = typed @(Ann a)
+
 -- | See <https://docs.python.org/3.5/reference/compound_stmts.html#the-with-statement>
 data WithItem (v :: [*]) a
   = WithItem
@@ -390,6 +405,10 @@ data WithItem (v :: [*]) a
   , _withItemBinder :: Maybe ([Whitespace], Expr v a) -- ^ @[\'as\' \<spaces\> \<expr\>]@
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (WithItem v) where
+  annot :: forall a. Lens' (WithItem v a) (Ann a)
+  annot = typed @(Ann a)
 
 -- | Decorators on function definitions
 --
@@ -407,6 +426,10 @@ data Decorator (v :: [*]) a
   , _decoratorBlankLines :: [(Blank a, Newline)] -- ^ Trailing blank lines
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (Decorator v) where
+  annot :: forall a. Lens' (Decorator v a) (Ann a)
+  annot = typed @(Ann a)
 
 -- | See <https://docs.python.org/3.5/reference/compound_stmts.html>
 data CompoundStatement (v :: [*]) a
@@ -502,6 +525,10 @@ data CompoundStatement (v :: [*]) a
   , _unsafeCsWithBody :: Suite v a -- ^ @\<suite\>@
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (CompoundStatement v) where
+  annot :: forall a. Lens' (CompoundStatement v a) (Ann a)
+  annot = typed @(Ann a)
 
 instance HasExprs ExceptAs where
   _Exprs f (ExceptAs ann e a) = ExceptAs ann <$> f e <*> pure (coerce a)

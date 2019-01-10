@@ -1,5 +1,6 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language DataKinds #-}
+{-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language LambdaCase #-}
 
 {-|
@@ -32,6 +33,7 @@ import Control.Lens.Setter ((.~))
 import Control.Lens.Tuple (_2)
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty)
+import Data.Generics.Product.Typed (typed)
 import GHC.Generics (Generic)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -58,11 +60,15 @@ data ImportAs e v a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasAnn (ImportAs e v) where
+  annot :: forall a. Lens' (ImportAs e v a) (Ann a)
+  annot = typed @(Ann a)
+
 instance Validated e => Validated (ImportAs e) where
   unvalidated = to unsafeCoerce
 
 importAsAnn :: Lens' (ImportAs e v a) a
-importAsAnn = lens (getAnn . _importAsAnn) (\s a -> s { _importAsAnn = Ann a })
+importAsAnn = annot_
 
 importAsName :: Validated e => Lens (ImportAs e v a) (ImportAs e' '[] a) (e v a) (e' '[] a)
 importAsName = lens _importAsName (\s a -> (s ^. unvalidated) { _importAsName = a })
@@ -103,6 +109,10 @@ data ImportTargets v a
       -- ) spaces
       [Whitespace]
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (ImportTargets v) where
+  annot :: forall a. Lens' (ImportTargets v a) (Ann a)
+  annot = typed @(Ann a)
 
 instance HasTrailingWhitespace (ImportTargets v a) where
   trailingWhitespace =

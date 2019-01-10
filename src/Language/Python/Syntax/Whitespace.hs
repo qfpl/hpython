@@ -1,8 +1,9 @@
 {-# language DataKinds #-}
 {-# language GeneralizedNewtypeDeriving, MultiParamTypeClasses, BangPatterns #-}
 {-# language TypeFamilies #-}
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language TemplateHaskell #-}
+{-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 
 {-|
 Module      : Language.Python.Syntax.Whitespace
@@ -34,6 +35,7 @@ import Control.Lens.Setter ((.~))
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (Traversal')
 import Data.Deriving (deriveEq1, deriveOrd1)
+import Data.Generics.Product.Typed (typed)
 import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.FingerTree (FingerTree, Measured(..), fromList)
@@ -42,10 +44,12 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Monoid (Monoid, Endo(..), Dual(..))
 import Data.Semigroup (Semigroup, (<>))
 import GHC.Exts (IsList(..))
+import GHC.Generics (Generic)
 
 import qualified Data.List.NonEmpty as NonEmpty
 
-import Language.Python.Syntax.Comment (Comment)
+import Language.Python.Syntax.Ann
+import Language.Python.Syntax.Comment
 
 -- | A newline is either a carriage return, a line feed, or a carriage return
 -- followed by a line feed.
@@ -117,10 +121,14 @@ class HasTrailingNewline (s :: [*] -> * -> *) where
 -- whitespace and/or a comment.
 data Blank a
   = Blank
-  { _blankAnn :: a
+  { _blankAnn :: Ann a
   , _blankWhitespaces :: [Whitespace]
   , _blankComment :: Maybe (Comment a)
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
+  } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn Blank where
+  annot :: forall a. Lens' (Blank a) (Ann a)
+  annot = typed @(Ann a)
 
 -- | Python has rules regarding the expansion of tabs into spaces and how to
 -- go about computing indentation after this is done.
@@ -194,11 +202,15 @@ subtractStart (Indents a _) (Indents b c) = Indents <$> stripPrefix a b <*> pure
 data Indents a
   = Indents
   { _indentsValue :: [Indent]
-  , _indentsAnn :: a
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
+  , _indentsAnn :: Ann a
+  } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 instance Semigroup a => Semigroup (Indents a) where
   Indents a b <> Indents c d = Indents (a <> c) (b <> d)
+
+instance HasAnn Indents where
+  annot :: forall a. Lens' (Indents a) (Ann a)
+  annot = typed @(Ann a)
 
 makeLenses ''Indents
 deriveEq1 ''Indents

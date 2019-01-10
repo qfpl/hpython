@@ -13,6 +13,7 @@ import Language.Python.DSL
 import Language.Python.Optics
 import Language.Python.Parse (parseModule, parseStatement, parseExpr)
 import Language.Python.Render (showStatement, showExpr)
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Punctuation
@@ -34,11 +35,11 @@ prop_syntax_1 =
     let
       e =
         -- lambda *: None
-        Lambda ()
+        Lambda (Ann ())
           [Space]
-          (CommaSepMany (UnnamedStarParam () []) (MkComma []) CommaSepNone)
+          (CommaSepMany (UnnamedStarParam (Ann ()) []) (MkComma []) CommaSepNone)
           (MkColon [Space])
-          (None () [])
+          (None (Ann ()) [])
     res <- syntaxValidateExpr e
     shouldBeFailure res
 
@@ -50,18 +51,18 @@ prop_syntax_2 =
       e :: Statement '[] ()
       e =
         CompoundStatement .
-        Fundef () []
-          (Indents mempty ())
+        Fundef (Ann ()) []
+          (Indents mempty (Ann ()))
           Nothing
           (pure Space)
             "test"
             [] CommaSepNone [] Nothing .
-          SuiteMany () (MkColon []) Nothing LF $
+          SuiteMany (Ann ()) (MkColon []) Nothing LF $
           Block []
-            (SmallStatement (Indents [i] ()) $
-             MkSmallStatement (Pass () []) [] Nothing Nothing Nothing)
-            [Right . SmallStatement (Indents [i] ()) $
-             MkSmallStatement (Pass () []) [] Nothing Nothing Nothing]
+            (SmallStatement (Indents [i] (Ann ())) $
+             MkSmallStatement (Pass (Ann ()) []) [] Nothing Nothing Nothing)
+            [Right . SmallStatement (Indents [i] (Ann ())) $
+             MkSmallStatement (Pass (Ann ()) []) [] Nothing Nothing Nothing]
     res <- shouldBeParseSuccess parseStatement (showStatement e)
     res' <- shouldBeParseSuccess parseStatement (showStatement res)
     void res === void res'
@@ -80,8 +81,8 @@ prop_syntax_4 =
     let
       e :: Expr '[] ()
       e =
-        String () . pure $
-        StringLiteral ()
+        String (Ann ()) . pure $
+        StringLiteral (Ann ())
           Nothing
         ShortString SingleQuote
         [Char_lit '\\', Char_lit 'u']
@@ -96,8 +97,8 @@ prop_syntax_5 =
     let
       e :: Expr '[] ()
       e =
-        String () . pure $
-        StringLiteral ()
+        String (Ann ()) . pure $
+        StringLiteral (Ann ())
           Nothing
         ShortString SingleQuote
         [Char_lit '\\', Char_lit 'x']

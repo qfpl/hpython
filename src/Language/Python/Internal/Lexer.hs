@@ -69,6 +69,7 @@ import qualified Data.Text as Text
 import qualified Text.Megaparsec as Parsec
 
 import Language.Python.Internal.Token (PyToken(..), pyTokenAnn)
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Comment
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Numbers
@@ -113,7 +114,8 @@ parseNewline = TkNewline <$> newline
 
 parseComment :: (CharParsing m, Monad m) => m (SrcInfo -> PyToken SrcInfo)
 parseComment =
-  (\a b -> TkComment (MkComment b a)) <$ char '#' <*> many (satisfy (`notElem` ['\r', '\n']))
+  (\a b -> TkComment (MkComment (Ann b) a)) <$ char '#' <*>
+  many (satisfy (`notElem` ['\r', '\n']))
 
 stringOrBytesPrefix
   :: CharParsing m
@@ -197,27 +199,29 @@ number = do
           (\x j ann ->
              case x of
                Nothing ->
-                 maybe (TkInt $ IntLiteralDec ann n) (TkImag . ImagLiteralInt ann n) j
+                 maybe
+                   (TkInt $ IntLiteralDec (Ann ann) n)
+                   (TkImag . ImagLiteralInt (Ann ann) n) j
                Just (Right e) ->
                  let
-                   f = FloatLiteralWhole ann n e
+                   f = FloatLiteralWhole (Ann ann) n e
                  in
-                   maybe (TkFloat f) (TkImag . ImagLiteralFloat ann f) j
+                   maybe (TkFloat f) (TkImag . ImagLiteralFloat (Ann ann) f) j
                Just (Left (Left e)) ->
                  let
-                   f = FloatLiteralFull ann n (Just (That e))
+                   f = FloatLiteralFull (Ann ann) n (Just (That e))
                  in
-                   maybe (TkFloat f) (TkImag . ImagLiteralFloat ann f) j
+                   maybe (TkFloat f) (TkImag . ImagLiteralFloat (Ann ann) f) j
                Just (Left (Right (a, b))) ->
                  let
-                   f = FloatLiteralFull ann n $
+                   f = FloatLiteralFull (Ann ann) n $
                      case (a, b) of
                        (Nothing, Nothing) -> Nothing
                        (Just x, Nothing) -> Just $ This x
                        (Nothing, Just x) -> Just $ That x
                        (Just x, Just y) -> Just $ These x y
                  in
-                   maybe (TkFloat f) (TkImag . ImagLiteralFloat ann f) j) <$>
+                   maybe (TkFloat f) (TkImag . ImagLiteralFloat (Ann ann) f) j) <$>
           optional
             (Left <$ char '.' <*>
              (Left <$> floatExp <|>
@@ -227,28 +231,30 @@ number = do
         Nothing ->
           (\a b j ann ->
              let
-               f = FloatLiteralPoint ann a b
+               f = FloatLiteralPoint (Ann ann) a b
              in
-               maybe (TkFloat f) (TkImag . ImagLiteralFloat ann f) j) <$>
+               maybe (TkFloat f) (TkImag . ImagLiteralFloat (Ann ann) f) j) <$>
           -- try is necessary here to prevent the intercepting of dereference tokens
           try (char '.' *> some1 parseDecimal) <*>
           optional floatExp <*>
           optional jJ
     Just z ->
-      (\xX a b -> TkInt (IntLiteralHex b xX a)) <$>
+      (\xX a b -> TkInt (IntLiteralHex (Ann b) xX a)) <$>
       (True <$ char 'X' <|> False <$ char 'x') <*>
       some1 parseHeXaDeCiMaL
       <|>
-      (\bB a b -> TkInt (IntLiteralBin b bB a)) <$>
+      (\bB a b -> TkInt (IntLiteralBin (Ann b) bB a)) <$>
       (True <$ char 'B' <|> False <$ char 'b') <*>
       some1 parseBinary
       <|>
-      (\oO a b -> TkInt (IntLiteralOct b oO a)) <$>
+      (\oO a b -> TkInt (IntLiteralOct (Ann b) oO a)) <$>
       (True <$ char 'O' <|> False <$ char 'o') <*>
       some1 parseOctal
       <|>
       (\n j a ->
-         maybe (TkInt $ IntLiteralDec a (z :| n)) (TkImag . ImagLiteralInt a (z :| n)) j) <$>
+         maybe
+           (TkInt $ IntLiteralDec (Ann a) (z :| n))
+           (TkImag . ImagLiteralInt (Ann a) (z :| n)) j) <$>
       try (many parse0 <* notFollowedBy (char '.' <|> char 'e' <|> char 'E' <|> digit)) <*>
       optional jJ
       <|>
@@ -256,20 +262,20 @@ number = do
          case a of
            Left (Left (b, c, j)) ->
              let
-               f = FloatLiteralFull ann (z :| n') $
+               f = FloatLiteralFull (Ann ann) (z :| n') $
                  case (b, c) of
                    (Nothing, Nothing) -> Nothing
                    (Just x, Nothing) -> Just $ This x
                    (Nothing, Just x) -> Just $ That x
                    (Just x, Just y) -> Just $ These x y
              in
-               maybe (TkFloat f) (TkImag . ImagLiteralFloat ann f) j
+               maybe (TkFloat f) (TkImag . ImagLiteralFloat (Ann ann) f) j
            Left (Right (x, j)) ->
              let
-               f = FloatLiteralWhole ann (z :| n') x
+               f = FloatLiteralWhole (Ann ann) (z :| n') x
              in
-               maybe (TkFloat f) (TkImag . ImagLiteralFloat ann f) j
-           Right j -> TkImag $ ImagLiteralInt ann (z :| n') j) <$>
+               maybe (TkFloat f) (TkImag . ImagLiteralFloat (Ann ann) f) j
+           Right j -> TkImag $ ImagLiteralInt (Ann ann) (z :| n') j) <$>
       many parseDecimal <*>
       (Left <$>
        (Left <$>
@@ -724,14 +730,14 @@ chunked = go FingerTree.empty
       let
         leaps' = leaps FingerTree.|> Summed n
       in
-        TkIndent a (Indents (splitIndents leaps' i) a) : go leaps' is
+        TkIndent a (Indents (splitIndents leaps' i) (Ann a)) : go leaps' is
     go leaps (Dedent a : is) =
       case FingerTree.viewr leaps of
         FingerTree.EmptyR -> error "impossible"
         leaps' FingerTree.:> _ -> TkDedent a : go leaps' is
     go leaps (IndentedLine ll : is) = logicalLineToTokens ll <> go leaps is
     go leaps (Level i a : is) =
-      TkLevel a (Indents (splitIndents leaps $ NonEmpty.toList i ^. from indentWhitespaces) a) : go leaps is
+      TkLevel a (Indents (splitIndents leaps $ NonEmpty.toList i ^. from indentWhitespaces) (Ann a)) : go leaps is
 
 -- | Insert indent and dedent tokens
 --

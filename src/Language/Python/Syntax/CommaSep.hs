@@ -1,5 +1,5 @@
 {-# language LambdaCase #-}
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 
 {-|
 Module      : Language.Python.Syntax.CommaSep
@@ -32,6 +32,7 @@ import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe)
 import Data.Semigroup (Semigroup(..))
+import GHC.Generics (Generic)
 
 import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Whitespace (Whitespace (Space), HasTrailingWhitespace (..))
@@ -41,7 +42,7 @@ data CommaSep a
   = CommaSepNone
   | CommaSepOne a
   | CommaSepMany a Comma (CommaSep a)
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 -- | 'Traversal' targeting the trailing whitespace in a comma separated list.
 --
@@ -91,7 +92,7 @@ instance Monoid (CommaSep a) where
 data CommaSep1 a
   = CommaSepOne1 a
   | CommaSepMany1 a Comma (CommaSep1 a)
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 -- | Get the first element of a 'CommaSep1'
 commaSep1Head :: CommaSep1 a -> a
@@ -139,7 +140,7 @@ listToCommaSep1 (a :| as) = go (a:as)
 data CommaSep1' a
   = CommaSepOne1' a (Maybe Comma)
   | CommaSepMany1' a Comma (CommaSep1' a)
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 -- | Iso to unpack a 'CommaSep'
 _CommaSep

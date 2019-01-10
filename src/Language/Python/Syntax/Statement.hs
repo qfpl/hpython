@@ -2,6 +2,7 @@
 {-# language DataKinds, KindSignatures #-}
 {-# language MultiParamTypeClasses, FlexibleInstances #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language TypeFamilies #-}
 {-# language LambdaCase #-}
 {-# language UndecidableInstances #-}
@@ -56,6 +57,7 @@ where
 import Control.Lens.Cons (_last)
 import Control.Lens.Fold (foldMapOf, folded)
 import Control.Lens.Getter ((^.), to, view)
+import Control.Lens.Lens (Lens')
 import Control.Lens.Plated (Plated(..), gplate)
 import Control.Lens.Prism (_Right)
 import Control.Lens.Setter ((.~), over, mapped)
@@ -66,6 +68,7 @@ import Data.Bifoldable (bifoldMap)
 import Data.Bifunctor (bimap)
 import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
+import Data.Generics.Product.Typed (typed)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (isNothing)
 import Data.Monoid ((<>))
@@ -75,6 +78,7 @@ import Unsafe.Coerce (unsafeCoerce)
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Optics.Validated
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Comment
@@ -107,7 +111,7 @@ data Block (v :: [*]) a
   { _blockBlankLines :: [(Blank a, Newline)] -- ^ Blank lines at the beginning of the block
   , _blockHead :: Statement v a -- ^ The first statement of the block
   , _blockTail :: [Either (Blank a, Newline) (Statement v a)] -- ^ The remaining items of the block, which may be statements or blank lines
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Generic)
 
 instance Functor (Block v) where
   fmap f (Block a b c) =
@@ -195,7 +199,7 @@ data SmallStatement (v :: [*]) a
       (Maybe (Semicolon a))
       (Maybe (Comment a))
       (Maybe Newline)
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 -- | A 'Statement' is either a 'SmallStatement' or a 'CompoundStatement'
 --
@@ -203,7 +207,10 @@ data SmallStatement (v :: [*]) a
 data Statement (v :: [*]) a
   = SmallStatement (Indents a) (SmallStatement v a)
   | CompoundStatement (CompoundStatement v a)
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasStatements Statement where
+  _Statements = id
 
 instance HasExprs SmallStatement where
   _Exprs f (MkSmallStatement s ss a b c) =
@@ -267,55 +274,55 @@ data SimpleStatement (v :: [*]) a
   -- | @\'return\' \<spaces\> [\<expr\>]@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#the-return-statement
-  = Return a [Whitespace] (Maybe (Expr v a))
+  = Return (Ann a) [Whitespace] (Maybe (Expr v a))
   -- | @\<expr\>@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#expression-statements
-  | Expr a (Expr v a)
+  | Expr (Ann a) (Expr v a)
   -- | @\<expr\> (\'=\' \<spaces\> \<expr\>)+@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#assignment-statements
-  | Assign a (Expr v a) (NonEmpty (Equals, Expr v a))
+  | Assign (Ann a) (Expr v a) (NonEmpty (Equals, Expr v a))
   -- | @\<expr\> \<augassign\> \<expr\>@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#augmented-assignment-statements
-  | AugAssign a (Expr v a) (AugAssign a) (Expr v a)
+  | AugAssign (Ann a) (Expr v a) (AugAssign a) (Expr v a)
   -- | @\'pass\' \<spaces\>@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#the-pass-statement
-  | Pass a [Whitespace]
+  | Pass (Ann a) [Whitespace]
   -- | @\'break\' \<spaces\>@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#the-break-statement
-  | Break a [Whitespace]
+  | Break (Ann a) [Whitespace]
   -- | @\'continue\' \<spaces\>@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#the-continue-statement
-  | Continue a [Whitespace]
+  | Continue (Ann a) [Whitespace]
   -- | @\'global\' \<spaces\> \<idents\>@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#the-global-statement
-  | Global a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
+  | Global (Ann a) (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   -- | @\'nonlocal\' \<spaces\> \<idents\>@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#the-nonlocal-statement
-  | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident v a))
+  | Nonlocal (Ann a) (NonEmpty Whitespace) (CommaSep1 (Ident v a))
   -- | @\'del\' \<spaces\> \<exprs\>@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#the-del-statement
-  | Del a [Whitespace] (CommaSep1' (Expr v a))
+  | Del (Ann a) [Whitespace] (CommaSep1' (Expr v a))
   -- | @\'import\' \<spaces\> \<modulenames\>@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#the-import-statement
   | Import
-      a
+      (Ann a)
       (NonEmpty Whitespace)
-      (CommaSep1 (ImportAs (ModuleName v) v a))
+      (CommaSep1 (ImportAs ModuleName v a))
   -- | @\'from\' \<spaces\> \<relative_module_name\> \'import\' \<spaces\> \<import_targets\>@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#the-import-statement
   | From
-      a
+      (Ann a)
       [Whitespace]
       (RelativeModuleName v a)
       [Whitespace]
@@ -323,17 +330,21 @@ data SimpleStatement (v :: [*]) a
   -- | @\'raise\' \<spaces\> [\<expr\> [\'as\' \<spaces\> \<expr\>]]@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#the-raise-statement
-  | Raise a
+  | Raise (Ann a)
       [Whitespace]
       (Maybe (Expr v a, Maybe ([Whitespace], Expr v a)))
   -- | @\'assert\' \<spaces\> \<expr\> [\',\' \<spaces\> \<expr\>]@
   --
   -- https://docs.python.org/3.5/reference/simple_stmts.html#the-assert-statement
-  | Assert a
+  | Assert (Ann a)
       [Whitespace]
       (Expr v a)
       (Maybe (Comma, Expr v a))
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (SimpleStatement v) where
+  annot :: forall a. Lens' (SimpleStatement v a) (Ann a)
+  annot = typed @(Ann a)
 
 instance Plated (SimpleStatement '[] a) where; plate = gplate
 
@@ -360,32 +371,44 @@ instance HasExprs SimpleStatement where
 -- | See <https://docs.python.org/3.5/reference/compound_stmts.html#the-try-statement>
 data ExceptAs (v :: [*]) a
   = ExceptAs
-  { _exceptAsAnn :: a
+  { _exceptAsAnn :: Ann a
   , _exceptAsExpr :: Expr v a -- ^ @\<expr\>@
   , _exceptAsName :: Maybe ([Whitespace], Ident v a) -- ^ @[\'as\' \<ident\>]@
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (ExceptAs v) where
+  annot :: forall a. Lens' (ExceptAs v a) (Ann a)
+  annot = typed @(Ann a)
 
 -- | A compound statement consists of one or more clauses.
 -- A clause consists of a header and a suite.
 data Suite (v :: [*]) a
   -- ':' <space> smallStatement
-  = SuiteOne a Colon (SmallStatement v a)
-  | SuiteMany a
+  = SuiteOne (Ann a) Colon (SmallStatement v a)
+  | SuiteMany (Ann a)
       -- ':' <spaces> [comment] <newline>
       Colon (Maybe (Comment a)) Newline
       -- <block>
       (Block v a)
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (Suite v) where
+  annot :: forall a. Lens' (Suite v a) (Ann a)
+  annot = typed @(Ann a)
 
 -- | See <https://docs.python.org/3.5/reference/compound_stmts.html#the-with-statement>
 data WithItem (v :: [*]) a
   = WithItem
-  { _withItemAnn :: a
+  { _withItemAnn :: Ann a
   , _withItemValue :: Expr v a -- ^ @\<expr\>@
   , _withItemBinder :: Maybe ([Whitespace], Expr v a) -- ^ @[\'as\' \<spaces\> \<expr\>]@
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (WithItem v) where
+  annot :: forall a. Lens' (WithItem v a) (Ann a)
+  annot = typed @(Ann a)
 
 -- | Decorators on function definitions
 --
@@ -394,7 +417,7 @@ data WithItem (v :: [*]) a
 -- <https://docs.python.org/3.5/glossary.html#term-decorator>
 data Decorator (v :: [*]) a
   = Decorator
-  { _decoratorAnn :: a
+  { _decoratorAnn :: Ann a
   , _decoratorIndents :: Indents a -- ^ Preceding indentation
   , _decoratorAt :: At -- ^ @\'\@\' \<spaces\>@
   , _decoratorExpr :: Expr v a -- ^ @\<expr\>@
@@ -402,7 +425,11 @@ data Decorator (v :: [*]) a
   , _decoratorNewline :: Newline -- ^ Trailing newline
   , _decoratorBlankLines :: [(Blank a, Newline)] -- ^ Trailing blank lines
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (Decorator v) where
+  annot :: forall a. Lens' (Decorator v a) (Ann a)
+  annot = typed @(Ann a)
 
 -- | See <https://docs.python.org/3.5/reference/compound_stmts.html>
 data CompoundStatement (v :: [*]) a
@@ -410,7 +437,7 @@ data CompoundStatement (v :: [*]) a
   --
   -- https://docs.python.org/3.5/reference/compound_stmts.html#coroutine-function-definition
   = Fundef
-  { _csAnn :: a
+  { _csAnn :: Ann a
   , _unsafeCsFundefDecorators :: [Decorator v a] -- ^ Preceding 'Decorator's
   , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsFundefAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
@@ -424,7 +451,7 @@ data CompoundStatement (v :: [*]) a
   }
   -- | https://docs.python.org/3.5/reference/compound_stmts.html#the-if-statement
   | If
-  { _csAnn :: a
+  { _csAnn :: Ann a
   , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsIfIf :: [Whitespace] -- ^ @\'if\' \<spaces\>@
   , _unsafeCsIfCond :: Expr v a -- ^ @\<expr\>@
@@ -434,7 +461,7 @@ data CompoundStatement (v :: [*]) a
   }
   -- | https://docs.python.org/3.5/reference/compound_stmts.html#the-while-statement
   | While
-  { _csAnn :: a
+  { _csAnn :: Ann a
   , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsWhileWhile :: [Whitespace] -- ^ @\'while\' \<spaces\>@
   , _unsafeCsWhileCond :: Expr v a -- ^ @\<expr\>@
@@ -444,7 +471,7 @@ data CompoundStatement (v :: [*]) a
   }
   -- | https://docs.python.org/3.5/reference/compound_stmts.html#the-try-statement
   | TryExcept
-  { _csAnn :: a
+  { _csAnn :: Ann a
   , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsTryExceptTry :: [Whitespace] -- ^ @\'try\' \<spaces\>@
   , _unsafeCsTryExceptBody :: Suite v a -- ^ @\<suite\>@
@@ -454,7 +481,7 @@ data CompoundStatement (v :: [*]) a
   }
   -- | https://docs.python.org/3.5/reference/compound_stmts.html#the-try-statement
   | TryFinally
-  { _csAnn :: a
+  { _csAnn :: Ann a
   , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsTryFinallyTry :: [Whitespace] -- ^ @\'try\' \<spaces\>@
   , _unsafeCsTryFinallyTryBody :: Suite v a -- ^ @\<suite\>@
@@ -466,7 +493,7 @@ data CompoundStatement (v :: [*]) a
   --
   -- https://docs.python.org/3.5/reference/compound_stmts.html#the-async-for-statement
   | For
-  { _csAnn :: a
+  { _csAnn :: Ann a
   , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsForAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
   , _unsafeCsForFor :: [Whitespace] -- ^ @\'for\' \<spaces\>@
@@ -478,7 +505,7 @@ data CompoundStatement (v :: [*]) a
   }
   -- | https://docs.python.org/3.5/reference/compound_stmts.html#class-definitions
   | ClassDef
-  { _csAnn :: a
+  { _csAnn :: Ann a
   , _unsafeCsClassDefDecorators :: [Decorator v a] -- ^ Preceding 'Decorator's
   , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsClassDefClass :: NonEmpty Whitespace -- ^ @\'class\' \<spaces\>@
@@ -490,14 +517,18 @@ data CompoundStatement (v :: [*]) a
   --
   -- https://docs.python.org/3.5/reference/compound_stmts.html#the-async-with-statement
   | With
-  { _csAnn :: a
+  { _csAnn :: Ann a
   , _csIndents :: Indents a -- ^ Preceding indentation
   , _unsafeCsWithAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
   , _unsafeCsWithWith :: [Whitespace] -- ^ @\'with\' \<spaces\>@
   , _unsafeCsWithItems :: CommaSep1 (WithItem v a) -- ^ @\<with_items\>@
   , _unsafeCsWithBody :: Suite v a -- ^ @\<suite\>@
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (CompoundStatement v) where
+  annot :: forall a. Lens' (CompoundStatement v a) (Ann a)
+  annot = typed @(Ann a)
 
 instance HasExprs ExceptAs where
   _Exprs f (ExceptAs ann e a) = ExceptAs ann <$> f e <*> pure (coerce a)
@@ -552,8 +583,8 @@ instance HasExprs CompoundStatement where
   _Exprs fun (TryFinally idnt a b c d e f) =
     TryFinally idnt a b <$> _Exprs fun c <*> pure d <*>
     pure e <*> _Exprs fun f
-  _Exprs fun (For idnt a asyncWs b c d e f g) =
-    For idnt a asyncWs b <$> fun c <*> pure d <*> traverse fun e <*>
+  _Exprs fun (For a idnt asyncWs b c d e f g) =
+    For a idnt asyncWs b <$> fun c <*> pure d <*> traverse fun e <*>
     _Exprs fun f <*>
     (traverse._3._Exprs) fun g
   _Exprs fun (ClassDef a decos idnt b c d e) =

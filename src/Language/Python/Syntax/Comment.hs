@@ -1,4 +1,5 @@
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language TemplateHaskell #-}
 
 {-|
@@ -12,7 +13,12 @@ Portability : non-portable
 
 module Language.Python.Syntax.Comment where
 
+import Control.Lens.Lens (Lens')
+import Data.Generics.Product.Typed (typed)
 import Data.Deriving (deriveEq1, deriveOrd1)
+import GHC.Generics (Generic)
+
+import Language.Python.Syntax.Ann
 
 -- | A Python single-line comment, such as on the following line:
 --
@@ -35,10 +41,14 @@ import Data.Deriving (deriveEq1, deriveOrd1)
 -- string expressions (since that's what they are).
 data Comment a
   = MkComment
-  { _commentAnn :: a
+  { _commentAnn :: Ann a
   , _commentValue :: String
   }
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn Comment where
+  annot :: forall a. Lens' (Comment a) (Ann a)
+  annot = typed @(Ann a)
 
 deriveEq1 ''Comment
 deriveOrd1 ''Comment

@@ -19,6 +19,7 @@ import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Parse (SrcInfo, parseStatement, parseExpr, parseExprList)
 import Language.Python.Parse.Error (ParseError)
 import Language.Python.Render
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Module
 import Language.Python.Syntax.Statement
@@ -142,7 +143,7 @@ string_correct path =
     str <- forAll $ Gen.list (Range.constant 0 100) Gen.unicode
     qt <- forAll $ Gen.element [SingleQuote, DoubleQuote]
     st <- forAll $ Gen.element [ShortString, LongString]
-    let ex = String () . pure $ StringLiteral () Nothing st qt (fromHaskellString str) []
+    let ex = String (Ann ()) . pure $ StringLiteral (Ann ()) Nothing st qt (fromHaskellString str) []
     goodExpr path ex
 
     let ex' = showExpr ex

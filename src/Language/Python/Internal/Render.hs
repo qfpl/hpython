@@ -957,7 +957,7 @@ renderExpr (Float _ n ws) = do
 renderExpr (Imag _ n ws) = do
   singleton $ TkImag (() <$ n)
   traverse_ renderWhitespace ws
-renderExpr (Ident name) = renderIdent name
+renderExpr (Ident _ name) = renderIdent name
 renderExpr (List _ ws1 exprs ws2) = do
   brackets $ do
     traverse_ renderWhitespace ws1
@@ -1074,13 +1074,13 @@ renderDot (MkDot ws) = do
   traverse_ renderWhitespace ws
 
 renderRelativeModuleName :: RelativeModuleName v a -> RenderOutput ()
-renderRelativeModuleName (RelativeWithName ds mn) = do
+renderRelativeModuleName (RelativeWithName _ ds mn) = do
   traverse_ renderDot ds
   renderModuleName mn
-renderRelativeModuleName (Relative ds) =
+renderRelativeModuleName (Relative _ ds) =
   traverse_ renderDot ds
 
-renderImportAs :: (e a -> RenderOutput ()) -> ImportAs e v a -> RenderOutput ()
+renderImportAs :: (e v a -> RenderOutput ()) -> ImportAs e v a -> RenderOutput ()
 renderImportAs f (ImportAs _ ea m) = do
   f ea
   traverse_

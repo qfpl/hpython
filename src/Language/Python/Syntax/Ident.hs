@@ -1,6 +1,7 @@
 {-# language DataKinds, KindSignatures #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language FlexibleInstances #-}
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 
 {-|
 Module      : Language.Python.Syntax.Ident
@@ -23,11 +24,14 @@ module Language.Python.Syntax.Ident
   )
 where
 
-import Control.Lens.Lens (Lens, lens)
+import Control.Lens.Lens (Lens, Lens', lens)
 import Data.Char (isDigit, isLetter)
+import Data.Generics.Product.Typed (typed)
 import Data.String (IsString(..))
+import GHC.Generics (Generic)
 
 import Language.Python.Optics.Validated (Validated)
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Raw
 import Language.Python.Syntax.Whitespace
 
@@ -39,10 +43,14 @@ import Language.Python.Syntax.Whitespace
 -- See <https://docs.python.org/3.5/reference/lexical_analysis.html#identifiers>
 data Ident (v :: [*]) a
   = MkIdent
-  { _identAnn :: a
+  { _identAnn :: Ann a
   , _identValue :: String
   , _identWhitespace :: [Whitespace]
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
+  } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (Ident v) where
+  annot :: forall a. Lens' (Ident v a) (Ann a)
+  annot = typed @(Ann a)
 
 -- | Determine whether this character could start a valid identifier
 isIdentifierStart :: Char -> Bool
@@ -59,13 +67,13 @@ isIdentifierChar = do
   pure $ a || b
 
 instance IsString (Raw Ident) where
-  fromString s = MkIdent () s []
+  fromString s = MkIdent (Ann ()) s []
 
 identValue :: Lens (Ident v a) (Ident '[] a) String String
 identValue = lens _identValue (\s a -> s { _identValue = a })
 
 identAnn :: Lens (Ident v a) (Ident v a) a a
-identAnn = lens _identAnn (\s a -> s { _identAnn = a })
+identAnn = annot_
 
 identWhitespace :: Lens (Ident v a) (Ident v a) [Whitespace] [Whitespace]
 identWhitespace = lens _identWhitespace (\s ws -> s { _identWhitespace = ws })

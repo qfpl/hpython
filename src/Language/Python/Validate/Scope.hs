@@ -60,7 +60,7 @@ import Control.Arrow ((&&&))
 import Control.Applicative ((<|>))
 import Control.Lens.Cons (snoc)
 import Control.Lens.Fold ((^..), toListOf, folded)
-import Control.Lens.Getter ((^.), to, getting, use)
+import Control.Lens.Getter ((^.), view, to, getting, use)
 import Control.Lens.Lens (Lens')
 import Control.Lens.Plated (cosmos)
 import Control.Lens.Prism (_Right, _Just)
@@ -87,6 +87,7 @@ import qualified Data.Map.Strict as Map
 
 import Language.Python.Optics
 import Language.Python.Optics.Validated (unvalidated)
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
@@ -216,11 +217,11 @@ validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params
      traverseOf (traverse._2) validateExprScope mty <*>
      locallyExtendOver
        scGlobalScope
-       ((_identAnn &&& _identValue) name :
-         toListOf (folded.getting paramName.to (_identAnn &&& _identValue)) params)
+       ((view annot_ &&& _identValue) name :
+         toListOf (folded.getting paramName.to (view annot_ &&& _identValue)) params)
        (validateSuiteScope s)) <*
-  extendScope scLocalScope [(_identAnn &&& _identValue) name] <*
-  extendScope scImmediateScope [(_identAnn &&& _identValue) name]
+  extendScope scLocalScope [(view annot_ &&& _identValue) name] <*
+  extendScope scImmediateScope [(view annot_ &&& _identValue) name]
 validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
@@ -258,7 +259,7 @@ validateCompoundStatementScope (TryExcept idnts a b e f k l) =
           traverse validateExceptAsScope g <*>
           locallyExtendOver
             scGlobalScope
-            (toListOf (folded.exceptAsName._Just._2.to (_identAnn &&& _identValue)) g)
+            (toListOf (folded.exceptAsName._Just._2.to (view annot_ &&& _identValue)) g)
             (validateSuiteScope h))
        f <*>
      traverseOf (traverse._3) validateSuiteScope k <*>
@@ -288,7 +289,7 @@ validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
     pure d <*>
     traverse validateExprScope e <*>
     (let
-       ls = c ^.. unvalidated.cosmos._Ident.to (_identAnn &&& _identValue)
+       ls = c ^.. unvalidated.cosmos._Ident.to (view annot_ &&& _identValue)
      in
        extendScope scLocalScope ls *>
        extendScope scImmediateScope ls *>
@@ -299,13 +300,13 @@ validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
   traverse validateDecoratorScope decos <*>
   traverseOf (traverse._2.traverse.traverse) validateArgScope d <*>
   validateSuiteScope g <*
-  extendScope scImmediateScope [c ^. to (_identAnn &&& _identValue)]
+  extendScope scImmediateScope [c ^. to (view annot_ &&& _identValue)]
 validateCompoundStatementScope (With a b asyncWs c d e) =
   let
     names =
       d ^..
       folded.unvalidated.to _withItemBinder.folded._2.
-      assignTargets.to (_identAnn &&& _identValue)
+      assignTargets.to (view annot_ &&& _identValue)
   in
     With @(Nub (Scope ': v)) a b asyncWs c <$>
     traverse
@@ -340,7 +341,7 @@ validateSimpleStatementScope (Assign a l rs) =
   let
     ls =
       (l : (snd <$> NonEmpty.init rs)) ^..
-      folded.unvalidated.assignTargets.to (_identAnn &&& _identValue)
+      folded.unvalidated.assignTargets.to (view annot_ &&& _identValue)
   in
   Assign a <$>
   validateAssignExprScope l <*>
@@ -353,12 +354,12 @@ validateSimpleStatementScope (AugAssign a l aa r) =
   (\l' -> AugAssign a l' aa) <$>
   validateExprScope l <*>
   validateExprScope r
-validateSimpleStatementScope (Global a _ _) = errorVM1 (_FoundGlobal # a)
-validateSimpleStatementScope (Nonlocal a _ _) = errorVM1 (_FoundNonlocal # a)
+validateSimpleStatementScope (Global a _ _) = errorVM1 (_FoundGlobal # getAnn a)
+validateSimpleStatementScope (Nonlocal a _ _) = errorVM1 (_FoundNonlocal # getAnn a)
 validateSimpleStatementScope (Del a ws cs) =
   Del a ws <$
   traverse_
-    (\case; Ident a -> errorVM1 (_DeletedIdent # (a ^. identAnn)); _ -> pure ())
+    (\case; Ident a _ -> errorVM1 (_DeletedIdent # getAnn a); _ -> pure ())
     cs <*>
   traverse validateExprScope cs
 validateSimpleStatementScope s@Pass{} = pure $ unsafeCoerce s
@@ -460,7 +461,7 @@ validateComprehensionScope f (Comprehension a b c d) =
       validateAssignExprScope c <*>
       validateExprScope e <*
       extendScope scGlobalScope
-        (c ^.. unvalidated.assignTargets.to (_identAnn &&& _identValue))
+        (c ^.. unvalidated.assignTargets.to (view annot_ &&& _identValue))
 
     validateCompIfScope
       :: AsScopeError e a
@@ -627,7 +628,7 @@ validateExprScope (Parens a ws1 e ws2) =
   Parens a ws1 <$>
   validateExprScope e <*>
   pure ws2
-validateExprScope (Ident i) = Ident <$> validateIdentScope i
+validateExprScope (Ident a i) = Ident a <$> validateIdentScope i
 validateExprScope (Tuple a b ws d) =
   Tuple a <$>
   validateTupleItemScope b <*>

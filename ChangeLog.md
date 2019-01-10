@@ -2,6 +2,8 @@
 
 ## 0.2
 
+*2019-01-10*
+
 * Improved Plated instance for exprs
 
   It now drills down into collections, parameters, arguments, subscripts, and

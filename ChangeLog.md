@@ -19,6 +19,9 @@
 
 * Re-export `Data.Validation` from `Language.Python.Parse` [breaking]
 
+* Added `annot` and `annot_` lenses to `Language.Python.Syntax.Ann` to retrieve
+  annotations from structures [non-breaking]
+
 ## 0.1.0.1
 
 *2019-01-07*

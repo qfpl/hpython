@@ -7,6 +7,7 @@ import Control.Lens.Iso (from)
 import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
 
+import Data.VFix
 import Language.Python.DSL
 import Language.Python.Syntax
 
@@ -22,26 +23,27 @@ import Language.Python.Syntax
 append_to :: Raw Statement
 append_to =
   CompoundStatement $
-  Fundef () [] (Indents [] ())
+  Fundef (Ann ()) [] (Indents [] (Ann ()))
     Nothing
     (Space :| [])
     "append_to"
     []
-    ( CommaSepMany (PositionalParam () "element" Nothing) (MkComma [Space]) $
-      CommaSepOne (KeywordParam () "to" Nothing [] (List () [] Nothing []))
+    ( CommaSepMany (PositionalParam (Ann ()) "element" Nothing) (MkComma [Space]) $
+      CommaSepOne
+        (KeywordParam (Ann ()) "to" Nothing [] (VIn $ List (Ann ()) [] Nothing []))
     )
     []
     Nothing
-    (SuiteMany () (MkColon []) Nothing LF $
+    (SuiteMany (Ann ()) (MkColon []) Nothing LF $
      Block []
      ( SmallStatement
-         (Indents [replicate 4 Space ^. from indentWhitespaces] ())
+         (Indents [replicate 4 Space ^. from indentWhitespaces] (Ann ()))
          (MkSmallStatement
-          (Expr () $
-           Call ()
-             (Deref () (Ident "to") [] "append")
+          (Expr (Ann ()) . VIn $
+           Call (Ann ())
+             (VIn $ Deref (Ann ()) (VIn $ Ident (Ann ()) "to") [] "append")
              []
-             (Just $ CommaSepOne1' (PositionalArg () (Ident "element")) Nothing)
+             (Just $ CommaSepOne1' (PositionalArg (Ann ()) (VIn $ Ident (Ann ()) "element")) Nothing)
              [])
           []
           Nothing
@@ -50,9 +52,9 @@ append_to =
      )
      [ Right $
          SmallStatement
-           (Indents [replicate 4 Space ^. from indentWhitespaces] ())
+           (Indents [replicate 4 Space ^. from indentWhitespaces] (Ann ()))
            (MkSmallStatement
-            (Return () [Space] (Just $ Ident "to"))
+            (Return (Ann ()) [Space] (Just . VIn $ Ident (Ann ()) "to"))
             []
             Nothing
             Nothing

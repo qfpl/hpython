@@ -1,4 +1,5 @@
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language FlexibleInstances, MultiParamTypeClasses #-}
 
 {-|
 Module      : Language.Python.Syntax.Module
@@ -14,6 +15,10 @@ module Language.Python.Syntax.Module
   )
 where
 
+import GHC.Generics (Generic)
+
+import Language.Python.Optics.Exprs
+import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Whitespace
 
@@ -24,7 +29,7 @@ data Module v a
   | ModuleBlankFinal (Blank a)
   | ModuleBlank (Blank a) Newline (Module v a)
   | ModuleStatement (Statement v a) (Module v a)
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
 instance HasStatements Module where
   _Statements f = go
@@ -33,3 +38,6 @@ instance HasStatements Module where
       go (ModuleBlankFinal a) = pure $ ModuleBlankFinal a
       go (ModuleBlank a b c) = ModuleBlank a b <$> go c
       go (ModuleStatement a b) = ModuleStatement <$> f a <*> go b
+
+instance HasExprs Module Expr where
+  _Exprs = _Statements._Exprs

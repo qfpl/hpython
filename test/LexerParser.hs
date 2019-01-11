@@ -2,20 +2,20 @@
 module LexerParser (lexerParserTests) where
 
 import Hedgehog
+import Control.Lens.Review ((#))
 import Control.Monad (void)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as Text
 
 import Language.Python.DSL
+import Language.Python.Optics.Expr
 import Language.Python.Render
 import Language.Python.Parse (parseModule, parseStatement, parseExpr, parseExprList)
-import Language.Python.Syntax.CommaSep (CommaSep(..), Comma(..))
-import Language.Python.Syntax.Expr (Expr(..))
+import Language.Python.Syntax.Ann
+import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Strings
-  ( StringLiteral(..), StringType(..), QuoteType(..), PyChar(..)
-  , RawBytesPrefix(..), RawStringPrefix(..)
-  )
-import Language.Python.Syntax.Whitespace (Whitespace(..))
+import Language.Python.Syntax.Types
+import Language.Python.Syntax.Whitespace
 
 import Helpers (shouldBeParseSuccess, shouldBeParseFailure)
 
@@ -288,14 +288,18 @@ prop_fulltrip_26 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
-            (pure $
-             RawBytesLiteral ()
-               Prefix_br
-               LongString
-               SingleQuote
-               [ Char_esc_bslash ]
-               [])
+          _String #
+          MkString
+          { _stringAnn = Ann ()
+          , _stringValue =
+            pure $
+            RawBytesLiteral (Ann ())
+              Prefix_br
+              LongString
+              SingleQuote
+              [ Char_esc_bslash ]
+              []
+          }
     annotateShow str
 
     res <- shouldBeParseSuccess parseExpr str
@@ -306,14 +310,18 @@ prop_fulltrip_27 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
-            (pure $
-             RawStringLiteral ()
-               Prefix_r
-               LongString
-               SingleQuote
-               [ Char_lit '\\', Char_lit '\\', Char_lit '\\', Char_lit '\'' ]
-               [])
+          _String #
+          MkString
+          { _stringAnn = Ann ()
+          , _stringValue =
+            pure $
+            RawStringLiteral (Ann ())
+              Prefix_r
+              LongString
+              SingleQuote
+              [ Char_lit '\\', Char_lit '\\', Char_lit '\\', Char_lit '\'' ]
+              []
+          }
     annotateShow str
 
     res <- shouldBeParseSuccess parseExpr str
@@ -324,14 +332,18 @@ prop_fulltrip_28 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
-            (pure $
-             RawStringLiteral ()
-               Prefix_r
-               ShortString
-               DoubleQuote
-               [ Char_lit '\\' ]
-               [])
+          _String #
+          MkString
+          { _stringAnn = Ann ()
+          , _stringValue =
+            pure $
+            RawStringLiteral (Ann ())
+              Prefix_r
+              ShortString
+              DoubleQuote
+              [ Char_lit '\\' ]
+              []
+          }
     annotateShow str
 
     res <- shouldBeParseSuccess parseExpr str
@@ -342,14 +354,18 @@ prop_fulltrip_29 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
-            (pure $
-             RawStringLiteral ()
-               Prefix_r
-               ShortString
-               DoubleQuote
-               [ Char_lit '\\', Char_lit '\\' ]
-               [])
+          _String #
+          MkString
+          { _stringAnn = Ann ()
+          , _stringValue =
+            pure $
+            RawStringLiteral (Ann ())
+              Prefix_r
+              ShortString
+              DoubleQuote
+              [ Char_lit '\\', Char_lit '\\' ]
+              []
+          }
     annotateShow str
 
     res <- shouldBeParseSuccess parseExpr str
@@ -360,14 +376,18 @@ prop_fulltrip_30 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
-            (pure $
-             RawStringLiteral ()
-               Prefix_r
-               ShortString
-               DoubleQuote
-               [ Char_lit '\\', Char_lit '\\', Char_lit '\\' ]
-               [])
+          _String #
+          MkString
+          { _stringAnn = Ann ()
+          , _stringValue =
+            pure $
+            RawStringLiteral (Ann ())
+              Prefix_r
+              ShortString
+              DoubleQuote
+              [ Char_lit '\\', Char_lit '\\', Char_lit '\\' ]
+              []
+          }
     annotateShow str
 
     res <- shouldBeParseSuccess parseExpr str
@@ -385,14 +405,18 @@ prop_fulltrip_32 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
-            (pure $
-             RawStringLiteral ()
-               Prefix_r
-               LongString
-               DoubleQuote
-               [ Char_lit ' ', Char_lit '"' ]
-               [])
+          _String #
+          MkString
+          { _stringAnn = Ann ()
+          , _stringValue =
+            pure $
+            RawStringLiteral (Ann ())
+              Prefix_r
+              LongString
+              DoubleQuote
+              [ Char_lit ' ', Char_lit '"' ]
+              []
+          }
     annotateShow str
 
     res <- shouldBeParseSuccess parseExpr str
@@ -403,14 +427,18 @@ prop_fulltrip_33 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
-            (pure $
-             RawStringLiteral ()
-               Prefix_r
-               LongString
-               DoubleQuote
-               [ Char_lit '"', Char_lit ' ' ]
-               [])
+          _String #
+          MkString
+          { _stringAnn = Ann ()
+          , _stringValue =
+            pure $
+            RawStringLiteral (Ann ())
+              Prefix_r
+              LongString
+              DoubleQuote
+              [ Char_lit '"', Char_lit ' ' ]
+              []
+          }
     annotateShow str
 
     res <- shouldBeParseSuccess parseExpr str
@@ -421,14 +449,20 @@ prop_fulltrip_34 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
-            (pure $
-             RawStringLiteral ()
-               Prefix_r
-               LongString
-               DoubleQuote
-               [ Char_lit '"' ]
-               [])
+
+          _String #
+          MkString
+          { _stringAnn = Ann ()
+          , _stringValue =
+            pure $
+            RawStringLiteral (Ann ())
+              Prefix_r
+              LongString
+              DoubleQuote
+              [ Char_lit '"' ]
+              []
+          }
+
     annotateShow str
 
     res <- shouldBeParseSuccess parseExpr str
@@ -439,9 +473,13 @@ prop_fulltrip_35 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
-            (pure $
-             RawStringLiteral ()
+
+          _String #
+          MkString
+          { _stringAnn = Ann ()
+          , _stringValue =
+             pure $
+             RawStringLiteral (Ann ())
                Prefix_r
                LongString
                DoubleQuote
@@ -449,7 +487,9 @@ prop_fulltrip_35 =
                , Char_esc_bslash
                , Char_esc_doublequote
                ]
-               [])
+               []
+          }
+
     annotateShow str
 
     res <- shouldBeParseSuccess parseExpr str
@@ -460,13 +500,19 @@ prop_fulltrip_36 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
-            (RawStringLiteral ()
+
+          _String #
+          MkString
+          { _stringAnn = Ann ()
+          , _stringValue =
+            RawStringLiteral (Ann ())
                Prefix_r
                LongString
                SingleQuote
                [Char_lit '\\', Char_esc_bslash] [] :|
-            [])
+            []
+          }
+
     annotateShow str
 
     res <- shouldBeParseSuccess parseExpr str
@@ -484,13 +530,19 @@ prop_fulltrip_38 =
   withTests 1 . property $ do
     let str =
           showExpr $
-          String ()
-            (RawStringLiteral ()
+
+          _String #
+          MkString
+          { _stringAnn = Ann ()
+          , _stringValue =
+            RawStringLiteral (Ann ())
                Prefix_r
                LongString
                SingleQuote
                [Char_esc_bslash, Char_lit '\\'] [] :|
-            [])
+            []
+          }
+
     annotateShow str
 
     res <- shouldBeParseSuccess parseExpr str
@@ -529,11 +581,12 @@ prop_fulltrip_43 =
   withTests 1 . property $ do
     let
       e =
-        Yield
-        { _unsafeExprAnn = ()
-        , _unsafeYieldWhitespace = [Space]
-        , _unsafeYieldValue =
-            CommaSepMany (Ident (MkIdent () "a" [])) (MkComma [Space]) $
+        _Yield #
+        MkYield
+        { _yieldAnn = Ann ()
+        , _yieldWhitespace = [Space]
+        , _yieldValue =
+            CommaSepMany (_Ident # MkIdent (Ann ()) "a" []) (MkComma [Space]) $
             CommaSepMany (tuple_ [ti_ $ var_ "b"]) (MkComma []) $
             CommaSepNone
         }

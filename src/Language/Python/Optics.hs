@@ -25,6 +25,8 @@ module Language.Python.Optics
   , module Language.Python.Optics.Expr
     -- ** Classy Traversal
   , module Language.Python.Optics.Exprs
+    -- * Identifiers
+  , module Language.Python.Optics.Idents
     -- * Indentation
   , module Language.Python.Optics.Indents
     -- * Newlines
@@ -72,12 +74,12 @@ where
 import Control.Lens.Getter ((^.), view)
 import Control.Lens.Iso (Iso', iso, from)
 import Control.Lens.Traversal (Traversal)
-import Control.Lens.Wrapped (_Wrapped)
 import Control.Lens.Prism (Prism, prism)
 
 import Data.VFix
 import Language.Python.Optics.Expr
 import Language.Python.Optics.Exprs
+import Language.Python.Optics.Idents
 import Language.Python.Optics.Indents
 import Language.Python.Optics.Newlines
 import Language.Python.Optics.Validated
@@ -370,15 +372,6 @@ instance HasWith CompoundStatement where
 instance HasWith Statement where
   _With = _CompoundStatement._With
 
-_Ident :: Prism (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
-_Ident =
-  _Wrapped .
-  prism
-    Ident
-    (\case
-        Ident a -> Right a
-        a -> Left $ a ^. unvalidated)
-
 -- | 'Traversal' targeting the variables that would modified as a result of an assignment
 --
 -- Here are some examples of assignment targets:
@@ -417,7 +410,7 @@ assignTargets f e =
   case vout e of
     List a b c d -> (\c' -> VIn $ List a b c' d) <$> (traverse.traverse._Exprs.assignTargets) f c
     Parens a b c d -> (\c' -> VIn $ Parens a b c' d) <$> assignTargets f c
-    Ident a -> VIn . Ident <$> f a
+    Ident a b -> VIn . Ident a <$> f b
     Tuple a b c d ->
       (\b' d' -> VIn $ Tuple a b' c d') <$>
       (_Exprs.assignTargets) f b <*>
@@ -433,8 +426,8 @@ assignTargets f e =
     Call{} -> pure $ e ^. unvalidated
     None{} -> pure $ e ^. unvalidated
     Ellipsis{} -> pure $ e ^. unvalidated
-    BinOp{} -> pure $ e ^. unvalidated
-    UnOp{} -> pure $ e ^. unvalidated
+    Binary{} -> pure $ e ^. unvalidated
+    Unary{} -> pure $ e ^. unvalidated
     Int{} -> pure $ e ^. unvalidated
     Float{} -> pure $ e ^. unvalidated
     Imag{} -> pure $ e ^. unvalidated

@@ -12,6 +12,7 @@ import Data.Validation (Validation(..), _Success)
 import Language.Python.Validate
 import Language.Python.DSL
 import Language.Python.Optics
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Whitespace
 
 scopeTests :: Group
@@ -46,7 +47,7 @@ prop_scope_1 =
           , line_ . return_ $ var_ "a" .+ var_ "b" .+ var_ "c"
           ]
     res <- fullyValidate expr
-    res === Failure (FoundDynamic () (MkIdent () "c" []) :| [])
+    res === Failure (FoundDynamic () (MkIdent (Ann ()) "c" []) :| [])
 
 prop_scope_2 :: Property
 prop_scope_2 =
@@ -73,7 +74,7 @@ prop_scope_3 =
           [ line_ . return_ $ var_ "a" .+ var_ "b" .+ var_ "c" ]
     res <- fullyValidate expr
     annotateShow res
-    res === Failure (NotInScope (MkIdent () "c" []) :| [])
+    res === Failure (NotInScope (MkIdent (Ann ()) "c" []) :| [])
 
 prop_scope_4 :: Property
 prop_scope_4 =
@@ -86,7 +87,7 @@ prop_scope_4 =
           , line_ $ call_ (var_ "g") []
           ]
     res <- fullyValidate expr
-    res === Failure (NotInScope (MkIdent () "g" []) :| [])
+    res === Failure (NotInScope (MkIdent (Ann ()) "g" []) :| [])
 
 prop_scope_5 :: Property
 prop_scope_5 =
@@ -99,7 +100,7 @@ prop_scope_5 =
           ]
     res <- fullyValidate expr
     annotateShow res
-    res === Failure (NotInScope (MkIdent () "c" []) :| [])
+    res === Failure (NotInScope (MkIdent (Ann ()) "c" []) :| [])
 
 prop_scope_6 :: Property
 prop_scope_6 =
@@ -115,7 +116,7 @@ prop_scope_6 =
           ]
     res <- fullyValidate expr
     annotateShow res
-    res === Failure (FoundDynamic () (MkIdent () "x" []) :| [])
+    res === Failure (FoundDynamic () (MkIdent (Ann ()) "x" []) :| [])
 
 prop_scope_7 :: Property
 prop_scope_7 =
@@ -131,7 +132,7 @@ prop_scope_7 =
           ]
     res <- fullyValidate expr
     annotateShow res
-    res === Failure (FoundDynamic () (MkIdent () "x" []) :| [])
+    res === Failure (FoundDynamic () (MkIdent (Ann ()) "x" []) :| [])
 
 prop_scope_8 :: Property
 prop_scope_8 =
@@ -162,7 +163,7 @@ prop_scope_9 =
           ]
     res <- fullyValidate expr
     annotateShow res
-    res === Failure (FoundDynamic () (MkIdent () "x" []) :| [])
+    res === Failure (FoundDynamic () (MkIdent (Ann ()) "x" []) :| [])
 
 prop_scope_10 :: Property
 prop_scope_10 =
@@ -189,4 +190,4 @@ prop_scope_11 =
           ]
     res <- fullyValidate st
     annotateShow res
-    res === Failure (BadShadowing (MkIdent () "x" [Space]) :| [])
+    res === Failure (BadShadowing (MkIdent (Ann ()) "x" [Space]) :| [])

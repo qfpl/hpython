@@ -13,11 +13,12 @@ import Language.Python.DSL
 import Language.Python.Optics
 import Language.Python.Parse (parseModule, parseStatement, parseExpr)
 import Language.Python.Render (showStatement, showExpr)
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.CommaSep
-import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Strings
+import Language.Python.Syntax.Types
 import Language.Python.Syntax.Whitespace
 
 import Helpers
@@ -34,11 +35,13 @@ prop_syntax_1 =
     let
       e =
         -- lambda *: None
-        Lambda ()
+        _Lambda #
+        MkLambda
+          (Ann ())
           [Space]
-          (CommaSepMany (UnnamedStarParam () []) (MkComma []) CommaSepNone)
+          (CommaSepMany (UnnamedStarParam (Ann ()) []) (MkComma []) CommaSepNone)
           (MkColon [Space])
-          (None () [])
+          (_None # MkNone (Ann ()) [])
     res <- syntaxValidateExpr e
     shouldBeFailure res
 
@@ -50,18 +53,18 @@ prop_syntax_2 =
       e :: Statement '[] ()
       e =
         CompoundStatement .
-        Fundef () []
-          (Indents mempty ())
+        Fundef (Ann ()) []
+          (Indents mempty (Ann ()))
           Nothing
           (pure Space)
             "test"
             [] CommaSepNone [] Nothing .
-          SuiteMany () (MkColon []) Nothing LF $
+          SuiteMany (Ann ()) (MkColon []) Nothing LF $
           Block []
-            (SmallStatement (Indents [i] ()) $
-             MkSmallStatement (Pass () []) [] Nothing Nothing Nothing)
-            [Right . SmallStatement (Indents [i] ()) $
-             MkSmallStatement (Pass () []) [] Nothing Nothing Nothing]
+            (SmallStatement (Indents [i] (Ann ())) $
+             MkSmallStatement (Pass (Ann ()) []) [] Nothing Nothing Nothing)
+            [Right . SmallStatement (Indents [i] (Ann ())) $
+             MkSmallStatement (Pass (Ann ()) []) [] Nothing Nothing Nothing]
     res <- shouldBeParseSuccess parseStatement (showStatement e)
     res' <- shouldBeParseSuccess parseStatement (showStatement res)
     void res === void res'
@@ -80,12 +83,17 @@ prop_syntax_4 =
     let
       e :: Expr '[] ()
       e =
-        String () . pure $
-        StringLiteral ()
-          Nothing
-        ShortString SingleQuote
-        [Char_lit '\\', Char_lit 'u']
-        []
+        _String #
+        MkString
+        { _stringAnn = Ann ()
+        , _stringValue =
+          pure $
+          StringLiteral (Ann ())
+            Nothing
+          ShortString SingleQuote
+          [Char_lit '\\', Char_lit 'u']
+          []
+        }
     res <- shouldBeParseSuccess parseExpr (showExpr e)
     res' <- shouldBeParseSuccess parseExpr (showExpr res)
     void res === void res'
@@ -96,12 +104,17 @@ prop_syntax_5 =
     let
       e :: Expr '[] ()
       e =
-        String () . pure $
-        StringLiteral ()
-          Nothing
-        ShortString SingleQuote
-        [Char_lit '\\', Char_lit 'x']
-        []
+        _String #
+        MkString
+        { _stringAnn = Ann ()
+        , _stringValue =
+          pure $
+          StringLiteral (Ann ())
+            Nothing
+          ShortString SingleQuote
+          [Char_lit '\\', Char_lit 'x']
+          []
+        }
     res <- shouldBeParseSuccess parseExpr (showExpr e)
     res' <- shouldBeParseSuccess parseExpr (showExpr res)
     void res === void res'

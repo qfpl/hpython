@@ -2,17 +2,21 @@
 module FixMutableDefaultArguments where
 
 import Control.Lens.Cons (_head)
-import Control.Lens.Fold ((^..), (^?), filtered, folded, anyOf, has)
+import Control.Lens.Fold ((^..), (^?), filtered, folded, foldMapOf, has)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Review ((#))
 import Control.Lens.Setter ((.~), (%~))
 import Control.Monad (guard)
 import Data.Function ((&))
 import Data.Semigroup ((<>))
+import Data.Monoid (Any(..))
 
+import Data.VConst
+import Data.VFix
+import Data.VFoldable
 import Language.Python.DSL
 import Language.Python.Optics
-import Language.Python.Syntax.Expr (Expr(..), _Exprs)
+import Language.Python.Syntax
 
 {-
 
@@ -160,42 +164,48 @@ fixMutableDefaultArguments input = do
 
     -}
     isMutable :: Raw Expr -> Bool
-    isMutable Unit{} = False
-    isMutable None{} = False
-    isMutable Ellipsis{} = False
-    isMutable Lambda{} = False
-    isMutable Float{} = False
-    isMutable Imag{} = False
-    isMutable Int{} = False
-    isMutable Bool{} = False
-    isMutable String{} = False
+    isMutable e = unVConst $ vcata alg e
+      where
+        alg expr =
+          VConst $
+          case expr of
+            Unit{} -> False
+            None{} -> False
+            Ellipsis{} -> False
+            Lambda{} -> False
+            Float{} -> False
+            Imag{} -> False
+            Int{} -> False
+            Bool{} -> False
+            String{} -> False
 
-    isMutable List{} = True
-    isMutable ListComp{} = True
-    isMutable Deref{} = True
-    isMutable Call{} = True
-    isMutable BinOp{} = True
-    isMutable UnOp{} = True
-    isMutable Not{} = True
-    isMutable DictComp{} = True
-    isMutable Dict{} = True
-    isMutable Ident{} = True
-    isMutable Yield{} = True
-    isMutable Await{} = True
-    isMutable YieldFrom{} = True
-    isMutable SetComp{} = True
-    isMutable Set{} = True
-    isMutable Subscript{} = True
-    isMutable Generator{} = True
+            List{} -> True
+            ListComp{} -> True
+            Deref{} -> True
+            Call{} -> True
+            Binary{} -> True
+            Unary{} -> True
+            Not{} -> True
+            DictComp{} -> True
+            Dict{} -> True
+            Ident{} -> True
+            Yield{} -> True
+            Await{} -> True
+            YieldFrom{} -> True
+            SetComp{} -> True
+            Set{} -> True
+            Subscript{} -> True
+            Generator{} -> True
 
-    isMutable (Ternary _ _ _ a _ b) = isMutable a || isMutable b
-    isMutable (Parens _ _ a _) = isMutable a
-    isMutable (Tuple _ a _ as) =
-      {-
+            Ternary _ _ _ a _ b -> unVConst a || unVConst b
+            Parens _ _ a _ -> unVConst a
+            Tuple _ a _ as ->
+              {-
 
-      Tuples contain many expressions, and are mutable if any of the sub-expressions
-      are mutable. The '_Exprs' traversal can get at all these sub-expressions
+              Tuples contain many expressions, and are mutable if any of the sub-expressions
+              are mutable. The '_Exprs' traversal can get at all these sub-expressions
 
-      -}
-      anyOf _Exprs isMutable a ||
-      anyOf (folded.folded._Exprs) isMutable as
+              -}
+              getAny $
+              vfoldMap (Any . unVConst) a <>
+              foldMapOf (folded.folded) (vfoldMap (Any . unVConst)) as

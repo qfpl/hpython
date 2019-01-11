@@ -43,7 +43,10 @@ import Language.Python.Syntax.Whitespace
 -- | Trailing commas can only be present in a parameter list of entirely
 -- positional arguments. This removes the bad trailing comma, and appends
 -- the comma's trailing whitespace to the previous token
-correctParams :: CommaSep (Param v a) -> CommaSep (Param v a)
+correctParams
+  :: HasTrailingWhitespace (expr v a)
+  => CommaSep (Param expr v a)
+  -> CommaSep (Param expr v a)
 correctParams CommaSepNone = CommaSepNone
 correctParams (CommaSepOne a) = CommaSepOne a
 correctParams (CommaSepMany a (MkComma b) c) =

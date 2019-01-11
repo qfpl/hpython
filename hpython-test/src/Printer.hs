@@ -7,8 +7,11 @@ import qualified Hedgehog.Range as Range
 
 import Data.Foldable (traverse_)
 import Data.List.NonEmpty (NonEmpty(..))
+
+import Data.VFix
 import Language.Python.Render
 import Language.Python.Internal.Render.Correction
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Strings
 
@@ -22,33 +25,37 @@ prop_printer_1 =
   withTests 1 . property $ do
     let
       e1 =
-        String () $
-        StringLiteral () Nothing ShortString SingleQuote [] [] :|
-        [StringLiteral () Nothing ShortString SingleQuote [] []]
+        VIn .
+        String (Ann ()) $
+        StringLiteral (Ann ()) Nothing ShortString SingleQuote [] [] :|
+        [StringLiteral (Ann ()) Nothing ShortString SingleQuote [] []]
 
     showExpr e1 === "'' ''"
 
     let
       e2 =
-        String () $
-        StringLiteral () Nothing ShortString DoubleQuote [] [] :|
-        [StringLiteral () Nothing ShortString DoubleQuote [] []]
+        VIn .
+        String (Ann ()) $
+        StringLiteral (Ann ()) Nothing ShortString DoubleQuote [] [] :|
+        [StringLiteral (Ann ()) Nothing ShortString DoubleQuote [] []]
 
     showExpr e2 === "\"\" \"\""
 
     let
       e3 =
-        String () $
-        StringLiteral () Nothing ShortString SingleQuote [] [] :|
-        [StringLiteral () Nothing ShortString DoubleQuote [] []]
+        VIn .
+        String (Ann ()) $
+        StringLiteral (Ann ()) Nothing ShortString SingleQuote [] [] :|
+        [StringLiteral (Ann ()) Nothing ShortString DoubleQuote [] []]
 
     showExpr e3 === "''\"\""
 
     let
       e4 =
-        String () $
-        StringLiteral () Nothing ShortString SingleQuote [] [] :|
-        [StringLiteral () (Just Prefix_u) ShortString SingleQuote [] []]
+        VIn .
+        String (Ann ()) $
+        StringLiteral (Ann ()) Nothing ShortString SingleQuote [] [] :|
+        [StringLiteral (Ann ()) (Just Prefix_u) ShortString SingleQuote [] []]
 
     showExpr e4 === "''u''"
 
@@ -118,8 +125,9 @@ prop_printer_6 =
     let
       s = [Char_lit '\\', Char_esc_bslash]
       e =
-        String () $
-        RawBytesLiteral () Prefix_br ShortString SingleQuote s [] :|
+        VIn .
+        String (Ann ()) $
+        RawBytesLiteral (Ann ()) Prefix_br ShortString SingleQuote s [] :|
         []
 
     correctBackslashes s === [Char_esc_bslash, Char_esc_bslash]
@@ -131,8 +139,9 @@ prop_printer_7 =
     let
       s = [Char_newline, Char_lit '\\', Char_esc_doublequote]
       e =
-        String () $
-        StringLiteral () Nothing ShortString DoubleQuote s [] :|
+        VIn .
+        String (Ann ()) $
+        StringLiteral (Ann ()) Nothing ShortString DoubleQuote s [] :|
         []
 
     showExpr e === "\"\\newline\\\\\\\"\""

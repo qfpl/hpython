@@ -1,4 +1,5 @@
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language OverloadedStrings #-}
 {-# language LambdaCase #-}
 {-# language TemplateHaskell #-}
@@ -48,13 +49,16 @@ module Language.Python.Syntax.Strings
   )
 where
 
-import Control.Lens.Lens (lens)
+import Control.Lens.Lens (Lens', lens)
 import Control.Lens.TH (makeLensesFor)
 import Data.Digit.Octal (OctDigit)
 import Data.Digit.Hexadecimal.MixedCase (HeXDigit(..))
+import Data.Generics.Product.Typed (typed)
 import Data.Maybe (isJust)
 import Data.Text (Text)
+import GHC.Generics (Generic)
 
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Whitespace
 
 -- | Double or single quotation marks?
@@ -68,7 +72,7 @@ import Language.Python.Syntax.Whitespace
 data QuoteType
   = SingleQuote
   | DoubleQuote
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 -- | Three pairs of quotations or one?
 --
@@ -81,7 +85,7 @@ data QuoteType
 data StringType
   = ShortString
   | LongString
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 -- | In Python 3.5, a prefix of @u@ or @U@ is allowed, but doesn't have any
 -- meaning. They exist for backwards compatibility with Python 2.
@@ -90,19 +94,19 @@ data StringType
 data StringPrefix
   = Prefix_u
   | Prefix_U
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 -- | Raw strings are prefixed with either @r@ or @R@.
 data RawStringPrefix
   = Prefix_r
   | Prefix_R
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 -- | This prefix indicates it's a bytes literal rather than a string literal.
 data BytesPrefix
   = Prefix_b
   | Prefix_B
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 -- | A string of raw bytes can be indicated by a number of prefixes
 data RawBytesPrefix
@@ -114,7 +118,7 @@ data RawBytesPrefix
   | Prefix_rB
   | Prefix_Rb
   | Prefix_RB
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 -- | Most types of 'StringLiteral' have prefixes. Plain old strings may have
 -- an optional prefix, but it is meaningless.
@@ -131,7 +135,7 @@ hasPrefix BytesLiteral{} = True
 -- trailing whitespace.
 data StringLiteral a
   = RawStringLiteral
-  { _stringLiteralAnn :: a
+  { _stringLiteralAnn :: Ann a
   , _unsafeRawStringLiteralPrefix :: RawStringPrefix
   , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
@@ -139,7 +143,7 @@ data StringLiteral a
   , _stringLiteralWhitespace :: [Whitespace]
   }
   | StringLiteral
-  { _stringLiteralAnn :: a
+  { _stringLiteralAnn :: Ann a
   , _unsafeStringLiteralPrefix :: Maybe StringPrefix
   , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
@@ -147,7 +151,7 @@ data StringLiteral a
   , _stringLiteralWhitespace :: [Whitespace]
   }
   | RawBytesLiteral
-  { _stringLiteralAnn :: a
+  { _stringLiteralAnn :: Ann a
   , _unsafeRawBytesLiteralPrefix :: RawBytesPrefix
   , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
@@ -155,14 +159,18 @@ data StringLiteral a
   , _stringLiteralWhitespace :: [Whitespace]
   }
   | BytesLiteral
-  { _stringLiteralAnn :: a
+  { _stringLiteralAnn :: Ann a
   , _unsafeBytesLiteralPrefix :: BytesPrefix
   , _stringLiteralStringType :: StringType
   , _stringLiteralQuoteType :: QuoteType
   , _stringLiteralValue :: [PyChar]
   , _stringLiteralWhitespace :: [Whitespace]
   }
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn StringLiteral where
+  annot :: forall a. Lens' (StringLiteral a) (Ann a)
+  annot = typed @(Ann a)
 
 instance HasTrailingWhitespace (StringLiteral a) where
   trailingWhitespace =
@@ -229,7 +237,7 @@ data PyChar
   | Char_esc_v
   -- | Any character
   | Char_lit Char
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 -- | Determine whether a 'PyChar' is an escape character or not.
 isEscape :: PyChar -> Bool

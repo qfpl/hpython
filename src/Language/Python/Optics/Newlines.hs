@@ -50,18 +50,18 @@ instance (HasNewlines a, HasNewlines b, HasNewlines c, HasNewlines d) => HasNewl
     _Newlines f c <*>
     _Newlines f d
 
-instance HasNewlines (e a) => HasNewlines (ImportAs e v a) where
+instance HasNewlines (e v a) => HasNewlines (ImportAs e v a) where
   _Newlines f (ImportAs a b c) =
     ImportAs a <$>
     _Newlines f b <*>
     _Newlines f c
 
 instance HasNewlines (RelativeModuleName v a) where
-  _Newlines f (RelativeWithName a b) =
-    RelativeWithName <$>
+  _Newlines f (RelativeWithName ann a b) =
+    RelativeWithName ann <$>
     _Newlines f a <*>
     _Newlines f b
-  _Newlines f (Relative a) = Relative <$> _Newlines f a
+  _Newlines f (Relative ann a) = Relative ann <$> _Newlines f a
 
 instance (HasNewlines a, HasNewlines b) => HasNewlines (Either a b) where
   _Newlines f (Left a) = Left <$> _Newlines f a
@@ -292,7 +292,7 @@ instance HasNewlines (expr v a) => HasNewlines (DictItem expr v a) where
     _Newlines f b <*>
     _Newlines f c
 
-instance HasNewlines (expr v a) => HasNewlines (Subscript expr v a) where
+instance HasNewlines (expr v a) => HasNewlines (SubscriptItem expr v a) where
   _Newlines f (SubscriptExpr a) = SubscriptExpr <$> _Newlines f a
   _Newlines f (SubscriptSlice a b c d) =
     SubscriptSlice <$>
@@ -377,13 +377,13 @@ instance HasNewlines (expr v a) => HasNewlines (ExprF expr v a) where
         _Newlines fun e
       None a b -> None a <$> _Newlines fun b
       Ellipsis a b -> Ellipsis a <$> _Newlines fun b
-      BinOp a b c d ->
-        BinOp a <$>
+      Binary a b c d ->
+        Binary a <$>
         _Newlines fun b <*>
         _Newlines fun c <*>
         _Newlines fun d
-      UnOp a b c ->
-        UnOp a <$>
+      Unary a b c ->
+        Unary a <$>
         _Newlines fun b <*>
         _Newlines fun c
       Parens a b c d ->
@@ -391,7 +391,7 @@ instance HasNewlines (expr v a) => HasNewlines (ExprF expr v a) where
         _Newlines fun b <*>
         _Newlines fun c <*>
         _Newlines fun d
-      Ident a -> Ident <$> _Newlines fun a
+      Ident a b -> Ident a <$> _Newlines fun b
       Int a b c -> Int a b <$> _Newlines fun c
       Float a b c -> Float a b <$> _Newlines fun c
       Imag a b c -> Imag a b <$> _Newlines fun c

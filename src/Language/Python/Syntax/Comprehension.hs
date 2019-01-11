@@ -4,14 +4,15 @@ Comprehensions https://docs.python.org/3/reference/expressions.html#grammar-toke
 
 -}
 
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language DataKinds, KindSignatures #-}
+{-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 module Language.Python.Syntax.Comprehension where
 
 import Control.Lens.Cons (_last)
 import Control.Lens.Fold ((^?!))
 import Control.Lens.Getter ((^.))
-import Control.Lens.Lens (lens)
+import Control.Lens.Lens (Lens', lens)
 import Control.Lens.Prism (_Left, _Right)
 import Control.Lens.Setter ((.~))
 import Control.Lens.Traversal (failing)
@@ -19,15 +20,26 @@ import Data.Bifoldable (bifoldMap)
 import Data.Bifunctor (bimap)
 import Data.Bitraversable (bitraverse)
 import Data.Function ((&))
+import Data.Generics.Product.Typed (typed)
+import GHC.Generics (Generic)
 
+import Data.VFoldable
+import Data.VFunctor
 import Data.VTraversable
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Whitespace
 
 -- | A condition inside a comprehension, e.g. @[x for x in xs if even(x)]@
 data CompIf expr (v :: [*]) a
-  = CompIf a [Whitespace] (expr v a)
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  = CompIf (Ann a) [Whitespace] (expr v a)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasAnn (CompIf expr v) where
+  annot :: forall a. Lens' (CompIf expr v a) (Ann a)
+  annot = typed @(Ann a)
+
+instance VFunctor CompIf where; vfmap = vfmapDefault
+instance VFoldable CompIf where; vfoldMap = vfoldMapDefault
 instance VTraversable CompIf where
   vtraverse f (CompIf a b c) = CompIf a b <$> f c
 
@@ -39,9 +51,15 @@ instance HasTrailingWhitespace (e v a) => HasTrailingWhitespace (CompIf e v a) w
 
 -- | A nested comprehesion, e.g. @[(x, y) for x in xs for y in ys]@
 data CompFor expr (v :: [*]) a
-  = CompFor a [Whitespace] (expr v a) [Whitespace] (expr v a)
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  = CompFor (Ann a) [Whitespace] (expr v a) [Whitespace] (expr v a)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasAnn (CompFor expr v) where
+  annot :: forall a. Lens' (CompFor expr v a) (Ann a)
+  annot = typed @(Ann a)
+
+instance VFunctor CompFor where; vfmap = vfmapDefault
+instance VFoldable CompFor where; vfoldMap = vfoldMapDefault
 instance VTraversable CompFor where
   vtraverse f (CompFor a b c d e) = (\c' -> CompFor a b c' d) <$> f c <*> f e
 
@@ -57,12 +75,28 @@ instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (CompFor expr
 -- x for y in z
 -- @
 data Comprehension h expr (v :: [*]) a
-  = Comprehension a
+  = Comprehension
+      (Ann a)
       (h expr v a)
       (CompFor expr v a)
       [Either (CompFor expr v a) (CompIf expr v a)] -- ^ <expr> <comp_for> (comp_for | comp_if)*
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
+instance HasAnn (Comprehension h expr v) where
+  annot :: forall a. Lens' (Comprehension h expr v a) (Ann a)
+  annot = typed @(Ann a)
+
+instance VFunctor h => VFunctor (Comprehension h) where
+  vfmap f (Comprehension a b c d) =
+    Comprehension a
+    (vfmap f b)
+    (vfmap f c)
+    (fmap (bimap (vfmap f) (vfmap f)) d)
+instance VFoldable h => VFoldable (Comprehension h) where
+  vfoldMap f (Comprehension _ b c d) =
+    vfoldMap f b <>
+    vfoldMap f c <>
+    foldMap (bifoldMap (vfoldMap f) (vfoldMap f)) d
 instance VTraversable h => VTraversable (Comprehension h) where
   vtraverse f (Comprehension a b c d) =
     Comprehension a <$>
@@ -87,16 +121,19 @@ instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (Comprehensio
 
 instance (Functor (expr v), Functor (h expr v)) => Functor (Comprehension h expr v) where
   fmap f (Comprehension a b c d) =
-    Comprehension (f a) (fmap f b) (fmap f c) (fmap (bimap (fmap f) (fmap f)) d)
+    Comprehension (fmap f a) (fmap f b) (fmap f c) (fmap (bimap (fmap f) (fmap f)) d)
 
 instance (Foldable (expr v), Foldable (h expr v)) => Foldable (Comprehension h expr v) where
   foldMap f (Comprehension a b c d) =
-    f a <> foldMap f b <> foldMap f c <> foldMap (bifoldMap (foldMap f) (foldMap f)) d
+    foldMap f a <>
+    foldMap f b <>
+    foldMap f c <>
+    foldMap (bifoldMap (foldMap f) (foldMap f)) d
 
 instance (Traversable (expr v), Traversable (h expr v)) => Traversable (Comprehension h expr v) where
   traverse f (Comprehension a b c d) =
     Comprehension <$>
-    f a <*>
+    traverse f a <*>
     traverse f b <*>
     traverse f c <*>
     traverse (bitraverse (traverse f) (traverse f)) d

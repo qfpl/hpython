@@ -15,14 +15,17 @@ import System.Directory
 import System.Exit
 import System.Process
 
+import Language.Python.Optics.Expr (_String)
 import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Parse (SrcInfo, parseStatement, parseExpr, parseExprList)
 import Language.Python.Parse.Error (ParseError)
 import Language.Python.Render
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Module
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Strings
+import Language.Python.Syntax.Types
 import Language.Python.Validate
 
 import Hedgehog
@@ -142,7 +145,15 @@ string_correct path =
     str <- forAll $ Gen.list (Range.constant 0 100) Gen.unicode
     qt <- forAll $ Gen.element [SingleQuote, DoubleQuote]
     st <- forAll $ Gen.element [ShortString, LongString]
-    let ex = String () . pure $ StringLiteral () Nothing st qt (fromHaskellString str) []
+    let
+      ex =
+        _String #
+        MkString
+        { _stringAnn = Ann ()
+        , _stringValue =
+          pure $ StringLiteral (Ann ()) Nothing st qt (fromHaskellString str) []
+        }
+
     goodExpr path ex
 
     let ex' = showExpr ex

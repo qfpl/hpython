@@ -51,7 +51,7 @@ lens_setSet l ms mb = do
 parameters_lens
   :: (Eq (Raw s), Show (Raw s), ParametersSyntax s)
   => Gen (Raw s)
-  -> Gen (Raw Param)
+  -> Gen (Raw (Param Expr))
   -> PropertyT IO ()
 parameters_lens ms mp = do
   lens_setGet parameters_ ms (Gen.list (Range.constant 0 10) mp)

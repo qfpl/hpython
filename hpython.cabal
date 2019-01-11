@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                hpython
-version:             0.1.0.1
+version:             0.2
 synopsis:            Python language tools
 description:
   `hpython` provides an abstract syntax tree for Python 3.5, along with a parser,
@@ -35,6 +35,10 @@ extra-source-files:  ChangeLog.md
                      test/files/indent_optics_out.py
                      test/files/indent_optics_in2.py
                      test/files/indent_optics_out2.py
+                     test/files/exprs_optics_in1.py
+                     test/files/exprs_optics_out1.py
+                     test/files/idents_optics_in1.py
+                     test/files/idents_optics_out1.py
                      test/files/joblib.py
                      test/files/joblib2.py
                      test/files/mypy.py
@@ -74,7 +78,10 @@ flag development
 library
   exposed-modules:     Data.Type.Set
                      , Data.Validate.Monadic
+                     , Data.VConst
                      , Data.VFix
+                     , Data.VFoldable
+                     , Data.VFunctor
                      , Data.VIdentity
                      , Data.VTraversable
                      , Language.Python
@@ -88,6 +95,7 @@ library
                      , Language.Python.Optics
                      , Language.Python.Optics.Expr
                      , Language.Python.Optics.Exprs
+                     , Language.Python.Optics.Idents
                      , Language.Python.Optics.Indents
                      , Language.Python.Optics.Newlines
                      , Language.Python.Optics.Validated
@@ -95,6 +103,7 @@ library
                      , Language.Python.Parse.Error
                      , Language.Python.Render
                      , Language.Python.Syntax
+                     , Language.Python.Syntax.Ann
                      , Language.Python.Syntax.AugAssign
                      , Language.Python.Syntax.Arg
                      , Language.Python.Syntax.CommaSep
@@ -132,6 +141,7 @@ library
                      , parsers >= 0.10 && < 0.13
                      , megaparsec >=6.3 && <7
                      , fingertree >=0.1 && <0.2
+                     , generic-lens >=1.0 && <1.2
                      , mtl >= 2.1 && < 2.3
                      , containers >=0.5.7.1 && <0.7
                      , deriving-compat >=0.4 && <0.6
@@ -157,6 +167,7 @@ executable example
                      , FixMutableDefaultArguments
                      , OptimizeTailRecursion
                      , Programs
+                     , Recase
                      , Validation
   hs-source-dirs:      example
   build-depends:       base >=4.9 && <5, lens, hpython, text
@@ -166,7 +177,6 @@ executable example
                        -Wunused-imports
   if flag(development)
     ghc-options:       -Werror
-
 
 benchmark bench
   main-is:             Main.hs

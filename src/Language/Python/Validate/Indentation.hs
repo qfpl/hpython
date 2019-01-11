@@ -57,6 +57,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Optics
 import Language.Python.Optics.Validated (unvalidated)
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Module
 import Language.Python.Syntax.Expr
@@ -104,20 +105,20 @@ checkIndent i =
       GreaterThan ->
         case (absolute1Comparison, absolute8Comparison) of
           (GT, GT) -> pure i
-          (GT, _) -> errorVM $ pure (_TabError # a)
-          (_, GT) -> errorVM $ pure (_TabError # a)
+          (GT, _) -> errorVM $ pure (_TabError # getAnn a)
+          (_, GT) -> errorVM $ pure (_TabError # getAnn a)
           (EQ, EQ) -> errorVM $ pure (_ExpectedGreaterThan # (i', i))
-          (_, EQ) -> errorVM $ pure (_TabError # a)
-          (EQ, _) -> errorVM $ pure (_TabError # a)
+          (_, EQ) -> errorVM $ pure (_TabError # getAnn a)
+          (EQ, _) -> errorVM $ pure (_TabError # getAnn a)
           (LT, LT) -> errorVM $ pure (_ExpectedGreaterThan # (i', i))
       EqualTo ->
         case (absolute1Comparison, absolute8Comparison) of
           (EQ, EQ) -> pure i
-          (EQ, _) -> errorVM $ pure (_TabError # a)
-          (_, EQ) -> errorVM $ pure (_TabError # a)
+          (EQ, _) -> errorVM $ pure (_TabError # getAnn a)
+          (_, EQ) -> errorVM $ pure (_TabError # getAnn a)
           (GT, GT) -> errorVM $ pure (_ExpectedEqualTo # (i', i))
-          (_, GT) -> errorVM $ pure (_TabError # a)
-          (GT, _) -> errorVM $ pure (_TabError # a)
+          (_, GT) -> errorVM $ pure (_TabError # getAnn a)
+          (GT, _) -> errorVM $ pure (_TabError # getAnn a)
           (LT, LT) -> errorVM $ pure (_ExpectedEqualTo # (i', i))
 
 setNextIndent :: NextIndent -> [Indent] -> ValidateIndentation e ()
@@ -147,7 +148,7 @@ validateBlankIndentation
   -> ValidateIndentation e (Blank a)
 validateBlankIndentation (Blank a ws cmt) =
   if any (\case; Continued{} -> True; _ -> False) ws
-  then errorVM1 $ _EmptyContinuedLine # a
+  then errorVM1 $ _EmptyContinuedLine # getAnn a
   else pure $ Blank a ws cmt
 
 validateBlockIndentation
@@ -216,14 +217,14 @@ validateExprIndentation e = pure $ unsafeCoerce e
 
 validateParamsIndentation
   :: AsIndentationError e a
-  => CommaSep (Param v a)
-  -> ValidateIndentation e (CommaSep (Param (Nub (Indentation ': v)) a))
+  => CommaSep (Param Expr v a)
+  -> ValidateIndentation e (CommaSep (Param Expr (Nub (Indentation ': v)) a))
 validateParamsIndentation e = pure $ unsafeCoerce e
 
 validateArgsIndentation
   :: AsIndentationError e a
-  => CommaSep (Arg v a)
-  -> ValidateIndentation e (CommaSep (Arg (Nub (Indentation ': v)) a))
+  => CommaSep (Arg Expr v a)
+  -> ValidateIndentation e (CommaSep (Arg Expr (Nub (Indentation ': v)) a))
 validateArgsIndentation e = pure $ unsafeCoerce e
 
 validateExceptAsIndentation

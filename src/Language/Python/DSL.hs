@@ -424,7 +424,10 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe)
 import Data.Semigroup ((<>))
 
+import Data.VFix
+import Data.VIdentity
 import Language.Python.Optics
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
@@ -473,7 +476,7 @@ makeWrapped ''Line
 
 -- | Create a blank 'Line'
 blank_ :: Raw Line
-blank_ = Line $ Left (Blank () [] Nothing, LF)
+blank_ = Line $ Left (Blank (Ann ()) [] Nothing, LF)
 
 -- | Convert some data to a 'Line'
 class AsLine s where
@@ -481,11 +484,11 @@ class AsLine s where
 
 instance AsLine SmallStatement where
   line_ ss =
-    Line . Right $ SmallStatement (Indents [] ()) ss
+    Line . Right $ SmallStatement (Indents [] (Ann ())) ss
 
 instance AsLine SimpleStatement where
   line_ ss =
-    Line . Right . SmallStatement (Indents [] ()) $
+    Line . Right . SmallStatement (Indents [] (Ann ())) $
     MkSmallStatement ss [] Nothing Nothing (Just LF)
 
 instance AsLine CompoundStatement where
@@ -510,9 +513,9 @@ instance AsLine Statement where
   line_ = Line . Right
 
 instance AsLine Expr where
-  line_ e = line_ $ Expr (e ^. exprAnn) e
+  line_ e = line_ $ Expr (e ^. annot) e
 
-instance HasExprs Line where
+instance HasExprs Line Expr where
   _Exprs f (Line a) = Line <$> (_Right._Exprs) f a
 
 instance HasStatements Line where
@@ -561,8 +564,8 @@ infix 0 .:
 -- | Constructing dictionary items
 --
 -- @('.:') :: 'Raw' 'Expr' -> 'Raw' 'Expr' -> 'Raw' 'DictItem'@
-instance ColonSyntax Expr DictItem where
-  (.:) a = DictItem () a (MkColon [Space])
+instance ColonSyntax Expr (DictItem Expr) where
+  (.:) a = DictItem (Ann ()) a (MkColon [Space])
 
 -- | Function parameter type annotations
 --
@@ -572,7 +575,7 @@ instance ColonSyntax Expr DictItem where
 -- as unnamed starred parameters cannot have type annotations.
 --
 -- See 'def_'
-instance ColonSyntax Param Param where
+instance ColonSyntax (Param Expr) (Param Expr) where
   (.:) p t = p & paramType_ ?~ (MkColon [Space], t)
 
 -- | Positional parameters/arguments
@@ -588,23 +591,23 @@ class PositionalSyntax p v | p -> v, v -> p where
   p_ :: Raw v -> Raw p
 
 -- | See 'def_'
-instance StarSyntax Ident Param where
-  s_ i = StarParam () [] i Nothing
+instance StarSyntax Ident (Param Expr) where
+  s_ i = StarParam (Ann ()) [] i Nothing
 
 -- | See 'def_'
-instance DoubleStarSyntax Ident Param where
-  ss_ i = DoubleStarParam () [] i Nothing
+instance DoubleStarSyntax Ident (Param Expr) where
+  ss_ i = DoubleStarParam (Ann ()) [] i Nothing
 
 class StarSyntax s t | t -> s where
   s_ :: Raw s -> Raw t
 
 -- | See 'call_'
-instance StarSyntax Expr Arg where
-  s_ = StarArg () []
+instance StarSyntax Expr (Arg Expr) where
+  s_ = StarArg (Ann ()) []
 
 -- | See 'call_'
-instance DoubleStarSyntax Expr Arg where
-  ss_ = DoubleStarArg () []
+instance DoubleStarSyntax Expr (Arg Expr) where
+  ss_ = DoubleStarArg (Ann ()) []
 
 -- | Keyword parameters/arguments
 --
@@ -623,29 +626,29 @@ class KeywordSyntax p where
 -- >>> def_ "a" [ p_ "b", star_ ] [ line_ pass_ ]
 -- def a(b, *):
 --     pass
-star_ :: Raw Param
-star_ = UnnamedStarParam () []
+star_ :: Raw (Param Expr)
+star_ = UnnamedStarParam (Ann ()) []
 
 class DoubleStarSyntax s t | t -> s where
   ss_ :: Raw s -> Raw t
 
 -- | See 'dict_'
-instance DoubleStarSyntax Expr DictItem where
-  ss_ = DictUnpack () []
+instance DoubleStarSyntax Expr (DictItem Expr) where
+  ss_ = DictUnpack (Ann ()) []
 
 -- | See 'def_'
-instance PositionalSyntax Param Ident where
-  p_ i = PositionalParam () i Nothing
+instance PositionalSyntax (Param Expr) Ident where
+  p_ i = PositionalParam (Ann ()) i Nothing
 
 -- | See 'def_'
-instance KeywordSyntax Param where
-  k_ a = KeywordParam () a Nothing []
+instance KeywordSyntax (Param Expr) where
+  k_ a = KeywordParam (Ann ()) a Nothing []
 
 -- | See 'call_'
-instance PositionalSyntax Arg Expr where; p_ = PositionalArg ()
+instance PositionalSyntax (Arg Expr) Expr where; p_ = PositionalArg (Ann ())
 
 -- | See 'call_'
-instance KeywordSyntax Arg where; k_ a = KeywordArg () a []
+instance KeywordSyntax (Arg Expr) where; k_ a = KeywordArg (Ann ()) a []
 
 class ParametersSyntax s where
   -- | A faux-Lens that allows targeting 'Param's in-between existing formatting,
@@ -680,12 +683,16 @@ class ParametersSyntax s where
   -- >>> set parameters_ [var_ "d", var_ "e"] (set parameters_ [] someFunction)
   -- def a(d, e):
   --     pass
-  parameters_ :: Functor f => ([Raw Param] -> f [Raw Param]) -> Raw s -> f (Raw s)
-  parameters :: Lens' (Raw s) (CommaSep (Raw Param))
+  parameters_
+    :: Functor f
+    => ([Raw (Param Expr)] -> f [Raw (Param Expr)])
+    -> Raw s
+    -> f (Raw s)
+  parameters :: Lens' (Raw s) (CommaSep (Raw (Param Expr)))
 
 class ArgumentsSyntax s where
-  setArguments :: [Raw Arg] -> Raw s -> Raw s
-  getArguments :: Raw s -> [Raw Arg]
+  setArguments :: [Raw (Arg Expr)] -> Raw s -> Raw s
+  getArguments :: Raw s -> [Raw (Arg Expr)]
 
 class DecoratorsSyntax s where
   setDecorators :: [Raw Expr] -> Raw s -> Raw s
@@ -696,7 +703,7 @@ decorated_ :: DecoratorsSyntax s => [Raw Expr] -> Raw s -> Raw s
 decorated_ = setDecorators
 
 exprsToDecorators :: Indents () -> [Raw Expr] -> [Raw Decorator]
-exprsToDecorators is = fmap (\e -> Decorator () is (MkAt []) e Nothing LF [])
+exprsToDecorators is = fmap (\e -> Decorator (Ann ()) is (MkAt []) e Nothing LF [])
 
 instance DecoratorsSyntax Fundef where
   decorators = fdDecorators
@@ -723,7 +730,7 @@ mkBody_ gIndents gBody f e =
     -- spaces.
     defaultIndent =
       fromMaybe
-        (Indents [replicate 4 Space ^. from indentWhitespaces] ())
+        (Indents [replicate 4 Space ^. from indentWhitespaces] (Ann ()))
         (e ^? gIndents)
 
     -- | The number of indentation chunks that precede the lines we're focusing on.
@@ -872,7 +879,10 @@ instance ParametersSyntax Fundef where
       ps = e ^. fdParameters
       ps' = f $ toList ps
 
-      go :: CommaSep (Raw Param) -> [Raw Param] -> CommaSep (Raw Param)
+      go
+        :: CommaSep (Raw (Param Expr))
+        -> [Raw (Param Expr)]
+        -> CommaSep (Raw (Param Expr))
       go CommaSepNone [] = CommaSepNone
       go CommaSepNone (x:xs) = listToCommaSep $ x:xs
       go CommaSepOne{} [] = CommaSepNone
@@ -890,9 +900,9 @@ instance ParametersSyntax Fundef where
 mkFundef :: Raw Ident -> [Raw Line] -> Raw Fundef
 mkFundef name body =
   MkFundef
-  { _fdAnn = ()
+  { _fdAnn = Ann ()
   , _fdDecorators = []
-  , _fdIndents = Indents [] ()
+  , _fdIndents = Indents [] (Ann ())
   , _fdAsync = Nothing
   , _fdDefSpaces = pure Space
   , _fdName = name
@@ -900,7 +910,7 @@ mkFundef name body =
   , _fdParameters = CommaSepNone
   , _fdRightParenSpaces = []
   , _fdReturnType = Nothing
-  , _fdBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _fdBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   }
 
 -- |
@@ -923,21 +933,21 @@ mkFundef name body =
 -- >>> def_ "f" [p_ "x" .: "String"] [line_ $ return_ "x"]
 -- def f(x: String):
 --     return x
-def_ :: Raw Ident -> [Raw Param] -> [Raw Line] -> Raw Fundef
+def_ :: Raw Ident -> [Raw (Param Expr)] -> [Raw Line] -> Raw Fundef
 def_ name params body = (mkFundef name body) { _fdParameters = listToCommaSep params }
 
 -- | Create a minimal valid 'Call'
-mkCall :: Raw Expr -> Raw Call
+mkCall :: Raw Expr -> Raw (Call Expr)
 mkCall e =
   MkCall
-  { _callAnn = ()
+  { _callAnn = Ann ()
   , _callFunction = e
   , _callLeftParen = []
   , _callArguments = Nothing
   , _callRightParen = []
   }
 
-instance ArgumentsSyntax Call where
+instance ArgumentsSyntax (Call Expr) where
   setArguments args code =
     code
     { _callArguments =
@@ -960,7 +970,7 @@ instance ArgumentsSyntax Call where
 --
 -- >>> call_ "f" [p_ $ var_ "x", k_ "y" 2, s_ "z", ss_ "w"]
 -- f(x, y=2, *z, **w)
-call_ :: Raw Expr -> [Raw Arg] -> Raw Expr
+call_ :: Raw Expr -> [Raw (Arg Expr)] -> Raw Expr
 call_ expr args =
   _Call #
   (mkCall expr)
@@ -976,8 +986,8 @@ call_ expr args =
 return_ :: Raw Expr -> Raw Statement
 return_ e =
   SmallStatement
-    (Indents [] ())
-    (MkSmallStatement (Return () [Space] $ Just e) [] Nothing Nothing (Just LF))
+    (Indents [] (Ann ()))
+    (MkSmallStatement (Return (Ann ()) [Space] $ Just e) [] Nothing Nothing (Just LF))
 
 -- | Turns an 'Expr' into a 'Statement'
 --
@@ -986,8 +996,8 @@ return_ e =
 expr_ :: Raw Expr -> Raw Statement
 expr_ e =
   SmallStatement
-    (Indents [] ())
-    (MkSmallStatement (Expr () e) [] Nothing Nothing (Just LF))
+    (Indents [] (Ann ()))
+    (MkSmallStatement (Expr (Ann ()) e) [] Nothing Nothing (Just LF))
 
 -- |
 -- >>> list_ [li_ $ var_ "a"]
@@ -1006,25 +1016,29 @@ class AsList s where
 
 class AsListItem s where
   -- | Create a 'ListItem'
-  li_ :: Raw s -> Raw ListItem
+  li_ :: Raw s -> Raw (ListItem Expr)
 
-instance AsListItem ListItem where
+instance AsListItem (ListItem Expr) where
   li_ = id
 
 instance AsListItem Expr where
-  li_ = ListItem ()
+  li_ = ListItem (Ann ())
 
 -- | See 'list_'
-instance StarSyntax Expr ListItem where
-  s_ = ListUnpack () [] []
+instance StarSyntax Expr (ListItem Expr) where
+  s_ = ListUnpack (Ann ()) [] []
 
-instance e ~ Raw ListItem => AsList [e] where
-  list_ es = List () [] (listToCommaSep1' es) []
+instance e ~ Raw (ListItem Expr) => AsList [e] where
+  list_ es = VIn $ List (Ann ()) [] (listToCommaSep1' es) []
 
-instance e ~ Comprehension Expr => AsList (Raw e) where
-  list_ c = ListComp () [] c []
+instance e ~ Comprehension VIdentity Expr => AsList (Raw e) where
+  list_ c = VIn $ ListComp (Ann ()) [] c []
 
-newtype Guard v a = MkGuard { unGuard :: Either (CompFor v a) (CompIf v a) }
+newtype Guard expr v a
+  = MkGuard
+  { unGuard
+    :: Either (CompFor expr v a) (CompIf expr v a)
+  }
 
 class ForSyntax a x | a -> x where
   for_ :: Raw x -> a
@@ -1034,16 +1048,16 @@ class ForSyntax a x | a -> x where
 --
 -- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") []
 -- a for a in b
-instance ForSyntax (Raw CompFor) In where
-  for_ (MkIn a b) = CompFor () [Space] a [Space] b
+instance ForSyntax (Raw (CompFor Expr)) In where
+  for_ (MkIn a b) = CompFor (Ann ()) [Space] a [Space] b
 
 -- |
 -- @'for_' :: 'Raw' 'In' -> 'Raw' 'Guard'@
 --
 -- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") [for_ $ var_ "c" `in_` var_ "d"]
 -- a for a in b for c in d
-instance ForSyntax (Raw Guard) In where
-  for_ (MkIn a b) = MkGuard . Left $ CompFor () [Space] a [Space] b
+instance ForSyntax (Raw (Guard Expr)) In where
+  for_ (MkIn a b) = MkGuard . Left $ CompFor (Ann ()) [Space] a [Space] b
 
 class IfSyntax a where
   if_ :: Raw Expr -> a
@@ -1053,8 +1067,8 @@ class IfSyntax a where
 --
 -- >>> comp_ (var_ "a") (for_ $ var_ "a" `in_` var_ "b") [if_ $ var_ "c" .== var_ "d"]
 -- a for a in b if c == d
-instance IfSyntax (Raw Guard) where
-  if_ = MkGuard . Right . CompIf () [Space]
+instance IfSyntax (Raw (Guard Expr)) where
+  if_ = MkGuard . Right . CompIf (Ann ()) [Space]
 
 -- |
 -- >>> set_ []
@@ -1076,30 +1090,35 @@ class AsSet s where
 
 class AsSetItem s where
   -- | Create a 'SetItem'
-  si_ :: Raw s -> Raw SetItem
+  si_ :: Raw s -> Raw (SetItem Expr)
 
-instance AsSetItem SetItem where
+instance AsSetItem (SetItem Expr) where
   si_ = id
 
 instance AsSetItem Expr where
-  si_ = SetItem ()
+  si_ = SetItem (Ann ())
 
 -- | See 'set_'
-instance StarSyntax Expr SetItem where
-  s_ = SetUnpack () [] []
+instance StarSyntax Expr (SetItem Expr) where
+  s_ = SetUnpack (Ann ()) [] []
 
-instance e ~ Raw SetItem => AsSet [e] where
+instance e ~ Raw (SetItem Expr) => AsSet [e] where
   set_ es =
     case es of
       [] -> call_ (var_ "set") []
-      a:as -> Set () [] ((a, zip (repeat (MkComma [Space])) as, Nothing) ^. _CommaSep1') []
+      a:as ->
+        VIn $
+        Set (Ann ())
+          []
+          ((a, zip (repeat (MkComma [Space])) as, Nothing) ^. _CommaSep1')
+          []
 
-instance e ~ Comprehension SetItem => AsSet (Raw e) where
-  set_ c = SetComp () [] c []
+instance e ~ Comprehension SetItem Expr => AsSet (Raw e) where
+  set_ c = VIn $ SetComp (Ann ()) [] c []
 
-comp_ :: Raw e -> Raw CompFor -> [Raw Guard] -> Raw (Comprehension e)
+comp_ :: Raw (e Expr) -> Raw (CompFor Expr) -> [Raw (Guard Expr)] -> Raw (Comprehension e Expr)
 comp_ val cfor guards =
-  Comprehension ()
+  Comprehension (Ann ())
     val
     (if null guards
      then cfor
@@ -1109,8 +1128,8 @@ comp_ val cfor guards =
 -- |
 -- >>> gen_ $ comp_ (var_ "a") (for_ $ var_ "a" `in_` list_ [li_ $ int_ 1, li_ $ int_ 2, li_ $ int_ 3]) [if_ $ var_ "a" .== 2]
 -- (a for a in [1, 2, 3] if a == 2)
-gen_ :: Raw (Comprehension Expr) -> Raw Expr
-gen_ = Generator ()
+gen_ :: Raw (Comprehension VIdentity Expr) -> Raw Expr
+gen_ = VIn . Generator (Ann ())
 
 -- |
 -- >>> dict_ [var_ "a" .: 1]
@@ -1129,9 +1148,10 @@ class AsDict s where
 
 -- |
 -- @'dict_' :: ['Raw' 'DictItem'] -> 'Raw' 'Expr'@
-instance e ~ Raw DictItem => AsDict [e] where
+instance e ~ Raw (DictItem Expr) => AsDict [e] where
   dict_ ds =
-    Dict ()
+    VIn $
+    Dict (Ann ())
     []
     (case ds of
        [] -> Nothing
@@ -1140,15 +1160,17 @@ instance e ~ Raw DictItem => AsDict [e] where
 
 -- |
 -- @'dict_' :: 'Raw' ('Comprehension' 'DictItem') -> 'Raw' 'Expr'@
-instance e ~ Comprehension DictItem => AsDict (Raw e) where
-  dict_ comp = DictComp () [] comp []
+instance e ~ Comprehension DictItem Expr => AsDict (Raw e) where
+  dict_ comp = VIn $ DictComp (Ann ()) [] comp []
 
 mkBinOp :: ([Whitespace] -> BinOp ()) -> Raw Expr -> Raw Expr -> Raw Expr
-mkBinOp bop a = BinOp () (a & trailingWhitespace .~ [Space]) (bop [Space])
+mkBinOp bop a =
+  VIn .
+  Binary (Ann ()) (a & trailingWhitespace .~ [Space]) (bop [Space])
 
 -- | @a is b@
 is_ :: Raw Expr -> Raw Expr -> Raw Expr
-is_ = mkBinOp $ Is ()
+is_ = mkBinOp $ Is (Ann ())
 infixl 1 `is_`
 
 -- |
@@ -1169,19 +1191,23 @@ infixl 1 `in_`
 --
 -- Does not have a precedence
 and_ :: Raw Expr -> Raw Expr -> Raw Expr
-and_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolAnd () [Space])
+and_ a =
+  VIn .
+  Binary (Ann ()) (a & trailingWhitespace .~ [Space]) (BoolAnd (Ann ()) [Space])
 
 -- | @a or b@
 --
 -- Does not have a precedence
 or_ :: Raw Expr -> Raw Expr -> Raw Expr
-or_ a = BinOp () (a & trailingWhitespace .~ [Space]) (BoolOr () [Space])
+or_ a =
+  VIn .
+  Binary (Ann ()) (a & trailingWhitespace .~ [Space]) (BoolOr (Ann ()) [Space])
 
 -- |
 -- >>> var_ "a" `in_` var_ "b"
 -- a in b
 instance InSyntax Expr (Raw Expr) where
-  in_ = mkBinOp $ In ()
+  in_ = mkBinOp $ In (Ann ())
 
 -- | See 'for_'
 instance e ~ Raw Expr => InSyntax InList [e] where
@@ -1189,71 +1215,71 @@ instance e ~ Raw Expr => InSyntax InList [e] where
 
 -- | @a not in b@
 notIn_ :: Raw Expr -> Raw Expr -> Raw Expr
-notIn_ = mkBinOp $ NotIn () [Space]
+notIn_ = mkBinOp $ NotIn (Ann ()) [Space]
 infixl 1 `notIn_`
 
 -- | @a is not b@
 isNot_ :: Raw Expr -> Raw Expr -> Raw Expr
-isNot_ = mkBinOp $ IsNot () [Space]
+isNot_ = mkBinOp $ IsNot (Ann ()) [Space]
 infixl 1 `isNot_`
 
 -- | @not a@
 not_ :: Raw Expr -> Raw Expr
-not_ = Not () [Space]
+not_ = VIn . Not (Ann ()) [Space]
 
 -- | @a == b@
 (.==) :: Raw Expr -> Raw Expr -> Raw Expr
-(.==) = mkBinOp $ Eq ()
+(.==) = mkBinOp $ Eq (Ann ())
 infixl 1 .==
 
 -- | @a < b@
 (.<) :: Raw Expr -> Raw Expr -> Raw Expr
-(.<) = mkBinOp $ Lt ()
+(.<) = mkBinOp $ Lt (Ann ())
 infixl 1 .<
 
 -- | @a <= b@
 (.<=) :: Raw Expr -> Raw Expr -> Raw Expr
-(.<=) = mkBinOp $ LtEq ()
+(.<=) = mkBinOp $ LtEq (Ann ())
 infixl 1 .<=
 
 -- | @a > b@
 (.>) :: Raw Expr -> Raw Expr -> Raw Expr
-(.>) = mkBinOp $ Gt ()
+(.>) = mkBinOp $ Gt (Ann ())
 infixl 1 .>
 
 -- | @a >= b@
 (.>=) :: Raw Expr -> Raw Expr -> Raw Expr
-(.>=) = mkBinOp $ GtEq ()
+(.>=) = mkBinOp $ GtEq (Ann ())
 infixl 1 .>=
 
 -- | @a != b@
 (.!=) :: Raw Expr -> Raw Expr -> Raw Expr
-(.!=) = mkBinOp $ NotEq ()
+(.!=) = mkBinOp $ NotEq (Ann ())
 infixl 1 .!=
 
 -- | @a | b@
 (.|) :: Raw Expr -> Raw Expr -> Raw Expr
-(.|) = mkBinOp $ BitOr ()
+(.|) = mkBinOp $ BitOr (Ann ())
 infixl 2 .|
 
 -- | @a ^ b@
 (.^) :: Raw Expr -> Raw Expr -> Raw Expr
-(.^) = mkBinOp $ BitXor ()
+(.^) = mkBinOp $ BitXor (Ann ())
 infixl 3 .^
 
 -- | @a & b@
 (.&) :: Raw Expr -> Raw Expr -> Raw Expr 
-(.&) = mkBinOp $ BitAnd ()
+(.&) = mkBinOp $ BitAnd (Ann ())
 infixl 4 .&
 
 -- | @a << b@
 (.<<) :: Raw Expr -> Raw Expr -> Raw Expr 
-(.<<) = mkBinOp $ ShiftLeft ()
+(.<<) = mkBinOp $ ShiftLeft (Ann ())
 infixl 5 .<<
 
 -- | @a >> b@
 (.>>) :: Raw Expr -> Raw Expr -> Raw Expr 
-(.>>) = mkBinOp $ ShiftRight ()
+(.>>) = mkBinOp $ ShiftRight (Ann ())
 infixl 5 .>>
 
 -- | @a + b@
@@ -1273,34 +1299,34 @@ infixl 7 .*
 
 -- | @a \@ b@
 (.@) :: Raw Expr -> Raw Expr -> Raw Expr
-(.@) = mkBinOp $ At ()
+(.@) = mkBinOp $ At (Ann ())
 infixl 7 .@
 
 -- | @a / b@
 (./) :: Raw Expr -> Raw Expr -> Raw Expr
-(./) = mkBinOp $ Divide ()
+(./) = mkBinOp $ Divide (Ann ())
 infixl 7 ./
 
 -- | @a // b@
 (.//) :: Raw Expr -> Raw Expr -> Raw Expr
-(.//) = mkBinOp $ FloorDivide ()
+(.//) = mkBinOp $ FloorDivide (Ann ())
 infixl 7 .//
 
 -- | @a % b@
 (.%) :: Raw Expr -> Raw Expr -> Raw Expr
-(.%) = mkBinOp $ Percent ()
+(.%) = mkBinOp $ Percent (Ann ())
 infixl 7 .%
 
 -- | @a ** b@
 (.**) :: Raw Expr -> Raw Expr -> Raw Expr
-(.**) = mkBinOp $ Exp ()
+(.**) = mkBinOp $ Exp (Ann ())
 infixr 8 .**
 
 -- |
 -- >>> var_ "a" /> var_ "b"
 -- a.b
 (/>) :: Raw Expr -> Raw Ident -> Raw Expr
-(/>) a = Deref () a []
+(/>) a = VIn . Deref (Ann ()) a []
 infixl 9 />
 
 -- | @-a@
@@ -1309,11 +1335,11 @@ neg_ = negate
 
 -- | @+a@
 pos_ :: Raw Expr -> Raw Expr
-pos_ = UnOp () (Positive () [])
+pos_ = VIn . Unary (Ann ()) (Positive (Ann ()) [])
 
 -- | @~a@
 compl_ :: Raw Expr -> Raw Expr
-compl_ = UnOp () (Complement () [])
+compl_ = VIn . Unary (Ann ()) (Complement (Ann ()) [])
 
 -- | Convert a list of 'Line's to a 'Block', giving them 4 spaces of indentation
 linesToBlockIndented :: [Raw Line] -> Raw Block
@@ -1347,11 +1373,11 @@ instance ElseSyntax While where
 mkWhile :: Raw Expr -> [Raw Line] -> Raw While
 mkWhile cond body =
   MkWhile
-  { _whileAnn = ()
-  , _whileIndents = Indents [] ()
+  { _whileAnn = Ann ()
+  , _whileIndents = Indents [] (Ann ())
   , _whileWhile = [Space]
   , _whileCond = cond
-  , _whileBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _whileBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   , _whileElse = Nothing
   }
 
@@ -1362,11 +1388,11 @@ while_ = mkWhile
 mkIf :: Raw Expr -> [Raw Line] -> Raw If
 mkIf cond body =
   MkIf
-  { _ifAnn = ()
-  , _ifIndents = Indents [] ()
+  { _ifAnn = Ann ()
+  , _ifIndents = Indents [] (Ann ())
   , _ifIf = [Space]
   , _ifCond = cond
-  , _ifBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _ifBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   , _ifElifs = []
   , _ifElse = Nothing
   }
@@ -1396,13 +1422,13 @@ ifThen_ :: Raw Expr -> [Raw Line] -> Raw If
 ifThen_ = mkIf
 
 var_ :: String -> Raw Expr
-var_ s = Ident $ MkIdent () s []
+var_ s = VIn . Ident (Ann ()) $ MkIdent (Ann ()) s []
 
 -- |
 -- >>> none_
 -- None
 none_ :: Raw Expr
-none_ = None () []
+none_ = VIn $ None (Ann ()) []
 
 -- | @'Raw' 'Expr'@ has a 'Num' instance, but sometimes we need to name integers
 -- explicitly
@@ -1418,17 +1444,17 @@ int_ = fromInteger
 pass_ :: Raw Statement
 pass_ =
   SmallStatement
-    (Indents [] ())
-    (MkSmallStatement (Pass () []) [] Nothing Nothing (Just LF))
+    (Indents [] (Ann ()))
+    (MkSmallStatement (Pass (Ann ()) []) [] Nothing Nothing (Just LF))
 
 -- | Create a minimal valid 'Elif'
 mkElif :: Raw Expr -> [Raw Line] -> Raw Elif
 mkElif cond body =
   MkElif
-  { _elifIndents = Indents [] ()
+  { _elifIndents = Indents [] (Ann ())
   , _elifElif = [Space]
   , _elifCond = cond
-  , _elifBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _elifBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   }
 
 elif_ :: Raw Expr -> [Raw Line] -> Raw If -> Raw If
@@ -1438,9 +1464,9 @@ elif_ cond body code = code & ifElifs <>~ [mkElif cond body]
 mkElse :: [Raw Line] -> Raw Else
 mkElse body =
   MkElse
-  { _elseIndents = Indents [] ()
+  { _elseIndents = Indents [] (Ann ())
   , _elseElse = []
-  , _elseBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _elseBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   }
 
 class ElseSyntax s where
@@ -1494,20 +1520,20 @@ instance ElseSyntax TryExcept where
 break_ :: Raw Statement
 break_ =
   SmallStatement
-    (Indents [] ())
-    (MkSmallStatement (Break () []) [] Nothing Nothing (Just LF))
+    (Indents [] (Ann ()))
+    (MkSmallStatement (Break (Ann ()) []) [] Nothing Nothing (Just LF))
 
 -- |
 -- >>> true_
 -- True
 true_ :: Raw Expr
-true_ = Bool () True []
+true_ = VIn $ Bool (Ann ()) True []
 
 -- |
 -- >>> false_
 -- False
 false_ :: Raw Expr
-false_ = Bool () False []
+false_ = VIn $ Bool (Ann ()) False []
 
 -- | Double-quoted string
 --
@@ -1515,8 +1541,9 @@ false_ = Bool () False []
 -- "asdf"
 str_ :: String -> Raw Expr
 str_ s =
-  String () . pure $
-  StringLiteral () Nothing ShortString DoubleQuote (Char_lit <$> s) []
+  VIn .
+  String (Ann ()) . pure $
+  StringLiteral (Ann ()) Nothing ShortString DoubleQuote (Char_lit <$> s) []
 
 -- | Single-quoted string
 --
@@ -1524,8 +1551,9 @@ str_ s =
 -- 'asdf'
 str'_ :: String -> Raw Expr
 str'_ s =
-  String () . pure $
-  StringLiteral () Nothing ShortString SingleQuote (Char_lit <$> s) []
+  VIn .
+  String (Ann ()) . pure $
+  StringLiteral (Ann ()) Nothing ShortString SingleQuote (Char_lit <$> s) []
 
 -- | Long double-quoted string
 --
@@ -1533,8 +1561,9 @@ str'_ s =
 -- """asdf"""
 longStr_ :: String -> Raw Expr
 longStr_ s =
-  String () . pure $
-  StringLiteral () Nothing LongString DoubleQuote (Char_lit <$> s) []
+  VIn .
+  String (Ann ()) . pure $
+  StringLiteral (Ann ()) Nothing LongString DoubleQuote (Char_lit <$> s) []
 
 -- | Long single-quoted string
 --
@@ -1542,15 +1571,19 @@ longStr_ s =
 -- '''asdf'''
 longStr'_ :: String -> Raw Expr
 longStr'_ s =
-  String () . pure $
-  StringLiteral () Nothing LongString SingleQuote (Char_lit <$> s) []
+  VIn .
+  String (Ann ()) . pure $
+  StringLiteral (Ann ()) Nothing LongString SingleQuote (Char_lit <$> s) []
 
 mkAugAssign :: AugAssignOp -> Raw Expr -> Raw Expr -> Raw Statement
 mkAugAssign at a b =
   SmallStatement
-    (Indents [] ())
+    (Indents [] (Ann ()))
     (MkSmallStatement
-       (AugAssign () (a & trailingWhitespace .~ [Space]) (MkAugAssign at () [Space]) b)
+       (AugAssign
+          (Ann ())
+          (a & trailingWhitespace .~ [Space])
+          (MkAugAssign (Ann ()) at [Space]) b)
        []
        Nothing
        Nothing
@@ -1567,9 +1600,9 @@ chainEq :: Raw Expr -> [Raw Expr] -> Raw Statement
 chainEq t [] = expr_ t
 chainEq t (a:as) =
   SmallStatement
-    (Indents [] ())
+    (Indents [] (Ann ()))
     (MkSmallStatement
-       (Assign () t $ (,) (MkEquals [Space]) <$> (a :| as))
+       (Assign (Ann ()) t $ (,) (MkEquals [Space]) <$> (a :| as))
        []
        Nothing
        Nothing
@@ -1579,9 +1612,9 @@ chainEq t (a:as) =
 (.=) :: Raw Expr -> Raw Expr -> Raw Statement
 (.=) a b =
   SmallStatement
-    (Indents [] ())
+    (Indents [] (Ann ()))
     (MkSmallStatement
-       (Assign () (a & trailingWhitespace .~ [Space]) $ pure (MkEquals [Space], b))
+       (Assign (Ann ()) (a & trailingWhitespace .~ [Space]) $ pure (MkEquals [Space], b))
        []
        Nothing
        Nothing
@@ -1656,17 +1689,17 @@ infix 0 .//=
 mkFor :: Raw Expr -> [Raw Expr] -> [Raw Line] -> Raw For
 mkFor binder collection body =
   MkFor
-  { _forAnn = ()
-  , _forIndents = Indents [] ()
+  { _forAnn = Ann ()
+  , _forIndents = Indents [] (Ann ())
   , _forAsync = Nothing
   , _forFor = [Space]
   , _forBinder = binder & trailingWhitespace .~ [Space]
   , _forIn = [Space]
   , _forCollection =
       fromMaybe
-        (CommaSepOne1' (Unit () [] []) Nothing)
+        (CommaSepOne1' (VIn $ Unit (Ann ()) [] []) Nothing)
         (listToCommaSep1' collection)
-  , _forBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _forBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   , _forElse = Nothing
   }
 
@@ -1702,29 +1735,29 @@ instance AsyncSyntax For where
 mkFinally :: [Raw Line] -> Raw Finally
 mkFinally body =
   MkFinally
-  { _finallyIndents = Indents [] ()
+  { _finallyIndents = Indents [] (Ann ())
   , _finallyFinally = []
-  , _finallyBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _finallyBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   }
 
 -- | Create a minimal valid 'Except'
 mkExcept :: [Raw Line] -> Raw Except
 mkExcept body =
   MkExcept
-  { _exceptIndents = Indents [] ()
+  { _exceptIndents = Indents [] (Ann ())
   , _exceptExcept = []
   , _exceptExceptAs = Nothing
-  , _exceptBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _exceptBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   }
 
 -- | Create a minimal valid 'TryExcept'
 mkTryExcept :: [Raw Line] -> Raw Except -> Raw TryExcept
 mkTryExcept body except =
   MkTryExcept
-  { _teAnn = ()
-  , _teIndents = Indents [] ()
+  { _teAnn = Ann ()
+  , _teIndents = Indents [] (Ann ())
   , _teTry = [Space]
-  , _teBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _teBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   , _teExcepts = pure except
   , _teElse = Nothing
   , _teFinally = Nothing
@@ -1734,10 +1767,10 @@ mkTryExcept body except =
 mkTryFinally :: [Raw Line] -> [Raw Line] -> Raw TryFinally
 mkTryFinally body fBody =
   MkTryFinally
-  { _tfAnn = ()
-  , _tfIndents = Indents [] ()
+  { _tfAnn = Ann ()
+  , _tfIndents = Indents [] (Ann ())
   , _tfTry = [Space]
-  , _tfBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _tfBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   , _tfFinally = mkFinally fBody
   }
 
@@ -1807,7 +1840,7 @@ instance AsExceptAs ExceptAs where
   toExceptAs = id
 
 instance AsExceptAs Expr where
-  toExceptAs e = ExceptAs () e Nothing
+  toExceptAs e = ExceptAs (Ann ()) e Nothing
 
 class ExceptSyntax s where
   except_ :: [Raw Line] -> s -> Raw TryExcept
@@ -1915,13 +1948,13 @@ class As s t u | s t -> u, u -> s t where
 
 -- | See 'exceptAs_'
 instance As Expr Ident ExceptAs where
-  as_ e name = ExceptAs () e $ Just ([Space], name)
+  as_ e name = ExceptAs (Ann ()) e $ Just ([Space], name)
 
 -- |
 -- >>> class_ "A" [] [line_ pass_]
 -- class A:
 --     pass
-class_ :: Raw Ident -> [Raw Arg] -> [Raw Line] -> Raw ClassDef
+class_ :: Raw Ident -> [Raw (Arg Expr)] -> [Raw Line] -> Raw ClassDef
 class_ name args body =
   (mkClassDef name body) {
     _cdArguments =
@@ -1934,13 +1967,13 @@ class_ name args body =
 mkClassDef :: Raw Ident -> [Raw Line] -> Raw ClassDef
 mkClassDef name body =
   MkClassDef
-  { _cdAnn = ()
+  { _cdAnn = Ann ()
   , _cdDecorators = []
-  , _cdIndents = Indents [] ()
+  , _cdIndents = Indents [] (Ann ())
   , _cdClass = Space :| []
   , _cdName = name
   , _cdArguments = Nothing
-  , _cdBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _cdBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   }
 
 instance BodySyntax ClassDef where
@@ -1972,12 +2005,12 @@ instance ArgumentsSyntax ClassDef where
 mkWith :: NonEmpty (Raw WithItem) -> [Raw Line] -> Raw With
 mkWith items body =
   MkWith
-  { _withAnn = ()
-  , _withIndents = Indents [] ()
+  { _withAnn = Ann ()
+  , _withIndents = Indents [] (Ann ())
   , _withAsync = Nothing
   , _withWith = [Space]
   , _withItems = listToCommaSep1 items
-  , _withBody = SuiteMany () (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _withBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
   }
 
 -- |
@@ -2002,17 +2035,17 @@ with_ :: AsWithItem e => NonEmpty (Raw e) -> [Raw Line] -> Raw With
 with_ items = mkWith (toWithItem <$> items)
 
 withItem_ :: Raw Expr -> Maybe (Raw Expr) -> Raw WithItem
-withItem_ a b = WithItem () a ((,) [Space] <$> b)
+withItem_ a b = WithItem (Ann ()) a ((,) [Space] <$> b)
 
 -- | See 'with_'
 instance As Expr Expr WithItem where
-  as_ a b = WithItem () a $ Just ([Space], b)
+  as_ a b = WithItem (Ann ()) a $ Just ([Space], b)
 
 class AsWithItem s where
   toWithItem :: Raw s -> Raw WithItem
 
 instance AsWithItem Expr where
-  toWithItem e = WithItem () e Nothing
+  toWithItem e = WithItem (Ann ()) e Nothing
 
 instance AsWithItem WithItem where
   toWithItem = id
@@ -2028,20 +2061,20 @@ instance AsyncSyntax With where
 -- >>> ellipsis_
 -- ...
 ellipsis_ :: Raw Expr
-ellipsis_ = Ellipsis () []
+ellipsis_ = VIn $ Ellipsis (Ann ()) []
 
 class AsTupleItem e where
   -- | Create a 'TupleItem'
-  ti_ :: Raw e -> Raw TupleItem
+  ti_ :: Raw e -> Raw (TupleItem Expr)
 
 -- | See 'tuple_'
-instance StarSyntax Expr TupleItem where
-  s_ = TupleUnpack () [] []
+instance StarSyntax Expr (TupleItem Expr) where
+  s_ = TupleUnpack (Ann ()) [] []
 
 instance AsTupleItem Expr where
-  ti_ = TupleItem ()
+  ti_ = TupleItem (Ann ())
 
-instance AsTupleItem TupleItem where
+instance AsTupleItem (TupleItem Expr) where
   ti_ = id
 
 -- |
@@ -2059,26 +2092,27 @@ instance AsTupleItem TupleItem where
 --
 -- >>> tuple_ [ti_ $ var_ "a", s_ $ var_ "b"]
 -- a, *b
-tuple_ :: [Raw TupleItem] -> Raw Expr
-tuple_ [] = Unit () [] []
+tuple_ :: [Raw (TupleItem Expr)] -> Raw Expr
+tuple_ [] = VIn $ Unit (Ann ()) [] []
 tuple_ (a:as) =
+  VIn $
   case as of
-    [] -> Tuple () (ti_ a) (MkComma []) Nothing
+    [] -> Tuple (Ann ()) (ti_ a) (MkComma []) Nothing
     b:bs ->
-      Tuple () a (MkComma [Space]) . Just $
+      Tuple (Ann ()) a (MkComma [Space]) . Just $
       (b, zip (repeat (MkComma [Space])) bs, Nothing) ^. _CommaSep1'
 
 -- |
 -- >>> await (var_ "a")
 -- await a
 await_ :: Raw Expr -> Raw Expr
-await_ = Await () [Space]
+await_ = VIn . Await (Ann ()) [Space]
 
 -- |
 -- >>> ifThenElse_ (var_ "a") (var_ "b") (var_ "c")
 -- a if b else c
 ifThenElse_ :: Raw Expr -> Raw Expr -> Raw Expr -> Raw Expr
-ifThenElse_ a b = Ternary () a [Space] b [Space]
+ifThenElse_ a b = VIn . Ternary (Ann ()) a [Space] b [Space]
 
 -- |
 -- >>> lambda_ [p_ "x"] "x"
@@ -2092,9 +2126,10 @@ ifThenElse_ a b = Ternary () a [Space] b [Space]
 --
 -- >>> lambda_ [p_ "x", k_ "y" 2, s_ "z", ss_ "w"] "a"
 -- lambda x, y=2, *z, **w: a
-lambda_ :: [Raw Param] -> Raw Expr -> Raw Expr
+lambda_ :: [Raw (Param Expr)] -> Raw Expr -> Raw Expr
 lambda_ params =
-  Lambda ()
+  VIn .
+  Lambda (Ann ())
     (if null params then [] else [Space])
     (listToCommaSep params)
     (MkColon [Space])
@@ -2109,13 +2144,13 @@ lambda_ params =
 -- >>> yield_ [var_ "a", var_ "b"]
 -- yield a, b
 yield_ :: [Raw Expr] -> Raw Expr
-yield_ as = Yield () (foldr (\_ _ -> [Space]) [] as) (listToCommaSep as)
+yield_ as = VIn $ Yield (Ann ()) (foldr (\_ _ -> [Space]) [] as) (listToCommaSep as)
 
 -- |
 -- >>> yieldFrom_ (var_ "a")
 -- yield from a
 yieldFrom_ :: Raw Expr -> Raw Expr
-yieldFrom_ = YieldFrom () [Space] [Space]
+yieldFrom_ = VIn . YieldFrom (Ann ()) [Space] [Space]
 
 -- | The slice with no bounds
 --
@@ -2227,17 +2262,21 @@ slice_ a b c =
 -- a[(1, *b)]
 subs_ :: Raw Expr -> Raw Expr -> Raw Expr
 subs_ a e =
-  Subscript () a
+  VIn $
+  Subscript (Ann ()) a
     []
     (exprToSubscript e ^. _CommaSep1')
     []
   where
     exprToSubscript
       :: Raw Expr
-      -> (Raw Subscript, [(Comma, Raw Subscript)], Maybe Comma)
+      -> (Raw (SubscriptItem Expr), [(Comma, Raw (SubscriptItem Expr))], Maybe Comma)
     exprToSubscript e =
       let
-        notSlice :: (Raw Subscript, [(Comma, Raw Subscript)], Maybe Comma)
+        notSlice
+          :: ( Raw (SubscriptItem Expr)
+             , [(Comma, Raw (SubscriptItem Expr))], Maybe Comma
+             )
         notSlice =
           case e ^? _Tuple of
             Nothing -> (SubscriptExpr e, [], Nothing)
@@ -2261,7 +2300,7 @@ subs_ a e =
       where
         mkSlice
           :: Raw Expr
-          -> Maybe (Raw Subscript)
+          -> Maybe (Raw (SubscriptItem Expr))
         mkSlice e = do
           c <- e ^? _Call
           case c ^? callFunction._Ident.identValue of
@@ -2287,7 +2326,7 @@ subs_ a e =
         noneToMaybe x = fromMaybe (Just x) $ Nothing <$ (x ^? _None)
 
         fromTupleItem
-          :: Raw TupleItem
-          -> Maybe (Raw Subscript)
+          :: Raw (TupleItem Expr)
+          -> Maybe (Raw (SubscriptItem Expr))
         fromTupleItem (TupleItem _ a) = mkSlice a <|> pure (SubscriptExpr a)
         fromTupleItem _ = Nothing

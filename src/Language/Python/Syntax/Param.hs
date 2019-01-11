@@ -1,8 +1,9 @@
-{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language DataKinds, KindSignatures #-}
 {-# language FlexibleInstances #-}
 {-# language LambdaCase #-}
 {-# language MultiParamTypeClasses #-}
+{-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 module Language.Python.Syntax.Param where
 
 import Control.Lens.Getter ((^.), view, to)
@@ -13,13 +14,18 @@ import Control.Lens.Traversal (Traversal, traverseOf)
 import Control.Lens.Tuple (_2)
 import Data.Coerce (coerce)
 import Data.Function ((&))
+import Data.Generics.Product.Typed (typed)
 import Data.Maybe (isNothing)
 import Data.String (IsString(..))
+import GHC.Generics (Generic)
 import Unsafe.Coerce (unsafeCoerce)
 
+import Data.VFoldable
+import Data.VFunctor
 import Data.VTraversable
 import Language.Python.Optics.Exprs
 import Language.Python.Optics.Validated
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Raw
@@ -31,13 +37,13 @@ import Language.Python.Syntax.Whitespace
 data Param expr (v :: [*]) a
   -- | @def foo(a):@
   = PositionalParam
-  { _paramAnn :: a
+  { _paramAnn :: Ann a
   , _paramName :: Ident v a
   , _paramType :: Maybe (Colon, expr v a)
   }
   -- | @def foo(bar=None):@
   | KeywordParam
-  { _paramAnn :: a
+  { _paramAnn :: Ann a
   , _paramName :: Ident v a
   -- ':' spaces <expr>
   , _paramType :: Maybe (Colon, expr v a)
@@ -47,7 +53,7 @@ data Param expr (v :: [*]) a
   }
   -- | @def foo(*xs):@
   | StarParam
-  { _paramAnn :: a
+  { _paramAnn :: Ann a
   -- '*' spaces
   , _unsafeStarParamWhitespace :: [Whitespace]
   , _unsafeStarParamName :: Ident v a
@@ -56,23 +62,29 @@ data Param expr (v :: [*]) a
   }
   -- | @def foo(*):@
   | UnnamedStarParam
-  { _paramAnn :: a
+  { _paramAnn :: Ann a
   -- '*' spaces
   , _unsafeUnnamedStarParamWhitespace :: [Whitespace]
   }
   -- | @def foo(**dict):@
   | DoubleStarParam
-  { _paramAnn :: a
+  { _paramAnn :: Ann a
   -- '**' spaces
   , _unsafeDoubleStarParamWhitespace :: [Whitespace]
   , _paramName :: Ident v a
   -- ':' spaces <expr>
   , _paramType :: Maybe (Colon, expr v a)
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasAnn (Param expr v) where
+  annot :: forall a. Lens' (Param expr v a) (Ann a)
+  annot = typed @(Ann a)
 
 instance Validated e => Validated (Param e) where; unvalidated = to unsafeCoerce
 
+instance VFunctor Param where; vfmap = vfmapDefault
+instance VFoldable Param where; vfoldMap = vfoldMapDefault
 instance VTraversable Param where
   vtraverse f p =
     case p of
@@ -91,7 +103,7 @@ instance VTraversable Param where
         traverseOf (traverse._2) f d
 
 instance IsString (Raw (Param expr)) where
-  fromString a = PositionalParam () (fromString a) Nothing
+  fromString a = PositionalParam (Ann ()) (fromString a) Nothing
 
 instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (Param expr v a) where
   trailingWhitespace =
@@ -131,7 +143,7 @@ instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (Param expr v
 
 -- | Lens on the syntrax tree annotation on a parameter
 paramAnn :: Lens' (Param expr v a) a
-paramAnn = lens _paramAnn (\s a -> s { _paramAnn = a})
+paramAnn = annot_
 
 -- | A faux-lens on the optional Python type annotation which may follow a parameter
 --

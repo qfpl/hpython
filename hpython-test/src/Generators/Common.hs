@@ -16,6 +16,8 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.These (These(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
+import Data.VFix
+import Language.Python.Syntax.Ann
 import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Comment
@@ -50,17 +52,17 @@ genSuite
   -> m (Suite '[] ())
 genSuite gss gb =
   Gen.choice
-  [ SuiteMany () <$>
+  [ SuiteMany (Ann ()) <$>
     genColon <*>
     Gen.maybe genComment <*>
     genNewline <*>
     gb
-  , SuiteOne () <$> genColon <*> genSmallStatement gss
+  , SuiteOne (Ann ()) <$> genColon <*> genSmallStatement gss
   ]
 
 genUnOp :: MonadGen m => m (UnOp ())
 genUnOp =
-  Gen.element [Negate (), Positive (), Complement ()] <*>
+  Gen.element [Negate (Ann ()), Positive (Ann ()), Complement (Ann ())] <*>
   genWhitespaces
 
 integralHeXaDeCiMaL'
@@ -103,31 +105,32 @@ integralHeXDigits n =
 genSmallInt :: MonadGen m => m (Expr '[] ())
 genSmallInt = do
   n <- Gen.integral (Range.constant 0 100)
-  Int () <$>
+  fmap VIn $
+    Int (Ann ()) <$>
     Gen.choice
-    [ pure $ IntLiteralDec () (integralDecDigits n ^?! _Right)
-    , IntLiteralBin () <$> Gen.bool <*> pure (integralBinDigits n ^?! _Right)
-    , IntLiteralOct () <$> Gen.bool <*> pure (integralOctDigits n ^?! _Right)
-    , IntLiteralHex () <$> Gen.bool <*> ((^?! _Right) <$> integralHeXDigits n)
+    [ pure $ IntLiteralDec (Ann ()) (integralDecDigits n ^?! _Right)
+    , IntLiteralBin (Ann ()) <$> Gen.bool <*> pure (integralBinDigits n ^?! _Right)
+    , IntLiteralOct (Ann ()) <$> Gen.bool <*> pure (integralOctDigits n ^?! _Right)
+    , IntLiteralHex (Ann ()) <$> Gen.bool <*> ((^?! _Right) <$> integralHeXDigits n)
     ] <*>
     genWhitespaces
 
 genUnit :: MonadGen m => m (Expr '[] ())
-genUnit = Unit () <$> genAnyWhitespaces <*> genWhitespaces
+genUnit = fmap VIn $ Unit (Ann ()) <$> genAnyWhitespaces <*> genWhitespaces
 
 genInt :: MonadGen m => m (Expr '[] ())
 genInt = do
   n <- Gen.integral (Range.constant (-2^32) (2^32))
   let
-    f = if n < 0 then (\a -> UnOp () <$> (Negate () <$> genWhitespaces) <*> a) else id
+    f = if n < 0 then (\a -> fmap VIn $ Unary (Ann ()) <$> (Negate (Ann ()) <$> genWhitespaces) <*> a) else id
     n' = if n < 0 then -n - 1 else n
-  f $
-    Int () <$>
+  f . fmap VIn $
+    Int (Ann ()) <$>
     Gen.choice
-      [ pure $ IntLiteralDec () (integralDecDigits n' ^?! _Right)
-      , IntLiteralBin () <$> Gen.bool <*> pure (integralBinDigits n' ^?! _Right)
-      , IntLiteralOct () <$> Gen.bool <*> pure (integralOctDigits n' ^?! _Right)
-      , IntLiteralHex () <$> Gen.bool <*> ((^?! _Right) <$> integralHeXDigits n')
+      [ pure $ IntLiteralDec (Ann ()) (integralDecDigits n' ^?! _Right)
+      , IntLiteralBin (Ann ()) <$> Gen.bool <*> pure (integralBinDigits n' ^?! _Right)
+      , IntLiteralOct (Ann ()) <$> Gen.bool <*> pure (integralOctDigits n' ^?! _Right)
+      , IntLiteralHex (Ann ()) <$> Gen.bool <*> ((^?! _Right) <$> integralHeXDigits n')
       ] <*>
     genWhitespaces
 
@@ -136,9 +139,10 @@ genE = Gen.element [Ee, EE]
 
 genSmallFloat :: MonadGen m => m (Expr '[] ())
 genSmallFloat =
-  Float () <$>
+  fmap VIn $
+  Float (Ann ()) <$>
   Gen.choice
-    [ FloatLiteralFull () <$>
+    [ FloatLiteralFull (Ann ()) <$>
       genDecs <*>
       Gen.maybe
         (Gen.choice
@@ -146,7 +150,7 @@ genSmallFloat =
            , That <$> floatExponent
            , These <$> genDecs <*> floatExponent
            ])
-    , FloatLiteralPoint () <$>
+    , FloatLiteralPoint (Ann ()) <$>
       genDecs <*>
       Gen.maybe floatExponent
     ] <*>
@@ -161,12 +165,13 @@ genSmallFloat =
 
 genImag :: MonadGen m => m (Expr '[] ())
 genImag =
-  Imag () <$>
+  fmap VIn $
+  Imag (Ann ()) <$>
   Gen.choice
-    [ ImagLiteralInt () <$>
+    [ ImagLiteralInt (Ann ()) <$>
       genDecs <*>
       Gen.bool
-    , ImagLiteralFloat () <$>
+    , ImagLiteralFloat (Ann ()) <$>
       genFloatLiteral <*>
       Gen.bool
     ] <*>
@@ -177,7 +182,7 @@ genImag =
 genFloatLiteral :: MonadGen m => m (FloatLiteral ())
 genFloatLiteral =
   Gen.choice
-    [ FloatLiteralFull () <$>
+    [ FloatLiteralFull (Ann ()) <$>
       genDecs <*>
       Gen.maybe
         (Gen.choice
@@ -185,10 +190,10 @@ genFloatLiteral =
            , That <$> floatExponent
            , These <$> genDecs <*> floatExponent
            ])
-    , FloatLiteralPoint () <$>
+    , FloatLiteralPoint (Ann ()) <$>
       genDecs <*>
       Gen.maybe floatExponent
-    , FloatLiteralWhole () <$>
+    , FloatLiteralWhole (Ann ()) <$>
       genDecs <*>
       floatExponent
     ]
@@ -202,7 +207,8 @@ genFloatLiteral =
 
 genFloat :: MonadGen m => m (Expr '[] ())
 genFloat =
-  Float () <$>
+  fmap VIn $
+  Float (Ann ()) <$>
   genFloatLiteral <*>
   genWhitespaces
 
@@ -290,7 +296,7 @@ genRawBytesPrefix =
 
 genComment :: MonadGen m => m (Comment ())
 genComment =
-  MkComment () <$> Gen.list (Range.linear 0 100) (Gen.filter (`notElem` "\0\r\n") Gen.ascii)
+  MkComment (Ann ()) <$> Gen.list (Range.linear 0 100) (Gen.filter (`notElem` "\0\r\n") Gen.ascii)
 
 genSizedWhitespace :: MonadGen m => m Whitespace -> m [Whitespace]
 genSizedWhitespace ws =
@@ -363,13 +369,13 @@ genWhitespaces1 = do
   (:|) <$> Gen.element [Space, Tab] <*> genWhitespaces
 
 genNone :: MonadGen m => m (Expr '[] ())
-genNone = None () <$> genWhitespaces
+genNone = fmap VIn $ None (Ann ()) <$> genWhitespaces
 
 genEllipsis :: MonadGen m => m (Expr '[] ())
-genEllipsis = Ellipsis () <$> genWhitespaces
+genEllipsis = fmap VIn $ Ellipsis (Ann ()) <$> genWhitespaces
 
 genBool :: MonadGen m => m (Expr '[] ())
-genBool = Bool () <$> Gen.bool <*> genWhitespaces
+genBool = fmap VIn $ Bool (Ann ()) <$> Gen.bool <*> genWhitespaces
 
 genOp :: MonadGen m => m (BinOp ())
 genOp = Gen.element $ _opOperator <$> operatorTable
@@ -387,7 +393,7 @@ genAt :: MonadGen m => m At
 genAt = MkAt <$> genWhitespaces
 
 genSemicolon :: MonadGen m => m (Semicolon ())
-genSemicolon = MkSemicolon () <$> genWhitespaces
+genSemicolon = MkSemicolon (Ann ()) <$> genWhitespaces
 
 genEquals :: MonadGen m => m Equals
 genEquals = MkEquals <$> genWhitespaces
@@ -445,7 +451,7 @@ genSizedCommaSep1' ma = Gen.sized $ \n ->
 
 genAugAssign :: MonadGen m => m (AugAssign ())
 genAugAssign =
-  MkAugAssign <$>
+  MkAugAssign (Ann ()) <$>
   Gen.element
     [ PlusEq
     , MinusEq
@@ -461,12 +467,11 @@ genAugAssign =
     , DoubleStarEq
     , DoubleSlashEq
     ] <*>
-  pure () <*>
   genWhitespaces
 
 genStringLiteral :: MonadGen m => m PyChar -> m (StringLiteral ())
 genStringLiteral gChar =
-  StringLiteral () <$>
+  StringLiteral (Ann ()) <$>
   Gen.maybe genStringPrefix <*>
   genStringType <*>
   genQuoteType <*>
@@ -475,53 +480,53 @@ genStringLiteral gChar =
 
 genBytesLiteral :: MonadGen m => m PyChar -> m (StringLiteral ())
 genBytesLiteral gChar =
-  BytesLiteral () <$>
+  BytesLiteral (Ann ()) <$>
   genBytesPrefix <*>
   genStringType <*>
   genQuoteType <*>
   genString gChar <*>
   genWhitespaces
 
-genTupleItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (TupleItem v ())
+genTupleItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (TupleItem Expr v ())
 genTupleItem ws ge =
   Gen.choice
-  [ TupleItem () <$> ge
-  , TupleUnpack () <$>
+  [ TupleItem (Ann ()) <$> ge
+  , TupleUnpack (Ann ()) <$>
     Gen.list (Range.constant 0 10) ((,) <$> genAnyWhitespaces <*> ws) <*>
     ws <*>
     ge
   ]
 
-genListItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (ListItem v ())
+genListItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (ListItem Expr v ())
 genListItem ws ge =
   Gen.choice
-  [ ListItem () <$>
+  [ ListItem (Ann ()) <$>
     ge
-  , ListUnpack () <$>
+  , ListUnpack (Ann ()) <$>
     Gen.list (Range.constant 0 10) ((,) <$> genAnyWhitespaces <*> ws) <*>
     ws <*>
     ge
   ]
 
-genSetItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (SetItem v ())
+genSetItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (SetItem Expr v ())
 genSetItem ws ge =
   Gen.choice
-  [ SetItem () <$>
+  [ SetItem (Ann ()) <$>
     ge
-  , SetUnpack () <$>
+  , SetUnpack (Ann ()) <$>
     Gen.list (Range.constant 0 10) ((,) <$> genAnyWhitespaces <*> ws) <*>
     ws <*>
     ge
   ]
 
-genDictItem :: MonadGen m => m (Expr v ()) -> m (DictItem v ())
+genDictItem :: MonadGen m => m (Expr v ()) -> m (DictItem Expr v ())
 genDictItem ge =
   Gen.choice
-  [ DictItem () <$>
+  [ DictItem (Ann ()) <$>
     ge <*>
     genColonAny <*>
     ge
-  , DictUnpack () <$>
+  , DictUnpack (Ann ()) <$>
     genAnyWhitespaces <*>
     ge
   ]

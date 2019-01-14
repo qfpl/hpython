@@ -84,6 +84,7 @@ library
                      , Data.VFunctor
                      , Data.VIdentity
                      , Data.VTraversable
+                     , Data.VariantV
                      , Language.Python
                      , Language.Python.DSL
                      , Language.Python.Internal.Lexer
@@ -99,6 +100,7 @@ library
                      , Language.Python.Optics.Indents
                      , Language.Python.Optics.Newlines
                      , Language.Python.Optics.Validated
+                     , Language.Python.Optics.Version
                      , Language.Python.Parse
                      , Language.Python.Parse.Error
                      , Language.Python.Render
@@ -110,6 +112,7 @@ library
                      , Language.Python.Syntax.Comment
                      , Language.Python.Syntax.Comprehension
                      , Language.Python.Syntax.Expr
+                     , Language.Python.Syntax.Expr.Types
                      , Language.Python.Syntax.Ident
                      , Language.Python.Syntax.Import
                      , Language.Python.Syntax.Module
@@ -117,6 +120,12 @@ library
                      , Language.Python.Syntax.Operator.Unary
                      , Language.Python.Syntax.ModuleNames
                      , Language.Python.Syntax.Numbers
+                     , Language.Python.Syntax.Numbers.Float
+                     , Language.Python.Syntax.Numbers.FloatLiteral
+                     , Language.Python.Syntax.Numbers.Imag
+                     , Language.Python.Syntax.Numbers.ImagLiteral
+                     , Language.Python.Syntax.Numbers.Int
+                     , Language.Python.Syntax.Numbers.IntLiteral
                      , Language.Python.Syntax.Param
                      , Language.Python.Syntax.Punctuation
                      , Language.Python.Syntax.Raw

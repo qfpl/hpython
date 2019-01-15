@@ -1,9 +1,11 @@
 {-# language DataKinds #-}
-{-# language GeneralizedNewtypeDeriving, MultiParamTypeClasses, BangPatterns #-}
-{-# language TypeFamilies #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
-{-# language TemplateHaskell #-}
+{-# language FlexibleInstances #-}
+{-# language GeneralizedNewtypeDeriving, MultiParamTypeClasses, BangPatterns #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
+{-# language TemplateHaskell #-}
+{-# language TypeFamilies #-}
+{-# language TypeOperators #-}
 {-# language UndecidableInstances #-}
 
 {-|
@@ -50,7 +52,8 @@ import GHC.Generics (Generic)
 
 import qualified Data.List.NonEmpty as NonEmpty
 
-import Data.VFix (VFix(..))
+import Data.VFix
+import Data.VariantV
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Comment
 
@@ -114,6 +117,24 @@ instance HasTrailingWhitespace a => HasTrailingWhitespace (NonEmpty a) where
 
 instance HasTrailingWhitespace (f (VFix f) v a) => HasTrailingWhitespace (VFix f v a) where
   trailingWhitespace = _Wrapped.trailingWhitespace
+
+instance HasTrailingWhitespace (VariantV '[] expr v x) where
+  trailingWhitespace = lens absurdVV absurdVV
+
+instance
+  ( HasTrailingWhitespace (a expr v x)
+  , HasTrailingWhitespace (VariantV as expr v x)
+  ) =>
+  HasTrailingWhitespace (VariantV (a ': as) expr v x) where
+
+  trailingWhitespace =
+    lens
+      (elimVV (view trailingWhitespace) (view trailingWhitespace))
+      (\x ws ->
+         elimVV
+           (injV . (trailingWhitespace .~ ws))
+           (widenVV . (trailingWhitespace .~ ws))
+           x)
 
 -- | A statement-containing thing may have a trailing newline
 --

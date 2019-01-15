@@ -1,5 +1,7 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
+{-# language TupleSections #-}
 
 {-|
 Module      : Language.Python.Syntax.Punctuation
@@ -16,6 +18,7 @@ module Language.Python.Syntax.Punctuation where
 
 import Control.Lens.Lens (Lens', lens)
 import Data.Generics.Product.Typed (typed)
+import Data.List.NonEmpty (NonEmpty(..))
 import GHC.Generics (Generic)
 
 import Language.Python.Syntax.Ann
@@ -76,3 +79,6 @@ data Underscore = MkUnderscore
 
 data Underscored a = Underscored a [(Maybe Underscore, a)]
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+nonEmptyUS :: NonEmpty a -> Underscored a
+nonEmptyUS (a :| as) = Underscored a $ (Nothing,) <$> as

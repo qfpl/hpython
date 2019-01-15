@@ -1,10 +1,13 @@
 {-# language DataKinds, KindSignatures #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
-{-# language ExistentialQuantification #-}
+{-# language FlexibleContexts #-}
 {-# language InstanceSigs, TypeApplications #-}
 {-# language LambdaCase #-}
 {-# language MultiParamTypeClasses, FlexibleInstances #-}
+{-# language QuantifiedConstraints #-}
+{-# language RankNTypes #-}
 {-# language ScopedTypeVariables #-}
+{-# language TemplateHaskell #-}
 {-# language TypeFamilies #-}
 {-# language UndecidableInstances #-}
 
@@ -19,7 +22,12 @@ Portability : non-portable
 
 module Language.Python.Syntax.Expr
   ( -- * Expressions
-    Expr, ExprF(..), shouldGroupLeft, shouldGroupRight
+    -- ** Base
+    ExprF(..)
+    -- ** 3.5
+  , Expr35(..)
+    -- ** 3.6
+  , Expr36(..)
     -- * Parameters and arguments
   , module Language.Python.Syntax.Param
   , module Language.Python.Syntax.Arg
@@ -27,18 +35,20 @@ module Language.Python.Syntax.Expr
   , module Language.Python.Syntax.Comprehension
     -- * Collection items
   , DictItem(..), ListItem(..), SetItem(..), TupleItem(..)
-    -- * Subscripts
-  , SubscriptItem(..)
   )
 where
 
 import Control.Lens.Fold ((^?), (^?!))
 import Control.Lens.Getter ((^.), getting, to)
+import Control.Lens.Iso (Iso', iso)
 import Control.Lens.Lens (Lens', lens)
-import Control.Lens.Prism (_Just, _Right)
+import Control.Lens.Prism (Prism, prism, _Just, _Right)
+import Control.Lens.Review ((#), review)
 import Control.Lens.Setter ((.~))
+import Control.Lens.TH (makeWrapped)
 import Control.Lens.Tuple (_2)
-import Data.Coerce (coerce)
+import Control.Lens.Wrapped (Unwrapped, _Wrapped, _Unwrapped)
+import Data.Coerce (Coercible, coerce)
 import Data.Digit.Integral (integralDecDigits)
 import Data.Function ((&))
 import Data.Generics.Product.Typed (typed)
@@ -53,19 +63,26 @@ import Data.VFunctor
 import Data.VIdentity
 import Data.VTraversable
 import Data.VariantV
-import Language.Python.Optics.Exprs (HasExprs(..))
-import Language.Python.Optics.Validated (Validated(..))
+import Language.Python.Optics.Exprs
+import Language.Python.Optics.Validated
 import Language.Python.Syntax.Arg
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Comprehension
+import Language.Python.Syntax.Dicts
+import Language.Python.Syntax.Expr.Optics
 import Language.Python.Syntax.Ident
+import Language.Python.Syntax.Lists
 import Language.Python.Syntax.Numbers
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Param
 import Language.Python.Syntax.Punctuation
+import Language.Python.Syntax.Raw
+import Language.Python.Syntax.Sets
 import Language.Python.Syntax.Strings
+import Language.Python.Syntax.Subscript
+import Language.Python.Syntax.Tuples
 import Language.Python.Syntax.Whitespace
 
 {-
@@ -78,247 +95,6 @@ as a phantom in 'Expr', so 'unsafeCoerce :: Expr v a -> Expr '[] a' is safe.
 
 -}
 instance Validated e => Validated (ExprF e) where; unvalidated = to unsafeCoerce
-instance Validated e => Validated (DictItem e) where; unvalidated = to unsafeCoerce
-instance Validated e => Validated (SetItem e) where; unvalidated = to unsafeCoerce
-instance Validated e => Validated (TupleItem e) where; unvalidated = to unsafeCoerce
-instance Validated e => Validated (ListItem e) where; unvalidated = to unsafeCoerce
-
-type Expr35 = VFix (VariantV '[ExprF, IntLiteral35])
-type Expr36 = VFix (VariantV '[ExprF, IntLiteral36])
-
--- | @a : b@ or @**a@
---
--- Used to construct dictionaries, e.g. @{ 1: a, 2: b, **c }@
---
--- https://docs.python.org/3/reference/expressions.html#dictionary-displays
-data DictItem expr (v :: [*]) a
-  = DictItem
-  { _dictItemAnn :: Ann a
-  , _unsafeDictItemKey :: expr v a
-  , _unsafeDictItemColon :: Colon
-  , _unsafeDictItemValue :: expr v a
-  }
-  | DictUnpack
-  { _dictItemAnn :: Ann a
-  , _unsafeDictItemUnpackWhitespace :: [Whitespace]
-  , _unsafeDictItemUnpackValue :: expr v a
-  } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
-
-instance HasAnn (DictItem expr v) where
-  annot :: forall a. Lens' (DictItem expr v a) (Ann a)
-  annot = typed @(Ann a)
-
-instance VFunctor DictItem where; vfmap = vfmapDefault
-instance VFoldable DictItem where; vfoldMap = vfoldMapDefault
-instance VTraversable DictItem where
-  vtraverse f (DictItem a b c d) = (\b' -> DictItem a b' c) <$> f b <*> f d
-  vtraverse f (DictUnpack a b c) = DictUnpack a b <$> f c
-
-instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (DictItem expr v a) where
-  trailingWhitespace =
-    lens
-      (\(DictItem _ _ _ a) -> a ^. trailingWhitespace)
-      (\(DictItem a b c d) ws -> DictItem a b c (d & trailingWhitespace .~ ws))
-
--- | Syntax for things that can be used as subscripts (inside the square brackets)
---
--- e.g.
---
--- @a[b]@
---
--- @a[:]@
---
--- @a[b:]@
---
--- @a[:b]@
---
--- @a[b:c]@
---
--- @a[b:c:d]@
---
--- https://docs.python.org/3/reference/expressions.html#subscriptions
-data SubscriptItem expr (v :: [*]) a
-  = SubscriptExpr (expr v a)
-  | SubscriptSlice
-      -- [expr]
-      (Maybe (expr v a))
-      -- ':' <spaces>
-      Colon
-      -- [expr]
-      (Maybe (expr v a))
-      -- [':' [expr]]
-      (Maybe (Colon, Maybe (expr v a)))
-  deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
-
-instance VFunctor SubscriptItem where; vfmap = vfmapDefault
-instance VFoldable SubscriptItem where; vfoldMap = vfoldMapDefault
-instance VTraversable SubscriptItem where
-  vtraverse f (SubscriptExpr a) = SubscriptExpr <$> f a
-  vtraverse f (SubscriptSlice a b c d) =
-    (\a' c' -> SubscriptSlice a' b c') <$>
-    traverse f a <*>
-    traverse f c <*>
-    (traverse._2.traverse) f d
-
-instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (SubscriptItem expr v a) where
-  trailingWhitespace =
-    lens
-      (\case
-          SubscriptExpr e -> e ^. trailingWhitespace
-          SubscriptSlice _ b c d ->
-            case d of
-              Nothing ->
-                case c of
-                  Nothing -> b ^. trailingWhitespace
-                  Just e -> e ^. trailingWhitespace
-              Just (e, f) ->
-                case f of
-                  Nothing -> e ^. trailingWhitespace
-                  Just g -> g ^. trailingWhitespace)
-      (\x ws ->
-         case x of
-          SubscriptExpr e -> SubscriptExpr $ e & trailingWhitespace .~ ws
-          SubscriptSlice a b c d ->
-            (\(b', c', d') -> SubscriptSlice a b' c' d') $
-            case d of
-              Nothing ->
-                case c of
-                  Nothing -> (MkColon ws, c, d)
-                  Just e -> (b, Just $ e & trailingWhitespace .~ ws, d)
-              Just (e, f) ->
-                case f of
-                  Nothing -> (b, c, Just (MkColon ws, f))
-                  Just g -> (b, c, Just (e, Just $ g & trailingWhitespace .~ ws)))
-
--- | @a@ or @*a@
---
--- Used to construct lists, e.g. @[ 1, 'x', **c ]@
---
--- https://docs.python.org/3/reference/expressions.html#list-displays
-data ListItem expr (v :: [*]) a
-  = ListItem
-  { _listItemAnn :: Ann a
-  , _unsafeListItemValue :: expr v a
-  }
-  | ListUnpack
-  { _listItemAnn :: Ann a
-  , _unsafeListUnpackParens :: [([Whitespace], [Whitespace])]
-  , _unsafeListUnpackWhitespace :: [Whitespace]
-  , _unsafeListUnpackValue :: expr v a
-  } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
-
-instance HasAnn (ListItem expr v) where
-  annot :: forall a. Lens' (ListItem expr v a) (Ann a)
-  annot = typed @(Ann a)
-
-instance VFunctor ListItem where; vfmap = vfmapDefault
-instance VFoldable ListItem where; vfoldMap = vfoldMapDefault
-instance VTraversable ListItem where
-  vtraverse f (ListItem a b) = ListItem a <$> f b
-  vtraverse f (ListUnpack a b c d) = ListUnpack a b c <$> f d
-
-instance HasExprs expr expr => HasExprs (ListItem expr) expr where
-  _Exprs f (ListItem a b) = ListItem a <$> f b
-  _Exprs f (ListUnpack a b c d) = ListUnpack a b c <$> f d
-
-instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (ListItem expr v a) where
-  trailingWhitespace =
-    lens
-      (\case
-          ListItem _ a -> a ^. trailingWhitespace
-          ListUnpack _ [] _ a -> a ^. trailingWhitespace
-          ListUnpack _ ((_, ws) : _) _ _ -> ws)
-      (\a ws ->
-         case a of
-           ListItem b c -> ListItem b $ c & trailingWhitespace .~ ws
-           ListUnpack b [] d e -> ListUnpack b [] d $ e & trailingWhitespace .~ ws
-           ListUnpack b ((c, _) : rest) e f -> ListUnpack b ((c, ws) : rest) e f)
-
--- | @a@ or @*a@
---
--- Used to construct sets, e.g. @{ 1, 'x', **c }@
---
--- https://docs.python.org/3/reference/expressions.html#set-displays
-data SetItem expr (v :: [*]) a
-  = SetItem
-  { _setItemAnn :: Ann a
-  , _unsafeSetItemValue :: expr v a
-  }
-  | SetUnpack
-  { _setItemAnn :: Ann a
-  , _unsafeSetUnpackParens :: [([Whitespace], [Whitespace])]
-  , _unsafeSetUnpackWhitespace :: [Whitespace]
-  , _unsafeSetUnpackValue :: expr v a
-  } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
-
-instance HasAnn (SetItem expr v) where
-  annot :: forall a. Lens' (SetItem expr v a) (Ann a)
-  annot = typed @(Ann a)
-
-instance VFunctor SetItem where; vfmap = vfmapDefault
-instance VFoldable SetItem where; vfoldMap = vfoldMapDefault
-instance VTraversable SetItem where
-  vtraverse f (SetItem a b) = SetItem a <$> f b
-  vtraverse f (SetUnpack a b c d) = SetUnpack a b c <$> f d
-
-instance HasExprs expr expr => HasExprs (SetItem expr) expr where
-  _Exprs f (SetItem a b) = SetItem a <$> f b
-  _Exprs f (SetUnpack a b c d) = SetUnpack a b c <$> f d
-
-instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (SetItem expr v a) where
-  trailingWhitespace =
-    lens
-      (\case
-          SetItem _ a -> a ^. trailingWhitespace
-          SetUnpack _ [] _ a -> a ^. trailingWhitespace
-          SetUnpack _ ((_, ws) : _) _ _ -> ws)
-      (\a ws ->
-         case a of
-           SetItem b c -> SetItem b $ c & trailingWhitespace .~ ws
-           SetUnpack b [] d e -> SetUnpack b [] d $ e & trailingWhitespace .~ ws
-           SetUnpack b ((c, _) : rest) e f -> SetUnpack b ((c, ws) : rest) e f)
-
--- | @a@ or @*a@
---
--- Used to construct tuples, e.g. @(1, 'x', **c)@
-data TupleItem expr (v :: [*]) a
-  = TupleItem
-  { _tupleItemAnn :: Ann a
-  , _unsafeTupleItemValue :: expr v a
-  }
-  | TupleUnpack
-  { _tupleItemAnn :: Ann a
-  , _unsafeTupleUnpackParens :: [([Whitespace], [Whitespace])]
-  , _unsafeTupleUnpackWhitespace :: [Whitespace]
-  , _unsafeTupleUnpackValue :: expr v a
-  } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
-
-instance HasAnn (TupleItem expr v) where
-  annot :: forall a. Lens' (TupleItem expr v a) (Ann a)
-  annot = typed @(Ann a)
-
-instance VFunctor TupleItem where; vfmap = vfmapDefault
-instance VFoldable TupleItem where; vfoldMap = vfoldMapDefault
-instance VTraversable TupleItem where
-  vtraverse f (TupleItem a b) = TupleItem a <$> f b
-  vtraverse f (TupleUnpack a b c d) = TupleUnpack a b c <$> f d
-
-instance HasExprs expr expr => HasExprs (TupleItem expr) expr where
-  _Exprs f (TupleItem a b) = TupleItem a <$> f b
-  _Exprs f (TupleUnpack a b c d) = TupleUnpack a b c <$> f d
-
-instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (TupleItem expr v a) where
-  trailingWhitespace =
-    lens
-      (\case
-          TupleItem _ a -> a ^. trailingWhitespace
-          TupleUnpack _ [] _ a -> a ^. trailingWhitespace
-          TupleUnpack _ ((_, ws) : _) _ _ -> ws)
-      (\a ws ->
-         case a of
-           TupleItem b c -> TupleItem b $ c & trailingWhitespace .~ ws
-           TupleUnpack b [] d e -> TupleUnpack b [] d $ e & trailingWhitespace .~ ws
-           TupleUnpack b ((c, _) : rest) e f -> TupleUnpack b ((c, ws) : rest) e f)
 
 -- | This large sum type covers all valid Python /expressions/
 data ExprF expr (v :: [*]) a
@@ -385,8 +161,7 @@ data ExprF expr (v :: [*]) a
   -- [ spaces
   , _unsafeListCompWhitespaceLeft :: [Whitespace]
   -- comprehension
-  , _unsafeListCompValue :: Comprehension VIdentity expr v a
-  -- ] spaces
+  , _unsafeListCompValue :: Comprehension VIdentity expr v a -- ] spaces
   , _unsafeListCompWhitespaceRight :: [Whitespace]
   }
   -- | @[a, b, c]@
@@ -664,9 +439,6 @@ instance VTraversable ExprF where
       Unary a b c -> Unary a b <$> fun c
       Parens a b c d -> (\c' -> Parens a b c' d) <$> fun c
       Ident a b -> pure $ Ident a b
-      Int a b c -> pure $ Int a b c
-      Float a b c -> pure $ Float a b c
-      Imag a b c -> pure $ Imag a b c
       Bool a b c -> pure $ Bool a b c
       String a b -> pure $ String a b
       Not a b c -> Not a b <$> fun c
@@ -712,9 +484,6 @@ instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (ExprF expr v
           Unary _ _ e -> e ^. trailingWhitespace
           Parens _ _ _ ws -> ws
           Ident _ a -> a ^. getting trailingWhitespace
-          Int _ _ ws -> ws
-          Float _ _ ws -> ws
-          Imag _ _ ws -> ws
           Bool _ _ ws -> ws
           String _ v -> v ^. trailingWhitespace
           Not _ _ e -> e ^. trailingWhitespace
@@ -745,9 +514,6 @@ instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (ExprF expr v
           Unary a b c -> Unary a b (c & trailingWhitespace .~ ws)
           Parens a b c _ -> Parens a b (coerce c) ws
           Ident a b -> Ident a $ b & trailingWhitespace .~ ws
-          Int a b _ -> Int a b ws
-          Float a b _ -> Float a b ws
-          Imag a b _ -> Imag a b ws
           Bool a b _ -> Bool a b ws
           String a v -> String a (v & trailingWhitespace .~ ws)
           Not a b c -> Not a b (c & trailingWhitespace .~ ws)
@@ -764,169 +530,36 @@ instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (ExprF expr v
 instance IsString (ExprF expr '[] ()) where
   fromString s = Ident (Ann ()) $ MkIdent (Ann ()) s []
 
-instance Num (Expr '[] ()) where
-  fromInteger n
-    | n >= 0 =
-      VIn $
-      Int (Ann ()) (IntLiteralDec (Ann ()) $ integralDecDigits n ^?! _Right) []
-    | otherwise =
-        VIn $
-        Unary
-          (Ann ())
-          (Negate (Ann ()) [])
-          (VIn $
-           Int (Ann ()) (IntLiteralDec (Ann ()) $ integralDecDigits (-n) ^?! _Right) [])
+instance
+  (Validated expr, Validated (VariantV vs expr), CtorV vs ExprF) =>
+  AsExpr (VariantV vs expr) expr where
 
-  negate = VIn . Unary (Ann ()) (Negate (Ann ()) [])
-
-  (+) a =
-    VIn .
-    Binary (Ann ())
-      (a & trailingWhitespace .~ [Space])
-      (Plus (Ann ()) [Space])
-  (*) a =
-    VIn .
-    Binary (Ann ())
-      (a & trailingWhitespace .~ [Space])
-      (Multiply (Ann ()) [Space])
-  (-) a =
-    VIn .
-    Binary (Ann ())
-      (a & trailingWhitespace .~ [Space])
-    (Minus (Ann ()) [Space])
-  signum = undefined
-  abs = undefined
-
-instance HasExprs Expr Expr where
-  _Exprs = id
-
-class AsExpr outer inner | outer -> inner where
-  -- |
-  -- A faux-Prism for matching on the @Ident@ constructor of an 'Expr'.
-  --
-  -- It's not a Prism because:
-  --
-  -- When 'Control.Lens.Fold.preview'ing, it discards the 'Expr'\'s annotation, and when
-  -- 'Control.Lens.Review.review'ing, it re-constructs an annotation from the supplied 'Language.Python.Syntax.Ident.Ident'
-  --
-  -- @'_Ident' :: 'Prism' (outer v a) (outer '[] a) ('Ident' v a) ('Ident' '[] a)@
-  _Ident
-    :: (Choice p, Applicative f)
-    => p (Ident v a) (f (Ident '[] a))
-    -> p (outer v a) (f (outer '[] a))
-  _Int :: Prism (outer v a) (outer '[] a) (PyInt v a) (PyInt '[] a)
-  _Float :: Prism (outer v a) (outer '[] a) (PyFloat v a) (PyFloat '[] a)
-  _Imag :: Prism (outer v a) (outer '[] a) (Imag v a) (Imag '[] a)
-  _Bool :: Prism (outer v a) (outer '[] a) (PyBool v a) (PyBool '[] a)
-  _String :: Prism (outer v a) (outer '[] a) (PyString v a) (PyString '[] a)
-  _Unit :: Prism (outer v a) (outer '[] a) (Unit v a) (Unit '[] a)
-  _Lambda :: Prism (outer v a) (outer '[] a) (Lambda inner v a) (Lambda inner '[] a)
-  _Yield :: Prism (outer v a) (outer '[] a) (Yield inner v a) (Yield inner '[] a)
-  _YieldFrom
-    :: Prism
-         (outer v a)
-         (outer '[] a)
-         (YieldFrom inner v a)
-         (YieldFrom inner '[] a)
-  _Ternary
-    :: Prism
-         (outer v a)
-         (outer '[] a)
-         (Ternary inner v a)
-         (Ternary inner '[] a)
-  _ListComp
-    :: Prism
-         (outer v a)
-         (outer '[] a)
-         (ListComp inner v a)
-         (ListComp inner '[] a)
-  _Dict
-    :: Prism
-         (outer v a)
-         (outer '[] a)
-         (Dict inner v a)
-         (Dict inner '[] a)
-  _DictComp
-    :: Prism
-         (outer v a)
-         (outer '[] a)
-         (DictComp inner v a)
-         (DictComp inner '[] a)
-  _Set
-    :: Prism
-         (outer v a)
-         (outer '[] a)
-         (Set inner v a)
-         (Set inner '[] a)
-  _SetComp
-    :: Prism
-         (outer v a)
-         (outer '[] a)
-         (SetComp inner v a)
-         (SetComp inner '[] a)
-  _Deref
-    :: Prism
-         (outer v a)
-         (outer '[] a)
-         (Deref inner v a)
-         (Deref inner '[] a)
-  _Subscript
-    :: Prism
-         (outer v a)
-         (outer '[] a)
-         (Subscript inner v a)
-         (Subscript inner '[] a)
-  _Tuple
-    :: Prism
-        (outer v a)
-        (outer '[] a)
-        (Tuple inner v a)
-        (Tuple inner '[] a)
-  _Binary
-    :: Prism
-        (outer v a)
-        (outer '[] a)
-        (Binary inner v a)
-        (Binary inner '[] a)
-  _Unary
-    :: Prism
-        (outer v a)
-        (outer '[] a)
-        (Unary inner v a)
-        (Unary inner '[] a)
-  _Not
-    :: Prism
-        (outer v a)
-        (outer '[] a)
-        (Not inner v a)
-        (Not inner '[] a)
-  _Generator
-    :: Prism
-        (outer v a)
-        (outer '[] a)
-        (Generator inner v a)
-        (Generator inner '[] a)
-  _Await
-    :: Prism
-        (outer v a)
-        (outer '[] a)
-        (Await inner v a)
-        (Await inner '[] a)
-  _Parens
-    :: Prism
-        (outer v a)
-        (outer '[] a)
-        (Parens inner v a)
-        (Parens inner '[] a)
-  _None :: Prism (outer v a) (outer '[] a) (None v a) (None '[] a)
-  _Ellipsis :: Prism (outer v a) (outer '[] a) (Ellipsis v a) (Ellipsis '[] a)
-  _Call :: Prism (outer v a) (outer '[] a) (Call inner v a) (Call inner '[] a)
-  _List
-    :: Prism
-        (outer v a)
-        (outer '[] a)
-        (List inner v a)
-        (List inner '[] a)
+  _Ident = _CtorV' @ExprF ._Ident
+  _Tuple = _CtorV' @ExprF ._Tuple
+  _None = _CtorV' @ExprF ._None
+  _Call = _CtorV' @ExprF ._Call
+  _List = _CtorV' @ExprF ._List
+  _Bool = _CtorV' @ExprF ._Bool
+  _String = _CtorV' @ExprF ._String
+  _Unit = _CtorV' @ExprF ._Unit
+  _Lambda = _CtorV' @ExprF ._Lambda
+  _Yield = _CtorV' @ExprF ._Yield
+  _YieldFrom = _CtorV' @ExprF ._YieldFrom
+  _Ternary = _CtorV' @ExprF ._Ternary
+  _ListComp = _CtorV' @ExprF ._ListComp
+  _Dict = _CtorV' @ExprF ._Dict
+  _DictComp = _CtorV' @ExprF ._DictComp
+  _Set = _CtorV' @ExprF ._Set
+  _SetComp = _CtorV' @ExprF ._SetComp
+  _Deref = _CtorV' @ExprF ._Deref
+  _Subscript = _CtorV' @ExprF ._Subscript
+  _Binary = _CtorV' @ExprF ._Binary
+  _Unary = _CtorV' @ExprF ._Unary
+  _Not = _CtorV' @ExprF ._Not
+  _Generator = _CtorV' @ExprF ._Generator
+  _Await = _CtorV' @ExprF ._Await
+  _Parens = _CtorV' @ExprF ._Parens
+  _Ellipsis = _CtorV' @ExprF ._Ellipsis
 
 instance Validated expr => AsExpr (ExprF expr) expr where
   _Ident =
@@ -935,6 +568,7 @@ instance Validated expr => AsExpr (ExprF expr) expr where
       (\case
           Ident _ a -> Right a
           a -> Left $ a ^. unvalidated)
+
   _Tuple =
     prism
       (\(MkTuple a b c d) -> Tuple a b c d)
@@ -961,41 +595,6 @@ instance Validated expr => AsExpr (ExprF expr) expr where
       (\(MkList a b c d) -> List a b c d)
       (\case
           List a b c d -> Right (MkList a b c d)
-          a -> Left $ a ^. unvalidated)
-
-  _Int =
-    prism
-      (\(MkInt a b c) -> Int a b c)
-      (\case
-          Int a b c -> Right (MkInt a b c)
-          a -> Left $ a ^. unvalidated)
-
-  _Float =
-    prism
-      (\(MkFloat a b c) -> Float a b c)
-      (\case
-          Float a b c -> Right (MkFloat a b c)
-          a -> Left $ a ^. unvalidated)
-
-  _Imag =
-    prism
-      (\(MkImag a b c) -> Imag a b c)
-      (\case
-          Imag a b c -> Right (MkImag a b c)
-          a -> Left $ a ^. unvalidated)
-
-  _Bool =
-    prism
-      (\(MkBool a b c) -> Bool a b c)
-      (\case
-          Bool a b c -> Right (MkBool a b c)
-          a -> Left $ a ^. unvalidated)
-
-  _String =
-    prism
-      (\(MkString a b) -> String a b)
-      (\case
-          String a b -> Right (MkString a b)
           a -> Left $ a ^. unvalidated)
 
   _Unit =
@@ -1131,91 +730,182 @@ instance Validated expr => AsExpr (ExprF expr) expr where
           Ellipsis a b -> Right (MkEllipsis a b)
           a -> Left $ a ^. unvalidated)
 
-instance AsExpr (expr (VFix expr)) (VFix expr') => AsExpr (VFix expr) (VFix expr') where
-  _Ident = _Wrapped._Ident
-  _Tuple = _Wrapped._Tuple
-  _None = _Wrapped._None
-  _Call = _Wrapped._Call
-  _List = _Wrapped._List
-  _Int = _Wrapped._Int
-  _Float = _Wrapped._Float
-  _Imag = _Wrapped._Imag
-  _Bool = _Wrapped._Bool
-  _String = _Wrapped._String
-  _Unit = _Wrapped._Unit
-  _Lambda = _Wrapped._Lambda
-  _Yield = _Wrapped._Yield
-  _YieldFrom = _Wrapped._YieldFrom
-  _Ternary = _Wrapped._Ternary
-  _ListComp = _Wrapped._ListComp
-  _Dict = _Wrapped._Dict
-  _DictComp = _Wrapped._DictComp
-  _Set = _Wrapped._Set
-  _SetComp = _Wrapped._SetComp
-  _Deref = _Wrapped._Deref
-  _Subscript = _Wrapped._Subscript
-  _Binary = _Wrapped._Binary
-  _Unary = _Wrapped._Unary
-  _Not = _Wrapped._Not
-  _Generator = _Wrapped._Generator
-  _Await = _Wrapped._Await
-  _Parens = _Wrapped._Parens
-  _Ellipsis = _Wrapped._Ellipsis
+  _Bool =
+    prism
+      (\(MkBool a b c) -> Bool a b c)
+      (\case
+          Bool a b c -> Right (MkBool a b c)
+          a -> Left $ a ^. unvalidated)
 
--- |
--- @shouldGroupLeft op left@ returns true if @left@ needs to be parenthesised
--- when it is the left argument of @op@
-shouldGroupLeft :: AsExpr expr expr => BinOp a -> expr v a -> Bool
-shouldGroupLeft op left =
-  let
-    entry = lookupOpEntry op operatorTable
+  _String =
+    prism
+      (\(MkString a b) -> String a b)
+      (\case
+          String a b -> Right (MkString a b)
+          a -> Left $ a ^. unvalidated)
 
-    lEntry =
-      case vout left of
-        Binary _ _ lOp _ -> Just $ lookupOpEntry lOp operatorTable
-        _ -> Nothing
+newtype Expr35 v a = Expr35 { unExpr35 :: VFix (VariantV '[ExprF, PyInt35]) v a }
+makeWrapped ''Expr35
 
-    leftf =
-      case entry ^. opAssoc of
-        R | Just (OpEntry _ prec R) <- lEntry -> prec <= entry ^. opPrec
-        _ -> False
+instance Validated Expr35 where; unvalidated = to unsafeCoerce
 
-    leftf' =
-      case (vout left, op) of
-        (Unary{}, Exp{}) -> True
-        (Tuple{}, _) -> True
-        (Not{}, BoolAnd{}) -> False
-        (Not{}, BoolOr{}) -> False
-        (Not{}, _) -> True
-        _ -> maybe False (\p -> p < entry ^. opPrec) (lEntry ^? _Just.opPrec)
-  in
-    leftf || leftf'
+py35
+  :: VFunctor b
+  => (forall expr. Validated expr => Prism (ExprF expr v a) (ExprF expr '[] a) (b expr v a) (b expr '[] a))
+  -> Prism (Expr35 v a) (Expr35 '[] a) (b Expr35 v a) (b Expr35 '[] a)
+py35 p = _Wrapped._Wrapped._CtorV' @ExprF .p.iso (vfmap Expr35) (vfmap unExpr35)
 
--- |
--- @shouldGroupRight op right@ returns true if @right@ needs to be parenthesised
--- when it is the right argument of @op@
-shouldGroupRight :: AsExpr expr expr => BinOp a -> expr v a -> Bool
-shouldGroupRight op right =
-  let
-    entry = lookupOpEntry op operatorTable
+instance AsExpr Expr35 Expr35 where
+  _Ident = _Wrapped._Wrapped._CtorV' @ExprF ._Ident
+  _Tuple = py35 _Tuple
+  _None = py35 _None
+  _Call = py35 _Call
+  _List = py35 _List
+  _Bool = py35 _Bool
+  _String = py35 _String
+  _Unit = py35 _Unit
+  _Lambda = py35 _Lambda
+  _Yield = py35 _Yield
+  _YieldFrom = py35 _YieldFrom
+  _Ternary = py35 _Ternary
+  _ListComp = py35 _ListComp
+  _Dict = py35 _Dict
+  _DictComp = py35 _DictComp
+  _Set = py35 _Set
+  _SetComp = py35 _SetComp
+  _Deref = py35 _Deref
+  _Subscript = py35 _Subscript
+  _Binary = py35 _Binary
+  _Unary = py35 _Unary
+  _Not = py35 _Not
+  _Generator = py35 _Generator
+  _Await = py35 _Await
+  _Ellipsis = py35 _Ellipsis
+  _Parens = py35 _Parens
 
-    rEntry =
-      case vout right of
-        Binary _ _ rOp _ -> Just $ lookupOpEntry rOp operatorTable
-        _ -> Nothing
+newtype Expr36 v a = Expr36 { unExpr36 :: VFix (VariantV '[ExprF, PyInt36]) v a }
 
-    rightf =
-      case entry ^. opAssoc of
-        L | Just (OpEntry _ prec L) <- rEntry -> prec <= entry ^. opPrec
-        _ -> False
+exprFromInteger
+  :: ( AsPyInt (e (VFix e)) int
+     , AsIntLiteral (int ()) f ()
+     , AsExpr (VFix e) (VFix e)
+     )
+  => (forall a. NonEmpty a -> f a)
+  -> Integer
+  -> Raw (VFix e)
+exprFromInteger l n
+  | n >= 0 =
+    _Int #
+    MkInt
+      (Ann ())
+      (_IntLiteralDec # (Ann (), integralDecDigits n ^?! _Right.to l))
+      []
+  | otherwise =
+      _Unary #
+      MkUnary
+        (Ann ())
+        (Negate (Ann ()) [])
+        (_Int #
+         MkInt
+          (Ann ())
+          (_IntLiteralDec # (Ann (), integralDecDigits (-n) ^?! _Right.to l))
+          [])
 
-    rightf' =
-      case (op, vout right) of
-        (_, Tuple{}) -> True
-        (BoolAnd{}, Not{}) -> False
-        (BoolOr{}, Not{}) -> False
-        (_, Not{}) -> True
-        _ -> maybe False (\p -> p < entry ^. opPrec) (rEntry ^? _Just.opPrec)
-  in
-    rightf || rightf'
+exprNegate :: AsExpr (VFix e) (VFix e) => Raw (VFix e) -> Raw (VFix e)
+exprNegate = review _Unary . MkUnary (Ann ()) (Negate (Ann ()) [])
 
+exprPlus
+  :: ( HasTrailingWhitespace (Raw (VFix e))
+     , AsExpr (VFix e) (VFix e)
+     )
+  => Raw (VFix e)
+  -> Raw (VFix e)
+  -> Raw (VFix e)
+exprPlus a =
+  review _Binary .
+  MkBinary
+    (Ann ())
+    (a & trailingWhitespace .~ [Space])
+    (Plus (Ann ()) [Space])
+
+exprMultiply
+  :: ( HasTrailingWhitespace (Raw (VFix e))
+     , AsExpr (VFix e) (VFix e)
+     )
+  => Raw (VFix e)
+  -> Raw (VFix e)
+  -> Raw (VFix e)
+exprMultiply a =
+  review _Binary .
+  MkBinary
+    (Ann ())
+    (a & trailingWhitespace .~ [Space])
+    (Multiply (Ann ()) [Space])
+
+exprMinus
+  :: ( HasTrailingWhitespace (Raw (VFix e))
+     , AsExpr (VFix e) (VFix e)
+     )
+  => Raw (VFix e)
+  -> Raw (VFix e)
+  -> Raw (VFix e)
+exprMinus a =
+  review _Binary .
+  MkBinary
+    (Ann ())
+    (a & trailingWhitespace .~ [Space])
+    (Minus (Ann ()) [Space])
+
+instance Num (Raw Expr35) where
+  fromInteger = Expr35 . exprFromInteger id
+  negate = Expr35 . exprNegate . unExpr35
+  (+) (Expr35 a) = Expr35 . exprPlus a . unExpr35
+  (*) (Expr35 a) = Expr35 . exprMultiply a . unExpr35
+  (-) (Expr35 a) = Expr35 . exprMinus a . unExpr35
+  signum = undefined
+  abs = undefined
+
+{-
+
+instance Num (Raw (VFix (VariantV vs))) where
+  fromInteger n
+    | n >= 0 =
+      _Int # (Ann (), _IntLiteralDec # (Ann (), integralDecDigits n ^?! _Right), [])
+    | otherwise =
+        _Unary #
+        MkUnary
+          (Ann ())
+          (Negate (Ann ()) [])
+          (_Int #
+           ( Ann ()
+           , _IntLiteralDec # (Ann (), integralDecDigits (-n) ^?! _Right)
+           , []
+           ))
+
+  negate = VIn . Unary (Ann ()) (Negate (Ann ()) [])
+
+  (+) a =
+    VIn .
+    Binary (Ann ())
+      (a & trailingWhitespace .~ [Space])
+      (Plus (Ann ()) [Space])
+  (*) a =
+    VIn .
+    Binary (Ann ())
+      (a & trailingWhitespace .~ [Space])
+      (Multiply (Ann ()) [Space])
+  (-) a =
+    VIn .
+    Binary (Ann ())
+      (a & trailingWhitespace .~ [Space])
+    (Minus (Ann ()) [Space])
+  signum = undefined
+  abs = undefined
+
+instance HasExprs Expr35 Expr35 where
+  _Exprs = id
+
+instance HasExprs Expr36 Expr36 where
+  _Exprs = id
+
+-}

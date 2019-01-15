@@ -94,7 +94,6 @@ library
                      , Language.Python.Internal.Token
                      , Language.Python.Internal.Syntax.IR
                      , Language.Python.Optics
-                     , Language.Python.Optics.Expr
                      , Language.Python.Optics.Exprs
                      , Language.Python.Optics.Idents
                      , Language.Python.Optics.Indents
@@ -111,13 +110,17 @@ library
                      , Language.Python.Syntax.CommaSep
                      , Language.Python.Syntax.Comment
                      , Language.Python.Syntax.Comprehension
+                     , Language.Python.Syntax.Dicts
                      , Language.Python.Syntax.Expr
+                     , Language.Python.Syntax.Expr.Optics
+                     , Language.Python.Syntax.Expr.Precedence
                      , Language.Python.Syntax.Expr.Types
                      , Language.Python.Syntax.Ident
                      , Language.Python.Syntax.Import
                      , Language.Python.Syntax.Module
                      , Language.Python.Syntax.Operator.Binary
                      , Language.Python.Syntax.Operator.Unary
+                     , Language.Python.Syntax.Lists
                      , Language.Python.Syntax.ModuleNames
                      , Language.Python.Syntax.Numbers
                      , Language.Python.Syntax.Numbers.Float
@@ -129,8 +132,11 @@ library
                      , Language.Python.Syntax.Param
                      , Language.Python.Syntax.Punctuation
                      , Language.Python.Syntax.Raw
+                     , Language.Python.Syntax.Sets
                      , Language.Python.Syntax.Statement
                      , Language.Python.Syntax.Strings
+                     , Language.Python.Syntax.Subscript
+                     , Language.Python.Syntax.Tuples
                      , Language.Python.Syntax.Types
                      , Language.Python.Syntax.Whitespace
                      , Language.Python.Validate

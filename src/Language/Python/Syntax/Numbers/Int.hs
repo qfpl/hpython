@@ -1,5 +1,6 @@
 {-# language DataKinds, KindSignatures #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language FlexibleContexts #-}
 {-# language FlexibleInstances, MultiParamTypeClasses, TypeFamilies #-}
 {-# language FunctionalDependencies #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
@@ -24,68 +25,67 @@ module Language.Python.Syntax.Numbers.Int
   ( -- * Classy Prism
     AsPyInt(..)
     -- * Datatypes
-    -- ** 3.5
-  , PyInt35(..)
+  , PyInt35
+  , PyInt36
+  , PyInt(..)
     -- *** Lenses
-  , int35Ann
-  , int35Value
-  , int35Whitespace
-    -- ** 3.6
-  , PyInt36(..)
-    -- *** Lenses
-  , int36Ann
-  , int36Value
-  , int36Whitespace
+  , intAnn
+  , intValue
+  , intWhitespace
   )
 where
 
-import Control.Lens.Lens (Lens')
-import Control.Lens.Prism (Prism')
+import Control.Lens.Getter (to)
+import Control.Lens.Iso (coerced)
+import Control.Lens.Prism (Prism)
 import Control.Lens.TH (makeLenses)
-import Data.Generics.Product.Typed (typed)
+import Control.Lens.Wrapped (_Wrapped)
 import GHC.Generics (Generic)
+import Unsafe.Coerce (unsafeCoerce)
 
+import Data.VFix
+import Data.VariantV
+import Language.Python.Optics.Validated
 import Language.Python.Optics.Version
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Numbers.IntLiteral
 import Language.Python.Syntax.Whitespace
 
-class AsPyInt s int v a | s -> v a, int -> v a where
-  _Int :: Prism' (s v a) (Ann a, int v a, [Whitespace])
+class AsPyInt s int | s -> int where
+  _Int
+    :: Prism
+         (s v a)
+         (s '[] a)
+         (PyInt int expr v a)
+         (PyInt int expr '[] a)
 
-data PyInt35 (v :: [*]) (a :: *)
-  = MkInt35
-  { _int35Ann :: Ann a
-  , _int35Value :: IntLiteral35 a
-  , _int35Whitespace :: [Whitespace]
+instance
+  (Validated (VariantV vs expr), CtorV vs (PyInt f)) =>
+  AsPyInt (VariantV vs expr) f where
+  _Int = _CtorV' @(PyInt f) . coerced
+
+instance AsPyInt (e (VFix e)) f => AsPyInt (VFix e) f where
+  _Int = _Wrapped._Int
+
+data PyInt f (expr :: [*] -> * -> *) (v :: [*]) (a :: *)
+  = MkInt
+  { _intAnn :: Ann a
+  , _intValue :: f a
+  , _intWhitespace :: [Whitespace]
   } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
-makeLenses ''PyInt35
+makeLenses ''PyInt
 
-instance HasAnn (PyInt35 v) where
-  annot :: forall a. Lens' (PyInt35 v a) (Ann a)
-  annot = typed @(Ann a)
+instance Validated e => Validated (PyInt f e) where; unvalidated = to unsafeCoerce
 
-instance Upgrade (PyInt35 v a) (PyInt35 v a) where
-  upgrade = id
-  downgrade = Just
+instance HasTrailingWhitespace (PyInt f expr v a) where
+  trailingWhitespace = intWhitespace
 
+instance HasAnn (PyInt f expr v) where
+  annot = intAnn
 
-data PyInt36 (v :: [*]) (a :: *)
-  = MkInt36
-  { _int36Ann :: Ann a
-  , _int36Value :: IntLiteral36 a
-  , _int36Whitespace :: [Whitespace]
-  } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
-makeLenses ''PyInt36
+instance Upgrade (f a) (f' a) => Upgrade (PyInt f expr v a) (PyInt f' expr v a) where
+  upgrade (MkInt a b c) = MkInt a (upgrade b) c
+  downgrade (MkInt a b c) = (\b' -> MkInt a b' c) <$> downgrade b
 
-instance HasAnn (PyInt36 v) where
-  annot :: forall a. Lens' (PyInt36 v a) (Ann a)
-  annot = typed @(Ann a)
-
-instance Upgrade (PyInt36 v a) (PyInt36 v a) where
-  upgrade = id
-  downgrade = Just
-
-instance Upgrade (PyInt35 v a) (PyInt36 v a) where
-  upgrade (MkInt35 a b c) = MkInt36 a (upgrade b) c
-  downgrade (MkInt36 a b c) = (\b' -> MkInt35 a b' c) <$> downgrade b
+type PyInt35 = PyInt IntLiteral35
+type PyInt36 = PyInt IntLiteral36

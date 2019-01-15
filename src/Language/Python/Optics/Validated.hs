@@ -1,4 +1,8 @@
 {-# language DataKinds, PolyKinds, DefaultSignatures #-}
+{-# language ExplicitForAll #-}
+{-# language FlexibleContexts #-}
+{-# language FlexibleInstances #-}
+{-# language TypeOperators #-}
 {-# language UndecidableInstances #-}
 
 {-|
@@ -12,14 +16,17 @@ Portability : non-portable
 
 module Language.Python.Optics.Validated
   ( Validated(..)
+  , _CtorV'
   )
 where
 
-import Control.Lens.Getter (Getter, to)
+import Control.Lens.Getter ((^.), Getter, to)
+import Control.Lens.Prism (Prism, prism)
 import Data.Coerce (Coercible, coerce)
 import Unsafe.Coerce (unsafeCoerce)
 
 import Data.VFix
+import Data.VariantV
 
 -- | A type class for things for which we can strip the validation information.
 -- This can help types line up when they need to, for example to put many
@@ -31,3 +38,20 @@ class Validated (s :: [*] -> * -> *) where
 
 instance Validated (f (VFix f)) => Validated (VFix f) where
   unvalidated = to unsafeCoerce
+
+instance Validated (VariantV '[] expr) where
+  unvalidated = to absurdVV
+
+instance
+  (Validated (a expr), Validated (VariantV as expr)) => Validated (VariantV (a ': as) expr) where
+  unvalidated = to unsafeCoerce
+
+_CtorV'
+  :: forall g vs expr v a
+   . (CtorV vs g, Validated (VariantV vs expr))
+  => Prism
+       (VariantV vs expr v a)
+       (VariantV vs expr '[] a)
+       (g expr v a)
+       (g expr '[] a)
+_CtorV' = prism injV (\a -> maybe (Left $ a ^. unvalidated) Right $ prjV a)

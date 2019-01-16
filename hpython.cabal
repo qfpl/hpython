@@ -60,7 +60,7 @@ extra-source-files:  ChangeLog.md
                      test/files/weird.py
                      test/files/weird2.py
 
-cabal-version:       >=1.10
+cabal-version:       >=2
 tested-with:           GHC == 8.0.2
                      , GHC == 8.2.2
                      , GHC == 8.4.4
@@ -75,55 +75,288 @@ flag development
   default: False
   manual: True
 
-library
-  exposed-modules:     Data.Type.Set
-                     , Data.Validate.Monadic
-                     , Data.VConst
+library hpython-vdata
+  exposed-modules:     Data.VConst
                      , Data.VFix
-                     , Data.VFoldable
                      , Data.VFunctor
+                     , Data.VFoldable
                      , Data.VIdentity
                      , Data.VTraversable
+  build-depends:       base >=4.9 && <5
+                     , digit >=0.7 && < 0.8
+                     , lens >= 4 && < 4.18
+                     , generic-lens >=1.0 && <1.2
+                     , deriving-compat >=0.4 && <0.6
+  hs-source-dirs:      src/vdata
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Wincomplete-patterns
+                       -Wincomplete-record-updates
+                       -Wunused-imports
+  if flag(development)
+    ghc-options:       -Werror
+
+library hpython-ann
+  exposed-modules:     Language.Python.Syntax.Ann
+  build-depends:       base >=4.9 && <5
+                     , digit >=0.7 && < 0.8
+                     , lens >= 4 && < 4.18
+                     , generic-lens >=1.0 && <1.2
+                     , deriving-compat >=0.4 && <0.6
+                     , hpython-vdata
+  hs-source-dirs:      src/ann
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Wincomplete-patterns
+                       -Wincomplete-record-updates
+                       -Wunused-imports
+  if flag(development)
+    ghc-options:       -Werror
+
+library hpython-punctuation
+  exposed-modules:     Language.Python.Syntax.CommaSep
+                     , Language.Python.Syntax.Comment
+                     , Language.Python.Syntax.Punctuation
+                     , Language.Python.Syntax.Whitespace
+  build-depends:       base >=4.9 && <5
+                     , digit >=0.7 && < 0.8
+                     , fingertree >=0.1 && <0.2
+                     , lens >= 4 && < 4.18
+                     , generic-lens >=1.0 && <1.2
+                     , deriving-compat >=0.4 && <0.6
+                     , hpython-ann
+                     , hpython-vdata
+  hs-source-dirs:      src/punctuation
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Wincomplete-patterns
+                       -Wincomplete-record-updates
+                       -Wunused-imports
+  if flag(development)
+    ghc-options:       -Werror
+
+
+library hpython-numbers
+  signatures:          Language.Python.Syntax.Digits.Sig
+  exposed-modules:     Language.Python.Syntax.Imag
+                     , Language.Python.Syntax.Int
+                     , Language.Python.Syntax.Float
+  build-depends:       base >=4.9 && <5
+                     , digit >=0.7 && < 0.8
+                     , lens >= 4 && < 4.18
+                     , generic-lens >=1.0 && <1.2
+                     , deriving-compat >=0.4 && <0.6
+                     , these >=0.7.4 && <0.8
+                     , hpython-ann
+  hs-source-dirs:      src/numbers
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Wincomplete-patterns
+                       -Wincomplete-record-updates
+                       -Wunused-imports
+  if flag(development)
+    ghc-options:       -Werror
+
+library hpython-strings
+  exposed-modules:     Language.Python.Syntax.Strings
+  build-depends:       base >=4.9 && <5
+                     , digit >=0.7 && < 0.8
+                     , lens >= 4 && < 4.18
+                     , generic-lens >=1.0 && <1.2
+                     , deriving-compat >=0.4 && <0.6
+                     , text >=1.2 && <1.3
+                     , these >=0.7.4 && <0.8
+                     , hpython-ann
+                     , hpython-punctuation
+  hs-source-dirs:      src/strings
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Wincomplete-patterns
+                       -Wincomplete-record-updates
+                       -Wunused-imports
+  if flag(development)
+    ghc-options:       -Werror
+
+library hpython-validated
+  exposed-modules:     Language.Python.Optics.Validated
+  build-depends:       base >=4.9 && <5
+                     , digit >=0.7 && < 0.8
+                     , lens >= 4 && < 4.18
+                     , generic-lens >=1.0 && <1.2
+                     , deriving-compat >=0.4 && <0.6
+                     , these >=0.7.4 && <0.8
+                     , hpython-ann
+                     , hpython-vdata
+  hs-source-dirs:      src/validated
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Wincomplete-patterns
+                       -Wincomplete-record-updates
+                       -Wunused-imports
+  if flag(development)
+    ghc-options:       -Werror
+
+library hpython-raw
+  exposed-modules:     Language.Python.Syntax.Raw
+  build-depends:       base >=4.9 && <5
+                     , hpython-ann
+                     , hpython-vdata
+  hs-source-dirs:      src/raw
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Wincomplete-patterns
+                       -Wincomplete-record-updates
+                       -Wunused-imports
+  if flag(development)
+    ghc-options:       -Werror
+
+library hpython-numbers35
+  exposed-modules:     Language.Python35.Syntax.Digits
+  build-depends:       base >=4.9 && <5
+                     , deriving-compat >=0.4 && <0.6
+  hs-source-dirs:      src/numbers35
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Wincomplete-patterns
+                       -Wincomplete-record-updates
+                       -Wunused-imports
+  if flag(development)
+    ghc-options:       -Werror
+
+library hpython-numbers36
+  exposed-modules:     Language.Python36.Syntax.Digits
+  build-depends:       base >=4.9 && <5
+                     , deriving-compat >=0.4 && <0.6
+                     , hpython-punctuation
+  hs-source-dirs:      src/numbers36
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Wincomplete-patterns
+                       -Wincomplete-record-updates
+                       -Wunused-imports
+  if flag(development)
+    ghc-options:       -Werror
+
+library hpython-token
+  exposed-modules:     Language.Python.Token
+  build-depends:       base >=4.9 && <5
+                     , digit >=0.7 && < 0.8
+                     , lens >= 4 && < 4.18
+                     , generic-lens >=1.0 && <1.2
+                     , deriving-compat >=0.4 && <0.6
+                     , text >=1.2 && <1.3
+                     , these >=0.7.4 && <0.8
+                     , hpython-ann
+                     , hpython-numbers
+                     , hpython-punctuation
+                     , hpython-strings
+  hs-source-dirs:      src/token
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Wincomplete-patterns
+                       -Wincomplete-record-updates
+                       -Wunused-imports
+  if flag(development)
+    ghc-options:       -Werror
+
+library hpython-expr
+  exposed-modules:     Language.Python.Optics.Exprs
+                     , Language.Python.Syntax.Expr
+                     , Language.Python.Syntax.Arg
+                     , Language.Python.Syntax.Comprehension
+                     , Language.Python.Syntax.Ident
+                     , Language.Python.Syntax.Operator.Binary
+                     , Language.Python.Syntax.Operator.Unary
+                     , Language.Python.Syntax.Param
+  build-depends:       base >=4.9 && <5
+                     , digit >=0.7 && < 0.8
+                     , lens >= 4 && < 4.18
+                     , generic-lens >=1.0 && <1.2
+                     , deriving-compat >=0.4 && <0.6
+                     , text >=1.2 && <1.3
+                     , these >=0.7.4 && <0.8
+                     , hpython-ann
+                     , hpython-numbers
+                     , hpython-punctuation
+                     , hpython-raw
+                     , hpython-strings
+                     , hpython-validated
+                     , hpython-vdata
+  hs-source-dirs:      src/expr
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Wincomplete-patterns
+                       -Wincomplete-record-updates
+                       -Wunused-imports
+  if flag(development)
+    ghc-options:       -Werror
+
+library
+  mixins:              hpython-numbers
+                         (Language.Python.Syntax.Imag as Language.Python35.Syntax.Imag
+                         ,Language.Python.Syntax.Int as Language.Python35.Syntax.Int
+                         ,Language.Python.Syntax.Float as Language.Python35.Syntax.Float
+                         )
+                         requires (Language.Python.Syntax.Digits.Sig as Language.Python35.Syntax.Digits)
+                     , hpython-numbers
+                         (Language.Python.Syntax.Imag as Language.Python36.Syntax.Imag
+                         ,Language.Python.Syntax.Int as Language.Python36.Syntax.Int
+                         ,Language.Python.Syntax.Float as Language.Python36.Syntax.Float
+                         )
+                         requires (Language.Python.Syntax.Digits.Sig as Language.Python36.Syntax.Digits)
+                     , hpython-token
+                         (Language.Python.Token as Language.Python35.Token)
+                         requires (Language.Python.Syntax.Digits.Sig as Language.Python35.Syntax.Digits)
+                     , hpython-token
+                         (Language.Python.Token as Language.Python36.Token)
+                         requires (Language.Python.Syntax.Digits.Sig as Language.Python36.Syntax.Digits)
+  reexported-modules:  Data.VFix
+                     , Data.VFunctor
+                     , Data.VFoldable
+                     , Data.VTraversable
+                     , Language.Python.Optics.Validated
+                     , Language.Python.Syntax.Ann
+                     , Language.Python.Syntax.Comment
+                     , Language.Python.Syntax.Punctuation
+                     , Language.Python.Syntax.Raw
+                     , Language.Python.Syntax.Whitespace
+
+                     , Language.Python35.Syntax.Digits
+                     , Language.Python35.Syntax.Float
+                     , Language.Python35.Syntax.Imag
+                     , Language.Python35.Syntax.Int
+                     , Language.Python35.Token
+
+                     , Language.Python36.Syntax.Digits
+                     , Language.Python36.Syntax.Float
+                     , Language.Python36.Syntax.Imag
+                     , Language.Python36.Syntax.Int
+                     , Language.Python36.Token
+
+  exposed-modules:     Data.Type.Set
+                     , Data.Validate.Monadic
                      , Language.Python
                      , Language.Python.DSL
                      , Language.Python.Internal.Lexer
                      , Language.Python.Internal.Parse
                      , Language.Python.Internal.Render
                      , Language.Python.Internal.Render.Correction
-                     , Language.Python.Internal.Token
                      , Language.Python.Internal.Syntax.IR
                      , Language.Python.Optics
                      , Language.Python.Optics.Expr
-                     , Language.Python.Optics.Exprs
                      , Language.Python.Optics.Idents
                      , Language.Python.Optics.Indents
                      , Language.Python.Optics.Newlines
-                     , Language.Python.Optics.Validated
                      , Language.Python.Parse
                      , Language.Python.Parse.Error
                      , Language.Python.Render
                      , Language.Python.Syntax
-                     , Language.Python.Syntax.Ann
                      , Language.Python.Syntax.AugAssign
-                     , Language.Python.Syntax.Arg
-                     , Language.Python.Syntax.CommaSep
-                     , Language.Python.Syntax.Comment
-                     , Language.Python.Syntax.Comprehension
-                     , Language.Python.Syntax.Expr
-                     , Language.Python.Syntax.Ident
                      , Language.Python.Syntax.Import
                      , Language.Python.Syntax.Module
-                     , Language.Python.Syntax.Operator.Binary
-                     , Language.Python.Syntax.Operator.Unary
                      , Language.Python.Syntax.ModuleNames
-                     , Language.Python.Syntax.Numbers
-                     , Language.Python.Syntax.Param
-                     , Language.Python.Syntax.Punctuation
-                     , Language.Python.Syntax.Raw
                      , Language.Python.Syntax.Statement
-                     , Language.Python.Syntax.Strings
                      , Language.Python.Syntax.Types
-                     , Language.Python.Syntax.Whitespace
                      , Language.Python.Validate
                      , Language.Python.Validate.Error
                      , Language.Python.Validate.Scope
@@ -137,10 +370,10 @@ library
                      , bytestring >= 0.10 && < 0.11
                      , digit >=0.7 && < 0.8
                      , dlist >=0.8 && <0.9
+                     , fingertree >=0.1 && <0.2
                      , lens >= 4 && < 4.18
                      , parsers >= 0.10 && < 0.13
                      , megaparsec >=6.3 && <7
-                     , fingertree >=0.1 && <0.2
                      , generic-lens >=1.0 && <1.2
                      , mtl >= 2.1 && < 2.3
                      , containers >=0.5.7.1 && <0.7
@@ -151,6 +384,15 @@ library
                      , validation >= 1 && < 1.1
                      , parsers-megaparsec >=0.1 && <0.2
                      , recursion-schemes >=5.1 && <5.2
+                     , hpython-vdata
+                     , hpython-ann
+                     , hpython-numbers
+                     , hpython-numbers35
+                     , hpython-numbers36
+                     , hpython-punctuation
+                     , hpython-token
+                     , hpython-raw
+                     , hpython-validated
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -Wall
@@ -212,12 +454,12 @@ test-suite hpython-tests
   hs-source-dirs:      test
   build-depends:       base >=4.9 && <5
                      , filepath
-                     , hpython
                      , hedgehog >= 0.5 && < 0.7
                      , lens >= 4 && < 4.18
                      , text >=1.2 && <1.3
                      , megaparsec >=6.3 && < 7
                      , validation >= 1 && < 1.1
+                     , hpython
   default-language:    Haskell2010
   ghc-options:         -Wall
                        -Wincomplete-patterns

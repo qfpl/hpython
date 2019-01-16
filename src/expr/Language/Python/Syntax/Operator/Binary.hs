@@ -254,7 +254,7 @@ lookupOpEntry :: BinOp a -> [OpEntry] -> OpEntry
 lookupOpEntry op =
   go (op $> ())
   where
-    go op [] = error $ show op <> " not found in operator table"
-    go op (x:xs)
-      | sameOperator (x ^. opOperator) op = x
-      | otherwise = go op xs
+    go o [] = error $ show o <> " not found in operator table"
+    go o (x:xs)
+      | sameOperator (x ^. opOperator) o = x
+      | otherwise = go o xs

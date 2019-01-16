@@ -1,0 +1,24 @@
+{-# language KindSignatures #-}
+{-# language TemplateHaskell #-}
+signature Language.Python.Syntax.Digits.Sig where
+
+import Data.Functor.Classes (Eq1(..), Ord1(..), Show1(..))
+import Data.List.NonEmpty (NonEmpty)
+import GHC.Generics (Generic)
+
+data Digits (a :: *)
+instance Eq a => Eq (Digits a)
+instance Ord a => Ord (Digits a)
+instance Show a => Show (Digits a)
+instance Eq1 Digits
+instance Ord1 Digits
+instance Show1 Digits
+instance Functor Digits
+instance Foldable Digits
+instance Traversable Digits
+instance Generic (Digits a)
+
+toDigits :: NonEmpty a -> Digits a
+fromDigits :: Digits a -> NonEmpty a
+
+showDigits :: (a -> Char) -> Digits a -> String

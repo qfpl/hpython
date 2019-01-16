@@ -58,8 +58,11 @@ import Language.Python.Syntax.Arg
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Comprehension
+import Language.Python.Syntax.Digits.Sig
+import Language.Python.Syntax.Float
 import Language.Python.Syntax.Ident
-import Language.Python.Syntax.Numbers
+import Language.Python.Syntax.Imag
+import Language.Python.Syntax.Int
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Param
@@ -659,8 +662,8 @@ data ExprF expr (v :: [*]) a
 instance VFunctor ExprF where; vfmap = vfmapDefault
 instance VFoldable ExprF where; vfoldMap = vfoldMapDefault
 instance VTraversable ExprF where
-  vtraverse fun e =
-    case e of
+  vtraverse fun expr =
+    case expr of
       Unit a b c -> pure $ Unit a b c
       Lambda a b c d e ->
         (\c' -> Lambda a b c' d) <$>
@@ -758,8 +761,8 @@ instance HasTrailingWhitespace (expr v a) => HasTrailingWhitespace (ExprF expr v
           Set _ _ _ ws -> ws
           Generator  _ a -> a ^. trailingWhitespace
           Await _ _ e -> e ^. trailingWhitespace)
-      (\e ws ->
-        case e of
+      (\expr ws ->
+        case expr of
           Unit a b _ -> Unit a b ws
           Lambda a b c d f -> Lambda a b c d (f & trailingWhitespace .~ ws)
           Yield a _ CommaSepNone -> Yield a ws CommaSepNone
@@ -800,14 +803,14 @@ instance Num (Expr '[] ()) where
   fromInteger n
     | n >= 0 =
       VIn $
-      Int (Ann ()) (IntLiteralDec (Ann ()) $ integralDecDigits n ^?! _Right) []
+      Int (Ann ()) (IntLiteralDec (Ann ()) $ integralDecDigits n ^?! _Right.to toDigits) []
     | otherwise =
         VIn $
         Unary
           (Ann ())
           (Negate (Ann ()) [])
           (VIn $
-           Int (Ann ()) (IntLiteralDec (Ann ()) $ integralDecDigits (-n) ^?! _Right) [])
+           Int (Ann ()) (IntLiteralDec (Ann ()) $ integralDecDigits (-n) ^?! _Right.to toDigits) [])
 
   negate = VIn . Unary (Ann ()) (Negate (Ann ()) [])
 

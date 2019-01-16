@@ -70,3 +70,11 @@ newtype At
 instance HasTrailingWhitespace At where
   trailingWhitespace =
     lens (\(MkAt ws) -> ws) (\_ ws -> MkAt ws)
+
+newtype Underscore
+  = MkUnderscore [Whitespace]
+  deriving (Eq, Ord, Show)
+
+instance HasTrailingWhitespace Underscore where
+  trailingWhitespace =
+    lens (\(MkUnderscore ws) -> ws) (\_ ws -> MkUnderscore ws)

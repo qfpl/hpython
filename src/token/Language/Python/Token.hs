@@ -11,17 +11,19 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Internal.Token where
+module Language.Python.Token where
 
 import Control.Lens.Getter ((^.))
 import Data.Deriving (deriveEq1, deriveOrd1)
 import Data.Functor.Classes (liftCompare, liftEq)
 
 import Language.Python.Syntax.Ann
-import Language.Python.Syntax.Comment (Comment(..))
-import Language.Python.Syntax.Numbers
+import Language.Python.Syntax.Comment
+import Language.Python.Syntax.Float
+import Language.Python.Syntax.Imag
+import Language.Python.Syntax.Int
 import Language.Python.Syntax.Strings
-import Language.Python.Syntax.Whitespace (Newline(..), Indents)
+import Language.Python.Syntax.Whitespace
 
 -- | A 'PyToken' is a single lexical token of Python source. A 'PyToken' has an
 -- optional annotation, which can be '()' when no annotation is desired.

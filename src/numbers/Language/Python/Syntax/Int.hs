@@ -1,18 +1,19 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
-{-# language TemplateHaskell #-}
 module Language.Python.Syntax.Int where
 
 import Control.Lens.Lens (Lens')
 import Control.Lens.Review ((#))
-import Data.Deriving (deriveEq1, deriveOrd1, deriveShow1)
 import Data.Digit.Binary (BinDigit)
 import Data.Digit.Char (charHeXaDeCiMaL, charOctal, charBinary, charDecimal)
 import Data.Digit.Hexadecimal.MixedCase (HeXDigit)
 import Data.Digit.Octal (OctDigit)
 import Data.Digit.Decimal (DecDigit)
+import Data.Functor.Classes (Eq1(..), Ord1(..), Show1(..))
 import Data.Generics.Product.Typed (typed)
-import GHC.Generics (Generic)
+import GHC.Generics (Generic, Generic1)
+import Generic.Data (gliftEq, gliftCompare, gliftShowsPrec)
+import Generic.Data.Orphans ()
 
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Digits.Sig
@@ -58,11 +59,10 @@ data IntLiteral a
   , _unsafeIntLiteralHexUppercase :: Bool
   , _unsafeIntLiteralHexValue :: Digits HeXDigit
   }
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
-
-deriveEq1 ''IntLiteral
-deriveOrd1 ''IntLiteral
-deriveShow1 ''IntLiteral
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Generic, Generic1)
+instance Eq1 IntLiteral where; liftEq = gliftEq
+instance Ord1 IntLiteral where; liftCompare = gliftCompare
+instance Show1 IntLiteral where; liftShowsPrec = gliftShowsPrec
 
 instance HasAnn IntLiteral where
   annot :: forall a. Lens' (IntLiteral a) (Ann a)

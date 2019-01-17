@@ -48,7 +48,7 @@ import Data.Digit.Octal (parseOctal)
 import Data.FingerTree (FingerTree, Measured(..))
 import Data.Foldable (asum)
 import Data.Functor.Identity (Identity)
-import Data.List.NonEmpty (NonEmpty(..), some1)
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Monoid (Sum(..))
 import Data.Set (Set)
 import Data.Semigroup (Semigroup, (<>))
@@ -68,9 +68,11 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
 import qualified Text.Megaparsec as Parsec
 
-import Language.Python.Internal.Token (PyToken(..), pyTokenAnn)
+import Language.Python.Token (PyToken(..), pyTokenAnn)
+import Language.Python.Parse.Digits.Sig (parseDigits, parseDigitsTail)
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Comment
+import Language.Python.Syntax.Digits.Sig (consDigits)
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Numbers
 import Language.Python.Syntax.Strings
@@ -193,7 +195,11 @@ number = do
   zero <- optional parse0
   case zero of
     Nothing -> do
-      nn <- optional $ (:|) <$> parseDecimalNoZero <*> many parseDecimal
+      nn <-
+        optional $
+        consDigits <$>
+        parseDecimalNoZero <*>
+        parseDigitsTail parseDecimal
       case nn of
         Just n ->
           (\x j ann ->
@@ -217,15 +223,15 @@ number = do
                    f = FloatLiteralFull (Ann ann) n $
                      case (a, b) of
                        (Nothing, Nothing) -> Nothing
-                       (Just x, Nothing) -> Just $ This x
-                       (Nothing, Just x) -> Just $ That x
-                       (Just x, Just y) -> Just $ These x y
+                       (Just y, Nothing) -> Just $ This y
+                       (Nothing, Just y) -> Just $ That y
+                       (Just y, Just z) -> Just $ These y z
                  in
                    maybe (TkFloat f) (TkImag . ImagLiteralFloat (Ann ann) f) j) <$>
           optional
             (Left <$ char '.' <*>
              (Left <$> floatExp <|>
-              Right <$> ((,) <$> optional (some1 parseDecimal) <*> optional floatExp)) <|>
+              Right <$> ((,) <$> optional (parseDigits parseDecimal) <*> optional floatExp)) <|>
              Right <$> floatExp) <*>
           optional jJ
         Nothing ->
@@ -235,34 +241,34 @@ number = do
              in
                maybe (TkFloat f) (TkImag . ImagLiteralFloat (Ann ann) f) j) <$>
           -- try is necessary here to prevent the intercepting of dereference tokens
-          try (char '.' *> some1 parseDecimal) <*>
+          try (char '.' *> parseDigits parseDecimal) <*>
           optional floatExp <*>
           optional jJ
     Just z ->
       (\xX a b -> TkInt (IntLiteralHex (Ann b) xX a)) <$>
       (True <$ char 'X' <|> False <$ char 'x') <*>
-      some1 parseHeXaDeCiMaL
+      parseDigits parseHeXaDeCiMaL
       <|>
       (\bB a b -> TkInt (IntLiteralBin (Ann b) bB a)) <$>
       (True <$ char 'B' <|> False <$ char 'b') <*>
-      some1 parseBinary
+      parseDigits parseBinary
       <|>
       (\oO a b -> TkInt (IntLiteralOct (Ann b) oO a)) <$>
       (True <$ char 'O' <|> False <$ char 'o') <*>
-      some1 parseOctal
+      parseDigits parseOctal
       <|>
       (\n j a ->
          maybe
-           (TkInt $ IntLiteralDec (Ann a) (z :| n))
-           (TkImag . ImagLiteralInt (Ann a) (z :| n)) j) <$>
-      try (many parse0 <* notFollowedBy (char '.' <|> char 'e' <|> char 'E' <|> digit)) <*>
+           (TkInt $ IntLiteralDec (Ann a) (consDigits z n))
+           (TkImag . ImagLiteralInt (Ann a) (consDigits z n)) j) <$>
+      try (parseDigitsTail parse0 <* notFollowedBy (char '.' <|> char 'e' <|> char 'E' <|> digit)) <*>
       optional jJ
       <|>
       (\n' a ann ->
          case a of
            Left (Left (b, c, j)) ->
              let
-               f = FloatLiteralFull (Ann ann) (z :| n') $
+               f = FloatLiteralFull (Ann ann) (consDigits z n') $
                  case (b, c) of
                    (Nothing, Nothing) -> Nothing
                    (Just x, Nothing) -> Just $ This x
@@ -272,15 +278,15 @@ number = do
                maybe (TkFloat f) (TkImag . ImagLiteralFloat (Ann ann) f) j
            Left (Right (x, j)) ->
              let
-               f = FloatLiteralWhole (Ann ann) (z :| n') x
+               f = FloatLiteralWhole (Ann ann) (consDigits z n') x
              in
                maybe (TkFloat f) (TkImag . ImagLiteralFloat (Ann ann) f) j
-           Right j -> TkImag $ ImagLiteralInt (Ann ann) (z :| n') j) <$>
-      many parseDecimal <*>
+           Right j -> TkImag $ ImagLiteralInt (Ann ann) (consDigits z n') j) <$>
+      parseDigitsTail parseDecimal <*>
       (Left <$>
        (Left <$>
         ((,,) <$ char '.' <*>
-         optional (some1 parseDecimal) <*>
+         optional (parseDigits parseDecimal) <*>
          optional floatExp <*>
          optional jJ) <|>
         Right <$>
@@ -292,7 +298,7 @@ number = do
       FloatExponent <$>
       (EE <$ char 'E' <|> Ee <$ char 'e') <*>
       optional (Pos <$ char '+' <|> Neg <$ char '-') <*>
-      some1 parseDecimal
+      parseDigits parseDecimal
 
 {-# inline parseToken #-}
 parseToken
@@ -638,33 +644,33 @@ indentation ann lls =
   where
     finalDedents :: StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
     finalDedents = do
-      (ann, _) :| is <- get
+      (a, _) :| is <- get
       case is of
         [] -> pure []
         i' : is' -> do
           put $ i' :| is'
-          (Dedent ann :) <$> finalDedents
+          (Dedent a :) <$> finalDedents
 
     dedents
       :: a
       -> Int
       -> StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
-    dedents ann n = do
+    dedents a n = do
       is <- get
       let (popped, remainder) = NonEmpty.span ((> n) . indentLevel . snd) is
       when (n `notElem` fmap (indentLevel . snd) (NonEmpty.toList is)) .
-        throwError $ IncorrectDedent ann
+        throwError $ IncorrectDedent a
       put $ case remainder of
         [] -> error "I don't know whether this can happen"
         x : xs -> x :| xs
-      pure $ replicate (length popped) (Dedent ann)
+      pure $ replicate (length popped) (Dedent a)
 
     go
       :: Semigroup a
       => LogicalLine a
       -> StateT (NonEmpty (a, Indent)) (Either (TabError a)) [IndentedLine a]
     go ll@BlankLine{} = pure [IndentedLine ll]
-    go ll@(LogicalLine ann (spTks, spcs) _ _) = do
+    go ll@(LogicalLine a (spTks, spcs) _ _) = do
       (_, i) :| _ <- get
       let
         et8 = absoluteIndentLevel 8 spcs
@@ -675,7 +681,7 @@ indentation ann lls =
         (not (et8 < et8i && et1 < et1i) &&
           not (et8 > et8i && et1 > et1i) &&
           not (et8 == et8i && et1 == et1i))
-        (throwError $ TabError ann)
+        (throwError $ TabError a)
       let
         ilSpcs = indentLevel spcs
         ili = indentLevel i
@@ -685,12 +691,12 @@ indentation ann lls =
             (x:xs, y:ys) -> [ Level (y:|ys) (foldMap1 pyTokenAnn $ x:|xs) ]
             _ -> error "impossible"
       case compare ilSpcs ili of
-        LT -> (<> (levelIndent <> [IndentedLine ll])) <$> dedents ann ilSpcs
+        LT -> (<> (levelIndent <> [IndentedLine ll])) <$> dedents a ilSpcs
         EQ ->
           pure $ levelIndent <> [ IndentedLine ll ]
         GT -> do
-          modify $ NonEmpty.cons (ann, spcs)
-          pure [Indent (ilSpcs - ili) spcs ann, IndentedLine ll]
+          modify $ NonEmpty.cons (a, spcs)
+          pure [Indent (ilSpcs - ili) spcs a, IndentedLine ll]
 
 newtype Summed a = Summed a
   deriving (Eq, Show, Ord, Num)
@@ -704,19 +710,19 @@ splitIndents :: FingerTree (Sum Int) (Summed Int) -> Indent -> [Indent]
 splitIndents ns ws = go ns ws []
   where
     go :: FingerTree (Sum Int) (Summed Int) -> Indent -> [Indent] -> [Indent]
-    go ns ws =
-      case FingerTree.viewr ns of
-        FingerTree.EmptyR -> (ws :)
-        ns' FingerTree.:> n
-          | FingerTree.null ns' -> (ws :)
+    go ns' ws' =
+      case FingerTree.viewr ns' of
+        FingerTree.EmptyR -> (ws' :)
+        ns'' FingerTree.:> n
+          | FingerTree.null ns'' -> (ws' :)
           | otherwise ->
               let
                 (befores, afters) =
-                  FingerTree.split ((> getSum (measure ns')) . getIndentLevel) $ unIndent ws
+                  FingerTree.split ((> getSum (measure ns'')) . getIndentLevel) $ unIndent ws'
               in
                 if FingerTree.null afters
-                then error $ "could not carve out " <> show n <> " from " <> show ws
-                else go ns' (MkIndent befores) . (MkIndent afters :)
+                then error $ "could not carve out " <> show n <> " from " <> show ws'
+                else go ns'' (MkIndent befores) . (MkIndent afters :)
 
 chunked :: [IndentedLine a] -> [PyToken a]
 chunked = go FingerTree.empty

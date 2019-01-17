@@ -1,0 +1,8 @@
+signature Language.Python.Parse.Digits.Sig where
+
+import Text.Parser.Char (CharParsing)
+
+import Language.Python.Syntax.Digits.Sig
+
+parseDigits :: CharParsing m => m a -> m (Digits a)
+parseDigitsTail :: CharParsing m => m a -> m (DigitsTail a)

@@ -15,7 +15,7 @@ module Language.Python.Syntax.Comment where
 
 import Control.Lens.Lens (Lens')
 import Data.Generics.Product.Typed (typed)
-import Data.Deriving (deriveEq1, deriveOrd1)
+import Data.Deriving (deriveEq1, deriveOrd1, deriveShow1)
 import GHC.Generics (Generic)
 
 import Language.Python.Syntax.Ann
@@ -52,3 +52,4 @@ instance HasAnn Comment where
 
 deriveEq1 ''Comment
 deriveOrd1 ''Comment
+deriveShow1 ''Comment

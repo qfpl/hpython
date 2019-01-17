@@ -36,7 +36,7 @@ import Control.Lens.Setter ((.~))
 import Control.Lens.TH (makeLenses)
 import Control.Lens.Traversal (Traversal')
 import Control.Lens.Wrapped (_Wrapped)
-import Data.Deriving (deriveEq1, deriveOrd1)
+import Data.Deriving (deriveEq1, deriveOrd1, deriveShow1)
 import Data.Generics.Product.Typed (typed)
 import Data.Foldable (toList)
 import Data.Function ((&))
@@ -221,3 +221,4 @@ instance HasAnn Indents where
 makeLenses ''Indents
 deriveEq1 ''Indents
 deriveOrd1 ''Indents
+deriveShow1 ''Indents

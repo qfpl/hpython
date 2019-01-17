@@ -102,7 +102,7 @@ library hpython-ann
                      , digit >=0.7 && < 0.8
                      , lens >= 4 && < 4.18
                      , generic-lens >=1.0 && <1.2
-                     , deriving-compat >=0.4 && <0.6
+                     , generic-data >=0.5 && <0.6
                      , hpython-vdata
   hs-source-dirs:      src/ann
   default-language:    Haskell2010
@@ -138,14 +138,18 @@ library hpython-punctuation
 
 library hpython-numbers
   signatures:          Language.Python.Syntax.Digits.Sig
+                     , Language.Python.Parse.Digits.Sig
   exposed-modules:     Language.Python.Syntax.Imag
                      , Language.Python.Syntax.Int
                      , Language.Python.Syntax.Float
+                     , Language.Python.Syntax.Numbers
   build-depends:       base >=4.9 && <5
                      , digit >=0.7 && < 0.8
                      , lens >= 4 && < 4.18
                      , generic-lens >=1.0 && <1.2
                      , deriving-compat >=0.4 && <0.6
+                     , generic-data >=0.5 && <0.6
+                     , parsers >= 0.10 && < 0.13
                      , these >=0.7.4 && <0.8
                      , hpython-ann
   hs-source-dirs:      src/numbers
@@ -165,6 +169,7 @@ library hpython-strings
                      , generic-lens >=1.0 && <1.2
                      , deriving-compat >=0.4 && <0.6
                      , text >=1.2 && <1.3
+                     , fingertree >=0.1 && <0.2
                      , these >=0.7.4 && <0.8
                      , hpython-ann
                      , hpython-punctuation
@@ -212,8 +217,10 @@ library hpython-raw
 
 library hpython-numbers35
   exposed-modules:     Language.Python35.Syntax.Digits
+                     , Language.Python35.Parse.Digits
   build-depends:       base >=4.9 && <5
                      , deriving-compat >=0.4 && <0.6
+                     , parsers >= 0.10 && < 0.13
   hs-source-dirs:      src/numbers35
   default-language:    Haskell2010
   ghc-options:         -Wall
@@ -225,8 +232,10 @@ library hpython-numbers35
 
 library hpython-numbers36
   exposed-modules:     Language.Python36.Syntax.Digits
+                     , Language.Python36.Parse.Digits
   build-depends:       base >=4.9 && <5
                      , deriving-compat >=0.4 && <0.6
+                     , parsers >= 0.10 && < 0.13
                      , hpython-punctuation
   hs-source-dirs:      src/numbers36
   default-language:    Haskell2010
@@ -243,7 +252,7 @@ library hpython-token
                      , digit >=0.7 && < 0.8
                      , lens >= 4 && < 4.18
                      , generic-lens >=1.0 && <1.2
-                     , deriving-compat >=0.4 && <0.6
+                     , generic-data >=0.5 && <0.6
                      , text >=1.2 && <1.3
                      , these >=0.7.4 && <0.8
                      , hpython-ann
@@ -260,7 +269,8 @@ library hpython-token
     ghc-options:       -Werror
 
 library hpython-expr
-  exposed-modules:     Language.Python.Optics.Exprs
+  exposed-modules:     Language.Python.Optics.Expr
+                     , Language.Python.Optics.Exprs
                      , Language.Python.Syntax.Expr
                      , Language.Python.Syntax.Arg
                      , Language.Python.Syntax.Comprehension
@@ -268,6 +278,7 @@ library hpython-expr
                      , Language.Python.Syntax.Operator.Binary
                      , Language.Python.Syntax.Operator.Unary
                      , Language.Python.Syntax.Param
+                     , Language.Python.Syntax.Types
   build-depends:       base >=4.9 && <5
                      , digit >=0.7 && < 0.8
                      , lens >= 4 && < 4.18
@@ -291,25 +302,87 @@ library hpython-expr
   if flag(development)
     ghc-options:       -Werror
 
+library hpython-parse
+  reexported-modules:  Language.Python.Token
+  exposed-modules:     Language.Python.Internal.Lexer
+                     , Language.Python.Internal.Parse
+                     , Language.Python.Internal.Syntax.IR
+                     , Language.Python.Parse
+                     , Language.Python.Parse.Error
+  build-depends:       base >=4.9 && <5
+                     , containers >=0.5.7.1 && <0.7
+                     , digit >=0.7 && < 0.8
+                     , fingertree >=0.1 && <0.2
+                     , lens >= 4 && < 4.18
+                     , megaparsec >=6.3 && <7
+                     , mtl >= 2.1 && < 2.3
+                     , parsers >= 0.10 && < 0.13
+                     , parsers-megaparsec >=0.1 && <0.2
+                     , semigroupoids >=5.2.2 && <5.4
+                     , text >=1.2 && <1.3
+                     , these >=0.7.4 && <0.8
+                     , validation >= 1 && < 1.1
+                     , hpython-ann
+                     , hpython-expr
+                     , hpython-numbers
+                     , hpython-punctuation
+                     , hpython-strings
+                     , hpython-token
+                     , hpython-vdata
+  hs-source-dirs:      src/parse
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Wincomplete-patterns
+                       -Wincomplete-record-updates
+                       -Wunused-imports
+  if flag(development)
+    ghc-options:       -Werror
+
 library
   mixins:              hpython-numbers
-                         (Language.Python.Syntax.Imag as Language.Python35.Syntax.Imag
+                         (Language.Python.Syntax.Float as Language.Python35.Syntax.Float
+                         ,Language.Python.Syntax.Imag as Language.Python35.Syntax.Imag
                          ,Language.Python.Syntax.Int as Language.Python35.Syntax.Int
-                         ,Language.Python.Syntax.Float as Language.Python35.Syntax.Float
+                         ,Language.Python.Syntax.Numbers as Language.Python35.Syntax.Numbers
                          )
-                         requires (Language.Python.Syntax.Digits.Sig as Language.Python35.Syntax.Digits)
+                         requires
+                           (Language.Python.Syntax.Digits.Sig as Language.Python35.Syntax.Digits
+                           ,Language.Python.Parse.Digits.Sig as Language.Python35.Parse.Digits
+                           )
                      , hpython-numbers
-                         (Language.Python.Syntax.Imag as Language.Python36.Syntax.Imag
+                         (Language.Python.Syntax.Float as Language.Python36.Syntax.Float
+                         ,Language.Python.Syntax.Imag as Language.Python36.Syntax.Imag
                          ,Language.Python.Syntax.Int as Language.Python36.Syntax.Int
-                         ,Language.Python.Syntax.Float as Language.Python36.Syntax.Float
+                         ,Language.Python.Syntax.Numbers as Language.Python36.Syntax.Numbers
                          )
-                         requires (Language.Python.Syntax.Digits.Sig as Language.Python36.Syntax.Digits)
-                     , hpython-token
-                         (Language.Python.Token as Language.Python35.Token)
-                         requires (Language.Python.Syntax.Digits.Sig as Language.Python35.Syntax.Digits)
-                     , hpython-token
-                         (Language.Python.Token as Language.Python36.Token)
-                         requires (Language.Python.Syntax.Digits.Sig as Language.Python36.Syntax.Digits)
+                         requires
+                           (Language.Python.Syntax.Digits.Sig as Language.Python36.Syntax.Digits
+                           ,Language.Python.Parse.Digits.Sig as Language.Python36.Parse.Digits
+                           )
+                     , hpython-parse
+                         (Language.Python.Internal.Lexer as Language.Python35.Internal.Lexer
+                         ,Language.Python.Internal.Parse as Language.Python35.Internal.Parse
+                         ,Language.Python.Internal.Syntax.IR as Language.Python35.Internal.Syntax.IR 
+                         ,Language.Python.Parse as Language.Python35.Parse
+                         ,Language.Python.Parse.Error as Language.Python35.Parse.Error
+                         ,Language.Python.Token as Language.Python35.Token
+                         )
+                         requires
+                           (Language.Python.Syntax.Digits.Sig as Language.Python35.Syntax.Digits
+                           ,Language.Python.Parse.Digits.Sig as Language.Python35.Parse.Digits
+                           )
+                     , hpython-parse
+                         (Language.Python.Internal.Lexer as Language.Python36.Internal.Lexer
+                         ,Language.Python.Internal.Parse as Language.Python36.Internal.Parse
+                         ,Language.Python.Internal.Syntax.IR as Language.Python36.Internal.Syntax.IR 
+                         ,Language.Python.Parse as Language.Python36.Parse
+                         ,Language.Python.Parse.Error as Language.Python36.Parse.Error
+                         ,Language.Python.Token as Language.Python36.Token
+                         )
+                         requires
+                           (Language.Python.Syntax.Digits.Sig as Language.Python36.Syntax.Digits
+                           ,Language.Python.Parse.Digits.Sig as Language.Python36.Parse.Digits
+                           )
   reexported-modules:  Data.VFix
                      , Data.VFunctor
                      , Data.VFoldable
@@ -321,12 +394,22 @@ library
                      , Language.Python.Syntax.Raw
                      , Language.Python.Syntax.Whitespace
 
+                     , Language.Python35.Internal.Lexer
+                     , Language.Python35.Internal.Parse
+                     , Language.Python35.Internal.Syntax.IR 
+                     , Language.Python35.Parse
+                     , Language.Python35.Parse.Error
                      , Language.Python35.Syntax.Digits
                      , Language.Python35.Syntax.Float
                      , Language.Python35.Syntax.Imag
                      , Language.Python35.Syntax.Int
                      , Language.Python35.Token
 
+                     , Language.Python36.Internal.Lexer
+                     , Language.Python36.Internal.Parse
+                     , Language.Python36.Internal.Syntax.IR 
+                     , Language.Python36.Parse
+                     , Language.Python36.Parse.Error
                      , Language.Python36.Syntax.Digits
                      , Language.Python36.Syntax.Float
                      , Language.Python36.Syntax.Imag
@@ -337,18 +420,12 @@ library
                      , Data.Validate.Monadic
                      , Language.Python
                      , Language.Python.DSL
-                     , Language.Python.Internal.Lexer
-                     , Language.Python.Internal.Parse
                      , Language.Python.Internal.Render
                      , Language.Python.Internal.Render.Correction
-                     , Language.Python.Internal.Syntax.IR
                      , Language.Python.Optics
-                     , Language.Python.Optics.Expr
                      , Language.Python.Optics.Idents
                      , Language.Python.Optics.Indents
                      , Language.Python.Optics.Newlines
-                     , Language.Python.Parse
-                     , Language.Python.Parse.Error
                      , Language.Python.Render
                      , Language.Python.Syntax
                      , Language.Python.Syntax.AugAssign
@@ -356,7 +433,6 @@ library
                      , Language.Python.Syntax.Module
                      , Language.Python.Syntax.ModuleNames
                      , Language.Python.Syntax.Statement
-                     , Language.Python.Syntax.Types
                      , Language.Python.Validate
                      , Language.Python.Validate.Error
                      , Language.Python.Validate.Scope
@@ -372,7 +448,6 @@ library
                      , dlist >=0.8 && <0.9
                      , fingertree >=0.1 && <0.2
                      , lens >= 4 && < 4.18
-                     , parsers >= 0.10 && < 0.13
                      , megaparsec >=6.3 && <7
                      , generic-lens >=1.0 && <1.2
                      , mtl >= 2.1 && < 2.3
@@ -382,6 +457,7 @@ library
                      , text >=1.2 && <1.3
                      , these >=0.7.4 && <0.8
                      , validation >= 1 && < 1.1
+                     , parsers >= 0.10 && < 0.13
                      , parsers-megaparsec >=0.1 && <0.2
                      , recursion-schemes >=5.1 && <5.2
                      , hpython-vdata
@@ -390,7 +466,7 @@ library
                      , hpython-numbers35
                      , hpython-numbers36
                      , hpython-punctuation
-                     , hpython-token
+                     , hpython-parse
                      , hpython-raw
                      , hpython-validated
   hs-source-dirs:      src

@@ -2,7 +2,7 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language KindSignatures #-}
--- {-# language TemplateHaskell #-}
+{-# language TemplateHaskell #-}
 
 {-|
 Module      : Language.Python.Syntax.Types

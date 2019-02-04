@@ -307,21 +307,31 @@ genParams isLambda =
 
   sizedBind (sizedMaybe $ genStarParam isLambda pparamNames) $ \sp ->
   let pparamNames' = pparamNames <> (sp ^.. _Just.paramName.identValue) in
+    go pparams sp pparamNames' CommaSepNone
+  where
+    base pparams sp pparamNames' kwparams =
+      let
+        pparamNames'' = pparamNames' <> kwparams ^.. folded.paramName.identValue
+      in do
+        kwparams' <-
+          if has (folded._UnnamedStarParam) sp && null kwparams
+          then CommaSepOne <$> genKeywordParam isLambda pparamNames''
+          else pure kwparams
 
-  sizedBind (sizedCommaSep (genKeywordParam isLambda pparamNames')) $ \kwparams ->
-  let
-    pparamNames'' = pparamNames' <> kwparams ^.. folded.paramName.identValue
-  in do
-    kwparams' <-
-      if has (folded._UnnamedStarParam) sp && null kwparams
-      then CommaSepOne <$> genKeywordParam isLambda pparamNames''
-      else pure kwparams
+        sizedBind (sizedMaybe $ genDoubleStarParam isLambda pparamNames'') $ \dsp ->
 
-    sizedBind (sizedMaybe $ genDoubleStarParam isLambda pparamNames'') $ \dsp ->
+          pure $
+            pparams <> maybeToCommaSep sp <>
+              kwparams' <> maybeToCommaSep dsp
 
-      pure $
-        pparams <> maybeToCommaSep sp <>
-          kwparams' <> maybeToCommaSep dsp
+    go pparams sp pparamNames' kwparams =
+      sizedRecursive
+        [ base pparams sp pparamNames' kwparams ]
+        [ sizedBind (genKeywordParam isLambda pparamNames') $ \kwparam ->
+          go pparams sp
+            (pparamNames' <> kwparam ^.. paramName.identValue)
+            (kwparams <> CommaSepOne kwparam)
+        ]
 
 genDeletableList :: (MonadState GenState m, MonadGen m) => m (Expr '[] ()) -> m (Expr '[] ())
 genDeletableList genExpr' =

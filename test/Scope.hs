@@ -34,7 +34,7 @@ fullyValidate x =
         Failure errs -> do
           annotateShow (errs :: NonEmpty (SyntaxError ()))
           failure
-        Success a' -> pure $ runValidateScope (validateStatementScope a')
+        Success a' -> pure $ runValidateScope mempty (validateStatementScope a')
 
 prop_scope_1 :: Property
 prop_scope_1 =

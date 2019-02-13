@@ -103,13 +103,40 @@ data Binding ann
   | Dirty ann
   deriving (Eq, Ord, Show)
 
+data Entry a
+  = Entry
+  { _entryAttrs :: !(Map ByteString (Entry a))
+  , _entryLocation :: a
+  } deriving (Eq, Show)
+
+entry :: a -> Entry a
+entry = Entry mempty
+
+data GlobalEntry a
+  = GlobalEntry
+  { _geAttrs :: !(Map ByteString (Entry a))
+  , _geLocation :: Maybe a
+  } deriving (Eq, Show)
+
+builtinEntry :: Map ByteString (Entry a) -> GlobalEntry a
+builtinEntry a = GlobalEntry a Nothing
+
+globalEntry :: a -> GlobalEntry a
+globalEntry = GlobalEntry mempty . Just
+
+toGlobalEntry :: Entry a -> GlobalEntry a
+toGlobalEntry e =
+  GlobalEntry
+  { _geAttrs = _entryAttrs e
+  , _geLocation = Just $ _entryLocation e
+  }
+
 data ScopeContext a
   = ScopeContext
-  { _scGlobalScope :: !(Map ByteString (Maybe a))
-  , _scLocalScope :: !(Map ByteString a)
-  , _scImmediateScope :: !(Map ByteString a)
-  }
-  deriving (Eq, Show)
+  { _scGlobalScope :: !(Map ByteString (GlobalEntry a))
+  , _scLocalScope :: !(Map ByteString (Entry a))
+  , _scImmediateScope :: !(Map ByteString (Entry a))
+  } deriving (Eq, Show)
 makeLenses ''ScopeContext
 
 emptyScopeContext :: ScopeContext a
@@ -120,74 +147,74 @@ builtinsScopeContext =
   emptyScopeContext
   { _scGlobalScope =
     Map.fromList
-      [ ("abs", Nothing)
-      , ("dict", Nothing)
-      , ("help", Nothing)
-      , ("min", Nothing)
-      , ("setattr", Nothing)
-      , ("all", Nothing)
-      , ("dir", Nothing)
-      , ("hex", Nothing)
-      , ("next", Nothing)
-      , ("slice", Nothing)
-      , ("any", Nothing)
-      , ("divmod", Nothing)
-      , ("id", Nothing)
-      , ("object", Nothing)
-      , ("sorted", Nothing)
-      , ("ascii", Nothing)
-      , ("enumerate", Nothing)
-      , ("input", Nothing)
-      , ("oct", Nothing)
-      , ("staticmethod", Nothing)
-      , ("bin", Nothing)
-      , ("eval", Nothing)
-      , ("int", Nothing)
-      , ("open", Nothing)
-      , ("str", Nothing)
-      , ("bool", Nothing)
-      , ("exec", Nothing)
-      , ("isinstance", Nothing)
-      , ("ord", Nothing)
-      , ("sum", Nothing)
-      , ("bytearray", Nothing)
-      , ("filter", Nothing)
-      , ("issubclass", Nothing)
-      , ("pow", Nothing)
-      , ("super", Nothing)
-      , ("bytes", Nothing)
-      , ("float", Nothing)
-      , ("iter", Nothing)
-      , ("print", Nothing)
-      , ("tuple", Nothing)
-      , ("callable", Nothing)
-      , ("format", Nothing)
-      , ("len", Nothing)
-      , ("property", Nothing)
-      , ("type", Nothing)
-      , ("chr", Nothing)
-      , ("frozenset", Nothing)
-      , ("list", Nothing)
-      , ("range", Nothing)
-      , ("vars", Nothing)
-      , ("classmethod", Nothing)
-      , ("getattr", Nothing)
-      , ("locals", Nothing)
-      , ("repr", Nothing)
-      , ("zip", Nothing)
-      , ("compile", Nothing)
-      , ("globals", Nothing)
-      , ("map", Nothing)
-      , ("reversed", Nothing)
-      , ("__import__", Nothing)
-      , ("complex", Nothing)
-      , ("hasattr", Nothing)
-      , ("max", Nothing)
-      , ("round", Nothing)
-      , ("delattr", Nothing)
-      , ("hash", Nothing)
-      , ("memoryview", Nothing)
-      , ("set", Nothing)
+      [ ("abs", builtinEntry mempty)
+      , ("dict", builtinEntry mempty)
+      , ("help", builtinEntry mempty)
+      , ("min", builtinEntry mempty)
+      , ("setattr", builtinEntry mempty)
+      , ("all", builtinEntry mempty)
+      , ("dir", builtinEntry mempty)
+      , ("hex", builtinEntry mempty)
+      , ("next", builtinEntry mempty)
+      , ("slice", builtinEntry mempty)
+      , ("any", builtinEntry mempty)
+      , ("divmod", builtinEntry mempty)
+      , ("id", builtinEntry mempty)
+      , ("object", builtinEntry mempty)
+      , ("sorted", builtinEntry mempty)
+      , ("ascii", builtinEntry mempty)
+      , ("enumerate", builtinEntry mempty)
+      , ("input", builtinEntry mempty)
+      , ("oct", builtinEntry mempty)
+      , ("staticmethod", builtinEntry mempty)
+      , ("bin", builtinEntry mempty)
+      , ("eval", builtinEntry mempty)
+      , ("int", builtinEntry mempty)
+      , ("open", builtinEntry mempty)
+      , ("str", builtinEntry mempty)
+      , ("bool", builtinEntry mempty)
+      , ("exec", builtinEntry mempty)
+      , ("isinstance", builtinEntry mempty)
+      , ("ord", builtinEntry mempty)
+      , ("sum", builtinEntry mempty)
+      , ("bytearray", builtinEntry mempty)
+      , ("filter", builtinEntry mempty)
+      , ("issubclass", builtinEntry mempty)
+      , ("pow", builtinEntry mempty)
+      , ("super", builtinEntry mempty)
+      , ("bytes", builtinEntry mempty)
+      , ("float", builtinEntry mempty)
+      , ("iter", builtinEntry mempty)
+      , ("print", builtinEntry mempty)
+      , ("tuple", builtinEntry mempty)
+      , ("callable", builtinEntry mempty)
+      , ("format", builtinEntry mempty)
+      , ("len", builtinEntry mempty)
+      , ("property", builtinEntry mempty)
+      , ("type", builtinEntry mempty)
+      , ("chr", builtinEntry mempty)
+      , ("frozenset", builtinEntry mempty)
+      , ("list", builtinEntry mempty)
+      , ("range", builtinEntry mempty)
+      , ("vars", builtinEntry mempty)
+      , ("classmethod", builtinEntry mempty)
+      , ("getattr", builtinEntry mempty)
+      , ("locals", builtinEntry mempty)
+      , ("repr", builtinEntry mempty)
+      , ("zip", builtinEntry mempty)
+      , ("compile", builtinEntry mempty)
+      , ("globals", builtinEntry mempty)
+      , ("map", builtinEntry mempty)
+      , ("reversed", builtinEntry mempty)
+      , ("__import__", builtinEntry mempty)
+      , ("complex", builtinEntry mempty)
+      , ("hasattr", builtinEntry mempty)
+      , ("max", builtinEntry mempty)
+      , ("round", builtinEntry mempty)
+      , ("delattr", builtinEntry mempty)
+      , ("hash", builtinEntry mempty)
+      , ("memoryview", builtinEntry mempty)
+      , ("set", builtinEntry mempty)
       ]
   }
 
@@ -249,9 +276,9 @@ inScope s = do
   is <- use scImmediateScope
   let
     s' = fromString s
-    inis = Map.lookup s' is
-    inls = Map.lookup s' ls
-    ings = Map.lookup s' gs
+    inis = _entryLocation <$> Map.lookup s' is
+    inls = _entryLocation <$> Map.lookup s' ls
+    ings = _geLocation <$> Map.lookup s' gs
   pure $
     (Clean . Just <$> inis) <|>
     (ings *> (Clean . Just <$> inls)) <|>
@@ -298,15 +325,17 @@ validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params
      traverseOf (traverse._2) validateExprScope mty <*>
      locallyExtendOver
        scGlobalScope
-       ((Just . view annot_ &&& _identValue) name :
-         toListOf (folded.getting paramName.to (Just . view annot_ &&& _identValue)) params)
+       ((globalEntry . view annot_ &&& _identValue) name :
+         toListOf
+           (folded.getting paramName.to (globalEntry . view annot_ &&& _identValue))
+           params)
        (validateSuiteScope s)) <*
-  extendScope scLocalScope [(view annot_ &&& _identValue) name] <*
-  extendScope scImmediateScope [(view annot_ &&& _identValue) name]
+  extendScope scLocalScope [(entry . view annot_ &&& _identValue) name] <*
+  extendScope scImmediateScope [(entry . view annot_ &&& _identValue) name]
 validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` fmap Just (unionR ls is)) $
+  locallyOver scGlobalScope (`unionR` fmap toGlobalEntry (unionR ls is)) $
   locallyOver scImmediateScope (const Map.empty)
     (If idnts a ws1 <$>
      validateExprScope e <*>
@@ -321,7 +350,7 @@ validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
 validateCompoundStatementScope (While idnts a ws1 e b els) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` fmap Just (unionR ls is)) $
+  locallyOver scGlobalScope (`unionR` fmap toGlobalEntry (unionR ls is)) $
   locallyOver scImmediateScope (const Map.empty)
     (While idnts a ws1 <$>
      validateExprScope e <*>
@@ -330,7 +359,7 @@ validateCompoundStatementScope (While idnts a ws1 e b els) =
 validateCompoundStatementScope (TryExcept idnts a b e f k l) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` fmap Just (unionR ls is)) $
+  locallyOver scGlobalScope (`unionR` fmap toGlobalEntry (unionR ls is)) $
   locallyOver scImmediateScope (const Map.empty)
     (TryExcept idnts a b <$>
      validateSuiteScope e <*>
@@ -341,7 +370,7 @@ validateCompoundStatementScope (TryExcept idnts a b e f k l) =
           locallyExtendOver
             scGlobalScope
             (toListOf
-               (folded.exceptAsName._Just._2.to (Just . view annot_ &&& _identValue))
+               (folded.exceptAsName._Just._2.to (globalEntry . view annot_ &&& _identValue))
                g)
             (validateSuiteScope h))
        f <*>
@@ -350,7 +379,7 @@ validateCompoundStatementScope (TryExcept idnts a b e f k l) =
 validateCompoundStatementScope (TryFinally idnts a b e idnts2 f i) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` fmap Just (unionR ls is)) $
+  locallyOver scGlobalScope (`unionR` fmap toGlobalEntry (unionR ls is)) $
   locallyOver scImmediateScope (const Map.empty)
     (TryFinally idnts a b <$>
      validateSuiteScope e <*>
@@ -360,7 +389,7 @@ validateCompoundStatementScope (TryFinally idnts a b e idnts2 f i) =
 validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` fmap Just (unionR ls is)) $
+  locallyOver scGlobalScope (`unionR` fmap toGlobalEntry (unionR ls is)) $
   locallyOver scImmediateScope (const Map.empty) $
     For @(Nub (Scope ': v)) idnts a asyncWs b <$>
     (unsafeCoerce c <$
@@ -372,7 +401,7 @@ validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
     pure d <*>
     traverse validateExprScope e <*>
     (let
-       ls = c ^.. unvalidated.cosmos._Ident.to (view annot_ &&& _identValue)
+       ls = c ^.. unvalidated.cosmos._Ident.to (entry . view annot_ &&& _identValue)
      in
        extendScope scLocalScope ls *>
        extendScope scImmediateScope ls *>
@@ -383,13 +412,13 @@ validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
   traverse validateDecoratorScope decos <*>
   traverseOf (traverse._2.traverse.traverse) validateArgScope d <*>
   validateSuiteScope g <*
-  extendScope scImmediateScope [c ^. to (view annot_ &&& _identValue)]
+  extendScope scImmediateScope [c ^. to (entry . view annot_ &&& _identValue)]
 validateCompoundStatementScope (With a b asyncWs c d e) =
   let
     names =
       d ^..
       folded.unvalidated.to _withItemBinder.folded._2.
-      assignTargets.to (view annot_ &&& _identValue)
+      assignTargets.to (entry . view annot_ &&& _identValue)
   in
     With @(Nub (Scope ': v)) a b asyncWs c <$>
     traverse
@@ -424,7 +453,7 @@ validateSimpleStatementScope (Assign a l rs) =
   let
     ls =
       (l : (snd <$> NonEmpty.init rs)) ^..
-      folded.unvalidated.assignTargets.to (view annot_ &&& _identValue)
+      folded.unvalidated.assignTargets.to (entry . view annot_ &&& _identValue)
   in
   Assign a <$>
   validateAssignExprScope l <*>
@@ -544,7 +573,8 @@ validateComprehensionScope f (Comprehension a b c d) =
       validateAssignExprScope c <*>
       validateExprScope e <*
       extendScope scGlobalScope
-        (c ^.. unvalidated.assignTargets.to (Just . view annot_ &&& _identValue))
+        (c ^..
+         unvalidated.assignTargets.to (globalEntry . view annot_ &&& _identValue))
 
     validateCompIfScope
       :: AsScopeError e a

@@ -4,6 +4,7 @@
 {-# language FlexibleContexts #-}
 {-# language RankNTypes #-}
 {-# language LambdaCase #-}
+{-# language OverloadedStrings #-}
 {-# language ScopedTypeVariables, TypeApplications #-}
 
 {-|
@@ -27,7 +28,8 @@ module Language.Python.Validate.Scope
     -- ** Extra types
   , ScopeContext(..), scGlobalScope, scLocalScope, scImmediateScope
   , runValidateScope'
-  , initialScopeContext
+  , emptyScopeContext
+  , builtinsScopeContext
   , Binding(..)
     -- ** Extra functions
   , inScope
@@ -96,32 +98,110 @@ import Language.Python.Validate.Scope.Error
 
 data Scope
 
-data Binding = Clean | Dirty
+data Binding ann
+  = Clean (Maybe ann)
+  | Dirty ann
   deriving (Eq, Ord, Show)
 
 data ScopeContext a
   = ScopeContext
-  { _scGlobalScope :: !(Map ByteString a)
+  { _scGlobalScope :: !(Map ByteString (Maybe a))
   , _scLocalScope :: !(Map ByteString a)
   , _scImmediateScope :: !(Map ByteString a)
   }
   deriving (Eq, Show)
 makeLenses ''ScopeContext
 
-initialScopeContext :: ScopeContext a
-initialScopeContext = ScopeContext Map.empty Map.empty Map.empty
+emptyScopeContext :: ScopeContext a
+emptyScopeContext = ScopeContext Map.empty Map.empty Map.empty
+
+builtinsScopeContext :: ScopeContext a
+builtinsScopeContext =
+  emptyScopeContext
+  { _scGlobalScope =
+    Map.fromList
+      [ ("abs", Nothing)
+      , ("dict", Nothing)
+      , ("help", Nothing)
+      , ("min", Nothing)
+      , ("setattr", Nothing)
+      , ("all", Nothing)
+      , ("dir", Nothing)
+      , ("hex", Nothing)
+      , ("next", Nothing)
+      , ("slice", Nothing)
+      , ("any", Nothing)
+      , ("divmod", Nothing)
+      , ("id", Nothing)
+      , ("object", Nothing)
+      , ("sorted", Nothing)
+      , ("ascii", Nothing)
+      , ("enumerate", Nothing)
+      , ("input", Nothing)
+      , ("oct", Nothing)
+      , ("staticmethod", Nothing)
+      , ("bin", Nothing)
+      , ("eval", Nothing)
+      , ("int", Nothing)
+      , ("open", Nothing)
+      , ("str", Nothing)
+      , ("bool", Nothing)
+      , ("exec", Nothing)
+      , ("isinstance", Nothing)
+      , ("ord", Nothing)
+      , ("sum", Nothing)
+      , ("bytearray", Nothing)
+      , ("filter", Nothing)
+      , ("issubclass", Nothing)
+      , ("pow", Nothing)
+      , ("super", Nothing)
+      , ("bytes", Nothing)
+      , ("float", Nothing)
+      , ("iter", Nothing)
+      , ("print", Nothing)
+      , ("tuple", Nothing)
+      , ("callable", Nothing)
+      , ("format", Nothing)
+      , ("len", Nothing)
+      , ("property", Nothing)
+      , ("type", Nothing)
+      , ("chr", Nothing)
+      , ("frozenset", Nothing)
+      , ("list", Nothing)
+      , ("range", Nothing)
+      , ("vars", Nothing)
+      , ("classmethod", Nothing)
+      , ("getattr", Nothing)
+      , ("locals", Nothing)
+      , ("repr", Nothing)
+      , ("zip", Nothing)
+      , ("compile", Nothing)
+      , ("globals", Nothing)
+      , ("map", Nothing)
+      , ("reversed", Nothing)
+      , ("__import__", Nothing)
+      , ("complex", Nothing)
+      , ("hasattr", Nothing)
+      , ("max", Nothing)
+      , ("round", Nothing)
+      , ("delattr", Nothing)
+      , ("hash", Nothing)
+      , ("memoryview", Nothing)
+      , ("set", Nothing)
+      ]
+  }
 
 type ValidateScope ann e = ValidateM (NonEmpty e) (State (ScopeContext ann))
 
 runValidateScope :: ValidateScope ann e a -> Validation (NonEmpty e) a
-runValidateScope = runValidateScope' initialScopeContext
+runValidateScope = runValidateScope' builtinsScopeContext
 
 runValidateScope' :: ScopeContext ann -> ValidateScope ann e a -> Validation (NonEmpty e) a
 runValidateScope' s = flip evalState s . runValidateM
 
 extendScope
-  :: Setter' (ScopeContext ann) (Map ByteString ann)
-  -> [(ann, String)]
+  :: Setter' (ScopeContext ann) (Map ByteString x)
+  -> [(x, String)]
   -> ValidateScope ann e ()
 extendScope l s =
   liftVM0 $ do
@@ -153,8 +233,8 @@ locallyOver l f m =
     getCompose (unValidateM m) <* modify (l .~ before)
 
 locallyExtendOver
-  :: Lens' (ScopeContext ann) (Map ByteString ann)
-  -> [(ann, String)]
+  :: Lens' (ScopeContext ann) (Map ByteString x)
+  -> [(x, String)]
   -> ValidateScope ann e a
   -> ValidateScope ann e a
 locallyExtendOver l s m = locallyOver l id $ extendScope l s *> m
@@ -162,20 +242,21 @@ locallyExtendOver l s m = locallyOver l id $ extendScope l s *> m
 inScope
   :: MonadState (ScopeContext ann) m
   => String
-  -> m (Maybe (Binding, ann))
+  -> m (Maybe (Binding ann))
 inScope s = do
   gs <- use scGlobalScope
   ls <- use scLocalScope
   is <- use scImmediateScope
   let
     s' = fromString s
+    inis = Map.lookup s' is
     inls = Map.lookup s' ls
     ings = Map.lookup s' gs
   pure $
-    ((,) Clean <$> Map.lookup s' is) <|>
-    (ings *> ((,) Clean <$> inls)) <|>
-    ((,) Clean <$> ings) <|>
-    ((,) Dirty <$> inls)
+    (Clean . Just <$> inis) <|>
+    (ings *> (Clean . Just <$> inls)) <|>
+    (Clean <$> ings) <|>
+    (Dirty <$> inls)
 
 validateExceptAsScope
   :: AsScopeError e a
@@ -217,15 +298,15 @@ validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params
      traverseOf (traverse._2) validateExprScope mty <*>
      locallyExtendOver
        scGlobalScope
-       ((view annot_ &&& _identValue) name :
-         toListOf (folded.getting paramName.to (view annot_ &&& _identValue)) params)
+       ((Just . view annot_ &&& _identValue) name :
+         toListOf (folded.getting paramName.to (Just . view annot_ &&& _identValue)) params)
        (validateSuiteScope s)) <*
   extendScope scLocalScope [(view annot_ &&& _identValue) name] <*
   extendScope scImmediateScope [(view annot_ &&& _identValue) name]
 validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` unionR ls is) $
+  locallyOver scGlobalScope (`unionR` fmap Just (unionR ls is)) $
   locallyOver scImmediateScope (const Map.empty)
     (If idnts a ws1 <$>
      validateExprScope e <*>
@@ -240,7 +321,7 @@ validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
 validateCompoundStatementScope (While idnts a ws1 e b els) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` unionR ls is) $
+  locallyOver scGlobalScope (`unionR` fmap Just (unionR ls is)) $
   locallyOver scImmediateScope (const Map.empty)
     (While idnts a ws1 <$>
      validateExprScope e <*>
@@ -249,7 +330,7 @@ validateCompoundStatementScope (While idnts a ws1 e b els) =
 validateCompoundStatementScope (TryExcept idnts a b e f k l) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` unionR ls is) $
+  locallyOver scGlobalScope (`unionR` fmap Just (unionR ls is)) $
   locallyOver scImmediateScope (const Map.empty)
     (TryExcept idnts a b <$>
      validateSuiteScope e <*>
@@ -259,7 +340,9 @@ validateCompoundStatementScope (TryExcept idnts a b e f k l) =
           traverse validateExceptAsScope g <*>
           locallyExtendOver
             scGlobalScope
-            (toListOf (folded.exceptAsName._Just._2.to (view annot_ &&& _identValue)) g)
+            (toListOf
+               (folded.exceptAsName._Just._2.to (Just . view annot_ &&& _identValue))
+               g)
             (validateSuiteScope h))
        f <*>
      traverseOf (traverse._3) validateSuiteScope k <*>
@@ -267,7 +350,7 @@ validateCompoundStatementScope (TryExcept idnts a b e f k l) =
 validateCompoundStatementScope (TryFinally idnts a b e idnts2 f i) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` unionR ls is) $
+  locallyOver scGlobalScope (`unionR` fmap Just (unionR ls is)) $
   locallyOver scImmediateScope (const Map.empty)
     (TryFinally idnts a b <$>
      validateSuiteScope e <*>
@@ -277,7 +360,7 @@ validateCompoundStatementScope (TryFinally idnts a b e idnts2 f i) =
 validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
   use scLocalScope `bindVM` (\ls ->
   use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` unionR ls is) $
+  locallyOver scGlobalScope (`unionR` fmap Just (unionR ls is)) $
   locallyOver scImmediateScope (const Map.empty) $
     For @(Nub (Scope ': v)) idnts a asyncWs b <$>
     (unsafeCoerce c <$
@@ -394,8 +477,8 @@ validateIdentScope i =
   inScope (_identValue i) `bindVM`
   \context ->
   case context of
-    Just (Clean, _) -> pure $ coerce i
-    Just (Dirty, ann)-> errorVM1 (_FoundDynamic # (ann, i ^. unvalidated))
+    Just (Clean _) -> pure $ coerce i
+    Just (Dirty ann)-> errorVM1 (_FoundDynamic # (ann, i ^. unvalidated))
     Nothing -> errorVM1 (_NotInScope # (i ^. unvalidated))
 
 validateArgScope
@@ -461,7 +544,7 @@ validateComprehensionScope f (Comprehension a b c d) =
       validateAssignExprScope c <*>
       validateExprScope e <*
       extendScope scGlobalScope
-        (c ^.. unvalidated.assignTargets.to (view annot_ &&& _identValue))
+        (c ^.. unvalidated.assignTargets.to (Just . view annot_ &&& _identValue))
 
     validateCompIfScope
       :: AsScopeError e a

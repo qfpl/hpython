@@ -1,5 +1,6 @@
 {-# language DataKinds #-}
 {-# language FlexibleContexts #-}
+{-# language LambdaCase #-}
 {-# language ScopedTypeVariables #-}
 
 {-|
@@ -19,47 +20,43 @@ module Language.Python.Import
   , SearchConfig(..), mkSearchConfig
     -- * Finding and Loading
   , ModuleInfo(..)
+  , LoadedModule(..)
+  , findAndLoadAll
   , findModule
   , loadModule
   )
 where
 
-import Control.Lens.Getter ((^.), getting)
+import Control.Lens.Fold ((^..), folded)
+import Control.Lens.Getter ((^.), getting, to)
 import Control.Lens.Review ((#), un, review)
 import Control.Monad.Except (ExceptT(..), runExceptT)
 import Data.Bifunctor (bimap)
 import Data.Validation (validation, bindValidation)
 import System.Directory (doesFileExist)
 import System.FilePath ((<.>), (</>), takeDirectory)
+import Unsafe.Coerce (unsafeCoerce)
+
+import qualified Data.Map as Map
 
 import Data.Type.Set (Member)
 import Language.Python.Import.Error
+  (AsImportError, _ImportNotFound, _ImportParseErrors, _ImportValidationErrors)
+import Language.Python.Optics (_Statements, _SimpleStatements, _Import)
 import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Parse (SrcInfo, readModule)
 import Language.Python.Syntax.Ident (identValue)
+import Language.Python.Syntax.Import (_importAsName, _importAsQual)
 import Language.Python.Syntax.Module (Module)
 import Language.Python.Syntax.ModuleNames (ModuleName, unfoldModuleName)
+import Language.Python.Syntax.Statement (Statement(..))
+import Language.Python.Syntax.Types (importNames)
 import Language.Python.Validate
-  ( Indentation, Syntax
-  , runValidateIndentation, runValidateSyntax
-  , validateModuleIndentation, validateModuleSyntax
+  ( Indentation, Syntax, Scope
+  , runValidateIndentation, runValidateSyntax, runValidateScope
+  , validateModuleIndentation, validateModuleSyntax, validateModuleScope
   )
-
-{-
-
-Find the location of python3.5 ?? Or have that as an argument
-If the location is a symbol link, then the target is used
-
-If $PYTHONHOME is set then it goes to prefix and exec_prefix
-If $PYTHONHOME=X:Y then prefix=X, exec_prefix=Y
-
-Afterward, we search upward. The directory that contains
-`lib/python$VERSION/os.py` is the prefix, and the directory that
-contains `lib/python$VERSION/lib-dynload` is the exec prefix
-
-if user_site_directory is true, then don't add site-packages to sys.path
-
--}
+import Language.Python.Validate.Scope (moduleEntry)
 
 data SearchConfig
   = SearchConfig
@@ -83,10 +80,11 @@ mkSearchConfig pp =
       , "lib" </> "python3.5" </> "site-packages"
       ]
 
-data ModuleInfo
+data ModuleInfo a
   = ModuleInfo
-  { _miFile :: FilePath
-  }
+  { _miName :: ModuleName '[] a
+  , _miFile :: FilePath
+  } deriving (Eq, Show)
 
 -- |
 -- Find a module by looking in the paths specified by 'SearchConfig'
@@ -97,16 +95,16 @@ findModule ::
   ) =>
   SearchConfig ->
   ModuleName v a ->
-  IO (Either e ModuleInfo)
+  IO (Either e (ModuleInfo a))
 findModule sc mn = search (_scSearchPaths sc)
   where
-    search :: [FilePath] -> IO (Either e ModuleInfo)
+    search :: [FilePath] -> IO (Either e (ModuleInfo a))
     search [] = pure . Left $ _ImportNotFound.un unvalidated # mn
     search (path : rest) = do
       let file = path </> moduleFileName
       b <- doesFileExist file
       if b
-        then pure $ Right ModuleInfo{ _miFile = file }
+        then pure $ Right ModuleInfo{ _miName = mn ^. unvalidated, _miFile = file }
         else search rest
 
     moduleDirs :: ([String], String)
@@ -123,7 +121,7 @@ findModule sc mn = search (_scSearchPaths sc)
 -- Load and validate a module
 loadModule ::
   AsImportError e SrcInfo =>
-  ModuleInfo ->
+  ModuleInfo SrcInfo ->
   IO (Either e (Module '[Syntax, Indentation] SrcInfo))
 loadModule mi =
   runExceptT $ do
@@ -137,3 +135,63 @@ loadModule mi =
       bindValidation
         (runValidateIndentation (validateModuleIndentation mod))
         (runValidateSyntax . validateModuleSyntax)
+
+data LoadedModule v a
+  = LoadedModule
+  { _lmInfo :: ModuleInfo a
+  , _lmTarget :: Module v a
+  , _lmDependencies :: [(ModuleInfo a, Module v a)]
+  } deriving (Eq, Show)
+
+-- |
+-- Find and load a module and its immediate dependencies
+findAndLoadAll ::
+  (Member Syntax v, AsImportError e SrcInfo) =>
+  SearchConfig ->
+  ModuleName v SrcInfo ->
+  IO (Either e (LoadedModule '[Scope, Syntax, Indentation] SrcInfo))
+findAndLoadAll sc mn =
+  runExceptT $ do
+    minfo <- ExceptT $ findModule sc mn
+    mod <- ExceptT $ loadModule minfo
+
+    let
+      tlImports =
+        mod ^..
+        getting _Statements .
+        to (\case
+               SmallStatement _ s -> s ^.. getting _SimpleStatements
+               _ -> []) .
+        folded .
+        getting _Import .
+        importNames .
+        folded
+
+    deps <-
+      traverse
+        (\ias -> do
+           let n = _importAsName ias
+           res <- ExceptT $ findAndLoadAll sc (_importAsName ias)
+           pure
+             -- it's fine to skip skip scope checking for these two
+             ( unsafeCoerce n
+             , unsafeCoerce . snd <$> _importAsQual ias
+             , _lmInfo res
+             , _lmTarget res
+             ))
+        tlImports
+    let
+      scope =
+        foldr
+          (\(a, b, _, c) -> uncurry Map.insert $ moduleEntry a b c)
+          Map.empty
+          deps
+
+    mod' <-
+      ExceptT . pure $
+      validation
+        (Left . review _ImportValidationErrors)
+        Right
+        (runValidateScope scope $ validateModuleScope mod)
+
+    pure $ LoadedModule minfo mod' ((\(_, _, c, d) -> (c, d)) <$> deps)

@@ -152,6 +152,20 @@ module Language.Python.Syntax.Types
   , elseIndents
   , elseElse
   , elseBody
+    -- * Simple statements
+    -- ** @import@
+  , Import(..)
+    -- *** Lenses
+  , importAnn
+  , importWhitespace
+  , importNames
+    -- ** Assignment
+  , Assign(..)
+  , unfoldAssign
+    -- *** Lenses
+  , assignAnn
+  , assignTarget
+  , assignRest
     -- * Expressions
     -- ** @None@
   , None(..)
@@ -201,15 +215,20 @@ where
 
 import Control.Lens.Lens (Lens')
 import Control.Lens.TH (makeLenses)
+import Data.Bifunctor (first)
 import Data.Generics.Product.Typed (typed)
-import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty (NonEmpty(..))
 import GHC.Generics (Generic)
+
+import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.CommaSep (Comma, CommaSep, CommaSep1, CommaSep1')
 import Language.Python.Syntax.Expr (Arg, Expr, ListItem, Param, TupleItem)
 import Language.Python.Syntax.Ident (Ident)
-import Language.Python.Syntax.Punctuation (Colon)
+import Language.Python.Syntax.Import (ImportAs)
+import Language.Python.Syntax.ModuleNames (ModuleName)
+import Language.Python.Syntax.Punctuation (Colon, Equals)
 import Language.Python.Syntax.Statement (Decorator, ExceptAs, Suite, WithItem)
 import Language.Python.Syntax.Whitespace
 
@@ -503,3 +522,34 @@ makeLenses ''TupleUnpack
 instance HasAnn (TupleUnpack v) where
   annot :: forall a. Lens' (TupleUnpack v a) (Ann a)
   annot = typed @(Ann a)
+
+data Import v a
+  = MkImport
+  { _importAnn :: Ann a
+  , _importWhitespace :: NonEmpty Whitespace
+  , _importNames :: CommaSep1 (ImportAs ModuleName v a)
+  } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+makeLenses ''Import
+
+instance HasAnn (Import v) where
+  annot :: forall a. Lens' (Import v a) (Ann a)
+  annot = typed @(Ann a)
+
+data Assign v a
+  = MkAssign
+  { _assignAnn :: Ann a
+  , _assignTarget :: Expr v a
+  , _assignRest :: NonEmpty (Equals, Expr v a)
+  } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+makeLenses ''Assign
+
+instance HasAnn (Assign v) where
+  annot :: forall a. Lens' (Assign v a) (Ann a)
+  annot = typed @(Ann a)
+
+-- | Unfold an assignment into a 'NonEmpty' sequence of l-values and an r-value
+unfoldAssign :: Assign v a -> (NonEmpty (Expr v a), Expr v a)
+unfoldAssign (MkAssign _ a bs) = go a bs
+  where
+    go a ((_, x) :| []) = (pure a, x)
+    go a ((_, x) :| y:ys) = first (a `NonEmpty.cons`) $ go x (y :| ys)

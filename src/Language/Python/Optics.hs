@@ -26,37 +26,46 @@ module Language.Python.Optics
   , module Language.Python.Optics.Indents
     -- * Newlines
   , module Language.Python.Optics.Newlines
-    -- * Simple statements
-    -- ** Assignment
+    -- * Statements
+  , HasStatements(..)
+    -- ** Simple statements
+  , HasSimpleStatements(..)
+    -- *** Assignment
   , assignTargets
-    -- * Compound statements
+    -- ** Compound statements
   , HasCompoundStatement(..)
-    -- ** Function definitions
+    -- *** Function definitions
   , HasFundef(..)
-    -- ** Class defintions
+    -- *** Class defintions
   , HasClassDef(..)
-    -- ** @while@ statements
+    -- *** @while@ statements
   , HasWhile(..)
-    -- ** @for@ statements
+    -- *** @for@ statements
   , HasFor(..)
-    -- ** @with@ statements
+    -- *** @with@ statements
   , HasWith(..)
-    -- ** @if@ statements
+    -- *** @if@ statements
   , HasIf(..)
   , _Elif
-    -- ** @try@ statements
+    -- *** @try@ statements
   , HasTryExcept(..)
   , HasTryFinally(..)
   , _Finally
   , _Except
-    -- ** @else@
+    -- *** @else@
   , _Else
     -- * Parameters
   , _PositionalParam
   , _KeywordParam
   , _UnnamedStarParam
   , _StarParam
+    -- * Simple Statements
+    -- ** @import@
+  , HasImport(..)
+    -- ** @assign@
+  , HasAssign(..)
     -- * Expressions
+  , HasExprs(..)
     -- ** Identifiers
   , _Ident
     -- ** @None@
@@ -77,6 +86,7 @@ where
 import Control.Lens.Getter ((^.), view)
 import Control.Lens.Iso (Iso', iso, from)
 import Control.Lens.Traversal (Traversal)
+import Control.Lens.Tuple (_2)
 import Control.Lens.Prism (Choice, Prism, prism)
 
 import Language.Python.Optics.Idents
@@ -378,6 +388,50 @@ instance HasWith CompoundStatement where
 
 instance HasWith Statement where
   _With = _CompoundStatement._With
+
+class HasImport s where
+  _Import :: Prism (s v a) (s '[] a) (Import v a) (Import '[] a)
+
+instance HasImport Import where
+  _Import = id
+
+instance HasImport SimpleStatement where
+  _Import =
+    prism
+      (\(MkImport a b c) -> Import a b c)
+      (\case
+          Import a b c -> Right (MkImport a b c)
+          a -> Left $ a ^. unvalidated)
+
+class HasAssign s where
+  _Assign :: Prism (s v a) (s '[] a) (Assign v a) (Assign '[] a)
+
+instance HasAssign Assign where
+  _Assign = id
+
+instance HasAssign SimpleStatement where
+  _Assign =
+    prism
+      (\(MkAssign a b c) -> Assign a b c)
+      (\case
+          Assign a b c -> Right (MkAssign a b c)
+          a -> Left $ a ^. unvalidated)
+
+class HasSimpleStatements s where
+  _SimpleStatements ::
+    Traversal (s v a) (s '[] a) (SimpleStatement v a) (SimpleStatement '[] a)
+
+instance HasSimpleStatements SimpleStatement where
+  _SimpleStatements = id
+
+instance HasSimpleStatements SmallStatement where
+  _SimpleStatements f (MkSmallStatement a b c d e) =
+    MkSmallStatement <$>
+    f a <*>
+    (traverse._2) f b <*>
+    pure c <*>
+    pure d <*>
+    pure e
 
 -- |
 -- A faux-Prism for matching on the @Ident@ constructor of an 'Expr'.

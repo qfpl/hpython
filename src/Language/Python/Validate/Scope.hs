@@ -25,6 +25,9 @@ module Language.Python.Validate.Scope
   , validateStatementScope
   , validateExprScope
     -- * Miscellany
+    -- ** Calculating module exports
+  , globals
+  , moduleEntry
     -- ** Extra types
   , ScopeContext(..), scGlobalScope, scLocalScope, scImmediateScope
   , runValidateScope'
@@ -61,7 +64,7 @@ import Data.Validation
 import Control.Arrow ((&&&))
 import Control.Applicative ((<|>))
 import Control.Lens.Cons (snoc)
-import Control.Lens.Fold ((^..), toListOf, folded)
+import Control.Lens.Fold ((^..), toListOf, folded, foldrOf, preview)
 import Control.Lens.Getter ((^.), view, to, getting, use)
 import Control.Lens.Lens (Lens')
 import Control.Lens.Plated (cosmos)
@@ -69,13 +72,14 @@ import Control.Lens.Prism (_Right, _Just)
 import Control.Lens.Review ((#))
 import Control.Lens.Setter ((%~), (.~), Setter', mapped, over)
 import Control.Lens.TH (makeLenses)
-import Control.Lens.Tuple (_2, _3)
+import Control.Lens.Tuple (_1, _2, _3)
 import Control.Lens.Traversal (traverseOf)
 import Control.Monad.State (MonadState, State, evalState, modify)
 import Data.Bitraversable (bitraverse)
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
-import Data.Foldable (traverse_)
+import Data.Foldable (traverse_, fold)
+import Data.Function ((&))
 import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Map.Strict (Map)
@@ -94,6 +98,8 @@ import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Module
+import Language.Python.Syntax.ModuleNames
+import Language.Python.Syntax.Types
 import Language.Python.Validate.Scope.Error
 
 data Scope
@@ -113,21 +119,94 @@ entry :: a -> Entry a
 entry = Entry mempty
 
 data GlobalEntry a
-  = GlobalEntry
-  { _geAttrs :: !(Map ByteString (Entry a))
+  = GlobalEntryDone
+  { _geAttrsDone :: !(Map ByteString (Entry a))
+  , _geLocation :: Maybe a
+  }
+  | GlobalEntryMore
+  { _geAttrsMore :: !(Map ByteString (GlobalEntry a))
   , _geLocation :: Maybe a
   } deriving (Eq, Show)
 
+-- |
+-- Extract the identifiers that are definitely in a module's global scope
+--
+-- Currently these are:
+--
+-- - The targets of top-level assignments
+-- - Top-level class definitions, and their attributes recursively
+-- - Top-level function definitions
+globals :: Module v a -> Map ByteString (Entry a)
+globals = go
+  where
+    go :: HasStatements s => s v a -> Map ByteString (Entry a)
+    go =
+      foldrOf
+        (getting _Statements)
+        (\a b ->
+          case a of
+            CompoundStatement s ->
+              fold $
+
+              (\x ->
+                 Map.insert
+                   (x ^. cdName.getting identValue.to fromString)
+                   (Entry (go $ x ^. cdBody) $ x ^. annot_)
+                   b) <$>
+              preview (getting _ClassDef) s
+
+              <|>
+
+              (\x ->
+                 Map.insert
+                   (x ^. fdName.getting identValue.to fromString)
+                   (entry $ x ^. annot_)
+                   b) <$>
+              preview (getting _Fundef) s
+
+            SmallStatement _ s ->
+              foldrOf
+                (getting (_SimpleStatements._Assign).to unfoldAssign._1.folded.getting assignTargets)
+                (\a' -> Map.insert (a' ^. getting identValue.to fromString) (entry $ a' ^. annot_))
+                b
+                s)
+        mempty
+
+-- |
+-- Creates a 'GlobalEntry' for a 'Module', which lists all the in-scope identifiers
+-- for that module.
+--
+-- If the module name is a path (e.g. @a.b.c@) and no renaming is supplied
+-- then it creates nested entries so we can use the regular dereferencing machinery.
+--
+-- If a renaming is given, then that renaming will be the key in the symbol table.
+moduleEntry ::
+  ModuleName v a -> -- ^ Module name
+  Maybe (Ident v a) -> -- ^ Optional renaming
+  Module v a -> -- ^ The module
+  (ByteString, GlobalEntry a)
+moduleEntry _ (Just i) mod =
+  (fromString $ i ^. getting identValue, GlobalEntryDone (globals mod) Nothing)
+moduleEntry (ModuleNameOne _ i) Nothing mod =
+  (fromString $ i ^. getting identValue, GlobalEntryDone (globals mod) Nothing)
+moduleEntry (ModuleNameMany _ i _ rest) Nothing mod =
+  let
+    (n, e) = moduleEntry rest Nothing mod
+  in
+    ( fromString $ i ^. getting identValue
+    , GlobalEntryMore (Map.singleton n e) Nothing
+    )
+
 builtinEntry :: Map ByteString (Entry a) -> GlobalEntry a
-builtinEntry a = GlobalEntry a Nothing
+builtinEntry a = GlobalEntryDone a Nothing
 
 globalEntry :: a -> GlobalEntry a
-globalEntry = GlobalEntry mempty . Just
+globalEntry = GlobalEntryDone mempty . Just
 
 toGlobalEntry :: Entry a -> GlobalEntry a
 toGlobalEntry e =
-  GlobalEntry
-  { _geAttrs = _entryAttrs e
+  GlobalEntryDone
+  { _geAttrsDone = _entryAttrs e
   , _geLocation = Just $ _entryLocation e
   }
 
@@ -220,8 +299,14 @@ builtinsScopeContext =
 
 type ValidateScope ann e = ValidateM (NonEmpty e) (State (ScopeContext ann))
 
-runValidateScope :: ValidateScope ann e a -> Validation (NonEmpty e) a
-runValidateScope = runValidateScope' builtinsScopeContext
+runValidateScope ::
+  Map ByteString (GlobalEntry ann) -> -- ^ Extensions to the global scope
+  ValidateScope ann e a -> -- ^ Validation action
+  Validation (NonEmpty e) a
+runValidateScope exts =
+  runValidateScope' $
+  builtinsScopeContext &
+    scGlobalScope %~ (\x -> Map.unionWith const x exts)
 
 runValidateScope' :: ScopeContext ann -> ValidateScope ann e a -> Validation (NonEmpty e) a
 runValidateScope' s = flip evalState s . runValidateM

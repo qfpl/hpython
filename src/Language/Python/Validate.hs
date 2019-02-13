@@ -85,4 +85,4 @@ validateAll
 validateAll vi vsyn vsco m =
   runValidateIndentation (vi m) `bindValidation` \m' ->
   runValidateSyntax (vsyn m') `bindValidation` \m'' ->
-  runValidateScope (vsco m'')
+  runValidateScope mempty (vsco m'')

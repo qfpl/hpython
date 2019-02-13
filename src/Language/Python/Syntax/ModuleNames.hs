@@ -20,12 +20,13 @@ module Language.Python.Syntax.ModuleNames
   ( ModuleName(..)
   , RelativeModuleName(..)
   , makeModuleName
+  , unfoldModuleName
   )
 where
 
 import Control.Lens.Cons (_last)
 import Control.Lens.Fold ((^?!))
-import Control.Lens.Getter ((^.))
+import Control.Lens.Getter ((^.), to)
 import Control.Lens.Lens (Lens', lens)
 import Control.Lens.Setter ((.~))
 import Data.Coerce (coerce)
@@ -33,12 +34,14 @@ import Data.Function ((&))
 import Data.Generics.Product.Typed (typed)
 import Data.List.NonEmpty (NonEmpty(..))
 import GHC.Generics (Generic)
+import Unsafe.Coerce (unsafeCoerce)
 
 import qualified Data.List.NonEmpty as NonEmpty
 
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Punctuation
+import Language.Python.Optics.Validated (Validated(..))
 import Language.Python.Syntax.Whitespace
 
 -- | @.a.b@
@@ -52,6 +55,7 @@ data RelativeModuleName v a
   = RelativeWithName (Ann a) [Dot] (ModuleName v a)
   | Relative (Ann a) (NonEmpty Dot)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+instance Validated RelativeModuleName where; unvalidated = to unsafeCoerce
 
 instance HasAnn (RelativeModuleName v) where
   annot :: forall a. Lens' (RelativeModuleName v a) (Ann a)
@@ -80,6 +84,7 @@ data ModuleName v a
   = ModuleNameOne (Ann a) (Ident v a)
   | ModuleNameMany (Ann a) (Ident v a) Dot (ModuleName v a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+instance Validated ModuleName where; unvalidated = to unsafeCoerce
 
 instance HasAnn (ModuleName v) where
   annot :: forall a. Lens' (ModuleName v a) (Ann a)
@@ -91,6 +96,14 @@ makeModuleName i [] = ModuleNameOne (_identAnn i) i
 makeModuleName i ((a, b) : as) =
   ModuleNameMany (_identAnn i) i (MkDot a) $
   makeModuleName b as
+
+-- |
+-- View a 'ModuleName' as a module path follewed by a module name
+unfoldModuleName :: ModuleName v a -> ([Ident v a], Ident v a)
+unfoldModuleName = go id
+  where
+    go f (ModuleNameOne _ a) = (f [], a)
+    go f (ModuleNameMany _ a _ b) = go (f . (a :)) b
 
 instance HasTrailingWhitespace (ModuleName v a) where
   trailingWhitespace =

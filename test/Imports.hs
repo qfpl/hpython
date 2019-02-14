@@ -35,7 +35,7 @@ prop_imports_1 =
   withTests 1 . property $ do
     let
       mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
-      mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "a" []) []
+      mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "b" []) []
     res <-
       liftIO . withFiles files $
       findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "") mname
@@ -56,17 +56,17 @@ prop_imports_1 =
         , showModule $
           module_
           [ line_ $ import_ (pure "a")
-          , line_ $ call_ (var_ "print") [p_ $ var_ "a" /> "c"]
+          , line_ $ call_ (var_ "print") [p_ $ var_ "a" /> "a"]
           ]
         )
       ]
 
 prop_imports_2 :: Property
 prop_imports_2 =
-  withShrinks 0 . withTests 1 . property $ do
+  withTests 1 . property $ do
     let
       mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
-      mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "a" []) []
+      mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "b" []) []
     res <-
       liftIO . withFiles files $
       findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "") mname
@@ -95,7 +95,7 @@ prop_imports_3 =
   withTests 1 . property $ do
     let
       mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
-      mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "c" []) []
+      mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "a" []) []
     res <-
       liftIO . withFiles files $
       findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "") mname
@@ -104,7 +104,7 @@ prop_imports_3 =
       Left{} -> success
   where
     files =
-      [ ( "c.py"
+      [ ( "a.py"
         , showModule $
           module_
           [ line_ $ call_ (var_ "print") [p_ $ var_ "a"]

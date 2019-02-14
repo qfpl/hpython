@@ -1,4 +1,5 @@
 {-# language DataKinds, TypeOperators #-}
+{-# language DeriveFunctor #-}
 {-# language GeneralizedNewtypeDeriving #-}
 {-# language TemplateHaskell, TypeFamilies, FlexibleInstances, MultiParamTypeClasses #-}
 {-# language FlexibleContexts #-}
@@ -114,7 +115,7 @@ data Entry a
   = Entry
   { _entryAttrs :: !(Map ByteString (Entry a))
   , _entryLocation :: a
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Functor)
 
 entry :: a -> Entry a
 entry = Entry mempty
@@ -127,7 +128,7 @@ data GlobalEntry a
   | GlobalEntryMore
   { _geAttrsMore :: !(Map ByteString (GlobalEntry a))
   , _geLocation :: Maybe a
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Functor)
 
 -- |
 -- Extract the identifiers that are definitely in a module's global scope

@@ -59,7 +59,7 @@ validateExprAll
   => Expr '[] a -- ^ 'Expr' to validate
   -> Validation (NonEmpty e) (Expr '[Scope, Syntax, Indentation] a)
 validateExprAll =
-  validateAll validateExprIndentation validateExprSyntax validateExprScope
+  validateAll validateExprIndentation validateExprSyntax validateExprScope_
 
 -- | Validate a datatype for indentation, syntax, and scope correctness
 --

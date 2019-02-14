@@ -4,6 +4,7 @@
 module Main where
 
 import DSL
+import Imports
 import LexerParser
 import Optics
 import Parser
@@ -18,8 +19,22 @@ import Hedgehog
 
 main :: IO ()
 main = do
-  results <- traverse checkParallel groups
-  when (not (and results))
+  -- results1 <- traverse checkSequential groups1
+  results1 <- traverse check (groups1 >>= fmap snd . groupProperties)
+  results2 <- traverse checkParallel groups2
+  when (not (and results1 && and results2))
     exitFailure
   where
-    groups = [lexerParserTests, dslTests, parserTests, opticsTests, scopeTests, syntaxTests, roundtripTests]
+    groups1 =
+      [ importsTests
+      ]
+
+    groups2 =
+      [ lexerParserTests
+      , dslTests
+      , parserTests
+      , opticsTests
+      , scopeTests
+      , syntaxTests
+      , roundtripTests
+      ]

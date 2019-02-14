@@ -87,6 +87,10 @@ module Language.Python.DSL
   , decorated_
   , DecoratorsSyntax(..)
     -- * Statements
+    -- ** @import@
+  , import_
+  , importAs_
+  , ImportAs(..)
     -- ** @async@
   , AsyncSyntax(..)
     -- ** Block bodies
@@ -430,7 +434,9 @@ import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
+import Language.Python.Syntax.Import
 import Language.Python.Syntax.Module
+import Language.Python.Syntax.ModuleNames
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Punctuation
@@ -1915,11 +1921,48 @@ instance AsLine TryFinally where
   line_ = line_ @Statement . (_TryFinally #)
 
 class As s t u | s t -> u, u -> s t where
-  as_ :: Raw s -> Raw t -> Raw u
+  as_ :: s -> Raw t -> Raw u
 
 -- | See 'exceptAs_'
-instance As Expr Ident ExceptAs where
+instance (v ~ '[], a ~ ()) => As (Expr v a) Ident ExceptAs where
   as_ e name = ExceptAs (Ann ()) e $ Just ([Space], name)
+
+-- | See 'with_'
+instance (v ~ '[], a ~ ()) => As (Expr v a) Expr WithItem where
+  as_ a b = WithItem (Ann ()) a $ Just ([Space], b)
+
+instance e ~ Raw Ident => As (NonEmpty e) Ident (ImportAs ModuleName) where
+  as_ (m :| ms) =
+    ImportAs (Ann ()) (makeModuleName m $ (,) [] <$> ms) .
+    Just . (,) (pure Space)
+
+-- |
+-- >>> importAs_ (pure "a" \`as_\` "b")
+-- import a as b
+--
+-- >>> importAs_ (("a" :| ["b", "c"] \`as_\` "d")
+-- import a.b.c as d
+importAs_ :: Raw (ImportAs ModuleName) -> Raw Import
+importAs_ = MkImport (Ann ()) (pure Space) . CommaSepOne1
+
+-- |
+-- >>> import_ (pure "a")
+-- import a
+--
+-- >>> import_ ("a" :| ["b", "c"])
+-- import a.b.c
+import_ ::
+  NonEmpty (Raw Ident) -> -- ^ Module name, as a list of 'Ident's
+  Raw Import
+import_ (i :| is) =
+  MkImport
+    (Ann ())
+    (pure Space)
+    (CommaSepOne1 $
+     ImportAs (Ann ()) (makeModuleName i $ (,) (pure Space) <$> is) Nothing)
+
+instance AsLine Import where
+  line_ i = line_ @SimpleStatement $ _Import # i
 
 -- |
 -- >>> class_ "A" [] [line_ pass_]
@@ -2007,10 +2050,6 @@ with_ items = mkWith (toWithItem <$> items)
 
 withItem_ :: Raw Expr -> Maybe (Raw Expr) -> Raw WithItem
 withItem_ a b = WithItem (Ann ()) a ((,) [Space] <$> b)
-
--- | See 'with_'
-instance As Expr Expr WithItem where
-  as_ a b = WithItem (Ann ()) a $ Just ([Space], b)
 
 class AsWithItem s where
   toWithItem :: Raw s -> Raw WithItem

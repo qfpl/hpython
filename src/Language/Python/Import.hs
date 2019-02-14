@@ -22,6 +22,7 @@ module Language.Python.Import
   , ModuleInfo(..)
   , LoadedModule(..)
   , findAndLoadAll
+  , findAndLoad
   , findModule
   , loadModule
   )
@@ -41,7 +42,6 @@ import qualified Data.Map as Map
 
 import Data.Type.Set (Member)
 import Language.Python.Import.Error
-  (AsImportError, _ImportNotFound, _ImportParseErrors, _ImportValidationErrors)
 import Language.Python.Optics (_Statements, _SimpleStatements, _Import)
 import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Parse (SrcInfo, readModule)
@@ -89,7 +89,7 @@ data ModuleInfo a
 -- |
 -- Find a module by looking in the paths specified by 'SearchConfig'
 findModule ::
-  forall v e a.
+  forall e v a.
   ( Member Syntax v
   , AsImportError e a
   ) =>
@@ -136,6 +136,19 @@ loadModule mi =
         (runValidateIndentation (validateModuleIndentation mod))
         (runValidateSyntax . validateModuleSyntax)
 
+findAndLoad ::
+  forall e v.
+  ( Member Syntax v
+  , AsImportError e SrcInfo
+  ) =>
+  SearchConfig ->
+  ModuleName v SrcInfo ->
+  IO (Either e (Module '[Syntax, Indentation] SrcInfo))
+findAndLoad sc mn =
+  runExceptT $ do
+    minfo <- ExceptT $ findModule sc mn
+    ExceptT $ loadModule minfo
+
 data LoadedModule v a
   = LoadedModule
   { _lmInfo :: ModuleInfo a
@@ -146,6 +159,7 @@ data LoadedModule v a
 -- |
 -- Find and load a module and its immediate dependencies
 findAndLoadAll ::
+  forall e v.
   (Member Syntax v, AsImportError e SrcInfo) =>
   SearchConfig ->
   ModuleName v SrcInfo ->

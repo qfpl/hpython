@@ -98,7 +98,7 @@ makeModuleName i ((a, b) : as) =
   makeModuleName b as
 
 -- |
--- View a 'ModuleName' as a module path follewed by a module name
+-- View a 'ModuleName' as a module path followed by a module name
 unfoldModuleName :: ModuleName v a -> ([Ident v a], Ident v a)
 unfoldModuleName = go id
   where

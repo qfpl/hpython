@@ -23,14 +23,11 @@ where
 
 import Data.Functor.Compose (Compose(..))
 import Data.Semigroup (Semigroup)
-import Data.Validation (Validation(..))
+import Data.Validation (Validation(..), validation)
 
 -- | The composition of 'Data.Validation.Validation' with another 'Applicative' functor.
 --
 -- 'Data.Validation.Validation' is not a 'Monad', and 'ValidateM' is not a monad transformer.
--- It is equipped with a useful bind function, but that function does not have
--- the right type to make 'ValidateM' a 'Monad' (besides which it would break
--- the laws)
 newtype ValidateM e m a = ValidateM { unValidateM :: Compose m (Validation e) a }
   deriving (Functor, Applicative)
 
@@ -38,9 +35,12 @@ newtype ValidateM e m a = ValidateM { unValidateM :: Compose m (Validation e) a 
 runValidateM :: ValidateM e m a -> m (Validation e a)
 runValidateM = getCompose . unValidateM
 
--- | Bind into a 'ValidateM'. Note that the first parameter is @m a@, not @ValidateM e m a@.
-bindVM :: Monad m => m a -> (a -> ValidateM e m b) -> ValidateM e m b
-bindVM m f = ValidateM . Compose $ m >>= getCompose . unValidateM . f
+-- | Bind into a 'ValidateM'
+bindVM :: Monad m => ValidateM e m a -> (a -> ValidateM e m b) -> ValidateM e m b
+bindVM m f =
+  ValidateM . Compose $ do
+    a <- getCompose $ unValidateM m
+    validation (pure . Failure) (getCompose . unValidateM . f) a
 
 -- | Lift into a succeeding validation
 liftVM0 :: (Functor m, Semigroup e) => m a -> ValidateM e m a

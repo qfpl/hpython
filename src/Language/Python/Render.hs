@@ -7,9 +7,6 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Render
-  ( showModule, showStatement, showExpr
-  )
-where
+module Language.Python.Render (showModule, showStatement, showExpr) where
 
 import Language.Python.Internal.Render

@@ -114,3 +114,65 @@ prop_imports_3 =
           ]
         )
       ]
+
+prop_imports_4 :: Property
+prop_imports_4 =
+  withTests 1 . property $ do
+    let
+      mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
+      mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "b" []) []
+    dir <- liftIO getCurrentDirectory
+    res <-
+      liftIO . withFiles files . runImporter $
+      findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
+    case res of
+      Right{} -> success
+      Left e -> do
+        annotateShow e
+        failure
+  where
+    files =
+      [ ( "a.py"
+        , showModule $
+          module_
+          [ line_ (var_ "a" .= 1)
+          ]
+        )
+      , ( "b.py"
+        , showModule $
+          module_
+          [ line_ $ importAs_ (pure "a" `as_` "b")
+          , line_ $ call_ (var_ "print") [p_ $ var_ "b" /> "a"]
+          ]
+        )
+      ]
+
+prop_imports_5 :: Property
+prop_imports_5 =
+  withTests 1 . property $ do
+    let
+      mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
+      mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "b" []) []
+    dir <- liftIO getCurrentDirectory
+    res <-
+      liftIO . withFiles files . runImporter $
+      findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
+    case res of
+      Right{} -> failure
+      Left{} -> success
+  where
+    files =
+      [ ( "a.py"
+        , showModule $
+          module_
+          [ line_ (var_ "a" .= 1)
+          ]
+        )
+      , ( "b.py"
+        , showModule $
+          module_
+          [ line_ $ importAs_ (pure "a" `as_` "b")
+          , line_ $ call_ (var_ "print") [p_ $ var_ "a" /> "a"]
+          ]
+        )
+      ]

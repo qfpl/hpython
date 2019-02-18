@@ -37,7 +37,7 @@ prop_imports_1 =
       mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
       mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "b" []) []
     res <-
-      liftIO . withFiles files $
+      liftIO . withFiles files . runImporter $
       findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "") mname
     case res of
       Right{} -> success
@@ -68,7 +68,7 @@ prop_imports_2 =
       mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
       mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "b" []) []
     res <-
-      liftIO . withFiles files $
+      liftIO . withFiles files . runImporter $
       findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "") mname
     case res of
       Right{} -> failure
@@ -97,7 +97,7 @@ prop_imports_3 =
       mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
       mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "a" []) []
     res <-
-      liftIO . withFiles files $
+      liftIO . withFiles files . runImporter $
       findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "") mname
     case res of
       Right{} -> failure

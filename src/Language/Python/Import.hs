@@ -1,5 +1,6 @@
 {-# language DataKinds #-}
 {-# language FlexibleContexts #-}
+{-# language GeneralizedNewtypeDeriving #-}
 {-# language LambdaCase #-}
 {-# language ScopedTypeVariables #-}
 
@@ -19,6 +20,7 @@ module Language.Python.Import
     -- * Configuration
   , SearchConfig(..), mkSearchConfig
     -- * Finding and Loading
+  , Importer, runImporter
   , ModuleInfo(..)
   , LoadedModule(..)
   , findAndLoadAll
@@ -32,7 +34,13 @@ import Control.Lens.Fold ((^..), folded)
 import Control.Lens.Getter ((^.), getting, to)
 import Control.Lens.Review ((#), un, review)
 import Control.Monad.Except (ExceptT(..), runExceptT)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.State  (StateT, evalStateT, get, modify)
+import Control.Monad.Trans.Class (lift)
 import Data.Bifunctor (bimap)
+import Data.Functor.Classes (liftEq, liftCompare)
+import Data.IORef (IORef, readIORef, newIORef)
+import Data.Map (Map)
 import Data.Validation (validation, bindValidation)
 import System.Directory (doesFileExist)
 import System.FilePath ((<.>), (</>), takeDirectory)
@@ -84,25 +92,63 @@ data ModuleInfo a
   = ModuleInfo
   { _miName :: ModuleName '[] a
   , _miFile :: FilePath
-  } deriving (Eq, Show)
+  } deriving Show
+
+newtype CacheKey = CacheKey (ModuleName '[] SrcInfo)
+instance Eq CacheKey where
+  CacheKey a == CacheKey b = liftEq (\_ _ -> True) a b
+instance Ord CacheKey where
+  CacheKey a `compare` CacheKey b = liftCompare (\_ _ -> EQ) a b
+
+data CacheValue
+  = CacheValue
+  { _cvPath :: FilePath
+  , _cvData :: Module '[Syntax, Indentation] SrcInfo
+  }
+
+newtype ImportCache
+  = ImportCache
+  { unImportCache :: Map CacheKey (IORef CacheValue)
+  }
 
 -- |
--- Find a module by looking in the paths specified by 'SearchConfig'
+-- The module importer provides a cache to avoid constantly re-loading
+-- and re-checkign files
+newtype Importer a
+  = Importer (StateT ImportCache IO a)
+  deriving (Functor, Applicative, Monad, MonadIO)
+
+runImporter :: Importer a -> IO a
+runImporter (Importer m) = evalStateT m $ ImportCache mempty
+
+-- |
+-- Find a module by first looking in the cache, and then searching the paths
+-- specified by 'SearchConfig'
 findModule ::
-  forall e v a.
+  forall e v.
   ( Member Syntax v
-  , AsImportError e a
+  , AsImportError e SrcInfo
   ) =>
   SearchConfig ->
-  ModuleName v a ->
-  IO (Either e (ModuleInfo a))
-findModule sc mn = search (_scSearchPaths sc)
+  ModuleName v SrcInfo ->
+  Importer (Either e (ModuleInfo SrcInfo))
+findModule sc mn = checkCacheThen (search $ _scSearchPaths sc)
   where
-    search :: [FilePath] -> IO (Either e (ModuleInfo a))
+    checkCacheThen :: Importer (Either e (ModuleInfo SrcInfo)) -> Importer (Either e (ModuleInfo SrcInfo))
+    checkCacheThen next = do
+      ImportCache cache <- Importer get
+      let res = Map.lookup (CacheKey $ mn ^. unvalidated) cache
+      case res of
+        Nothing -> next
+        Just ref -> do
+          value <- liftIO $ readIORef ref
+          pure . Right $ ModuleInfo (mn ^. unvalidated) (_cvPath value)
+
+    search :: [FilePath] -> Importer (Either e (ModuleInfo SrcInfo))
     search [] = pure . Left $ _ImportNotFound.un unvalidated # mn
     search (path : rest) = do
       let file = path </> moduleFileName
-      b <- doesFileExist file
+      b <- liftIO $ doesFileExist file
       if b
         then pure $ Right ModuleInfo{ _miName = mn ^. unvalidated, _miFile = file }
         else search rest
@@ -118,23 +164,41 @@ findModule sc mn = search (_scSearchPaths sc)
     moduleFileName = foldr (</>) (snd moduleDirs <.> "py") (fst moduleDirs)
 
 -- |
--- Load and validate a module
+-- If the module is in the cache, return it immediately. Otherwise, load it from disk
+-- and validate it
 loadModule ::
   AsImportError e SrcInfo =>
   ModuleInfo SrcInfo ->
-  IO (Either e (Module '[Syntax, Indentation] SrcInfo))
+  Importer (Either e (Module '[Syntax, Indentation] SrcInfo))
 loadModule mi =
   runExceptT $ do
-    mod <-
-      ExceptT $
-      validation (Left . review _ImportParseErrors) Right <$>
-      readModule (_miFile mi)
+    ImportCache cache <- lift $ Importer get
+    let res = Map.lookup (CacheKey $ _miName mi) cache
+    case res of
+      Just ref -> do
+        value <- liftIO $ readIORef ref
+        pure $ _cvData value
+      Nothing -> do
+        mod <-
+          ExceptT $
+          validation (Left . review _ImportParseErrors) Right <$>
+          liftIO (readModule $ _miFile mi)
 
-    ExceptT . pure .
-      validation (Left . review _ImportValidationErrors) Right $
-      bindValidation
-        (runValidateIndentation (validateModuleIndentation mod))
-        (runValidateSyntax . validateModuleSyntax)
+        mod' <-
+          ExceptT . pure .
+          validation (Left . review _ImportValidationErrors) Right $
+          bindValidation
+            (runValidateIndentation (validateModuleIndentation mod))
+            (runValidateSyntax . validateModuleSyntax)
+
+        ref <- liftIO . newIORef $ CacheValue (_miFile mi) mod'
+
+        lift . Importer . modify $
+          ImportCache .
+          Map.insert (CacheKey $ _miName mi) ref .
+          unImportCache
+
+        pure mod'
 
 findAndLoad ::
   forall e v.
@@ -143,7 +207,7 @@ findAndLoad ::
   ) =>
   SearchConfig ->
   ModuleName v SrcInfo ->
-  IO (Either e (Module '[Syntax, Indentation] SrcInfo))
+  Importer (Either e (Module '[Syntax, Indentation] SrcInfo))
 findAndLoad sc mn =
   runExceptT $ do
     minfo <- ExceptT $ findModule sc mn
@@ -154,7 +218,7 @@ data LoadedModule v a
   { _lmInfo :: ModuleInfo a
   , _lmTarget :: Module v a
   , _lmDependencies :: [(ModuleInfo a, Module v a)]
-  } deriving (Eq, Show)
+  } deriving Show
 
 -- |
 -- Find and load a module and its immediate dependencies
@@ -163,7 +227,7 @@ findAndLoadAll ::
   (Member Syntax v, AsImportError e SrcInfo) =>
   SearchConfig ->
   ModuleName v SrcInfo ->
-  IO (Either e (LoadedModule '[Scope, Syntax, Indentation] SrcInfo))
+  Importer (Either e (LoadedModule '[Scope, Syntax, Indentation] SrcInfo))
 findAndLoadAll sc mn =
   runExceptT $ do
     minfo <- ExceptT $ findModule sc mn

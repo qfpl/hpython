@@ -19,8 +19,7 @@ import Hedgehog
 
 main :: IO ()
 main = do
-  -- results1 <- traverse checkSequential groups1
-  results1 <- traverse check (groups1 >>= fmap snd . groupProperties)
+  results1 <- traverse checkSequential groups1
   results2 <- traverse checkParallel groups2
   when (not (and results1 && and results2))
     exitFailure

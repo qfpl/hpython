@@ -23,7 +23,7 @@ import Language.Python.Syntax.Whitespace
 
 -- | A period character, possibly followed by some whitespace.
 newtype Dot = MkDot [Whitespace]
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 instance HasTrailingWhitespace Dot where
   trailingWhitespace =

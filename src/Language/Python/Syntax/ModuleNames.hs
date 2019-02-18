@@ -2,6 +2,7 @@
 {-# language DataKinds, FlexibleInstances, MultiParamTypeClasses #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language LambdaCase #-}
+{-# language TemplateHaskell #-}
 
 {-|
 Module      : Language.Python.Syntax.ModuleNames
@@ -30,6 +31,7 @@ import Control.Lens.Getter ((^.), to)
 import Control.Lens.Lens (Lens', lens)
 import Control.Lens.Setter ((.~))
 import Data.Coerce (coerce)
+import Data.Deriving (deriveEq1, deriveOrd1)
 import Data.Function ((&))
 import Data.Generics.Product.Typed (typed)
 import Data.List.NonEmpty (NonEmpty(..))
@@ -85,6 +87,8 @@ data ModuleName v a
   | ModuleNameMany (Ann a) (Ident v a) Dot (ModuleName v a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 instance Validated ModuleName where; unvalidated = to unsafeCoerce
+deriveEq1 ''ModuleName
+deriveOrd1 ''ModuleName
 
 instance HasAnn (ModuleName v) where
   annot :: forall a. Lens' (ModuleName v a) (Ann a)

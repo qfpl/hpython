@@ -2,6 +2,7 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language FlexibleInstances #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
+{-# language TemplateHaskell #-}
 
 {-|
 Module      : Language.Python.Syntax.Ident
@@ -26,6 +27,7 @@ where
 
 import Control.Lens.Lens (Lens, Lens', lens)
 import Data.Char (isDigit, isLetter)
+import Data.Deriving (deriveEq1, deriveOrd1)
 import Data.Generics.Product.Typed (typed)
 import Data.String (IsString(..))
 import GHC.Generics (Generic)
@@ -47,6 +49,8 @@ data Ident (v :: [*]) a
   , _identValue :: String
   , _identWhitespace :: [Whitespace]
   } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+deriveEq1 ''Ident
+deriveOrd1 ''Ident
 
 instance HasAnn (Ident v) where
   annot :: forall a. Lens' (Ident v a) (Ann a)

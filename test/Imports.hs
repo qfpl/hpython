@@ -10,7 +10,7 @@ import Control.Exception (bracket_)
 import Control.Monad.IO.Class (liftIO)
 import Data.Foldable (traverse_)
 import Data.Text (Text)
-import System.Directory (removeFile)
+import System.Directory (removeFile, getCurrentDirectory)
 
 import qualified Data.Text.IO as Text
 
@@ -36,9 +36,10 @@ prop_imports_1 =
     let
       mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
       mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "b" []) []
+    dir <- liftIO getCurrentDirectory
     res <-
       liftIO . withFiles files . runImporter $
-      findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "") mname
+      findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
     case res of
       Right{} -> success
       Left e -> do
@@ -67,9 +68,10 @@ prop_imports_2 =
     let
       mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
       mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "b" []) []
+    dir <- liftIO getCurrentDirectory
     res <-
       liftIO . withFiles files . runImporter $
-      findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "") mname
+      findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
     case res of
       Right{} -> failure
       Left{} -> success
@@ -96,9 +98,10 @@ prop_imports_3 =
     let
       mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
       mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "a" []) []
+    dir <- liftIO getCurrentDirectory
     res <-
       liftIO . withFiles files . runImporter $
-      findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "") mname
+      findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
     case res of
       Right{} -> failure
       Left{} -> success

@@ -27,7 +27,7 @@ module Language.Python.Validate.Scope
   , validateExprScope_
     -- * Miscellany
     -- ** Calculating module exports
-  , globals
+  , getGlobals
   , moduleEntry
     -- ** Extra types
   , ScopeContext(..), scGlobalScope, scLocalScope, scImmediateScope
@@ -138,8 +138,8 @@ data GlobalEntry a
 -- - The targets of top-level assignments
 -- - Top-level class definitions, and their attributes recursively
 -- - Top-level function definitions
-globals :: Module v a -> Map ByteString (Entry a)
-globals = go
+getGlobals :: Module v a -> Map ByteString (Entry a)
+getGlobals = go
   where
     go :: HasStatements s => s v a -> Map ByteString (Entry a)
     go =
@@ -189,11 +189,11 @@ moduleEntry ::
   (ByteString, GlobalEntry a)
 moduleEntry _ (Just i) mod =
   ( i ^. getting identValue.to fromString
-  , GlobalEntryDone (globals mod) Nothing
+  , GlobalEntryDone (getGlobals mod) Nothing
   )
 moduleEntry (ModuleNameOne _ i) Nothing mod =
   ( i ^. getting identValue.to fromString
-  , GlobalEntryDone (globals mod) Nothing
+  , GlobalEntryDone (getGlobals mod) Nothing
   )
 moduleEntry (ModuleNameMany _ i _ rest) Nothing mod =
   let
@@ -227,80 +227,94 @@ makeLenses ''ScopeContext
 emptyScopeContext :: ScopeContext a
 emptyScopeContext = ScopeContext Map.empty Map.empty Map.empty
 
+builtins :: Map ByteString (GlobalEntry a)
+builtins =
+  Map.fromList
+    [ ("abs", builtinEntry mempty)
+    , ("dict", builtinEntry mempty)
+    , ("help", builtinEntry mempty)
+    , ("min", builtinEntry mempty)
+    , ("setattr", builtinEntry mempty)
+    , ("all", builtinEntry mempty)
+    , ("dir", builtinEntry mempty)
+    , ("hex", builtinEntry mempty)
+    , ("next", builtinEntry mempty)
+    , ("slice", builtinEntry mempty)
+    , ("any", builtinEntry mempty)
+    , ("divmod", builtinEntry mempty)
+    , ("id", builtinEntry mempty)
+    , ("object", builtinEntry mempty)
+    , ("sorted", builtinEntry mempty)
+    , ("ascii", builtinEntry mempty)
+    , ("enumerate", builtinEntry mempty)
+    , ("input", builtinEntry mempty)
+    , ("oct", builtinEntry mempty)
+    , ("staticmethod", builtinEntry mempty)
+    , ("bin", builtinEntry mempty)
+    , ("eval", builtinEntry mempty)
+    , ("int", builtinEntry mempty)
+    , ("open", builtinEntry mempty)
+    , ("str", builtinEntry mempty)
+    , ("bool", builtinEntry mempty)
+    , ("exec", builtinEntry mempty)
+    , ("isinstance", builtinEntry mempty)
+    , ("ord", builtinEntry mempty)
+    , ("sum", builtinEntry mempty)
+    , ("bytearray", builtinEntry mempty)
+    , ("filter", builtinEntry mempty)
+    , ("issubclass", builtinEntry mempty)
+    , ("pow", builtinEntry mempty)
+    , ("super", builtinEntry mempty)
+    , ("bytes", builtinEntry mempty)
+    , ("float", builtinEntry mempty)
+    , ("iter", builtinEntry mempty)
+    , ("print", builtinEntry mempty)
+    , ("tuple", builtinEntry mempty)
+    , ("callable", builtinEntry mempty)
+    , ("format", builtinEntry mempty)
+    , ("len", builtinEntry mempty)
+    , ("property", builtinEntry mempty)
+    , ("type", builtinEntry mempty)
+    , ("chr", builtinEntry mempty)
+    , ("frozenset", builtinEntry mempty)
+    , ("list", builtinEntry mempty)
+    , ("range", builtinEntry mempty)
+    , ("vars", builtinEntry mempty)
+    , ("classmethod", builtinEntry mempty)
+    , ("getattr", builtinEntry mempty)
+    , ("locals", builtinEntry mempty)
+    , ("repr", builtinEntry mempty)
+    , ("zip", builtinEntry mempty)
+    , ("compile", builtinEntry mempty)
+    , ("globals", builtinEntry mempty)
+    , ("map", builtinEntry mempty)
+    , ("reversed", builtinEntry mempty)
+    , ("__import__", builtinEntry mempty)
+    , ("complex", builtinEntry mempty)
+    , ("hasattr", builtinEntry mempty)
+    , ("max", builtinEntry mempty)
+    , ("round", builtinEntry mempty)
+    , ("delattr", builtinEntry mempty)
+    , ("hash", builtinEntry mempty)
+    , ("memoryview", builtinEntry mempty)
+    , ("set", builtinEntry mempty)
+    ]
+
+globals :: Map ByteString (GlobalEntry a)
+globals =
+  Map.fromList
+  [ ("__builtins__", GlobalEntryMore builtins Nothing)
+  , ("__name__", builtinEntry mempty)
+  , ("__spec__", builtinEntry mempty)
+  , ("__doc__", builtinEntry mempty)
+  , ("__package__", builtinEntry mempty)
+  , ("__loader__", builtinEntry mempty)
+  ]
+
 builtinsScopeContext :: ScopeContext a
 builtinsScopeContext =
   emptyScopeContext
-  { _scGlobalScope =
-    Map.fromList
-      [ ("abs", builtinEntry mempty)
-      , ("dict", builtinEntry mempty)
-      , ("help", builtinEntry mempty)
-      , ("min", builtinEntry mempty)
-      , ("setattr", builtinEntry mempty)
-      , ("all", builtinEntry mempty)
-      , ("dir", builtinEntry mempty)
-      , ("hex", builtinEntry mempty)
-      , ("next", builtinEntry mempty)
-      , ("slice", builtinEntry mempty)
-      , ("any", builtinEntry mempty)
-      , ("divmod", builtinEntry mempty)
-      , ("id", builtinEntry mempty)
-      , ("object", builtinEntry mempty)
-      , ("sorted", builtinEntry mempty)
-      , ("ascii", builtinEntry mempty)
-      , ("enumerate", builtinEntry mempty)
-      , ("input", builtinEntry mempty)
-      , ("oct", builtinEntry mempty)
-      , ("staticmethod", builtinEntry mempty)
-      , ("bin", builtinEntry mempty)
-      , ("eval", builtinEntry mempty)
-      , ("int", builtinEntry mempty)
-      , ("open", builtinEntry mempty)
-      , ("str", builtinEntry mempty)
-      , ("bool", builtinEntry mempty)
-      , ("exec", builtinEntry mempty)
-      , ("isinstance", builtinEntry mempty)
-      , ("ord", builtinEntry mempty)
-      , ("sum", builtinEntry mempty)
-      , ("bytearray", builtinEntry mempty)
-      , ("filter", builtinEntry mempty)
-      , ("issubclass", builtinEntry mempty)
-      , ("pow", builtinEntry mempty)
-      , ("super", builtinEntry mempty)
-      , ("bytes", builtinEntry mempty)
-      , ("float", builtinEntry mempty)
-      , ("iter", builtinEntry mempty)
-      , ("print", builtinEntry mempty)
-      , ("tuple", builtinEntry mempty)
-      , ("callable", builtinEntry mempty)
-      , ("format", builtinEntry mempty)
-      , ("len", builtinEntry mempty)
-      , ("property", builtinEntry mempty)
-      , ("type", builtinEntry mempty)
-      , ("chr", builtinEntry mempty)
-      , ("frozenset", builtinEntry mempty)
-      , ("list", builtinEntry mempty)
-      , ("range", builtinEntry mempty)
-      , ("vars", builtinEntry mempty)
-      , ("classmethod", builtinEntry mempty)
-      , ("getattr", builtinEntry mempty)
-      , ("locals", builtinEntry mempty)
-      , ("repr", builtinEntry mempty)
-      , ("zip", builtinEntry mempty)
-      , ("compile", builtinEntry mempty)
-      , ("globals", builtinEntry mempty)
-      , ("map", builtinEntry mempty)
-      , ("reversed", builtinEntry mempty)
-      , ("__import__", builtinEntry mempty)
-      , ("complex", builtinEntry mempty)
-      , ("hasattr", builtinEntry mempty)
-      , ("max", builtinEntry mempty)
-      , ("round", builtinEntry mempty)
-      , ("delattr", builtinEntry mempty)
-      , ("hash", builtinEntry mempty)
-      , ("memoryview", builtinEntry mempty)
-      , ("set", builtinEntry mempty)
-      ]
+  { _scGlobalScope = builtins <> globals
   }
 
 type ValidateScope ann e = ValidateM (NonEmpty e) (State (ScopeContext ann))

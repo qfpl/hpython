@@ -74,16 +74,16 @@ data SearchConfig
 
 mkSearchConfig ::
   FilePath -> -- ^ Python executable path, e.g. @/usr/bin/python3.5@
+  FilePath -> -- ^ Current directory
   SearchConfig
-mkSearchConfig pp =
+mkSearchConfig pp curdir =
   SearchConfig
   { _scPythonPath = pp
-  , _scSearchPaths = fmap (takeDirectory pp </>) paths
+  , _scSearchPaths = curdir : fmap (takeDirectory pp </>) paths
   }
   where
     paths =
-      [ ""
-      , "lib" </> "python3.5"
+      [ "lib" </> "python3.5"
       , "lib" </> "python3.5" </> "lib-dynload"
       , "lib" </> "python3.5" </> "site-packages"
       ]

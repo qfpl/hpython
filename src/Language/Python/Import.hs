@@ -89,7 +89,11 @@ mkSearchConfig pp curdir =
       ]
 
 data ModuleInfo a
-  = ModuleInfo
+  = FileModuleInfo
+  { _miName :: ModuleName '[] a
+  , _miFile :: FilePath
+  }
+  | PackageModuleInfo
   { _miName :: ModuleName '[] a
   , _miFile :: FilePath
   } deriving Show
@@ -102,7 +106,7 @@ instance Ord CacheKey where
 
 data CacheValue
   = CacheValue
-  { _cvPath :: FilePath
+  { _cvInfo :: ModuleInfo SrcInfo
   , _cvData :: Module '[Syntax, Indentation] SrcInfo
   }
 
@@ -142,16 +146,22 @@ findModule sc mn = checkCacheThen (search $ _scSearchPaths sc)
         Nothing -> next
         Just ref -> do
           value <- liftIO $ readIORef ref
-          pure . Right $ ModuleInfo (mn ^. unvalidated) (_cvPath value)
+          pure . Right $ _cvInfo value
 
     search :: [FilePath] -> Importer (Either e (ModuleInfo SrcInfo))
     search [] = pure . Left $ _ImportNotFound.un unvalidated # mn
     search (path : rest) = do
-      let file = path </> moduleFileName
-      b <- liftIO $ doesFileExist file
-      if b
-        then pure $ Right ModuleInfo{ _miName = mn ^. unvalidated, _miFile = file }
-        else search rest
+      let
+        pkg = path </> moduleFileName </> "__init__" <.> "py"
+        file = path </> moduleFileName <.> "py"
+      b1 <- liftIO $ doesFileExist pkg
+      if b1
+        then pure $ Right PackageModuleInfo{ _miName = mn ^. unvalidated, _miFile = pkg }
+        else do
+          b2 <- liftIO $ doesFileExist file
+          if b2
+            then pure $ Right FileModuleInfo{ _miName = mn ^. unvalidated, _miFile = file }
+            else search rest
 
     moduleDirs :: ([String], String)
     moduleDirs =
@@ -161,7 +171,7 @@ findModule sc mn = checkCacheThen (search $ _scSearchPaths sc)
         (unfoldModuleName mn)
 
     moduleFileName :: FilePath
-    moduleFileName = foldr (</>) (snd moduleDirs <.> "py") (fst moduleDirs)
+    moduleFileName = foldr (</>) (snd moduleDirs) (fst moduleDirs)
 
 -- |
 -- If the module is in the cache, return it immediately. Otherwise, load it from disk
@@ -191,7 +201,7 @@ loadModule mi =
             (runValidateIndentation (validateModuleIndentation mod))
             (runValidateSyntax . validateModuleSyntax)
 
-        ref <- liftIO . newIORef $ CacheValue (_miFile mi) mod'
+        ref <- liftIO . newIORef $ CacheValue mi mod'
 
         lift . Importer . modify $
           ImportCache .

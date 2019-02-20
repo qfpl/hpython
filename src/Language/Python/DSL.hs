@@ -55,6 +55,8 @@ module Language.Python.DSL
   , InSyntax(..), In(..), InList(..)
     -- * @:@ syntax
   , ColonSyntax(..)
+    -- * Punctuation
+  , dot_
     -- * Comprehensions
   , comp_
   , Guard(..)
@@ -90,7 +92,21 @@ module Language.Python.DSL
     -- ** @import@
   , import_
   , importAs_
+  , Import(..)
   , ImportAs(..)
+    -- *** Lenses
+  , importAnn
+  , importWhitespace
+  , importNames
+    -- ** @from ... import ...@
+  , FromImportSyntax(..)
+  , FromImport(..)
+    -- *** Lenses
+  , fiAnn
+  , fiFrom
+  , fiFromName
+  , fiImport
+  , fiTargets
     -- ** @async@
   , AsyncSyntax(..)
     -- ** Block bodies
@@ -1963,6 +1979,159 @@ import_ (i :| is) =
 
 instance AsLine Import where
   line_ i = line_ @SimpleStatement $ _Import # i
+
+dot_ :: Dot
+dot_ = MkDot []
+
+class FromImportSyntax ds is | ds -> is, is -> ds where
+  -- |
+  -- @
+  -- 'fromImport_' ::
+  --   (['Dot'], 'NonEmpty' ('Raw' 'Ident')) ->
+  --   'NonEmpty' ('Raw' 'Ident') ->
+  --   'Raw' 'FromImport'
+  -- @
+  --
+  -- @
+  -- 'fromImport_' ::
+  --   ('NonEmpty' 'Dot'], ['Raw' 'Ident']) ->
+  --   'NonEmpty' ('Raw' 'Ident') ->
+  --   'Raw' 'FromImport'
+  -- @
+  --
+  -- >>> fromImport_ ([], "a" :| ["b", "c"]) ("d" :| ["e"])
+  -- from a.b.c import d, e
+  --
+  -- >>> fromImport_ ([dot_], pure "a") ("b" :| ["c"])
+  -- from .a import b, c
+  --
+  -- >>> fromImport_ (pure dot_, []) ("a" :| ["b"])
+  -- from . import a, b
+  --
+  -- >>> fromImport_ (dot_ :| [dot_, dot_], []) ("a" :| ["b"])
+  -- from ... import a, b
+  --
+  -- >>> fromImport_ (pure dot_, ["a"]) ("b" :| ["c"])
+  -- from .a import b, c
+  fromImport_ :: (ds Dot, is (Raw Ident)) -> NonEmpty (Raw Ident) -> Raw FromImport
+
+  -- |
+  -- @
+  -- 'fromImportAs_' ::
+  --   (['Dot'], 'NonEmpty' ('Raw' 'Ident')) ->
+  --   'NonEmpty' ('Raw' ('ImportAs' 'Ident')) ->
+  --   'Raw' 'FromImport'
+  -- @
+  --
+  -- @
+  -- 'fromImport_' ::
+  --   ('NonEmpty' 'Dot'], ['Raw' 'Ident']) ->
+  --   'NonEmpty' ('Raw' ('ImportAs' 'Ident')) ->
+  --   'Raw' 'FromImport'
+  -- @
+  --
+  -- >>> fromImportAs_ ([], "a" :| ["b", "c"]) (pure $ var_ "d" `as_` "e")
+  -- from a.b.c import d as e
+  --
+  -- >>> fromImport_ ([dot_], pure "a") (var_ "b" `as_` "x" :| [var_ "c" `as_` "y"])
+  -- from .a import b as x, c as y
+  --
+  -- >>> fromImport_ (pure dot_, []) (pure $ var_ "a" `as_` "b")
+  -- from . import a as b
+  --
+  -- >>> fromImport_ ([pure dot_], ["a"]) (var_ "b" `as_` "x" :| [var_ "c" `as_` "y"])
+  -- from .a import b as x, c as y
+  fromImportAs_ :: (ds Dot, is (Raw Ident)) -> NonEmpty (Raw (ImportAs Ident)) -> Raw FromImport
+
+  -- |
+  -- @
+  -- 'fromImportAll_' ::
+  --   (['Dot'], 'NonEmpty' ('Raw' 'Ident')) ->
+  --   'Raw' 'FromImport'
+  -- @
+  --
+  -- @
+  -- 'fromImportAll_' ::
+  --   ('NonEmpty' 'Dot'], ['Raw' 'Ident']) ->
+  --   'Raw' 'FromImport'
+  -- @
+  --
+  -- >>> fromImportAs_ ([], "a" :| ["b", "c"])
+  -- from a.b.c import *
+  --
+  -- >>> fromImport_ ([dot_], pure "a")
+  -- from .a import *
+  --
+  -- >>> fromImport_ (pure dot_, [])
+  -- from . import *
+  --
+  -- >>> fromImport_ ([pure dot_], ["a"])
+  -- from .a import *
+  fromImportAll_ :: (ds Dot, is (Raw Ident)) -> Raw FromImport
+
+instance FromImportSyntax [] NonEmpty where
+  fromImport_ (ds, i :| is) names =
+    MkFromImport
+      (Ann ())
+      [Space]
+      (RelativeWithName (Ann ()) ds (makeModuleName i $ (,) [] <$> is))
+      [Space]
+      (ImportSome (Ann ()) . listToCommaSep1 $
+       (\a -> ImportAs (Ann ()) a Nothing) <$> names)
+
+  fromImportAs_ (ds, i :| is) names =
+    MkFromImport
+      (Ann ())
+      [Space]
+      (RelativeWithName (Ann ()) ds (makeModuleName i $ (,) [] <$> is))
+      [Space]
+      (ImportSome (Ann ()) $ listToCommaSep1 names)
+
+  fromImportAll_ (ds, i :| is) =
+    MkFromImport
+      (Ann ())
+      [Space]
+      (RelativeWithName (Ann ()) ds (makeModuleName i $ (,) [] <$> is))
+      [Space]
+      (ImportAll (Ann ()) [])
+
+instance FromImportSyntax NonEmpty [] where
+  fromImport_ (ds, is) names =
+    MkFromImport
+      (Ann ())
+      [Space]
+      (case is of
+         ii : iis ->
+           RelativeWithName (Ann ()) (toList ds) (makeModuleName ii $ (,) [] <$> iis)
+         [] ->
+           Relative (Ann ()) ds)
+      [Space]
+      (ImportSome (Ann ()) . listToCommaSep1 $
+       (\a -> ImportAs (Ann ()) a Nothing) <$> names)
+
+  fromImportAs_ (ds, is) names =
+    MkFromImport
+      (Ann ())
+      [Space]
+      (case is of
+         ii : iis ->
+           RelativeWithName (Ann ()) (toList ds) (makeModuleName ii $ (,) [] <$> iis)
+         [] ->
+           Relative (Ann ()) ds)
+      [Space]
+      (ImportSome (Ann ()) $ listToCommaSep1 names)
+
+  fromImportAll_ (ds, is) =
+    MkFromImport
+      (Ann ())
+      [Space]
+      (case is of
+         ii : iis ->
+           RelativeWithName (Ann ()) (toList ds) (makeModuleName ii $ (,) [] <$> iis)
+         [] ->
+           Relative (Ann ()) ds)
+      [Space]
+      (ImportAll (Ann ()) [])
 
 -- |
 -- >>> class_ "A" [] [line_ pass_]

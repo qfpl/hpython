@@ -10,7 +10,11 @@ import Control.Exception (bracket_)
 import Control.Monad.IO.Class (liftIO)
 import Data.Foldable (traverse_)
 import Data.Text (Text)
-import System.Directory (removeFile, getCurrentDirectory)
+import System.FilePath ((</>))
+import System.Directory
+  ( removeDirectoryRecursive
+  , getCurrentDirectory, setCurrentDirectory, createDirectoryIfMissing
+  )
 
 import qualified Data.Text.IO as Text
 
@@ -24,11 +28,22 @@ import Language.Python.Validate
 importsTests :: Group
 importsTests = $$discover
 
-withFiles :: [(FilePath, Text)] -> IO a -> IO a
-withFiles files =
+withFiles :: [(FilePath, FilePath, Text)] -> IO a -> IO a
+withFiles files m = do
+  top <- getCurrentDirectory
   bracket_
-    (traverse_ (uncurry Text.writeFile) files)
-    (traverse_ (removeFile . fst) files)
+    (do
+        createDirectoryIfMissing False (top </> "sandbox")
+        setCurrentDirectory (top </> "sandbox")
+        traverse_
+          (\(a, b, c) -> do
+              createDirectoryIfMissing True a
+              Text.writeFile (a </> b) c)
+          files)
+    (do
+       setCurrentDirectory top
+       removeDirectoryRecursive (top </> "sandbox"))
+    m
 
 prop_imports_1 :: Property
 prop_imports_1 =
@@ -36,10 +51,10 @@ prop_imports_1 =
     let
       mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
       mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "b" []) []
-    dir <- liftIO getCurrentDirectory
     res <-
-      liftIO . withFiles files . runImporter $
-      findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
+      liftIO . withFiles files . runImporter $ do
+        dir <- liftIO getCurrentDirectory
+        findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
     case res of
       Right{} -> success
       Left e -> do
@@ -47,13 +62,13 @@ prop_imports_1 =
         failure
   where
     files =
-      [ ( "a.py"
+      [ ( ".", "a.py"
         , showModule $
           module_
           [ line_ (var_ "a" .= 1)
           ]
         )
-      , ( "b.py"
+      , ( ".", "b.py"
         , showModule $
           module_
           [ line_ $ import_ (pure "a")
@@ -68,22 +83,22 @@ prop_imports_2 =
     let
       mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
       mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "b" []) []
-    dir <- liftIO getCurrentDirectory
     res <-
-      liftIO . withFiles files . runImporter $
-      findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
+      liftIO . withFiles files . runImporter $ do
+        dir <- liftIO getCurrentDirectory
+        findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
     case res of
       Right{} -> failure
       Left{} -> success
   where
     files =
-      [ ( "a.py"
+      [ ( ".", "a.py"
         , showModule $
           module_
           [ line_ (var_ "b" .= 1)
           ]
         )
-      , ( "b.py"
+      , ( ".", "b.py"
         , showModule $
           module_
           [ line_ $ import_ (pure "a")
@@ -98,16 +113,16 @@ prop_imports_3 =
     let
       mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
       mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "a" []) []
-    dir <- liftIO getCurrentDirectory
     res <-
-      liftIO . withFiles files . runImporter $
-      findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
+      liftIO . withFiles files . runImporter $ do
+        dir <- liftIO getCurrentDirectory
+        findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
     case res of
       Right{} -> failure
       Left{} -> success
   where
     files =
-      [ ( "a.py"
+      [ ( ".", "a.py"
         , showModule $
           module_
           [ line_ $ call_ (var_ "print") [p_ $ var_ "a"]
@@ -121,10 +136,10 @@ prop_imports_4 =
     let
       mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
       mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "b" []) []
-    dir <- liftIO getCurrentDirectory
     res <-
-      liftIO . withFiles files . runImporter $
-      findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
+      liftIO . withFiles files . runImporter $ do
+        dir <- liftIO getCurrentDirectory
+        findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
     case res of
       Right{} -> success
       Left e -> do
@@ -132,13 +147,13 @@ prop_imports_4 =
         failure
   where
     files =
-      [ ( "a.py"
+      [ ( ".", "a.py"
         , showModule $
           module_
           [ line_ (var_ "a" .= 1)
           ]
         )
-      , ( "b.py"
+      , ( ".", "b.py"
         , showModule $
           module_
           [ line_ $ importAs_ (pure "a" `as_` "b")
@@ -153,22 +168,22 @@ prop_imports_5 =
     let
       mname :: ModuleName '[Scope, Syntax, Indentation] SrcInfo
       mname = makeModuleName (MkIdent (Ann $ initialSrcInfo "<unknown>") "b" []) []
-    dir <- liftIO getCurrentDirectory
     res <-
-      liftIO . withFiles files . runImporter $
-      findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
+      liftIO . withFiles files . runImporter $ do
+        dir <- liftIO getCurrentDirectory
+        findAndLoadAll @(ImportError SrcInfo) (mkSearchConfig "" dir) mname
     case res of
       Right{} -> failure
       Left{} -> success
   where
     files =
-      [ ( "a.py"
+      [ ( ".", "a.py"
         , showModule $
           module_
           [ line_ (var_ "a" .= 1)
           ]
         )
-      , ( "b.py"
+      , ( ".", "b.py"
         , showModule $
           module_
           [ line_ $ importAs_ (pure "a" `as_` "b")

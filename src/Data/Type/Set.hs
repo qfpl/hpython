@@ -12,7 +12,7 @@ Portability : non-portable
 This module defines some helpful set-like functions for working with type-level lists.
 -}
 
-module Data.Type.Set (Nub, Member) where
+module Data.Type.Set (Delete, Nub, Member) where
 
 -- | Remove adjacent equal elements from a type-level list
 type family Nub t where
@@ -20,6 +20,12 @@ type family Nub t where
   Nub '[e] = '[e]
   Nub (e ': e ': s) = Nub (e ': s)
   Nub (e ': f ': s) = e ': Nub (f ': s)
+
+-- | Delete an element from a type-level list
+type family Delete (a :: k) (as :: [k]) :: [k] where
+  Delete a '[] = '[]
+  Delete a (a ': as) = Delete a as
+  Delete a (b ': as) = b ': Delete a as
 
 -- | Determine whether type @a@ is a member of type-level list @s@
 class Member a s where

@@ -78,9 +78,12 @@ flag development
 library
   exposed-modules:     Data.Type.Set
                      , Data.Validate.Monadic
+                     , System.OS
+
                      , Language.Python
                      , Language.Python.DSL
                      , Language.Python.Import
+                     , Language.Python.Import.Builtins
                      , Language.Python.Import.Error
                      , Language.Python.Internal.Lexer
                      , Language.Python.Internal.Parse

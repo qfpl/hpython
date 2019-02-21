@@ -1,0 +1,143 @@
+{-# language OverloadedStrings #-}
+{-# language TupleSections #-}
+module Language.Python.Import.Builtins where
+
+import Data.ByteString (ByteString)
+import Data.Map (Map)
+
+import qualified Data.Map as Map
+
+import System.OS (os, isUnix, isSolaris, isLinux)
+import Language.Python.Parse (SrcInfo)
+import Language.Python.Syntax.ModuleNames
+  (ModuleName, makeModuleName, sameModuleName)
+import Language.Python.Syntax.Raw (Raw)
+import Language.Python.Validate.Scope (GlobalEntry, builtinEntry)
+
+lookupModuleName :: ModuleName v a -> [(ModuleName v' a', x)] -> Maybe x
+lookupModuleName _ [] = Nothing
+lookupModuleName mn ((mn', a) : rest)
+  | sameModuleName mn mn' = Just a
+  | otherwise = lookupModuleName mn rest
+
+lookupBuiltinModule :: ModuleName v a -> Maybe (Map ByteString (GlobalEntry SrcInfo))
+lookupBuiltinModule mn = lookupModuleName mn builtinModules
+
+builtinModules :: [(Raw ModuleName, Map ByteString (GlobalEntry SrcInfo))]
+builtinModules =
+  [ (timeModuleName, timeModule)
+  , (mathModuleName, mathModule)
+  ]
+
+timeModuleName :: Raw ModuleName
+timeModuleName = makeModuleName "time" []
+
+timeModule :: Map ByteString (GlobalEntry SrcInfo)
+timeModule =
+  Map.fromList $ (, builtinEntry mempty) <$> names
+  where
+    names :: [ByteString]
+    names =
+      [ "altzone"
+      , "asctime"
+      , "clock"
+      , "ctime"
+      , "daylight"
+      , "get_clock_info"
+      , "gmtime"
+      , "localtime"
+      , "mktime"
+      , "monotonic"
+      , "perf_counter"
+      , "process_time"
+      , "sleep"
+      , "strftime"
+      , "strptime"
+      , "struct_time"
+      , "time"
+      , "timezone"
+      , "tzname"
+      , "tzset"
+      ] <>
+      either
+        (const [])
+        (\x ->
+           if isUnix x
+           then
+             [ "clock_getres"
+             , "clock_gettime"
+             , "clock_settime"
+             , "CLOCK_MONOTONIC"
+             , "CLOCK_PROCESS_CPUTIME_ID"
+             , "CLOCK_REALTIME"
+             , "CLOCK_THREAD_CPUTIME_ID"
+             ]
+           else [])
+        os <>
+      either
+        (const [])
+        (\x -> ["CLOCK_HIGHRES" | isSolaris x])
+        os <>
+      either
+        (const [])
+        (\x -> ["CLOCK_MONOTONIC_RAW" | isLinux x])
+        os
+
+mathModuleName :: Raw ModuleName
+mathModuleName = makeModuleName "math" []
+
+mathModule :: Map ByteString (GlobalEntry SrcInfo)
+mathModule =
+  Map.fromList $ (, builtinEntry mempty) <$> names
+  where
+    names :: [ByteString]
+    names =
+      [ "ceil"
+      , "copysign"
+      , "fabs"
+      , "factorial"
+      , "floor"
+      , "fmod"
+      , "frexp"
+      , "fsum"
+      , "gcd"
+      , "isclose"
+      , "isfinite"
+      , "isinf"
+      , "isnan"
+      , "ldexp"
+      , "modf"
+      , "trunc"
+      , "exp"
+      , "expm1"
+      , "log"
+      , "log1p"
+      , "log2"
+      , "log10"
+      , "pow"
+      , "sqrt"
+      , "acos"
+      , "asin"
+      , "atan"
+      , "atan2"
+      , "cos"
+      , "hypot"
+      , "sin"
+      , "tan"
+      , "degrees"
+      , "radians"
+      , "acosh"
+      , "asinh"
+      , "atanh"
+      , "cosh"
+      , "sinh"
+      , "tanh"
+      , "erf"
+      , "erfc"
+      , "gamma"
+      , "lgamma"
+      , "pi"
+      , "e"
+      , "inf"
+      , "nan"
+      ]

@@ -28,6 +28,7 @@ module Language.Python.Optics
   , module Language.Python.Optics.Newlines
     -- * Statements
   , HasStatements(..)
+  , _SmallStatement
     -- ** Simple statements
   , HasSimpleStatements(..)
     -- *** Assignment
@@ -62,6 +63,8 @@ module Language.Python.Optics
     -- * Simple Statements
     -- ** @import@
   , HasImport(..)
+    -- ** @from ... import@
+  , HasFromImport(..)
     -- ** @assign@
   , HasAssign(..)
     -- * Expressions
@@ -216,6 +219,19 @@ instance HasCompoundStatement Statement where
       (\case
           CompoundStatement a -> Right a
           a -> Left (a ^. unvalidated))
+
+_SmallStatement ::
+  Prism
+    (Statement v a)
+    (Statement '[] a)
+    (Indents a, SmallStatement v a)
+    (Indents a, SmallStatement '[] a)
+_SmallStatement =
+  prism
+    (uncurry SmallStatement)
+    (\case
+        SmallStatement a b -> Right (a, b)
+        a -> Left (a ^. unvalidated))
 
 class HasFundef s where
   _Fundef :: Prism (s v a) (s '[] a) (Fundef v a) (Fundef '[] a)
@@ -401,6 +417,20 @@ instance HasImport SimpleStatement where
       (\(MkImport a b c) -> Import a b c)
       (\case
           Import a b c -> Right (MkImport a b c)
+          a -> Left $ a ^. unvalidated)
+
+class HasFromImport s where
+  _FromImport :: Prism (s v a) (s '[] a) (FromImport v a) (FromImport '[] a)
+
+instance HasFromImport FromImport where
+  _FromImport = id
+
+instance HasFromImport SimpleStatement where
+  _FromImport =
+    prism
+      (\(MkFromImport a b c d e) -> From a b c d e)
+      (\case
+          From a b c d e -> Right (MkFromImport a b c d e)
           a -> Left $ a ^. unvalidated)
 
 class HasAssign s where

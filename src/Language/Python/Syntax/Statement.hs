@@ -90,15 +90,33 @@ import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Whitespace
 
 -- See note [unsafeCoerce Validation] in Language.Python.Internal.Syntax.Expr
-instance Validated Statement where; unvalidated = to unsafeCoerce
-instance Validated SmallStatement where; unvalidated = to unsafeCoerce
-instance Validated SimpleStatement where; unvalidated = to unsafeCoerce
-instance Validated CompoundStatement where; unvalidated = to unsafeCoerce
-instance Validated Block where; unvalidated = to unsafeCoerce
-instance Validated Suite where; unvalidated = to unsafeCoerce
-instance Validated WithItem where; unvalidated = to unsafeCoerce
-instance Validated ExceptAs where; unvalidated = to unsafeCoerce
-instance Validated Decorator where; unvalidated = to unsafeCoerce
+instance Validated Statement where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
+instance Validated SmallStatement where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
+instance Validated SimpleStatement where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
+instance Validated CompoundStatement where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
+instance Validated Block where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
+instance Validated Suite where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
+instance Validated WithItem where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
+instance Validated ExceptAs where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
+instance Validated Decorator where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
 
 -- | 'Traversal' over all the 'Statement's in a term
 class HasStatements s where

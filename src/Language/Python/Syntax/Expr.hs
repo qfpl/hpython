@@ -74,13 +74,27 @@ nominal role, due to datatypes like 'Comprehension'. We only ever use @v@ in
 as a phantom in 'Expr', so 'unsafeCoerce :: Expr v a -> Expr '[] a' is safe.
 
 -}
-instance Validated Expr where; unvalidated = to unsafeCoerce
-instance Validated Param where; unvalidated = to unsafeCoerce
-instance Validated Arg where; unvalidated = to unsafeCoerce
-instance Validated DictItem where; unvalidated = to unsafeCoerce
-instance Validated SetItem where; unvalidated = to unsafeCoerce
-instance Validated TupleItem where; unvalidated = to unsafeCoerce
-instance Validated ListItem where; unvalidated = to unsafeCoerce
+instance Validated Expr where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
+instance Validated Param where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
+instance Validated Arg where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
+instance Validated DictItem where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
+instance Validated SetItem where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
+instance Validated TupleItem where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
+instance Validated ListItem where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
 
 -- | 'Control.Lens.Traversal.Traversal' over all the expressions in a term
 class HasExprs s where

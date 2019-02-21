@@ -14,8 +14,11 @@ module Language.Python.Syntax.Module
   )
 where
 
+import Control.Lens.Getter (to)
 import GHC.Generics (Generic)
+import Unsafe.Coerce (unsafeCoerce)
 
+import Language.Python.Optics.Validated (Validated(..))
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Whitespace
@@ -39,3 +42,7 @@ instance HasStatements Module where
 
 instance HasExprs Module where
   _Exprs = _Statements._Exprs
+
+instance Validated Module where
+  unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce

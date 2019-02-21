@@ -159,6 +159,14 @@ module Language.Python.Syntax.Types
   , importAnn
   , importWhitespace
   , importNames
+    -- ** @from ... import@
+  , FromImport(..)
+    -- *** Lenses
+  , fiAnn
+  , fiFrom
+  , fiFromName
+  , fiImport
+  , fiTargets
     -- ** Assignment
   , Assign(..)
   , unfoldAssign
@@ -226,8 +234,8 @@ import Language.Python.Syntax.Ann
 import Language.Python.Syntax.CommaSep (Comma, CommaSep, CommaSep1, CommaSep1')
 import Language.Python.Syntax.Expr (Arg, Expr, ListItem, Param, TupleItem)
 import Language.Python.Syntax.Ident (Ident)
-import Language.Python.Syntax.Import (ImportAs)
-import Language.Python.Syntax.ModuleNames (ModuleName)
+import Language.Python.Syntax.Import (ImportAs, ImportTargets)
+import Language.Python.Syntax.ModuleNames (ModuleName, RelativeModuleName)
 import Language.Python.Syntax.Punctuation (Colon, Equals)
 import Language.Python.Syntax.Statement (Decorator, ExceptAs, Suite, WithItem)
 import Language.Python.Syntax.Whitespace
@@ -533,6 +541,20 @@ makeLenses ''Import
 
 instance HasAnn (Import v) where
   annot :: forall a. Lens' (Import v a) (Ann a)
+  annot = typed @(Ann a)
+
+data FromImport v a
+  = MkFromImport
+  { _fiAnn :: Ann a
+  , _fiFrom :: [Whitespace]
+  , _fiFromName :: RelativeModuleName v a
+  , _fiImport :: [Whitespace]
+  , _fiTargets :: ImportTargets v a
+  } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+makeLenses ''FromImport
+
+instance HasAnn (FromImport v) where
+  annot :: forall a. Lens' (FromImport v a) (Ann a)
   annot = typed @(Ann a)
 
 data Assign v a

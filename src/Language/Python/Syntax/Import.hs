@@ -66,6 +66,7 @@ instance HasAnn (ImportAs e v) where
 
 instance Validated e => Validated (ImportAs e) where
   unvalidated = to unsafeCoerce
+  demoted_ = to unsafeCoerce
 
 importAsAnn :: Lens' (ImportAs e v a) a
 importAsAnn = annot_

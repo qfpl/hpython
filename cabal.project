@@ -1,9 +1,13 @@
 packages:
   ./
   ./hpython-test/
+  ./hpython-scope/
 
 package hpython
   flags: +development
 
 package hpython-test
+  flags: +development
+
+package hpython-scope
   flags: +development

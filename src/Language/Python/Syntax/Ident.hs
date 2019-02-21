@@ -25,14 +25,16 @@ module Language.Python.Syntax.Ident
   )
 where
 
+import Control.Lens.Getter (to)
 import Control.Lens.Lens (Lens, Lens', lens)
 import Data.Char (isDigit, isLetter)
+import Data.Coerce (coerce)
 import Data.Deriving (deriveEq1, deriveOrd1)
 import Data.Generics.Product.Typed (typed)
 import Data.String (IsString(..))
 import GHC.Generics (Generic)
 
-import Language.Python.Optics.Validated (Validated)
+import Language.Python.Optics.Validated (Validated(..))
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Raw
 import Language.Python.Syntax.Whitespace
@@ -51,6 +53,9 @@ data Ident (v :: [*]) a
   } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 deriveEq1 ''Ident
 deriveOrd1 ''Ident
+
+instance Semigroup a => Semigroup (Ident v a) where
+  MkIdent a b _ <> MkIdent c d e = MkIdent (a <> c) (b <> d) e
 
 instance HasAnn (Ident v) where
   annot :: forall a. Lens' (Ident v a) (Ann a)
@@ -85,4 +90,4 @@ identWhitespace = lens _identWhitespace (\s ws -> s { _identWhitespace = ws })
 instance HasTrailingWhitespace (Ident v a) where
   trailingWhitespace = identWhitespace
 
-instance Validated Ident where
+instance Validated Ident where; demoted_ = to coerce

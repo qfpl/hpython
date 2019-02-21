@@ -2133,6 +2133,9 @@ instance FromImportSyntax NonEmpty [] where
       [Space]
       (ImportAll (Ann ()) [])
 
+instance AsLine FromImport where
+  line_ i = line_ @SimpleStatement $ _FromImport # i
+
 -- |
 -- >>> class_ "A" [] [line_ pass_]
 -- class A:

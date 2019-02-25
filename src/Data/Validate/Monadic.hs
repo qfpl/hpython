@@ -38,9 +38,14 @@ newtype ValidateM e m a = ValidateM { unValidateM :: Compose m (Validation e) a 
 runValidateM :: ValidateM e m a -> m (Validation e a)
 runValidateM = getCompose . unValidateM
 
--- | Bind into a 'ValidateM'. Note that the first parameter is @m a@, not @ValidateM e m a@.
-bindVM :: Monad m => m a -> (a -> ValidateM e m b) -> ValidateM e m b
-bindVM m f = ValidateM . Compose $ m >>= getCompose . unValidateM . f
+-- | Bind into a 'ValidateM'
+bindVM :: Monad m => ValidateM e m a -> (a -> ValidateM e m b) -> ValidateM e m b
+bindVM m f =
+  ValidateM . Compose $ do
+    res <- getCompose $ unValidateM m
+    case res of
+      Failure err -> pure $ Failure err
+      Success a -> getCompose . unValidateM $ f a
 
 -- | Lift into a succeeding validation
 liftVM0 :: (Functor m, Semigroup e) => m a -> ValidateM e m a

@@ -183,6 +183,56 @@ validateDecoratorScope (Decorator a b c d e f g) =
   (\d' -> Decorator a b c d' e f g) <$>
   validateExprScope d
 
+parallel2 ::
+  ValidateScope a e x ->
+  ValidateScope a e y ->
+  ValidateScope a e (x, y)
+parallel2 a b =
+  liftVM0 get `bindVM` \st ->
+  ((,) <$>
+   ((,) <$ liftVM0 (put st) <*> a <*> liftVM0 get) <*>
+   ((,) <$ liftVM0 (put st) <*> b <*> liftVM0 get)) `bindVM`
+  \((ares, ast), (bres, bst)) ->
+  (ares, bres) <$
+    liftVM0
+    (put $
+     Map.unionWith
+       (\e1 e2 ->
+          if Seq.length (_entryPath e1) < Seq.length (_entryPath e2)
+          then e2
+          else e1)
+       ast
+       bst)
+
+parallelList ::
+  (x -> ValidateScope a e y) ->
+  [x] ->
+  ValidateScope a e [y]
+parallelList _ [] = pure []
+parallelList f (x:xs) = uncurry (:) <$> parallel2 (f x) (parallelList f xs)
+
+parallelNonEmpty ::
+  (x -> ValidateScope a e y) ->
+  NonEmpty x ->
+  ValidateScope a e (NonEmpty y)
+parallelNonEmpty f (x:|xs) = uncurry (:|) <$> parallel2 (f x) (parallelList f xs)
+
+parallel3 ::
+  ValidateScope a e x1 ->
+  ValidateScope a e x2 ->
+  ValidateScope a e x3 ->
+  ValidateScope a e (x1, x2, x3)
+parallel3 a b c = (\(a', (b', c')) -> (a', b', c')) <$> parallel2 a (parallel2 b c)
+
+parallel4 ::
+  ValidateScope a e x1 ->
+  ValidateScope a e x2 ->
+  ValidateScope a e x3 ->
+  ValidateScope a e x4 ->
+  ValidateScope a e (x1, x2, x3, x4)
+parallel4 a b c d =
+  (\(a', (b', c', d')) -> (a', b', c', d')) <$> parallel2 a (parallel3 b c d)
+
 validateCompoundStatementScope
   :: forall e v a
    . AsScopeError e a
@@ -199,57 +249,59 @@ validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params
      validateSuiteScope s) <*
   extendScope [name]
 validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
-  If idnts a ws1 <$>
+  (\e' (b', elifs', melse') -> If idnts a ws1 e' b' elifs' melse') <$>
   validateExprScope e <*>
-  controlScope (validateSuiteScope b) <*>
-  traverse
-    (\(a, b, c, d) ->
-      (,,,) a b <$>
-      validateExprScope c <*>
-      controlScope (validateSuiteScope d))
-    elifs <*>
-  traverseOf (traverse._3) (controlScope . validateSuiteScope) melse
+  parallel3
+    (controlScope $ validateSuiteScope b)
+    (parallelList
+     (\(a, b, c, d) ->
+       (,,,) a b <$>
+       validateExprScope c <*>
+       controlScope (validateSuiteScope d))
+     elifs)
+    (traverseOf (traverse._3) (controlScope . validateSuiteScope) melse)
 validateCompoundStatementScope (While idnts a ws1 e b els) =
   While idnts a ws1 <$>
   validateExprScope e <*>
   controlScope (validateSuiteScope b) <*>
   traverseOf (traverse._3) (controlScope . validateSuiteScope) els
 validateCompoundStatementScope (TryExcept idnts a b e f k l) =
-  TryExcept idnts a b <$>
-  controlScope (validateSuiteScope e) <*>
-  traverse
-    (\(idnts, ws, g, h) ->
-      (,,,) idnts ws <$>
-      traverse validateExceptAsScope g <*>
-      controlScope
-      (extendScope (toListOf (folded.exceptAsName._Just._2) g) *>
-       validateSuiteScope h))
-    f <*>
-  traverseOf (traverse._3) (controlScope . validateSuiteScope) k <*>
-  traverseOf (traverse._3) (controlScope . validateSuiteScope) l
+  (\(e', f', k', l') -> TryExcept idnts a b e' f' k' l') <$>
+  parallel4
+    (controlScope $ validateSuiteScope e)
+    (parallelNonEmpty
+       (\(idnts, ws, g, h) ->
+         (,,,) idnts ws <$>
+         traverse validateExceptAsScope g <*>
+         controlScope
+         (extendScope (toListOf (folded.exceptAsName._Just._2) g) *>
+          validateSuiteScope h))
+       f)
+    (traverseOf (traverse._3) (controlScope . validateSuiteScope) k)
+    (traverseOf (traverse._3) (controlScope . validateSuiteScope) l)
 validateCompoundStatementScope (TryFinally idnts a b e idnts2 f i) =
-  TryFinally idnts a b <$>
-  controlScope (validateSuiteScope e) <*>
-  pure idnts2 <*>
-  pure f <*>
-  controlScope (validateSuiteScope i)
+  (\(e', i') -> TryFinally idnts a b e' idnts2 f i') <$>
+  parallel2
+    (controlScope $ validateSuiteScope e)
+    (controlScope $ validateSuiteScope i)
 validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
   let
     cs = c ^.. unvalidated.cosmos._Ident
   in
-    For idnts a asyncWs b <$>
+    (\c' d' e' (h', i') -> For idnts a asyncWs b c' d' e' h' i') <$>
     (unsafeCoerce c <$
-    traverse
-      (\s ->
-        inScope (s ^. identValue) `bindVM` \res ->
-        if res then errorVM1 (_BadShadowing # coerce s) else pure ())
-      cs) <*>
+     traverse
+       (\s ->
+         inScope (s ^. identValue) `bindVM` \res ->
+         if res then errorVM1 (_BadShadowing # coerce s) else pure ())
+       cs) <*>
     pure d <*>
     traverse validateExprScope e <*>
-    controlScope
-      (extendScope (toList cs) *>
-       validateSuiteScope h) <*>
-    traverseOf (traverse._3) (controlScope . validateSuiteScope) i
+    parallel2
+      (controlScope $
+       extendScope (toList cs) *>
+       validateSuiteScope h)
+      (traverseOf (traverse._3) (controlScope . validateSuiteScope) i)
 validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
   (\decos' -> ClassDef a decos' idnts b (coerce c)) <$>
   traverse validateDecoratorScope decos <*>
@@ -271,7 +323,7 @@ validateCompoundStatementScope (With a b asyncWs c d e) =
          traverseOf (traverse._2) validateAssignExprScope c)
       d <*
     extendScope names <*>
-    definitionScope (validateSuiteScope e)
+    controlScope (validateSuiteScope e)
 
 validateSimpleStatementScope
   :: AsScopeError e a

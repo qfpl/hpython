@@ -34,6 +34,9 @@ newtype Ann a = Ann { getAnn :: a }
 class HasAnn s where
   annot :: Lens' (s a) (Ann a)
 
+instance HasAnn Ann where
+  annot = id
+
 -- | Get an annotation and forget the wrapper
 annot_ :: HasAnn s => Lens' (s a) a
 annot_ = annot._Wrapped

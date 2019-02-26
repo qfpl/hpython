@@ -212,7 +212,7 @@ validateIdentSyntax (MkIdent a name ws)
   | not (all isAscii name) = errorVM1 (_BadCharacter # (getAnn a, name))
   | null name = errorVM1 (_EmptyIdentifier # getAnn a)
   | otherwise =
-      bindVM (view inFunction) $ \fi ->
+      bindVM (liftVM0 $ view inFunction) $ \fi ->
         let
           reserved =
             reservedWords <>
@@ -230,7 +230,7 @@ validateWhitespace
   -> f Whitespace
   -> ValidateSyntax e (f Whitespace)
 validateWhitespace ann ws =
-  ask `bindVM` \ctxt ->
+  liftVM0 ask `bindVM` \ctxt ->
   if _inParens ctxt
   then pure ws
   else if
@@ -492,7 +492,7 @@ validateExprSyntax (Lambda a b c d e) =
 validateExprSyntax (Yield a b c) =
   Yield a <$>
   validateWhitespace (getAnn a) b <*
-  (ask `bindVM` \ctxt ->
+  (liftVM0 ask `bindVM` \ctxt ->
       case _inFunction ctxt of
         Nothing
           | _inGenerator ctxt -> pure ()
@@ -506,7 +506,7 @@ validateExprSyntax (YieldFrom a b c d) =
   YieldFrom a <$>
   validateWhitespace (getAnn a) b <*>
   validateWhitespace (getAnn a) c <*
-  (ask `bindVM` \ctxt ->
+  (liftVM0 ask `bindVM` \ctxt ->
       case _inFunction ctxt of
         Nothing
           | _inGenerator ctxt -> pure ()
@@ -574,7 +574,7 @@ validateExprSyntax (ListComp a ws1 comp ws2) =
 validateExprSyntax (Generator a comp) =
   Generator a <$> validateComprehensionSyntax validateExprSyntax comp
 validateExprSyntax (Await a ws expr) =
-  bindVM ask $ \ctxt ->
+  bindVM (liftVM0 ask) $ \ctxt ->
   Await a <$>
   validateWhitespace (getAnn a) ws <*
   (if not $ fromMaybe False (ctxt ^? inFunction._Just.asyncFunction)
@@ -792,7 +792,7 @@ validateCompoundStatementSyntax (ClassDef a decos idnts b c d g) =
     (local $ (inClass .~ True) . (inFunction .~ Nothing))
     (validateSuiteSyntax g)
 validateCompoundStatementSyntax (For a idnts asyncWs b c d e h i) =
-  bindVM ask $ \ctxt ->
+  bindVM (liftVM0 ask) $ \ctxt ->
   For a idnts <$
   (if isJust asyncWs && not (fromMaybe False $ ctxt ^? inFunction._Just.asyncFunction)
    then errorVM1 (_AsyncForOutsideCoroutine # getAnn a)
@@ -812,7 +812,7 @@ validateCompoundStatementSyntax (For a idnts asyncWs b c d e h i) =
        validateSuiteSyntax w)
     i
 validateCompoundStatementSyntax (With a b asyncWs c d e) =
-  bindVM ask $ \ctxt ->
+  bindVM (liftVM0 ask) $ \ctxt ->
   With a b <$
   (if isJust asyncWs && not (fromMaybe False $ ctxt ^? inFunction._Just.asyncFunction)
    then errorVM1 (_AsyncWithOutsideCoroutine # getAnn a)
@@ -872,7 +872,7 @@ validateImportTargetsSyntax
   => ImportTargets v a
   -> ValidateSyntax e (ImportTargets (Nub (Syntax ': v)) a)
 validateImportTargetsSyntax (ImportAll a ws) =
-  bindVM ask $ \ctxt ->
+  bindVM (liftVM0 ask) $ \ctxt ->
   if ctxt ^. inClass || has (inFunction._Just) ctxt
     then errorVM1 $ _WildcardImportInDefinition # getAnn a
     else ImportAll a <$> validateWhitespace (getAnn a) ws
@@ -943,7 +943,7 @@ validateSimpleStatementSyntax (Raise a ws f) =
          c)
     f
 validateSimpleStatementSyntax (Return a ws expr) =
-  ask `bindVM` \sctxt ->
+  liftVM0 ask `bindVM` \sctxt ->
     case _inFunction sctxt of
       Just{} ->
         Return a <$>
@@ -954,7 +954,7 @@ validateSimpleStatementSyntax (Expr a expr) =
   Expr a <$>
   validateExprSyntax expr
 validateSimpleStatementSyntax (Assign a lvalue rs) =
-  ask `bindVM` \sctxt ->
+  liftVM0 ask `bindVM` \sctxt ->
     let
       assigns =
         if isJust (_inFunction sctxt)
@@ -990,14 +990,14 @@ validateSimpleStatementSyntax (Pass a ws) =
   Pass a <$> validateWhitespace (getAnn a) ws
 validateSimpleStatementSyntax (Break a ws) =
   Break a <$
-  (ask `bindVM` \sctxt ->
+  (liftVM0 ask `bindVM` \sctxt ->
      if _inLoop sctxt
      then pure ()
      else errorVM1 (_BreakOutsideLoop # getAnn a)) <*>
   validateWhitespace (getAnn a) ws
 validateSimpleStatementSyntax (Continue a ws) =
   Continue a <$
-  (ask `bindVM` \sctxt ->
+  (liftVM0 ask `bindVM` \sctxt ->
      (if _inLoop sctxt
       then pure ()
       else errorVM1 (_ContinueOutsideLoop # getAnn a)) *>
@@ -1006,7 +1006,7 @@ validateSimpleStatementSyntax (Continue a ws) =
       else pure ())) <*>
   validateWhitespace (getAnn a) ws
 validateSimpleStatementSyntax (Global a ws ids) =
-  ask `bindVM` \ctx ->
+  liftVM0 ask `bindVM` \ctx ->
   let
     params = ctx ^.. inFunction.folded.functionParams.folded
   in
@@ -1022,8 +1022,8 @@ validateSimpleStatementSyntax (Global a ws ids) =
          validateIdentSyntax i)
       ids
 validateSimpleStatementSyntax (Nonlocal a ws ids) =
-  ask `bindVM` \sctxt ->
-  get `bindVM` \nls ->
+  liftVM0 ask `bindVM` \sctxt ->
+  liftVM0 get `bindVM` \nls ->
   (case deleteFirstsBy' (\a -> (==) (a ^. unvalidated.identValue)) (ids ^.. folded.unvalidated) nls of
      [] -> pure ()
      ids -> traverse_ (\e -> errorVM1 (_NoBindingNonlocal # e)) ids) *>

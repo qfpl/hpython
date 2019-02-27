@@ -32,7 +32,7 @@ module Language.Python.Validate.Scope
   , moduleEntryMap
   , moduleEntry
     -- ** Extra types
-  , Level(..), Entry(..), entryPath
+  , Level(..), Entry(..), entryPath, updateEntry
     -- ** Extra functions
   , runValidateScope'
   , definitionScope
@@ -85,7 +85,7 @@ import Data.Foldable (toList, traverse_, fold)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Map.Strict (Map)
 import Data.Maybe (isJust)
-import Data.Sequence ((|>), Seq)
+import Data.Sequence ((|>), Seq, ViewL(..))
 import Data.String (fromString)
 import Data.Type.Set (Nub)
 import Data.Validate.Monadic
@@ -115,9 +115,24 @@ data Level
   | Control
   deriving (Eq, Show)
 
+toplevelPath :: Seq Level -> Bool
+toplevelPath lvl =
+  case Seq.viewl lvl of
+    EmptyL -> False
+    Toplevel :< rest -> Seq.null rest
+    _ -> False
+
+data EntryType
+  = ClassEntry
+  | FunctionEntry
+  | VarEntry
+  | ParamEntry
+  deriving (Eq, Show)
+
 data Entry a
   = Entry
   { _entryValue :: a
+  , _entryType :: EntryType
   , _entryPath :: !(Seq Level)
   , _subEntries :: Map ByteString (Entry a)
   }
@@ -125,10 +140,66 @@ data Entry a
   { _subEntries :: Map ByteString (Entry a)
   } deriving (Eq, Show, Functor)
 
+isClassEntry :: Entry a -> Bool
+isClassEntry (Entry _ ClassEntry _ _) = True
+isClassEntry _ = False
+
+isFunctionEntry :: Entry a -> Bool
+isFunctionEntry (Entry _ FunctionEntry _ _) = True
+isFunctionEntry _ = False
+
+lookupEntry ::
+  Seq ByteString ->
+  Map ByteString (Entry a) ->
+  Maybe (Entry a)
+lookupEntry path =
+  case Seq.viewl path of
+    EmptyL -> error "updateEntry: empty path"
+    p :< ps -> go p ps
+  where
+    go ::
+      ByteString ->
+      Seq ByteString ->
+      Map ByteString (Entry a) ->
+      Maybe (Entry a)
+    go p ps m =
+      case Seq.viewl ps of
+        EmptyL -> Map.lookup p m
+        p' :< ps' -> Map.lookup p m >>= go p' ps' . _subEntries
+
+updateEntry ::
+  Seq ByteString ->
+  Entry a ->
+  Map ByteString (Entry a) ->
+  Map ByteString (Entry a)
+updateEntry path =
+  case Seq.viewl path of
+    EmptyL -> error "updateEntry: empty path"
+    p :< ps -> go p ps
+  where
+    go ::
+      ByteString ->
+      Seq ByteString ->
+      Entry a ->
+      Map ByteString (Entry a) ->
+      Map ByteString (Entry a)
+    go p ps e =
+      case Seq.viewl ps of
+        EmptyL -> Map.alter (const $ Just e) p
+        p' :< ps' ->
+          Map.alter
+            (\mentry ->
+               Just $
+               case mentry of
+                 Nothing -> GlobalEntry $ go p' ps' e mempty
+                 Just entry ->
+                   entry { _subEntries = go p' ps' e $ _subEntries entry })
+            p
+
 -- | The 'entryPath' for a 'GlobalEntry' is @['Toplevel']@
 entryPath :: Entry a -> Seq Level
 entryPath GlobalEntry{} = [Toplevel]
-entryPath (Entry _ a _) = a
+entryPath (Entry _ _ a _) = a
 
 -- |
 -- Extract the identifiers that are definitely in a module's global scope
@@ -153,7 +224,7 @@ getGlobals = go
               (\x ->
                  Map.insert
                    (x ^. cdName.getting identValue.to fromString)
-                   (Entry (x ^. annot_) [Toplevel] (go $ x ^. cdBody))
+                   (Entry (x ^. annot_) ClassEntry [Toplevel] (go $ x ^. cdBody))
                    b) <$>
               preview (getting _ClassDef) s
 
@@ -162,7 +233,7 @@ getGlobals = go
               (\x ->
                  Map.insert
                    (x ^. fdName.getting identValue.to fromString)
-                   (Entry (x ^. annot_) [Toplevel] mempty)
+                   (Entry (x ^. annot_) FunctionEntry [Toplevel] mempty)
                    b) <$>
               preview (getting _Fundef) s
 
@@ -172,7 +243,7 @@ getGlobals = go
                 (\a' ->
                    Map.insert
                      (a' ^. getting identValue.to fromString)
-                     (Entry (a' ^. annot_) [Toplevel] mempty))
+                     (Entry (a' ^. annot_) VarEntry [Toplevel] mempty))
                 b
                 s)
         mempty
@@ -416,15 +487,15 @@ controlScope :: ValidateScope ann e a -> ValidateScope ann e a
 controlScope = liftVM1 (local (|> Control))
 
 -- | Add some entries to the context, using the current depth and level
-extendScope :: [Ident v ann] -> ValidateScope ann e ()
-extendScope entries =
+extendScope :: EntryType -> [Ident v ann] -> ValidateScope ann e ()
+extendScope ety entries =
   liftVM0 ask `bindVM` \path ->
   liftVM0 . modify $ \scope ->
     foldr
       (\ident ->
          Map.insert
            (fromString $ _identValue ident)
-           (Entry (ident ^. annot_) path mempty))
+           (Entry (ident ^. annot_) ety path mempty))
       scope
       entries
 
@@ -521,9 +592,10 @@ validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params
   pure ws3 <*>
   traverseOf (traverse._2) validateExprScope_ mty <*>
   definitionScope
-    (extendScope (name : toListOf (folded.getting paramName) params) *>
+    (extendScope ParamEntry [name] *>
+     extendScope VarEntry (toListOf (folded.getting paramName) params) *>
      validateSuiteScope s) <*
-  extendScope [name]
+  extendScope FunctionEntry [name]
 validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
   (\e' (b', elifs', melse') -> If idnts a ws1 e' b' elifs' melse') <$>
   validateExprScope_ e <*>
@@ -550,7 +622,7 @@ validateCompoundStatementScope (TryExcept idnts a b e f k l) =
          (,,,) idnts ws <$>
          traverse validateExceptAsScope g <*>
          controlScope
-         (extendScope (toListOf (folded.exceptAsName._Just._2) g) *>
+         (extendScope VarEntry (toListOf (folded.exceptAsName._Just._2) g) *>
           validateSuiteScope h))
        f)
     (traverseOf (traverse._3) (controlScope . validateSuiteScope) k)
@@ -575,7 +647,7 @@ validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
     traverse validateExprScope_ e <*>
     parallel2
       (controlScope $
-       extendScope (toList cs) *>
+       extendScope VarEntry (toList cs) *>
        validateSuiteScope h)
       (traverseOf (traverse._3) (controlScope . validateSuiteScope) i)
 validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
@@ -583,7 +655,7 @@ validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
   traverse validateDecoratorScope decos <*>
   traverseOf (traverse._2.traverse.traverse) validateArgScope d <*>
   definitionScope (validateSuiteScope g) <*
-  extendScope [c]
+  extendScope ClassEntry [c]
 validateCompoundStatementScope (With a b asyncWs c d e) =
   let
     names =
@@ -598,7 +670,7 @@ validateCompoundStatementScope (With a b asyncWs c d e) =
          validateExprScope_ b <*>
          traverseOf (traverse._2) validateAssignExprScope c)
       d <*
-    extendScope names <*>
+    extendScope VarEntry names <*>
     controlScope (validateSuiteScope e)
 
 validateSimpleStatementScope
@@ -672,7 +744,7 @@ validateIdentScope i =
   liftVM0 ask `bindVM` \curPath ->
     case res of
       Nothing -> errorVM1 (_NotInScope # (i ^. unvalidated))
-      Just (Entry ann path _) ->
+      Just (Entry ann _ path _) ->
         coerce i <$
         if Seq.length curPath < Seq.length path
         then errorVM1 (_FoundDynamic # (ann, i ^. unvalidated))
@@ -741,7 +813,7 @@ validateComprehensionScope f (Comprehension a b c d) =
       (\c' -> CompFor a b c' d) <$>
       validateAssignExprScope c <*>
       validateExprScope_ e <*
-      extendScope (c ^.. unvalidated.assignTargets)
+      extendScope VarEntry (c ^.. unvalidated.assignTargets)
 
     validateCompIfScope
       :: AsScopeError e a
@@ -766,10 +838,29 @@ validateAssignExprScope (List a ws1 es ws2) =
     listItem (ListItem a b) = ListItem a <$> validateAssignExprScope b
     listItem (ListUnpack a b c d) = ListUnpack a b c <$> validateAssignExprScope d
 validateAssignExprScope (Deref a e ws1 r) =
-  Deref a <$>
-  validateExprScope_ e <*>
-  pure ws1 <*>
-  validateIdentScope r
+  validateExprScope e `bindVM` \(e', mattrs) ->
+  Deref a e' ws1 (coerce r) <$
+  case mattrs of
+    Nothing -> pure ()
+    Just (attrsPath, attrs) ->
+      let ix = r ^. getting identValue . to fromString in
+      case Map.lookup ix attrs of
+        Just{} -> pure ()
+        Nothing ->
+          liftVM0 ask `bindVM` \path ->
+          liftVM0 get `bindVM` \scope ->
+          if
+            toplevelPath path &&
+            maybe
+              False
+              ((||) <$> isFunctionEntry <*> isClassEntry)
+              (lookupEntry attrsPath scope)
+          then
+            liftVM0 . modify $
+            updateEntry
+              (attrsPath |> ix)
+              (Entry (r ^. annot_) VarEntry path mempty)
+          else errorVM1 (_MissingAttribute # (e ^. unvalidated, r ^. unvalidated))
 validateAssignExprScope (Parens a ws1 e ws2) =
   Parens a ws1 <$>
   validateAssignExprScope e <*>
@@ -787,10 +878,10 @@ validateAssignExprScope (Ident a (MkIdent b c d)) =
   liftVM0 ask `bindVM` \curPath ->
   Ident a (MkIdent b c d) <$
   case res of
-    Nothing -> extendScope [MkIdent b c d]
-    Just (Entry _ path _)->
+    Nothing -> extendScope VarEntry [MkIdent b c d]
+    Just (Entry _ _ path _)->
       if Seq.length curPath < Seq.length path
-      then extendScope [MkIdent b c d]
+      then extendScope VarEntry [MkIdent b c d]
       else pure ()
     Just GlobalEntry{} -> pure ()
 validateAssignExprScope e@Unit{} = pure $ unsafeCoerce e
@@ -866,7 +957,10 @@ validateExprScope_
   -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
 validateExprScope_ = fmap fst . validateExprScope
 
-unrefined :: Applicative f => f a -> f (a, Maybe (Map ByteString (Entry x)))
+unrefined ::
+  Applicative f =>
+  f a ->
+  f (a, Maybe (Seq ByteString, Map ByteString (Entry x)))
 unrefined m = (,) <$> m <*> pure Nothing
 
 -- | Validate an expressions scope, and return a possible refinement to the scope
@@ -878,7 +972,9 @@ validateExprScope ::
   AsScopeError e a =>
   Expr v a ->
   ValidateScope a e
-    (Expr (Nub (Scope ': v)) a, Maybe (Map ByteString (Entry a)))
+    ( Expr (Nub (Scope ': v)) a
+    , Maybe (Seq ByteString, Map ByteString (Entry a))
+    )
 validateExprScope (Lambda a b c d e) =
   unrefined $
   Lambda a b <$>
@@ -924,10 +1020,12 @@ validateExprScope (Deref a e ws1 (MkIdent ann i ws)) =
     (,) (Deref a e' ws1 $ MkIdent ann i ws) <$>
     case mscope of
       Nothing -> pure Nothing
-      Just scope ->
-        case Map.lookup (fromString i) scope of
-          Nothing -> errorVM1 $ _NotInScope # MkIdent ann i ws
-          Just entry -> pure . Just $ _subEntries entry
+      Just (path, scope) ->
+        let ix = fromString i in
+        case Map.lookup ix scope of
+          Nothing ->
+            errorVM1 $ _MissingAttribute # (e ^. unvalidated, MkIdent ann i ws)
+          Just entry -> pure . Just $ (path |> ix, _subEntries entry)
 validateExprScope (Call a e ws1 as ws2) =
   unrefined $
   Call a <$>
@@ -950,7 +1048,9 @@ validateExprScope (Parens a ws1 e ws2) =
 validateExprScope (Ident a i) =
   (,) <$>
   (Ident a <$> validateIdentScope i) <*>
-  fmap (fmap _subEntries) (lookupScope $ i ^. getting identValue)
+  fmap
+    (fmap ((,) [i ^. getting identValue . to fromString] . _subEntries))
+    (lookupScope $ i ^. getting identValue)
 validateExprScope (Tuple a b ws d) =
   unrefined $
   Tuple a <$>

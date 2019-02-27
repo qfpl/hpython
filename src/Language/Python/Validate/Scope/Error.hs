@@ -14,7 +14,8 @@ Portability : non-portable
 module Language.Python.Validate.Scope.Error where
 
 import Control.Lens.TH
-import Language.Python.Syntax.Ident
+import Language.Python.Syntax.Expr (Expr)
+import Language.Python.Syntax.Ident (Ident)
 
 data ScopeError a
   -- |
@@ -63,6 +64,24 @@ data ScopeError a
   --
   -- This error occurs when we spot this pattern.
   | BadShadowing (Ident '[] a)
+  -- |
+  -- @
+  -- # x is in scope
+  -- x.a = 0
+  -- @
+  --
+  -- In the above code, knowing whether @x@ is in scope isn't enough to predict
+  -- whether the assignment will fail. Neither is knowing @x@'s current attributes.
+  -- If @x@ were an instance of a user-defined class, then the assignment would
+  -- succeed, and @x@ would be given the @a@ attribute. If @x@ was a built-in type
+  -- like @int@ or @string@, then the assignment would fail with an @AttributeError@.
+  --
+  -- Sometimes we have enough information to know such an assignment will succeed,
+  -- and add extra scope information where necessary. This only works if @x@ is
+  -- a function or class definition. But in for any other usage we can't know if the
+  -- assignment would be successfull, in which case the 'MissingAttribute' error
+  -- is raised.
+  | MissingAttribute (Expr '[] a) (Ident '[] a)
   deriving (Eq, Show)
 
 makeClassyPrisms ''ScopeError

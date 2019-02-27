@@ -460,3 +460,20 @@ prop_scope_24 =
     res <- fullyValidateModule code
     annotateShow res
     void res === Success ()
+
+prop_scope_25 :: Property
+prop_scope_25 =
+  withTests 1 . property $ do
+    let
+      code =
+        module_
+        [ line_ $
+          class_ "a" []
+          [ line_ $
+            def_ "b" []
+            [ line_ $ call_ "print" [p_ $ var_ "a"] ]
+          ]
+        ]
+    res <- fullyValidateModule code
+    annotateShow res
+    void res === Success ()

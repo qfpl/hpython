@@ -720,9 +720,9 @@ validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
 validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
   (\decos' -> ClassDef a decos' idnts b (coerce c)) <$>
   traverse validateDecoratorScope decos <*>
-  traverseOf (traverse._2.traverse.traverse) validateArgScope d <*>
+  traverseOf (traverse._2.traverse.traverse) validateArgScope d <*
+  extendScope ClassEntry [c] <*>
   definitionScope (validateSuiteScope g) <*
-  extendScope ClassEntry [c] <*
   liftVM0
     (ask >>= \path -> do
      modify $ \st ->

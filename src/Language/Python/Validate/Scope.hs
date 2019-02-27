@@ -17,8 +17,25 @@ License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
 Stability   : experimental
 Portability : non-portable
--}
 
+Note: we try our very best to check that the program is scope safe, but without
+a type checker we have to make some concessions. The main one is that
+function parameters have no attribute information associated with them, and thus
+every dereference of a function parameter is consiered valid.
+
+For example, this code will pass scope checking:
+
+@
+def f(x):
+  print(x.a)
+@
+
+Unfortunately, it's not practical to reject these sorts of usage.
+
+This means that *there are some programs that pass the scope checker, but throw
+AttributeErrors at runtime*.
+
+-}
 module Language.Python.Validate.Scope
   ( module Data.Validation
   , module Language.Python.Validate.Scope.Error
@@ -44,7 +61,7 @@ module Language.Python.Validate.Scope
     -- *** Entry operations
   , entryPath
   , lookupEntry, setEntry, updateEntry
-  , isClassEntry, isFunctionEntry
+  , isClassEntry, isFunctionEntry, isParamEntry
     -- *** Scope operations
   , definitionScope
   , controlScope
@@ -160,6 +177,10 @@ isClassEntry _ = False
 isFunctionEntry :: Entry a -> Bool
 isFunctionEntry (Entry _ FunctionEntry _ _) = True
 isFunctionEntry _ = False
+
+isParamEntry :: Entry a -> Bool
+isParamEntry (Entry _ ParamEntry _ _) = True
+isParamEntry _ = False
 
 lookupEntry ::
   Seq ByteString ->
@@ -638,8 +659,8 @@ validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params
   pure ws3 <*>
   traverseOf (traverse._2) validateExprScope_ mty <*>
   definitionScope
-    (extendScope ParamEntry [name] *>
-     extendScope VarEntry (toListOf (folded.getting paramName) params) *>
+    (extendScope FunctionEntry [name] *>
+     extendScope ParamEntry (toListOf (folded.getting paramName) params) *>
      validateSuiteScope s) <*
   extendScope FunctionEntry [name]
 validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
@@ -918,7 +939,7 @@ validateAssignExprScope (Deref a e ws1 r) =
   Deref a e' ws1 (coerce r) <$
   case mattrs of
     Nothing -> pure ()
-    Just (attrsPath, attrs) ->
+    Just (ety, attrsPath, attrs) ->
       let ix = r ^. getting identValue . to fromString in
       case Map.lookup ix attrs of
         Just{} -> pure ()
@@ -936,7 +957,12 @@ validateAssignExprScope (Deref a e ws1 r) =
             setEntry
               (attrsPath |> ix)
               (Entry (r ^. annot_) VarEntry path mempty)
-          else errorVM1 (_MissingAttribute # (e ^. unvalidated, r ^. unvalidated))
+          else
+            case ety of
+              -- when it comes to parameters, all bets are off without a type system.
+              -- just let it through :(
+              Just ParamEntry -> pure ()
+              _ -> errorVM1 (_MissingAttribute # (e ^. unvalidated, r ^. unvalidated))
 validateAssignExprScope (Parens a ws1 e ws2) =
   Parens a ws1 <$>
   validateAssignExprScope e <*>
@@ -1036,7 +1062,7 @@ validateExprScope_ = fmap fst . validateExprScope
 unrefined ::
   Applicative f =>
   f a ->
-  f (a, Maybe (Seq ByteString, Map ByteString (Entry x)))
+  f (a, Maybe (Maybe EntryType, Seq ByteString, Map ByteString (Entry x)))
 unrefined m = (,) <$> m <*> pure Nothing
 
 -- | Validate an expressions scope, and return a possible refinement to the scope
@@ -1049,14 +1075,16 @@ validateExprScope ::
   Expr v a ->
   ValidateScope a e
     ( Expr (Nub (Scope ': v)) a
-    , Maybe (Seq ByteString, Map ByteString (Entry a))
+    , Maybe (Maybe EntryType, Seq ByteString, Map ByteString (Entry a))
     )
-validateExprScope (Lambda a b c d e) =
+validateExprScope (Lambda ann ws params col body) =
   unrefined $
-  Lambda a b <$>
-  traverse validateParamScope c <*>
-  pure d <*>
-  validateExprScope_ e
+  Lambda ann ws <$>
+  traverse validateParamScope params <*>
+  pure col <*>
+  definitionScope
+    (extendScope ParamEntry (toListOf (folded.getting paramName) params) *>
+     validateExprScope_ body)
 validateExprScope (Yield a b c) =
   unrefined $ Yield a b <$> traverse validateExprScope_ c
 validateExprScope (YieldFrom a b c d) =
@@ -1096,12 +1124,23 @@ validateExprScope (Deref a e ws1 (MkIdent ann i ws)) =
     (,) (Deref a e' ws1 $ MkIdent ann i ws) <$>
     case mscope of
       Nothing -> pure Nothing
-      Just (path, scope) ->
+      Just (ety, path, scope) ->
         let ix = fromString i in
         case Map.lookup ix scope of
           Nothing ->
-            errorVM1 $ _MissingAttribute # (e ^. unvalidated, MkIdent ann i ws)
-          Just entry -> pure . Just $ (path |> ix, _subEntries entry)
+            case ety of
+              Just ParamEntry -> pure $ Just (Just ParamEntry, path |> ix, mempty)
+              _ ->
+                errorVM1 $ _MissingAttribute # (e ^. unvalidated, MkIdent ann i ws)
+          Just entry ->
+            pure $
+            Just
+            ( case entry of
+                GlobalEntry{} -> Nothing
+                Entry _ ety' _ _ -> Just ety'
+            , path |> ix
+            , _subEntries entry
+            )
 validateExprScope (Call a e ws1 as ws2) =
   unrefined $
   Call a <$>
@@ -1125,7 +1164,12 @@ validateExprScope (Ident a i) =
   (,) <$>
   (Ident a <$> validateIdentScope i) <*>
   fmap
-    (fmap ((,) [i ^. getting identValue . to fromString] . _subEntries))
+    (fmap
+       (\entry ->
+          ( case entry of; GlobalEntry{} -> Nothing; Entry _ ety _ _ -> Just ety
+          , [i ^. getting identValue . to fromString]
+          , _subEntries entry
+          )))
     (lookupScope $ i ^. getting identValue)
 validateExprScope (Tuple a b ws d) =
   unrefined $

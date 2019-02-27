@@ -444,3 +444,19 @@ prop_scope_23 =
     annotateShow res
     void res ===
       Failure (MissingAttribute (var_ "a") "b" :| [])
+
+prop_scope_24 :: Property
+prop_scope_24 =
+  withTests 1 . property $ do
+    let
+      code =
+        module_
+        [ line_ $
+          def_ "a" [p_ "b"]
+          [ line_ $ call_ "print" [p_ $ var_ "b" /> "c"]
+          , line_ ((var_ "b" /> "c") .= 1)
+          ]
+        ]
+    res <- fullyValidateModule code
+    annotateShow res
+    void res === Success ()

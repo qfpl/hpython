@@ -53,7 +53,10 @@ module Language.Python.Validate.Scope
   , moduleEntryMap
   , moduleEntry
     -- ** Extra types
-  , Level(..), Entry(..), EntryType(..)
+  , Level(..)
+  , Env(..)
+  , envPath, envInClass
+  , Entry(..), EntryType(..)
     -- ** Extra functions
   , runValidateScope'
   , isStaticmethod
@@ -96,16 +99,17 @@ import Control.Applicative ((<|>))
 import Control.Lens.Cons (snoc)
 import Control.Lens.Fold
   ((^..), toListOf, folded, foldrOf, preview, filtered, anyOf)
-import Control.Lens.Getter ((^.), to, getting)
+import Control.Lens.Getter ((^.), to, getting, view)
 import Control.Lens.Plated (cosmos)
 import Control.Lens.Prism (_Right, _Just)
 import Control.Lens.Review ((#))
-import Control.Lens.Setter (mapped, over)
-import Control.Lens.TH (makeLensesFor)
+import Control.Lens.Setter ((.~), (%~), mapped, over)
+import Control.Lens.TH (makeLensesFor, makeLenses)
 import Control.Lens.Tuple (_1, _2, _3)
 import Control.Lens.Traversal (traverseOf)
+import Control.Monad (unless)
 import Control.Monad.State (State, evalState, modify, get, put)
-import Control.Monad.Reader (ReaderT, runReaderT, ask, local)
+import Control.Monad.Reader (ReaderT, runReaderT, local)
 import Data.Bitraversable (bitraverse)
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
@@ -506,23 +510,35 @@ globals =
   , "__loader__"
   ]
 
+data Env
+  = Env
+  { _envPath :: Seq Level
+  , _envInClass :: Bool
+  } deriving (Eq, Show)
+makeLenses ''Env
+
 type ValidateScope ann e
   = ValidateM
       (NonEmpty e)
-      (ReaderT (Seq Level) (State (Map ByteString (Entry ann))))
+      (ReaderT Env (State (Map ByteString (Entry ann))))
 
 runValidateScope ::
   Map ByteString (Entry ann) -> -- ^ Extensions to the context
   ValidateScope ann e a ->
   Validation (NonEmpty e) a
-runValidateScope exts = runValidateScope' [Toplevel] (exts <> globals <> builtins)
+runValidateScope exts =
+  runValidateScope' [Toplevel] False (exts <> globals <> builtins)
 
 runValidateScope' ::
   Seq Level -> -- ^ Path
+  Bool -> -- ^ Are we checking a class body?
   Map ByteString (Entry ann) -> -- ^ Context
   ValidateScope ann e a -> -- ^ Validation action
   Validation (NonEmpty e) a
-runValidateScope' path s = flip evalState s . flip runReaderT path . runValidateM
+runValidateScope' path cls s =
+  flip evalState s .
+  flip runReaderT (Env path cls) .
+  runValidateM
 
 localScope ::
   (Map ByteString (Entry ann) -> Map ByteString (Entry ann)) ->
@@ -535,16 +551,16 @@ localScope f m =
 
 -- | Run a validation action for a definition block
 definitionScope :: ValidateScope ann e a -> ValidateScope ann e a
-definitionScope = liftVM1 (local (|> Definition)) . localScope id
+definitionScope = liftVM1 (local (envPath %~ (|> Definition))) . localScope id
 
 -- | Run a validation action for a flow control block
 controlScope :: ValidateScope ann e a -> ValidateScope ann e a
-controlScope = liftVM1 (local (|> Control))
+controlScope = liftVM1 (local (envPath %~ (|> Control)))
 
 -- | Add some entries to the context, using the current depth and level
 extendScope :: EntryType -> [Ident v ann] -> ValidateScope ann e ()
 extendScope ety entries =
-  liftVM0 ask `bindVM` \path ->
+  liftVM0 (view envPath) `bindVM` \path ->
   liftVM0 . modify $ \scope ->
     foldr
       (\ident ->
@@ -573,7 +589,8 @@ validateSuiteScope
   :: AsScopeError e a
   => Suite v a
   -> ValidateScope a e (Suite (Nub (Scope ': v)) a)
-validateSuiteScope (SuiteMany ann a b c d) = SuiteMany ann a b c <$> validateBlockScope d
+validateSuiteScope (SuiteMany ann a b c d) =
+  SuiteMany ann a b c <$> validateBlockScope d
 validateSuiteScope (SuiteOne ann a b) =
   SuiteOne ann a <$> validateSmallStatementScope b
 
@@ -653,17 +670,20 @@ validateCompoundStatementScope
   => CompoundStatement v a
   -> ValidateScope a e (CompoundStatement (Nub (Scope ': v)) a)
 validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params ws3 mty s) =
+  liftVM0 (view envInClass) `bindVM` \inClass ->
+  liftVM1 (local $ envInClass .~ False) $
   (\decos' -> Fundef a decos' idnts asyncWs ws1 (coerce name) ws2) <$>
   traverse validateDecoratorScope decos <*>
   traverse validateParamScope params <*>
   pure ws3 <*>
   traverseOf (traverse._2) validateExprScope_ mty <*>
   definitionScope
-    (extendScope FunctionEntry [name] *>
+    (unless inClass (extendScope FunctionEntry [name]) *>
      extendScope ParamEntry (toListOf (folded.getting paramName) params) *>
      validateSuiteScope s) <*
   extendScope FunctionEntry [name]
 validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
+  liftVM1 (local $ envInClass .~ False) $
   (\e' (b', elifs', melse') -> If idnts a ws1 e' b' elifs' melse') <$>
   validateExprScope_ e <*>
   parallel3
@@ -676,11 +696,13 @@ validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
      elifs)
     (traverseOf (traverse._3) (controlScope . validateSuiteScope) melse)
 validateCompoundStatementScope (While idnts a ws1 e b els) =
+  liftVM1 (local $ envInClass .~ False) $
   While idnts a ws1 <$>
   validateExprScope_ e <*>
   controlScope (validateSuiteScope b) <*>
   traverseOf (traverse._3) (controlScope . validateSuiteScope) els
 validateCompoundStatementScope (TryExcept idnts a b e f k l) =
+  liftVM1 (local $ envInClass .~ False) $
   (\(e', f', k', l') -> TryExcept idnts a b e' f' k' l') <$>
   parallel4
     (controlScope $ validateSuiteScope e)
@@ -695,11 +717,13 @@ validateCompoundStatementScope (TryExcept idnts a b e f k l) =
     (traverseOf (traverse._3) (controlScope . validateSuiteScope) k)
     (traverseOf (traverse._3) (controlScope . validateSuiteScope) l)
 validateCompoundStatementScope (TryFinally idnts a b e idnts2 f i) =
+  liftVM1 (local $ envInClass .~ False) $
   (\(e', i') -> TryFinally idnts a b e' idnts2 f i') <$>
   parallel2
     (controlScope $ validateSuiteScope e)
     (controlScope $ validateSuiteScope i)
 validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
+  liftVM1 (local $ envInClass .~ False) $
   let
     cs = c ^.. unvalidated.cosmos._Ident
   in
@@ -718,14 +742,17 @@ validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
        validateSuiteScope h)
       (traverseOf (traverse._3) (controlScope . validateSuiteScope) i)
 validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
+  liftVM1 (local $ envInClass .~ False) $
   (\decos' -> ClassDef a decos' idnts b (coerce c)) <$>
   traverse validateDecoratorScope decos <*>
   traverseOf (traverse._2.traverse.traverse) validateArgScope d <*
-  extendScope ClassEntry [c] <*>
-  definitionScope (validateSuiteScope g) <*
+  extendScope ClassEntry [c] <*
   liftVM0
-    (ask >>= \path -> do
-     modify $ \st ->
+    (view envPath >>= \path ->
+     modify (addClassVars path) *> modify (addClassDefs path)) <*>
+  definitionScope (liftVM1 (local $ envInClass .~ True) $ validateSuiteScope g)
+  where
+    addClassVars path st =
        foldrOf
          (getting (_Statements._SmallStatement)._2.
           getting (_SimpleStatements._Assign).
@@ -740,7 +767,7 @@ validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
                  (Entry (a ^. annot_) VarEntry (path |> Definition) mempty)))
          st
          g
-     modify $ \st ->
+    addClassDefs path st =
        foldrOf
          (getting (_Statements._Fundef).
           filtered ((||) <$> isStaticmethod <*> isClassmethod).fdName)
@@ -752,8 +779,9 @@ validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
                  (a ^. getting identValue . to fromString)
                  (Entry (a ^. annot_) VarEntry (path |> Definition) mempty)))
          st
-         g)
+         g
 validateCompoundStatementScope (With a b asyncWs c d e) =
+  liftVM1 (local $ envInClass .~ False) $
   let
     names =
       d ^..
@@ -838,7 +866,7 @@ validateIdentScope
   -> ValidateScope a e (Ident (Nub (Scope ': v)) a)
 validateIdentScope i =
   lookupScope (_identValue i) `bindVM` \res ->
-  liftVM0 ask `bindVM` \curPath ->
+  liftVM0 (view envPath) `bindVM` \curPath ->
     case res of
       Nothing -> errorVM1 (_NotInScope # (i ^. unvalidated))
       Just (Entry ann _ path _) ->
@@ -944,7 +972,7 @@ validateAssignExprScope (Deref a e ws1 r) =
       case Map.lookup ix attrs of
         Just{} -> pure ()
         Nothing ->
-          liftVM0 ask `bindVM` \path ->
+          liftVM0 (view envPath) `bindVM` \path ->
           liftVM0 get `bindVM` \scope ->
           if
             toplevelPath path &&
@@ -977,7 +1005,7 @@ validateAssignExprScope (Tuple a b ws d) =
     tupleItem (TupleUnpack a b c d) = TupleUnpack a b c <$> validateAssignExprScope d
 validateAssignExprScope (Ident a (MkIdent b c d)) =
   lookupScope c `bindVM` \res ->
-  liftVM0 ask `bindVM` \curPath ->
+  liftVM0 (view envPath) `bindVM` \curPath ->
   Ident a (MkIdent b c d) <$
   case res of
     Nothing -> extendScope VarEntry [MkIdent b c d]

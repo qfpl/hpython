@@ -477,3 +477,39 @@ prop_scope_25 =
     res <- fullyValidateModule code
     annotateShow res
     void res === Success ()
+
+prop_scope_26 :: Property
+prop_scope_26 =
+  withTests 1 . property $ do
+    let
+      code =
+        module_
+        [ line_ $
+          class_ "a" []
+          [ line_ $
+            decorated_ [var_ "staticmethod"] $
+            def_ "b" [] [ line_ pass_ ]
+          , line_ $
+            def_ "c" []
+            [ line_ $ call_ "print" [p_ $ var_ "a" /> "b"] ]
+          ]
+        ]
+    res <- fullyValidateModule code
+    annotateShow res
+    void res === Success ()
+
+prop_scope_27 :: Property
+prop_scope_27 =
+  withTests 1 . property $ do
+    let
+      code =
+        module_
+        [ line_ $
+          class_ "a" []
+          [ line_ $
+            def_ "b" [] [ line_ $ return_ (var_ "b") ]
+          ]
+        ]
+    res <- fullyValidateModule code
+    annotateShow res
+    void res === Failure (NotInScope "b" :| [])

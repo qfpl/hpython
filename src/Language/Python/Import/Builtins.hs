@@ -12,7 +12,7 @@ import Language.Python.Parse (SrcInfo)
 import Language.Python.Syntax.ModuleNames
   (ModuleName, makeModuleName, sameModuleName)
 import Language.Python.Syntax.Raw (Raw)
-import Language.Python.Validate.Scope (GlobalEntry, builtinEntry)
+import Language.Python.Validate.Scope (Entry(..))
 
 lookupModuleName :: ModuleName v a -> [(ModuleName v' a', x)] -> Maybe x
 lookupModuleName _ [] = Nothing
@@ -20,10 +20,10 @@ lookupModuleName mn ((mn', a) : rest)
   | sameModuleName mn mn' = Just a
   | otherwise = lookupModuleName mn rest
 
-lookupBuiltinModule :: ModuleName v a -> Maybe (Map ByteString (GlobalEntry SrcInfo))
+lookupBuiltinModule :: ModuleName v a -> Maybe (Map ByteString (Entry SrcInfo))
 lookupBuiltinModule mn = lookupModuleName mn builtinModules
 
-builtinModules :: [(Raw ModuleName, Map ByteString (GlobalEntry SrcInfo))]
+builtinModules :: [(Raw ModuleName, Map ByteString (Entry SrcInfo))]
 builtinModules =
   [ (timeModuleName, timeModule)
   , (mathModuleName, mathModule)
@@ -32,9 +32,9 @@ builtinModules =
 timeModuleName :: Raw ModuleName
 timeModuleName = makeModuleName "time" []
 
-timeModule :: Map ByteString (GlobalEntry SrcInfo)
+timeModule :: Map ByteString (Entry SrcInfo)
 timeModule =
-  Map.fromList $ (, builtinEntry mempty) <$> names
+  Map.fromList $ (, GlobalEntry mempty) <$> names
   where
     names :: [ByteString]
     names =
@@ -86,9 +86,9 @@ timeModule =
 mathModuleName :: Raw ModuleName
 mathModuleName = makeModuleName "math" []
 
-mathModule :: Map ByteString (GlobalEntry SrcInfo)
+mathModule :: Map ByteString (Entry SrcInfo)
 mathModule =
-  Map.fromList $ (, builtinEntry mempty) <$> names
+  Map.fromList $ (, GlobalEntry mempty) <$> names
   where
     names :: [ByteString]
     names =

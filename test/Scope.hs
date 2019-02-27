@@ -191,3 +191,47 @@ prop_scope_11 =
     res <- fullyValidate st
     annotateShow res
     res === Failure (BadShadowing (MkIdent (Ann ()) "x" [Space]) :| [])
+
+prop_scope_12 :: Property
+prop_scope_12 =
+  withTests 1 . property $ do
+    let
+      st =
+        _If #
+        (if_ none_ [line_ (var_ "x" .= 2)] &
+         else_ [line_ (var_ "y" .= var_ "x")])
+    res <- fullyValidate st
+    annotateShow res
+    res === Failure (NotInScope (MkIdent (Ann ()) "x" []) :| [])
+
+prop_scope_13 :: Property
+prop_scope_13 =
+  withTests 1 . property $ do
+    let
+      st =
+        _Fundef #
+        def_ "test" []
+        [ line_ $
+          if_ none_ [line_ (var_ "x" .= 1)] &
+          else_ [line_ (var_ "y" .= 2)]
+        , line_ $ var_ "x"
+        ]
+    res <- fullyValidate st
+    annotateShow res
+    res === Failure (FoundDynamic () (MkIdent (Ann ()) "x" []) :| [])
+
+prop_scope_14 :: Property
+prop_scope_14 =
+  withTests 1 . property $ do
+    let
+      st =
+        _Fundef #
+        def_ "test" []
+        [ line_ $
+          if_ none_ [line_ (var_ "x" .= 1)] &
+          else_ [line_ (var_ "y" .= 2)]
+        , line_ $ var_ "y"
+        ]
+    res <- fullyValidate st
+    annotateShow res
+    res === Failure (FoundDynamic () (MkIdent (Ann ()) "y" []) :| [])

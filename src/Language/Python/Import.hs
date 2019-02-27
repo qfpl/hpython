@@ -83,8 +83,7 @@ import Language.Python.Validate
   , validateModuleIndentation, validateModuleSyntax, validateModuleScope
   )
 import Language.Python.Validate.Scope
-  ( GlobalEntry(..), moduleEntry, moduleEntryMap
-  , getGlobals, toGlobalEntry
+  ( Entry(..), moduleEntry, moduleEntryMap, getGlobals
   )
 
 data SearchConfig
@@ -199,7 +198,7 @@ findModule sc mn = checkCacheThen (search $ _scSearchPaths sc)
     moduleFileName = foldr (</>) (snd moduleDirs) (fst moduleDirs)
 
 data LoadResult v
-  = LoadedBuiltin (Map ByteString (GlobalEntry SrcInfo))
+  = LoadedBuiltin (Map ByteString (Entry SrcInfo))
   | LoadedModule (Module v SrcInfo)
 
 -- |
@@ -250,7 +249,7 @@ relativeImport ::
   RelativeModuleName '[Syntax, Indentation] SrcInfo -> -- ^ Target module (relative)
   ImportTargets '[Syntax, Indentation] SrcInfo -> -- ^ Import targets
   -- Importer (Either e (Map ByteString (GlobalEntry SrcInfo)))
-  Importer (Either e (Map ByteString (GlobalEntry SrcInfo)))
+  Importer (Either e (Map ByteString (Entry SrcInfo)))
 relativeImport sc mod targetMod targets =
   runExceptT $ do
     absTarget <- absoluteTargetMod mod targetMod
@@ -265,7 +264,7 @@ relativeImport sc mod targetMod targets =
         (_, targetMod) <- ExceptT $ findAndLoadAll sc absTarget
         case targetMod of
           LoadedBuiltin mapping -> pure mapping
-          LoadedModule mod -> pure $ toGlobalEntry <$> getGlobals mod
+          LoadedModule mod -> pure $ getGlobals mod
       ImportSome _ is -> exposeTargets absTarget is
       ImportSomeParens _ _ is _ -> exposeTargets absTarget is
   where
@@ -336,7 +335,7 @@ relativeImport sc mod targetMod targets =
       Foldable f =>
       ModuleName '[Syntax, Indentation] SrcInfo ->
       f (ImportAs Ident '[Syntax, Indentation] SrcInfo) ->
-      ExceptT e Importer (Map ByteString (GlobalEntry SrcInfo))
+      ExceptT e Importer (Map ByteString (Entry SrcInfo))
     exposeTargets mn tgts = do
       found <- lift $ findModule @e sc mn
       scope <-
@@ -350,7 +349,7 @@ relativeImport sc mod targetMod targets =
             tgt <- snd <$> ExceptT (findAndLoadAll sc mn)
             case tgt of
               LoadedBuiltin mapping -> pure mapping
-              LoadedModule mod -> pure $ toGlobalEntry <$> getGlobals mod
+              LoadedModule mod -> pure $ getGlobals mod
       foldr
         (\(ImportAs _ name qual) mb ->
            let

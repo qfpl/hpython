@@ -21,8 +21,16 @@ module Language.Python.Syntax.Statement
     Statement(..)
     -- ** Traversals
   , HasStatements(..)
-    -- * Decorators
+    -- ** Decorators
   , Decorator(..)
+    -- *** Lenses
+  , decoratorAnn
+  , decoratorIndents
+  , decoratorAt
+  , decoratorExpr
+  , decoratorComment
+  , decoratorNewline
+  , decoratorBlankLines
     -- ** Compound statements
   , CompoundStatement(..)
     -- ** Small statements
@@ -746,6 +754,7 @@ instance HasTrailingNewline CompoundStatement where
       With a b c d e f ->
         With a b c d e $ setTrailingNewline f n
 
+makeLenses ''Decorator
 makeLenses ''WithItem
 makeLenses ''ExceptAs
 makeLenses ''Block

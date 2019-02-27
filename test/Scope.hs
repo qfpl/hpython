@@ -390,3 +390,57 @@ prop_scope_20 =
     res <- fullyValidateModule code
     annotateShow res
     void res === Success ()
+
+prop_scope_21 :: Property
+prop_scope_21 =
+  withTests 1 . property $ do
+    let
+      code =
+        module_
+        [ line_ $
+          class_ "a" []
+          [ line_ $
+            decorated_ [var_ "classmethod"] $
+            def_ "b" [] [line_ pass_]
+          ]
+        , line_ $ call_ (var_ "print") [p_ $ var_ "a" /> "b"]
+        ]
+    res <- fullyValidateModule code
+    annotateShow res
+    void res === Success ()
+
+prop_scope_22 :: Property
+prop_scope_22 =
+  withTests 1 . property $ do
+    let
+      code =
+        module_
+        [ line_ $
+          class_ "a" []
+          [ line_ $
+            decorated_ [var_ "staticmethod"] $
+            def_ "b" [] [line_ pass_]
+          ]
+        , line_ $ call_ (var_ "print") [p_ $ var_ "a" /> "b"]
+        ]
+    res <- fullyValidateModule code
+    annotateShow res
+    void res === Success ()
+
+prop_scope_23 :: Property
+prop_scope_23 =
+  withTests 1 . property $ do
+    let
+      code =
+        module_
+        [ line_ $
+          class_ "a" []
+          [ line_ $
+            def_ "b" [] [line_ pass_]
+          ]
+        , line_ $ call_ (var_ "print") [p_ $ var_ "a" /> "b"]
+        ]
+    res <- fullyValidateModule code
+    annotateShow res
+    void res ===
+      Failure (MissingAttribute (var_ "a") "b" :| [])

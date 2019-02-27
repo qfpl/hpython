@@ -27,24 +27,31 @@ module Language.Python.Validate.Scope
   , validateModuleScope
   , validateStatementScope
   , validateExprScope_
+    -- ** Builtin and global variables
+  , builtins
+  , globals
     -- * Miscellany
     -- ** Calculating module exports
   , getGlobals
   , moduleEntryMap
   , moduleEntry
     -- ** Extra types
-  , Level(..), Entry(..), entryPath
-  , lookupEntry, setEntry, updateEntry
+  , Level(..), Entry(..), EntryType(..)
     -- ** Extra functions
   , runValidateScope'
+  , isStaticmethod
+  , isClassmethod
+    -- *** Entry operations
+  , entryPath
+  , lookupEntry, setEntry, updateEntry
+  , isClassEntry, isFunctionEntry
+    -- *** Scope operations
   , definitionScope
   , controlScope
   , inScope
   , lookupScope
   , localScope
   , extendScope
-  , builtins
-  , globals
     -- ** Validation functions
   , validateArgScope
   , validateAssignExprScope
@@ -70,7 +77,8 @@ import Data.Validation
 
 import Control.Applicative ((<|>))
 import Control.Lens.Cons (snoc)
-import Control.Lens.Fold ((^..), toListOf, folded, foldrOf, preview)
+import Control.Lens.Fold
+  ((^..), toListOf, folded, foldrOf, preview, filtered, anyOf)
 import Control.Lens.Getter ((^.), to, getting)
 import Control.Lens.Plated (cosmos)
 import Control.Lens.Prism (_Right, _Just)
@@ -606,6 +614,18 @@ parallel4 ::
 parallel4 a b c d =
   (\(a', (b', c', d')) -> (a', b', c', d')) <$> parallel2 a (parallel3 b c d)
 
+isStaticmethod :: Fundef v a -> Bool
+isStaticmethod =
+  anyOf
+    (fdDecorators.folded.decoratorExpr.getting (_Ident.identValue))
+    (== "staticmethod")
+
+isClassmethod :: Fundef v a -> Bool
+isClassmethod =
+  anyOf
+    (fdDecorators.folded.decoratorExpr.getting (_Ident.identValue))
+    (== "classmethod")
+
 validateCompoundStatementScope
   :: forall e v a
    . AsScopeError e a
@@ -683,23 +703,35 @@ validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
   definitionScope (validateSuiteScope g) <*
   extendScope ClassEntry [c] <*
   liftVM0
-    (ask >>= \path ->
-     modify $
-     \st ->
-     foldrOf
-       (getting (_Statements._SmallStatement)._2.
-        getting (_SimpleStatements._Assign).
-        to unfoldAssign._1.folded.
-        getting assignTargets)
-       (\a ->
-          updateEntry
-            [c ^. getting identValue . to fromString]
-            (over subEntries $
-             Map.insert
-               (a ^. getting identValue . to fromString)
-               (Entry (a ^. annot_) VarEntry (path |> Definition) mempty)))
-       st
-       g)
+    (ask >>= \path -> do
+     modify $ \st ->
+       foldrOf
+         (getting (_Statements._SmallStatement)._2.
+          getting (_SimpleStatements._Assign).
+          to unfoldAssign._1.folded.
+          getting assignTargets)
+         (\a ->
+            updateEntry
+              [c ^. getting identValue . to fromString]
+              (over subEntries $
+               Map.insert
+                 (a ^. getting identValue . to fromString)
+                 (Entry (a ^. annot_) VarEntry (path |> Definition) mempty)))
+         st
+         g
+     modify $ \st ->
+       foldrOf
+         (getting (_Statements._Fundef).
+          filtered ((||) <$> isStaticmethod <*> isClassmethod).fdName)
+         (\a ->
+            updateEntry
+              [c ^. getting identValue . to fromString]
+              (over subEntries $
+               Map.insert
+                 (a ^. getting identValue . to fromString)
+                 (Entry (a ^. annot_) VarEntry (path |> Definition) mempty)))
+         st
+         g)
 validateCompoundStatementScope (With a b asyncWs c d e) =
   let
     names =

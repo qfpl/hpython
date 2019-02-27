@@ -61,8 +61,8 @@ fullyValidateModule x =
           failure
         Success a' -> pure $ runValidateScope mempty (validateModuleScope a')
 
-prop_updateEntry_1 :: Property
-prop_updateEntry_1 =
+prop_setEntry_1 :: Property
+prop_setEntry_1 =
   property $ do
     keys <-
       fmap fromList . forAll $
@@ -74,10 +74,10 @@ prop_updateEntry_1 =
       EmptyR -> discard
       ks :> k ->
         foldr (\a b -> Map.singleton a $ GlobalEntry b) (Map.singleton k entry) ks ===
-        updateEntry keys entry mempty
+        setEntry keys entry mempty
 
-prop_updateEntry_2 :: Property
-prop_updateEntry_2 =
+prop_setEntry_2 :: Property
+prop_setEntry_2 =
   property $ do
     keys <-
       fmap fromList . forAll $
@@ -94,11 +94,11 @@ prop_updateEntry_2 =
           entry2 = GlobalEntry $ Map.singleton someKey (GlobalEntry mempty)
         annotateShow entry2
 
-        let map1 = updateEntry keys entry1 mempty
+        let map1 = setEntry keys entry1 mempty
         annotateShow map1
 
         foldr (\a b -> Map.singleton a $ GlobalEntry b) (Map.singleton k entry2) ks ===
-          updateEntry keys entry2 map1
+          setEntry keys entry2 map1
 
 prop_scope_1 :: Property
 prop_scope_1 =
@@ -360,3 +360,33 @@ prop_scope_18 =
       (MissingAttribute
          (Ident (Ann ()) $ MkIdent (Ann ()) "a" [])
          (MkIdent (Ann ()) "b" [Space]) :| [])
+
+prop_scope_19 :: Property
+prop_scope_19 =
+  withTests 1 . property $ do
+    let
+      code =
+        module_
+        [ line_ $ class_ "a" [] [line_ (var_ "b" .= 1)]
+        , line_ $ call_ (var_ "print") [p_ $ var_ "a" /> "b"]
+        ]
+    res <- fullyValidateModule code
+    annotateShow res
+    void res === Success ()
+
+prop_scope_20 :: Property
+prop_scope_20 =
+  withTests 1 . property $ do
+    let
+      code =
+        module_
+        [ line_ $
+          class_ "a" []
+          [line_ $ chainEq (var_ "b") [var_ "c", 0]
+          ]
+        , line_ $ call_ (var_ "print") [p_ $ var_ "a" /> "b"]
+        , line_ $ call_ (var_ "print") [p_ $ var_ "a" /> "c"]
+        ]
+    res <- fullyValidateModule code
+    annotateShow res
+    void res === Success ()

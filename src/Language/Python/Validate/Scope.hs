@@ -1,13 +1,14 @@
 {-# language DataKinds, TypeOperators #-}
 {-# language DeriveFunctor #-}
-{-# language OverloadedStrings #-}
-{-# language TupleSections #-}
 {-# language FlexibleContexts #-}
-{-# language RankNTypes #-}
 {-# language LambdaCase #-}
-{-# language OverloadedLists #-}
-{-# language ScopedTypeVariables, TypeApplications #-}
 {-# language MultiParamTypeClasses #-}
+{-# language OverloadedLists #-}
+{-# language OverloadedStrings #-}
+{-# language RankNTypes #-}
+{-# language ScopedTypeVariables, TypeApplications #-}
+{-# language TemplateHaskell #-}
+{-# language TupleSections #-}
 
 {-|
 Module      : Language.Python.Validate.Scope
@@ -32,7 +33,8 @@ module Language.Python.Validate.Scope
   , moduleEntryMap
   , moduleEntry
     -- ** Extra types
-  , Level(..), Entry(..), entryPath, updateEntry
+  , Level(..), Entry(..), entryPath
+  , lookupEntry, setEntry, updateEntry
     -- ** Extra functions
   , runValidateScope'
   , definitionScope
@@ -74,6 +76,7 @@ import Control.Lens.Plated (cosmos)
 import Control.Lens.Prism (_Right, _Just)
 import Control.Lens.Review ((#))
 import Control.Lens.Setter (mapped, over)
+import Control.Lens.TH (makeLensesFor)
 import Control.Lens.Tuple (_1, _2, _3)
 import Control.Lens.Traversal (traverseOf)
 import Control.Monad.State (State, evalState, modify, get, put)
@@ -140,6 +143,8 @@ data Entry a
   { _subEntries :: Map ByteString (Entry a)
   } deriving (Eq, Show, Functor)
 
+makeLensesFor [("_subEntries", "subEntries")] ''Entry
+
 isClassEntry :: Entry a -> Bool
 isClassEntry (Entry _ ClassEntry _ _) = True
 isClassEntry _ = False
@@ -154,7 +159,7 @@ lookupEntry ::
   Maybe (Entry a)
 lookupEntry path =
   case Seq.viewl path of
-    EmptyL -> error "updateEntry: empty path"
+    EmptyL -> error "lookupEntry: empty path"
     p :< ps -> go p ps
   where
     go ::
@@ -169,12 +174,33 @@ lookupEntry path =
 
 updateEntry ::
   Seq ByteString ->
-  Entry a ->
+  (Entry a -> Entry a) ->
   Map ByteString (Entry a) ->
   Map ByteString (Entry a)
 updateEntry path =
   case Seq.viewl path of
-    EmptyL -> error "updateEntry: empty path"
+    EmptyL -> error "setEntry: empty path"
+    p :< ps -> go p ps
+  where
+    go ::
+      ByteString ->
+      Seq ByteString ->
+      (Entry a -> Entry a) ->
+      Map ByteString (Entry a) ->
+      Map ByteString (Entry a)
+    go p ps f =
+      case Seq.viewl ps of
+        EmptyL -> Map.update (Just . f) p
+        p' :< ps' -> Map.update (Just . over subEntries (go p' ps' f)) p
+
+setEntry ::
+  Seq ByteString ->
+  Entry a ->
+  Map ByteString (Entry a) ->
+  Map ByteString (Entry a)
+setEntry path =
+  case Seq.viewl path of
+    EmptyL -> error "setEntry: empty path"
     p :< ps -> go p ps
   where
     go ::
@@ -655,7 +681,25 @@ validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
   traverse validateDecoratorScope decos <*>
   traverseOf (traverse._2.traverse.traverse) validateArgScope d <*>
   definitionScope (validateSuiteScope g) <*
-  extendScope ClassEntry [c]
+  extendScope ClassEntry [c] <*
+  liftVM0
+    (ask >>= \path ->
+     modify $
+     \st ->
+     foldrOf
+       (getting (_Statements._SmallStatement)._2.
+        getting (_SimpleStatements._Assign).
+        to unfoldAssign._1.folded.
+        getting assignTargets)
+       (\a ->
+          updateEntry
+            [c ^. getting identValue . to fromString]
+            (over subEntries $
+             Map.insert
+               (a ^. getting identValue . to fromString)
+               (Entry (a ^. annot_) VarEntry (path |> Definition) mempty)))
+       st
+       g)
 validateCompoundStatementScope (With a b asyncWs c d e) =
   let
     names =
@@ -857,7 +901,7 @@ validateAssignExprScope (Deref a e ws1 r) =
               (lookupEntry attrsPath scope)
           then
             liftVM0 . modify $
-            updateEntry
+            setEntry
               (attrsPath |> ix)
               (Entry (r ^. annot_) VarEntry path mempty)
           else errorVM1 (_MissingAttribute # (e ^. unvalidated, r ^. unvalidated))

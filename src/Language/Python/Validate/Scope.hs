@@ -20,19 +20,23 @@ Portability : non-portable
 
 Note: we try our very best to check that the program is scope safe, but without
 a type checker we have to make some concessions. The main one is that
-function parameters have no attribute information associated with them, and thus
-every dereference of a function parameter is consiered valid.
+variables (function parameters/targets of assignment) have no attribute
+information associated with them, and thus every dereference of a variable
+is considered valid.
 
 For example, this code will pass scope checking:
 
 @
 def f(x):
   print(x.a)
+
+b = 1
+print(b.a)
 @
 
 Unfortunately, it's not practical to reject these sorts of usage.
 
-This means that *there are some programs that pass the scope checker, but throw
+This means that *there are programs that pass the scope checker, but throw
 AttributeErrors at runtime*.
 
 -}
@@ -987,9 +991,12 @@ validateAssignExprScope (Deref a e ws1 r) =
               (Entry (r ^. annot_) VarEntry path mempty)
           else
             case ety of
-              -- when it comes to parameters, all bets are off without a type system.
+              -- when it comes to variables/parameters, all bets are off
+              -- without a type system.
+              --
               -- just let it through :(
               Just ParamEntry -> pure ()
+              Just VarEntry -> pure ()
               _ -> errorVM1 (_MissingAttribute # (e ^. unvalidated, r ^. unvalidated))
 validateAssignExprScope (Parens a ws1 e ws2) =
   Parens a ws1 <$>
@@ -1157,7 +1164,8 @@ validateExprScope (Deref a e ws1 (MkIdent ann i ws)) =
         case Map.lookup ix scope of
           Nothing ->
             case ety of
-              Just ParamEntry -> pure $ Just (Just ParamEntry, path |> ix, mempty)
+              Just ParamEntry -> pure $ Just (ety, path |> ix, mempty)
+              Just VarEntry -> pure $ Just (ety, path |> ix, mempty)
               _ ->
                 errorVM1 $ _MissingAttribute # (e ^. unvalidated, MkIdent ann i ws)
           Just entry ->

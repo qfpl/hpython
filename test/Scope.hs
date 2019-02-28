@@ -355,11 +355,7 @@ prop_scope_18 =
         ]
     res <- fullyValidateModule code
     annotateShow res
-    void res ===
-      Failure
-      (MissingAttribute
-         (Ident (Ann ()) $ MkIdent (Ann ()) "a" [])
-         (MkIdent (Ann ()) "b" [Space]) :| [])
+    void res === Success ()
 
 prop_scope_19 :: Property
 prop_scope_19 =
@@ -442,8 +438,7 @@ prop_scope_23 =
         ]
     res <- fullyValidateModule code
     annotateShow res
-    void res ===
-      Failure (MissingAttribute (var_ "a") "b" :| [])
+    void res === Failure (MissingAttribute (var_ "a") "b" :| [])
 
 prop_scope_24 :: Property
 prop_scope_24 =

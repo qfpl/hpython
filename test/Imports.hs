@@ -439,3 +439,22 @@ prop_imports_19 =
         ]
       )
     ]
+
+prop_imports_20 :: Property
+prop_imports_20 =
+  importingSucceeds
+    ("test2" :| [])
+    [ ( ".", "test1.py"
+      , showModule $
+        module_
+        [ line_ $ class_ "a" [] [line_ pass_]
+        ]
+      )
+    , ( ".", "test2.py"
+      , showModule $
+        module_
+        [ line_ $ import_ ("test1" :| [])
+        , line_ $ call_ "print" [p_ $ var_ "test1" /> "a" /> "__new__"]
+        ]
+      )
+    ]

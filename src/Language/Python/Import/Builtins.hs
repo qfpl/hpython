@@ -1,3 +1,4 @@
+{-# language OverloadedLists #-}
 {-# language OverloadedStrings #-}
 {-# language TupleSections #-}
 module Language.Python.Import.Builtins where
@@ -12,7 +13,7 @@ import Language.Python.Parse (SrcInfo)
 import Language.Python.Syntax.ModuleNames
   (ModuleName, makeModuleName, sameModuleName)
 import Language.Python.Syntax.Raw (Raw)
-import Language.Python.Validate.Scope (Entry(..))
+import Language.Python.Validate.Scope (Entry(..),  EntryType(..), Level(..))
 
 lookupModuleName :: ModuleName v a -> [(ModuleName v' a', x)] -> Maybe x
 lookupModuleName _ [] = Nothing
@@ -34,10 +35,12 @@ timeModuleName = makeModuleName "time" []
 
 timeModule :: Map ByteString (Entry SrcInfo)
 timeModule =
-  Map.fromList $ (, GlobalEntry mempty) <$> names
+  Map.fromList $
+  fmap (, Entry Nothing (Just FunctionEntry) [Toplevel] mempty) functions <>
+  fmap (, Entry Nothing (Just ClassEntry) [Toplevel] mempty) classes
   where
-    names :: [ByteString]
-    names =
+    functions :: [ByteString]
+    functions =
       [ "altzone"
       , "asctime"
       , "clock"
@@ -53,7 +56,6 @@ timeModule =
       , "sleep"
       , "strftime"
       , "strptime"
-      , "struct_time"
       , "time"
       , "timezone"
       , "tzname"
@@ -83,15 +85,20 @@ timeModule =
         (\x -> ["CLOCK_MONOTONIC_RAW" | isLinux x])
         os
 
+    classes :: [ByteString]
+    classes = [ "struct_time" ]
+
 mathModuleName :: Raw ModuleName
 mathModuleName = makeModuleName "math" []
 
 mathModule :: Map ByteString (Entry SrcInfo)
 mathModule =
-  Map.fromList $ (, GlobalEntry mempty) <$> names
+  Map.fromList $
+  fmap (, Entry Nothing (Just FunctionEntry) [Toplevel] mempty) functions <>
+  fmap (, Entry Nothing (Just VarEntry) [Toplevel] mempty) vars
   where
-    names :: [ByteString]
-    names =
+    functions :: [ByteString]
+    functions =
       [ "ceil"
       , "copysign"
       , "fabs"
@@ -136,7 +143,11 @@ mathModule =
       , "erfc"
       , "gamma"
       , "lgamma"
-      , "pi"
+      ]
+
+    vars :: [ByteString]
+    vars =
+      [ "pi"
       , "e"
       , "inf"
       , "nan"

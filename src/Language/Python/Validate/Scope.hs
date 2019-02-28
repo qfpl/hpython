@@ -66,7 +66,6 @@ module Language.Python.Validate.Scope
   , isStaticmethod
   , isClassmethod
     -- *** Entry operations
-  , entryPath
   , lookupEntry, setEntry, updateEntry
   , isClassEntry, isFunctionEntry, isParamEntry
     -- *** Scope operations
@@ -120,7 +119,7 @@ import Data.Coerce (coerce)
 import Data.Foldable (toList, traverse_, fold)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Map.Strict (Map)
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromMaybe)
 import Data.Sequence ((|>), Seq, ViewL(..))
 import Data.String (fromString)
 import Data.Type.Set (Nub)
@@ -167,27 +166,24 @@ data EntryType
 
 data Entry a
   = Entry
-  { _entryValue :: a
-  , _entryType :: EntryType
+  { _entryValue :: Maybe a
+  , _entryType :: Maybe EntryType
   , _entryPath :: !(Seq Level)
   , _subEntries :: Map ByteString (Entry a)
-  }
-  | GlobalEntry
-  { _subEntries :: Map ByteString (Entry a)
   } deriving (Eq, Show, Functor)
 
 makeLensesFor [("_subEntries", "subEntries")] ''Entry
 
 isClassEntry :: Entry a -> Bool
-isClassEntry (Entry _ ClassEntry _ _) = True
+isClassEntry (Entry _ (Just ClassEntry) _ _) = True
 isClassEntry _ = False
 
 isFunctionEntry :: Entry a -> Bool
-isFunctionEntry (Entry _ FunctionEntry _ _) = True
+isFunctionEntry (Entry _ (Just FunctionEntry) _ _) = True
 isFunctionEntry _ = False
 
 isParamEntry :: Entry a -> Bool
-isParamEntry (Entry _ ParamEntry _ _) = True
+isParamEntry (Entry _ (Just ParamEntry) _ _) = True
 isParamEntry _ = False
 
 lookupEntry ::
@@ -216,7 +212,7 @@ updateEntry ::
   Map ByteString (Entry a)
 updateEntry path =
   case Seq.viewl path of
-    EmptyL -> error "setEntry: empty path"
+    EmptyL -> error "updateEntry: empty path"
     p :< ps -> go p ps
   where
     go ::
@@ -231,11 +227,12 @@ updateEntry path =
         p' :< ps' -> Map.update (Just . over subEntries (go p' ps' f)) p
 
 setEntry ::
+  Seq Level ->
   Seq ByteString ->
   Entry a ->
   Map ByteString (Entry a) ->
   Map ByteString (Entry a)
-setEntry path =
+setEntry lvl path =
   case Seq.viewl path of
     EmptyL -> error "setEntry: empty path"
     p :< ps -> go p ps
@@ -254,15 +251,82 @@ setEntry path =
             (\mentry ->
                Just $
                case mentry of
-                 Nothing -> GlobalEntry $ go p' ps' e mempty
+                 Nothing -> Entry Nothing Nothing lvl (go p' ps' e mempty)
                  Just entry ->
                    entry { _subEntries = go p' ps' e $ _subEntries entry })
             p
 
--- | The 'entryPath' for a 'GlobalEntry' is @['Toplevel']@
-entryPath :: Entry a -> Seq Level
-entryPath GlobalEntry{} = [Toplevel]
-entryPath (Entry _ _ a _) = a
+addClassDefaults ::
+  Ident v a -> -- ^ Class name
+  Seq Level -> -- ^ Scope path
+  Map ByteString (Entry a) ->
+  Map ByteString (Entry a)
+addClassDefaults c path =
+  updateEntry
+    [c ^. getting identValue . to fromString]
+    (over subEntries $ \old ->
+      Map.fromList
+        [ ( "__new__"
+          , Entry Nothing (Just FunctionEntry) (path |> Definition) mempty
+          )
+        ] <>
+      old)
+
+addClassVars ::
+  HasStatements s =>
+  Ident v a -> -- ^ Class name
+  Seq Level -> -- ^ Scope path
+  s v a -> -- ^ Code containing the definitions
+  Map ByteString (Entry a) ->
+  Map ByteString (Entry a)
+addClassVars c path code st =
+    foldrOf
+      (getting (_Statements._SmallStatement)._2.
+      getting (_SimpleStatements._Assign).
+      to unfoldAssign._1.folded.
+      getting assignTargets)
+      (\a ->
+        updateEntry
+          [c ^. getting identValue . to fromString]
+          (over subEntries $
+            Map.insert
+              (a ^. getting identValue . to fromString)
+              (Entry (Just $ a ^. annot_) (Just VarEntry) (path |> Definition) mempty)))
+      st
+      code
+
+isStaticmethod :: Fundef v a -> Bool
+isStaticmethod =
+  anyOf
+    (fdDecorators.folded.decoratorExpr.getting (_Ident.identValue))
+    (== "staticmethod")
+
+isClassmethod :: Fundef v a -> Bool
+isClassmethod =
+  anyOf
+    (fdDecorators.folded.decoratorExpr.getting (_Ident.identValue))
+    (== "classmethod")
+
+addClassDefs ::
+  HasStatements s =>
+  Ident v a -> -- ^ Class name
+  Seq Level -> -- ^ Scope path
+  s v a -> -- ^ Code containing the definitions
+  Map ByteString (Entry a) ->
+  Map ByteString (Entry a)
+addClassDefs c path code st =
+    foldrOf
+      (getting (_Statements._Fundef).
+      filtered ((||) <$> isStaticmethod <*> isClassmethod).fdName)
+      (\a ->
+        updateEntry
+          [c ^. getting identValue . to fromString]
+          (over subEntries $
+            Map.insert
+              (a ^. getting identValue . to fromString)
+              (Entry (Just $ a ^. annot_) (Just VarEntry) (path |> Definition) mempty)))
+      st
+      code
 
 -- |
 -- Extract the identifiers that are definitely in a module's global scope
@@ -285,9 +349,16 @@ getGlobals = go
               fold $
 
               (\x ->
+                 addClassDefaults (x ^. cdName) [Toplevel] $
+                 addClassDefs (x ^. cdName) [Toplevel, Definition] (x ^. cdBody) $
+                 addClassVars (x ^. cdName) [Toplevel, Definition] (x ^. cdBody) $
                  Map.insert
                    (x ^. cdName.getting identValue.to fromString)
-                   (Entry (x ^. annot_) ClassEntry [Toplevel] (go $ x ^. cdBody))
+                   (Entry
+                      (Just $ x ^. annot_)
+                      (Just ClassEntry)
+                      [Toplevel]
+                      mempty)
                    b) <$>
               preview (getting _ClassDef) s
 
@@ -296,7 +367,11 @@ getGlobals = go
               (\x ->
                  Map.insert
                    (x ^. fdName.getting identValue.to fromString)
-                   (Entry (x ^. annot_) FunctionEntry [Toplevel] mempty)
+                   (Entry
+                      (Just $ x ^. annot_)
+                      (Just FunctionEntry)
+                      [Toplevel]
+                      mempty)
                    b) <$>
               preview (getting _Fundef) s
 
@@ -306,7 +381,11 @@ getGlobals = go
                 (\a' ->
                    Map.insert
                      (a' ^. getting identValue.to fromString)
-                     (Entry (a' ^. annot_) VarEntry [Toplevel] mempty))
+                     (Entry
+                        (Just $ a' ^. annot_)
+                        (Just VarEntry)
+                        [Toplevel]
+                        mempty))
                 b
                 s)
         mempty
@@ -326,18 +405,18 @@ moduleEntryMap ::
   (ByteString, Entry a)
 moduleEntryMap _ (Just i) vals =
   ( i ^. getting identValue.to fromString
-  , GlobalEntry vals
+  , Entry Nothing Nothing [Toplevel] vals
   )
 moduleEntryMap (ModuleNameOne _ i) Nothing vals =
   ( i ^. getting identValue.to fromString
-  , GlobalEntry vals
+  , Entry Nothing Nothing [Toplevel] vals
   )
 moduleEntryMap (ModuleNameMany _ i _ rest) Nothing vals =
   let
     (n, e) = moduleEntryMap rest Nothing vals
   in
     ( i ^. getting identValue.to fromString
-    , GlobalEntry $ Map.singleton n e
+    , Entry Nothing Nothing [Toplevel] $ Map.singleton n e
     )
 
 -- |
@@ -356,10 +435,13 @@ moduleEntry ::
 moduleEntry a b = moduleEntryMap a b . getGlobals
 
 builtins :: Map ByteString (Entry a)
-builtins = Map.fromList $ (, GlobalEntry mempty) <$> names
+builtins =
+  Map.fromList $
+  fmap (, Entry Nothing (Just FunctionEntry) [Toplevel] mempty) functions <>
+  fmap (, Entry Nothing (Just ClassEntry) [Toplevel] mempty) classes
   where
-    names :: [ByteString]
-    names =
+    functions :: [ByteString]
+    functions =
       [ "abs"
       , "dict"
       , "help"
@@ -428,8 +510,12 @@ builtins = Map.fromList $ (, GlobalEntry mempty) <$> names
       , "hash"
       , "memoryview"
       , "set"
+      ]
+
+    classes :: [ByteString]
+    classes =
       -- Builtin exceptions
-      , "ArithmeticError"
+      [ "ArithmeticError"
       , "AssertionError"
       , "AttributeError"
       , "BaseException"
@@ -504,9 +590,9 @@ builtins = Map.fromList $ (, GlobalEntry mempty) <$> names
 globals :: Map ByteString (Entry a)
 globals =
   Map.fromList $
-  [ ("__builtins__", GlobalEntry builtins) ] <>
+  [ ("__builtins__", Entry Nothing (Just VarEntry) [Toplevel] builtins) ] <>
 
-  fmap (, GlobalEntry mempty)
+  fmap (, Entry Nothing (Just VarEntry) [Toplevel] mempty)
   [ "__name__"
   , "__spec__"
   , "__doc__"
@@ -570,7 +656,7 @@ extendScope ety entries =
       (\ident ->
          Map.insert
            (fromString $ _identValue ident)
-           (Entry (ident ^. annot_) ety path mempty))
+           (Entry (Just $ ident ^. annot_) (Just ety) path mempty))
       scope
       entries
 
@@ -621,7 +707,7 @@ parallel2 a b =
     (put $
      Map.unionWith
        (\e1 e2 ->
-          if Seq.length (entryPath e1) < Seq.length (entryPath e2)
+          if Seq.length (_entryPath e1) < Seq.length (_entryPath e2)
           then e2
           else e1)
        ast
@@ -655,18 +741,6 @@ parallel4 ::
   ValidateScope a e (x1, x2, x3, x4)
 parallel4 a b c d =
   (\(a', (b', c', d')) -> (a', b', c', d')) <$> parallel2 a (parallel3 b c d)
-
-isStaticmethod :: Fundef v a -> Bool
-isStaticmethod =
-  anyOf
-    (fdDecorators.folded.decoratorExpr.getting (_Ident.identValue))
-    (== "staticmethod")
-
-isClassmethod :: Fundef v a -> Bool
-isClassmethod =
-  anyOf
-    (fdDecorators.folded.decoratorExpr.getting (_Ident.identValue))
-    (== "classmethod")
 
 validateCompoundStatementScope
   :: forall e v a
@@ -753,37 +827,10 @@ validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
   extendScope ClassEntry [c] <*
   liftVM0
     (view envPath >>= \path ->
-     modify (addClassVars path) *> modify (addClassDefs path)) <*>
+     modify (addClassDefaults c path) *>
+     modify (addClassVars c path g) *>
+     modify (addClassDefs c path g)) <*>
   definitionScope (liftVM1 (local $ envInClass .~ True) $ validateSuiteScope g)
-  where
-    addClassVars path st =
-       foldrOf
-         (getting (_Statements._SmallStatement)._2.
-          getting (_SimpleStatements._Assign).
-          to unfoldAssign._1.folded.
-          getting assignTargets)
-         (\a ->
-            updateEntry
-              [c ^. getting identValue . to fromString]
-              (over subEntries $
-               Map.insert
-                 (a ^. getting identValue . to fromString)
-                 (Entry (a ^. annot_) VarEntry (path |> Definition) mempty)))
-         st
-         g
-    addClassDefs path st =
-       foldrOf
-         (getting (_Statements._Fundef).
-          filtered ((||) <$> isStaticmethod <*> isClassmethod).fdName)
-         (\a ->
-            updateEntry
-              [c ^. getting identValue . to fromString]
-              (over subEntries $
-               Map.insert
-                 (a ^. getting identValue . to fromString)
-                 (Entry (a ^. annot_) VarEntry (path |> Definition) mempty)))
-         st
-         g
 validateCompoundStatementScope (With a b asyncWs c d e) =
   liftVM1 (local $ envInClass .~ False) $
   let
@@ -876,9 +923,9 @@ validateIdentScope i =
       Just (Entry ann _ path _) ->
         coerce i <$
         if Seq.length curPath < Seq.length path
-        then errorVM1 (_FoundDynamic # (ann, i ^. unvalidated))
+        then
+          errorVM1 (_FoundDynamic # (fromMaybe (i ^. annot_) ann, i ^. unvalidated))
         else pure ()
-      Just (GlobalEntry _) -> pure $ coerce i
 
 validateArgScope
   :: AsScopeError e a
@@ -987,8 +1034,9 @@ validateAssignExprScope (Deref a e ws1 r) =
           then
             liftVM0 . modify $
             setEntry
+              path
               (attrsPath |> ix)
-              (Entry (r ^. annot_) VarEntry path mempty)
+              (Entry (Just $ r ^. annot_) (Just VarEntry) path mempty)
           else
             case ety of
               -- when it comes to variables/parameters, all bets are off
@@ -1020,7 +1068,6 @@ validateAssignExprScope (Ident a (MkIdent b c d)) =
       if Seq.length curPath < Seq.length path
       then extendScope VarEntry [MkIdent b c d]
       else pure ()
-    Just GlobalEntry{} -> pure ()
 validateAssignExprScope e@Unit{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Lambda{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Yield{} = pure $ unsafeCoerce e
@@ -1171,9 +1218,7 @@ validateExprScope (Deref a e ws1 (MkIdent ann i ws)) =
           Just entry ->
             pure $
             Just
-            ( case entry of
-                GlobalEntry{} -> Nothing
-                Entry _ ety' _ _ -> Just ety'
+            ( _entryType entry
             , path |> ix
             , _subEntries entry
             )
@@ -1202,7 +1247,7 @@ validateExprScope (Ident a i) =
   fmap
     (fmap
        (\entry ->
-          ( case entry of; GlobalEntry{} -> Nothing; Entry _ ety _ _ -> Just ety
+          ( _entryType entry
           , [i ^. getting identValue . to fromString]
           , _subEntries entry
           )))

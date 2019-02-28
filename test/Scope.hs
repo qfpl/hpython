@@ -10,7 +10,7 @@ import Control.Monad (void)
 import Data.Function ((&))
 import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty ((:|)))
-import Data.Sequence (ViewR(..))
+import Data.Sequence (Seq, ViewR(..))
 import Data.Validation (Validation(..), _Success)
 import GHC.Exts (fromList)
 
@@ -61,20 +61,27 @@ fullyValidateModule x =
           failure
         Success a' -> pure $ runValidateScope mempty (validateModuleScope a')
 
+genLevel :: Gen Level
+genLevel = Gen.element [Toplevel, Definition, Control]
+
+genPath :: Gen (Seq Level)
+genPath = fromList <$> Gen.list (Range.constant 0 10) genLevel
+
 prop_setEntry_1 :: Property
 prop_setEntry_1 =
   property $ do
     keys <-
       fmap fromList . forAll $
       Gen.list (Range.constant 1 10) (Gen.bytes (Range.constant 0 10))
+    path <- forAll genPath
     let
       entry :: Entry ()
-      entry = GlobalEntry mempty
+      entry = Entry Nothing Nothing path mempty
     case Seq.viewr keys of
       EmptyR -> discard
       ks :> k ->
-        foldr (\a b -> Map.singleton a $ GlobalEntry b) (Map.singleton k entry) ks ===
-        setEntry keys entry mempty
+        foldr (\a b -> Map.singleton a $ Entry Nothing Nothing path b) (Map.singleton k entry) ks ===
+        setEntry path keys entry mempty
 
 prop_setEntry_2 :: Property
 prop_setEntry_2 =
@@ -82,23 +89,26 @@ prop_setEntry_2 =
     keys <-
       fmap fromList . forAll $
       Gen.list (Range.constant 1 10) (Gen.bytes (Range.constant 0 10))
+    path <- forAll genPath
     case Seq.viewr keys of
       EmptyR -> discard
       ks :> k -> do
         someKey <- forAll $ Gen.bytes (Range.constant 0 10)
         let
           entry1 :: Entry ()
-          entry1 = GlobalEntry mempty
+          entry1 = Entry Nothing Nothing path mempty
 
           entry2 :: Entry ()
-          entry2 = GlobalEntry $ Map.singleton someKey (GlobalEntry mempty)
+          entry2 =
+            Entry Nothing Nothing path $
+            Map.singleton someKey (Entry Nothing Nothing path mempty)
         annotateShow entry2
 
-        let map1 = setEntry keys entry1 mempty
+        let map1 = setEntry path keys entry1 mempty
         annotateShow map1
 
-        foldr (\a b -> Map.singleton a $ GlobalEntry b) (Map.singleton k entry2) ks ===
-          setEntry keys entry2 map1
+        foldr (\a b -> Map.singleton a $ Entry Nothing Nothing path b) (Map.singleton k entry2) ks ===
+          setEntry path keys entry2 map1
 
 prop_scope_1 :: Property
 prop_scope_1 =
@@ -508,3 +518,16 @@ prop_scope_27 =
     res <- fullyValidateModule code
     annotateShow res
     void res === Failure (NotInScope "b" :| [])
+
+prop_scope_28 :: Property
+prop_scope_28 =
+  withTests 1 . property $ do
+    let
+      code =
+        module_
+        [ line_ $ class_ "a" [] [ line_ pass_ ]
+        , line_ $ call_ "print" [ p_ $ var_ "a" /> "__new__"]
+        ]
+    res <- fullyValidateModule code
+    annotateShow res
+    void res === Success ()

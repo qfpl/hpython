@@ -324,7 +324,7 @@ addClassDefs c path code st =
           (over subEntries $
             Map.insert
               (a ^. getting identValue . to fromString)
-              (Entry (Just $ a ^. annot_) (Just VarEntry) (path |> Definition) mempty)))
+              (Entry (Just $ a ^. annot_) (Just FunctionEntry) (path |> Definition) mempty)))
       st
       code
 

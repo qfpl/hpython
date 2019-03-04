@@ -531,3 +531,63 @@ prop_scope_28 =
     res <- fullyValidateModule code
     annotateShow res
     void res === Success ()
+
+prop_scope_29 :: Property
+prop_scope_29 =
+  withTests 1 . property $ do
+    let
+      code =
+        module_
+        [ line_ (var_ "a" .= 1)
+        , line_ $ del_ [var_ "a"]
+        , line_ $ var_ "a"
+        ]
+    res <- fullyValidateModule code
+    annotateShow res
+    void res === Failure (NotInScope "a" :| [])
+
+prop_scope_30 :: Property
+prop_scope_30 =
+  withTests 1 . property $ do
+    let
+      code =
+        module_
+        [ line_ (var_ "a" .= 1)
+        , line_ $
+          def_ "f" []
+          [ line_ $ del_ [var_ "a"]
+          ]
+        ]
+    res <- fullyValidateModule code
+    annotateShow res
+    void res === Failure (DeletedIdent () :| [])
+
+prop_scope_31 :: Property
+prop_scope_31 =
+  withTests 1 . property $ do
+    let
+      code =
+        module_
+        [ line_ (var_ "a" .= 1)
+        , line_ $
+          def_ "f" []
+          [ line_ $ del_ [var_ "b"]
+          ]
+        ]
+    res <- fullyValidateModule code
+    annotateShow res
+    void res === Failure (NotInScope "b" :| [DeletedIdent ()])
+
+prop_scope_32 :: Property
+prop_scope_32 =
+  withTests 1 . property $ do
+    let
+      code =
+        module_
+        [ line_ (var_ "a" .= 1)
+        , line_ $ del_ [var_ "b"]
+        , line_ $ var_ "a"
+        ]
+    res <- fullyValidateModule code
+    annotateShow res
+    void res === Failure (NotInScope "b" :| [])

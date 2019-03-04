@@ -65,8 +65,10 @@ module Language.Python.Optics
   , HasImport(..)
     -- ** @from ... import@
   , HasFromImport(..)
-    -- ** @assign@
+    -- ** Assignments
   , HasAssign(..)
+    -- ** @del@
+  , HasDel(..)
     -- * Expressions
   , HasExprs(..)
     -- ** Identifiers
@@ -548,3 +550,17 @@ assignTargets f e =
     Set{} -> pure $ e ^. unvalidated
     Generator{} -> pure $ e ^. unvalidated
     Await{} -> pure $ e ^. unvalidated
+
+class HasDel s where
+  _Del :: Prism (s v a) (s '[] a) (Del v a) (Del '[] a)
+
+instance HasDel Del where
+  _Del = id
+
+instance HasDel SimpleStatement where
+  _Del =
+    prism
+      (\(MkDel a b c) -> Del a b c)
+      (\case
+          Del a b c -> Right (MkDel a b c)
+          a -> Left $ a ^. unvalidated)

@@ -174,6 +174,12 @@ module Language.Python.Syntax.Types
   , assignAnn
   , assignTarget
   , assignRest
+    -- ** @del@
+  , Del(..)
+    -- *** Lenses
+  , delAnn
+  , delWhitespace
+  , delTargets
     -- * Expressions
     -- ** @None@
   , None(..)
@@ -575,3 +581,15 @@ unfoldAssign (MkAssign _ a bs) = go a bs
   where
     go a ((_, x) :| []) = (pure a, x)
     go a ((_, x) :| y:ys) = first (a `NonEmpty.cons`) $ go x (y :| ys)
+
+data Del v a
+  = MkDel
+  { _delAnn :: Ann a
+  , _delWhitespace :: [Whitespace]
+  , _delTargets :: CommaSep1' (Expr v a)
+  } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+makeLenses ''Del
+
+instance HasAnn (Del v) where
+  annot :: forall a. Lens' (Del v a) (Ann a)
+  annot = typed @(Ann a)

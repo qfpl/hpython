@@ -116,7 +116,7 @@ import Control.Monad.Reader (ReaderT, runReaderT, local)
 import Data.Bitraversable (bitraverse)
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
-import Data.Foldable (toList, traverse_, fold)
+import Data.Foldable (toList, fold)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Map.Strict (Map)
 import Data.Maybe (isJust, fromMaybe)
@@ -882,11 +882,25 @@ validateSimpleStatementScope (AugAssign a l aa r) =
 validateSimpleStatementScope (Global a _ _) = errorVM1 (_FoundGlobal # getAnn a)
 validateSimpleStatementScope (Nonlocal a _ _) = errorVM1 (_FoundNonlocal # getAnn a)
 validateSimpleStatementScope (Del a ws cs) =
-  Del a ws <$
-  traverse_
-    (\case; Ident a _ -> errorVM1 (_DeletedIdent # getAnn a); _ -> pure ())
-    cs <*>
-  traverse validateExprScope_ cs
+  liftVM0 (view envPath) `bindVM` \path ->
+  Del a ws <$>
+  if toplevelPath path
+  then
+    traverse
+      (\case
+          e@(Ident _ val) ->
+            validateExprScope_ e <*
+            liftVM0 (modify $ Map.delete (val ^. getting identValue . to fromString))
+          e -> validateExprScope_ e)
+      cs
+  else
+    traverse
+      (\case
+          e@(Ident ann _) ->
+            validateExprScope_ e <*
+            errorVM1 (_DeletedIdent # getAnn ann)
+          e -> validateExprScope_ e)
+      cs
 validateSimpleStatementScope s@Pass{} = pure $ unsafeCoerce s
 validateSimpleStatementScope s@Break{} = pure $ unsafeCoerce s
 validateSimpleStatementScope s@Continue{} = pure $ unsafeCoerce s

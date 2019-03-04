@@ -28,6 +28,11 @@
   added to the scope sequentially. Now, the multiple blocks are checked in the
   same scope, and their final scopes are combined at the end of the process.
 
+* Scope-checking now accepts `del` at the top level of modules
+
+  `del` is safe to use when not under any conditionals. The scope checker will
+  now remove identifiers from scope if they are deleted at the top level.
+
 ## 0.2
 
 *2019-01-10*

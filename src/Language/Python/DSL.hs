@@ -18,6 +18,7 @@ passing @['line_' 'pass_']@
 {-# language RankNTypes #-}
 {-# language RecordWildCards #-}
 {-# language TemplateHaskell #-}
+{-# language TupleSections #-}
 {-# language TypeApplications #-}
 {-# language TypeFamilies #-}
 {-# language UndecidableInstances #-}
@@ -155,6 +156,13 @@ module Language.Python.DSL
   , (.>>=)
   , (.**=)
   , (.//=)
+    -- ** @del@
+  , del_
+  , Del(..)
+    -- *** Lenses
+  , delAnn
+  , delWhitespace
+  , delTargets
     -- ** Exceptions
   , tryE_
   , tryF_
@@ -2506,3 +2514,19 @@ subs_ a e =
           -> Maybe (Raw Subscript)
         fromTupleItem (TupleItem _ a) = mkSlice a <|> pure (SubscriptExpr a)
         fromTupleItem _ = Nothing
+
+del_ :: [Raw Expr] -> Raw Statement
+del_ es =
+  case es of
+    [] -> pass_
+    ee : ees ->
+      SmallStatement (Indents [] (Ann ())) $
+      MkSmallStatement st [] Nothing Nothing (Just LF)
+      where
+        st =
+          _Del #
+          MkDel
+          { _delAnn = Ann ()
+          , _delWhitespace = [Space]
+          , _delTargets = (ee, fmap (MkComma [Space],) ees, Nothing) ^. _CommaSep1'
+          }

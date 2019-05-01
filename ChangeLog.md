@@ -1,6 +1,6 @@
 # Revision history for hpython
 
-## Next version
+## 0.3
 
 * Changed the sigature of `Data.Validation.Monadic.bindVM` to have the same form as
   `(>>=)`

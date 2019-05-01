@@ -29,9 +29,12 @@ import Control.Lens.Traversal (Traversal')
 import Data.Coerce (coerce)
 import Data.Function ((&))
 import Data.Functor (($>))
+import Data.Functor.Apply ((<.>))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe)
 import Data.Semigroup (Semigroup(..))
+import Data.Semigroup.Foldable (Foldable1(..))
+import Data.Semigroup.Traversable (Traversable1(..), foldMap1Default)
 import GHC.Generics (Generic)
 
 import Language.Python.Syntax.Punctuation
@@ -94,6 +97,13 @@ data CommaSep1 a
   | CommaSepMany1 a Comma (CommaSep1 a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance Foldable1 CommaSep1 where; foldMap1 = foldMap1Default
+instance Traversable1 CommaSep1 where
+  traverse1 f = go
+    where
+      go (CommaSepOne1 a) = CommaSepOne1 <$> f a
+      go (CommaSepMany1 a b c) = (\a' c' -> CommaSepMany1 a' b c') <$> f a <.> go c
+
 -- | Get the first element of a 'CommaSep1'
 commaSep1Head :: CommaSep1 a -> a
 commaSep1Head (CommaSepOne1 a) = a
@@ -141,6 +151,13 @@ data CommaSep1' a
   = CommaSepOne1' a (Maybe Comma)
   | CommaSepMany1' a Comma (CommaSep1' a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance Foldable1 CommaSep1' where; foldMap1 = foldMap1Default
+instance Traversable1 CommaSep1' where
+  traverse1 f = go
+    where
+      go (CommaSepOne1' a b) = (\a' -> CommaSepOne1' a' b) <$> f a
+      go (CommaSepMany1' a b c) = (\a' c' -> CommaSepMany1' a' b c') <$> f a <.> go c
 
 -- | Iso to unpack a 'CommaSep'
 _CommaSep

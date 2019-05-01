@@ -27,6 +27,10 @@
   were succeeding in scope checking because the variables from each block were
   added to the scope sequentially. Now, the multiple blocks are checked in the
   same scope, and their final scopes are combined at the end of the process.
+  
+* Added `Foldable1`/`Traversable1` instances for `CommaSep1` and `CommaSep1'`
+
+* Added `HasStatements1` with instances for `Statement` and `Block`
 
 ## 0.2
 

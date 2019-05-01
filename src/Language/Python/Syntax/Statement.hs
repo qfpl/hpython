@@ -21,6 +21,7 @@ module Language.Python.Syntax.Statement
     Statement(..)
     -- ** Traversals
   , HasStatements(..)
+  , HasStatements1(..)
     -- * Decorators
   , Decorator(..)
     -- ** Compound statements
@@ -62,14 +63,15 @@ import Control.Lens.Plated (Plated(..), gplate)
 import Control.Lens.Prism (_Right)
 import Control.Lens.Setter ((.~), over, mapped)
 import Control.Lens.TH (makeLenses)
-import Control.Lens.Traversal (Traversal, traverseOf)
+import Control.Lens.Traversal (Traversal, Traversal1, traverseOf)
 import Control.Lens.Tuple (_1, _2, _3, _4)
 import Data.Bifoldable (bifoldMap)
 import Data.Bifunctor (bimap)
 import Data.Bitraversable (bitraverse)
 import Data.Coerce (coerce)
+import Data.Functor.Apply ((<.>))
 import Data.Generics.Product.Typed (typed)
-import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (isNothing)
 import Data.Monoid ((<>))
 import GHC.Generics (Generic)
@@ -103,6 +105,9 @@ instance Validated Decorator where; unvalidated = to unsafeCoerce
 -- | 'Traversal' over all the 'Statement's in a term
 class HasStatements s where
   _Statements :: Traversal (s v a) (s '[] a) (Statement v a) (Statement '[] a)
+
+class HasStatements s => HasStatements1 s where
+  _Statements1 :: Traversal1 (s v a) (s '[] a) (Statement v a) (Statement '[] a)
 
 -- | A 'Block' is an indented multi-line chunk of code, forming part of a
 -- 'Suite'.
@@ -186,6 +191,20 @@ instance HasStatements Block where
   _Statements f (Block a b c) =
     Block a <$> f b <*> (traverse._Right) f c
 
+instance HasStatements1 Block  where
+  _Statements1 f (Block a l m) = uncurry (Block a) <$> go l m
+    where
+      go b [] = (\b' -> (b', [])) <$> f b
+      go b (Left c:cs) =
+        (\(b', cs') -> (b', Left c:cs')) <$>
+        go b cs
+      go b (Right c:cs) =
+        (,) <$>
+        f b <.>
+        fmap
+          (\(c', cs') -> Right c' : cs')
+          (go c cs)
+
 instance HasStatements Suite where
   _Statements _ (SuiteOne a b c) = pure $ SuiteOne a b (c ^. unvalidated)
   _Statements f (SuiteMany a b c d e) = SuiteMany a b c d <$> _Statements f e
@@ -211,6 +230,9 @@ data Statement (v :: [*]) a
 
 instance HasStatements Statement where
   _Statements = id
+
+instance HasStatements1 Statement where
+  _Statements1 = id
 
 instance HasExprs SmallStatement where
   _Exprs f (MkSmallStatement s ss a b c) =

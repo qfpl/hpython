@@ -118,9 +118,9 @@ runValidateScope :: ValidateScope ann e a -> Validation (NonEmpty e) a
 runValidateScope = runValidateScope' [Toplevel] mempty
 
 runValidateScope' ::
-  Seq Level -> -- ^ Path
-  Map ByteString (Entry ann) -> -- ^ Context
-  ValidateScope ann e a -> -- ^ Validation action
+  Seq Level {- ^ Path -} ->
+  Map ByteString (Entry ann) {- ^ Context -} ->
+  ValidateScope ann e a {- ^ Validation action -} ->
   Validation (NonEmpty e) a
 runValidateScope' path s = flip evalState s . flip runReaderT path . runValidateM
 

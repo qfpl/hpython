@@ -1,5 +1,6 @@
 {-# language DeriveFunctor, DeriveGeneric #-}
 {-# language OverloadedStrings #-}
+{-# language TemplateHaskell #-}
 
 {-|
 Module      : Language.Python.Internal.Token
@@ -13,10 +14,9 @@ Portability : non-portable
 module Language.Python.Token where
 
 import Control.Lens.Getter ((^.))
-import Data.Functor.Classes (Eq1(..), Ord1(..), Show1(..))
+import Data.Deriving (deriveEq1, deriveOrd1, deriveShow1)
+import Data.Functor.Classes (liftEq, liftCompare)
 import GHC.Generics (Generic, Generic1)
-import Generic.Data (gliftEq, gliftCompare, gliftShowsPrec)
-import Generic.Data.Orphans ()
 
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Comment
@@ -125,9 +125,9 @@ data PyToken a
   | TkLevel a (Indents a)
   | TkDedent a
   deriving (Show, Functor, Generic, Generic1)
-instance Eq1 PyToken where; liftEq = gliftEq
-instance Ord1 PyToken where; liftCompare = gliftCompare
-instance Show1 PyToken where; liftShowsPrec = gliftShowsPrec
+deriveEq1 ''PyToken
+deriveOrd1 ''PyToken
+deriveShow1 ''PyToken
 
 instance Eq (PyToken a) where
   (==) = liftEq (\_ _ -> True)

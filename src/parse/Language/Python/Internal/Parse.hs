@@ -127,7 +127,6 @@ import qualified Text.Megaparsec as Megaparsec
 
 import Language.Python.Internal.Lexer (SrcInfo(..), withSrcInfo)
 import Language.Python.Internal.Syntax.IR
-import Language.Python.Internal.Token
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
@@ -140,6 +139,7 @@ import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
+import Language.Python.Token
 
 newtype PyTokens = PyTokens { unPyTokens :: [PyToken SrcInfo] }
   deriving (Eq, Ord)
@@ -471,7 +471,7 @@ binOp op tm =
   (\t ts ->
       case ts of
         [] -> t
-        _ -> foldl (\tm (o, val) -> Binary (tm ^. exprAnn) tm o val) t ts) <$>
+        _ -> foldl (\tm' (o, val) -> Binary (tm' ^. exprAnn) tm' o val) t ts) <$>
   tm <*>
   many ((,) <$> op <*> tm)
 
@@ -479,11 +479,11 @@ orTest :: MonadParsec e PyTokens m => m Whitespace -> m (Expr SrcInfo)
 orTest ws = binOp orOp andTest
   where
     orOp =
-      (\(tk, ws) -> BoolOr (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> BoolOr (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkOr{} -> True; _ -> False) "or"
 
     andOp =
-      (\(tk, ws) -> BoolAnd (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> BoolAnd (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkAnd{} -> True; _ -> False) "and"
     andTest = binOp andOp notTest
 
@@ -493,49 +493,49 @@ orTest ws = binOp orOp andTest
       comparison
 
     compOp =
-      (\(tk, ws) -> maybe (Is (Ann $ pyTokenAnn tk) ws) (IsNot (Ann $ pyTokenAnn tk) ws)) <$>
+      (\(tk, w) -> maybe (Is (Ann $ pyTokenAnn tk) w) (IsNot (Ann $ pyTokenAnn tk) w)) <$>
       token ws (\case; TkIs{} -> True; _ -> False) "is" <*>
       optional (snd <$> token ws (\case; TkNot{} -> True; _ -> False) "not")
 
       <|>
 
-      (\(tk, ws) -> NotIn (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> NotIn (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkNot{} -> True; _ -> False) "not" <*>
       (snd <$> token ws (\case; TkIn{} -> True; _ -> False) "in")
 
       <|>
 
-      (\(tk, ws) -> In (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> In (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkIn{} -> True; _ -> False) "in"
 
       <|>
 
-      (\(tk, ws) -> Eq (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> Eq (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkDoubleEq{} -> True; _ -> False) "=="
 
       <|>
 
-      (\(tk, ws) -> Lt (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> Lt (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkLt{} -> True; _ -> False) "<"
 
       <|>
 
-      (\(tk, ws) -> LtEq (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> LtEq (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkLte{} -> True; _ -> False) "<="
 
       <|>
 
-      (\(tk, ws) -> Gt (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> Gt (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkGt{} -> True; _ -> False) ">"
 
       <|>
 
-      (\(tk, ws) -> GtEq (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> GtEq (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkGte{} -> True; _ -> False) ">="
 
       <|>
 
-      (\(tk, ws) -> NotEq (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> NotEq (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkBangEq{} -> True; _ -> False) "!="
 
     comparison = binOp compOp $ orExpr ws
@@ -598,66 +598,66 @@ doubleStar sp = token sp (\case; TkDoubleStar{} -> True; _ -> False) "**"
 orExpr :: MonadParsec e PyTokens m => m Whitespace -> m (Expr SrcInfo)
 orExpr ws =
   binOp
-    ((\(tk, ws) -> BitOr (Ann $ pyTokenAnn tk) ws) <$>
+    ((\(tk, w) -> BitOr (Ann $ pyTokenAnn tk) w) <$>
      token ws (\case; TkPipe{} -> True; _ -> False) "|")
     xorExpr
   where
     xorExpr =
       binOp
-        ((\(tk, ws) -> BitXor (Ann $ pyTokenAnn tk) ws) <$>
+        ((\(tk, w) -> BitXor (Ann $ pyTokenAnn tk) w) <$>
          token ws (\case; TkCaret{} -> True; _ -> False) "^")
         andExpr
 
     andExpr =
       binOp
-        ((\(tk, ws) -> BitAnd (Ann $ pyTokenAnn tk) ws) <$>
+        ((\(tk, w) -> BitAnd (Ann $ pyTokenAnn tk) w) <$>
          token ws (\case; TkAmpersand{} -> True; _ -> False) "&")
         shiftExpr
 
     shiftExpr =
       binOp
-        ((\(tk, ws) -> ShiftLeft (Ann $ pyTokenAnn tk) ws) <$>
+        ((\(tk, w) -> ShiftLeft (Ann $ pyTokenAnn tk) w) <$>
          token ws (\case; TkShiftLeft{} -> True; _ -> False) "<<"
 
          <|>
 
-         (\(tk, ws) -> ShiftRight (Ann $ pyTokenAnn tk) ws) <$>
+         (\(tk, w) -> ShiftRight (Ann $ pyTokenAnn tk) w) <$>
          token ws (\case; TkShiftRight{} -> True; _ -> False) ">>")
         arithExpr
 
     arithOp =
-      (\(tk, ws) -> Plus (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> Plus (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkPlus{} -> True; _ -> False) "+"
 
       <|>
 
-      (\(tk, ws) -> Minus (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> Minus (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkMinus{} -> True; _ -> False) "-"
 
     arithExpr = binOp arithOp term
 
     termOp =
-      (\(tk, ws) -> Multiply (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> Multiply (Ann $ pyTokenAnn tk) w) <$>
       star ws
 
       <|>
 
-      (\(tk, ws) -> At (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> At (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkAt{} -> True; _ -> False) "@"
 
       <|>
 
-      (\(tk, ws) -> Divide (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> Divide (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkSlash{} -> True; _ -> False) "/"
 
       <|>
 
-      (\(tk, ws) -> FloorDivide (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> FloorDivide (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkDoubleSlash{} -> True; _ -> False) "//"
 
       <|>
 
-      (\(tk, ws) -> Percent (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> Percent (Ann $ pyTokenAnn tk) w) <$>
       token ws (\case; TkPercent{} -> True; _ -> False) "%"
 
     term = binOp termOp factor
@@ -675,7 +675,7 @@ orExpr ws =
       power
 
     powerOp =
-      (\(tk, ws) -> Exp (Ann $ pyTokenAnn tk) ws) <$>
+      (\(tk, w) -> Exp (Ann $ pyTokenAnn tk) w) <$>
       doubleStar ws
 
     power =
@@ -695,8 +695,8 @@ orExpr ws =
           mws <- optional $ snd <$> colon anySpace
           case mws of
             Nothing -> pure $ SubscriptExpr ex
-            Just ws ->
-              SubscriptSlice (Just ex) ws <$>
+            Just w ->
+              SubscriptSlice (Just ex) w <$>
               optional (expr anySpace) <*>
               optional ((,) <$> (snd <$> colon anySpace) <*> optional (expr anySpace))
 
@@ -763,10 +763,10 @@ orExpr ws =
            optional (commaSep1' anySpace (expr anySpace <|> starExpr anySpace))))) <*>
       (snd <$> token ws (\case; TkRightBracket{} -> True; _ -> False) "]")
 
-    doubleStarExpr ws =
+    doubleStarExpr w =
       (\(tk, sp) -> DictUnpack (pyTokenAnn tk) sp) <$>
-      doubleStar ws <*>
-      orExpr ws
+      doubleStar w <*>
+      orExpr w
 
     dictItem =
       (\a -> DictItem (a ^. exprAnn) a) <$>
@@ -802,12 +802,12 @@ orExpr ws =
                (\(rest, final) -> Set ann ws1 ((ex, rest, final) ^. _CommaSep1')) <$>
                commaSepRest (expr anySpace <|> starExpr anySpace)
              Just clws ->
-               (\ex2 a ->
+               (\ex2 b ->
                  let
                    dictItemAnn = ex ^. exprAnn
                    firstDictItem = DictItem dictItemAnn ex clws ex2
                  in
-                 case a of
+                 case b of
                    Left (c, d) ->
                      DictComp ann ws1 (Comprehension dictItemAnn firstDictItem c d)
                    Right (rest, final) ->

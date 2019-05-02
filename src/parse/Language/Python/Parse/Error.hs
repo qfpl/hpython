@@ -21,7 +21,7 @@ import Language.Python.Internal.Lexer
   (AsLexicalError(..), AsTabError(..), AsIncorrectDedent(..))
 import Language.Python.Internal.Parse (AsParseError(..))
 import Language.Python.Internal.Syntax.IR (AsIRError(..))
-import Language.Python.Internal.Token (PyToken)
+import Language.Python.Token (PyToken)
 
 data ParseError a
   -- | An error occured during tokenization (this is a re-packed megaparsec error)

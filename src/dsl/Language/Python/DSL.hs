@@ -465,7 +465,7 @@ module_ [] = ModuleEmpty
 module_ (a:as) =
   case unLine a of
     Left (bl, nl) -> ModuleBlank bl nl $ module_ as
-    Right a -> ModuleStatement a $ module_ as
+    Right b -> ModuleStatement b $ module_ as
 
 -- | One or more lines of Python code
 newtype Line v a
@@ -898,7 +898,7 @@ instance ParametersSyntax Fundef where
 
 -- | Create a minimal valid function definition
 mkFundef :: Raw Ident -> [Raw Line] -> Raw Fundef
-mkFundef name body =
+mkFundef name bdy =
   MkFundef
   { _fdAnn = Ann ()
   , _fdDecorators = []
@@ -910,7 +910,7 @@ mkFundef name body =
   , _fdParameters = CommaSepNone
   , _fdRightParenSpaces = []
   , _fdReturnType = Nothing
-  , _fdBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _fdBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented bdy
   }
 
 -- |
@@ -934,7 +934,7 @@ mkFundef name body =
 -- def f(x: String):
 --     return x
 def_ :: Raw Ident -> [Raw (Param Expr)] -> [Raw Line] -> Raw Fundef
-def_ name params body = (mkFundef name body) { _fdParameters = listToCommaSep params }
+def_ name params bdy = (mkFundef name bdy) { _fdParameters = listToCommaSep params }
 
 -- | Create a minimal valid 'Call'
 mkCall :: Raw Expr -> Raw (Call Expr)
@@ -1371,13 +1371,13 @@ instance ElseSyntax While where
 
 -- | Create a minimal valid 'While'
 mkWhile :: Raw Expr -> [Raw Line] -> Raw While
-mkWhile cond body =
+mkWhile cond bdy =
   MkWhile
   { _whileAnn = Ann ()
   , _whileIndents = Indents [] (Ann ())
   , _whileWhile = [Space]
   , _whileCond = cond
-  , _whileBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _whileBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented bdy
   , _whileElse = Nothing
   }
 
@@ -1386,13 +1386,13 @@ while_ = mkWhile
 
 -- | Create a minimal valid 'If'
 mkIf :: Raw Expr -> [Raw Line] -> Raw If
-mkIf cond body =
+mkIf cond bdy =
   MkIf
   { _ifAnn = Ann ()
   , _ifIndents = Indents [] (Ann ())
   , _ifIf = [Space]
   , _ifCond = cond
-  , _ifBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _ifBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented bdy
   , _ifElifs = []
   , _ifElse = Nothing
   }
@@ -1449,24 +1449,24 @@ pass_ =
 
 -- | Create a minimal valid 'Elif'
 mkElif :: Raw Expr -> [Raw Line] -> Raw Elif
-mkElif cond body =
+mkElif cond bdy =
   MkElif
   { _elifIndents = Indents [] (Ann ())
   , _elifElif = [Space]
   , _elifCond = cond
-  , _elifBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _elifBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented bdy
   }
 
 elif_ :: Raw Expr -> [Raw Line] -> Raw If -> Raw If
-elif_ cond body code = code & ifElifs <>~ [mkElif cond body]
+elif_ cond bdy code = code & ifElifs <>~ [mkElif cond bdy]
 
 -- | Create a minimal valid 'Else'
 mkElse :: [Raw Line] -> Raw Else
-mkElse body =
+mkElse bdy =
   MkElse
   { _elseIndents = Indents [] (Ann ())
   , _elseElse = []
-  , _elseBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _elseBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented bdy
   }
 
 class ElseSyntax s where
@@ -1474,19 +1474,19 @@ class ElseSyntax s where
   setElse :: [Whitespace] -> Maybe (Raw Else) -> Raw s -> Raw s
 
 else_ :: ElseSyntax s => [Raw Line] -> Raw s -> Raw s
-else_ body = setElse (replicate 4 Space) $ Just (mkElse body)
+else_ bdy = setElse (replicate 4 Space) $ Just (mkElse bdy)
 
 mkGetElse
   :: (Raw s -> Indents ())
   -> (Raw s -> Maybe (Raw Else))
   -> Raw s
   -> Maybe (Raw Else)
-mkGetElse indentLevel elseField code =
+mkGetElse indentLvl elseField code =
   fromMaybe
     (error "malformed indentation in else block")
     (traverseOf
         (traverse._Indents)
-        (subtractStart (indentLevel code))
+        (subtractStart (indentLvl code))
         (elseField code))
 
 mkSetElse
@@ -1496,13 +1496,13 @@ mkSetElse
   -> Maybe (Raw Else)
   -> Raw s
   -> Raw s
-mkSetElse indentLevel elseField _ new code =
+mkSetElse indentLvl elseField _ new code =
   code &
   elseField .~
-    fmap (elseIndents .~ indentLevel code)
+    fmap (elseIndents .~ indentLvl code)
     (over
        (traverse._Indents.indentsValue)
-       (indentLevel code ^. indentsValue <>)
+       (indentLvl code ^. indentsValue <>)
        new)
 
 instance ElseSyntax For where
@@ -1687,7 +1687,7 @@ infix 0 .**=
 infix 0 .//=
 
 mkFor :: Raw Expr -> [Raw Expr] -> [Raw Line] -> Raw For
-mkFor binder collection body =
+mkFor binder collection bdy =
   MkFor
   { _forAnn = Ann ()
   , _forIndents = Indents [] (Ann ())
@@ -1699,7 +1699,7 @@ mkFor binder collection body =
       fromMaybe
         (CommaSepOne1' (VIn $ Unit (Ann ()) [] []) Nothing)
         (listToCommaSep1' collection)
-  , _forBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _forBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented bdy
   , _forElse = Nothing
   }
 
@@ -1733,31 +1733,31 @@ instance AsyncSyntax For where
 
 -- | Create a minimal valid 'Finally'
 mkFinally :: [Raw Line] -> Raw Finally
-mkFinally body =
+mkFinally bdy =
   MkFinally
   { _finallyIndents = Indents [] (Ann ())
   , _finallyFinally = []
-  , _finallyBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _finallyBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented bdy
   }
 
 -- | Create a minimal valid 'Except'
 mkExcept :: [Raw Line] -> Raw Except
-mkExcept body =
+mkExcept bdy =
   MkExcept
   { _exceptIndents = Indents [] (Ann ())
   , _exceptExcept = []
   , _exceptExceptAs = Nothing
-  , _exceptBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _exceptBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented bdy
   }
 
 -- | Create a minimal valid 'TryExcept'
 mkTryExcept :: [Raw Line] -> Raw Except -> Raw TryExcept
-mkTryExcept body except =
+mkTryExcept bdy except =
   MkTryExcept
   { _teAnn = Ann ()
   , _teIndents = Indents [] (Ann ())
   , _teTry = [Space]
-  , _teBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _teBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented bdy
   , _teExcepts = pure except
   , _teElse = Nothing
   , _teFinally = Nothing
@@ -1765,12 +1765,12 @@ mkTryExcept body except =
 
 -- | Create a minimal valid 'TryFinally'
 mkTryFinally :: [Raw Line] -> [Raw Line] -> Raw TryFinally
-mkTryFinally body fBody =
+mkTryFinally bdy fBody =
   MkTryFinally
   { _tfAnn = Ann ()
   , _tfIndents = Indents [] (Ann ())
   , _tfTry = [Space]
-  , _tfBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _tfBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented bdy
   , _tfFinally = mkFinally fBody
   }
 
@@ -1796,13 +1796,13 @@ class FinallySyntax s t | s -> t where
 -- finally:
 --     pass
 instance FinallySyntax (Raw TryExcept) TryExcept where
-  finally_ body = teFinally ?~ mkFinally body
+  finally_ bdy = teFinally ?~ mkFinally bdy
 
 instance FinallySyntax (Raw TryFinally) TryFinally where
-  finally_ body = tfFinally .~ mkFinally body
+  finally_ bdy = tfFinally .~ mkFinally bdy
 
 instance (a ~ [Raw Line], b ~ Raw TryFinally) => FinallySyntax (a -> b) TryFinally where
-  finally_ body f = f body
+  finally_ bdy f = f bdy
 
 instance BodySyntax TryExcept where
   body = teBody
@@ -1878,8 +1878,8 @@ class ExceptSyntax s where
 -- except Exception as b:
 --     a = 3
 instance (e ~ Raw Except, s ~ Raw TryExcept) => ExceptSyntax (e -> s) where
-  except_ body f = f $ mkExcept body
-  exceptAs_ ea body f = f $ mkExcept body & exceptExceptAs ?~ toExceptAs ea
+  except_ bdy f = f $ mkExcept bdy
+  exceptAs_ ea bdy f = f $ mkExcept bdy & exceptExceptAs ?~ toExceptAs ea
 
 -- |
 -- @'except_' :: ['Raw' 'Line'] -> 'Raw' 'TryExcept' -> 'Raw' 'TryExcept'@
@@ -1896,9 +1896,9 @@ instance (e ~ Raw Except, s ~ Raw TryExcept) => ExceptSyntax (e -> s) where
 --   'exceptAs_' ('var_' \"Exception\" \``as_`\` 'id_' "b") ['line_' 'pass_']
 -- @
 instance ExceptSyntax (Raw TryExcept) where
-  except_ body = teExcepts %~ (<> pure (mkExcept body))
-  exceptAs_ ea body =
-    teExcepts %~ (<> pure (mkExcept body & exceptExceptAs ?~ toExceptAs ea))
+  except_ bdy = teExcepts %~ (<> pure (mkExcept bdy))
+  exceptAs_ ea bdy =
+    teExcepts %~ (<> pure (mkExcept bdy & exceptExceptAs ?~ toExceptAs ea))
 
 -- |
 -- @'except_' :: ['Raw' 'Line'] -> 'Raw' 'TryFinally' -> 'Raw' 'TryExcept'@
@@ -1915,24 +1915,24 @@ instance ExceptSyntax (Raw TryExcept) where
 --   'exceptAs_' ('var_' \"Exception\" \``as_`\` 'id_' "b") ['line_' 'pass_']
 -- @
 instance ExceptSyntax (Raw TryFinally) where
-  except_ body MkTryFinally{..} =
+  except_ bdy MkTryFinally{..} =
     MkTryExcept
     { _teAnn = _tfAnn
     , _teIndents = _tfIndents
     , _teTry = _tfTry
     , _teBody = _tfBody
-    , _teExcepts = pure $ mkExcept body
+    , _teExcepts = pure $ mkExcept bdy
     , _teElse = Nothing
     , _teFinally = Just _tfFinally
     }
 
-  exceptAs_ ea body MkTryFinally{..} =
+  exceptAs_ ea bdy MkTryFinally{..} =
     MkTryExcept
     { _teAnn = _tfAnn
     , _teIndents = _tfIndents
     , _teTry = _tfTry
     , _teBody = _tfBody
-    , _teExcepts = pure $ mkExcept body & exceptExceptAs ?~ toExceptAs ea
+    , _teExcepts = pure $ mkExcept bdy & exceptExceptAs ?~ toExceptAs ea
     , _teElse = Nothing
     , _teFinally = Just _tfFinally
     }
@@ -1955,8 +1955,8 @@ instance As Expr Ident ExceptAs where
 -- class A:
 --     pass
 class_ :: Raw Ident -> [Raw (Arg Expr)] -> [Raw Line] -> Raw ClassDef
-class_ name args body =
-  (mkClassDef name body) {
+class_ name args bdy =
+  (mkClassDef name bdy) {
     _cdArguments =
       case args of
         [] -> Nothing
@@ -1965,7 +1965,7 @@ class_ name args body =
 
 -- | Create a minimal 'ClassDef'
 mkClassDef :: Raw Ident -> [Raw Line] -> Raw ClassDef
-mkClassDef name body =
+mkClassDef name bdy =
   MkClassDef
   { _cdAnn = Ann ()
   , _cdDecorators = []
@@ -1973,7 +1973,7 @@ mkClassDef name body =
   , _cdClass = Space :| []
   , _cdName = name
   , _cdArguments = Nothing
-  , _cdBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _cdBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented bdy
   }
 
 instance BodySyntax ClassDef where
@@ -2003,14 +2003,14 @@ instance ArgumentsSyntax ClassDef where
 
 -- | Create a minimal valid 'With'
 mkWith :: NonEmpty (Raw WithItem) -> [Raw Line] -> Raw With
-mkWith items body =
+mkWith items bdy =
   MkWith
   { _withAnn = Ann ()
   , _withIndents = Indents [] (Ann ())
   , _withAsync = Nothing
   , _withWith = [Space]
   , _withItems = listToCommaSep1 items
-  , _withBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented body
+  , _withBody = SuiteMany (Ann ()) (MkColon []) Nothing LF $ linesToBlockIndented bdy
   }
 
 -- |
@@ -2271,15 +2271,15 @@ subs_ a e =
     exprToSubscript
       :: Raw Expr
       -> (Raw (SubscriptItem Expr), [(Comma, Raw (SubscriptItem Expr))], Maybe Comma)
-    exprToSubscript e =
+    exprToSubscript ee =
       let
         notSlice
           :: ( Raw (SubscriptItem Expr)
              , [(Comma, Raw (SubscriptItem Expr))], Maybe Comma
              )
         notSlice =
-          case e ^? _Tuple of
-            Nothing -> (SubscriptExpr e, [], Nothing)
+          case ee ^? _Tuple of
+            Nothing -> (SubscriptExpr ee, [], Nothing)
             Just tup ->
               let
                 h = tup ^. tupleHead
@@ -2287,22 +2287,22 @@ subs_ a e =
                 t = tup ^? tupleTail._Just.from _CommaSep1'
                 res =
                   case t of
-                    Just (a, bs, c) ->
+                    Just (aa, bs, c) ->
                       (,,) <$>
                       fromTupleItem h <*>
-                      traverseOf (traverse._2) fromTupleItem ((comma, a) : bs) <*>
+                      traverseOf (traverse._2) fromTupleItem ((comma, aa) : bs) <*>
                       pure c
-                    Nothing -> (\a -> (a, [], Just comma)) <$> fromTupleItem h
+                    Nothing -> (\b -> (b, [], Just comma)) <$> fromTupleItem h
               in
-                fromMaybe (SubscriptExpr e, [], Nothing) res
+                fromMaybe (SubscriptExpr ee, [], Nothing) res
       in
-        maybe notSlice (\a -> (a, [], Nothing)) $ mkSlice e
+        maybe notSlice (\b -> (b, [], Nothing)) $ mkSlice ee
       where
         mkSlice
           :: Raw Expr
           -> Maybe (Raw (SubscriptItem Expr))
-        mkSlice e = do
-          c <- e ^? _Call
+        mkSlice eee = do
+          c <- eee ^? _Call
           case c ^? callFunction._Ident.identValue of
             Just "slice" ->
               pure $ case c ^.. callArguments.folded.folded of
@@ -2320,7 +2320,7 @@ subs_ a e =
                     (MkColon [])
                     (noneToMaybe y)
                     ((,) (MkColon []) . Just <$> noneToMaybe z)
-                _ -> SubscriptExpr e
+                _ -> SubscriptExpr eee
             _ -> Nothing
 
         noneToMaybe x = fromMaybe (Just x) $ Nothing <$ (x ^? _None)
@@ -2328,5 +2328,5 @@ subs_ a e =
         fromTupleItem
           :: Raw (TupleItem Expr)
           -> Maybe (Raw (SubscriptItem Expr))
-        fromTupleItem (TupleItem _ a) = mkSlice a <|> pure (SubscriptExpr a)
+        fromTupleItem (TupleItem _ b) = mkSlice b <|> pure (SubscriptExpr b)
         fromTupleItem _ = Nothing

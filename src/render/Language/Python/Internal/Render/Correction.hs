@@ -32,13 +32,13 @@ import Data.Text (Text)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
 
-import Language.Python.Internal.Token
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Numbers
 import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
+import Language.Python.Token
 
 -- | Trailing commas can only be present in a parameter list of entirely
 -- positional arguments. This removes the bad trailing comma, and appends
@@ -243,14 +243,14 @@ correctQuotesRaw qt (x:y:ys) =
     q = quote qt
 
     go [] = []
-    go [x] = [x]
-    go (x:y:ys) =
-      case x of
-        Char_lit '\\' -> x : go (y:ys)
+    go [a] = [a]
+    go (a:b:bs) =
+      case a of
+        Char_lit '\\' -> a : go (b:bs)
         _ ->
-          case y of
-            Char_lit c | q == c -> x : go (qc:ys)
-            _ -> x : go (y:ys)
+          case b of
+            Char_lit c | q == c -> a : go (qc:bs)
+            _ -> a : go (b:bs)
 
 -- | Every third literal quote at the beginning of a long (non-raw) string should
 -- be escaped

@@ -57,7 +57,6 @@ import qualified Data.Text.Lazy.Builder as Builder
 import Data.VFix
 import Data.VIdentity
 import Language.Python.Internal.Render.Correction
-import Language.Python.Internal.Token (PyToken(..))
 import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Comment
@@ -73,6 +72,7 @@ import Language.Python.Syntax.Punctuation
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
+import Language.Python.Token (PyToken(..))
 
 -- | A 'RenderOutput' is an intermediate form used during rendering
 -- with efficient concatenation
@@ -247,25 +247,25 @@ renderPyCharsWithCorrection c qt st = Text.pack . go . c qt st
           "\\" <>
           [charOctal # a, charOctal # b] <>
           go cs
-        Char_octal3 a b c : cs ->
+        Char_octal3 a b cc : cs ->
           "\\" <>
-          [charOctal # a, charOctal # b, charOctal # c] <>
+          [charOctal # a, charOctal # b, charOctal # cc] <>
           go cs
         Char_hex a b : cs ->
           "\\x" <> [charHeXaDeCiMaL # a, charHeXaDeCiMaL # b] <> go cs
-        Char_uni16 a b c d : cs ->
+        Char_uni16 a b cc d : cs ->
           "\\u" <>
           [ charHeXaDeCiMaL # a
           , charHeXaDeCiMaL # b
-          , charHeXaDeCiMaL # c
+          , charHeXaDeCiMaL # cc
           , charHeXaDeCiMaL # d
           ] <>
           go cs
-        Char_uni32 a b c d e f g h : cs ->
+        Char_uni32 a b cc d e f g h : cs ->
           "\\u" <>
           [ charHeXaDeCiMaL # a
           , charHeXaDeCiMaL # b
-          , charHeXaDeCiMaL # c
+          , charHeXaDeCiMaL # cc
           , charHeXaDeCiMaL # d
           , charHeXaDeCiMaL # e
           , charHeXaDeCiMaL # f
@@ -283,14 +283,14 @@ renderPyCharsWithCorrection c qt st = Text.pack . go . c qt st
         Char_esc_r : cs -> '\\' : 'r' : go cs
         Char_esc_t : cs -> '\\' : 't' : go cs
         Char_esc_v : cs -> '\\' : 'v' : go cs
-        Char_lit c : cs ->
+        Char_lit cc : cs ->
           case st of
-            LongString -> c : go cs
+            LongString -> cc : go cs
             ShortString ->
-              case c of
+              case cc of
                 '\r' -> go $ Char_esc_r : cs
                 '\n' -> go $ Char_esc_n : cs
-                _ -> c : go cs
+                _ -> cc : go cs
 
 renderPyChars :: QuoteType -> StringType -> [PyChar] -> Text
 renderPyChars =
@@ -336,25 +336,25 @@ renderPyCharsBytesWithCorrection c qt st = Text.pack . go . c qt st
           "\\" <>
           [charOctal # a, charOctal # b] <>
           go cs
-        Char_octal3 a b c : cs ->
+        Char_octal3 a b cc : cs ->
           "\\" <>
-          [charOctal # a, charOctal # b, charOctal # c] <>
+          [charOctal # a, charOctal # b, charOctal # cc] <>
           go cs
         Char_hex a b : cs ->
           "\\x" <> [charHeXaDeCiMaL # a, charHeXaDeCiMaL # b] <> go cs
-        Char_uni16 a b c d : cs ->
+        Char_uni16 a b cc d : cs ->
           "\\u" <>
           [ charHeXaDeCiMaL # a
           , charHeXaDeCiMaL # b
-          , charHeXaDeCiMaL # c
+          , charHeXaDeCiMaL # cc
           , charHeXaDeCiMaL # d
           ] <>
           go cs
-        Char_uni32 a b c d e f g h : cs ->
+        Char_uni32 a b cc d e f g h : cs ->
           "\\u" <>
           [ charHeXaDeCiMaL # a
           , charHeXaDeCiMaL # b
-          , charHeXaDeCiMaL # c
+          , charHeXaDeCiMaL # cc
           , charHeXaDeCiMaL # d
           , charHeXaDeCiMaL # e
           , charHeXaDeCiMaL # f
@@ -372,22 +372,22 @@ renderPyCharsBytesWithCorrection c qt st = Text.pack . go . c qt st
         Char_esc_r : cs -> '\\' : 'r' : go cs
         Char_esc_t : cs -> '\\' : 't' : go cs
         Char_esc_v : cs -> '\\' : 'v' : go cs
-        Char_lit c : cs
-          | o <- ord c, o > 127 ->
+        Char_lit ch : cs
+          | o <- ord ch, o > 127 ->
             let
               h = intToHexH o
             in
             case replicate (8 - length h) HeXDigit0 <> h of
-              [a, b, c, d, e, f, g, h] -> go $ Char_uni32 a b c d e f g h : cs
-              _ -> error $ "character " <> show c <> " out of unicode range"
+              [a, b, cc, d, e, f, g, hh] -> go $ Char_uni32 a b cc d e f g hh : cs
+              _ -> error $ "character " <> show ch <> " out of unicode range"
           | otherwise ->
               case st of
-                LongString -> c : go cs
+                LongString -> ch : go cs
                 ShortString ->
-                  case c of
+                  case ch of
                     '\r' -> go $ Char_esc_r : cs
                     '\n' -> go $ Char_esc_n : cs
-                    _ -> c : go cs
+                    _ -> ch : go cs
 
 renderPyCharsBytes :: QuoteType -> StringType -> [PyChar] -> Text
 renderPyCharsBytes =
@@ -470,52 +470,52 @@ showToken t =
     TkFor{} -> "for"
     TkIn{} -> "in"
     TkYield{} -> "yield"
-    TkInt i -> showIntLiteral i
-    TkFloat i -> showFloatLiteral i
-    TkImag i -> showImagLiteral i
+    TkInt i -> Text.pack $ showIntLiteral i
+    TkFloat i -> Text.pack $ showFloatLiteral i
+    TkImag i -> Text.pack $ showImagLiteral i
     TkIdent s _ -> Text.pack s
     TkString sp st qt s _ ->
       let
-        quote =
+        theQuote =
           Text.pack $
           (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
       in
         foldMap showStringPrefix sp <>
-        quote <>
+        theQuote <>
         renderPyChars qt st s <>
-        quote
+        theQuote
     TkBytes sp st qt s _ ->
       let
-        quote =
+        theQuote =
           Text.pack $
           (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
       in
         showBytesPrefix sp <>
-        quote <>
+        theQuote <>
         renderPyCharsBytes qt st s <>
-        quote
+        theQuote
     TkRawString sp st qt s _ ->
       let
-        quote =
+        theQuote =
           case st of
             LongString -> Text.pack . replicate 3 $ showQuoteType qt
             ShortString -> Text.singleton $ showQuoteType qt
       in
         showRawStringPrefix sp <>
-        quote <>
+        theQuote <>
         renderRawPyChars qt st s <>
-        quote
+        theQuote
     TkRawBytes sp st qt s _ ->
       let
-        quote =
+        theQuote =
           case st of
             LongString -> Text.pack . replicate 3 $ showQuoteType qt
             ShortString -> Text.singleton $ showQuoteType qt
       in
         showRawBytesPrefix sp <>
-        quote <>
+        theQuote <>
         renderRawPyCharsBytes qt st s <>
-        quote
+        theQuote
     TkSpace{} -> " "
     TkTab{} -> "\t"
     TkNewline nl _ ->
@@ -944,16 +944,16 @@ renderExpr expr =
     Bool _ b ws -> do
       singleton $ if b then TkTrue () else TkFalse ()
       traverse_ renderWhitespace ws
-    Unary _ op expr -> do
+    Unary _ op e -> do
       renderUnOp op
-      case vout expr of
-        Binary _ _ Exp{} _ -> parensTupleGenerator expr
-        Binary{} -> parensDistTWS renderExpr expr
-        Deref _ (VIn Int{}) _ _ -> parensDistTWS renderExpr expr
-        Not{} -> parensDistTWS renderExpr expr
-        Ternary{} -> parensDistTWS renderExpr expr
-        Lambda{} -> parensDistTWS renderExpr expr
-        _ -> parensTupleGenerator expr
+      case vout e of
+        Binary _ _ Exp{} _ -> parensTupleGenerator e
+        Binary{} -> parensDistTWS renderExpr e
+        Deref _ (VIn Int{}) _ _ -> parensDistTWS renderExpr e
+        Not{} -> parensDistTWS renderExpr e
+        Ternary{} -> parensDistTWS renderExpr e
+        Lambda{} -> parensDistTWS renderExpr e
+        _ -> parensTupleGenerator e
     String _ vs ->
       traverse_ renderStringLiteral $ correctAdjacentStrings vs
     Int _ n ws -> do
@@ -981,30 +981,30 @@ renderExpr expr =
               _ -> parensTupleGenerator e)
           comp
       traverse_ renderWhitespace ws2
-    Call _ expr ws args ws2 -> do
-      (case vout expr of
-        Unary{} -> parensDistTWS renderExpr expr
-        Binary{} -> parensDistTWS renderExpr expr
-        Tuple{} -> parensDistTWS renderExpr expr
-        Not{} -> parensDistTWS renderExpr expr
-        Ternary{} -> parensDistTWS renderExpr expr
-        Lambda{} -> parensDistTWS renderExpr expr
-        _ -> parensGenerator expr)
+    Call _ e ws args ws2 -> do
+      (case vout e of
+        Unary{} -> parensDistTWS renderExpr e
+        Binary{} -> parensDistTWS renderExpr e
+        Tuple{} -> parensDistTWS renderExpr e
+        Not{} -> parensDistTWS renderExpr e
+        Ternary{} -> parensDistTWS renderExpr e
+        Lambda{} -> parensDistTWS renderExpr e
+        _ -> parensGenerator e)
       parens $ do
         traverse_ renderWhitespace ws
         traverse_ renderArgs args
       traverse_ renderWhitespace ws2
-    Deref _ expr ws name -> do
-      (case vout expr of
-        Int{} -> parensDistTWS renderExpr expr
-        Binary{} -> parensDistTWS renderExpr expr
-        Tuple{} -> parensDistTWS renderExpr expr
-        Not{} -> parensDistTWS renderExpr expr
-        Unary{} -> parensDistTWS renderExpr expr
-        Ternary{} -> parensDistTWS renderExpr expr
-        Lambda{} -> parensDistTWS renderExpr expr
-        Await{} -> parensDistTWS renderExpr expr
-        _ -> parensGenerator expr)
+    Deref _ e ws name -> do
+      (case vout e of
+        Int{} -> parensDistTWS renderExpr e
+        Binary{} -> parensDistTWS renderExpr e
+        Tuple{} -> parensDistTWS renderExpr e
+        Not{} -> parensDistTWS renderExpr e
+        Unary{} -> parensDistTWS renderExpr e
+        Ternary{} -> parensDistTWS renderExpr e
+        Lambda{} -> parensDistTWS renderExpr e
+        Await{} -> parensDistTWS renderExpr e
+        _ -> parensGenerator e)
       singleton $ TkDot ()
       traverse_ renderWhitespace ws
       renderIdent name
@@ -1056,18 +1056,18 @@ renderExpr expr =
             YieldFrom{} -> parensDistTWS renderExpr e
             _ -> parensTupleGenerator e)
         a
-    Await _ ws expr -> do
+    Await _ ws e -> do
       singleton $ TkIdent "await" ()
       traverse_ renderWhitespace ws
-      (case vout expr of
-        Unary{} -> parensDistTWS renderExpr expr
-        Binary{} -> parensDistTWS renderExpr expr
-        Tuple{} -> parensDistTWS renderExpr expr
-        Not{} -> parensDistTWS renderExpr expr
-        Ternary{} -> parensDistTWS renderExpr expr
-        Lambda{} -> parensDistTWS renderExpr expr
-        Await{} -> parensDistTWS renderExpr expr
-        _ -> parensGenerator expr)
+      (case vout e of
+        Unary{} -> parensDistTWS renderExpr e
+        Binary{} -> parensDistTWS renderExpr e
+        Tuple{} -> parensDistTWS renderExpr e
+        Not{} -> parensDistTWS renderExpr e
+        Ternary{} -> parensDistTWS renderExpr e
+        Lambda{} -> parensDistTWS renderExpr e
+        Await{} -> parensDistTWS renderExpr e
+        _ -> parensGenerator e)
 
 renderModuleName :: ModuleName v a -> RenderOutput ()
 renderModuleName (ModuleNameOne _ s) = renderIdent s
@@ -1134,9 +1134,9 @@ renderSimpleStatement (Assert _ b c d) = do
   traverse_ renderWhitespace b
   parensTupleGenerator c
   traverse_
-    (\(a, b) -> do
-        renderComma a
-        parensTupleGenerator b)
+    (\(x, y) -> do
+        renderComma x
+        parensTupleGenerator y)
     d
 renderSimpleStatement (Raise _ ws x) = do
   singleton $ TkRaise ()
@@ -1297,28 +1297,28 @@ renderCompoundStatement (If _ idnt ws1 expr s elifs body') = do
   notFinal $ renderSuite s
   traverseOf_
     (_init.traverse)
-    (\(idnt, ws4, ex, s) -> do
-        renderIndents idnt
+    (\(i, ws4, ex, t) -> do
+        renderIndents i
         singleton $ TkElif ()
         traverse_ renderWhitespace ws4
         parensTupleGenerator ex
-        notFinal $ renderSuite s)
+        notFinal $ renderSuite t)
     elifs
   traverseOf_
     _last
-    (\(idnt, ws4, ex, s) -> do
-        renderIndents idnt
+    (\(i, ws4, ex, t) -> do
+        renderIndents i
         singleton $ TkElif ()
         traverse_ renderWhitespace ws4
         parensTupleGenerator ex
-        (if isNothing body' then final else notFinal) $ renderSuite s)
+        (if isNothing body' then final else notFinal) $ renderSuite t)
     elifs
   traverse_
-    (\(idnt, ws4, s) -> do
-        renderIndents idnt
+    (\(i, ws4, t) -> do
+        renderIndents i
         singleton $ TkElse ()
         traverse_ renderWhitespace ws4
-        final $ renderSuite s)
+        final $ renderSuite t)
     body'
 renderCompoundStatement (While _ idnt ws1 expr s els) = do
   renderIndents idnt
@@ -1327,11 +1327,11 @@ renderCompoundStatement (While _ idnt ws1 expr s els) = do
   parensTupleGenerator expr
   (if isNothing els then final else notFinal) $ renderSuite s
   traverse_
-    (\(idnt, ws4, s) -> do
-        renderIndents idnt
+    (\(i, ws4, t) -> do
+        renderIndents i
         singleton $ TkElse ()
         traverse_ renderWhitespace ws4
-        final $ renderSuite s)
+        final $ renderSuite t)
     els
 renderCompoundStatement (TryExcept _ idnt a s e f g) = do
   renderIndents idnt
@@ -1339,33 +1339,33 @@ renderCompoundStatement (TryExcept _ idnt a s e f g) = do
   traverse_ renderWhitespace a
   notFinal $ renderSuite s
   traverse_
-    (\(idnt, ws1, eas, s) -> do
-       renderIndents idnt
+    (\(i, ws1, eas, t) -> do
+       renderIndents i
        singleton $ TkExcept ()
        traverse_ renderWhitespace ws1
        traverse_ renderExceptAs eas
-       notFinal $ renderSuite s)
+       notFinal $ renderSuite t)
     (NonEmpty.init e)
   (case NonEmpty.last e of
-     (idnt, ws1, eas, s) -> do
-       renderIndents idnt
+     (i, ws1, eas, t) -> do
+       renderIndents i
        singleton $ TkExcept ()
        traverse_ renderWhitespace ws1
        traverse_ renderExceptAs eas
-       (if isNothing f && isNothing g then final else notFinal) $ renderSuite s)
+       (if isNothing f && isNothing g then final else notFinal) $ renderSuite t)
   traverse_
-    (\(idnt, ws1, s) -> do
-       renderIndents idnt
+    (\(i, ws1, t) -> do
+       renderIndents i
        singleton $ TkElse ()
        traverse_ renderWhitespace ws1
-       (if isNothing g then final else notFinal) $ renderSuite s)
+       (if isNothing g then final else notFinal) $ renderSuite t)
     f
   traverse_
-    (\(idnt, ws1, s) -> do
-       renderIndents idnt
+    (\(i, ws1, t) -> do
+       renderIndents i
        singleton $ TkFinally ()
        traverse_ renderWhitespace ws1
-       final $ renderSuite s)
+       final $ renderSuite t)
     g
 renderCompoundStatement (TryFinally _ idnt a s idnt2 e s') = do
   renderIndents idnt
@@ -1391,11 +1391,11 @@ renderCompoundStatement (For _ idnt asyncWs a b c d s h) = do
   renderCommaSep1' parensTupleGenerator d
   (if isNothing h then final else notFinal) $ renderSuite s
   traverse_
-    (\(idnt, x, s) -> do
-        renderIndents idnt
+    (\(i, x, t) -> do
+        renderIndents i
         singleton $ TkElse ()
         traverse_ renderWhitespace x
-        final $ renderSuite s)
+        final $ renderSuite t)
     h
 renderCompoundStatement (ClassDef _ decos idnt a b c s) = do
   traverse_ renderDecorator decos

@@ -547,8 +547,8 @@ exprAnn =
         StarExpr _ a b -> StarExpr ann a b
         Lambda _ a b c d -> Lambda ann a b c d
         Yield _ a b -> Yield ann a b
-        YieldFrom ann a b c -> YieldFrom ann a b c
-        Ternary ann a b c d e -> Ternary ann a b c d e
+        YieldFrom _ a b c -> YieldFrom ann a b c
+        Ternary _ a b c d e' -> Ternary ann a b c d e'
         None _ a -> None ann a
         Ellipsis _ a -> Ellipsis ann a
         List _ a b c -> List ann a b c
@@ -764,10 +764,10 @@ fromIR_arg
   -> Validation (NonEmpty e) (Syntax.Arg Syntax.Expr '[] a)
 fromIR_arg a =
   case a of
-    PositionalArg a b -> Syntax.PositionalArg (Ann a) <$> fromIR_expr b
-    KeywordArg a b c d -> Syntax.KeywordArg (Ann a) b c <$> fromIR_expr d
-    StarArg a b c -> Syntax.StarArg (Ann a) b <$> fromIR_expr c
-    DoubleStarArg a b c -> Syntax.DoubleStarArg (Ann a) b <$> fromIR_expr c
+    PositionalArg b c -> Syntax.PositionalArg (Ann b) <$> fromIR_expr c
+    KeywordArg b c d e -> Syntax.KeywordArg (Ann b) c d <$> fromIR_expr e
+    StarArg b c d -> Syntax.StarArg (Ann b) c <$> fromIR_expr d
+    DoubleStarArg b c d -> Syntax.DoubleStarArg (Ann b) c <$> fromIR_expr d
 
 fromIR_decorator
   :: AsIRError e a
@@ -903,9 +903,9 @@ fromIR_SimpleStatement ex =
     Raise a b c ->
       Syntax.Raise (Ann a) b <$>
       traverse
-        (\(a, b) -> (,) <$>
-          fromIR_expr a <*>
-          traverseOf (traverse._2) fromIR_expr b)
+        (\(x, y) -> (,) <$>
+          fromIR_expr x <*>
+          traverseOf (traverse._2) fromIR_expr y)
         c
     Assert a b c d ->
       Syntax.Assert (Ann a) b <$>
@@ -928,7 +928,7 @@ fromIR_compoundStatement st =
       Syntax.If (Ann a) b c <$>
       fromIR_expr d <*>
       fromIR_suite e <*>
-      traverse (\(a, b, c, d) -> (,,,) a b <$> fromIR_expr c <*> fromIR_suite d) f <*>
+      traverse (\(x, y, z, w) -> (,,,) x y <$> fromIR_expr z <*> fromIR_suite w) f <*>
       traverseOf (traverse._3) fromIR_suite g
     While a b c d e f ->
       Syntax.While (Ann a) b c <$>
@@ -939,7 +939,7 @@ fromIR_compoundStatement st =
       Syntax.TryExcept (Ann a) b c <$>
       fromIR_suite d <*>
       traverse
-        (\(a, b, c, d) -> (,,,) a b <$> traverse fromIR_exceptAs c <*> fromIR_suite d)
+        (\(x, y, z, w) -> (,,,) x y <$> traverse fromIR_exceptAs z <*> fromIR_suite w)
         e <*>
       traverseOf (traverse._3) fromIR_suite f <*>
       traverseOf (traverse._3) fromIR_suite g

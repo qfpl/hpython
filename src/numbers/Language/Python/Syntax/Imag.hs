@@ -1,16 +1,15 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
+{-# language TemplateHaskell #-}
 module Language.Python.Syntax.Imag where
 
 import Control.Lens.Lens (Lens')
 import Control.Lens.Review ((#))
+import Data.Deriving (deriveEq1, deriveOrd1, deriveShow1)
 import Data.Digit.Char (charDecimal)
 import Data.Digit.Decimal (DecDigit)
-import Data.Functor.Classes (Eq1(..), Ord1(..), Show1(..))
 import Data.Generics.Product.Typed (typed)
 import GHC.Generics (Generic, Generic1)
-import Generic.Data (gliftEq, gliftCompare, gliftShowsPrec)
-import Generic.Data.Orphans ()
 
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Float
@@ -41,9 +40,9 @@ data ImagLiteral a
   , _imagLiteralUppercase :: Bool
   }
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Generic, Generic1)
-instance Eq1 ImagLiteral where; liftEq = gliftEq
-instance Ord1 ImagLiteral where; liftCompare = gliftCompare
-instance Show1 ImagLiteral where; liftShowsPrec = gliftShowsPrec
+deriveEq1 ''ImagLiteral
+deriveOrd1 ''ImagLiteral
+deriveShow1 ''ImagLiteral
 
 instance HasAnn ImagLiteral where
   annot :: forall a. Lens' (ImagLiteral a) (Ann a)

@@ -43,7 +43,6 @@ import Language.Python.Internal.Lexer
   ( SrcInfo(..), initialSrcInfo, withSrcInfo
   , tokenize, insertTabs
   )
-import Language.Python.Internal.Token (PyToken)
 import Language.Python.Internal.Parse
   ( Parser, runParser, level, module_, statement, exprOrStarList
   , expr, space
@@ -55,6 +54,7 @@ import Language.Python.Syntax.Expr (Expr)
 import Language.Python.Syntax.Module (Module)
 import Language.Python.Syntax.Statement (Statement)
 import Language.Python.Syntax.Whitespace (Indents (..))
+import Language.Python.Token (PyToken)
 
 import qualified Language.Python.Internal.Syntax.IR as IR
 

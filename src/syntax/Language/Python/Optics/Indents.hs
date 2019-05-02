@@ -15,7 +15,7 @@ module Language.Python.Optics.Indents where
 import Control.Lens.Traversal (Traversal')
 
 import Language.Python.Syntax
-import Language.Python.Internal.Token
+import Language.Python.Token
 
 -- | 'Traversal'' targeting the indent-chunks in a structure
 --
@@ -192,48 +192,48 @@ instance HasIndents (CompoundStatement '[] a) a where
         fun idnt <*>
         _Indents fun d <*>
         traverse
-          (\(idnt, a, b, c) ->
-             (\idnt'  -> (,,,) idnt' a b) <$>
-             fun idnt <*>
-             _Indents fun c)
+          (\(i, x, y, z) ->
+             (\idnt'  -> (,,,) idnt' x y) <$>
+             fun i <*>
+             _Indents fun z)
           elifs <*>
         traverse
-          (\(idnt, a, b) ->
-             (\idnt' -> (,,) idnt' a) <$>
-             fun idnt <*>
-             _Indents fun b)
+          (\(i, x, y) ->
+             (\idnt' -> (,,) idnt' x) <$>
+             fun i <*>
+             _Indents fun y)
           e
       While a idnt b c d e ->
         (\idnt' -> While a idnt' b c) <$>
         fun idnt <*>
         _Indents fun d <*>
         traverse
-          (\(idnt, a, b) ->
-             (\idnt' -> (,,) idnt' a) <$>
-             fun idnt <*>
-             _Indents fun b)
+          (\(i, x, y) ->
+             (\idnt' -> (,,) idnt' x) <$>
+             fun i <*>
+             _Indents fun y)
           e
       TryExcept a idnt b c d e f ->
         (\idnt' -> TryExcept a idnt' b) <$>
         fun idnt <*>
         _Indents fun c <*>
         traverse
-          (\(idnt, a, b, c) ->
-             (\idnt' -> (,,,) idnt' a b) <$>
-             fun idnt <*>
-             _Indents fun c)
+          (\(i, x, y, z) ->
+             (\idnt' -> (,,,) idnt' x y) <$>
+             fun i <*>
+             _Indents fun z)
           d <*>
         traverse
-          (\(idnt, a, b) ->
-             (\idnt' -> (,,) idnt' a) <$>
-             fun idnt <*>
-             _Indents fun b)
+          (\(i, x, y) ->
+             (\idnt' -> (,,) idnt' x) <$>
+             fun i <*>
+             _Indents fun y)
           e <*>
         traverse
-          (\(idnt, a, b) ->
-             (\idnt' -> (,,) idnt' a) <$>
-             fun idnt <*>
-             _Indents fun b)
+          (\(i, x, y) ->
+             (\idnt' -> (,,) idnt' x) <$>
+             fun i <*>
+             _Indents fun y)
           f
       TryFinally a idnt b c idnt2 d e ->
         (\idnt' c' idnt2' -> TryFinally a idnt' b c' idnt2' d) <$>
@@ -246,10 +246,10 @@ instance HasIndents (CompoundStatement '[] a) a where
         fun idnt <*>
         _Indents fun f <*>
         traverse
-          (\(idnt, a, b) ->
-             (\idnt' -> (,,) idnt' a) <$>
-             fun idnt <*>
-             _Indents fun b)
+          (\(i, x, y) ->
+             (\idnt' -> (,,) idnt' x) <$>
+             fun i <*>
+             _Indents fun y)
           g
       ClassDef a decos idnt b c d e ->
         (\decos' idnt' -> ClassDef a decos' idnt' b c d) <$>

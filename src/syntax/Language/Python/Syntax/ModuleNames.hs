@@ -65,10 +65,10 @@ instance HasTrailingWhitespace (RelativeModuleName v a) where
           Relative _ (a :| as) -> (a : as) ^?! _last.trailingWhitespace)
       (\a ws -> case a of
           RelativeWithName ann x mn -> RelativeWithName ann x (mn & trailingWhitespace .~ ws)
-          Relative ann (a :| as) ->
+          Relative ann (b :| bs) ->
             Relative ann .
             NonEmpty.fromList $
-            (a : as) & _last.trailingWhitespace .~ ws)
+            (b : bs) & _last.trailingWhitespace .~ ws)
 
 -- | A module name. It can be a single segment, or a sequence of them which
 -- are implicitly separated by period character.
@@ -100,5 +100,5 @@ instance HasTrailingWhitespace (ModuleName v a) where
           ModuleNameMany _ _ _ mn -> mn ^. trailingWhitespace)
       (\mn ws -> case mn of
           ModuleNameOne a b -> ModuleNameOne a (b & trailingWhitespace .~ ws)
-          ModuleNameMany a b d mn ->
-            ModuleNameMany a (coerce b) d (mn & trailingWhitespace .~ ws))
+          ModuleNameMany a b d mn' ->
+            ModuleNameMany a (coerce b) d (mn' & trailingWhitespace .~ ws))

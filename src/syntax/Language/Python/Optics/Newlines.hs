@@ -311,22 +311,22 @@ instance HasNewlines (expr v a) => HasNewlines (ExprF expr v a) where
   _Newlines fun e =
     case e of
       Unit a b c -> Unit a <$> _Newlines fun b <*> _Newlines fun c
-      Lambda a b c d e ->
+      Lambda a b c d ee ->
         Lambda a <$>
         _Newlines fun b <*>
         _Newlines fun c <*>
         _Newlines fun d <*>
-        _Newlines fun e
+        _Newlines fun ee
       Yield a b c ->
         Yield a <$> _Newlines fun b <*> _Newlines fun c
       YieldFrom a b c d ->
         YieldFrom a <$> _Newlines fun b <*> _Newlines fun c <*> _Newlines fun d
-      Ternary a b c d e f ->
+      Ternary a b c d ee f ->
         Ternary a <$>
         _Newlines fun b <*>
         _Newlines fun c <*>
         _Newlines fun d <*>
-        _Newlines fun e <*>
+        _Newlines fun ee <*>
         _Newlines fun f
       ListComp a b c d ->
         ListComp a <$>
@@ -363,18 +363,18 @@ instance HasNewlines (expr v a) => HasNewlines (ExprF expr v a) where
         _Newlines fun b <*>
         _Newlines fun c <*>
         _Newlines fun d
-      Subscript a b c d e ->
+      Subscript a b c d ee ->
         Subscript a <$>
         _Newlines fun b <*>
         _Newlines fun c <*>
         _Newlines fun d <*>
-        _Newlines fun e
-      Call a b c d e ->
+        _Newlines fun ee
+      Call a b c d ee ->
         Call a <$>
         _Newlines fun b <*>
         _Newlines fun c <*>
         _Newlines fun d <*>
-        _Newlines fun e
+        _Newlines fun ee
       None a b -> None a <$> _Newlines fun b
       Ellipsis a b -> Ellipsis a <$> _Newlines fun b
       Binary a b c d ->
@@ -431,7 +431,7 @@ instance HasNewlines (WithItem v a) where
 instance HasNewlines (CompoundStatement v a) where
   _Newlines fun s =
     case s of
-      Fundef ann decos idnt asyncWs ws1 name ws2 params ws3 mty s ->
+      Fundef ann decos idnt asyncWs ws1 name ws2 params ws3 mty st ->
         Fundef ann <$>
         _Newlines fun decos <*>
         _Newlines fun idnt <*>
@@ -442,21 +442,21 @@ instance HasNewlines (CompoundStatement v a) where
         _Newlines fun params <*>
         _Newlines fun ws3 <*>
         _Newlines fun mty <*>
-        _Newlines fun s
-      If ann idnt ws1 cond s elifs els ->
+        _Newlines fun st
+      If ann idnt ws1 cond st elifs els ->
         If ann <$>
         _Newlines fun idnt <*>
         _Newlines fun ws1 <*>
         _Newlines fun cond <*>
-        _Newlines fun s <*>
+        _Newlines fun st <*>
         _Newlines fun elifs <*>
         _Newlines fun els
-      While ann idnt ws1 cond s els ->
+      While ann idnt ws1 cond st els ->
         While ann <$>
         _Newlines fun idnt <*>
         _Newlines fun ws1 <*>
         _Newlines fun cond <*>
-        _Newlines fun s <*>
+        _Newlines fun st <*>
         _Newlines fun els
       TryExcept ann idnt b c f k l ->
         TryExcept ann <$>

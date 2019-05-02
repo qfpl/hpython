@@ -151,7 +151,7 @@ instance HasBlocks CompoundStatement where
   _Blocks f (If idnt a ws1 e1 s elifs b') =
     If idnt a ws1 (e1 ^. unvalidated) <$>
     _Blocks f s <*>
-    traverse (\(a, b, c, d) -> (,,,) a b (c ^. unvalidated) <$> _Blocks f d) elifs <*>
+    traverse (\(x, y, z, w) -> (,,,) x y (z ^. unvalidated) <$> _Blocks f w) elifs <*>
     traverseOf (traverse._3._Blocks) f b'
   _Blocks f (While idnt a ws1 e1 s els) =
     While idnt a ws1 (e1 ^. unvalidated) <$>
@@ -161,7 +161,7 @@ instance HasBlocks CompoundStatement where
     TryExcept idnt a (coerce b) <$>
     _Blocks fun c <*>
     traverse
-      (\(a, b, c, d) -> (,,,) a b (view unvalidated <$> c) <$> _Blocks fun d)
+      (\(x, y, z, w) -> (,,,) x y (view unvalidated <$> z) <$> _Blocks fun w)
       d <*>
     traverseOf (traverse._3._Blocks) fun e <*>
     traverseOf (traverse._3._Blocks) fun f
@@ -243,16 +243,16 @@ instance Plated (Statement '[] a) where
   plate fun (CompoundStatement s) =
     CompoundStatement <$>
     case s of
-      Fundef idnt a decos asyncWs ws1 b ws2 c ws3 mty s ->
-        Fundef idnt a decos asyncWs ws1 b ws2 c ws3 mty <$> _Statements fun s
-      If idnt a ws1 b s elifs sts' ->
+      Fundef idnt a decos asyncWs ws1 b ws2 c ws3 mty t ->
+        Fundef idnt a decos asyncWs ws1 b ws2 c ws3 mty <$> _Statements fun t
+      If idnt a ws1 b t elifs sts' ->
         If idnt a ws1 b <$>
-        _Statements fun s <*>
+        _Statements fun t <*>
         (traverse._4._Statements) fun elifs <*>
         (traverse._3._Statements) fun sts'
-      While idnt a ws1 b s els ->
+      While idnt a ws1 b t els ->
         While idnt a ws1 b <$>
-        _Statements fun s <*>
+        _Statements fun t <*>
         (traverse._3._Statements) fun els
       TryExcept idnt a b c d e f ->
         TryExcept idnt a b <$> _Statements fun c <*>
@@ -566,7 +566,7 @@ instance HasExprs CompoundStatement Expr where
     fun e <*>
     _Exprs fun s <*>
     traverse
-      (\(a, b, c, d) -> (,,,) a b <$> fun c <*> _Exprs fun d)
+      (\(x, y, z, w) -> (,,,) x y <$> fun z <*> _Exprs fun w)
       elifs <*>
     (traverse._3._Exprs) fun sts'
   _Exprs f (While idnt a ws1 e s els) =
@@ -577,7 +577,7 @@ instance HasExprs CompoundStatement Expr where
   _Exprs fun (TryExcept idnt a b c d e f) =
     TryExcept idnt a b <$> _Exprs fun c <*>
     traverse
-      (\(a, b, c, d) -> (,,,) a b <$> traverse (_Exprs fun) c <*> _Exprs fun d)
+      (\(x, y, z, w) -> (,,,) x y <$> traverse (_Exprs fun) z <*> _Exprs fun w)
       d <*>
     (traverse._3._Exprs) fun e <*>
     (traverse._3._Exprs) fun f

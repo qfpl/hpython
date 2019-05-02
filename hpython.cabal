@@ -151,7 +151,9 @@ library hpython-strings
 
 library hpython-validated
   import: deps, config
-  exposed-modules:     Language.Python.Optics.Validated
+  exposed-modules:     Data.Type.Set
+                     , Data.Validate.Monadic
+                     , Language.Python.Optics.Validated
   build-depends:       hpython-ann
                      , hpython-vdata
   hs-source-dirs:      src/validated
@@ -185,20 +187,28 @@ library hpython-token
                      , hpython-strings
   hs-source-dirs:      src/token
 
+library hpython-ident
+  import: deps, config
+  exposed-modules:     Language.Python.Optics.Idents
+                     , Language.Python.Syntax.Ident
+  build-depends:       hpython-ann
+                     , hpython-punctuation
+                     , hpython-raw
+                     , hpython-validated
+  hs-source-dirs:      src/ident
+
 library hpython-syntax
   import: deps, config
   exposed-modules:     Language.Python.Optics
                      , Language.Python.Optics.Expr
                      , Language.Python.Optics.Exprs
                      , Language.Python.Optics.Indents
-                     , Language.Python.Optics.Idents
                      , Language.Python.Optics.Newlines
                      , Language.Python.Syntax
                      , Language.Python.Syntax.AugAssign
                      , Language.Python.Syntax.Expr
                      , Language.Python.Syntax.Arg
                      , Language.Python.Syntax.Comprehension
-                     , Language.Python.Syntax.Ident
                      , Language.Python.Syntax.Import
                      , Language.Python.Syntax.Module
                      , Language.Python.Syntax.ModuleNames
@@ -208,6 +218,7 @@ library hpython-syntax
                      , Language.Python.Syntax.Statement
                      , Language.Python.Syntax.Types
   build-depends:       hpython-ann
+                     , hpython-ident
                      , hpython-numbers
                      , hpython-punctuation
                      , hpython-raw
@@ -216,6 +227,25 @@ library hpython-syntax
                      , hpython-validated
                      , hpython-vdata
   hs-source-dirs:      src/syntax
+
+library hpython-validation
+  import: deps, config
+  exposed-modules:     Language.Python.Validate
+                     , Language.Python.Validate.Error
+                     , Language.Python.Validate.Scope
+                     , Language.Python.Validate.Scope.Error
+                     , Language.Python.Validate.Syntax
+                     , Language.Python.Validate.Syntax.Error
+                     , Language.Python.Validate.Indentation
+                     , Language.Python.Validate.Indentation.Error
+  build-depends:       hpython-ann
+                     , hpython-parse
+                     , hpython-punctuation
+                     , hpython-strings
+                     , hpython-syntax
+                     , hpython-validated
+                     , hpython-vdata
+  hs-source-dirs:      src/validation
 
 library hpython-render
   import: deps, config
@@ -304,59 +334,138 @@ library
                            (Language.Python.Syntax.Digits.Sig as Language.Python36.Syntax.Digits
                            ,Language.Python.Parse.Digits.Sig as Language.Python36.Parse.Digits
                            )
+                     , hpython-validation
+                         (Language.Python.Validate as Language.Python35.Validate
+                         ,Language.Python.Validate.Error as Language.Python35.Validate.Error
+                         ,Language.Python.Validate.Scope as Language.Python35.Validate.Scope
+                         ,Language.Python.Validate.Scope.Error as Language.Python35.Validate.Scope.Error
+                         ,Language.Python.Validate.Syntax as Language.Python35.Validate.Syntax
+                         ,Language.Python.Validate.Syntax.Error as Language.Python35.Validate.Syntax.Error
+                         ,Language.Python.Validate.Indentation as Language.Python35.Validate.Indentation
+                         ,Language.Python.Validate.Indentation.Error as Language.Python35.Validate.Indentation.Error
+                         )
+                         requires
+                           (Language.Python.Syntax.Digits.Sig as Language.Python35.Syntax.Digits
+                           ,Language.Python.Parse.Digits.Sig as Language.Python35.Parse.Digits
+                           )
+                     , hpython-validation
+                         (Language.Python.Validate as Language.Python36.Validate
+                         ,Language.Python.Validate.Error as Language.Python36.Validate.Error
+                         ,Language.Python.Validate.Scope as Language.Python36.Validate.Scope
+                         ,Language.Python.Validate.Scope.Error as Language.Python36.Validate.Scope.Error
+                         ,Language.Python.Validate.Syntax as Language.Python36.Validate.Syntax
+                         ,Language.Python.Validate.Syntax.Error as Language.Python36.Validate.Syntax.Error
+                         ,Language.Python.Validate.Indentation as Language.Python36.Validate.Indentation
+                         ,Language.Python.Validate.Indentation.Error as Language.Python36.Validate.Indentation.Error
+                         )
+                         requires
+                           (Language.Python.Syntax.Digits.Sig as Language.Python36.Syntax.Digits
+                           ,Language.Python.Parse.Digits.Sig as Language.Python36.Parse.Digits
+                           )
+                     , hpython-render
+                         (Language.Python.Internal.Render as Language.Python35.Internal.Render
+                         ,Language.Python.Internal.Render.Correction as Language.Python35.Internal.Render.Correction
+                         ,Language.Python.Render as Language.Python35.Render
+                         )
+                         requires
+                           (Language.Python.Syntax.Digits.Sig as Language.Python35.Syntax.Digits
+                           ,Language.Python.Parse.Digits.Sig as Language.Python35.Parse.Digits
+                           )
+                     , hpython-render
+                         (Language.Python.Internal.Render as Language.Python36.Internal.Render
+                         ,Language.Python.Internal.Render.Correction as Language.Python36.Internal.Render.Correction
+                         ,Language.Python.Render as Language.Python36.Render
+                         )
+                         requires
+                           (Language.Python.Syntax.Digits.Sig as Language.Python36.Syntax.Digits
+                           ,Language.Python.Parse.Digits.Sig as Language.Python36.Parse.Digits
+                           )
+                     , hpython-dsl
+                         (Language.Python.DSL as Language.Python35.DSL)
+                         requires
+                           (Language.Python.Syntax.Digits.Sig as Language.Python35.Syntax.Digits
+                           ,Language.Python.Parse.Digits.Sig as Language.Python35.Parse.Digits
+                           )
+                     , hpython-dsl
+                         (Language.Python.DSL as Language.Python36.DSL)
+                         requires
+                           (Language.Python.Syntax.Digits.Sig as Language.Python36.Syntax.Digits
+                           ,Language.Python.Parse.Digits.Sig as Language.Python36.Parse.Digits
+                           )
   reexported-modules:  Data.VFix
                      , Data.VFunctor
                      , Data.VFoldable
                      , Data.VTraversable
+                     , Language.Python.Optics.Idents
                      , Language.Python.Optics.Validated
                      , Language.Python.Syntax.Ann
                      , Language.Python.Syntax.Comment
+                     , Language.Python.Syntax.Ident
                      , Language.Python.Syntax.Punctuation
                      , Language.Python.Syntax.Raw
                      , Language.Python.Syntax.Whitespace
 
+                     , Language.Python35.DSL
                      , Language.Python35.Internal.Lexer
                      , Language.Python35.Internal.Parse
+                     , Language.Python35.Internal.Render
+                     , Language.Python35.Internal.Render.Correction
                      , Language.Python35.Internal.Syntax.IR 
                      , Language.Python35.Parse
                      , Language.Python35.Parse.Error
+                     , Language.Python35.Render
                      , Language.Python35.Syntax.Digits
                      , Language.Python35.Syntax.Float
                      , Language.Python35.Syntax.Imag
                      , Language.Python35.Syntax.Int
                      , Language.Python35.Token
+                     , Language.Python35.Validate
+                     , Language.Python35.Validate.Error
+                     , Language.Python35.Validate.Scope
+                     , Language.Python35.Validate.Scope.Error
+                     , Language.Python35.Validate.Syntax
+                     , Language.Python35.Validate.Syntax.Error
+                     , Language.Python35.Validate.Indentation
+                     , Language.Python35.Validate.Indentation.Error
 
+                     , Language.Python36.DSL
                      , Language.Python36.Internal.Lexer
                      , Language.Python36.Internal.Parse
+                     , Language.Python36.Internal.Render
+                     , Language.Python36.Internal.Render.Correction
                      , Language.Python36.Internal.Syntax.IR 
                      , Language.Python36.Parse
                      , Language.Python36.Parse.Error
+                     , Language.Python36.Render
                      , Language.Python36.Syntax.Digits
                      , Language.Python36.Syntax.Float
                      , Language.Python36.Syntax.Imag
                      , Language.Python36.Syntax.Int
                      , Language.Python36.Token
+                     , Language.Python36.Validate
+                     , Language.Python36.Validate.Error
+                     , Language.Python36.Validate.Scope
+                     , Language.Python36.Validate.Scope.Error
+                     , Language.Python36.Validate.Syntax
+                     , Language.Python36.Validate.Syntax.Error
+                     , Language.Python36.Validate.Indentation
+                     , Language.Python36.Validate.Indentation.Error
 
-  exposed-modules:     Data.Type.Set
-                     , Data.Validate.Monadic
-                     , Language.Python
-                     , Language.Python.Validate
-                     , Language.Python.Validate.Error
-                     , Language.Python.Validate.Scope
-                     , Language.Python.Validate.Scope.Error
-                     , Language.Python.Validate.Syntax
-                     , Language.Python.Validate.Syntax.Error
-                     , Language.Python.Validate.Indentation
-                     , Language.Python.Validate.Indentation.Error
+  exposed-modules:     Language.Python35
+                     , Language.Python36
   build-depends:       hpython-vdata
                      , hpython-ann
+                     , hpython-dsl
+                     , hpython-ident
                      , hpython-numbers
                      , hpython-numbers35
                      , hpython-numbers36
                      , hpython-punctuation
                      , hpython-parse
                      , hpython-raw
+                     , hpython-render
                      , hpython-validated
+                     , hpython-validation
   hs-source-dirs:      src
 
 executable example

@@ -539,8 +539,8 @@ validateExprSyntax expr =
       liftVM1 (local $ inParens .~ True) (validateExprSyntax e) <*>
       validateWhitespace (getAnn a) ws2
     Bool a b ws -> pure $ Bool a b ws
-    Unary a op expr ->
-      Unary a op <$> validateExprSyntax expr
+    Unary a op ex ->
+      Unary a op <$> validateExprSyntax ex
     String a strLits ->
       if
         all
@@ -583,7 +583,7 @@ validateExprSyntax expr =
       validateComprehensionSyntax
         (fmap VIdentity . validateExprSyntax . unVIdentity)
         comp
-    Await a ws expr ->
+    Await a ws ex ->
       bindVM ask $ \ctxt ->
       Await a <$>
       validateWhitespace (getAnn a) ws <*
@@ -593,15 +593,15 @@ validateExprSyntax expr =
       if ctxt^.inGenerator
       then errorVM1 $ _AwaitInsideComprehension # getAnn a
       else pure ()) <*>
-      validateExprSyntax expr
-    Deref a expr ws1 name ->
+      validateExprSyntax ex
+    Deref a ex ws1 name ->
       Deref a <$>
-      validateExprSyntax expr <*>
+      validateExprSyntax ex <*>
       validateWhitespace (getAnn a) ws1 <*>
       validateIdentSyntax name
-    Call a expr ws args ws2 ->
+    Call a ex ws args ws2 ->
       Call a <$>
-      validateExprSyntax expr <*>
+      validateExprSyntax ex <*>
       liftVM1 (local $ inParens .~ True) (validateWhitespace (getAnn a) ws) <*>
       liftVM1 (local $ inParens .~ True) (traverse validateArgsSyntax args) <*>
       validateWhitespace (getAnn a) ws2
@@ -624,8 +624,8 @@ validateExprSyntax expr =
         validateComprehensionSyntax dictItem comp) <*>
       validateWhitespace (getAnn a) ws2
       where
-        dictItem (DictUnpack a _ _) = errorVM1 (_InvalidDictUnpacking # getAnn a)
-        dictItem a = validateDictItemSyntax a
+        dictItem (DictUnpack aa _ _) = errorVM1 (_InvalidDictUnpacking # getAnn aa)
+        dictItem aa = validateDictItemSyntax aa
     Dict a b c d ->
       Dict a b <$>
       liftVM1
@@ -639,8 +639,8 @@ validateExprSyntax expr =
         validateComprehensionSyntax setItem comp) <*>
       validateWhitespace (getAnn a) ws2
       where
-        setItem (SetUnpack a _ _ _) = errorVM1 (_InvalidSetUnpacking # getAnn a)
-        setItem a = validateSetItemSyntax a
+        setItem (SetUnpack aa _ _ _) = errorVM1 (_InvalidSetUnpacking # getAnn aa)
+        setItem aa = validateSetItemSyntax aa
     Set a b c d ->
       Set a b <$>
       liftVM1
@@ -687,11 +687,11 @@ validateDecoratorSyntax (Decorator a b c d e f g) =
   traverseOf (traverse._1) validateBlankSyntax g
   where
     someDerefs Ident{} = True
-    someDerefs (Deref _ a _ _) = someDerefs $ vout a
+    someDerefs (Deref _ aa _ _) = someDerefs $ vout aa
     someDerefs _ = False
 
-    isDecoratorValue e@(Call _ a _ _ _) | someDerefs (vout a) = pure $ unsafeCoerce e
-    isDecoratorValue e | someDerefs e = pure $ unsafeCoerce e
+    isDecoratorValue ee@(Call _ aa _ _ _) | someDerefs (vout aa) = pure $ unsafeCoerce ee
+    isDecoratorValue ee | someDerefs ee = pure $ unsafeCoerce ee
     isDecoratorValue _ = errorVM1 (_MalformedDecorator # getAnn a)
 
 validateBlankSyntax :: AsSyntaxError e a => Blank a -> ValidateSyntax e (Blank a)
@@ -739,8 +739,8 @@ validateCompoundStatementSyntax (If a idnts ws1 expr body elifs body') =
   validateExprSyntax expr <*>
   validateSuiteSyntax body <*>
   traverse
-    (\(a, b, c, d) ->
-       (\c' -> (,,,) a b c') <$>
+    (\(aa, b, c, d) ->
+       (\c' -> (,,,) aa b c') <$>
        validateExprSyntax c <*>
        validateSuiteSyntax d)
     elifs <*>
@@ -756,9 +756,9 @@ validateCompoundStatementSyntax (TryExcept a idnts b e f k l) =
   validateWhitespace (getAnn a) b <*>
   validateSuiteSyntax e <*>
   traverse
-    (\(idnts, f, g, j) ->
-       (,,,) idnts <$>
-       validateWhitespace (getAnn a) f <*>
+    (\(is, ff, g, j) ->
+       (,,,) is <$>
+       validateWhitespace (getAnn a) ff <*>
        traverse validateExceptAsSyntax g <*>
        validateSuiteSyntax j)
     f <*
@@ -766,14 +766,14 @@ validateCompoundStatementSyntax (TryExcept a idnts b e f k l) =
    then errorVM1 $ _DefaultExceptMustBeLast # getAnn a
    else pure ()) <*>
   traverse
-    (\(idnts, x, w) ->
-       (,,) idnts <$>
+    (\(is, x, w) ->
+       (,,) is <$>
        validateWhitespace (getAnn a) x <*>
        validateSuiteSyntax w)
     k <*>
   traverse
-    (\(idnts, x, w) ->
-       (,,) idnts <$>
+    (\(is, x, w) ->
+       (,,) is <$>
        validateWhitespace (getAnn a) x <*>
        liftVM1 (local $ inFinally .~ True) (validateSuiteSyntax w))
     l
@@ -816,8 +816,8 @@ validateCompoundStatementSyntax (For a idnts asyncWs b c d e h i) =
     (local $ (inFinally .~ False) . (inLoop .~ True))
     (validateSuiteSyntax h) <*>
   traverse
-    (\(idnts, x, w) ->
-       (,,) idnts <$>
+    (\(is, x, w) ->
+       (,,) is <$>
        validateWhitespace (getAnn a) x <*>
        validateSuiteSyntax w)
     i
@@ -830,15 +830,15 @@ validateCompoundStatementSyntax (With a b asyncWs c d e) =
   traverse (validateWhitespace $ getAnn a) asyncWs <*>
   validateWhitespace (getAnn a) c <*>
   traverse
-    (\(WithItem a b c) ->
-        WithItem a <$>
-        validateExprSyntax b <*>
+    (\(WithItem x y z) ->
+        WithItem x <$>
+        validateExprSyntax y <*>
         traverse
-          (\(ws, b) ->
+          (\(ws, bb) ->
              (,) <$>
              validateWhitespace (getAnn a) ws <*>
-             validateAssignmentSyntax (getAnn a) b)
-          c)
+             validateAssignmentSyntax (getAnn a) bb)
+          z)
     d <*>
   validateSuiteSyntax e
 
@@ -975,7 +975,7 @@ validateSimpleStatementSyntax (Assign a lvalue rs) =
     in
       Assign a <$>
       validateAssignmentSyntax (getAnn a) lvalue <*>
-      ((\a b -> case a of; [] -> pure b; a : as -> a :| (snoc as b)) <$>
+      ((\aa b -> case aa of; [] -> pure b; c : cs -> c :| (snoc cs b)) <$>
        traverse
          (\(ws, b) ->
             (,) <$>
@@ -1034,9 +1034,9 @@ validateSimpleStatementSyntax (Global a ws ids) =
 validateSimpleStatementSyntax (Nonlocal a ws ids) =
   ask `bindVM` \sctxt ->
   get `bindVM` \nls ->
-  (case deleteFirstsBy' (\a -> (==) (a ^. unvalidated.identValue)) (ids ^.. folded.unvalidated) nls of
+  (case deleteFirstsBy' (\aa -> (==) (aa ^. unvalidated.identValue)) (ids ^.. folded.unvalidated) nls of
      [] -> pure ()
-     ids -> traverse_ (\e -> errorVM1 (_NoBindingNonlocal # e)) ids) *>
+     is -> traverse_ (\e -> errorVM1 (_NoBindingNonlocal # e)) is) *>
   case sctxt ^? inFunction._Just.functionParams of
     Nothing -> errorVM1 (_NonlocalOutsideFunction # getAnn a)
     Just params ->

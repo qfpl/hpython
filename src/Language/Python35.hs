@@ -1,5 +1,5 @@
 {-|
-Module      : Language.Python
+Module      : Language.Python35
 Copyright   : (C) CSIRO 2017-2019
 License     : BSD3
 Maintainer  : Isaac Elliott <isaace71295@gmail.com>
@@ -22,19 +22,19 @@ Portability : non-portable
 
 -}
 
-module Language.Python
-  ( module Language.Python.DSL
-  , module Language.Python.Optics
-  , module Language.Python.Parse
-  , module Language.Python.Render
-  , module Language.Python.Syntax
-  , module Language.Python.Validate
+module Language.Python35
+  ( module Language.Python35.DSL
+  , module Language.Python35.Optics
+  , module Language.Python35.Parse
+  , module Language.Python35.Render
+  , module Language.Python35.Syntax
+  , module Language.Python35.Validate
   )
 where
 
-import Language.Python.DSL
-import Language.Python.Optics
-import Language.Python.Parse
-import Language.Python.Render
-import Language.Python.Syntax
-import Language.Python.Validate
+import Language.Python35.DSL
+import Language.Python35.Optics
+import Language.Python35.Parse
+import Language.Python35.Render
+import Language.Python35.Syntax
+import Language.Python35.Validate

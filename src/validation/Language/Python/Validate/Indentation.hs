@@ -263,21 +263,21 @@ validateCompoundStatementIndentation (If a idnt ws1 expr s elifs body1) =
   validateExprIndentation expr <*>
   validateSuiteIndentation idnt s <*>
   traverse
-    (\(idnt2, a, b, c) ->
+    (\(idnt2, x, y, z) ->
        (,,,) <$
        setNextIndent EqualTo (idnt ^. indentsValue) <*>
        checkIndent idnt2 <*>
-       pure a <*>
-       validateExprIndentation b <*>
-       validateSuiteIndentation idnt c)
+       pure x <*>
+       validateExprIndentation y <*>
+       validateSuiteIndentation idnt z)
     elifs <*>
   traverse
-    (\(idnt2, a, b) ->
+    (\(idnt2, x, y) ->
        (,,) <$
        setNextIndent EqualTo (idnt ^. indentsValue) <*>
        checkIndent idnt2 <*>
-       pure a <*>
-       validateSuiteIndentation idnt b)
+       pure x <*>
+       validateSuiteIndentation idnt y)
     body1
 validateCompoundStatementIndentation (While a idnt ws1 expr s els) =
   (\idnt' expr' -> While a idnt' ws1 expr') <$>
@@ -285,40 +285,40 @@ validateCompoundStatementIndentation (While a idnt ws1 expr s els) =
   validateExprIndentation expr <*>
   validateSuiteIndentation idnt s <*>
   traverse
-    (\(idnt2, a, b) ->
+    (\(idnt2, x, y) ->
        (,,) <$
        setNextIndent EqualTo (idnt ^. indentsValue) <*>
        checkIndent idnt2 <*>
-       pure a <*>
-       validateSuiteIndentation idnt b)
+       pure x <*>
+       validateSuiteIndentation idnt y)
     els
 validateCompoundStatementIndentation (TryExcept a idnt b c d e f) =
   (\idnt' -> TryExcept a idnt' b) <$>
   checkIndent idnt <*>
   validateSuiteIndentation idnt c <*>
   traverse
-    (\(a, b, c, d) ->
-       (\a' -> (,,,) a' b) <$
+    (\(x, y, z, w) ->
+       (\a' -> (,,,) a' y) <$
        setNextIndent EqualTo (idnt ^. indentsValue) <*>
-       checkIndent a <*>
-       traverse validateExceptAsIndentation c <*>
-       validateSuiteIndentation idnt d)
+       checkIndent x <*>
+       traverse validateExceptAsIndentation z <*>
+       validateSuiteIndentation idnt w)
     d <*
   setNextIndent EqualTo (idnt ^. indentsValue) <*>
   traverse
-    (\(idnt2, a, b) ->
-       (\idnt2' -> (,,) idnt2' a) <$
+    (\(idnt2, x, y) ->
+       (\idnt2' -> (,,) idnt2' x) <$
        setNextIndent EqualTo (idnt ^. indentsValue) <*>
        checkIndent idnt2 <*>
-       validateSuiteIndentation idnt b)
+       validateSuiteIndentation idnt y)
     e <*
   setNextIndent EqualTo (idnt ^. indentsValue) <*>
   traverse
-    (\(idnt2, a, b) ->
-       (\idnt2' -> (,,) idnt2' a) <$
+    (\(idnt2, x, y) ->
+       (\idnt2' -> (,,) idnt2' x) <$
        setNextIndent EqualTo (idnt ^. indentsValue) <*>
        checkIndent idnt2 <*>
-       validateSuiteIndentation idnt b)
+       validateSuiteIndentation idnt y)
     f
 validateCompoundStatementIndentation (TryFinally a idnt b c idnt2 d e) =
   (\idnt' c' idnt2' -> TryFinally a idnt' b c' idnt2' d) <$>
@@ -335,11 +335,11 @@ validateCompoundStatementIndentation (For a idnt asyncWs b c d e h i) =
   validateSuiteIndentation idnt h <*
   setNextIndent EqualTo (idnt ^. indentsValue) <*>
   traverse
-    (\(idnt2, a, b) ->
-       (\idnt2' -> (,,) idnt2' a) <$
+    (\(idnt2, x, y) ->
+       (\idnt2' -> (,,) idnt2' x) <$
        setNextIndent EqualTo (idnt ^. indentsValue) <*>
        checkIndent idnt2 <*>
-       validateSuiteIndentation idnt b)
+       validateSuiteIndentation idnt y)
     i
 validateCompoundStatementIndentation (ClassDef a decos idnt b c d e) =
   (\decos' idnt' ->

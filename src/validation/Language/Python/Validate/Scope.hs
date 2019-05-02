@@ -233,8 +233,8 @@ validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
      validateExprScope e <*>
      validateSuiteScope b <*>
      traverse
-       (\(a, b, c, d) ->
-          (\c' -> (,,,) a b c') <$>
+       (\(x, y, c, d) ->
+          (\c' -> (,,,) x y c') <$>
           validateExprScope c <*>
           validateSuiteScope d)
        elifs <*>
@@ -256,8 +256,8 @@ validateCompoundStatementScope (TryExcept idnts a b e f k l) =
     (TryExcept idnts a b <$>
      validateSuiteScope e <*>
      traverse
-       (\(idnts, ws, g, h) ->
-          (,,,) idnts ws <$>
+       (\(i, ws, g, h) ->
+          (,,,) i ws <$>
           traverse validateExceptAsScope g <*>
           locallyExtendOver
             scGlobalScope
@@ -291,10 +291,10 @@ validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
     pure d <*>
     traverse validateExprScope e <*>
     (let
-       ls = c ^.. unvalidated.cosmos._Ident.to (view annot_ &&& _identValue)
+       lss = c ^.. unvalidated.cosmos._Ident.to (view annot_ &&& _identValue)
      in
-       extendScope scLocalScope ls *>
-       extendScope scImmediateScope ls *>
+       extendScope scLocalScope lss *>
+       extendScope scImmediateScope lss *>
        validateSuiteScope h) <*>
     traverseOf (traverse._3) validateSuiteScope i))
 validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
@@ -312,10 +312,10 @@ validateCompoundStatementScope (With a b asyncWs c d e) =
   in
     With @(Nub (Scope ': v)) a b asyncWs c <$>
     traverse
-      (\(WithItem a b c) ->
-         WithItem @(Nub (Scope ': v)) a <$>
-         validateExprScope b <*>
-         traverseOf (traverse._2) validateAssignExprScope c)
+      (\(WithItem x y z) ->
+         WithItem @(Nub (Scope ': v)) x <$>
+         validateExprScope y <*>
+         traverseOf (traverse._2) validateAssignExprScope z)
       d <*
     extendScope scLocalScope names <*
     extendScope scImmediateScope names <*>
@@ -349,7 +349,7 @@ validateSimpleStatementScope st =
       in
       Assign a <$>
       validateAssignExprScope l <*>
-      ((\a b -> case a of; [] -> b :| []; a : as -> a :| snoc as b) <$>
+      ((\aa b -> case aa of; [] -> b :| []; c : cs -> c :| snoc cs b) <$>
       traverseOf (traverse._2) validateAssignExprScope (NonEmpty.init rs) <*>
       (\(ws, b) -> (,) ws <$> validateExprScope b) (NonEmpty.last rs)) <*
       extendScope scLocalScope ls <*
@@ -363,7 +363,7 @@ validateSimpleStatementScope st =
     Del a ws cs ->
       Del a ws <$
       traverse_
-        (\case; VIn (Ident a _) -> errorVM1 (_DeletedIdent # getAnn a); _ -> pure ())
+        (\case; VIn (Ident aa _) -> errorVM1 (_DeletedIdent # getAnn aa); _ -> pure ())
         cs <*>
       traverse validateExprScope cs
     Pass{} -> pure $ unsafeCoerce st
@@ -460,19 +460,19 @@ validateComprehensionScope f (Comprehension a b c d) =
       :: AsScopeError e a
       => CompFor Expr v a
       -> ValidateScope a e (CompFor Expr (Nub (Scope ': v)) a)
-    validateCompForScope (CompFor a b c d e) =
-      (\c' -> CompFor a b c' d) <$>
-      validateAssignExprScope c <*>
+    validateCompForScope (CompFor x y z w e) =
+      (\z' -> CompFor x y z' w) <$>
+      validateAssignExprScope z <*>
       validateExprScope e <*
       extendScope scGlobalScope
-        (c ^.. unvalidated.assignTargets.to (view annot_ &&& _identValue))
+        (z ^.. unvalidated.assignTargets.to (view annot_ &&& _identValue))
 
     validateCompIfScope
       :: AsScopeError e a
       => CompIf Expr v a
       -> ValidateScope a e (CompIf Expr (Nub (Scope ': v)) a)
-    validateCompIfScope (CompIf a b c) =
-      CompIf a b <$> validateExprScope c
+    validateCompIfScope (CompIf x y z) =
+      CompIf x y <$> validateExprScope z
 
 validateAssignExprScope
   :: AsScopeError e a
@@ -490,8 +490,8 @@ validateAssignExprScope expr =
       traverseOf (traverse.traverse) listItem es <*>
       pure ws2
       where
-        listItem (ListItem a b) = ListItem a <$> validateAssignExprScope b
-        listItem (ListUnpack a b c d) = ListUnpack a b c <$> validateAssignExprScope d
+        listItem (ListItem x y) = ListItem x <$> validateAssignExprScope y
+        listItem (ListUnpack x y z w) = ListUnpack x y z <$> validateAssignExprScope w
     Deref a e ws1 r ->
       Deref a <$>
       validateExprScope e <*>
@@ -507,8 +507,8 @@ validateAssignExprScope expr =
       pure ws <*>
       traverseOf (traverse.traverse) tupleItem d
       where
-        tupleItem (TupleItem a b) = TupleItem a <$> validateAssignExprScope b
-        tupleItem (TupleUnpack a b c d) = TupleUnpack a b c <$> validateAssignExprScope d
+        tupleItem (TupleItem x y) = TupleItem x <$> validateAssignExprScope y
+        tupleItem (TupleUnpack x y z w) = TupleUnpack x y z <$> validateAssignExprScope w
     Unit{} -> pure $ unsafeCoerce expr
     Lambda{} -> pure $ unsafeCoerce expr
     Yield{} -> pure $ unsafeCoerce expr

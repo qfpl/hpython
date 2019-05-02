@@ -1,5 +1,37 @@
 # Revision history for hpython
 
+## 0.3
+
+* Changed the sigature of `Data.Validation.Monadic.bindVM` to have the same form as
+  `(>>=)`
+  
+* Added `HasAnn` instance for `Language.Python.Syntax.Ann.Ann`
+
+* Reworked scope checking (`Language.Python.Validate.Scope`)
+
+  Instead of the old triplicate `ScopeContext`, we now keep a single context
+  and mark each entry with its 'occurrence path'. This is much simpler to manage,
+  but just as expressive as the old version.
+  
+* Improved scope checking of compound statements
+
+  Compound statements like
+  
+  ```
+  if ...:
+      x = 1
+  else:
+      y = x
+  ```
+  
+  were succeeding in scope checking because the variables from each block were
+  added to the scope sequentially. Now, the multiple blocks are checked in the
+  same scope, and their final scopes are combined at the end of the process.
+  
+* Added `Foldable1`/`Traversable1` instances for `CommaSep1` and `CommaSep1'`
+
+* Added `HasStatements1` with instances for `Statement` and `Block`
+
 ## 0.2
 
 *2019-01-10*

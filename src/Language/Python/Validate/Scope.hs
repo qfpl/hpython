@@ -1,10 +1,11 @@
 {-# language DataKinds, TypeOperators #-}
-{-# language GeneralizedNewtypeDeriving #-}
-{-# language TemplateHaskell, TypeFamilies, FlexibleInstances, MultiParamTypeClasses #-}
+{-# language DeriveFunctor #-}
 {-# language FlexibleContexts #-}
 {-# language RankNTypes #-}
 {-# language LambdaCase #-}
+{-# language OverloadedLists #-}
 {-# language ScopedTypeVariables, TypeApplications #-}
+{-# language MultiParamTypeClasses #-}
 
 {-|
 Module      : Language.Python.Validate.Scope
@@ -25,15 +26,15 @@ module Language.Python.Validate.Scope
   , validateExprScope
     -- * Miscellany
     -- ** Extra types
-  , ScopeContext(..), scGlobalScope, scLocalScope, scImmediateScope
-  , runValidateScope'
-  , initialScopeContext
-  , Binding(..)
+  , Level(..), Entry(..)
     -- ** Extra functions
+  , runValidateScope'
+  , definitionScope
+  , controlScope
   , inScope
+  , lookupScope
+  , localScope
   , extendScope
-  , locallyOver
-  , locallyExtendOver
     -- ** Validation functions
   , validateArgScope
   , validateAssignExprScope
@@ -56,34 +57,34 @@ where
 
 import Data.Validation
 
-import Control.Arrow ((&&&))
-import Control.Applicative ((<|>))
 import Control.Lens.Cons (snoc)
 import Control.Lens.Fold ((^..), toListOf, folded)
-import Control.Lens.Getter ((^.), view, to, getting, use)
-import Control.Lens.Lens (Lens')
+import Control.Lens.Getter ((^.), to, getting)
 import Control.Lens.Plated (cosmos)
 import Control.Lens.Prism (_Right, _Just)
 import Control.Lens.Review ((#))
-import Control.Lens.Setter ((%~), (.~), Setter', mapped, over)
-import Control.Lens.TH (makeLenses)
+import Control.Lens.Setter (mapped, over)
 import Control.Lens.Tuple (_2, _3)
 import Control.Lens.Traversal (traverseOf)
-import Control.Monad.State (MonadState, State, evalState, modify)
+import Control.Monad.State (State, evalState, modify, get, put)
+import Control.Monad.Reader (ReaderT, runReaderT, ask, local)
 import Data.Bitraversable (bitraverse)
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
-import Data.Foldable (traverse_)
-import Data.Functor.Compose (Compose(..))
+import Data.Foldable (toList, traverse_)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Map.Strict (Map)
+import Data.Maybe (isJust)
+import Data.Sequence ((|>), Seq)
 import Data.String (fromString)
 import Data.Type.Set (Nub)
-import Data.Validate.Monadic (ValidateM(..), runValidateM, bindVM, liftVM0, errorVM1)
+import Data.Validate.Monadic
+  (ValidateM(..), runValidateM, bindVM, liftVM0, liftVM1, errorVM1)
 import Unsafe.Coerce (unsafeCoerce)
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import Data.Sequence as Seq
 
 import Language.Python.Optics
 import Language.Python.Optics.Validated (unvalidated)
@@ -96,86 +97,66 @@ import Language.Python.Validate.Scope.Error
 
 data Scope
 
-data Binding = Clean | Dirty
-  deriving (Eq, Ord, Show)
-
-data ScopeContext a
-  = ScopeContext
-  { _scGlobalScope :: !(Map ByteString a)
-  , _scLocalScope :: !(Map ByteString a)
-  , _scImmediateScope :: !(Map ByteString a)
-  }
+data Level
+  = Toplevel
+  | Definition
+  | Control
   deriving (Eq, Show)
-makeLenses ''ScopeContext
 
-initialScopeContext :: ScopeContext a
-initialScopeContext = ScopeContext Map.empty Map.empty Map.empty
+data Entry a
+  = Entry
+  { _entryValue :: a
+  , _entryPath :: !(Seq Level)
+  } deriving (Eq, Show, Functor)
 
-type ValidateScope ann e = ValidateM (NonEmpty e) (State (ScopeContext ann))
+type ValidateScope ann e
+  = ValidateM
+      (NonEmpty e)
+      (ReaderT (Seq Level) (State (Map ByteString (Entry ann))))
 
 runValidateScope :: ValidateScope ann e a -> Validation (NonEmpty e) a
-runValidateScope = runValidateScope' initialScopeContext
+runValidateScope = runValidateScope' [Toplevel] mempty
 
-runValidateScope' :: ScopeContext ann -> ValidateScope ann e a -> Validation (NonEmpty e) a
-runValidateScope' s = flip evalState s . runValidateM
+runValidateScope' ::
+  Seq Level -> -- ^ Path
+  Map ByteString (Entry ann) -> -- ^ Context
+  ValidateScope ann e a -> -- ^ Validation action
+  Validation (NonEmpty e) a
+runValidateScope' path s = flip evalState s . flip runReaderT path . runValidateM
 
-extendScope
-  :: Setter' (ScopeContext ann) (Map ByteString ann)
-  -> [(ann, String)]
-  -> ValidateScope ann e ()
-extendScope l s =
-  liftVM0 $ do
-    gs <- use scGlobalScope
-    let t = buildMap gs Map.empty
-    modify (over l (t `unionL`))
-  where
-    buildMap gs t =
-      foldr
-      (\(ann, a) b ->
-          let
-            a' = fromString a
-          in
-            if Map.member a' gs
-            then b
-            else Map.insert a' ann b)
-      t
-      s
+localScope ::
+  (Map ByteString (Entry ann) -> Map ByteString (Entry ann)) ->
+  ValidateScope ann e a ->
+  ValidateScope ann e a
+localScope f m =
+  liftVM0 get `bindVM` \s ->
+  liftVM0 (modify f) *>
+  m <* liftVM0 (put s)
 
-locallyOver
-  :: Lens' (ScopeContext ann) b
-  -> (b -> b)
-  -> ValidateScope ann e a
-  -> ValidateScope ann e a
-locallyOver l f m =
-  ValidateM . Compose $ do
-    before <- use l
-    modify (l %~ f)
-    getCompose (unValidateM m) <* modify (l .~ before)
+-- | Run a validation action for a definition block
+definitionScope :: ValidateScope ann e a -> ValidateScope ann e a
+definitionScope = liftVM1 (local (|> Definition)) . localScope id
 
-locallyExtendOver
-  :: Lens' (ScopeContext ann) (Map ByteString ann)
-  -> [(ann, String)]
-  -> ValidateScope ann e a
-  -> ValidateScope ann e a
-locallyExtendOver l s m = locallyOver l id $ extendScope l s *> m
+-- | Run a validation action for a flow control block
+controlScope :: ValidateScope ann e a -> ValidateScope ann e a
+controlScope = liftVM1 (local (|> Control))
 
-inScope
-  :: MonadState (ScopeContext ann) m
-  => String
-  -> m (Maybe (Binding, ann))
-inScope s = do
-  gs <- use scGlobalScope
-  ls <- use scLocalScope
-  is <- use scImmediateScope
-  let
-    s' = fromString s
-    inls = Map.lookup s' ls
-    ings = Map.lookup s' gs
-  pure $
-    ((,) Clean <$> Map.lookup s' is) <|>
-    (ings *> ((,) Clean <$> inls)) <|>
-    ((,) Clean <$> ings) <|>
-    ((,) Dirty <$> inls)
+-- | Add some entries to the context, using the current depth and level
+extendScope :: [Ident v ann] -> ValidateScope ann e ()
+extendScope entries =
+  liftVM0 ask `bindVM` \path ->
+  liftVM0 . modify $ \scope ->
+    foldr
+      (\ident ->
+         Map.insert (fromString $ _identValue ident) (Entry (ident ^. annot_) path))
+      scope
+      entries
+
+inScope :: String -> ValidateScope ann e Bool
+inScope = fmap isJust . lookupScope
+
+lookupScope :: String -> ValidateScope ann e (Maybe (Entry ann))
+lookupScope s = Map.lookup (fromString s) <$> liftVM0 get 
 
 validateExceptAsScope
   :: AsScopeError e a
@@ -202,122 +183,147 @@ validateDecoratorScope (Decorator a b c d e f g) =
   (\d' -> Decorator a b c d' e f g) <$>
   validateExprScope d
 
+parallel2 ::
+  ValidateScope a e x ->
+  ValidateScope a e y ->
+  ValidateScope a e (x, y)
+parallel2 a b =
+  liftVM0 get `bindVM` \st ->
+  ((,) <$>
+   ((,) <$ liftVM0 (put st) <*> a <*> liftVM0 get) <*>
+   ((,) <$ liftVM0 (put st) <*> b <*> liftVM0 get)) `bindVM`
+  \((ares, ast), (bres, bst)) ->
+  (ares, bres) <$
+    liftVM0
+    (put $
+     Map.unionWith
+       (\e1 e2 ->
+          if Seq.length (_entryPath e1) < Seq.length (_entryPath e2)
+          then e2
+          else e1)
+       ast
+       bst)
+
+parallelList ::
+  (x -> ValidateScope a e y) ->
+  [x] ->
+  ValidateScope a e [y]
+parallelList _ [] = pure []
+parallelList f (x:xs) = uncurry (:) <$> parallel2 (f x) (parallelList f xs)
+
+parallelNonEmpty ::
+  (x -> ValidateScope a e y) ->
+  NonEmpty x ->
+  ValidateScope a e (NonEmpty y)
+parallelNonEmpty f (x:|xs) = uncurry (:|) <$> parallel2 (f x) (parallelList f xs)
+
+parallel3 ::
+  ValidateScope a e x1 ->
+  ValidateScope a e x2 ->
+  ValidateScope a e x3 ->
+  ValidateScope a e (x1, x2, x3)
+parallel3 a b c = (\(a', (b', c')) -> (a', b', c')) <$> parallel2 a (parallel2 b c)
+
+parallel4 ::
+  ValidateScope a e x1 ->
+  ValidateScope a e x2 ->
+  ValidateScope a e x3 ->
+  ValidateScope a e x4 ->
+  ValidateScope a e (x1, x2, x3, x4)
+parallel4 a b c d =
+  (\(a', (b', c', d')) -> (a', b', c', d')) <$> parallel2 a (parallel3 b c d)
+
 validateCompoundStatementScope
   :: forall e v a
    . AsScopeError e a
   => CompoundStatement v a
   -> ValidateScope a e (CompoundStatement (Nub (Scope ': v)) a)
 validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params ws3 mty s) =
-  (locallyOver scLocalScope (const Map.empty) $
-   locallyOver scImmediateScope (const Map.empty) $
-     (\decos' -> Fundef a decos' idnts asyncWs ws1 (coerce name) ws2) <$>
-     traverse validateDecoratorScope decos <*>
-     traverse validateParamScope params <*>
-     pure ws3 <*>
-     traverseOf (traverse._2) validateExprScope mty <*>
-     locallyExtendOver
-       scGlobalScope
-       ((view annot_ &&& _identValue) name :
-         toListOf (folded.getting paramName.to (view annot_ &&& _identValue)) params)
-       (validateSuiteScope s)) <*
-  extendScope scLocalScope [(view annot_ &&& _identValue) name] <*
-  extendScope scImmediateScope [(view annot_ &&& _identValue) name]
+  (\decos' -> Fundef a decos' idnts asyncWs ws1 (coerce name) ws2) <$>
+  traverse validateDecoratorScope decos <*>
+  traverse validateParamScope params <*>
+  pure ws3 <*>
+  traverseOf (traverse._2) validateExprScope mty <*>
+  definitionScope
+    (extendScope (name : toListOf (folded.getting paramName) params) *>
+     validateSuiteScope s) <*
+  extendScope [name]
 validateCompoundStatementScope (If idnts a ws1 e b elifs melse) =
-  use scLocalScope `bindVM` (\ls ->
-  use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` unionR ls is) $
-  locallyOver scImmediateScope (const Map.empty)
-    (If idnts a ws1 <$>
-     validateExprScope e <*>
-     validateSuiteScope b <*>
-     traverse
-       (\(a, b, c, d) ->
-          (\c' -> (,,,) a b c') <$>
-          validateExprScope c <*>
-          validateSuiteScope d)
-       elifs <*>
-     traverseOf (traverse._3) validateSuiteScope melse)))
+  (\e' (b', elifs', melse') -> If idnts a ws1 e' b' elifs' melse') <$>
+  validateExprScope e <*>
+  parallel3
+    (controlScope $ validateSuiteScope b)
+    (parallelList
+     (\(a, b, c, d) ->
+       (,,,) a b <$>
+       validateExprScope c <*>
+       controlScope (validateSuiteScope d))
+     elifs)
+    (traverseOf (traverse._3) (controlScope . validateSuiteScope) melse)
 validateCompoundStatementScope (While idnts a ws1 e b els) =
-  use scLocalScope `bindVM` (\ls ->
-  use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` unionR ls is) $
-  locallyOver scImmediateScope (const Map.empty)
-    (While idnts a ws1 <$>
-     validateExprScope e <*>
-     validateSuiteScope b <*>
-     traverseOf (traverse._3) validateSuiteScope els)))
+  While idnts a ws1 <$>
+  validateExprScope e <*>
+  controlScope (validateSuiteScope b) <*>
+  traverseOf (traverse._3) (controlScope . validateSuiteScope) els
 validateCompoundStatementScope (TryExcept idnts a b e f k l) =
-  use scLocalScope `bindVM` (\ls ->
-  use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` unionR ls is) $
-  locallyOver scImmediateScope (const Map.empty)
-    (TryExcept idnts a b <$>
-     validateSuiteScope e <*>
-     traverse
+  (\(e', f', k', l') -> TryExcept idnts a b e' f' k' l') <$>
+  parallel4
+    (controlScope $ validateSuiteScope e)
+    (parallelNonEmpty
        (\(idnts, ws, g, h) ->
-          (,,,) idnts ws <$>
-          traverse validateExceptAsScope g <*>
-          locallyExtendOver
-            scGlobalScope
-            (toListOf (folded.exceptAsName._Just._2.to (view annot_ &&& _identValue)) g)
-            (validateSuiteScope h))
-       f <*>
-     traverseOf (traverse._3) validateSuiteScope k <*>
-     traverseOf (traverse._3) validateSuiteScope l)))
+         (,,,) idnts ws <$>
+         traverse validateExceptAsScope g <*>
+         controlScope
+         (extendScope (toListOf (folded.exceptAsName._Just._2) g) *>
+          validateSuiteScope h))
+       f)
+    (traverseOf (traverse._3) (controlScope . validateSuiteScope) k)
+    (traverseOf (traverse._3) (controlScope . validateSuiteScope) l)
 validateCompoundStatementScope (TryFinally idnts a b e idnts2 f i) =
-  use scLocalScope `bindVM` (\ls ->
-  use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` unionR ls is) $
-  locallyOver scImmediateScope (const Map.empty)
-    (TryFinally idnts a b <$>
-     validateSuiteScope e <*>
-     pure idnts2 <*>
-     pure f <*>
-     validateSuiteScope i)))
+  (\(e', i') -> TryFinally idnts a b e' idnts2 f i') <$>
+  parallel2
+    (controlScope $ validateSuiteScope e)
+    (controlScope $ validateSuiteScope i)
 validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
-  use scLocalScope `bindVM` (\ls ->
-  use scImmediateScope `bindVM` (\is ->
-  locallyOver scGlobalScope (`unionR` unionR ls is) $
-  locallyOver scImmediateScope (const Map.empty) $
-    For @(Nub (Scope ': v)) idnts a asyncWs b <$>
+  let
+    cs = c ^.. unvalidated.cosmos._Ident
+  in
+    (\c' d' e' (h', i') -> For idnts a asyncWs b c' d' e' h' i') <$>
     (unsafeCoerce c <$
      traverse
        (\s ->
-          inScope (s ^. identValue) `bindVM` \res ->
-          maybe (pure ()) (\_ -> errorVM1 (_BadShadowing # coerce s)) res)
-       (c ^.. unvalidated.cosmos._Ident)) <*>
+         inScope (s ^. identValue) `bindVM` \res ->
+         if res then errorVM1 (_BadShadowing # coerce s) else pure ())
+       cs) <*>
     pure d <*>
     traverse validateExprScope e <*>
-    (let
-       ls = c ^.. unvalidated.cosmos._Ident.to (view annot_ &&& _identValue)
-     in
-       extendScope scLocalScope ls *>
-       extendScope scImmediateScope ls *>
-       validateSuiteScope h) <*>
-    traverseOf (traverse._3) validateSuiteScope i))
+    parallel2
+      (controlScope $
+       extendScope (toList cs) *>
+       validateSuiteScope h)
+      (traverseOf (traverse._3) (controlScope . validateSuiteScope) i)
 validateCompoundStatementScope (ClassDef a decos idnts b c d g) =
-  (\decos' -> ClassDef @(Nub (Scope ': v)) a decos' idnts b (coerce c)) <$>
+  (\decos' -> ClassDef a decos' idnts b (coerce c)) <$>
   traverse validateDecoratorScope decos <*>
   traverseOf (traverse._2.traverse.traverse) validateArgScope d <*>
-  validateSuiteScope g <*
-  extendScope scImmediateScope [c ^. to (view annot_ &&& _identValue)]
+  definitionScope (validateSuiteScope g) <*
+  extendScope [c]
 validateCompoundStatementScope (With a b asyncWs c d e) =
   let
     names =
       d ^..
       folded.unvalidated.to _withItemBinder.folded._2.
-      assignTargets.to (view annot_ &&& _identValue)
+      assignTargets
   in
-    With @(Nub (Scope ': v)) a b asyncWs c <$>
+    With a b asyncWs c <$>
     traverse
       (\(WithItem a b c) ->
          WithItem @(Nub (Scope ': v)) a <$>
          validateExprScope b <*>
          traverseOf (traverse._2) validateAssignExprScope c)
       d <*
-    extendScope scLocalScope names <*
-    extendScope scImmediateScope names <*>
-    validateSuiteScope e
+    extendScope names <*>
+    controlScope (validateSuiteScope e)
 
 validateSimpleStatementScope
   :: AsScopeError e a
@@ -338,18 +344,11 @@ validateSimpleStatementScope (Raise a ws f) =
 validateSimpleStatementScope (Return a ws e) = Return a ws <$> traverse validateExprScope e
 validateSimpleStatementScope (Expr a e) = Expr a <$> validateExprScope e
 validateSimpleStatementScope (Assign a l rs) =
-  let
-    ls =
-      (l : (snd <$> NonEmpty.init rs)) ^..
-      folded.unvalidated.assignTargets.to (view annot_ &&& _identValue)
-  in
   Assign a <$>
   validateAssignExprScope l <*>
   ((\a b -> case a of; [] -> b :| []; a : as -> a :| snoc as b) <$>
    traverseOf (traverse._2) validateAssignExprScope (NonEmpty.init rs) <*>
-   (\(ws, b) -> (,) ws <$> validateExprScope b) (NonEmpty.last rs)) <*
-  extendScope scLocalScope ls <*
-  extendScope scImmediateScope ls
+   (\(ws, b) -> (,) ws <$> validateExprScope b) (NonEmpty.last rs))
 validateSimpleStatementScope (AugAssign a l aa r) =
   (\l' -> AugAssign a l' aa) <$>
   validateExprScope l <*>
@@ -391,12 +390,15 @@ validateIdentScope
   => Ident v a
   -> ValidateScope a e (Ident (Nub (Scope ': v)) a)
 validateIdentScope i =
-  inScope (_identValue i) `bindVM`
-  \context ->
-  case context of
-    Just (Clean, _) -> pure $ coerce i
-    Just (Dirty, ann)-> errorVM1 (_FoundDynamic # (ann, i ^. unvalidated))
-    Nothing -> errorVM1 (_NotInScope # (i ^. unvalidated))
+  lookupScope (_identValue i) `bindVM` \res ->
+  liftVM0 ask `bindVM` \curPath ->
+    case res of
+      Nothing -> errorVM1 (_NotInScope # (i ^. unvalidated))
+      Just (Entry ann path) ->
+        coerce i <$
+        if Seq.length curPath < Seq.length path
+        then errorVM1 (_FoundDynamic # (ann, i ^. unvalidated))
+        else pure ()
 
 validateArgScope
   :: AsScopeError e a
@@ -446,11 +448,11 @@ validateComprehensionScope
   -> Comprehension ex v a
   -> ValidateScope a e (Comprehension ex (Nub (Scope ': v)) a)
 validateComprehensionScope f (Comprehension a b c d) =
-  locallyOver scGlobalScope id $
-    (\c' d' b' -> Comprehension a b' c' d') <$>
-    validateCompForScope c <*>
-    traverse (bitraverse validateCompForScope validateCompIfScope) d <*>
-    f b
+  controlScope $
+  (\c' d' b' -> Comprehension a b' c' d') <$>
+  validateCompForScope c <*>
+  traverse (bitraverse validateCompForScope validateCompIfScope) d <*>
+  f b
   where
     validateCompForScope
       :: AsScopeError e a
@@ -460,8 +462,7 @@ validateComprehensionScope f (Comprehension a b c d) =
       (\c' -> CompFor a b c' d) <$>
       validateAssignExprScope c <*>
       validateExprScope e <*
-      extendScope scGlobalScope
-        (c ^.. unvalidated.assignTargets.to (view annot_ &&& _identValue))
+      extendScope (c ^.. unvalidated.assignTargets)
 
     validateCompIfScope
       :: AsScopeError e a
@@ -502,6 +503,16 @@ validateAssignExprScope (Tuple a b ws d) =
   where
     tupleItem (TupleItem a b) = TupleItem a <$> validateAssignExprScope b
     tupleItem (TupleUnpack a b c d) = TupleUnpack a b c <$> validateAssignExprScope d
+validateAssignExprScope (Ident a (MkIdent b c d)) =
+  lookupScope c `bindVM` \res ->
+  liftVM0 ask `bindVM` \curPath ->
+  Ident a (MkIdent b c d) <$
+  case res of
+    Nothing -> extendScope [MkIdent b c d]
+    Just (Entry _ path)->
+      if Seq.length curPath < Seq.length path
+      then extendScope [MkIdent b c d]
+      else pure ()
 validateAssignExprScope e@Unit{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Lambda{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Yield{} = pure $ unsafeCoerce e
@@ -511,7 +522,6 @@ validateAssignExprScope e@ListComp{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Call{} = pure $ unsafeCoerce e
 validateAssignExprScope e@UnOp{} = pure $ unsafeCoerce e
 validateAssignExprScope e@BinOp{} = pure $ unsafeCoerce e
-validateAssignExprScope e@Ident{} = pure $ unsafeCoerce e
 validateAssignExprScope e@None{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Ellipsis{} = pure $ unsafeCoerce e
 validateAssignExprScope e@Int{} = pure $ unsafeCoerce e
@@ -668,9 +678,3 @@ validateModuleScope m =
      ModuleStatement <$>
      validateStatementScope a <*>
      validateModuleScope b
-
-unionL :: Ord k => Map k v -> Map k v -> Map k v
-unionL = Map.unionWith const
-
-unionR :: Ord k => Map k v -> Map k v -> Map k v
-unionR = Map.unionWith (const id)

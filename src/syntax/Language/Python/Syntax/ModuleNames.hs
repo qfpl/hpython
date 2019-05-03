@@ -36,6 +36,7 @@ import GHC.Generics (Generic)
 
 import qualified Data.List.NonEmpty as NonEmpty
 
+import Language.Python.Optics.Idents (HasIdents)
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Ident
 import Language.Python.Syntax.Punctuation
@@ -52,6 +53,8 @@ data RelativeModuleName v a
   = RelativeWithName (Ann a) [Dot] (ModuleName v a)
   | Relative (Ann a) (NonEmpty Dot)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents RelativeModuleName
 
 instance HasAnn (RelativeModuleName v) where
   annot :: forall a. Lens' (RelativeModuleName v a) (Ann a)
@@ -80,6 +83,8 @@ data ModuleName v a
   = ModuleNameOne (Ann a) (Ident v a)
   | ModuleNameMany (Ann a) (Ident v a) Dot (ModuleName v a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents ModuleName
 
 instance HasAnn (ModuleName v) where
   annot :: forall a. Lens' (ModuleName v a) (Ann a)

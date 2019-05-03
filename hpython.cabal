@@ -140,12 +140,14 @@ library hpython-numbers
                      , Language.Python.Syntax.Float
                      , Language.Python.Syntax.Numbers
   build-depends:       hpython-ann
+                     , hpython-ident
   hs-source-dirs:      src/numbers
 
 library hpython-strings
   import: deps, config
   exposed-modules:     Language.Python.Syntax.Strings
   build-depends:       hpython-ann
+                     , hpython-ident
                      , hpython-punctuation
   hs-source-dirs:      src/strings
 
@@ -195,6 +197,7 @@ library hpython-ident
                      , hpython-punctuation
                      , hpython-raw
                      , hpython-validated
+                     , hpython-vdata
   hs-source-dirs:      src/ident
 
 library hpython-syntax
@@ -239,6 +242,7 @@ library hpython-validation
                      , Language.Python.Validate.Indentation
                      , Language.Python.Validate.Indentation.Error
   build-depends:       hpython-ann
+                     , hpython-ident
                      , hpython-parse
                      , hpython-punctuation
                      , hpython-strings
@@ -252,7 +256,8 @@ library hpython-render
   exposed-modules:     Language.Python.Internal.Render
                      , Language.Python.Internal.Render.Correction
                      , Language.Python.Render
-  build-depends:       hpython-numbers
+  build-depends:       hpython-ident
+                     , hpython-numbers
                      , hpython-punctuation
                      , hpython-strings
                      , hpython-syntax
@@ -269,6 +274,7 @@ library hpython-parse
                      , Language.Python.Parse
                      , Language.Python.Parse.Error
   build-depends:       hpython-ann
+                     , hpython-ident
                      , hpython-numbers
                      , hpython-punctuation
                      , hpython-strings
@@ -281,6 +287,7 @@ library hpython-dsl
   import: deps, config
   exposed-modules:     Language.Python.DSL
   build-depends:       hpython-ann
+                     , hpython-ident
                      , hpython-punctuation
                      , hpython-raw
                      , hpython-strings
@@ -392,7 +399,56 @@ library
                            (Language.Python.Syntax.Digits.Sig as Language.Python36.Syntax.Digits
                            ,Language.Python.Parse.Digits.Sig as Language.Python36.Parse.Digits
                            )
-  reexported-modules:  Data.VFix
+                     , hpython-syntax
+                         (Language.Python.Optics as Language.Python35.Optics
+                         ,Language.Python.Optics.Expr as Language.Python35.Optics.Expr
+                         ,Language.Python.Optics.Exprs as Language.Python35.Optics.Exprs
+                         ,Language.Python.Optics.Indents as Language.Python35.Optics.Indents
+                         ,Language.Python.Optics.Newlines as Language.Python35.Optics.Newlines
+                         ,Language.Python.Syntax as Language.Python35.Syntax
+                         ,Language.Python.Syntax.AugAssign as Language.Python35.Syntax.AugAssign
+                         ,Language.Python.Syntax.Expr as Language.Python35.Syntax.Expr
+                         ,Language.Python.Syntax.Arg as Language.Python35.Syntax.Arg
+                         ,Language.Python.Syntax.Comprehension as Language.Python35.Syntax.Comprehension
+                         ,Language.Python.Syntax.Import as Language.Python35.Syntax.Import
+                         ,Language.Python.Syntax.Module as Language.Python35.Syntax.Module
+                         ,Language.Python.Syntax.ModuleNames as Language.Python35.Syntax.ModuleNames
+                         ,Language.Python.Syntax.Operator.Binary as Language.Python35.Syntax.Operator.Binary
+                         ,Language.Python.Syntax.Operator.Unary as Language.Python35.Syntax.Operator.Unary
+                         ,Language.Python.Syntax.Param as Language.Python35.Syntax.Param
+                         ,Language.Python.Syntax.Statement as Language.Python35.Syntax.Statement
+                         ,Language.Python.Syntax.Types as Language.Python35.Syntax.Types
+                         )
+                         requires
+                           (Language.Python.Syntax.Digits.Sig as Language.Python35.Syntax.Digits
+                           ,Language.Python.Parse.Digits.Sig as Language.Python35.Parse.Digits
+                           )
+                     , hpython-syntax
+                         (Language.Python.Optics as Language.Python36.Optics
+                         ,Language.Python.Optics.Expr as Language.Python36.Optics.Expr
+                         ,Language.Python.Optics.Exprs as Language.Python36.Optics.Exprs
+                         ,Language.Python.Optics.Indents as Language.Python36.Optics.Indents
+                         ,Language.Python.Optics.Newlines as Language.Python36.Optics.Newlines
+                         ,Language.Python.Syntax as Language.Python36.Syntax
+                         ,Language.Python.Syntax.AugAssign as Language.Python36.Syntax.AugAssign
+                         ,Language.Python.Syntax.Expr as Language.Python36.Syntax.Expr
+                         ,Language.Python.Syntax.Arg as Language.Python36.Syntax.Arg
+                         ,Language.Python.Syntax.Comprehension as Language.Python36.Syntax.Comprehension
+                         ,Language.Python.Syntax.Import as Language.Python36.Syntax.Import
+                         ,Language.Python.Syntax.Module as Language.Python36.Syntax.Module
+                         ,Language.Python.Syntax.ModuleNames as Language.Python36.Syntax.ModuleNames
+                         ,Language.Python.Syntax.Operator.Binary as Language.Python36.Syntax.Operator.Binary
+                         ,Language.Python.Syntax.Operator.Unary as Language.Python36.Syntax.Operator.Unary
+                         ,Language.Python.Syntax.Param as Language.Python36.Syntax.Param
+                         ,Language.Python.Syntax.Statement as Language.Python36.Syntax.Statement
+                         ,Language.Python.Syntax.Types as Language.Python36.Syntax.Types
+                         )
+                         requires
+                           (Language.Python.Syntax.Digits.Sig as Language.Python36.Syntax.Digits
+                           ,Language.Python.Parse.Digits.Sig as Language.Python36.Parse.Digits
+                           )
+  reexported-modules:  Data.VConst
+                     , Data.VFix
                      , Data.VFunctor
                      , Data.VFoldable
                      , Data.VTraversable
@@ -418,6 +474,21 @@ library
                      , Language.Python35.Syntax.Float
                      , Language.Python35.Syntax.Imag
                      , Language.Python35.Syntax.Int
+
+                     , Language.Python35.Syntax
+                     , Language.Python35.Syntax.AugAssign
+                     , Language.Python35.Syntax.Expr
+                     , Language.Python35.Syntax.Arg
+                     , Language.Python35.Syntax.Comprehension
+                     , Language.Python35.Syntax.Import
+                     , Language.Python35.Syntax.Module
+                     , Language.Python35.Syntax.ModuleNames
+                     , Language.Python35.Syntax.Operator.Binary
+                     , Language.Python35.Syntax.Operator.Unary
+                     , Language.Python35.Syntax.Param
+                     , Language.Python35.Syntax.Statement
+                     , Language.Python35.Syntax.Types
+
                      , Language.Python35.Token
                      , Language.Python35.Validate
                      , Language.Python35.Validate.Error
@@ -427,6 +498,11 @@ library
                      , Language.Python35.Validate.Syntax.Error
                      , Language.Python35.Validate.Indentation
                      , Language.Python35.Validate.Indentation.Error
+                     , Language.Python35.Optics
+                     , Language.Python35.Optics.Expr
+                     , Language.Python35.Optics.Exprs
+                     , Language.Python35.Optics.Indents
+                     , Language.Python35.Optics.Newlines
 
                      , Language.Python36.DSL
                      , Language.Python36.Internal.Lexer
@@ -441,6 +517,21 @@ library
                      , Language.Python36.Syntax.Float
                      , Language.Python36.Syntax.Imag
                      , Language.Python36.Syntax.Int
+
+                     , Language.Python36.Syntax
+                     , Language.Python36.Syntax.AugAssign
+                     , Language.Python36.Syntax.Expr
+                     , Language.Python36.Syntax.Arg
+                     , Language.Python36.Syntax.Comprehension
+                     , Language.Python36.Syntax.Import
+                     , Language.Python36.Syntax.Module
+                     , Language.Python36.Syntax.ModuleNames
+                     , Language.Python36.Syntax.Operator.Binary
+                     , Language.Python36.Syntax.Operator.Unary
+                     , Language.Python36.Syntax.Param
+                     , Language.Python36.Syntax.Statement
+                     , Language.Python36.Syntax.Types
+
                      , Language.Python36.Token
                      , Language.Python36.Validate
                      , Language.Python36.Validate.Error
@@ -450,6 +541,11 @@ library
                      , Language.Python36.Validate.Syntax.Error
                      , Language.Python36.Validate.Indentation
                      , Language.Python36.Validate.Indentation.Error
+                     , Language.Python36.Optics
+                     , Language.Python36.Optics.Expr
+                     , Language.Python36.Optics.Exprs
+                     , Language.Python36.Optics.Indents
+                     , Language.Python36.Optics.Newlines
 
   exposed-modules:     Language.Python35
                      , Language.Python36
@@ -464,6 +560,7 @@ library
                      , hpython-parse
                      , hpython-raw
                      , hpython-render
+                     , hpython-syntax
                      , hpython-validated
                      , hpython-validation
   hs-source-dirs:      src

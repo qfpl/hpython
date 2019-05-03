@@ -5,6 +5,7 @@ Comprehensions https://docs.python.org/3/reference/expressions.html#grammar-toke
 -}
 
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language DataKinds, KindSignatures #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 module Language.Python.Syntax.Comprehension where
@@ -26,6 +27,7 @@ import GHC.Generics (Generic)
 import Data.VFoldable
 import Data.VFunctor
 import Data.VTraversable
+import Language.Python.Optics.Idents (HasIdents)
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Whitespace
 
@@ -33,6 +35,8 @@ import Language.Python.Syntax.Whitespace
 data CompIf expr (v :: [*]) a
   = CompIf (Ann a) [Whitespace] (expr v a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents expr => HasIdents (CompIf expr)
 
 instance HasAnn (CompIf expr v) where
   annot :: forall a. Lens' (CompIf expr v a) (Ann a)
@@ -53,6 +57,8 @@ instance HasTrailingWhitespace (e v a) => HasTrailingWhitespace (CompIf e v a) w
 data CompFor expr (v :: [*]) a
   = CompFor (Ann a) [Whitespace] (expr v a) [Whitespace] (expr v a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents expr => HasIdents (CompFor expr)
 
 instance HasAnn (CompFor expr v) where
   annot :: forall a. Lens' (CompFor expr v a) (Ann a)
@@ -81,6 +87,8 @@ data Comprehension h expr (v :: [*]) a
       (CompFor expr v a)
       [Either (CompFor expr v a) (CompIf expr v a)] -- ^ <expr> <comp_for> (comp_for | comp_if)*
   deriving (Eq, Show, Generic)
+
+instance (HasIdents (e expr), HasIdents expr) => HasIdents (Comprehension e expr)
 
 instance HasAnn (Comprehension h expr v) where
   annot :: forall a. Lens' (Comprehension h expr v a) (Ann a)

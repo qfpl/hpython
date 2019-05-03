@@ -1,8 +1,7 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language DataKinds, KindSignatures #-}
-{-# language FlexibleInstances #-}
+{-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
-{-# language MultiParamTypeClasses #-}
 module Language.Python.Syntax.Arg where
 
 import Control.Lens.Getter ((^.), to)
@@ -17,6 +16,7 @@ import Data.VFoldable
 import Data.VFunctor
 import Data.VTraversable
 import Language.Python.Optics.Exprs
+import Language.Python.Optics.Idents (HasIdents)
 import Language.Python.Optics.Validated
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Ident
@@ -55,6 +55,8 @@ data Arg expr (v :: [*]) a
   , _argExpr :: expr v a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents expr => HasIdents (Arg expr)
 
 instance HasAnn (Arg expr v) where
   annot :: forall a. Lens' (Arg expr v a) (Ann a)

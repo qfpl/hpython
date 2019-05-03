@@ -77,6 +77,7 @@ import Unsafe.Coerce (unsafeCoerce)
 
 import qualified Data.List.NonEmpty as NonEmpty
 
+import Language.Python.Optics.Idents (HasIdents)
 import Language.Python.Optics.Exprs
 import Language.Python.Optics.Validated
 import Language.Python.Syntax.Ann
@@ -113,6 +114,8 @@ data Block (v :: [*]) a
   , _blockHead :: Statement v a -- ^ The first statement of the block
   , _blockTail :: [Either (Blank a, Newline) (Statement v a)] -- ^ The remaining items of the block, which may be statements or blank lines
   } deriving (Eq, Show, Generic)
+
+instance HasIdents Block
 
 instance Functor (Block v) where
   fmap f (Block a b c) =
@@ -202,6 +205,8 @@ data SmallStatement (v :: [*]) a
       (Maybe Newline)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasIdents SmallStatement
+
 -- | A 'Statement' is either a 'SmallStatement' or a 'CompoundStatement'
 --
 -- https://docs.python.org/3.5/reference/compound_stmts.html#compound-statements
@@ -209,6 +214,8 @@ data Statement (v :: [*]) a
   = SmallStatement (Indents a) (SmallStatement v a)
   | CompoundStatement (CompoundStatement v a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents Statement
 
 instance HasStatements Statement where
   _Statements = id
@@ -343,6 +350,8 @@ data SimpleStatement (v :: [*]) a
       (Maybe (Comma, Expr v a))
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasIdents SimpleStatement
+
 instance HasAnn (SimpleStatement v) where
   annot :: forall a. Lens' (SimpleStatement v a) (Ann a)
   annot = typed @(Ann a)
@@ -378,6 +387,8 @@ data ExceptAs (v :: [*]) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasIdents ExceptAs
+
 instance HasAnn (ExceptAs v) where
   annot :: forall a. Lens' (ExceptAs v a) (Ann a)
   annot = typed @(Ann a)
@@ -394,6 +405,8 @@ data Suite (v :: [*]) a
       (Block v a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasIdents Suite
+
 instance HasAnn (Suite v) where
   annot :: forall a. Lens' (Suite v a) (Ann a)
   annot = typed @(Ann a)
@@ -406,6 +419,8 @@ data WithItem (v :: [*]) a
   , _withItemBinder :: Maybe ([Whitespace], Expr v a) -- ^ @[\'as\' \<spaces\> \<expr\>]@
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents WithItem
 
 instance HasAnn (WithItem v) where
   annot :: forall a. Lens' (WithItem v a) (Ann a)
@@ -427,6 +442,8 @@ data Decorator (v :: [*]) a
   , _decoratorBlankLines :: [(Blank a, Newline)] -- ^ Trailing blank lines
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents Decorator
 
 instance HasAnn (Decorator v) where
   annot :: forall a. Lens' (Decorator v a) (Ann a)
@@ -526,6 +543,8 @@ data CompoundStatement (v :: [*]) a
   , _unsafeCsWithBody :: Suite v a -- ^ @\<suite\>@
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents CompoundStatement
 
 instance HasAnn (CompoundStatement v) where
   annot :: forall a. Lens' (CompoundStatement v a) (Ann a)

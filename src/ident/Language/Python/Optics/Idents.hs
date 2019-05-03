@@ -18,7 +18,9 @@ Stability   : experimental
 Portability : non-portable
 -}
 
-module Language.Python.Optics.Idents (HasIdents(..)) where
+module Language.Python.Optics.Idents
+  (HasIdents(..), HasIdents'(..))
+where
 
 import Control.Lens.Iso (iso)
 import Control.Lens.Traversal (Traversal)
@@ -29,20 +31,10 @@ import GHC.Generics
 import Data.VFix
 import Data.VIdentity
 import Language.Python.Syntax.Ann
-import Language.Python.Syntax.AugAssign
 import Language.Python.Syntax.CommaSep
 import Language.Python.Syntax.Comment
-import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
-import Language.Python.Syntax.Import
-import Language.Python.Syntax.Module
-import Language.Python.Syntax.ModuleNames
-import Language.Python.Syntax.Numbers
-import Language.Python.Syntax.Operator.Binary
-import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Punctuation
-import Language.Python.Syntax.Statement
-import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
 
 -- | 'Traversal' that targets all the 'Ident's in a structure
@@ -59,40 +51,16 @@ class HasIdents s where
     => Traversal (s v a) (s '[] a) (Ident v a) (Ident '[] a)
   _Idents = iso from to . gidents @l @m @v @a
 
+-- |
+-- Helper class for deriving 'HasIdents'. You shouldn't need to
+-- use this.
 class HasIdents' s t v a where
   _Idents' :: Traversal s t (Ident v a) (Ident '[] a)
 
 instance HasIdents s => HasIdents' (s v a) (s '[] a) v a where
   _Idents' = _Idents
-
 instance HasIdents expr => HasIdents (VIdentity expr)
-instance HasIdents expr => HasIdents (ExprF expr)
-instance HasIdents expr => HasIdents (CompFor expr)
-instance HasIdents expr => HasIdents (CompIf expr)
-instance HasIdents expr => HasIdents (DictItem expr)
-instance HasIdents expr => HasIdents (SetItem expr)
-instance (HasIdents (e expr), HasIdents expr) => HasIdents (Comprehension e expr)
-instance HasIdents expr => HasIdents (TupleItem expr)
-instance HasIdents expr => HasIdents (ListItem expr)
-instance HasIdents expr => HasIdents (Param expr)
-instance HasIdents expr => HasIdents (SubscriptItem expr)
-instance HasIdents expr => HasIdents (Arg expr)
-instance HasIdents Ident where
-  _Idents = id
-instance HasIdents n => HasIdents (ImportAs n)
-instance HasIdents ImportTargets
-instance HasIdents RelativeModuleName
-instance HasIdents ModuleName
-instance HasIdents SimpleStatement
-instance HasIdents SmallStatement
-instance HasIdents Decorator
-instance HasIdents Block
-instance HasIdents Suite
-instance HasIdents ExceptAs
-instance HasIdents WithItem
-instance HasIdents CompoundStatement
-instance HasIdents Statement
-instance HasIdents Module
+instance HasIdents Ident where; _Idents = id
 
 instance HasIdents (expr (VFix expr)) => HasIdents (VFix expr) where
   _Idents = _Wrapped._Idents
@@ -125,13 +93,6 @@ instance {-# overlappable #-} HasIdents' a b v x => GHasIdents (K1 i a) (K1 i b)
 -- redundant instances
 
 instance HasIdents' (Ann a) (Ann a) v a where; _Idents' _ = pure
-instance HasIdents' (BinOp a) (BinOp a) v a where; _Idents' _ = pure
-instance HasIdents' (IntLiteral a) (IntLiteral a) v a where; _Idents' _ = pure
-instance HasIdents' (FloatLiteral a) (FloatLiteral a) v a where; _Idents' _ = pure
-instance HasIdents' (ImagLiteral a) (ImagLiteral a) v a where; _Idents' _ = pure
-instance HasIdents' (StringLiteral a) (StringLiteral a) v a where; _Idents' _ = pure
-instance HasIdents' (UnOp a) (UnOp a) v a where; _Idents' _ = pure
-instance HasIdents' (AugAssign a) (AugAssign a) v a where; _Idents' _ = pure
 instance HasIdents' Whitespace Whitespace v a where; _Idents' _ = pure
 instance HasIdents' Newline Newline v a where; _Idents' _ = pure
 instance HasIdents' (Blank a) (Blank a) v a where; _Idents' _ = pure

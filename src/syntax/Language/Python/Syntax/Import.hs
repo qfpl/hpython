@@ -37,6 +37,7 @@ import Data.Generics.Product.Typed (typed)
 import GHC.Generics (Generic)
 import Unsafe.Coerce (unsafeCoerce)
 
+import Language.Python.Optics.Idents (HasIdents)
 import Language.Python.Optics.Validated
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.CommaSep
@@ -59,6 +60,8 @@ data ImportAs e v a
   , _importAsQual :: Maybe (NonEmpty Whitespace, Ident v a)
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents n => HasIdents (ImportAs n)
 
 instance HasAnn (ImportAs e v) where
   annot :: forall a. Lens' (ImportAs e v a) (Ann a)
@@ -109,6 +112,8 @@ data ImportTargets v a
       -- ) spaces
       [Whitespace]
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents ImportTargets
 
 instance HasAnn (ImportTargets v) where
   annot :: forall a. Lens' (ImportTargets v a) (Ann a)

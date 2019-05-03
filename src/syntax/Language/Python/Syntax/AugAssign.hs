@@ -1,4 +1,5 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 
 {-|
@@ -16,6 +17,7 @@ import Control.Lens.Lens (Lens', lens)
 import Data.Generics.Product.Typed (typed)
 import GHC.Generics
 
+import Language.Python.Optics.Idents (HasIdents'(..))
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Whitespace
 
@@ -48,6 +50,8 @@ instance HasAnn AugAssign where
 instance HasTrailingWhitespace (AugAssign a) where
   trailingWhitespace =
     lens _augAssignWhitespace (\a b -> a { _augAssignWhitespace = b })
+
+instance HasIdents' (AugAssign a) (AugAssign a) v a where; _Idents' _ = pure
 
 -- | Augmented assignment operators
 data AugAssignOp

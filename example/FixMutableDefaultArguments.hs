@@ -14,9 +14,9 @@ import Data.Monoid (Any(..))
 import Data.VConst
 import Data.VFix
 import Data.VFoldable
-import Language.Python.DSL
-import Language.Python.Optics
-import Language.Python.Syntax
+import Language.Python35.DSL
+import Language.Python35.Optics
+import Language.Python35.Syntax
 
 {-
 

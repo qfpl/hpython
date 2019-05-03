@@ -1,4 +1,5 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language TemplateHaskell #-}
 module Language.Python.Syntax.Int where
@@ -14,6 +15,7 @@ import Data.Digit.Decimal (DecDigit)
 import Data.Generics.Product.Typed (typed)
 import GHC.Generics (Generic, Generic1)
 
+import Language.Python.Optics.Idents (HasIdents'(..))
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Digits.Sig
 
@@ -66,6 +68,8 @@ deriveShow1 ''IntLiteral
 instance HasAnn IntLiteral where
   annot :: forall a. Lens' (IntLiteral a) (Ann a)
   annot = typed @(Ann a)
+
+instance HasIdents' (IntLiteral a) (IntLiteral a) v a where; _Idents' _ = pure
 
 showIntLiteral :: IntLiteral a -> String
 showIntLiteral (IntLiteralDec _ n) =

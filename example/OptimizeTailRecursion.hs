@@ -16,9 +16,9 @@ import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.Semigroup ((<>))
 
-import Language.Python.Optics
-import Language.Python.DSL
-import Language.Python.Syntax
+import Language.Python35.Optics
+import Language.Python35.DSL
+import Language.Python35.Syntax
 
 optimizeTailRecursion :: Raw Statement -> Maybe (Raw Statement)
 optimizeTailRecursion st = do
@@ -65,8 +65,8 @@ optimizeTailRecursion st = do
       | otherwise = False
 
     hasTC :: String -> Raw Statement -> Bool
-    hasTC name st =
-      case st of
+    hasTC name stt =
+      case stt of
         CompoundStatement (If _ _ _ _ sts [] sts') ->
           allOf _last (hasTC name) (sts ^.. _Statements) ||
           allOf _last (hasTC name) (sts' ^.. _Just._3._Statements)
@@ -84,9 +84,9 @@ optimizeTailRecursion st = do
         (_Ident.identValue %~ (\a -> if a `elem` params then a <> suffix else a))
 
     looped :: String -> [String] -> Raw Statement -> [Raw Line]
-    looped name params st
-      | Just ifSt <- st ^? _If
-      , hasTC name st =
+    looped name params stt
+      | Just ifSt <- stt ^? _If
+      , hasTC name stt =
           let
             ifBodyLines = toList $ ifSt ^. body_
           in
@@ -107,8 +107,8 @@ optimizeTailRecursion st = do
                      looped name params (toList sts'' ^?! _last._Statements))
                 ]
       | otherwise =
-          case st of
-            CompoundStatement{} -> [line_ st]
+          case stt of
+            CompoundStatement{} -> [line_ stt]
             SmallStatement idnts (MkSmallStatement s ss sc cmt nl) ->
               let
                 initExps = foldr (\_ _ -> init ss) [] ss
@@ -145,4 +145,4 @@ optimizeTailRecursion st = do
                         [ line_ break_ ]
                   Expr _ e
                     | isTailCall name e -> newSts <> [line_ pass_]
-                  _ -> [line_ st]
+                  _ -> [line_ stt]

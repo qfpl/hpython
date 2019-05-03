@@ -7,10 +7,10 @@ import Data.Char (toUpper)
 
 import qualified Data.Text.IO as Text
 
-import Language.Python.Parse
 import Language.Python.Optics.Idents
-import Language.Python.Render (showModule)
-import Language.Python.Syntax (identValue)
+import Language.Python35.Parse
+import Language.Python35.Render (showModule)
+import Language.Python35.Syntax (identValue)
 
 snakeToCamel :: String -> String
 snakeToCamel =

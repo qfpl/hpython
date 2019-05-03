@@ -17,6 +17,7 @@ where
 
 import GHC.Generics (Generic)
 
+import Language.Python.Optics.Idents (HasIdents)
 import Language.Python.Optics.Exprs
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Statement
@@ -30,6 +31,8 @@ data Module v a
   | ModuleBlank (Blank a) Newline (Module v a)
   | ModuleStatement (Statement v a) (Module v a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents Module
 
 instance HasStatements Module where
   _Statements f = go

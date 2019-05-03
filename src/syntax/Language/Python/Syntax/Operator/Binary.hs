@@ -27,6 +27,7 @@ import Data.Generics.Product.Typed (typed)
 import Data.Semigroup ((<>))
 import GHC.Generics (Generic)
 
+import Language.Python.Optics.Idents (HasIdents'(..))
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Whitespace
 
@@ -87,6 +88,8 @@ data BinOp a
 instance HasAnn BinOp where
   annot :: forall a. Lens' (BinOp a) (Ann a)
   annot = typed @(Ann a)
+
+instance HasIdents' (BinOp a) (BinOp a) v a where; _Idents' _ = pure
 
 instance HasTrailingWhitespace (BinOp a) where
   trailingWhitespace =

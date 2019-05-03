@@ -1,4 +1,5 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language TemplateHaskell #-}
 module Language.Python.Syntax.Imag where
@@ -11,6 +12,7 @@ import Data.Digit.Decimal (DecDigit)
 import Data.Generics.Product.Typed (typed)
 import GHC.Generics (Generic, Generic1)
 
+import Language.Python.Optics.Idents (HasIdents'(..))
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Float
 import Language.Python.Syntax.Digits.Sig
@@ -47,6 +49,8 @@ deriveShow1 ''ImagLiteral
 instance HasAnn ImagLiteral where
   annot :: forall a. Lens' (ImagLiteral a) (Ann a)
   annot = typed @(Ann a)
+
+instance HasIdents' (ImagLiteral a) (ImagLiteral a) v a where; _Idents' _ = pure
 
 showImagLiteral :: ImagLiteral a -> String
 showImagLiteral (ImagLiteralInt _ ds b) =

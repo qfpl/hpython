@@ -4,9 +4,9 @@ module Validation where
 
 import qualified Data.Text.IO as Text
 
-import Language.Python.DSL
-import Language.Python.Render
-import Language.Python.Validate
+import Language.Python35.DSL
+import Language.Python35.Render
+import Language.Python35.Validate
 
 good_program :: Raw Module
 good_program =

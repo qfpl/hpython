@@ -10,16 +10,18 @@ import Indentation
 import Recase
 import Validation
 
-import Language.Python.Render (showModule)
-import Language.Python.Syntax.Statement (_Statements)
+import Language.Python35.Render (showModule)
+import Language.Python35.Syntax.Statement (_Statements)
 
 import qualified Data.Text.IO as StrictText
 
+section :: IO a -> IO ()
 section a = do
   putStrLn "**********"
-  a
+  _ <- a
   putStrLn "\n**********\n"
 
+main :: IO ()
 main = do
   section $ do
     putStrLn "Before\n"

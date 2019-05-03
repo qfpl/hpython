@@ -8,8 +8,8 @@ import Data.Function ((&))
 import Data.List.NonEmpty (NonEmpty(..))
 
 import Data.VFix
-import Language.Python.DSL
-import Language.Python.Syntax
+import Language.Python35.DSL
+import Language.Python35.Syntax
 
 
 -- |

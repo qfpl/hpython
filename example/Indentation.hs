@@ -5,8 +5,8 @@ import Control.Lens.Setter ((.~))
 import Control.Lens.Plated (transform)
 import GHC.Natural (Natural)
 
-import Language.Python.Optics
-import Language.Python.Syntax.Statement (Statement)
+import Language.Python35.Optics
+import Language.Python35.Syntax.Statement (Statement)
 import Language.Python.Syntax.Whitespace (Whitespace (Space, Tab))
 
 {-

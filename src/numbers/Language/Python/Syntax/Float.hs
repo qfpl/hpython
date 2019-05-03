@@ -1,4 +1,5 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language LambdaCase #-}
 {-# language TemplateHaskell #-}
@@ -13,6 +14,7 @@ import Data.Generics.Product.Typed (typed)
 import Data.These (These(..))
 import GHC.Generics (Generic, Generic1)
 
+import Language.Python.Optics.Idents (HasIdents'(..))
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Digits.Sig
 
@@ -80,6 +82,8 @@ deriveShow1 ''FloatLiteral
 instance HasAnn FloatLiteral where
   annot :: forall a. Lens' (FloatLiteral a) (Ann a)
   annot = typed @(Ann a)
+
+instance HasIdents' (FloatLiteral a) (FloatLiteral a) v a where; _Idents' _ = pure
 
 showFloatExponent :: FloatExponent -> String
 showFloatExponent (FloatExponent e s ds) =

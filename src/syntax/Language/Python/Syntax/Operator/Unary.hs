@@ -1,4 +1,5 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language LambdaCase #-}
 
@@ -19,6 +20,7 @@ import Control.Lens.Lens (Lens', lens)
 import Data.Generics.Product.Typed (typed)
 import GHC.Generics (Generic)
 
+import Language.Python.Optics.Idents (HasIdents'(..))
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Whitespace
 
@@ -49,3 +51,5 @@ instance HasTrailingWhitespace (UnOp a) where
            Negate a _ -> Negate a ws
            Positive a _ -> Positive a ws
            Complement a _ -> Complement a ws)
+
+instance HasIdents' (UnOp a) (UnOp a) v a where; _Idents' _ = pure

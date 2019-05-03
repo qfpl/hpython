@@ -53,6 +53,7 @@ import Data.VFunctor
 import Data.VIdentity
 import Data.VTraversable
 import Language.Python.Optics.Exprs (HasExprs(..))
+import Language.Python.Optics.Idents (HasIdents)
 import Language.Python.Optics.Validated (Validated(..))
 import Language.Python.Syntax.Arg
 import Language.Python.Syntax.Ann
@@ -105,6 +106,8 @@ data DictItem expr (v :: [*]) a
   , _unsafeDictItemUnpackValue :: expr v a
   } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasIdents expr => HasIdents (DictItem expr)
+
 instance HasAnn (DictItem expr v) where
   annot :: forall a. Lens' (DictItem expr v a) (Ann a)
   annot = typed @(Ann a)
@@ -150,6 +153,8 @@ data SubscriptItem expr (v :: [*]) a
       -- [':' [expr]]
       (Maybe (Colon, Maybe (expr v a)))
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents expr => HasIdents (SubscriptItem expr)
 
 instance VFunctor SubscriptItem where; vfmap = vfmapDefault
 instance VFoldable SubscriptItem where; vfoldMap = vfoldMapDefault
@@ -208,6 +213,8 @@ data ListItem expr (v :: [*]) a
   , _unsafeListUnpackValue :: expr v a
   } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasIdents expr => HasIdents (ListItem expr)
+
 instance HasAnn (ListItem expr v) where
   annot :: forall a. Lens' (ListItem expr v a) (Ann a)
   annot = typed @(Ann a)
@@ -252,6 +259,8 @@ data SetItem expr (v :: [*]) a
   , _unsafeSetUnpackValue :: expr v a
   } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasIdents expr => HasIdents (SetItem expr)
+
 instance HasAnn (SetItem expr v) where
   annot :: forall a. Lens' (SetItem expr v a) (Ann a)
   annot = typed @(Ann a)
@@ -293,6 +302,8 @@ data TupleItem expr (v :: [*]) a
   , _unsafeTupleUnpackWhitespace :: [Whitespace]
   , _unsafeTupleUnpackValue :: expr v a
   } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents expr => HasIdents (TupleItem expr)
 
 instance HasAnn (TupleItem expr v) where
   annot :: forall a. Lens' (TupleItem expr v a) (Ann a)
@@ -659,6 +670,7 @@ data ExprF expr (v :: [*]) a
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
+instance HasIdents expr => HasIdents (ExprF expr)
 instance VFunctor ExprF where; vfmap = vfmapDefault
 instance VFoldable ExprF where; vfoldMap = vfoldMapDefault
 instance VTraversable ExprF where

@@ -1,8 +1,7 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language DataKinds, KindSignatures #-}
-{-# language FlexibleInstances #-}
+{-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language LambdaCase #-}
-{-# language MultiParamTypeClasses #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 module Language.Python.Syntax.Param where
 
@@ -23,6 +22,7 @@ import Unsafe.Coerce (unsafeCoerce)
 import Data.VFoldable
 import Data.VFunctor
 import Data.VTraversable
+import Language.Python.Optics.Idents (HasIdents)
 import Language.Python.Optics.Exprs
 import Language.Python.Optics.Validated
 import Language.Python.Syntax.Ann
@@ -76,6 +76,8 @@ data Param expr (v :: [*]) a
   , _paramType :: Maybe (Colon, expr v a)
   }
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
+
+instance HasIdents expr => HasIdents (Param expr)
 
 instance HasAnn (Param expr v) where
   annot :: forall a. Lens' (Param expr v a) (Ann a)

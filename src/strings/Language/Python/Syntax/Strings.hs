@@ -1,4 +1,5 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language OverloadedStrings #-}
 {-# language LambdaCase #-}
@@ -58,6 +59,7 @@ import Data.Maybe (isJust)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 
+import Language.Python.Optics.Idents (HasIdents'(..))
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Whitespace
 
@@ -185,6 +187,8 @@ instance HasTrailingWhitespace (StringLiteral a) where
           RawStringLiteral a b c d e _ -> RawStringLiteral a b c d e ws
           BytesLiteral a b c d e _ -> BytesLiteral a b c d e ws
           RawBytesLiteral a b c d e _ -> RawBytesLiteral a b c d e ws)
+
+instance HasIdents' (StringLiteral a) (StringLiteral a) v a where; _Idents' _ = pure
 
 -- | A character in a string literal. This is a large sum type, with a
 -- catch-all of a Haskell 'Char'.

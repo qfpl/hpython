@@ -1,4 +1,5 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
+{-# language MultiParamTypeClasses #-}
 
 {-|
 Module      : Language.Python.Syntax.Module
@@ -22,14 +23,14 @@ import Language.Python.Syntax.Whitespace
 
 -- | A Python 'Module', which is stored as a sequence of statements.
 -- A module corresponds to one source file of Python code.
-data Module v a
+data Module a
   = ModuleEmpty
   | ModuleBlankFinal (Blank a)
-  | ModuleBlank (Blank a) Newline (Module v a)
-  | ModuleStatement (Statement v a) (Module v a)
+  | ModuleBlank (Blank a) Newline (Module a)
+  | ModuleStatement (Statement a) (Module a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
-instance HasStatements Module where
+instance HasStatements (Module a) (Module a) (Statement a) (Statement a) where
   _Statements f = go
     where
       go ModuleEmpty = pure ModuleEmpty
@@ -37,5 +38,5 @@ instance HasStatements Module where
       go (ModuleBlank a b c) = ModuleBlank a b <$> go c
       go (ModuleStatement a b) = ModuleStatement <$> f a <*> go b
 
-instance HasExprs Module where
+instance HasExprs (Module a) (Module a) (Expr a) (Expr a)where
   _Exprs = _Statements._Exprs

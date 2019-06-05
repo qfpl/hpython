@@ -14,8 +14,6 @@ Python programs directly in Haskell.
 * Parser and printer, with a round-trip law: `print ∘ parse ≡ id`
 * Optics for manipulating the syntax tree
 * Indentation, syntax, and scope checking
-* The syntax tree is indexed by its level of validation, to distinguish between
-  syntactically valid Python and unvalidated code
 * Convenient DSL for building Python programs
 
 ## Examples

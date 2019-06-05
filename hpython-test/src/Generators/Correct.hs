@@ -95,7 +95,7 @@ genBlank =
   Gen.list (Range.constant 0 10) (Gen.element [Space, Tab]) <*>
   Gen.maybe genComment
 
-genIdent :: (MonadGen m, MonadState GenState m) => m (Ident '[] ())
+genIdent :: (MonadGen m, MonadState GenState m) => m (Ident ())
 genIdent = do
   isAsync <- maybe False snd <$> use inFunction
   let reserved = reservedWords <> (if isAsync then ["async", "await"] else [])
@@ -107,21 +107,21 @@ genIdent = do
       (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_'])) <*>
     genWhitespaces
 
-genDeletableTuple :: (MonadGen m, MonadState GenState m) => m (Expr '[] ()) -> m (Expr '[] ())
+genDeletableTuple :: (MonadGen m, MonadState GenState m) => m (Expr ()) -> m (Expr ())
 genDeletableTuple expr =
   Tuple (Ann ()) <$>
   (TupleItem (Ann ()) <$> expr) <*>
   genComma <*>
   Gen.maybe (genSizedCommaSep1' $ TupleItem (Ann ()) <$> expr)
 
-genTuple :: (MonadGen m, MonadState GenState m) => m (Expr '[] ()) -> m (Expr '[] ())
+genTuple :: (MonadGen m, MonadState GenState m) => m (Expr ()) -> m (Expr ())
 genTuple expr =
   Tuple (Ann ()) <$>
   genTupleItem genWhitespaces expr <*>
   genComma <*>
   Gen.maybe (genSizedCommaSep1' $ genTupleItem genWhitespaces expr)
 
-genAssignableTuple :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
+genAssignableTuple :: (MonadGen m, MonadState GenState m) => m (Expr ())
 genAssignableTuple =
   (\(ti, tis) ws -> Tuple (Ann ()) ti ws tis) <$> genTupleItems <*> genComma
   where
@@ -156,7 +156,7 @@ genAssignableTuple =
               comma <- genComma
               genTupleItemsRest' (seen || has _TupleUnpack ti) ti ((comma, a) : as))
 
-genModuleName :: (MonadGen m, MonadState GenState m) => m (ModuleName '[] ())
+genModuleName :: (MonadGen m, MonadState GenState m) => m (ModuleName ())
 genModuleName =
   Gen.recursive Gen.choice
   [ ModuleNameOne (Ann ()) <$> genIdent ]
@@ -166,7 +166,7 @@ genModuleName =
     genModuleName
   ]
 
-genRelativeModuleName :: (MonadGen m, MonadState GenState m) => m (RelativeModuleName '[] ())
+genRelativeModuleName :: (MonadGen m, MonadState GenState m) => m (RelativeModuleName ())
 genRelativeModuleName =
   Gen.choice
   [ Relative (Ann ()) <$>
@@ -176,7 +176,7 @@ genRelativeModuleName =
     genModuleName
   ]
 
-genImportTargets :: (MonadGen m, MonadState GenState m) => m (ImportTargets '[] ())
+genImportTargets :: (MonadGen m, MonadState GenState m) => m (ImportTargets ())
 genImportTargets = do
   ctxt <- get
   let
@@ -194,7 +194,7 @@ genImportTargets = do
     | not isInFunction && not isInClass
     ]
 
-genBlock :: (MonadGen m, MonadState GenState m) => m (Block '[] ())
+genBlock :: (MonadGen m, MonadState GenState m) => m (Block ())
 genBlock = doIndent *> go <* doDedent
   where
     genLine =
@@ -210,7 +210,7 @@ genBlock = doIndent *> go <* doDedent
         pure st <*>
         sizedList genLine
 
-genPositionalArg :: (MonadGen m, MonadState GenState m) => m (Arg '[] ())
+genPositionalArg :: (MonadGen m, MonadState GenState m) => m (Arg ())
 genPositionalArg =
   sizedRecursive
     [ PositionalArg (Ann ()) <$> genExpr
@@ -218,7 +218,7 @@ genPositionalArg =
     ]
     []
 
-genKeywordArg :: (MonadGen m, MonadState GenState m) => m (Arg '[] ())
+genKeywordArg :: (MonadGen m, MonadState GenState m) => m (Arg ())
 genKeywordArg =
   sizedRecursive
     [ KeywordArg (Ann ()) <$> genIdent <*> genWhitespaces <*> genExpr
@@ -226,7 +226,7 @@ genKeywordArg =
     ]
     []
 
-genArgs :: (MonadGen m, MonadState GenState m) => m (CommaSep1' (Arg '[] ()))
+genArgs :: (MonadGen m, MonadState GenState m) => m (CommaSep1' (Arg ()))
 genArgs =
   sized4
     (\a b c d -> (a, b <> c, d) ^. _CommaSep1')
@@ -238,7 +238,7 @@ genArgs =
 genPositionalParams
   :: (MonadGen m, MonadState GenState m)
   => Bool -- ^ This is for a lambda
-  -> m (CommaSep (Param '[] ()))
+  -> m (CommaSep (Param ()))
 genPositionalParams isLambda =
   Gen.scale (max 0 . subtract 1) $
   Gen.sized $ fmap (listToCommaSep . fmap (uncurry $ PositionalParam (Ann ()))) . go []
@@ -256,7 +256,7 @@ genKeywordParam
   :: (MonadGen m, MonadState GenState m)
   => Bool -- ^ This is for a lambda
   -> [String]
-  -> m (Param '[] ())
+  -> m (Param ())
 genKeywordParam isLambda positionals =
   Gen.scale (max 0 . subtract 1) $
   KeywordParam (Ann ()) <$>
@@ -269,7 +269,7 @@ genStarParam
   :: (MonadGen m, MonadState GenState m)
   => Bool -- ^ This is for a lambda
   -> [String]
-  -> m (Param '[] ())
+  -> m (Param ())
 genStarParam isLambda positionals = Gen.choice [namedStarParam, unnamedStarParam]
   where
     unnamedStarParam = UnnamedStarParam (Ann ()) <$> genWhitespaces
@@ -289,7 +289,7 @@ genDoubleStarParam
   :: (MonadGen m, MonadState GenState m)
   => Bool -- ^ This is for a lambda
   -> [String]
-  -> m (Param '[] ())
+  -> m (Param ())
 genDoubleStarParam isLambda positionals =
   Gen.scale (max 0 . subtract 1) $
   DoubleStarParam (Ann ()) <$>
@@ -300,7 +300,7 @@ genDoubleStarParam isLambda positionals =
 genParams
   :: (MonadGen m, MonadState GenState m)
   => Bool -- ^ These are for a lambda
-  -> m (CommaSep (Param '[] ()))
+  -> m (CommaSep (Param ()))
 genParams isLambda =
   sizedBind (genPositionalParams isLambda) $ \pparams ->
   let pparamNames = pparams ^.. folded.paramName.identValue in
@@ -333,7 +333,7 @@ genParams isLambda =
             (kwparams <> CommaSepOne kwparam)
         ]
 
-genDeletableList :: (MonadState GenState m, MonadGen m) => m (Expr '[] ()) -> m (Expr '[] ())
+genDeletableList :: (MonadState GenState m, MonadGen m) => m (Expr ()) -> m (Expr ())
 genDeletableList genExpr' =
   Gen.shrink
     (\case
@@ -344,7 +344,7 @@ genDeletableList genExpr' =
   Gen.maybe (genSizedCommaSep1' $ ListItem (Ann ()) <$> genExpr') <*>
   genWhitespaces
 
-genList :: (MonadState GenState m, MonadGen m) => m (Expr '[] ()) -> m (Expr '[] ())
+genList :: (MonadState GenState m, MonadGen m) => m (Expr ()) -> m (Expr ())
 genList genExpr' =
   Gen.shrink
     (\case
@@ -355,7 +355,7 @@ genList genExpr' =
   Gen.maybe (genSizedCommaSep1' $ genListItem genWhitespaces genExpr') <*>
   genWhitespaces
 
-genAssignableList :: (MonadState GenState m, MonadGen m) => m (Expr '[] ())
+genAssignableList :: (MonadState GenState m, MonadGen m) => m (Expr ())
 genAssignableList =
   Gen.shrink
     (\case
@@ -388,17 +388,17 @@ genAssignableList =
               comma <- genComma
               genListItemsRest (seen || has _ListUnpack ti) ti ((comma, a) : as))
 
-genParens :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
+genParens :: MonadGen m => m (Expr ()) -> m (Expr ())
 genParens genExpr' = Parens (Ann ()) <$> genWhitespaces <*> genExpr' <*> genWhitespaces
 
-genDeref :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
+genDeref :: (MonadGen m, MonadState GenState m) => m (Expr ())
 genDeref =
   Deref (Ann ()) <$>
   genExpr <*>
   genWhitespaces <*>
   genIdent
 
-genCompFor :: (MonadGen m, MonadState GenState m) => m (CompFor '[] ())
+genCompFor :: (MonadGen m, MonadState GenState m) => m (CompFor ())
 genCompFor =
   sized2M
     (\a b ->
@@ -410,7 +410,7 @@ genCompFor =
         genAssignable)
     (Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr)
 
-genCompIf :: (MonadGen m, MonadState GenState m) => m (CompIf '[] ())
+genCompIf :: (MonadGen m, MonadState GenState m) => m (CompIf ())
 genCompIf =
   localState $ do
     inGenerator .= True
@@ -420,7 +420,7 @@ genCompIf =
         [ Gen.filter (\case; Tuple{} -> False; _ -> True) genExpr ]
         []
 
-genComprehension :: (MonadGen m, MonadState GenState m) => m (Comprehension Expr '[] ())
+genComprehension :: (MonadGen m, MonadState GenState m) => m (Comprehension Expr ())
 genComprehension =
   sized3
     (Comprehension (Ann ()))
@@ -432,7 +432,7 @@ genComprehension =
         inGenerator .= True
         sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
-genDictComp :: (MonadGen m, MonadState GenState m) => m (Comprehension DictItem '[] ())
+genDictComp :: (MonadGen m, MonadState GenState m) => m (Comprehension DictItem ())
 genDictComp =
   sized3
     (Comprehension (Ann ()))
@@ -444,7 +444,7 @@ genDictComp =
         inGenerator .= True
         sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
-genSetComp :: (MonadGen m, MonadState GenState m) => m (Comprehension SetItem '[] ())
+genSetComp :: (MonadGen m, MonadState GenState m) => m (Comprehension SetItem ())
 genSetComp =
   sized3
     (Comprehension (Ann ()))
@@ -456,7 +456,7 @@ genSetComp =
         inGenerator .= True
         sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
-genSubscriptItem :: (MonadGen m, MonadState GenState m) => m (Subscript '[] ())
+genSubscriptItem :: (MonadGen m, MonadState GenState m) => m (Subscript ())
 genSubscriptItem =
   sizedRecursive
     [ SubscriptExpr <$> genExpr
@@ -468,7 +468,7 @@ genSubscriptItem =
     ]
     []
 
-genExprList :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
+genExprList :: (MonadGen m, MonadState GenState m) => m (Expr ())
 genExprList =
   sizedBind genExpr $ \e -> do
     mes <- Gen.maybe $ sizedMaybe (genSizedCommaSep1' $ TupleItem (Ann ()) <$> genExpr)
@@ -478,7 +478,7 @@ genExprList =
 
 -- | This is necessary to prevent generating exponentials that will take forever to evaluate
 -- when python does constant folding
-genExpr :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
+genExpr :: (MonadGen m, MonadState GenState m) => m (Expr ())
 genExpr = genExpr' False
 
 genRawStringLiteral :: MonadGen m => m (StringLiteral ())
@@ -519,7 +519,7 @@ genRawBytesLiteral =
     genWhitespaces
   ]
 
-genStringLiterals :: MonadGen m => m (Expr '[] ())
+genStringLiterals :: MonadGen m => m (Expr ())
 genStringLiterals = do
   n <- Gen.integral (Range.constant 1 5) :: MonadGen m => m Integer
   b <- Gen.bool_
@@ -540,7 +540,7 @@ genStringLiterals = do
       (if b then ss else bs) <*>
       go b (n-1)
 
-genExpr' :: (MonadGen m, MonadState GenState m) => Bool -> m (Expr '[] ())
+genExpr' :: (MonadGen m, MonadState GenState m) => Bool -> m (Expr ())
 genExpr' isExp = do
   isInFunction <- isJust <$> use inFunction
   isInAsyncFunction <- maybe False snd <$> use inFunction
@@ -633,14 +633,14 @@ genExpr' isExp = do
      | isAsync && not isInGenerator
      ])
 
-genSubscript :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
+genSubscript :: (MonadGen m, MonadState GenState m) => m (Expr ())
 genSubscript =
   sized2M
     (\a b -> (\ws1 -> Subscript (Ann ()) a ws1 b) <$> genWhitespaces <*> genWhitespaces)
     genExpr
     (genSizedCommaSep1' genSubscriptItem)
 
-genDeletable :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
+genDeletable :: (MonadGen m, MonadState GenState m) => m (Expr ())
 genDeletable =
   sizedRecursive
     [ Ident (Ann ()) <$> genIdent
@@ -652,7 +652,7 @@ genDeletable =
     , genSubscript
     ]
 
-genAssignable :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
+genAssignable :: (MonadGen m, MonadState GenState m) => m (Expr ())
 genAssignable =
   sizedRecursive
     [ Ident (Ann ()) <$> genIdent
@@ -664,7 +664,7 @@ genAssignable =
     , genSubscript
     ]
 
-genAugAssignable :: (MonadGen m, MonadState GenState m) => m (Expr '[] ())
+genAugAssignable :: (MonadGen m, MonadState GenState m) => m (Expr ())
 genAugAssignable =
   sizedRecursive
     [ Ident (Ann ()) <$> genIdent ]
@@ -674,7 +674,7 @@ genAugAssignable =
 
 genSimpleStatement
   :: (HasCallStack, MonadGen m, MonadState GenState m)
-  => m (SimpleStatement '[] ())
+  => m (SimpleStatement ())
 genSimpleStatement = do
   ctxt <- get
   nonlocals <- use currentNonlocals
@@ -736,7 +736,7 @@ genSimpleStatement = do
      | isJust (_inFunction ctxt)
      ])
 
-genDecorator :: (MonadGen m, MonadState GenState m) => m (Decorator '[] ())
+genDecorator :: (MonadGen m, MonadState GenState m) => m (Decorator ())
 genDecorator =
   Decorator (Ann ()) <$>
   use currentIndentation <*>
@@ -766,7 +766,7 @@ genDecorator =
 
 genCompoundStatement
   :: (HasCallStack, MonadGen m, MonadState GenState m)
-  => m (CompoundStatement '[] ())
+  => m (CompoundStatement ())
 genCompoundStatement =
   sizedRecursive
     [ do
@@ -970,7 +970,7 @@ genCompoundStatement =
 
 genStatement
   :: (HasCallStack, MonadGen m, MonadState GenState m)
-  => m (Statement '[] ())
+  => m (Statement ())
 genStatement =
   sizedRecursive
     [ SmallStatement <$>
@@ -979,7 +979,7 @@ genStatement =
     ]
     [ CompoundStatement <$> localState genCompoundStatement ]
 
-genImportAs :: (HasTrailingWhitespace (e '[] ()), MonadGen m) => m (e '[] ()) -> m (Ident '[] ()) -> m (ImportAs e '[] ())
+genImportAs :: (HasTrailingWhitespace (e ()), MonadGen m) => m (e ()) -> m (Ident ()) -> m (ImportAs e ())
 genImportAs me genIdent =
   sized2
     (ImportAs (Ann ()))

@@ -1,4 +1,3 @@
-{-# language DataKinds, KindSignatures #-}
 {-# language MultiParamTypeClasses, TemplateHaskell, FunctionalDependencies,
     FlexibleInstances #-}
 
@@ -18,12 +17,12 @@ import Language.Python.Syntax.Expr (Expr)
 import Language.Python.Syntax.Ident (Ident)
 
 data SyntaxError a
-  = PositionalAfterKeywordArg a (Expr '[] a)
-  | PositionalAfterKeywordUnpacking a (Expr '[] a)
-  | CannotAssignTo a (Expr '[] a)
-  | CannotDelete a (Expr '[] a)
-  | CannotAugAssignTo a (Expr '[] a)
-  | NoBindingNonlocal (Ident '[] a)
+  = PositionalAfterKeywordArg a (Expr a)
+  | PositionalAfterKeywordUnpacking a (Expr a)
+  | CannotAssignTo a (Expr a)
+  | CannotDelete a (Expr a)
+  | CannotAugAssignTo a (Expr a)
+  | NoBindingNonlocal (Ident a)
   | PositionalAfterKeywordParam a String
   | UnexpectedDoubleStarParam a String
   | DuplicateArgument a String

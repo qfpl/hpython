@@ -1,4 +1,3 @@
-{-# language DataKinds #-}
 module Indentation where
 
 import Control.Lens.Setter ((.~))
@@ -20,8 +19,8 @@ Language.Python.Optics.Indents for more info.
 
 -}
 
-indentSpaces :: Natural -> Statement '[] a -> Statement '[] a
+indentSpaces :: Natural -> Statement a -> Statement a
 indentSpaces n = transform (_Indent .~ replicate (fromIntegral n) Space)
 
-indentTabs :: Statement '[] a -> Statement '[] a
+indentTabs :: Statement a -> Statement a
 indentTabs = transform (_Indent .~ [Tab])

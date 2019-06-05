@@ -43,7 +43,7 @@ import Language.Python.Syntax.Whitespace
 -- | Trailing commas can only be present in a parameter list of entirely
 -- positional arguments. This removes the bad trailing comma, and appends
 -- the comma's trailing whitespace to the previous token
-correctParams :: CommaSep (Param v a) -> CommaSep (Param v a)
+correctParams :: CommaSep (Param a) -> CommaSep (Param a)
 correctParams CommaSepNone = CommaSepNone
 correctParams (CommaSepOne a) = CommaSepOne a
 correctParams (CommaSepMany a (MkComma b) c) =
@@ -318,7 +318,7 @@ correctInitialFinalQuotesLong qt = correctFinalQuotes . correctInitialQuotes qt
 -- | It's possible that successive statements have no newlines in between
 -- them. This would cause them to be displayed on the same line. In every line where
 -- this would be the case, we explicitly insert a line-feed character.
-correctTrailingNewline :: HasTrailingNewline s => Bool -> s v a -> s v a
+correctTrailingNewline :: HasTrailingNewline s => Bool -> s -> s
 correctTrailingNewline False s =
   if hasn't trailingNewline s
   then setTrailingNewline s LF

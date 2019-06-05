@@ -1,5 +1,10 @@
 # Revision history for hpython
 
+## Next Release
+
+* Removed validation indices. This feature will be released as an
+  extra library if we really miss it.
+
 ## 0.3
 
 * Changed the sigature of `Data.Validation.Monadic.bindVM` to have the same form as

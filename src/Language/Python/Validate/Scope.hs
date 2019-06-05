@@ -1,10 +1,9 @@
-{-# language DataKinds, TypeOperators #-}
 {-# language DeriveFunctor #-}
 {-# language FlexibleContexts #-}
 {-# language RankNTypes #-}
 {-# language LambdaCase #-}
 {-# language OverloadedLists #-}
-{-# language ScopedTypeVariables, TypeApplications #-}
+{-# language ScopedTypeVariables #-}
 {-# language MultiParamTypeClasses #-}
 
 {-|
@@ -77,7 +76,6 @@ import Data.Map.Strict (Map)
 import Data.Maybe (isJust)
 import Data.Sequence ((|>), Seq)
 import Data.String (fromString)
-import Data.Type.Set (Nub)
 import Data.Validate.Monadic
   (ValidateM(..), runValidateM, bindVM, liftVM0, liftVM1, errorVM1)
 import Unsafe.Coerce (unsafeCoerce)
@@ -87,7 +85,6 @@ import qualified Data.Map.Strict as Map
 import Data.Sequence as Seq
 
 import Language.Python.Optics
-import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Expr
@@ -142,7 +139,7 @@ controlScope :: ValidateScope ann e a -> ValidateScope ann e a
 controlScope = liftVM1 (local (|> Control))
 
 -- | Add some entries to the context, using the current depth and level
-extendScope :: [Ident v ann] -> ValidateScope ann e ()
+extendScope :: [Ident ann] -> ValidateScope ann e ()
 extendScope entries =
   liftVM0 ask `bindVM` \path ->
   liftVM0 . modify $ \scope ->
@@ -160,8 +157,8 @@ lookupScope s = Map.lookup (fromString s) <$> liftVM0 get
 
 validateExceptAsScope
   :: AsScopeError e a
-  => ExceptAs v a
-  -> ValidateScope a e (ExceptAs (Nub (Scope ': v)) a)
+  => ExceptAs a
+  -> ValidateScope a e (ExceptAs a)
 validateExceptAsScope (ExceptAs ann e f) =
   ExceptAs ann <$>
   validateExprScope e <*>
@@ -169,16 +166,16 @@ validateExceptAsScope (ExceptAs ann e f) =
 
 validateSuiteScope
   :: AsScopeError e a
-  => Suite v a
-  -> ValidateScope a e (Suite (Nub (Scope ': v)) a)
+  => Suite a
+  -> ValidateScope a e (Suite a)
 validateSuiteScope (SuiteMany ann a b c d) = SuiteMany ann a b c <$> validateBlockScope d
 validateSuiteScope (SuiteOne ann a b) =
   SuiteOne ann a <$> validateSmallStatementScope b
 
 validateDecoratorScope
   :: AsScopeError e a
-  => Decorator v a
-  -> ValidateScope a e (Decorator (Nub (Scope ': v)) a)
+  => Decorator a
+  -> ValidateScope a e (Decorator a)
 validateDecoratorScope (Decorator a b c d e f g) =
   (\d' -> Decorator a b c d' e f g) <$>
   validateExprScope d
@@ -234,10 +231,10 @@ parallel4 a b c d =
   (\(a', (b', c', d')) -> (a', b', c', d')) <$> parallel2 a (parallel3 b c d)
 
 validateCompoundStatementScope
-  :: forall e v a
+  :: forall e a
    . AsScopeError e a
-  => CompoundStatement v a
-  -> ValidateScope a e (CompoundStatement (Nub (Scope ': v)) a)
+  => CompoundStatement a
+  -> ValidateScope a e (CompoundStatement a)
 validateCompoundStatementScope (Fundef a decos idnts asyncWs ws1 name ws2 params ws3 mty s) =
   (\decos' -> Fundef a decos' idnts asyncWs ws1 (coerce name) ws2) <$>
   traverse validateDecoratorScope decos <*>
@@ -286,7 +283,7 @@ validateCompoundStatementScope (TryFinally idnts a b e idnts2 f i) =
     (controlScope $ validateSuiteScope i)
 validateCompoundStatementScope (For idnts a asyncWs b c d e h i) =
   let
-    cs = c ^.. unvalidated.cosmos._Ident
+    cs = c ^.. cosmos._Ident
   in
     (\c' d' e' (h', i') -> For idnts a asyncWs b c' d' e' h' i') <$>
     (unsafeCoerce c <$
@@ -312,13 +309,13 @@ validateCompoundStatementScope (With a b asyncWs c d e) =
   let
     names =
       d ^..
-      folded.unvalidated.to _withItemBinder.folded._2.
+      folded.to _withItemBinder.folded._2.
       assignTargets
   in
     With a b asyncWs c <$>
     traverse
       (\(WithItem a b c) ->
-         WithItem @(Nub (Scope ': v)) a <$>
+         WithItem a <$>
          validateExprScope b <*>
          traverseOf (traverse._2) validateAssignExprScope c)
       d <*
@@ -327,8 +324,8 @@ validateCompoundStatementScope (With a b asyncWs c d e) =
 
 validateSimpleStatementScope
   :: AsScopeError e a
-  => SimpleStatement v a
-  -> ValidateScope a e (SimpleStatement (Nub (Scope ': v)) a)
+  => SimpleStatement a
+  -> ValidateScope a e (SimpleStatement a)
 validateSimpleStatementScope (Assert a b c d) =
   Assert a b <$>
   validateExprScope c <*>
@@ -369,8 +366,8 @@ validateSimpleStatementScope s@From{} = pure $ unsafeCoerce s
 
 validateSmallStatementScope
   :: AsScopeError e a
-  => SmallStatement v a
-  -> ValidateScope a e (SmallStatement (Nub (Scope ': v)) a)
+  => SmallStatement a
+  -> ValidateScope a e (SmallStatement a)
 validateSmallStatementScope (MkSmallStatement s ss sc cmt nl) =
   (\s' ss' -> MkSmallStatement s' ss' sc cmt nl) <$>
   validateSimpleStatementScope s <*>
@@ -378,8 +375,8 @@ validateSmallStatementScope (MkSmallStatement s ss sc cmt nl) =
 
 validateStatementScope
   :: AsScopeError e a
-  => Statement v a
-  -> ValidateScope a e (Statement (Nub (Scope ': v)) a)
+  => Statement a
+  -> ValidateScope a e (Statement a)
 validateStatementScope (CompoundStatement c) =
   CompoundStatement <$> validateCompoundStatementScope c
 validateStatementScope (SmallStatement idnts a) =
@@ -387,23 +384,23 @@ validateStatementScope (SmallStatement idnts a) =
 
 validateIdentScope
   :: AsScopeError e a
-  => Ident v a
-  -> ValidateScope a e (Ident (Nub (Scope ': v)) a)
+  => Ident a
+  -> ValidateScope a e (Ident a)
 validateIdentScope i =
   lookupScope (_identValue i) `bindVM` \res ->
   liftVM0 ask `bindVM` \curPath ->
     case res of
-      Nothing -> errorVM1 (_NotInScope # (i ^. unvalidated))
+      Nothing -> errorVM1 (_NotInScope # i)
       Just (Entry ann path) ->
         coerce i <$
         if Seq.length curPath < Seq.length path
-        then errorVM1 (_FoundDynamic # (ann, i ^. unvalidated))
+        then errorVM1 (_FoundDynamic # (ann, i))
         else pure ()
 
 validateArgScope
   :: AsScopeError e a
-  => Arg v a
-  -> ValidateScope a e (Arg (Nub (Scope ': v)) a)
+  => Arg a
+  -> ValidateScope a e (Arg a)
 validateArgScope (PositionalArg a e) =
   PositionalArg a <$> validateExprScope e
 validateArgScope (KeywordArg a ident ws2 expr) =
@@ -415,8 +412,8 @@ validateArgScope (DoubleStarArg a ws e) =
 
 validateParamScope
   :: AsScopeError e a
-  => Param v a
-  -> ValidateScope a e (Param (Nub (Scope ': v)) a)
+  => Param a
+  -> ValidateScope a e (Param a)
 validateParamScope (PositionalParam a ident mty) =
   PositionalParam a (coerce ident) <$>
   traverseOf (traverse._2) validateExprScope mty
@@ -435,8 +432,8 @@ validateParamScope (DoubleStarParam a b c d) =
 
 validateBlockScope
   :: AsScopeError e a
-  => Block v a
-  -> ValidateScope a e (Block (Nub (Scope ': v)) a)
+  => Block a
+  -> ValidateScope a e (Block a)
 validateBlockScope (Block x b bs) =
   Block x <$>
   validateStatementScope b <*>
@@ -444,9 +441,9 @@ validateBlockScope (Block x b bs) =
 
 validateComprehensionScope
   :: AsScopeError e a
-  => (ex v a -> ValidateScope a e (ex (Nub (Scope ': v)) a))
-  -> Comprehension ex v a
-  -> ValidateScope a e (Comprehension ex (Nub (Scope ': v)) a)
+  => (ex a -> ValidateScope a e (ex a))
+  -> Comprehension ex a
+  -> ValidateScope a e (Comprehension ex a)
 validateComprehensionScope f (Comprehension a b c d) =
   controlScope $
   (\c' d' b' -> Comprehension a b' c' d') <$>
@@ -456,25 +453,25 @@ validateComprehensionScope f (Comprehension a b c d) =
   where
     validateCompForScope
       :: AsScopeError e a
-      => CompFor v a
-      -> ValidateScope a e (CompFor (Nub (Scope ': v)) a)
+      => CompFor a
+      -> ValidateScope a e (CompFor a)
     validateCompForScope (CompFor a b c d e) =
       (\c' -> CompFor a b c' d) <$>
       validateAssignExprScope c <*>
       validateExprScope e <*
-      extendScope (c ^.. unvalidated.assignTargets)
+      extendScope (c ^.. assignTargets)
 
     validateCompIfScope
       :: AsScopeError e a
-      => CompIf v a
-      -> ValidateScope a e (CompIf (Nub (Scope ': v)) a)
+      => CompIf a
+      -> ValidateScope a e (CompIf a)
     validateCompIfScope (CompIf a b c) =
       CompIf a b <$> validateExprScope c
 
 validateAssignExprScope
   :: AsScopeError e a
-  => Expr v a
-  -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
+  => Expr a
+  -> ValidateScope a e (Expr a)
 validateAssignExprScope (Subscript a e1 ws1 e2 ws2) =
   (\e1' e2' -> Subscript a e1' ws1 e2' ws2) <$>
   validateAssignExprScope e1 <*>
@@ -539,8 +536,8 @@ validateAssignExprScope e@Ternary{} = pure $ unsafeCoerce e
 
 validateDictItemScope
   :: AsScopeError e a
-  => DictItem v a
-  -> ValidateScope a e (DictItem (Nub (Scope ': v)) a)
+  => DictItem a
+  -> ValidateScope a e (DictItem a)
 validateDictItemScope (DictItem a b c d) =
   (\b' -> DictItem a b' c) <$>
   validateExprScope b <*>
@@ -550,8 +547,8 @@ validateDictItemScope (DictUnpack a b c) =
 
 validateSubscriptScope
   :: AsScopeError e a
-  => Subscript v a
-  -> ValidateScope a e (Subscript (Nub (Scope ': v)) a)
+  => Subscript a
+  -> ValidateScope a e (Subscript a)
 validateSubscriptScope (SubscriptExpr e) = SubscriptExpr <$> validateExprScope e
 validateSubscriptScope (SubscriptSlice a b c d) =
   (\a' -> SubscriptSlice a' b) <$>
@@ -561,29 +558,29 @@ validateSubscriptScope (SubscriptSlice a b c d) =
 
 validateListItemScope
   :: AsScopeError e a
-  => ListItem v a
-  -> ValidateScope a e (ListItem (Nub (Scope ': v)) a)
+  => ListItem a
+  -> ValidateScope a e (ListItem a)
 validateListItemScope (ListItem a b) = ListItem a <$> validateExprScope b
 validateListItemScope (ListUnpack a b c d) = ListUnpack a b c <$> validateExprScope d
 
 validateSetItemScope
   :: AsScopeError e a
-  => SetItem v a
-  -> ValidateScope a e (SetItem (Nub (Scope ': v)) a)
+  => SetItem a
+  -> ValidateScope a e (SetItem a)
 validateSetItemScope (SetItem a b) = SetItem a <$> validateExprScope b
 validateSetItemScope (SetUnpack a b c d) = SetUnpack a b c <$> validateExprScope d
 
 validateTupleItemScope
   :: AsScopeError e a
-  => TupleItem v a
-  -> ValidateScope a e (TupleItem (Nub (Scope ': v)) a)
+  => TupleItem a
+  -> ValidateScope a e (TupleItem a)
 validateTupleItemScope (TupleItem a b) = TupleItem a <$> validateExprScope b
 validateTupleItemScope (TupleUnpack a b c d) = TupleUnpack a b c <$> validateExprScope d
 
 validateExprScope
   :: AsScopeError e a
-  => Expr v a
-  -> ValidateScope a e (Expr (Nub (Scope ': v)) a)
+  => Expr a
+  -> ValidateScope a e (Expr a)
 validateExprScope (Lambda a b c d e) =
   Lambda a b <$>
   traverse validateParamScope c <*>
@@ -667,8 +664,8 @@ validateExprScope (Set a b c d) =
 
 validateModuleScope
   :: AsScopeError e a
-  => Module v a
-  -> ValidateScope a e (Module (Nub (Scope ': v)) a)
+  => Module a
+  -> ValidateScope a e (Module a)
 validateModuleScope m =
   case m of
     ModuleEmpty -> pure ModuleEmpty

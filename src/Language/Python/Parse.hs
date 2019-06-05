@@ -1,4 +1,3 @@
-{-# language DataKinds #-}
 {-# language FlexibleContexts #-}
 {-# language MultiParamTypeClasses, FlexibleInstances #-}
 
@@ -70,7 +69,7 @@ parseModule
      )
   => FilePath -- ^ File name
   -> Text -- ^ Input to parse
-  -> Validation (NonEmpty e) (Module '[] SrcInfo)
+  -> Validation (NonEmpty e) (Module SrcInfo)
 parseModule fp input =
   let
     si = initialSrcInfo fp
@@ -93,7 +92,7 @@ parseStatement
      )
   => FilePath -- ^ File name
   -> Text -- ^ Input to parse
-  -> Validation (NonEmpty e) (Statement '[] SrcInfo)
+  -> Validation (NonEmpty e) (Statement SrcInfo)
 parseStatement fp input =
   let
     si = initialSrcInfo fp
@@ -118,7 +117,7 @@ parseExprList
      )
   => FilePath -- ^ File name
   -> Text -- ^ Input to parse
-  -> Validation (NonEmpty e) (Expr '[] SrcInfo)
+  -> Validation (NonEmpty e) (Expr SrcInfo)
 parseExprList fp input =
   let
     si = initialSrcInfo fp
@@ -141,7 +140,7 @@ parseExpr
      )
   => FilePath -- ^ File name
   -> Text -- ^ Input to parse
-  -> Validation (NonEmpty e) (Expr '[] SrcInfo)
+  -> Validation (NonEmpty e) (Expr SrcInfo)
 parseExpr fp input =
   let
     si = initialSrcInfo fp
@@ -163,7 +162,7 @@ readModule
      , AsIRError e SrcInfo
      )
   => FilePath -- ^ File to read
-  -> IO (Validation (NonEmpty e) (Module '[] SrcInfo))
+  -> IO (Validation (NonEmpty e) (Module SrcInfo))
 readModule fp = parseModule fp <$> Text.readFile fp
 
 -- | Parse a statement from a file
@@ -177,7 +176,7 @@ readStatement
      , AsIRError e SrcInfo
      )
   => FilePath -- ^ File to read
-  -> IO (Validation (NonEmpty e) (Statement '[] SrcInfo))
+  -> IO (Validation (NonEmpty e) (Statement SrcInfo))
 readStatement fp = parseStatement fp <$> Text.readFile fp
 
 -- | Parse an expression from a file
@@ -191,7 +190,7 @@ readExpr
      , AsIRError e SrcInfo
      )
   => FilePath -- ^ File to read
-  -> IO (Validation (NonEmpty e) (Expr '[] SrcInfo))
+  -> IO (Validation (NonEmpty e) (Expr SrcInfo))
 readExpr fp = parseExpr fp <$> Text.readFile fp
 
 -- | Parse an expression list (unparenthesised tuple) from a file
@@ -205,5 +204,5 @@ readExprList
      , AsIRError e SrcInfo
      )
   => FilePath -- ^ File to read
-  -> IO (Validation (NonEmpty e) (Expr '[] SrcInfo))
+  -> IO (Validation (NonEmpty e) (Expr SrcInfo))
 readExprList fp = parseExprList fp <$> Text.readFile fp

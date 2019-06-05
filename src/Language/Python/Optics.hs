@@ -1,4 +1,3 @@
-{-# language DataKinds #-}
 {-# language FlexibleContexts #-}
 {-# language MultiParamTypeClasses #-}
 {-# language FlexibleInstances #-}
@@ -19,9 +18,8 @@ Optics for manipulating Python syntax trees
 -}
 
 module Language.Python.Optics
-  ( module Language.Python.Optics.Validated
-    -- * Identifiers
-  , module Language.Python.Optics.Idents
+  ( -- * Identifiers
+    module Language.Python.Optics.Idents
     -- * Indentation
   , module Language.Python.Optics.Indents
     -- * Newlines
@@ -76,13 +74,12 @@ where
 
 import Control.Lens.Getter ((^.), view)
 import Control.Lens.Iso (Iso', iso, from)
-import Control.Lens.Traversal (Traversal)
-import Control.Lens.Prism (Choice, Prism, prism)
+import Control.Lens.Traversal (Traversal')
+import Control.Lens.Prism (Choice, Prism', prism)
 
 import Language.Python.Optics.Idents
 import Language.Python.Optics.Indents
 import Language.Python.Optics.Newlines
-import Language.Python.Optics.Validated
 import Language.Python.Syntax.Ann
 import Language.Python.Syntax.Expr
 import Language.Python.Syntax.Ident
@@ -90,111 +87,91 @@ import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Types
 import Language.Python.Syntax.Whitespace
 
-_TupleUnpack :: Prism (TupleItem v a) (TupleItem '[] a) (TupleUnpack v a) (TupleUnpack '[] a)
+_TupleUnpack :: Prism' (TupleItem a) (TupleUnpack a)
 _TupleUnpack =
   prism
     (\(MkTupleUnpack a b c d) -> TupleUnpack a b c d)
     (\case
        TupleUnpack a b c d -> Right $ MkTupleUnpack a b c d
-       a -> Left $ a ^. unvalidated)
+       a -> Left a)
 
-_Tuple :: Prism (Expr v a) (Expr '[] a) (Tuple v a) (Tuple '[] a)
+_Tuple :: Prism' (Expr a) (Tuple a)
 _Tuple =
   prism
     (\(MkTuple a b c d) -> Tuple a b c d)
     (\case
         Tuple a b c d -> Right (MkTuple a b c d)
-        a -> Left $ a ^. unvalidated)
+        a -> Left a)
 
-tupleItems :: Traversal (Tuple v a) (Tuple '[] a) (TupleItem v a) (TupleItem '[] a)
+tupleItems :: Traversal' (Tuple a) (TupleItem a)
 tupleItems f (MkTuple a b c d) =
   (\b' d' -> MkTuple a b' c d') <$>
   f b <*>
   (traverse.traverse) f d
 
-_ListUnpack :: Prism (ListItem v a) (ListItem '[] a) (ListUnpack v a) (ListUnpack '[] a)
+_ListUnpack :: Prism' (ListItem a) (ListUnpack a)
 _ListUnpack =
   prism
     (\(MkListUnpack a b c d) -> ListUnpack a b c d)
     (\case
        ListUnpack a b c d -> Right $ MkListUnpack a b c d
-       a -> Left $ a ^. unvalidated)
+       a -> Left a)
 
-_List :: Prism (Expr v a) (Expr '[] a) (List v a) (List '[] a)
+_List :: Prism' (Expr a) (List a)
 _List =
   prism
     (\(MkList a b c d) -> List a b c d)
     (\case
         List a b c d -> Right (MkList a b c d)
-        a -> Left $ a ^. unvalidated)
+        a -> Left a)
 
-listItems :: Traversal (List v a) (List '[] a) (ListItem v a) (ListItem '[] a)
+listItems :: Traversal' (List a) (ListItem a)
 listItems f (MkList a b c d) =
   (\c' -> MkList a b c' d) <$>
   (traverse.traverse) f c
 
-_None :: Prism (Expr v a) (Expr '[] a) (None v a) (None '[] a)
+_None :: Prism' (Expr a) (None a)
 _None =
   prism
     (\(MkNone a b) -> None a b)
     (\case
         None a b -> Right (MkNone a b)
-        a -> Left $ a ^. unvalidated)
+        a -> Left a)
 
-_KeywordParam
-  :: Prism
-       (Param v a)
-       (Param '[] a)
-       (KeywordParam v a)
-       (KeywordParam '[] a)
+_KeywordParam :: Prism' (Param a) (KeywordParam a)
 _KeywordParam =
   prism
     (\(MkKeywordParam a b c d e) -> KeywordParam a b c d e)
     (\case
         KeywordParam a b c d e -> Right (MkKeywordParam a b c d e)
-        a -> Left $ a ^. unvalidated)
+        a -> Left a)
 
-_PositionalParam
-  :: Prism
-       (Param v a)
-       (Param '[] a)
-       (PositionalParam v a)
-       (PositionalParam '[] a)
+_PositionalParam :: Prism' (Param a) (PositionalParam a)
 _PositionalParam =
   prism
     (\(MkPositionalParam a b c) -> PositionalParam a b c)
     (\case
         PositionalParam a b c -> Right (MkPositionalParam a b c)
-        a -> Left $ a ^. unvalidated)
+        a -> Left a)
 
-_StarParam
-  :: Prism
-       (Param v a)
-       (Param '[] a)
-       (StarParam v a)
-       (StarParam '[] a)
+_StarParam :: Prism' (Param a) (StarParam a)
 _StarParam =
   prism
     (\(MkStarParam a b c d) -> StarParam a b c d)
     (\case
         StarParam a b c d -> Right (MkStarParam a b c d)
-        a -> Left $ a ^. unvalidated)
+        a -> Left a)
 
-_UnnamedStarParam
-  :: Prism
-       (Param v a)
-       (Param '[] a)
-       (UnnamedStarParam v a)
-       (UnnamedStarParam '[] a)
+_UnnamedStarParam :: Prism' (Param a) (UnnamedStarParam a)
 _UnnamedStarParam =
   prism
     (\(MkUnnamedStarParam a b) -> UnnamedStarParam a b)
     (\case
         UnnamedStarParam a b -> Right (MkUnnamedStarParam a b)
-        a -> Left $ a ^. unvalidated)
+        a -> Left a)
 
 class HasCompoundStatement s where
-  _CompoundStatement :: Prism (s v a) (s '[] a) (CompoundStatement v a) (CompoundStatement '[] a)
+  _CompoundStatement :: Prism' (s a) (CompoundStatement a)
 
 instance HasCompoundStatement CompoundStatement where
   _CompoundStatement = id
@@ -205,10 +182,10 @@ instance HasCompoundStatement Statement where
       CompoundStatement
       (\case
           CompoundStatement a -> Right a
-          a -> Left (a ^. unvalidated))
+          a -> Left a)
 
 class HasFundef s where
-  _Fundef :: Prism (s v a) (s '[] a) (Fundef v a) (Fundef '[] a)
+  _Fundef :: Prism' (s a) (Fundef a)
 
 instance HasFundef Fundef where
   _Fundef = id
@@ -221,13 +198,13 @@ instance HasFundef CompoundStatement where
       (\case
           Fundef idnt a b c d e f g h i j ->
             Right $ MkFundef idnt a b c d e f g h i j
-          a -> Left $ a ^. unvalidated)
+          a -> Left a)
 
 instance HasFundef Statement where
   _Fundef = _CompoundStatement._Fundef
 
 class HasWhile s where
-  _While :: Prism (s v a) (s '[] a) (While v a) (While '[] a)
+  _While :: Prism' (s a) (While a)
 
 instance HasWhile While where
   _While = id
@@ -240,25 +217,25 @@ instance HasWhile CompoundStatement where
       (\case
           While a b c d e f ->
             Right . MkWhile a b c d e $ view (from _Else) <$> f
-          a -> Left $ a ^. unvalidated)
+          a -> Left a)
 
 instance HasWhile Statement where
   _While = _CompoundStatement._While
 
-_Else :: Iso' (Else v a) (Indents a, [Whitespace], Suite v a)
+_Else :: Iso' (Else a) (Indents a, [Whitespace], Suite a)
 _Else = iso (\(MkElse a b c) -> (a, b, c)) (\(a, b, c) -> MkElse a b c)
 
-_Elif :: Iso' (Elif v a) (Indents a, [Whitespace], Expr v a, Suite v a)
+_Elif :: Iso' (Elif a) (Indents a, [Whitespace], Expr a, Suite a)
 _Elif = iso (\(MkElif a b c d) -> (a, b, c, d)) (\(a, b, c, d) -> MkElif a b c d)
 
-_Finally :: Iso' (Finally v a) (Indents a, [Whitespace], Suite v a)
+_Finally :: Iso' (Finally a) (Indents a, [Whitespace], Suite a)
 _Finally = iso (\(MkFinally a b c) -> (a, b, c)) (\(a, b, c) -> MkFinally a b c)
 
-_Except :: Iso' (Except v a) (Indents a, [Whitespace], Maybe (ExceptAs v a), Suite v a)
+_Except :: Iso' (Except a) (Indents a, [Whitespace], Maybe (ExceptAs a), Suite a)
 _Except = iso (\(MkExcept a b c d) -> (a, b, c, d)) (\(a, b, c, d) -> MkExcept a b c d)
 
 class HasIf s where
-  _If :: Prism (s v a) (s '[] a) (If v a) (If '[] a)
+  _If :: Prism' (s a) (If a)
 
 instance HasIf If where
   _If = id
@@ -271,13 +248,13 @@ instance HasIf CompoundStatement where
       (\case
           If a b c d e f g ->
             Right $ MkIf a b c d e (view (from _Elif) <$> f) (view (from _Else) <$> g)
-          a -> Left $ a ^. unvalidated)
+          a -> Left a)
 
 instance HasIf Statement where
   _If = _CompoundStatement._If
 
 class HasTryExcept s where
-  _TryExcept :: Prism (s v a) (s '[] a) (TryExcept v a) (TryExcept '[] a)
+  _TryExcept :: Prism' (s a) (TryExcept a)
 
 instance HasTryExcept TryExcept where
   _TryExcept = id
@@ -294,13 +271,13 @@ instance HasTryExcept CompoundStatement where
               (view (from _Except) <$> e)
               (view (from _Else) <$> f)
               (view (from _Finally) <$> g)
-          a -> Left $ a ^. unvalidated)
+          a -> Left a)
 
 instance HasTryExcept Statement where
   _TryExcept = _CompoundStatement._TryExcept
 
 class HasTryFinally s where
-  _TryFinally :: Prism (s v a) (s '[] a) (TryFinally v a) (TryFinally '[] a)
+  _TryFinally :: Prism' (s a) (TryFinally a)
 
 instance HasTryFinally TryFinally where
   _TryFinally = id
@@ -313,13 +290,13 @@ instance HasTryFinally CompoundStatement where
       (\case
           TryFinally a b c d e f g ->
             Right $ MkTryFinally a b c d ((e, f, g) ^. from _Finally)
-          a -> Left $ a ^. unvalidated)
+          a -> Left a)
 
 instance HasTryFinally Statement where
   _TryFinally = _CompoundStatement._TryFinally
 
 class HasFor s where
-  _For :: Prism (s v a) (s '[] a) (For v a) (For '[] a)
+  _For :: Prism' (s a) (For a)
 
 instance HasFor For where
   _For = id
@@ -332,21 +309,21 @@ instance HasFor CompoundStatement where
       (\case
           For a b c d e f g h i ->
             Right $ MkFor a b c d e f g h (view (from _Else) <$> i)
-          a -> Left $ a ^. unvalidated)
+          a -> Left a)
 
 instance HasFor Statement where
   _For = _CompoundStatement._For
 
-_Call :: Prism (Expr v a) (Expr '[] a) (Call v a) (Call '[] a)
+_Call :: Prism' (Expr a) (Call a)
 _Call =
   prism
     (\(MkCall a b c d e) -> Call a b c d e)
     (\case
         Call a b c d e -> Right $ MkCall a b c d e
-        a -> Left $ a ^. unvalidated)
+        a -> Left a)
 
 class HasClassDef s where
-  _ClassDef :: Prism (s v a) (s '[] a) (ClassDef v a) (ClassDef '[] a)
+  _ClassDef :: Prism' (s a) (ClassDef a)
 
 instance HasClassDef ClassDef where
   _ClassDef = id
@@ -357,13 +334,13 @@ instance HasClassDef CompoundStatement where
       (\(MkClassDef a b c d e f g) -> ClassDef a b c d e f g)
       (\case
           ClassDef a b c d e f g -> Right $ MkClassDef a b c d e f g
-          a -> Left $ a ^. unvalidated)
+          a -> Left a)
 
 instance HasClassDef Statement where
   _ClassDef = _CompoundStatement._ClassDef
 
 class HasWith s where
-  _With :: Prism (s v a) (s '[] a) (With v a) (With '[] a)
+  _With :: Prism' (s a) (With a)
 
 instance HasWith With where
   _With = id
@@ -374,7 +351,7 @@ instance HasWith CompoundStatement where
       (\(MkWith a b c d e f) -> With a b c d e f)
       (\case
           With a b c d e f -> Right $ MkWith a b c d e f
-          a -> Left $ a ^. unvalidated)
+          a -> Left a)
 
 instance HasWith Statement where
   _With = _CompoundStatement._With
@@ -388,13 +365,13 @@ instance HasWith Statement where
 -- 'Control.Lens.Review.review'ing, it re-constructs an annotation from the supplied 'Language.Python.Syntax.Ident.Ident'
 --
 -- @'_Ident' :: 'Prism' ('Expr' v a) ('Expr' '[] a) ('Ident' v a) ('Ident' '[] a)@
-_Ident :: (Choice p, Applicative f) => p (Ident v a) (f (Ident '[] a)) -> p (Expr v a) (f (Expr '[] a))
+_Ident :: (Choice p, Applicative f) => p (Ident a) (f (Ident a)) -> p (Expr a) (f (Expr a))
 _Ident =
   prism
     (\i -> Ident (i ^. annot) i)
     (\case
         Ident _ a -> Right a
-        a -> Left $ a ^. unvalidated)
+        a -> Left a)
 
 -- | 'Traversal' targeting the variables that would modified as a result of an assignment
 --
@@ -429,7 +406,7 @@ _Ident =
 -- @
 -- {a: b} = c
 -- @
-assignTargets :: Traversal (Expr v a) (Expr '[] a) (Ident v a) (Ident '[] a)
+assignTargets :: Traversal' (Expr a) (Ident a)
 assignTargets f e =
   case e of
     List a b c d -> (\c' -> List a b c' d) <$> (traverse.traverse._Exprs.assignTargets) f c
@@ -439,28 +416,28 @@ assignTargets f e =
       (\b' d' -> Tuple a b' c d') <$>
       (_Exprs.assignTargets) f b <*>
       (traverse.traverse._Exprs.assignTargets) f d
-    Unit{} -> pure $ e ^. unvalidated
-    Lambda{} -> pure $ e ^. unvalidated
-    Yield{} -> pure $ e ^. unvalidated
-    YieldFrom{} -> pure $ e ^. unvalidated
-    Ternary{} -> pure $ e ^. unvalidated
-    ListComp{} -> pure $ e ^. unvalidated
-    Deref{} -> pure $ e ^. unvalidated
-    Subscript{} -> pure $ e ^. unvalidated
-    Call{} -> pure $ e ^. unvalidated
-    None{} -> pure $ e ^. unvalidated
-    Ellipsis{} -> pure $ e ^. unvalidated
-    BinOp{} -> pure $ e ^. unvalidated
-    UnOp{} -> pure $ e ^. unvalidated
-    Int{} -> pure $ e ^. unvalidated
-    Float{} -> pure $ e ^. unvalidated
-    Imag{} -> pure $ e ^. unvalidated
-    Bool{} -> pure $ e ^. unvalidated
-    String{} -> pure $ e ^. unvalidated
-    Not{} -> pure $ e ^. unvalidated
-    DictComp{} -> pure $ e ^. unvalidated
-    Dict{} -> pure $ e ^. unvalidated
-    SetComp{} -> pure $ e ^. unvalidated
-    Set{} -> pure $ e ^. unvalidated
-    Generator{} -> pure $ e ^. unvalidated
-    Await{} -> pure $ e ^. unvalidated
+    Unit{} -> pure e
+    Lambda{} -> pure e
+    Yield{} -> pure e
+    YieldFrom{} -> pure e
+    Ternary{} -> pure e
+    ListComp{} -> pure e
+    Deref{} -> pure e
+    Subscript{} -> pure e
+    Call{} -> pure e
+    None{} -> pure e
+    Ellipsis{} -> pure e
+    BinOp{} -> pure e
+    UnOp{} -> pure e
+    Int{} -> pure e
+    Float{} -> pure e
+    Imag{} -> pure e
+    Bool{} -> pure e
+    String{} -> pure e
+    Not{} -> pure e
+    DictComp{} -> pure e
+    Dict{} -> pure e
+    SetComp{} -> pure e
+    Set{} -> pure e
+    Generator{} -> pure e
+    Await{} -> pure e

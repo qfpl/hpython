@@ -28,14 +28,14 @@ import Generators.Sized
 genBlank :: MonadGen m => m (Blank ())
 genBlank = Blank (Ann ()) <$> genWhitespaces <*> Gen.maybe genComment
 
-genTuple :: MonadGen m => m (Expr '[] ()) -> m (Expr '[] ())
+genTuple :: MonadGen m => m (Expr ()) -> m (Expr ())
 genTuple expr =
   Tuple (Ann ()) <$>
   genTupleItem genWhitespaces expr <*>
   genComma <*>
   Gen.maybe (genSizedCommaSep1' $ genTupleItem genWhitespaces expr)
 
-genParam :: MonadGen m => m (Expr '[] ()) -> m (Param '[] ())
+genParam :: MonadGen m => m (Expr ()) -> m (Param ())
 genParam genExpr =
   sizedRecursive
     [ StarParam (Ann ()) <$>
@@ -56,7 +56,7 @@ genParam genExpr =
       genExpr
     ]
 
-genArg :: MonadGen m => m (Expr '[] ()) -> m (Arg '[] ())
+genArg :: MonadGen m => m (Expr ()) -> m (Arg ())
 genArg genExpr =
   sizedRecursive
     [ PositionalArg (Ann ()) <$> genExpr
@@ -66,7 +66,7 @@ genArg genExpr =
     ]
     []
 
-genIdent :: MonadGen m => m (Ident '[] ())
+genIdent :: MonadGen m => m (Ident ())
 genIdent =
   MkIdent (Ann ()) <$>
   liftA2 (:)
@@ -74,7 +74,7 @@ genIdent =
     (Gen.list (Range.constant 0 49) (Gen.choice [Gen.alphaNum, pure '_'])) <*>
   genWhitespaces
 
-genModuleName :: MonadGen m => m (ModuleName '[] ())
+genModuleName :: MonadGen m => m (ModuleName ())
 genModuleName =
   Gen.recursive Gen.choice
   [ ModuleNameOne (Ann ()) <$> genIdent ]
@@ -84,7 +84,7 @@ genModuleName =
     genModuleName
   ]
 
-genRelativeModuleName :: MonadGen m => m (RelativeModuleName '[] ())
+genRelativeModuleName :: MonadGen m => m (RelativeModuleName ())
 genRelativeModuleName =
   Gen.choice
   [ Relative (Ann ()) <$>
@@ -94,7 +94,7 @@ genRelativeModuleName =
     genModuleName
   ]
 
-genImportTargets :: MonadGen m => m (ImportTargets '[] ())
+genImportTargets :: MonadGen m => m (ImportTargets ())
 genImportTargets =
   Gen.choice
   [ ImportAll (Ann ()) <$> genWhitespaces
@@ -106,7 +106,7 @@ genImportTargets =
     genWhitespaces
   ]
 
-genBlock :: MonadGen m => m (Block '[] ())
+genBlock :: MonadGen m => m (Block ())
 genBlock =
   Block <$>
   Gen.list
@@ -119,7 +119,7 @@ genBlock =
      , fmap Left $ (,) <$> genBlank <*> genNewline
      ])
 
-genCompFor :: MonadGen m => m (CompFor '[] ())
+genCompFor :: MonadGen m => m (CompFor ())
 genCompFor =
   sized2M
     (\a b ->
@@ -129,13 +129,13 @@ genCompFor =
     genExpr
     genExpr
 
-genCompIf :: MonadGen m => m (CompIf '[] ())
+genCompIf :: MonadGen m => m (CompIf ())
 genCompIf =
   CompIf (Ann ()) <$>
   genWhitespaces <*>
   Gen.scale (max 0 . subtract 1) genExpr
 
-genComprehension :: MonadGen m => m (e '[] ()) -> m (Comprehension e '[] ())
+genComprehension :: MonadGen m => m (e ()) -> m (Comprehension e ())
 genComprehension me =
   sized3
     (Comprehension (Ann ()))
@@ -143,7 +143,7 @@ genComprehension me =
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
-genSubscript :: MonadGen m => m (Subscript '[] ())
+genSubscript :: MonadGen m => m (Subscript ())
 genSubscript =
   sizedRecursive
     [ SubscriptExpr <$> genExpr
@@ -155,7 +155,7 @@ genSubscript =
     ]
     []
 
-genDictComp :: MonadGen m => m (Comprehension DictItem '[] ())
+genDictComp :: MonadGen m => m (Comprehension DictItem ())
 genDictComp =
   sized3
     (Comprehension (Ann ()))
@@ -163,7 +163,7 @@ genDictComp =
     genCompFor
     (sizedList $ Gen.choice [Left <$> genCompFor, Right <$> genCompIf])
 
-genSetComp :: MonadGen m => m (Comprehension SetItem '[] ())
+genSetComp :: MonadGen m => m (Comprehension SetItem ())
 genSetComp =
   sized3
     (Comprehension (Ann ()))
@@ -173,7 +173,7 @@ genSetComp =
 
 -- | This is necessary to prevent generating exponentials that will take forever to evaluate
 -- when python does constant folding
-genExpr :: MonadGen m => m (Expr '[] ())
+genExpr :: MonadGen m => m (Expr ())
 genExpr = genExpr' False
 
 genPyChar' :: MonadGen m => m PyChar
@@ -214,7 +214,7 @@ genRawBytesLiteral =
   ]
 
 
-genExpr' :: MonadGen m => Bool -> m (Expr '[] ())
+genExpr' :: MonadGen m => Bool -> m (Expr ())
 genExpr' isExp =
   sizedRecursive
     [ genNone
@@ -314,7 +314,7 @@ genExpr' isExp =
            pure a)
     ]
 
-genSimpleStatement :: MonadGen m => m (SimpleStatement '[] ())
+genSimpleStatement :: MonadGen m => m (SimpleStatement ())
 genSimpleStatement =
   sizedRecursive
     [ Pass (Ann ()) <$> genWhitespaces
@@ -359,7 +359,7 @@ genSimpleStatement =
         (sizedMaybe ((,) <$> genComma <*> genExpr))
     ]
 
-genDecorator :: MonadGen m => m (Decorator '[] ())
+genDecorator :: MonadGen m => m (Decorator ())
 genDecorator =
   Decorator (Ann ()) <$>
   genIndents <*>
@@ -385,7 +385,7 @@ genFundef =
 
 genCompoundStatement
   :: MonadGen m
-  => m (CompoundStatement '[] ())
+  => m (CompoundStatement ())
 genCompoundStatement =
   sizedRecursive
     [ review _Fundef <$> genFundef
@@ -478,7 +478,7 @@ genCompoundStatement =
     ]
     []
 
-genStatement :: MonadGen m => m (Statement '[] ())
+genStatement :: MonadGen m => m (Statement ())
 genStatement =
   sizedRecursive
     [ SmallStatement <$> genIndents <*> genSmallStatement genSimpleStatement ]
@@ -491,7 +491,7 @@ genIndent =
 genIndents :: MonadGen m => m (Indents ())
 genIndents = (\is -> Indents is (Ann ())) <$> Gen.list (Range.constant 0 10) genIndent
 
-genModule :: MonadGen m => m (Module '[] ())
+genModule :: MonadGen m => m (Module ())
 genModule =
   sizedRecursive
     [ pure ModuleEmpty
@@ -507,7 +507,7 @@ genModule =
         genModule
     ]
 
-genImportAs :: MonadGen m => m (e '[] ()) -> m (Ident '[] ()) -> m (ImportAs e '[] ())
+genImportAs :: MonadGen m => m (e ()) -> m (Ident ()) -> m (ImportAs e ())
 genImportAs me genIdent =
   sized2M
     (\a b -> ImportAs (Ann ()) a <$> pure b)

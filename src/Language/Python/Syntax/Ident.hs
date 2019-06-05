@@ -2,6 +2,7 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
 {-# language FlexibleInstances #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
+{-# language TemplateHaskell #-}
 
 {-|
 Module      : Language.Python.Syntax.Ident
@@ -24,15 +25,14 @@ module Language.Python.Syntax.Ident
   )
 where
 
-import Control.Lens.Lens (Lens, Lens', lens)
+import Control.Lens.Lens (Lens')
+import Control.Lens.TH (makeLenses)
 import Data.Char (isDigit, isLetter)
 import Data.Generics.Product.Typed (typed)
 import Data.String (IsString(..))
 import GHC.Generics (Generic)
 
-import Language.Python.Optics.Validated (Validated)
 import Language.Python.Syntax.Ann
-import Language.Python.Syntax.Raw
 import Language.Python.Syntax.Whitespace
 
 -- | An identifier. Like many types in hpython, it has an optional annotation
@@ -41,15 +41,17 @@ import Language.Python.Syntax.Whitespace
 -- 'Raw' 'Ident's have an 'IsString' instance.
 --
 -- See <https://docs.python.org/3.5/reference/lexical_analysis.html#identifiers>
-data Ident (v :: [*]) a
+data Ident a
   = MkIdent
   { _identAnn :: Ann a
   , _identValue :: String
   , _identWhitespace :: [Whitespace]
   } deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
-instance HasAnn (Ident v) where
-  annot :: forall a. Lens' (Ident v a) (Ann a)
+makeLenses ''Ident
+
+instance HasAnn Ident where
+  annot :: forall a. Lens' (Ident a) (Ann a)
   annot = typed @(Ann a)
 
 -- | Determine whether this character could start a valid identifier
@@ -66,19 +68,8 @@ isIdentifierChar = do
   b <- isDigit
   pure $ a || b
 
-instance IsString (Raw Ident) where
+instance IsString (Ident ()) where
   fromString s = MkIdent (Ann ()) s []
 
-identValue :: Lens (Ident v a) (Ident '[] a) String String
-identValue = lens _identValue (\s a -> s { _identValue = a })
-
-identAnn :: Lens (Ident v a) (Ident v a) a a
-identAnn = annot_
-
-identWhitespace :: Lens (Ident v a) (Ident v a) [Whitespace] [Whitespace]
-identWhitespace = lens _identWhitespace (\s ws -> s { _identWhitespace = ws })
-
-instance HasTrailingWhitespace (Ident v a) where
+instance HasTrailingWhitespace (Ident a) where
   trailingWhitespace = identWhitespace
-
-instance Validated Ident where

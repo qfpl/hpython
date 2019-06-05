@@ -76,8 +76,7 @@ flag development
   manual: True
 
 library
-  exposed-modules:     Data.Type.Set
-                     , Data.Validate.Monadic
+  exposed-modules:     Data.Validate.Monadic
                      , Language.Python
                      , Language.Python.DSL
                      , Language.Python.Internal.Lexer
@@ -90,7 +89,6 @@ library
                      , Language.Python.Optics.Idents
                      , Language.Python.Optics.Indents
                      , Language.Python.Optics.Newlines
-                     , Language.Python.Optics.Validated
                      , Language.Python.Parse
                      , Language.Python.Parse.Error
                      , Language.Python.Render
@@ -108,7 +106,6 @@ library
                      , Language.Python.Syntax.ModuleNames
                      , Language.Python.Syntax.Numbers
                      , Language.Python.Syntax.Punctuation
-                     , Language.Python.Syntax.Raw
                      , Language.Python.Syntax.Statement
                      , Language.Python.Syntax.Strings
                      , Language.Python.Syntax.Types

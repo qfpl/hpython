@@ -10,8 +10,6 @@ Passing @[]@ to a function which expects a @['Raw' 'Line']@ is the same as
 passing @['line_' 'pass_']@
 -}
 
-
-{-# language DataKinds #-}
 {-# language FlexibleContexts #-}
 {-# language MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 {-# language LambdaCase #-}
@@ -434,11 +432,12 @@ import Language.Python.Syntax.Module
 import Language.Python.Syntax.Operator.Binary
 import Language.Python.Syntax.Operator.Unary
 import Language.Python.Syntax.Punctuation
-import Language.Python.Syntax.Raw
 import Language.Python.Syntax.Statement
 import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Types
 import Language.Python.Syntax.Whitespace
+
+type Raw f = f ()
 
 -- | 'Ident' has an 'Data.String.IsString' instance, but when a type class dispatches on
 -- an 'Ident' we will run into ambiguity if we try to use @OverloadedStrings@. In these
@@ -466,9 +465,9 @@ module_ (a:as) =
     Right a -> ModuleStatement a $ module_ as
 
 -- | One or more lines of Python code
-newtype Line v a
+newtype Line a
   = Line
-  { unLine :: Either (Blank a, Newline) (Statement v a)
+  { unLine :: Either (Blank a, Newline) (Statement a)
   } deriving (Eq, Show)
 makeWrapped ''Line
 
@@ -513,10 +512,10 @@ instance AsLine Statement where
 instance AsLine Expr where
   line_ e = line_ $ Expr (e ^. annot) e
 
-instance HasExprs Line where
+instance HasExprs (Line a) (Line a) (Expr a) (Expr a) where
   _Exprs f (Line a) = Line <$> (_Right._Exprs) f a
 
-instance HasStatements Line where
+instance HasStatements (Line a) (Line a) (Statement a) (Statement a) where
   _Statements f (Line a) = Line <$> _Right f a
 
 class BodySyntax s where
@@ -1022,10 +1021,10 @@ instance StarSyntax Expr ListItem where
 instance e ~ Raw ListItem => AsList [e] where
   list_ es = List (Ann ()) [] (listToCommaSep1' es) []
 
-instance e ~ Comprehension Expr => AsList (Raw e) where
+instance e ~ Expr => AsList (Raw (Comprehension e)) where
   list_ c = ListComp (Ann ()) [] c []
 
-newtype Guard v a = MkGuard { unGuard :: Either (CompFor v a) (CompIf v a) }
+newtype Guard a = MkGuard { unGuard :: Either (CompFor a) (CompIf a) }
 
 class ForSyntax a x | a -> x where
   for_ :: Raw x -> a
@@ -1155,12 +1154,12 @@ infixl 1 `is_`
 -- |
 -- >>> var_ "a" `in_` var_ "b"
 -- a in b
-data In v a = MkIn (Expr v a) (Expr v a)
+data In a = MkIn (Expr a) (Expr a)
 
 -- |
 -- >>> var_ "a" `in_` [var_ "b", var_ "c"]
 -- a in b, c
-data InList v a = MkInList (Expr v a) [Expr v a]
+data InList a = MkInList (Expr a) [Expr a]
 
 class InSyntax a x | a -> x, x -> a where
   in_ :: Raw Expr -> x -> Raw a

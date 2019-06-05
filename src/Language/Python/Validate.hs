@@ -1,4 +1,3 @@
-{-# language DataKinds, TypeOperators #-}
 {-# language FlexibleContexts #-}
 {-|
 Module      : Language.Python.Validate
@@ -36,8 +35,8 @@ validateModuleAll
      , AsSyntaxError e a
      , AsScopeError e a
      )
-  => Module '[] a -- ^ 'Module' to validate
-  -> Validation (NonEmpty e) (Module '[Scope, Syntax, Indentation] a)
+  => Module a -- ^ 'Module' to validate
+  -> Validation (NonEmpty e) (Module a)
 validateModuleAll =
   validateAll validateModuleIndentation validateModuleSyntax validateModuleScope
 
@@ -46,8 +45,8 @@ validateStatementAll
      , AsSyntaxError e a
      , AsScopeError e a
      )
-  => Statement '[] a -- ^ 'Statement' to validate
-  -> Validation (NonEmpty e) (Statement '[Scope, Syntax, Indentation] a)
+  => Statement a -- ^ 'Statement' to validate
+  -> Validation (NonEmpty e) (Statement a)
 validateStatementAll =
   validateAll validateStatementIndentation validateStatementSyntax validateStatementScope
 
@@ -56,8 +55,8 @@ validateExprAll
      , AsSyntaxError e a
      , AsScopeError e a
      )
-  => Expr '[] a -- ^ 'Expr' to validate
-  -> Validation (NonEmpty e) (Expr '[Scope, Syntax, Indentation] a)
+  => Expr a -- ^ 'Expr' to validate
+  -> Validation (NonEmpty e) (Expr a)
 validateExprAll =
   validateAll validateExprIndentation validateExprSyntax validateExprScope
 
@@ -77,11 +76,11 @@ validateAll
      , AsSyntaxError e a
      , AsScopeError e a
      )
-  => (s '[] a -> ValidateIndentation e (s '[Indentation] a)) -- ^ Indentation validator
-  -> (s '[Indentation] a -> ValidateSyntax e (s '[Syntax, Indentation] a)) -- ^ Syntax validator
-  -> (s '[Syntax, Indentation] a -> ValidateScope a e (s '[Scope, Syntax, Indentation] a)) -- ^ Scope validator
-  -> s '[] a
-  -> Validation (NonEmpty e) (s '[Scope, Syntax, Indentation] a)
+  => (s a -> ValidateIndentation e (s a)) -- ^ Indentation validator
+  -> (s a -> ValidateSyntax e (s a)) -- ^ Syntax validator
+  -> (s a -> ValidateScope a e (s  a)) -- ^ Scope validator
+  -> s a
+  -> Validation (NonEmpty e) (s a)
 validateAll vi vsyn vsco m =
   runValidateIndentation (vi m) `bindValidation` \m' ->
   runValidateSyntax (vsyn m') `bindValidation` \m'' ->

@@ -1,4 +1,5 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# language DeriveGeneric #-}
 {-# language GeneralizedNewtypeDeriving #-}
 {-# language ScopedTypeVariables, TypeApplications #-}
 {-# language FlexibleInstances, MultiParamTypeClasses, TemplateHaskell, TypeFamilies #-}
@@ -25,10 +26,11 @@ import Control.Lens.Wrapped (_Wrapped)
 import Data.Deriving (deriveEq1, deriveOrd1, deriveShow1)
 import Data.Semigroup (Semigroup)
 import Data.Monoid (Monoid)
+import GHC.Generics (Generic)
 
 -- | Used to mark annotations in data structures, which helps with generic deriving
 newtype Ann a = Ann { getAnn :: a }
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Semigroup, Monoid)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Semigroup, Monoid, Generic)
 
 -- | Classy 'Lens'' for things that are annotated
 class HasAnn s where

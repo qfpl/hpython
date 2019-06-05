@@ -1,10 +1,9 @@
 {-# options_ghc -fno-warn-unused-do-bind #-}
-{-# language DataKinds, TypeOperators, FlexibleContexts #-}
+{-# language TypeOperators, FlexibleContexts #-}
 {-# language OverloadedStrings #-}
 
 module Main where
 
-import Control.Lens
 import Control.Monad.State
 import Data.List.NonEmpty
 import Data.Functor (($>))
@@ -15,7 +14,6 @@ import System.Directory
 import System.Exit
 import System.Process
 
-import Language.Python.Optics.Validated (unvalidated)
 import Language.Python.Parse (SrcInfo, parseStatement, parseExpr, parseExprList)
 import Language.Python.Parse.Error (ParseError)
 import Language.Python.Render
@@ -107,7 +105,7 @@ syntax_modul path =
     annotateShow rst
     runPython3 path shouldSucceed rst
 
-goodExpr :: FilePath -> Expr '[] () -> PropertyT IO ()
+goodExpr :: FilePath -> Expr () -> PropertyT IO ()
 goodExpr path ex =
   case validateExprIndentation' ex of
     Failure errs -> annotateShow errs *> failure
@@ -155,35 +153,35 @@ string_correct path =
     ex' === showExpr py
 
 validateExprSyntax'
-  :: Expr '[Indentation] a
-  -> Validation (NonEmpty (SyntaxError a)) (Expr '[Syntax, Indentation] a)
+  :: Expr a
+  -> Validation (NonEmpty (SyntaxError a)) (Expr a)
 validateExprSyntax' = runValidateSyntax . validateExprSyntax
 
 validateExprIndentation'
-  :: Expr '[] a
-  -> Validation (NonEmpty (IndentationError a)) (Expr '[Indentation] a)
+  :: Expr a
+  -> Validation (NonEmpty (IndentationError a)) (Expr a)
 validateExprIndentation' = runValidateIndentation . validateExprIndentation
 
 validateStatementSyntax'
-  :: Statement '[Indentation] a
-  -> Validation (NonEmpty (SyntaxError a)) (Statement '[Syntax, Indentation] a)
+  :: Statement a
+  -> Validation (NonEmpty (SyntaxError a)) (Statement a)
 validateStatementSyntax' =
   runValidateSyntax . validateStatementSyntax
 
 validateStatementIndentation'
-  :: Statement '[] a
-  -> Validation (NonEmpty (IndentationError a)) (Statement '[Indentation] a)
+  :: Statement a
+  -> Validation (NonEmpty (IndentationError a)) (Statement a)
 validateStatementIndentation' = runValidateIndentation . validateStatementIndentation
 
 validateModuleSyntax'
-  :: Module '[Indentation] a
-  -> Validation (NonEmpty (SyntaxError a)) (Module '[Syntax, Indentation] a)
+  :: Module a
+  -> Validation (NonEmpty (SyntaxError a)) (Module a)
 validateModuleSyntax' =
   runValidateSyntax . validateModuleSyntax
 
 validateModuleIndentation'
-  :: Module '[] a
-  -> Validation (NonEmpty (IndentationError a)) (Module '[Indentation] a)
+  :: Module a
+  -> Validation (NonEmpty (IndentationError a)) (Module a)
 validateModuleIndentation' = runValidateIndentation . validateModuleIndentation
 
 expr_printparseprint_print :: Property
@@ -200,7 +198,7 @@ expr_printparseprint_print =
             _ <-
               validation (\e -> annotateShow (e :: NonEmpty (ParseError SrcInfo)) *> failure) pure $
               parseExprList "test" (showExpr res')
-            showExpr (res' ^. unvalidated) === showExpr (res $> ())
+            showExpr res' === showExpr (res $> ())
 
 statement_printparseprint_print :: Property
 statement_printparseprint_print =
@@ -218,8 +216,7 @@ statement_printparseprint_print =
               parseStatement "test" (showStatement res')
             annotateShow py
             annotateShow $ showStatement (() <$ py)
-            showStatement (res' ^. unvalidated) ===
-              showStatement (py $> ())
+            showStatement res' === showStatement (py $> ())
 
 main :: IO ()
 main =

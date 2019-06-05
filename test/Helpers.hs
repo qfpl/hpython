@@ -1,4 +1,3 @@
-{-# language DataKinds #-}
 {-# language RankNTypes #-}
 {-# language ScopedTypeVariables #-}
 module Helpers where
@@ -52,11 +51,11 @@ doParse pa input = do
     Right a -> pure a
 
 syntaxValidateModule
-  :: Module '[] ()
+  :: Module ()
   -> PropertyT IO
        (Validation
           (NonEmpty (SyntaxError ()))
-          (Module '[Syntax, Indentation] ()))
+          (Module ()))
 syntaxValidateModule x =
   case runValidateIndentation $ validateModuleIndentation x of
     Failure errs -> do
@@ -66,11 +65,11 @@ syntaxValidateModule x =
       pure $ runValidateSyntax (validateModuleSyntax a)
 
 syntaxValidateStatement
-  :: Statement '[] ()
+  :: Statement ()
   -> PropertyT IO
        (Validation
           (NonEmpty (SyntaxError ()))
-          (Statement '[Syntax, Indentation] ()))
+          (Statement ()))
 syntaxValidateStatement x =
   case runValidateIndentation $ validateStatementIndentation x of
     Failure errs -> do
@@ -80,11 +79,11 @@ syntaxValidateStatement x =
       pure $ runValidateSyntax (validateStatementSyntax a)
 
 syntaxValidateExpr
-  :: Expr '[] ()
+  :: Expr ()
   -> PropertyT IO
        (Validation
           (NonEmpty (SyntaxError ()))
-          (Expr '[Syntax, Indentation] ()))
+          (Expr ()))
 syntaxValidateExpr x =
   case runValidateIndentation $ validateExprIndentation x of
     Failure errs -> do

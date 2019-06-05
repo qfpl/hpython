@@ -152,19 +152,19 @@ parensDistTWS f a = do
   parens $ f (a & trailingWhitespace .~ [])
   traverse_ renderWhitespace (a ^. trailingWhitespace)
 
-parensTuple :: Expr v a -> RenderOutput ()
+parensTuple :: Expr a -> RenderOutput ()
 parensTuple e =
   case e of
     Tuple{} -> parensDistTWS renderExpr e
     _ -> renderExpr e
 
-parensGenerator :: Expr v a -> RenderOutput ()
+parensGenerator :: Expr a -> RenderOutput ()
 parensGenerator e =
   case e of
     Generator{} -> parensDistTWS renderExpr e
     _ -> renderExpr e
 
-parensTupleGenerator :: Expr v a -> RenderOutput ()
+parensTupleGenerator :: Expr a -> RenderOutput ()
 parensTupleGenerator e =
   case e of
     Tuple{} -> parensDistTWS renderExpr e
@@ -622,17 +622,17 @@ renderCommaSep1' f (CommaSepMany1' a comma c) = do
   renderComma comma
   renderCommaSep1' f c
 
-renderIdent :: Ident v a -> RenderOutput ()
+renderIdent :: Ident a -> RenderOutput ()
 renderIdent (MkIdent _ a b) = do
   singleton $ TkIdent a ()
   traverse_ renderWhitespace b
 
-parensTernaryLambda :: (Expr v a -> RenderOutput ()) -> Expr v a -> RenderOutput ()
+parensTernaryLambda :: (Expr a -> RenderOutput ()) -> Expr a -> RenderOutput ()
 parensTernaryLambda _ e@Ternary{} = parensDistTWS renderExpr e
 parensTernaryLambda _ e@Lambda{} = parensDistTWS renderExpr e
 parensTernaryLambda f e = f e
 
-renderCompFor :: CompFor v a -> RenderOutput ()
+renderCompFor :: CompFor a -> RenderOutput ()
 renderCompFor (CompFor _ ws1 ex1 ws2 ex2) = do
   singleton $ TkFor ()
   traverse_ renderWhitespace ws1
@@ -643,22 +643,22 @@ renderCompFor (CompFor _ ws1 ex1 ws2 ex2) = do
   traverse_ renderWhitespace ws2
   parensTernaryLambda parensTupleGenerator ex2
 
-renderCompIf :: CompIf v a -> RenderOutput ()
+renderCompIf :: CompIf a -> RenderOutput ()
 renderCompIf (CompIf _ ws ex) = do
   singleton $ TkIf ()
   traverse_ renderWhitespace ws
   parensTernaryLambda parensTupleGenerator ex
 
 renderComprehension
-  :: (e v a -> RenderOutput ())
-  -> Comprehension e v a
+  :: (e a -> RenderOutput ())
+  -> Comprehension e a
   -> RenderOutput ()
 renderComprehension f (Comprehension _ expr cf cs) = do
   f expr
   renderCompFor cf
   traverse_ (bitraverse_ renderCompFor renderCompIf) cs
 
-renderDictItem :: DictItem v a -> RenderOutput ()
+renderDictItem :: DictItem a -> RenderOutput ()
 renderDictItem (DictItem _ a b c) = do
   parensTupleGenerator a
   renderColon b
@@ -687,7 +687,7 @@ renderStringLiteral (RawBytesLiteral _ a b c d e) = do
   singleton $ TkRawBytes a b c d ()
   traverse_ renderWhitespace e
 
-renderSubscript :: Subscript v a -> RenderOutput ()
+renderSubscript :: Subscript a -> RenderOutput ()
 renderSubscript (SubscriptExpr a) =
   case a of
     Await{} -> parensDistTWS renderExpr a
@@ -702,7 +702,7 @@ renderSubscript (SubscriptSlice a b c d) = do
       (traverse_ parensTupleGenerator))
     d
 
-renderYield :: (Expr v a -> RenderOutput ()) -> Expr v a -> RenderOutput ()
+renderYield :: (Expr a -> RenderOutput ()) -> Expr a -> RenderOutput ()
 renderYield _ (Yield _ a b) = do
   singleton $ TkYield ()
   traverse_ renderWhitespace a
@@ -715,7 +715,7 @@ renderYield _ (YieldFrom _ a b c) = do
   parensTupleGenerator c
 renderYield re e = re e
 
-renderUnpackTarget :: Expr v a -> RenderOutput ()
+renderUnpackTarget :: Expr a -> RenderOutput ()
 renderUnpackTarget e =
   case e of
     BinOp _ _ BoolAnd{} _ -> parensDistTWS renderExpr e
@@ -738,7 +738,7 @@ renderNestedParens =
         traverse_ renderWhitespace ws2)
 
 renderTupleItems
-  :: CommaSep1' (TupleItem v a)
+  :: CommaSep1' (TupleItem a)
   -> RenderOutput ()
 renderTupleItems (CommaSepOne1' a Nothing) =
   case a of
@@ -784,7 +784,7 @@ renderTupleItems (CommaSepMany1' a comma rest) = do
   renderComma comma
   renderTupleItems rest
 
-renderSetItem :: SetItem v a -> RenderOutput ()
+renderSetItem :: SetItem a -> RenderOutput ()
 renderSetItem a =
   case a of
     SetItem _ b -> parensTupleGenerator b
@@ -796,7 +796,7 @@ renderSetItem a =
             renderUnpackTarget d)
         b
 
-renderSetItems :: CommaSep1' (SetItem v a) -> RenderOutput ()
+renderSetItems :: CommaSep1' (SetItem a) -> RenderOutput ()
 renderSetItems (CommaSepOne1' a Nothing) =
   case a of
     SetItem _ b -> parensTupleGenerator b
@@ -839,7 +839,7 @@ renderSetItems (CommaSepMany1' a comma rest) = do
   renderComma comma
   renderSetItems rest
 
-renderListItems :: CommaSep1' (ListItem v a) -> RenderOutput ()
+renderListItems :: CommaSep1' (ListItem a) -> RenderOutput ()
 renderListItems (CommaSepOne1' a Nothing) =
   case a of
     ListItem _ b -> parensTupleGenerator b
@@ -882,7 +882,7 @@ renderListItems (CommaSepMany1' a comma rest) = do
   renderComma comma
   renderListItems rest
 
-renderExpr :: Expr v a -> RenderOutput ()
+renderExpr :: Expr a -> RenderOutput ()
 renderExpr (Unit _ a b) = do
   singleton $ TkLeftParen ()
   traverse_ renderWhitespace a
@@ -1061,7 +1061,7 @@ renderExpr (Await _ ws expr) = do
      Await{} -> parensDistTWS renderExpr expr
      _ -> parensGenerator expr)
 
-renderModuleName :: ModuleName v a -> RenderOutput ()
+renderModuleName :: ModuleName a -> RenderOutput ()
 renderModuleName (ModuleNameOne _ s) = renderIdent s
 renderModuleName (ModuleNameMany _ n dot rest) = do
   renderIdent n
@@ -1073,14 +1073,14 @@ renderDot (MkDot ws) = do
   singleton $ TkDot ()
   traverse_ renderWhitespace ws
 
-renderRelativeModuleName :: RelativeModuleName v a -> RenderOutput ()
+renderRelativeModuleName :: RelativeModuleName a -> RenderOutput ()
 renderRelativeModuleName (RelativeWithName _ ds mn) = do
   traverse_ renderDot ds
   renderModuleName mn
 renderRelativeModuleName (Relative _ ds) =
   traverse_ renderDot ds
 
-renderImportAs :: (e v a -> RenderOutput ()) -> ImportAs e v a -> RenderOutput ()
+renderImportAs :: (e a -> RenderOutput ()) -> ImportAs e a -> RenderOutput ()
 renderImportAs f (ImportAs _ ea m) = do
   f ea
   traverse_
@@ -1090,7 +1090,7 @@ renderImportAs f (ImportAs _ ea m) = do
         renderIdent b)
     m
 
-renderImportTargets :: ImportTargets v a -> RenderOutput ()
+renderImportTargets :: ImportTargets a -> RenderOutput ()
 renderImportTargets (ImportAll _ ws) = do
   singleton $ TkStar ()
   traverse_ renderWhitespace ws
@@ -1120,7 +1120,7 @@ renderAugAssign aa = do
     DoubleSlashEq -> TkDoubleSlashEq ()
   traverse_ renderWhitespace (_augAssignWhitespace aa)
 
-renderSimpleStatement :: SimpleStatement v a -> RenderOutput ()
+renderSimpleStatement :: SimpleStatement a -> RenderOutput ()
 renderSimpleStatement (Assert _ b c d) = do
   singleton $ TkAssert ()
   traverse_ renderWhitespace b
@@ -1204,7 +1204,7 @@ renderBlank (Blank _ a b) = do
   traverse_ renderWhitespace a
   traverse_ renderComment b
 
-renderBlock :: Block v a -> RenderOutput ()
+renderBlock :: Block a -> RenderOutput ()
 renderBlock (Block a b c) = do
   traverse_ (bitraverse_ renderBlank (singleton . renderNewline)) a
   (if null c then final else notFinal) $ renderStatement b
@@ -1237,7 +1237,7 @@ renderColon (MkColon ws) = do
   traverse_ renderWhitespace ws
 
 renderSuite
-  :: Suite v a
+  :: Suite a
   -> RenderOutput ()
 renderSuite (SuiteMany _ a b c d) = do
   renderColon a
@@ -1249,7 +1249,7 @@ renderSuite (SuiteOne _ a b) = do
   fin <- isFinal
   renderSmallStatement $ correctTrailingNewline fin b
 
-renderDecorator :: Decorator v a -> RenderOutput ()
+renderDecorator :: Decorator a -> RenderOutput ()
 renderDecorator (Decorator _ a b c d e f) = do
   renderIndents a
   renderAt b
@@ -1258,7 +1258,7 @@ renderDecorator (Decorator _ a b c d e f) = do
   singleton (renderNewline e)
   traverse_ (bitraverse_ renderBlank (singleton . renderNewline)) f
 
-renderCompoundStatement :: CompoundStatement v a -> RenderOutput ()
+renderCompoundStatement :: CompoundStatement a -> RenderOutput ()
 renderCompoundStatement (Fundef _ decos idnt asyncWs ws1 name ws2 params ws3 mty s) = do
   traverse_ renderDecorator decos
   renderIndents idnt
@@ -1415,7 +1415,7 @@ renderCompoundStatement (With _ idnt asyncWs a b s) = do
   renderCommaSep1 renderWithItem b
   final $ renderSuite s
 
-renderWithItem :: WithItem v a -> RenderOutput ()
+renderWithItem :: WithItem a -> RenderOutput ()
 renderWithItem (WithItem _ a b) = do
   parensTupleGenerator a
   traverse_
@@ -1428,7 +1428,7 @@ renderWithItem (WithItem _ a b) = do
 renderIndent :: Indent -> RenderOutput ()
 renderIndent (MkIndent ws) = traverse_ renderWhitespace $ toList ws
 
-renderSmallStatement :: SmallStatement v a -> RenderOutput ()
+renderSmallStatement :: SmallStatement a -> RenderOutput ()
 renderSmallStatement (MkSmallStatement s ss sc cmt nl) = do
   renderSimpleStatement s
   traverse_
@@ -1440,14 +1440,14 @@ renderSmallStatement (MkSmallStatement s ss sc cmt nl) = do
   traverse_ renderComment cmt
   traverse_ (singleton . renderNewline) nl
 
-renderStatement :: Statement v a -> RenderOutput ()
+renderStatement :: Statement a -> RenderOutput ()
 renderStatement (CompoundStatement c) = renderCompoundStatement c
 renderStatement (SmallStatement idnts s) = do
   renderIndents idnts
   fin <- isFinal
   renderSmallStatement $ correctTrailingNewline fin s
 
-renderExceptAs :: ExceptAs v a -> RenderOutput ()
+renderExceptAs :: ExceptAs a -> RenderOutput ()
 renderExceptAs (ExceptAs _ e f) = do
   parensTupleGenerator e
   traverse_
@@ -1457,11 +1457,11 @@ renderExceptAs (ExceptAs _ e f) = do
         renderIdent b)
     f
 
-renderArgs :: CommaSep1' (Arg v a) -> RenderOutput ()
+renderArgs :: CommaSep1' (Arg a) -> RenderOutput ()
 renderArgs (CommaSepOne1' a Nothing) = renderArg parensTuple a
 renderArgs e = renderCommaSep1' (renderArg parensTupleGenerator) e
 
-renderArg :: (Expr v a -> RenderOutput ()) -> Arg v a -> RenderOutput ()
+renderArg :: (Expr a -> RenderOutput ()) -> Arg a -> RenderOutput ()
 renderArg re (PositionalArg _ expr) = re expr
 renderArg _ (KeywordArg _ name ws2 expr) = do
   renderIdent name
@@ -1477,10 +1477,10 @@ renderArg _ (DoubleStarArg _ ws expr) = do
   traverse_ renderWhitespace ws
   parensTupleGenerator expr
 
-renderParams :: CommaSep (Param v a) -> RenderOutput ()
+renderParams :: CommaSep (Param a) -> RenderOutput ()
 renderParams = renderCommaSep renderParam . correctParams
 
-renderParam :: Param v a -> RenderOutput ()
+renderParam :: Param a -> RenderOutput ()
 renderParam (PositionalParam _ name mty) = do
   renderIdent name
   traverse_
@@ -1615,7 +1615,7 @@ renderBinOp (ShiftRight _ ws) = do
 renderIndents :: Indents a -> RenderOutput ()
 renderIndents (Indents is _) = traverse_ renderIndent is
 
-renderModule :: Module v a -> RenderOutput ()
+renderModule :: Module a -> RenderOutput ()
 renderModule ModuleEmpty = pure ()
 renderModule (ModuleBlankFinal a) = renderBlank a
 renderModule (ModuleBlank a b c) = do
@@ -1627,13 +1627,13 @@ renderModule (ModuleStatement a b) = do
   renderModule b
 
 -- | Render an entire Python module to 'Text'
-showModule :: Module v a -> Text
+showModule :: Module a -> Text
 showModule = showRenderOutput . renderModule
 
 -- | Render a single Python statement to 'Text'
-showStatement :: Statement v a -> Text
+showStatement :: Statement a -> Text
 showStatement = showRenderOutput . renderStatement
 
 -- | Render a single Python expression to 'Text'
-showExpr :: Expr v a -> Text
+showExpr :: Expr a -> Text
 showExpr = showRenderOutput . parensGenerator

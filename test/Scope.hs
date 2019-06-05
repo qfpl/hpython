@@ -1,4 +1,4 @@
-{-# language OverloadedStrings, DataKinds, TemplateHaskell #-}
+{-# language OverloadedStrings, TemplateHaskell #-}
 module Scope (scopeTests) where
 
 import Hedgehog
@@ -19,11 +19,11 @@ scopeTests :: Group
 scopeTests = $$discover
 
 fullyValidate
-  :: Statement '[] ()
+  :: Statement ()
   -> PropertyT IO
        (Validation
           (NonEmpty (ScopeError ()))
-          (Statement '[Scope, Syntax, Indentation] ()))
+          (Statement ()))
 fullyValidate x =
   case runValidateIndentation $ validateStatementIndentation x of
     Failure errs -> do

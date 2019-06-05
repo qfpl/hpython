@@ -43,9 +43,9 @@ data ScopeError a
   -- @x@ will be in scope if the @True@ branch was entered, but not if the @False@
   -- branch was entered. This kind of behaviour makes scope checking intractible, so
   -- programs like this are considered scope errors.
-  | FoundDynamic a (Ident '[] a)
+  | FoundDynamic a (Ident a)
   -- | An identifier is not in scope
-  | NotInScope (Ident '[] a)
+  | NotInScope (Ident a)
   -- |
   -- For loops don't execute in a fresh scope, so if the 'counter' of the loop
   -- shadows a variable, then that variable will be mutated.
@@ -62,7 +62,7 @@ data ScopeError a
   -- outputs @3@
   --
   -- This error occurs when we spot this pattern.
-  | BadShadowing (Ident '[] a)
+  | BadShadowing (Ident a)
   deriving (Eq, Show)
 
 makeClassyPrisms ''ScopeError

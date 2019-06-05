@@ -1,5 +1,5 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
-{-# language DataKinds, FlexibleInstances, MultiParamTypeClasses #-}
+{-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language InstanceSigs, ScopedTypeVariables, TypeApplications #-}
 {-# language LambdaCase #-}
 
@@ -48,16 +48,16 @@ import Language.Python.Syntax.Whitespace
 -- @...@
 --
 --See <https://docs.python.org/3.5/tutorial/modules.html#intra-package-references>
-data RelativeModuleName v a
-  = RelativeWithName (Ann a) [Dot] (ModuleName v a)
+data RelativeModuleName a
+  = RelativeWithName (Ann a) [Dot] (ModuleName a)
   | Relative (Ann a) (NonEmpty Dot)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
-instance HasAnn (RelativeModuleName v) where
-  annot :: forall a. Lens' (RelativeModuleName v a) (Ann a)
+instance HasAnn RelativeModuleName where
+  annot :: forall a. Lens' (RelativeModuleName a) (Ann a)
   annot = typed @(Ann a)
 
-instance HasTrailingWhitespace (RelativeModuleName v a) where
+instance HasTrailingWhitespace (RelativeModuleName a) where
   trailingWhitespace =
     lens
       (\case
@@ -76,23 +76,23 @@ instance HasTrailingWhitespace (RelativeModuleName v a) where
 -- @a@
 --
 -- @a.b@
-data ModuleName v a
-  = ModuleNameOne (Ann a) (Ident v a)
-  | ModuleNameMany (Ann a) (Ident v a) Dot (ModuleName v a)
+data ModuleName a
+  = ModuleNameOne (Ann a) (Ident a)
+  | ModuleNameMany (Ann a) (Ident a) Dot (ModuleName a)
   deriving (Eq, Show, Functor, Foldable, Traversable, Generic)
 
-instance HasAnn (ModuleName v) where
-  annot :: forall a. Lens' (ModuleName v a) (Ann a)
+instance HasAnn ModuleName where
+  annot :: forall a. Lens' (ModuleName a) (Ann a)
   annot = typed @(Ann a)
 
 -- | Convenience constructor for 'ModuleName'
-makeModuleName :: Ident v a -> [([Whitespace], Ident v a)] -> ModuleName v a
+makeModuleName :: Ident a -> [([Whitespace], Ident a)] -> ModuleName a
 makeModuleName i [] = ModuleNameOne (_identAnn i) i
 makeModuleName i ((a, b) : as) =
   ModuleNameMany (_identAnn i) i (MkDot a) $
   makeModuleName b as
 
-instance HasTrailingWhitespace (ModuleName v a) where
+instance HasTrailingWhitespace (ModuleName a) where
   trailingWhitespace =
     lens
       (\case

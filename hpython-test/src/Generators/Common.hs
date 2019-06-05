@@ -1,5 +1,4 @@
 {-# options_ghc -fno-warn-type-defaults #-}
-{-# language DataKinds #-}
 module Generators.Common where
 
 import Hedgehog
@@ -32,8 +31,8 @@ import Generators.Sized
 
 genSmallStatement
   :: MonadGen m
-  => m (SimpleStatement '[] ())
-  -> m (SmallStatement '[] ())
+  => m (SimpleStatement ())
+  -> m (SmallStatement ())
 genSmallStatement gss =
   sized2M
     (\a b ->
@@ -46,9 +45,9 @@ genSmallStatement gss =
 
 genSuite
   :: MonadGen m
-  => m (SimpleStatement '[] ())
-  -> m (Block '[] ())
-  -> m (Suite '[] ())
+  => m (SimpleStatement ())
+  -> m (Block ())
+  -> m (Suite ())
 genSuite gss gb =
   Gen.choice
   [ SuiteMany (Ann ()) <$>
@@ -101,7 +100,7 @@ integralHeXDigits n =
       in
         (if q == 0 then pure else go q) <=< (\rest -> (: rest) <$> integralHeXaDeCiMaL' r)
 
-genSmallInt :: MonadGen m => m (Expr '[] ())
+genSmallInt :: MonadGen m => m (Expr ())
 genSmallInt = do
   n <- Gen.integral (Range.constant 0 100)
   Int (Ann ()) <$>
@@ -113,10 +112,10 @@ genSmallInt = do
     ] <*>
     genWhitespaces
 
-genUnit :: MonadGen m => m (Expr '[] ())
+genUnit :: MonadGen m => m (Expr ())
 genUnit = Unit (Ann ()) <$> genAnyWhitespaces <*> genWhitespaces
 
-genInt :: MonadGen m => m (Expr '[] ())
+genInt :: MonadGen m => m (Expr ())
 genInt = do
   n <- Gen.integral (Range.constant (-2^32) (2^32))
   let
@@ -135,7 +134,7 @@ genInt = do
 genE :: MonadGen m => m E
 genE = Gen.element [Ee, EE]
 
-genSmallFloat :: MonadGen m => m (Expr '[] ())
+genSmallFloat :: MonadGen m => m (Expr ())
 genSmallFloat =
   Float (Ann ()) <$>
   Gen.choice
@@ -160,7 +159,7 @@ genSmallFloat =
       Gen.maybe (Gen.element [Pos, Neg]) <*>
       genDecs
 
-genImag :: MonadGen m => m (Expr '[] ())
+genImag :: MonadGen m => m (Expr ())
 genImag =
   Imag (Ann ()) <$>
   Gen.choice
@@ -201,7 +200,7 @@ genFloatLiteral =
       Gen.maybe (Gen.element [Pos, Neg]) <*>
       genDecs
 
-genFloat :: MonadGen m => m (Expr '[] ())
+genFloat :: MonadGen m => m (Expr ())
 genFloat =
   Float (Ann ()) <$>
   genFloatLiteral <*>
@@ -363,13 +362,13 @@ genWhitespaces1 :: MonadGen m => m (NonEmpty Whitespace)
 genWhitespaces1 = do
   (:|) <$> Gen.element [Space, Tab] <*> genWhitespaces
 
-genNone :: MonadGen m => m (Expr '[] ())
+genNone :: MonadGen m => m (Expr ())
 genNone = None (Ann ()) <$> genWhitespaces
 
-genEllipsis :: MonadGen m => m (Expr '[] ())
+genEllipsis :: MonadGen m => m (Expr ())
 genEllipsis = Ellipsis (Ann ()) <$> genWhitespaces
 
-genBool :: MonadGen m => m (Expr '[] ())
+genBool :: MonadGen m => m (Expr ())
 genBool = Bool (Ann ()) <$> Gen.bool <*> genWhitespaces
 
 genOp :: MonadGen m => m (BinOp ())
@@ -482,7 +481,7 @@ genBytesLiteral gChar =
   genString gChar <*>
   genWhitespaces
 
-genTupleItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (TupleItem v ())
+genTupleItem :: MonadGen m => m [Whitespace] -> m (Expr ()) -> m (TupleItem ())
 genTupleItem ws ge =
   Gen.choice
   [ TupleItem (Ann ()) <$> ge
@@ -492,7 +491,7 @@ genTupleItem ws ge =
     ge
   ]
 
-genListItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (ListItem v ())
+genListItem :: MonadGen m => m [Whitespace] -> m (Expr ()) -> m (ListItem ())
 genListItem ws ge =
   Gen.choice
   [ ListItem (Ann ()) <$>
@@ -503,7 +502,7 @@ genListItem ws ge =
     ge
   ]
 
-genSetItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (SetItem v ())
+genSetItem :: MonadGen m => m [Whitespace] -> m (Expr ()) -> m (SetItem ())
 genSetItem ws ge =
   Gen.choice
   [ SetItem (Ann ()) <$>
@@ -514,7 +513,7 @@ genSetItem ws ge =
     ge
   ]
 
-genDictItem :: MonadGen m => m (Expr v ()) -> m (DictItem v ())
+genDictItem :: MonadGen m => m (Expr ()) -> m (DictItem ())
 genDictItem ge =
   Gen.choice
   [ DictItem (Ann ()) <$>

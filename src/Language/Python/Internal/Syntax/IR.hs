@@ -1,4 +1,3 @@
-{-# language DataKinds #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# language FunctionalDependencies, MultiParamTypeClasses #-}
 {-# language LambdaCase #-}
@@ -86,7 +85,7 @@ data CompoundStatement a
   , _csIndents :: Indents a
   , _unsafeCsFundefAsync :: Maybe (NonEmpty Whitespace) -- ^ @[\'async\' \<spaces\>]@
   , _unsafeCsFundefDef :: NonEmpty Whitespace -- ^ @\'def\' \<spaces\>@
-  , _unsafeCsFundefName :: Ident '[] a -- ^ @\<ident\>@
+  , _unsafeCsFundefName :: Ident a -- ^ @\<ident\>@
   , _unsafeCsFundefLeftParen :: [Whitespace] -- ^ @\'(\' \<spaces\>@
   , _unsafeCsFundefParameters :: CommaSep (Param a) -- ^ @\<parameters\>@
   , _unsafeCsFundefRightParen :: [Whitespace] -- ^ @\')\' \<spaces\>@
@@ -145,7 +144,7 @@ data CompoundStatement a
   , _unsafeCsClassDefDecorators :: [Decorator a]
   , _csIndents :: Indents a
   , _unsafeCsClassDefClass :: NonEmpty Whitespace -- ^ @\'class\' \<spaces\>@
-  , _unsafeCsClassDefName :: Ident '[] a -- ^ @\<ident\>@
+  , _unsafeCsClassDefName :: Ident a -- ^ @\<ident\>@
   , _unsafeCsClassDefArguments :: Maybe ([Whitespace], Maybe (CommaSep1' (Arg a)), [Whitespace]) -- ^ @[\'(\' \<spaces\> [\<args\>] \')\' \<spaces\>]@
   , _unsafeCsClassDefBody :: Suite a -- ^ @\<suite\>@
   }
@@ -167,19 +166,19 @@ data SimpleStatement a
   | Pass a [Whitespace]
   | Break a [Whitespace]
   | Continue a [Whitespace]
-  | Global a (NonEmpty Whitespace) (CommaSep1 (Ident '[] a))
-  | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident '[] a))
+  | Global a (NonEmpty Whitespace) (CommaSep1 (Ident a))
+  | Nonlocal a (NonEmpty Whitespace) (CommaSep1 (Ident a))
   | Del a [Whitespace] (CommaSep1' (Expr a))
   | Import
       a
       (NonEmpty Whitespace)
-      (CommaSep1 (ImportAs ModuleName '[] a))
+      (CommaSep1 (ImportAs ModuleName a))
   | From
       a
       [Whitespace]
-      (RelativeModuleName '[] a)
+      (RelativeModuleName a)
       [Whitespace]
-      (ImportTargets '[] a)
+      (ImportTargets a)
   | Raise a
       [Whitespace]
       (Maybe (Expr a, Maybe ([Whitespace], Expr a)))
@@ -192,12 +191,12 @@ data SimpleStatement a
 data Param a
   = PositionalParam
   { _paramAnn :: a
-  , _paramName :: Ident '[] a
+  , _paramName :: Ident a
   , _paramType :: Maybe (Colon, Expr a)
   }
   | KeywordParam
   { _paramAnn :: a
-  , _paramName :: Ident '[] a
+  , _paramName :: Ident a
   -- ':' spaces <expr>
   , _paramType :: Maybe (Colon, Expr a)
   -- = spaces
@@ -208,7 +207,7 @@ data Param a
   { _paramAnn :: a
   -- '*' spaces
   , _unsafeStarParamWhitespace :: [Whitespace]
-  , _unsafeStarParamName :: Ident '[] a
+  , _unsafeStarParamName :: Ident a
   , _paramType :: Maybe (Colon, Expr a)
   }
   | UnnamedStarParam
@@ -220,7 +219,7 @@ data Param a
   { _paramAnn :: a
   -- '**' spaces
   , _unsafeDoubleStarParamWhitespace :: [Whitespace]
-  , _paramName :: Ident '[] a
+  , _paramName :: Ident a
   , _paramType :: Maybe (Colon, Expr a)
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
@@ -286,7 +285,7 @@ data Arg a
   }
   | KeywordArg
   { _argAnn :: a
-  , _unsafeKeywordArgName :: Ident '[] a
+  , _unsafeKeywordArgName :: Ident a
   , _unsafeKeywordArgWhitespaceRight :: [Whitespace]
   , _argExpr :: Expr a
   }
@@ -399,7 +398,7 @@ data Expr a
   -- . spaces
   , _unsafeDerefWhitespaceLeft :: [Whitespace]
   -- ident
-  , _unsafeDerefValueRight :: Ident '[] a
+  , _unsafeDerefValueRight :: Ident a
   }
   | Subscript
   { _exprAnn :: a
@@ -453,7 +452,7 @@ data Expr a
   }
   | Ident
   { _exprAnn :: a
-  , _unsafeIdentValue :: Ident '[] a
+  , _unsafeIdentValue :: Ident a
   }
   | Int
   { _exprAnn :: a
@@ -632,7 +631,7 @@ data ExceptAs a
   = ExceptAs
   { _exceptAsAnn :: a
   , _exceptAsExpr :: Expr a
-  , _exceptAsName :: Maybe ([Whitespace], Ident '[] a)
+  , _exceptAsName :: Maybe ([Whitespace], Ident a)
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -653,7 +652,7 @@ makeLenses ''FromIRContext
 fromIR_expr
   :: AsIRError e a
   => Expr a
-  -> Validation (NonEmpty e) (Syntax.Expr '[] a)
+  -> Validation (NonEmpty e) (Syntax.Expr a)
 fromIR_expr ex =
   case ex of
     StarExpr{} -> Failure $ pure (_InvalidUnpacking # (ex ^. exprAnn))
@@ -726,7 +725,7 @@ fromIR_expr ex =
 fromIR_suite
   :: AsIRError e a
   => Suite a
-  -> Validation (NonEmpty e) (Syntax.Suite '[] a)
+  -> Validation (NonEmpty e) (Syntax.Suite a)
 fromIR_suite s =
   case s of
     SuiteOne a b c ->
@@ -737,7 +736,7 @@ fromIR_suite s =
 fromIR_param
   :: AsIRError e a
   => Param a
-  -> Validation (NonEmpty e) (Syntax.Param '[] a)
+  -> Validation (NonEmpty e) (Syntax.Param a)
 fromIR_param p =
   case p of
     PositionalParam a b c ->
@@ -756,7 +755,7 @@ fromIR_param p =
 fromIR_arg
   :: AsIRError e a
   => Arg a
-  -> Validation (NonEmpty e) (Syntax.Arg '[] a)
+  -> Validation (NonEmpty e) (Syntax.Arg a)
 fromIR_arg a =
   case a of
     PositionalArg a b -> Syntax.PositionalArg (Ann a) <$> fromIR_expr b
@@ -767,7 +766,7 @@ fromIR_arg a =
 fromIR_decorator
   :: AsIRError e a
   => Decorator a
-  -> Validation (NonEmpty e) (Syntax.Decorator '[] a)
+  -> Validation (NonEmpty e) (Syntax.Decorator a)
 fromIR_decorator (Decorator a b c d e f g) =
   (\d' -> Syntax.Decorator (Ann a) b c d' e f g) <$>
   fromIR_expr d
@@ -775,7 +774,7 @@ fromIR_decorator (Decorator a b c d e f g) =
 fromIR_exceptAs
   :: AsIRError e a
   => ExceptAs a
-  -> Validation (NonEmpty e) (Syntax.ExceptAs '[] a)
+  -> Validation (NonEmpty e) (Syntax.ExceptAs a)
 fromIR_exceptAs (ExceptAs a b c) =
   (\b' -> Syntax.ExceptAs (Ann a) b' c) <$>
   fromIR_expr b
@@ -783,7 +782,7 @@ fromIR_exceptAs (ExceptAs a b c) =
 fromIR_withItem
   :: AsIRError e a
   => WithItem a
-  -> Validation (NonEmpty e) (Syntax.WithItem '[] a)
+  -> Validation (NonEmpty e) (Syntax.WithItem a)
 fromIR_withItem (WithItem a b c) =
   Syntax.WithItem (Ann a) <$>
   fromIR_expr b <*>
@@ -791,9 +790,9 @@ fromIR_withItem (WithItem a b c) =
 
 fromIR_comprehension
   :: AsIRError e a
-  => (ex a -> Validation (NonEmpty e) (ex' '[] a))
+  => (ex a -> Validation (NonEmpty e) (ex' a))
   -> Comprehension ex a
-  -> Validation (NonEmpty e) (Syntax.Comprehension ex' '[] a)
+  -> Validation (NonEmpty e) (Syntax.Comprehension ex' a)
 fromIR_comprehension f (Comprehension a b c d) =
   Syntax.Comprehension (Ann a) <$>
   f b <*>
@@ -803,7 +802,7 @@ fromIR_comprehension f (Comprehension a b c d) =
 fromIR_dictItem
   :: AsIRError e a
   => DictItem a
-  -> Validation (NonEmpty e) (Syntax.DictItem '[] a)
+  -> Validation (NonEmpty e) (Syntax.DictItem a)
 fromIR_dictItem di =
   case di of
     DictItem a b c d ->
@@ -816,7 +815,7 @@ fromIR_dictItem di =
 fromIR_subscript
   :: AsIRError e a
   => Subscript a
-  -> Validation (NonEmpty e) (Syntax.Subscript '[] a)
+  -> Validation (NonEmpty e) (Syntax.Subscript a)
 fromIR_subscript s =
   case s of
     SubscriptExpr a -> Syntax.SubscriptExpr <$> fromIR_expr a
@@ -829,7 +828,7 @@ fromIR_subscript s =
 fromIR_block
   :: AsIRError e a
   => Block a
-  -> Validation (NonEmpty e) (Syntax.Block '[] a)
+  -> Validation (NonEmpty e) (Syntax.Block a)
 fromIR_block (Block a b c) =
   Syntax.Block a <$>
   fromIR_statement b <*>
@@ -838,7 +837,7 @@ fromIR_block (Block a b c) =
 fromIR_compFor
   :: AsIRError e a
   => CompFor a
-  -> Validation (NonEmpty e) (Syntax.CompFor '[] a)
+  -> Validation (NonEmpty e) (Syntax.CompFor a)
 fromIR_compFor (CompFor a b c d e) =
   (\c' -> Syntax.CompFor (Ann a) b c' d) <$>
   fromIR_expr c <*>
@@ -847,14 +846,14 @@ fromIR_compFor (CompFor a b c d e) =
 fromIR_compIf
   :: AsIRError e a
   => CompIf a
-  -> Validation (NonEmpty e) (Syntax.CompIf '[] a)
+  -> Validation (NonEmpty e) (Syntax.CompIf a)
 fromIR_compIf (CompIf a b c) =
   Syntax.CompIf (Ann a) b <$> fromIR_expr c
 
 fromIR_smallStatement
   :: AsIRError e a
   => SmallStatement a
-  -> Validation (NonEmpty e) (Syntax.SmallStatement '[] a)
+  -> Validation (NonEmpty e) (Syntax.SmallStatement a)
 fromIR_smallStatement (MkSmallStatement b c d e f) =
   (\b' c' -> Syntax.MkSmallStatement b' c' d e f) <$>
   fromIR_SimpleStatement b <*>
@@ -863,7 +862,7 @@ fromIR_smallStatement (MkSmallStatement b c d e f) =
 fromIR_statement
   :: AsIRError e a
   => Statement a
-  -> Validation (NonEmpty e) (Syntax.Statement '[] a)
+  -> Validation (NonEmpty e) (Syntax.Statement a)
 fromIR_statement ex =
   case ex of
     SmallStatement i a ->
@@ -874,7 +873,7 @@ fromIR_statement ex =
 fromIR_SimpleStatement
   :: AsIRError e a
   => SimpleStatement a
-  -> Validation (NonEmpty e) (Syntax.SimpleStatement '[] a)
+  -> Validation (NonEmpty e) (Syntax.SimpleStatement a)
 fromIR_SimpleStatement ex =
   case ex of
     Assign a b c ->
@@ -910,7 +909,7 @@ fromIR_SimpleStatement ex =
 fromIR_compoundStatement
   :: AsIRError e a
   => CompoundStatement a
-  -> Validation (NonEmpty e) (Syntax.CompoundStatement '[] a)
+  -> Validation (NonEmpty e) (Syntax.CompoundStatement a)
 fromIR_compoundStatement st =
   case st of
     Fundef a b asyncWs c d e f g h i j ->
@@ -959,7 +958,7 @@ fromIR_compoundStatement st =
 fromIR_listItem
   :: AsIRError e a
   => Expr a
-  -> Validation (NonEmpty e) (Syntax.ListItem '[] a)
+  -> Validation (NonEmpty e) (Syntax.ListItem a)
 fromIR_listItem (StarExpr a b c) =
   Syntax.ListUnpack (Ann a) [] b <$> fromIR_expr c
 fromIR_listItem (Parens a b c d) =
@@ -972,7 +971,7 @@ fromIR_listItem e = (\x -> Syntax.ListItem (x ^. annot) x) <$> fromIR_expr e
 fromIR_tupleItem
   :: AsIRError e a
   => Expr a
-  -> Validation (NonEmpty e) (Syntax.TupleItem '[] a)
+  -> Validation (NonEmpty e) (Syntax.TupleItem a)
 fromIR_tupleItem (StarExpr a b c) =
   Syntax.TupleUnpack (Ann a) [] b <$> fromIR_expr c
 fromIR_tupleItem (Parens a b c d) =
@@ -986,7 +985,7 @@ fromIR_tupleItem e =
 fromIR_setItem
   :: AsIRError e a
   => Expr a
-  -> Validation (NonEmpty e) (Syntax.SetItem '[] a)
+  -> Validation (NonEmpty e) (Syntax.SetItem a)
 fromIR_setItem (StarExpr a b c) =
   Syntax.SetUnpack (Ann a) [] b <$> fromIR_expr c
 fromIR_setItem (Parens a b c d) =
@@ -999,7 +998,7 @@ fromIR_setItem e = (\x -> Syntax.SetItem (x ^. annot) x) <$> fromIR_expr e
 fromIR
   :: AsIRError e a
   => Module a
-  -> Validation (NonEmpty e) (Syntax.Module '[] a)
+  -> Validation (NonEmpty e) (Syntax.Module a)
 fromIR ModuleEmpty = pure Syntax.ModuleEmpty
 fromIR (ModuleBlankFinal a) = pure $ Syntax.ModuleBlankFinal a
 fromIR (ModuleBlank a b c) = Syntax.ModuleBlank a b <$> fromIR c

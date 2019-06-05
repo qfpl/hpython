@@ -46,13 +46,13 @@ instance (HasNewlines a, HasNewlines b, HasNewlines c, HasNewlines d) => HasNewl
     _Newlines f c <*>
     _Newlines f d
 
-instance HasNewlines (e v a) => HasNewlines (ImportAs e v a) where
+instance HasNewlines (e a) => HasNewlines (ImportAs e a) where
   _Newlines f (ImportAs a b c) =
     ImportAs a <$>
     _Newlines f b <*>
     _Newlines f c
 
-instance HasNewlines (RelativeModuleName v a) where
+instance HasNewlines (RelativeModuleName a) where
   _Newlines f (RelativeWithName ann a b) =
     RelativeWithName ann <$>
     _Newlines f a <*>
@@ -79,7 +79,7 @@ instance HasNewlines Whitespace where
 instance HasNewlines (Blank a) where
   _Newlines f (Blank a b c) = (\b' -> Blank a b' c) <$> _Newlines f b
 
-instance HasNewlines (Block v a) where
+instance HasNewlines (Block a) where
   _Newlines f (Block a b c) =
     Block <$>
     _Newlines f a <*>
@@ -104,7 +104,7 @@ instance HasNewlines (Semicolon a) where
 instance HasNewlines Equals where
   _Newlines f (MkEquals a) = MkEquals <$> _Newlines f a
 
-instance HasNewlines (Suite v a) where
+instance HasNewlines (Suite a) where
   _Newlines f (SuiteOne a b c) = SuiteOne a b <$> _Newlines f c
   _Newlines f (SuiteMany a b c d e) =
     (\b' d' e' -> SuiteMany a b' c d' e') <$>
@@ -183,13 +183,13 @@ instance HasNewlines a => HasNewlines (CommaSep1' a) where
         _Newlines f b <*>
         go c
 
-instance HasNewlines (Ident v a) where
+instance HasNewlines (Ident a) where
   _Newlines f (MkIdent a b c) = MkIdent a b <$> _Newlines f c
 
 instance HasNewlines a => HasNewlines (Maybe a) where
   _Newlines = traverse._Newlines
 
-instance HasNewlines (Param v a) where
+instance HasNewlines (Param a) where
   _Newlines f (PositionalParam a b c) =
     PositionalParam a <$>
     _Newlines f b <*>
@@ -214,7 +214,7 @@ instance HasNewlines (Param v a) where
     _Newlines f c <*>
     _Newlines f d
 
-instance HasNewlines (Arg v a) where
+instance HasNewlines (Arg a) where
   _Newlines f (PositionalArg a b) =
     PositionalArg a <$>
     _Newlines f b
@@ -232,7 +232,7 @@ instance HasNewlines (Arg v a) where
     _Newlines f b <*>
     _Newlines f c
 
-instance HasNewlines (CompFor v a) where
+instance HasNewlines (CompFor a) where
   _Newlines f (CompFor a b c d e) =
     CompFor a <$>
     _Newlines f b <*>
@@ -240,20 +240,20 @@ instance HasNewlines (CompFor v a) where
     _Newlines f d <*>
     _Newlines f e
 
-instance HasNewlines (CompIf v a) where
+instance HasNewlines (CompIf a) where
   _Newlines f (CompIf a b c) =
     CompIf a <$>
     _Newlines f b <*>
     _Newlines f c
 
-instance HasNewlines (e v a) => HasNewlines (Comprehension e v a) where
+instance HasNewlines (e a) => HasNewlines (Comprehension e a) where
   _Newlines f (Comprehension a b c d) =
     Comprehension a <$>
     _Newlines f b <*>
     _Newlines f c <*>
     _Newlines f d
 
-instance HasNewlines (TupleItem v a) where
+instance HasNewlines (TupleItem a) where
   _Newlines f (TupleItem a b) = TupleItem a <$> _Newlines f b
   _Newlines f (TupleUnpack a b c d) =
     TupleUnpack a <$>
@@ -261,7 +261,7 @@ instance HasNewlines (TupleItem v a) where
     _Newlines f c <*>
     _Newlines f d
 
-instance HasNewlines (ListItem v a) where
+instance HasNewlines (ListItem a) where
   _Newlines f (ListItem a b) = ListItem a <$> _Newlines f b
   _Newlines f (ListUnpack a b c d) =
     ListUnpack a <$>
@@ -269,7 +269,7 @@ instance HasNewlines (ListItem v a) where
     _Newlines f c <*>
     _Newlines f d
 
-instance HasNewlines (SetItem v a) where
+instance HasNewlines (SetItem a) where
   _Newlines f (SetItem a b) = SetItem a <$> _Newlines f b
   _Newlines f (SetUnpack a b c d) =
     SetUnpack a <$>
@@ -277,7 +277,7 @@ instance HasNewlines (SetItem v a) where
     _Newlines f c <*>
     _Newlines f d
 
-instance HasNewlines (DictItem v a) where
+instance HasNewlines (DictItem a) where
   _Newlines f (DictItem a b c d) =
     DictItem a <$>
     _Newlines f b <*>
@@ -288,7 +288,7 @@ instance HasNewlines (DictItem v a) where
     _Newlines f b <*>
     _Newlines f c
 
-instance HasNewlines (Subscript v a) where
+instance HasNewlines (Subscript a) where
   _Newlines f (SubscriptExpr a) = SubscriptExpr <$> _Newlines f a
   _Newlines f (SubscriptSlice a b c d) =
     SubscriptSlice <$>
@@ -303,7 +303,7 @@ instance HasNewlines a => HasNewlines (NonEmpty a) where
 instance HasNewlines (StringLiteral a) where
   _Newlines = stringLiteralWhitespace.traverse._Newlines
 
-instance HasNewlines (Expr v a) where
+instance HasNewlines (Expr a) where
   _Newlines fun = go
     where
       go e =
@@ -404,7 +404,7 @@ instance HasNewlines (Expr v a) where
           Generator a b -> Generator a <$> _Newlines fun b
           Await a b c -> Await a <$> _Newlines fun b <*> _Newlines fun c
 
-instance HasNewlines (Decorator v a) where
+instance HasNewlines (Decorator a) where
   _Newlines fun (Decorator a b c d e f g) =
     Decorator a <$>
     _Newlines fun b <*>
@@ -414,13 +414,13 @@ instance HasNewlines (Decorator v a) where
     fun f <*>
     _Newlines fun g
 
-instance HasNewlines (ExceptAs v a) where
+instance HasNewlines (ExceptAs a) where
   _Newlines f (ExceptAs a b c) = ExceptAs a <$> _Newlines f b <*> _Newlines f c
 
-instance HasNewlines (WithItem v a) where
+instance HasNewlines (WithItem a) where
   _Newlines f (WithItem a b c) = WithItem a <$> _Newlines f b <*> _Newlines f c
 
-instance HasNewlines (CompoundStatement v a) where
+instance HasNewlines (CompoundStatement a) where
   _Newlines fun s =
     case s of
       Fundef ann decos idnt asyncWs ws1 name ws2 params ws3 mty s ->
@@ -492,7 +492,7 @@ instance HasNewlines (CompoundStatement v a) where
         _Newlines fun d <*>
         _Newlines fun e
 
-instance HasNewlines (ModuleName v a) where
+instance HasNewlines (ModuleName a) where
   _Newlines f = go
     where
       go (ModuleNameOne a b) =
@@ -500,7 +500,7 @@ instance HasNewlines (ModuleName v a) where
       go (ModuleNameMany a b c d) =
         ModuleNameMany a <$> _Newlines f b <*> _Newlines f c <*> go d
 
-instance HasNewlines (ImportTargets v a) where
+instance HasNewlines (ImportTargets a) where
   _Newlines f (ImportAll a b) =
     ImportAll a <$> _Newlines f b
   _Newlines f (ImportSome a b) =
@@ -511,7 +511,7 @@ instance HasNewlines (ImportTargets v a) where
     _Newlines f c <*>
     _Newlines f d
 
-instance HasNewlines (SimpleStatement v a) where
+instance HasNewlines (SimpleStatement a) where
   _Newlines fun s =
     case s of
       Return a b c -> Return a <$> _Newlines fun b <*> _Newlines fun c
@@ -548,7 +548,7 @@ instance HasNewlines (SimpleStatement v a) where
         _Newlines fun c <*>
         _Newlines fun d
 
-instance HasNewlines (SmallStatement v a) where
+instance HasNewlines (SmallStatement a) where
   _Newlines f (MkSmallStatement s ss sc cmt nl) =
     MkSmallStatement <$>
     _Newlines f s <*>
@@ -557,7 +557,7 @@ instance HasNewlines (SmallStatement v a) where
     pure cmt <*>
     _Newlines f nl
 
-instance HasNewlines (Statement v a) where
+instance HasNewlines (Statement a) where
   _Newlines f (CompoundStatement c) =
     CompoundStatement <$> _Newlines f c
   _Newlines f (SmallStatement i a) =
@@ -565,7 +565,7 @@ instance HasNewlines (Statement v a) where
     _Newlines f i <*>
     _Newlines f a
 
-instance HasNewlines (Module v a) where
+instance HasNewlines (Module a) where
   _Newlines f = go
     where
       go ModuleEmpty = pure ModuleEmpty

@@ -1,4 +1,3 @@
-{-# language DataKinds #-}
 {-# language FlexibleContexts #-}
 {-# language LambdaCase #-}
 {-# language RankNTypes #-}
@@ -274,7 +273,7 @@ token
   -> m (PyToken SrcInfo, [Whitespace])
 token ws f label = (,) <$> satisfy f <*> many ws <?> label
 
-identifier :: MonadParsec e PyTokens m => m Whitespace -> m (Ident '[] SrcInfo)
+identifier :: MonadParsec e PyTokens m => m Whitespace -> m (Ident SrcInfo)
 identifier ws =
   (\(TkIdent n ann) -> MkIdent (Ann ann) n) <$>
   satisfy (\case; TkIdent{} -> True; _ -> False) <*>
@@ -1044,7 +1043,7 @@ simpleStatement =
 
           <|>
 
-          (\a -> ImportSome (Ann $ commaSep1Head a ^. importAsAnn) a) <$>
+          (\a -> ImportSome (commaSep1Head a ^. annot) a) <$>
           commaSep1 space (importAs space (view annot_) (identifier space))
 
         importFrom =

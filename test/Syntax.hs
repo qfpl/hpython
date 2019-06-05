@@ -1,5 +1,4 @@
 {-# language OverloadedStrings, TemplateHaskell #-}
-{-# language DataKinds #-}
 module Syntax (syntaxTests) where
 
 import Hedgehog
@@ -48,7 +47,7 @@ prop_syntax_2 =
   withTests 1 . property $ do
     let
       i = replicate 4 Space ^. from indentWhitespaces
-      e :: Statement '[] ()
+      e :: Statement ()
       e =
         CompoundStatement .
         Fundef (Ann ()) []
@@ -79,7 +78,7 @@ prop_syntax_4 :: Property
 prop_syntax_4 =
   withTests 1 . property $ do
     let
-      e :: Expr '[] ()
+      e :: Expr ()
       e =
         String (Ann ()) . pure $
         StringLiteral (Ann ())
@@ -95,7 +94,7 @@ prop_syntax_5 :: Property
 prop_syntax_5 =
   withTests 1 . property $ do
     let
-      e :: Expr '[] ()
+      e :: Expr ()
       e =
         String (Ann ()) . pure $
         StringLiteral (Ann ())

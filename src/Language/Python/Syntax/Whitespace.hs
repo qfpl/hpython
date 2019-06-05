@@ -1,4 +1,3 @@
-{-# language DataKinds #-}
 {-# language GeneralizedNewtypeDeriving, MultiParamTypeClasses, BangPatterns #-}
 {-# language TypeFamilies #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveGeneric #-}
@@ -91,7 +90,7 @@ data Whitespace
   | Continued Newline [Whitespace]
   | Newline Newline
   | Comment (Comment ())
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 -- | Every syntactic element contains the whitespace that immediately follows it.
 --
@@ -113,9 +112,9 @@ instance HasTrailingWhitespace a => HasTrailingWhitespace (NonEmpty a) where
 --
 -- Some forms /always/ have a trailing newline, which is why this class isn't just
 -- @trailingNewline :: 'Lens'' (s v a) ('Maybe' 'Newline')@
-class HasTrailingNewline (s :: [*] -> * -> *) where
-  trailingNewline :: Traversal' (s v a) Newline
-  setTrailingNewline :: s v a -> Newline -> s v a
+class HasTrailingNewline s where
+  trailingNewline :: Traversal' s Newline
+  setTrailingNewline :: s -> Newline -> s
 
 -- | Lines which are "blank", meaning that they contain, if anything, only
 -- whitespace and/or a comment.

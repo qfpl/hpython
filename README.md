@@ -2,7 +2,7 @@
 
 Haskell-based language tools for Python
 
-<img src="http://i.imgur.com/0h9dFhl.png" width="300px"/>
+![CSIRO's Data61 Logo](https://raw.githubusercontent.com/qfpl/assets/master/data61-transparent-bg.png)
 
 `hpython` provides an abstract syntax tree for Python 3.5, along with a parser, printer,
 and syntax checker. It also contains optics for working with the AST, and a DSL for writing

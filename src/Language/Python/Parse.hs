@@ -43,9 +43,9 @@ import Language.Python.Internal.Lexer
   ( SrcInfo(..), initialSrcInfo, withSrcInfo
   , tokenize, insertTabs
   )
-import Language.Python.Internal.Token (PyToken)
+-- import Language.Python.Internal.Token (PyToken)
 import Language.Python.Internal.Parse
-  ( Parser, runParser, level, module_, statement, exprOrStarList
+  ( Parser, PyTokens, runParser, level, module_, statement, exprOrStarList
   , expr, space
   )
 import Language.Python.Internal.Syntax.IR (AsIRError)
@@ -62,10 +62,10 @@ import qualified Language.Python.Internal.Syntax.IR as IR
 --
 -- https://docs.python.org/3/reference/toplevel_components.html#file-input
 parseModule
-  :: ( AsLexicalError e Char
+  :: ( AsLexicalError e Text
      , AsTabError e SrcInfo
      , AsIncorrectDedent e SrcInfo
-     , AsParseError e (PyToken SrcInfo)
+     , AsParseError e PyTokens
      , AsIRError e SrcInfo
      )
   => FilePath -- ^ File name
@@ -85,10 +85,10 @@ parseModule fp input =
 --
 -- https://docs.python.org/3/reference/compound_stmts.html#grammar-token-statement
 parseStatement
-  :: ( AsLexicalError e Char
+  :: ( AsLexicalError e Text
      , AsTabError e SrcInfo
      , AsIncorrectDedent e SrcInfo
-     , AsParseError e (PyToken SrcInfo)
+     , AsParseError e PyTokens
      , AsIRError e SrcInfo
      )
   => FilePath -- ^ File name
@@ -110,10 +110,10 @@ parseStatement fp input =
 --
 -- https://docs.python.org/3.5/reference/expressions.html#grammar-token-expression_list
 parseExprList
-  :: ( AsLexicalError e Char
+  :: ( AsLexicalError e Text
      , AsTabError e SrcInfo
      , AsIncorrectDedent e SrcInfo
-     , AsParseError e (PyToken SrcInfo)
+     , AsParseError e PyTokens
      , AsIRError e SrcInfo
      )
   => FilePath -- ^ File name
@@ -133,10 +133,10 @@ parseExprList fp input =
 --
 -- https://docs.python.org/3.5/reference/expressions.html#grammar-token-expression
 parseExpr
-  :: ( AsLexicalError e Char
+  :: ( AsLexicalError e Text
      , AsTabError e SrcInfo
      , AsIncorrectDedent e SrcInfo
-     , AsParseError e (PyToken SrcInfo)
+     , AsParseError e PyTokens
      , AsIRError e SrcInfo
      )
   => FilePath -- ^ File name
@@ -156,10 +156,10 @@ parseExpr fp input =
 --
 -- https://docs.python.org/3/reference/toplevel_components.html#file-input
 readModule
-  :: ( AsLexicalError e Char
+  :: ( AsLexicalError e Text
      , AsTabError e SrcInfo
      , AsIncorrectDedent e SrcInfo
-     , AsParseError e (PyToken SrcInfo)
+     , AsParseError e PyTokens
      , AsIRError e SrcInfo
      )
   => FilePath -- ^ File to read
@@ -170,10 +170,10 @@ readModule fp = parseModule fp <$> Text.readFile fp
 --
 -- https://docs.python.org/3/reference/compound_stmts.html#grammar-token-statement
 readStatement
-  :: ( AsLexicalError e Char
+  :: ( AsLexicalError e Text
      , AsTabError e SrcInfo
      , AsIncorrectDedent e SrcInfo
-     , AsParseError e (PyToken SrcInfo)
+     , AsParseError e PyTokens
      , AsIRError e SrcInfo
      )
   => FilePath -- ^ File to read
@@ -184,10 +184,10 @@ readStatement fp = parseStatement fp <$> Text.readFile fp
 --
 -- https://docs.python.org/3.5/reference/expressions.html#grammar-token-expression
 readExpr
-  :: ( AsLexicalError e Char
+  :: ( AsLexicalError e Text
      , AsTabError e SrcInfo
      , AsIncorrectDedent e SrcInfo
-     , AsParseError e (PyToken SrcInfo)
+     , AsParseError e PyTokens
      , AsIRError e SrcInfo
      )
   => FilePath -- ^ File to read
@@ -198,10 +198,10 @@ readExpr fp = parseExpr fp <$> Text.readFile fp
 --
 -- https://docs.python.org/3.5/reference/expressions.html#grammar-token-expression_list
 readExprList
-  :: ( AsLexicalError e Char
+  :: ( AsLexicalError e Text
      , AsTabError e SrcInfo
      , AsIncorrectDedent e SrcInfo
-     , AsParseError e (PyToken SrcInfo)
+     , AsParseError e PyTokens
      , AsIRError e SrcInfo
      )
   => FilePath -- ^ File to read

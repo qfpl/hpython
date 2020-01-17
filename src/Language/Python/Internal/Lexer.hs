@@ -20,8 +20,11 @@ module Language.Python.Internal.Lexer
   ( tokenizeWithTabs
     -- * Source Information
   , SrcInfo(..), initialSrcInfo, withSrcInfo
+    -- * Converting to megaparsec source positions
+  , startPos
+  , endPos
     -- * Errors
-  , AsLexicalError(..), unsafeFromLexicalError
+  , AsLexicalError(..), fromLexicalError
   , AsTabError(..), AsIncorrectDedent(..), fromTabError, TabError(..)
     -- * Miscellaneous
   , tokenize
@@ -34,6 +37,7 @@ where
 import Control.Applicative ((<|>), many, optional)
 import Control.Lens.Getter ((^.))
 import Control.Lens.Iso (from)
+import Control.Lens.Lens (Lens', lens)
 import Control.Lens.Prism (Prism')
 import Control.Lens.Review ((#))
 import Control.Monad ((<=<), when, replicateM)
@@ -50,13 +54,11 @@ import Data.Foldable (asum)
 import Data.Functor.Identity (Identity)
 import Data.List.NonEmpty (NonEmpty(..), some1)
 import Data.Monoid (Sum(..))
-import Data.Set (Set)
 import Data.Semigroup (Semigroup, (<>))
 import Data.Semigroup.Foldable (foldMap1)
 import Data.These (These(..))
 import Data.Void (Void)
-import GHC.Stack (HasCallStack)
-import Text.Megaparsec (MonadParsec, ParseError, parse, unPos)
+import Text.Megaparsec (MonadParsec, parse, unPos)
 import Text.Megaparsec.Parsers
   ( ParsecT, CharParsing, LookAheadParsing, lookAhead, unParsecT, satisfy, text
   , char, manyTill, try
@@ -95,16 +97,50 @@ instance Semigroup SrcInfo where
 initialSrcInfo :: FilePath -> SrcInfo
 initialSrcInfo fp = SrcInfo fp 0 0 0 0 0 0
 
+startPos :: Lens' SrcInfo Parsec.SourcePos
+startPos =
+  lens
+    (\ info ->
+      Parsec.SourcePos
+        (_srcInfoName info)
+        (Parsec.mkPos (_srcInfoLineStart info))
+        (Parsec.mkPos (_srcInfoColStart info))
+    )
+    (\ info (Parsec.SourcePos fileName lineStart colStart) ->
+      info
+        { _srcInfoName = fileName
+        , _srcInfoLineStart = unPos lineStart
+        , _srcInfoColStart = unPos colStart
+        }
+    )
+
+endPos :: Lens' SrcInfo Parsec.SourcePos
+endPos =
+  lens
+    (\ info ->
+      Parsec.SourcePos
+        (_srcInfoName info)
+        (Parsec.mkPos (_srcInfoLineEnd info))
+        (Parsec.mkPos (_srcInfoColEnd info))
+    )
+    (\ info (Parsec.SourcePos fileName lineStart colStart) ->
+      info
+        { _srcInfoName = fileName
+        , _srcInfoLineEnd = unPos lineStart
+        , _srcInfoColEnd = unPos colStart
+        }
+    )
+
 {-# inline withSrcInfo #-}
 withSrcInfo :: MonadParsec e s m => m (SrcInfo -> a) -> m a
 withSrcInfo m =
   (\(Parsec.SourcePos name l c) o f (Parsec.SourcePos _ l' c') o' ->
      f $ SrcInfo name (unPos l) (unPos l') (unPos c) (unPos c') o o') <$>
-  Parsec.getPosition <*>
-  Parsec.getTokensProcessed <*>
+  Parsec.getSourcePos <*>
+  Parsec.getOffset <*>
   m <*>
-  Parsec.getPosition <*>
-  Parsec.getTokensProcessed
+  Parsec.getSourcePos <*>
+  Parsec.getOffset
 
 newline :: CharParsing m => m Newline
 newline = LF <$ char '\n' <|> char '\r' *> (CRLF <$ char '\n' <|> pure CR)
@@ -464,32 +500,25 @@ class AsLexicalError s t | s -> t where
   _LexicalError
     :: Prism'
          s
-         ( NonEmpty Parsec.SourcePos
-         , Maybe (Parsec.ErrorItem t)
-         , Set (Parsec.ErrorItem t)
-         )
+         (Parsec.ParseErrorBundle t Void)
 
 -- | Convert a concrete 'ParseError' to a value that has an instance of 'AsLexicalError'
---
--- This function is partial, because our parser will never use 'Parsec.FancyError'
-unsafeFromLexicalError
-  :: ( HasCallStack
-     , AsLexicalError s t
+fromLexicalError
+  :: ( AsLexicalError s t
      )
-  => ParseError t Void
+  => Parsec.ParseErrorBundle t Void
   -> s
-unsafeFromLexicalError (Parsec.TrivialError a b c) = _LexicalError # (a, b, c)
-unsafeFromLexicalError Parsec.FancyError{} = error "'fancy error' used in lexer"
+fromLexicalError bundle = _LexicalError # bundle
 
 {-# noinline tokenize #-}
 -- | Convert some input to a sequence of tokens. Indent and dedent tokens are not added
 -- (see 'insertTabs')
 tokenize
-  :: AsLexicalError e Char
+  :: AsLexicalError e Text.Text
   => FilePath -- ^ File name
   -> Text.Text -- ^ Input to tokenize
   -> Either e [PyToken SrcInfo]
-tokenize fp = first unsafeFromLexicalError . parse (unParsecT tokens) fp
+tokenize fp = first fromLexicalError . parse (unParsecT tokens) fp
   where
     tokens :: ParsecT Void Text.Text Identity [PyToken SrcInfo]
     tokens = many parseToken <* Parsec.eof
@@ -759,7 +788,7 @@ insertTabs a =
 -- | Tokenize an input file, inserting indent\/level\/dedent tokens in appropriate
 -- positions according to the block structure.
 tokenizeWithTabs
-  :: ( AsLexicalError s Char
+  :: ( AsLexicalError s Text.Text
      , AsTabError s SrcInfo
      , AsIncorrectDedent s SrcInfo
      )

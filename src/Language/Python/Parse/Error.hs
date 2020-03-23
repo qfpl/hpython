@@ -12,28 +12,26 @@ module Language.Python.Parse.Error
 where
 
 import Control.Lens.Prism (prism')
-import Data.Set (Set)
-import Data.List.NonEmpty (NonEmpty)
+-- import Data.Set (Set)
+import qualified Data.Text as Text
+import Data.Void (Void)
+import qualified Text.Megaparsec as Megaparsec
 import Text.Megaparsec.Error (ErrorItem(..))
 import Text.Megaparsec.Pos (SourcePos(..))
 
 import Language.Python.Internal.Lexer
   (AsLexicalError(..), AsTabError(..), AsIncorrectDedent(..))
-import Language.Python.Internal.Parse (AsParseError(..))
+import Language.Python.Internal.Parse (AsParseError(..), PyTokens())
 import Language.Python.Internal.Syntax.IR (AsIRError(..))
-import Language.Python.Internal.Token (PyToken)
+-- import Language.Python.Internal.Token (PyToken)
 
 data ParseError a
   -- | An error occured during tokenization (this is a re-packed megaparsec error)
   = LexicalError
-      (NonEmpty SourcePos)
-      (Maybe (ErrorItem Char))
-      (Set (ErrorItem Char))
+      (Megaparsec.ParseErrorBundle Text.Text Void)
   -- | An error occured during parsing (this is a re-packed megaparsec error)
   | ParseError
-      (NonEmpty SourcePos)
-      (Maybe (ErrorItem (PyToken a)))
-      (Set (ErrorItem (PyToken a)))
+      (Megaparsec.ParseErrorBundle PyTokens Void)
   -- | Tabs and spaces were used inconsistently
   | TabError a
   -- | The dedent at the end of a block doesn't match and preceding indents
@@ -55,12 +53,14 @@ data ParseError a
   | InvalidUnpacking a
   deriving (Eq, Show)
 
-instance AsLexicalError (ParseError a) Char where
+
+
+instance AsLexicalError (ParseError a) Text.Text where
   _LexicalError =
     prism'
-      (\(a, b, c) -> LexicalError a b c)
+      LexicalError
       (\case
-          LexicalError a b c -> Just (a, b ,c)
+          LexicalError bundle -> Just bundle
           _ -> Nothing)
 
 instance AsTabError (ParseError a) a where
@@ -79,12 +79,12 @@ instance AsIncorrectDedent (ParseError a) a where
           IncorrectDedent a -> Just a
           _ -> Nothing)
 
-instance AsParseError (ParseError a) (PyToken a) where
+instance AsParseError (ParseError a) PyTokens where
   _ParseError =
     prism'
-      (\(a, b, c) -> ParseError a b c)
+      ParseError
       (\case
-          ParseError a b c -> Just (a, b ,c)
+          ParseError bundle -> Just bundle
           _ -> Nothing)
 
 instance AsIRError (ParseError a) a where

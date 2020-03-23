@@ -230,3 +230,9 @@ pyTokenAnn tk =
     TkShiftRightEq a -> a
     TkDoubleStarEq a -> a
     TkDoubleSlashEq a -> a
+
+-- | Checks if the token represents a line change.
+isNewlineToken :: PyToken a -> Bool
+isNewlineToken (TkNewline _ _) = True
+isNewlineToken (TkContinued _ _) = True
+isNewlineToken _ = False

@@ -1,3 +1,4 @@
+{-# language CPP #-}
 {-# language DataKinds #-}
 {-# language FlexibleContexts #-}
 {-# language LambdaCase #-}
@@ -21,7 +22,7 @@ module Language.Python.Internal.Parse
   , PyTokens(..)
     -- * Errors
   , AsParseError(..)
-  , unsafeFromParseError
+  , fromParseError
     -- * Parsers
   , token
     -- ** Symbols
@@ -102,30 +103,31 @@ where
 
 import Control.Applicative (Alternative, (<|>), optional, many, some)
 import Control.Lens.Cons (snoc)
+import Control.Lens.Fold (lastOf)
 import Control.Lens.Getter ((^.), view)
 import Control.Lens.Prism (Prism')
 import Control.Lens.Review ((#))
 import Control.Monad (void)
 import Data.Bifunctor (first, second)
 import Data.Coerce (coerce)
+import Data.Foldable (traverse_)
 import Data.Function ((&))
 import Data.List (foldl')
-import Data.List.NonEmpty (NonEmpty, some1)
+import Data.List.NonEmpty (some1)
 import Data.Proxy (Proxy(..))
-import Data.Set (Set)
+import Data.Text (unpack)
 import Data.Void (Void)
-import GHC.Stack (HasCallStack)
 import Text.Megaparsec
-  ( (<?>), MonadParsec, Parsec, Stream(..), SourcePos(..), eof, try, lookAhead
-  , notFollowedBy
+  ( (<?>), MonadParsec, Parsec, PosState(..), Stream(..), SourcePos
+  , eof, try, lookAhead
+  , notFollowedBy, satisfy
   )
-import Text.Megaparsec.Char (satisfy)
-
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Text.Megaparsec as Megaparsec
 
-import Language.Python.Internal.Lexer (SrcInfo(..), withSrcInfo)
+import Language.Python.Internal.Lexer (SrcInfo(..), endPos, withSrcInfo, startPos)
+import qualified Language.Python.Internal.Render as Render
 import Language.Python.Internal.Syntax.IR
 import Language.Python.Internal.Token
 import Language.Python.Syntax.Ann
@@ -142,54 +144,17 @@ import Language.Python.Syntax.Strings
 import Language.Python.Syntax.Whitespace
 
 newtype PyTokens = PyTokens { unPyTokens :: [PyToken SrcInfo] }
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 instance Stream PyTokens where
   type Token PyTokens = PyToken SrcInfo
   type Tokens PyTokens = PyTokens
+
   tokenToChunk Proxy = PyTokens . pure
   tokensToChunk Proxy = PyTokens
   chunkToTokens Proxy = unPyTokens
   chunkLength Proxy = length . unPyTokens
   chunkEmpty Proxy = null . unPyTokens
-  positionAt1 Proxy _ tk =
-    let
-      ann = pyTokenAnn tk
-    in
-      SourcePos
-        (_srcInfoName ann)
-        (Megaparsec.mkPos $ _srcInfoLineStart ann)
-        (Megaparsec.mkPos $ _srcInfoColStart ann)
-  positionAtN Proxy spos (PyTokens tks) =
-    case tks of
-      [] -> spos
-      _ ->
-        let
-          ann = pyTokenAnn $ last tks
-        in
-          SourcePos
-            (_srcInfoName ann)
-            (Megaparsec.mkPos $ _srcInfoLineStart ann)
-            (Megaparsec.mkPos $ _srcInfoColStart ann)
-  advance1 Proxy _ _ tk =
-    let
-      ann = pyTokenAnn tk
-    in
-      SourcePos
-        (_srcInfoName ann)
-        (Megaparsec.mkPos $ _srcInfoLineEnd ann)
-        (Megaparsec.mkPos $ _srcInfoColEnd ann)
-  advanceN Proxy _ spos (PyTokens tks) =
-    case tks of
-      [] -> spos
-      _ ->
-        let
-          ann = pyTokenAnn $ last tks
-        in
-          SourcePos
-            (_srcInfoName ann)
-            (Megaparsec.mkPos $ _srcInfoLineEnd ann)
-            (Megaparsec.mkPos $ _srcInfoColEnd ann)
 
   take1_ (PyTokens p) =
     case p of
@@ -203,37 +168,101 @@ instance Stream PyTokens where
 
   takeWhile_ f = coerce (span f)
 
+  -- This function is called during error message generation to compute
+  -- the list of expected tokens.
+  --
+  showTokens _ =
+    unpack . Render.showTokens . NonEmpty.toList
+
+  -- This function is called during error message generation to compute
+  -- the source position and the rendered line of the error from the offset.
+  --
+  reachOffset offset posState =
+#if MIN_VERSION_megaparsec(8,0,0)
+    ( line
+#else
+    ( updatedSourcePos
+    , line
+#endif
+    , posState
+        { pstateInput      = coerce after
+        , pstateOffset     = max (pstateOffset posState) offset
+        , pstateSourcePos  = updatedSourcePos
+        , pstateLinePrefix = completeLineBefore
+        }
+    )
+    where
+      -- Split the token stream at the position given by the offset.
+      before, after :: [PyToken SrcInfo]
+      (before, after) =
+        splitAt (offset - pstateOffset posState) (unPyTokens (pstateInput posState))
+
+      -- Helper function to render a sequence of tokens as a string, restoring original layout.
+      renderAsString :: [PyToken SrcInfo] -> String
+      renderAsString =
+        unpack . Render.showRenderOutput . traverse_ Render.singleton . concatMap Render.expandIndents
+
+      -- Rendering of tokens between the focus point and the previous line change.
+      lineBefore :: String
+      lineBefore = renderAsString (reverse (takeWhile (not . isNewlineToken) (reverse before)))
+
+      -- Rendering of tokens between the focus point and the subsequent line change.
+      lineAfter :: String
+      lineAfter = renderAsString (takeWhile (not . isNewlineToken) after)
+
+      -- Cached contents of the beginning of the line from a previous call to 'reachOffset'.
+      --
+      -- We use them to prefix lineBefore if there has not been a line change in the new focus point.
+      --
+      completeLineBefore :: String
+      completeLineBefore =
+        if Megaparsec.sourceLine updatedSourcePos == Megaparsec.sourceLine (pstateSourcePos posState)
+          then pstateLinePrefix posState ++ lineBefore
+          else lineBefore
+
+      -- Megaparsec documentation states that empty lines should be replaced by the string
+      -- "<empty line>" and TAB characters should be expanded, so we do that here.
+      --
+      line :: String
+      line =
+        case completeLineBefore ++ lineAfter of
+          "" -> "<empty line>"
+          xs -> xs
+
+      updatedSourcePos :: SourcePos
+      updatedSourcePos =
+        case after of
+          [] -> maybe
+                 (pstateSourcePos posState) -- use old source pos if we have nothing better
+                 (\ t -> pyTokenAnn t ^. endPos) -- use end position of previous token if we move past end
+                 (lastOf traverse before)
+          (t : _) -> pyTokenAnn t ^. startPos -- use start position of next token normally
+
 class AsParseError s t | s -> t where
   _ParseError
     :: Prism'
          s
-         ( NonEmpty SourcePos
-         , Maybe (Megaparsec.ErrorItem t)
-         , Set (Megaparsec.ErrorItem t)
-         )
+         (Megaparsec.ParseErrorBundle t Void)
 
 -- | Convert a concrete 'Megaparsec.ParseError' to a value that has an instance of 'AsParseError'
---
--- This function is partial because our parser will never use 'Megaparsec.FancyError'
-unsafeFromParseError
-  :: (HasCallStack, AsParseError s t)
-  => Megaparsec.ParseError t e
+fromParseError
+  :: (AsParseError s t)
+  => Megaparsec.ParseErrorBundle t Void
   -> s
-unsafeFromParseError Megaparsec.FancyError{} = error "there are none of these"
-unsafeFromParseError (Megaparsec.TrivialError pos a b) = _ParseError # (pos, a, b)
+fromParseError bundle = _ParseError # bundle
 
 type Parser = Parsec Void PyTokens
 
 -- | Run a parser on some input
 {-# inline runParser #-}
 runParser
-  :: AsParseError e (PyToken SrcInfo)
+  :: AsParseError e PyTokens
   => FilePath -- ^ File name
   -> Parser a -- ^ Parser
   -> [PyToken SrcInfo] -- ^ Input to parse
   -> Either e a
 runParser file p input =
-  first unsafeFromParseError $ Megaparsec.parse p file (PyTokens input)
+  first fromParseError $ Megaparsec.parse p file (PyTokens input)
 
 eol :: MonadParsec e PyTokens m => m Newline
 eol =

@@ -1,3 +1,4 @@
+{-# language CPP #-}
 {-# language DataKinds #-}
 {-# language RankNTypes #-}
 {-# language ScopedTypeVariables #-}
@@ -11,6 +12,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Semigroup (Semigroup)
 import Data.Text (Text)
 import Data.Validation (Validation(..), _Failure)
+import qualified Text.Megaparsec as Megaparsec
 import Text.Megaparsec.Pos (SourcePos(..), mkPos)
 
 import Language.Python.Internal.Lexer
@@ -128,7 +130,20 @@ shouldBeParseError
   -> m ()
 shouldBeParseError line col tk res =
   case res ^? _Failure.folded._ParseError of
-    Just (srcPos :| _, Just (Tokens (errorItem :| [])), _) -> do
+    Just
+      (Megaparsec.ParseErrorBundle
+        (  Megaparsec.TrivialError offset (Just (Tokens (errorItem :| []))) _
+        :| _
+        )
+        posState
+      ) -> do
+      let
+#if MIN_VERSION_megaparsec(8,0,0)
+        Megaparsec.PosState { Megaparsec.pstateSourcePos = srcPos } =
+          Megaparsec.reachOffsetNoLine offset posState
+#else
+        (srcPos, _) = Megaparsec.reachOffsetNoLine offset posState
+#endif
       sourceLine srcPos === mkPos line
       sourceColumn srcPos === mkPos col
 
